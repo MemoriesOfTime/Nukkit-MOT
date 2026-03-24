@@ -52,14 +52,18 @@ public class UpdateClientInputLocksPacket extends DataPacket {
     public void decode() {
         this.lockComponentData = (int) this.getUnsignedVarInt();
         this.inputLockType = InputLockType.fromBitSet(this.lockComponentData);
-        this.serverPosition = this.getVector3f();
+        if (this.protocol < ProtocolInfo.v1_26_10) {
+            this.serverPosition = this.getVector3f();
+        }
     }
 
     @Override
     public void encode() {
         this.reset();
         this.putUnsignedVarInt(InputLockType.filterBitSet(this.protocol, this.resolveLockComponentData()));
-        this.putVector3f(this.serverPosition);
+        if (this.protocol < ProtocolInfo.v1_26_10) {
+            this.putVector3f(this.serverPosition);
+        }
     }
 
     private int resolveLockComponentData() {

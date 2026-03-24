@@ -42,6 +42,7 @@ public class EntityPacketRegressionTest extends AbstractPacketRegressionTest {
     void testAnimateEntityPacket(int protocolVersion) {
         var nukkitPacket = new AnimateEntityPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.animation = "animation.player.attack.rotations";
         nukkitPacket.nextState = "default";
         nukkitPacket.stopExpression = "query.any_animation_finished";
@@ -66,6 +67,7 @@ public class EntityPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetEntityDataPacket(int protocolVersion) {
         var nukkitPacket = new SetEntityDataPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.eid = 42;
         nukkitPacket.metadata = new EntityMetadata();
         if (protocolVersion >= ProtocolInfo.v1_16_100) {
@@ -86,6 +88,7 @@ public class EntityPacketRegressionTest extends AbstractPacketRegressionTest {
     void testAddEntityPacket(int protocolVersion) {
         var nukkitPacket = new AddEntityPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.entityUniqueId = 100;
         nukkitPacket.entityRuntimeId = 100;
         nukkitPacket.id = "minecraft:zombie";
@@ -124,6 +127,7 @@ public class EntityPacketRegressionTest extends AbstractPacketRegressionTest {
     void testAddItemEntityPacket(int protocolVersion) {
         var nukkitPacket = new AddItemEntityPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.entityUniqueId = 200;
         nukkitPacket.entityRuntimeId = 200;
         nukkitPacket.item = Item.AIR_ITEM;

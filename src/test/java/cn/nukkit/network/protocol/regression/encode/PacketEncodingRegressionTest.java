@@ -46,6 +46,7 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.network.protocol.PlayStatusPacket nukkitPacket =
                 new cn.nukkit.network.protocol.PlayStatusPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.status = cn.nukkit.network.protocol.PlayStatusPacket.LOGIN_SUCCESS;
         nukkitPacket.encode();
 
@@ -61,6 +62,7 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.network.protocol.SetTimePacket nukkitPacket =
                 new cn.nukkit.network.protocol.SetTimePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.time = 6000;
         nukkitPacket.encode();
 
@@ -76,6 +78,7 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.network.protocol.ChunkRadiusUpdatedPacket nukkitPacket =
                 new cn.nukkit.network.protocol.ChunkRadiusUpdatedPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.radius = 8;
         nukkitPacket.encode();
 
@@ -91,6 +94,7 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.network.protocol.DisconnectPacket nukkitPacket =
                 new cn.nukkit.network.protocol.DisconnectPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.hideDisconnectionScreen = false;
         nukkitPacket.message = "Server closed";
         nukkitPacket.encode();
@@ -108,6 +112,7 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.network.protocol.DisconnectPacket nukkitPacket =
                 new cn.nukkit.network.protocol.DisconnectPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.reason = DisconnectFailReason.UNKNOWN; // ordinal 0, safe across both implementations
         nukkitPacket.hideDisconnectionScreen = false;
         nukkitPacket.message = "Server closed";
@@ -133,6 +138,7 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.network.protocol.TransferPacket nukkitPacket =
                 new cn.nukkit.network.protocol.TransferPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.address = "127.0.0.1";
         nukkitPacket.port = 19132;
         if (protocolVersion >= ProtocolInfo.v1_21_30) {
@@ -158,6 +164,7 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.network.protocol.MovePlayerPacket nukkitPacket =
                 new cn.nukkit.network.protocol.MovePlayerPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.eid = 42;
         nukkitPacket.x = 100.5f;
         nukkitPacket.y = 64.0f;
@@ -197,6 +204,7 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.network.protocol.SetEntityMotionPacket nukkitPacket =
                 new cn.nukkit.network.protocol.SetEntityMotionPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.eid = 7;
         nukkitPacket.motionX = 0.5f;
         nukkitPacket.motionY = 1.0f;
@@ -224,6 +232,7 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.network.protocol.TextPacket nukkitPacket =
                 new cn.nukkit.network.protocol.TextPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.type = cn.nukkit.network.protocol.TextPacket.TYPE_RAW;
         nukkitPacket.isLocalized = false;
         nukkitPacket.message = "Hello World";

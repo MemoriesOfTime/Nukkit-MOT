@@ -135,6 +135,14 @@ public abstract class Particle extends Vector3 {
      * @since v766
      */
     public static final int TYPE_EYEBLOSSOM_CLOSE = dynamic(97);
+    /**
+     * @since v944
+     */
+    public static final int TYPE_PAUSE_MOB_GROWTH = dynamic(99);
+    /**
+     * @since v944
+     */
+    public static final int TYPE_RESET_MOB_GROWTH = dynamic(100);
 
     public Particle() {
         super(0, 0, 0);

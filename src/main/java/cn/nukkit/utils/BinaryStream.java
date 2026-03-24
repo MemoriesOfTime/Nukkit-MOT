@@ -1417,6 +1417,10 @@ public class BinaryStream {
         return new BlockVector3(this.getVarInt(), (int) this.getUnsignedVarInt(), this.getVarInt());
     }
 
+    public BlockVector3 getBlockVector3(GameVersion version) {
+        return new BlockVector3(this.getVarInt(), version.getProtocol() >= GameVersion.V1_26_10.getProtocol() ? this.getVarInt() : (int) this.getUnsignedVarInt(), this.getVarInt());
+    }
+
     public BlockVector3 getSignedBlockPosition() {
         return new BlockVector3(getVarInt(), getVarInt(), getVarInt());
     }
@@ -1431,9 +1435,23 @@ public class BinaryStream {
         this.putBlockVector3(v.x, v.y, v.z);
     }
 
+    public void putBlockVector3(GameVersion version, BlockVector3 v) {
+        this.putBlockVector3(version, v.x, v.y, v.z);
+    }
+
     public void putBlockVector3(int x, int y, int z) {
         this.putVarInt(x);
         this.putUnsignedVarInt(y);
+        this.putVarInt(z);
+    }
+
+    public void putBlockVector3(GameVersion version, int x, int y, int z) {
+        this.putVarInt(x);
+        if (version.getProtocol() >= GameVersion.V1_26_10.getProtocol()) {
+            this.putVarInt(y);
+        } else {
+            this.putUnsignedVarInt(y);
+        }
         this.putVarInt(z);
     }
 

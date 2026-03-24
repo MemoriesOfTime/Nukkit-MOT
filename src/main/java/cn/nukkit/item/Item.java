@@ -552,9 +552,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         int protocol = gameVersion.getProtocol();
         JsonObject root;
         JsonArray itemsArray;
-        String file = "CreativeItems/creative_items_" + protocol + ".json";
-
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(file)) {
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("creative_items.json")) {
             root = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject();
             itemsArray = root.getAsJsonArray("items");
             if (itemsArray.isEmpty()) {
@@ -887,46 +885,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             }
         }
 
-        // Register custom item in each version's RuntimeItemMapping
-        registerCustomItemRuntime(customItem, GameVersion.V1_16_100);
-        registerCustomItemRuntime(customItem, GameVersion.V1_17_0);
-        registerCustomItemRuntime(customItem, GameVersion.V1_17_10);
-        registerCustomItemRuntime(customItem, GameVersion.V1_18_0);
-        registerCustomItemRuntime(customItem, GameVersion.V1_18_10);
-        registerCustomItemRuntime(customItem, GameVersion.V1_18_30);
-        registerCustomItemRuntime(customItem, GameVersion.V1_19_0);
-        registerCustomItemRuntime(customItem, GameVersion.V1_19_10);
-        registerCustomItemRuntime(customItem, GameVersion.V1_19_50);
-        registerCustomItemRuntime(customItem, GameVersion.V1_19_60);
-        registerCustomItemRuntime(customItem, GameVersion.V1_19_70);
-        registerCustomItemRuntime(customItem, GameVersion.V1_19_80);
-        registerCustomItemRuntime(customItem, GameVersion.V1_20_0);
-        registerCustomItemRuntime(customItem, GameVersion.V1_20_10);
-        registerCustomItemRuntime(customItem, GameVersion.V1_20_30);
-        registerCustomItemRuntime(customItem, GameVersion.V1_20_40);
-        registerCustomItemRuntime(customItem, GameVersion.V1_20_50);
-        registerCustomItemRuntime(customItem, GameVersion.V1_20_60);
-        registerCustomItemRuntime(customItem, GameVersion.V1_20_70);
-        registerCustomItemRuntime(customItem, GameVersion.V1_20_80);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_0);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_20);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_30);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_40);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_50);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_60);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_70);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_80);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_90);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_100);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_110);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_120);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_130);
-        registerCustomItemRuntime(customItem, GameVersion.V1_26_0);
-
-        // NetEase
-        registerCustomItemRuntime(customItem, GameVersion.V1_20_50_NETEASE);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_2_NETEASE);
-        registerCustomItemRuntime(customItem, GameVersion.V1_21_50_NETEASE);
+        // Register custom item in all RuntimeItemMappings
+        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+            mapping.registerCustomItem(customItem);
+        }
 
         // Only add creative item once; runtime filtering via isSupportedOn per protocol
         if (addCreativeItem) {
@@ -939,9 +901,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return new OK<Void>(true);
     }
 
-    private static void registerCustomItemRuntime(CustomItem item, GameVersion protocol) {
-        RuntimeItems.getMapping(protocol).registerCustomItem(item);
-    }
 
     public static void deleteCustomItem(String namespaceId) {
         if (CUSTOM_ITEMS.containsKey(namespaceId)) {
@@ -950,55 +909,16 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             CUSTOM_ITEM_DEFINITIONS.remove(namespaceId);
             PENDING_CREATIVE_ITEMS.remove(namespaceId);
 
-            // Remove from each version's RuntimeItemMapping
-            deleteCustomItemRuntime(customItem, GameVersion.V1_16_100);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_17_0);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_17_10);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_18_0);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_18_10);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_18_30);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_19_0);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_19_10);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_19_50);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_19_60);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_19_70);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_19_80);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_20_0);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_20_10);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_20_30);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_20_40);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_20_50);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_20_60);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_20_70);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_20_80);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_0);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_20);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_30);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_40);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_50);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_60);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_70);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_80);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_90);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_100);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_110);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_120);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_130);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_26_0);
-
-            // NetEase
-            deleteCustomItemRuntime(customItem, GameVersion.V1_20_50_NETEASE);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_2_NETEASE);
-            deleteCustomItemRuntime(customItem, GameVersion.V1_21_50_NETEASE);
+            // Remove from all RuntimeItemMappings
+            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                mapping.deleteCustomItem((CustomItem) customItem);
+            }
 
             // Remove from creative items
             removeCreativeItem(customItem);
         }
     }
 
-    private static void deleteCustomItemRuntime(Item item, GameVersion protocol) {
-        RuntimeItems.getMapping(protocol).deleteCustomItem((CustomItem) item);
-    }
 
     public static HashMap<String, Supplier<? extends Item>> getCustomItems() {
         return new HashMap<>(CUSTOM_ITEMS);

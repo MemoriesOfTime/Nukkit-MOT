@@ -50,6 +50,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testToastRequestPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.ToastRequestPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.title = "Achievement";
         nukkitPacket.content = "You got it!";
         nukkitPacket.encode();
@@ -66,6 +67,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testTickSyncPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.TickSyncPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setRequestTimestamp(12345L);
         nukkitPacket.setResponseTimestamp(12346L);
         nukkitPacket.encode();
@@ -82,6 +84,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testCameraShakePacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.CameraShakePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.intensity = 0.5f;
         nukkitPacket.duration = 1.0f;
         nukkitPacket.shakeType = cn.nukkit.network.protocol.CameraShakePacket.CameraShakeType.POSITIONAL;
@@ -102,6 +105,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testNPCDialoguePacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.NPCDialoguePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setUniqueEntityId(100L);
         nukkitPacket.setAction(cn.nukkit.network.protocol.NPCDialoguePacket.Action.OPEN);
         nukkitPacket.setDialogue("Hello!");
@@ -126,6 +130,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testSetDisplayObjectivePacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.SetDisplayObjectivePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.displaySlot = DisplaySlot.SIDEBAR;
         nukkitPacket.objectiveId = "obj1";
         nukkitPacket.displayName = "Test Objective";
@@ -155,6 +160,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testPositionTrackingDBClientRequestPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.PositionTrackingDBClientRequestPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setAction(cn.nukkit.network.protocol.PositionTrackingDBClientRequestPacket.Action.QUERY);
         nukkitPacket.setTrackingId(42);
         nukkitPacket.encode();
@@ -173,6 +179,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testPositionTrackingDBServerBroadcastPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.PositionTrackingDBServerBroadcastPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setAction(cn.nukkit.network.protocol.PositionTrackingDBServerBroadcastPacket.Action.UPDATE);
         nukkitPacket.setTrackingId(42);
         nukkitPacket.encode();
@@ -195,6 +202,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testJigsawStructureDataPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.JigsawStructureDataPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.nbt = new CompoundTag("")
                 .putString("name", "test")
                 .putInt("dimension", 0);
@@ -213,6 +221,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testServerboundDiagnosticsPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.ServerboundDiagnosticsPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.avgFps = 60.0f;
         nukkitPacket.avgServerSimTickTimeMS = 5.0f;
         nukkitPacket.avgClientSimTickTimeMS = 3.0f;
@@ -244,6 +253,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testScriptCustomEventPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.ScriptCustomEventPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.eventName = "custom:test_event";
         nukkitPacket.eventData = "test_payload".getBytes(StandardCharsets.UTF_8);
         nukkitPacket.encode();
@@ -266,6 +276,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testCameraAimAssistActorPriorityPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.CameraAimAssistActorPriorityPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.priorities.add(new AimAssistActorPriorityData(0, 1, 2, 100));
         nukkitPacket.priorities.add(new AimAssistActorPriorityData(1, 0, 3, 50));
         nukkitPacket.encode();
@@ -291,6 +302,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testCameraSplinePacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.CameraSplinePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
 
         var curve = new ArrayList<Vector3f>();
         curve.add(new Vector3f(0, 0, 0));
@@ -336,6 +348,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
     void testVoxelShapesPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.VoxelShapesPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
 
         var storage = new ArrayList<Short>();
         storage.add((short) 1);

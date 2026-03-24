@@ -636,6 +636,13 @@ public class Network {
                 .registerPacket(ProtocolInfo.VOXEL_SHAPES_PACKET, VoxelShapesPacket.class)
                 .registerPacket(ProtocolInfo.CAMERA_SPLINE_PACKET, CameraSplinePacket.class)
                 .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_ACTOR_PRIORITY_PACKET, CameraAimAssistActorPriorityPacket.class)
+                // v944 packets
+                .registerPacket(ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET, ResourcePacksReadyForValidationPacket.class)
+                .registerPacket(ProtocolInfo.LOCATOR_BAR_PACKET, LocatorBarPacket.class)
+                .registerPacket(ProtocolInfo.PARTY_CHANGED_PACKET, PartyChangedPacket.class)
+                .registerPacket(ProtocolInfo.SERVERBOUND_DATA_DRIVEN_SCREEN_CLOSED_PACKET, ServerboundDataDrivenScreenClosedPacket.class)
+                .registerPacket(ProtocolInfo.SYNC_WORLD_CLOCKS_PACKET, SyncWorldClocksPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_ATTRIBUTE_LAYER_SYNC_PACKET, ClientboundAttributeLayerSyncPacket.class)
                 .build();
     }
 

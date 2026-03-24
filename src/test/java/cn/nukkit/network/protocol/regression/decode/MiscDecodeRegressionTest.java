@@ -1407,9 +1407,11 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         UpdateClientInputLocksPacket nk = crossEncode(cb, UpdateClientInputLocksPacket::new, protocol);
 
         assertEquals(0, nk.lockComponentData);
-        assertEquals(1.5f, nk.serverPosition.x, 0.001f);
-        assertEquals(64.5f, nk.serverPosition.y, 0.001f);
-        assertEquals(-2.5f, nk.serverPosition.z, 0.001f);
+        if (protocol < ProtocolInfo.v1_26_10) {
+            assertEquals(1.5f, nk.serverPosition.x, 0.001f);
+            assertEquals(64.5f, nk.serverPosition.y, 0.001f);
+            assertEquals(-2.5f, nk.serverPosition.z, 0.001f);
+        }
     }
 
     // ==================== UnlockedRecipesPacket ====================
@@ -2485,6 +2487,147 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
 
     private static String encodeBase64(String value) {
         return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    // ==================== v944 Packets ====================
+
+    static Stream<Arguments> versionsFrom944() {
+        return filteredVersions(ProtocolInfo.v1_26_10);
+    }
+
+    // ==================== PartyChangedPacket ====================
+
+    @ParameterizedTest(name = "PartyChangedPacket decode v{0}")
+    @MethodSource("versionsFrom944")
+    void partyChangedDecode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PartyChangedPacket();
+        cb.setPartyId("test-party-456");
+
+        PartyChangedPacket nk = crossEncode(cb, PartyChangedPacket::new, protocol);
+
+        assertEquals("test-party-456", nk.partyId);
+    }
+
+    // ==================== ServerboundDataDrivenScreenClosedPacket ====================
+
+    @ParameterizedTest(name = "ServerboundDataDrivenScreenClosedPacket decode v{0}")
+    @MethodSource("versionsFrom944")
+    void serverboundDataDrivenScreenClosedDecode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerboundDataDrivenScreenClosedPacket();
+        cb.setFormId(99);
+        cb.setCloseReason(org.cloudburstmc.protocol.bedrock.packet.ServerboundDataDrivenScreenClosedPacket.CloseReason.CLIENT_CANCELED);
+
+        ServerboundDataDrivenScreenClosedPacket nk = crossEncode(cb, ServerboundDataDrivenScreenClosedPacket::new, protocol);
+
+        assertEquals(99, nk.formId);
+        assertEquals(cn.nukkit.network.protocol.ServerboundDataDrivenScreenClosedPacket.CloseReason.CLIENT_CANCELED, nk.closeReason);
+    }
+
+    @ParameterizedTest(name = "ServerboundDataDrivenScreenClosedPacket INVALID_FORM decode v{0}")
+    @MethodSource("versionsFrom944")
+    void serverboundDataDrivenScreenClosedInvalidFormDecode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerboundDataDrivenScreenClosedPacket();
+        cb.setFormId(50);
+        cb.setCloseReason(org.cloudburstmc.protocol.bedrock.packet.ServerboundDataDrivenScreenClosedPacket.CloseReason.INVALID_FORM);
+
+        ServerboundDataDrivenScreenClosedPacket nk = crossEncode(cb, ServerboundDataDrivenScreenClosedPacket::new, protocol);
+
+        assertEquals(50, nk.formId);
+        assertEquals(cn.nukkit.network.protocol.ServerboundDataDrivenScreenClosedPacket.CloseReason.INVALID_FORM, nk.closeReason);
+    }
+
+    // ==================== LocatorBarPacket ====================
+
+    @ParameterizedTest(name = "LocatorBarPacket decode v{0}")
+    @MethodSource("versionsFrom944")
+    void locatorBarDecode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.LocatorBarPacket();
+
+        var cbWaypoint = new org.cloudburstmc.protocol.bedrock.data.LocatorBarWaypoint();
+        cbWaypoint.setUpdateFlag(2);
+        cbWaypoint.setVisible(true);
+        cbWaypoint.setWorldPosition(new org.cloudburstmc.protocol.bedrock.data.LocatorBarWaypoint.WorldPosition(
+                org.cloudburstmc.math.vector.Vector3f.from(50.0f, 32.0f, 100.0f), 1));
+        cbWaypoint.setTextureId(10);
+        cbWaypoint.setColor(java.awt.Color.BLUE);
+        cbWaypoint.setClientPositionAuthority(true);
+        cbWaypoint.setEntityUniqueId(12345L);
+
+        var payload = new org.cloudburstmc.protocol.bedrock.packet.LocatorBarPacket.Payload(
+                org.cloudburstmc.protocol.bedrock.packet.LocatorBarPacket.Action.UPDATE,
+                UUID.fromString("87654321-4321-4321-4321-cba987654321"),
+                cbWaypoint);
+
+        cb.getWaypoints().add(payload);
+
+        LocatorBarPacket nk = crossEncode(cb, LocatorBarPacket::new, protocol);
+
+        assertEquals(1, nk.waypoints.size());
+        var nkPayload = nk.waypoints.get(0);
+        assertEquals(cn.nukkit.network.protocol.LocatorBarPacket.Action.UPDATE, nkPayload.actionFlag);
+        assertEquals(UUID.fromString("87654321-4321-4321-4321-cba987654321"), nkPayload.groupHandle);
+        assertEquals(2, nkPayload.waypoint.updateFlag);
+        assertTrue(nkPayload.waypoint.visible);
+        assertEquals(50.0f, nkPayload.waypoint.worldPosition.position.getX(), 0.001f);
+        assertEquals(32.0f, nkPayload.waypoint.worldPosition.position.getY(), 0.001f);
+        assertEquals(100.0f, nkPayload.waypoint.worldPosition.position.getZ(), 0.001f);
+        assertEquals(1, nkPayload.waypoint.worldPosition.dimension);
+        assertEquals(10, nkPayload.waypoint.textureId);
+        assertEquals(java.awt.Color.BLUE.getRGB(), nkPayload.waypoint.color.getRGB());
+        assertTrue(nkPayload.waypoint.clientPositionAuthority);
+        assertEquals(12345L, (long) nkPayload.waypoint.entityUniqueId);
+    }
+
+    // ==================== SyncWorldClocksPacket ====================
+
+    @ParameterizedTest(name = "SyncWorldClocksPacket SyncState decode v{0}")
+    @MethodSource("versionsFrom944")
+    void syncWorldClocksSyncStateDecode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.SyncWorldClocksPacket();
+
+        var clockData = new java.util.ArrayList<org.cloudburstmc.protocol.bedrock.data.clock.SyncWorldClockStateData>();
+        clockData.add(new org.cloudburstmc.protocol.bedrock.data.clock.SyncWorldClockStateData(1, 6000, false));
+        clockData.add(new org.cloudburstmc.protocol.bedrock.data.clock.SyncWorldClockStateData(2, 12000, true));
+
+        cb.setData(new org.cloudburstmc.protocol.bedrock.data.clock.SyncStateData(clockData));
+
+        SyncWorldClocksPacket nk = crossEncode(cb, SyncWorldClocksPacket::new, protocol);
+
+        assertNotNull(nk.data);
+        assertTrue(nk.data instanceof cn.nukkit.network.protocol.types.clock.SyncStateData);
+        var syncData = (cn.nukkit.network.protocol.types.clock.SyncStateData) nk.data;
+        assertEquals(2, syncData.clockData.size());
+        assertEquals(1, syncData.clockData.get(0).clockId);
+        assertEquals(6000, syncData.clockData.get(0).time);
+        assertFalse(syncData.clockData.get(0).paused);
+        assertEquals(2, syncData.clockData.get(1).clockId);
+        assertEquals(12000, syncData.clockData.get(1).time);
+        assertTrue(syncData.clockData.get(1).paused);
+    }
+
+    // ==================== ClientboundAttributeLayerSyncPacket ====================
+
+    @ParameterizedTest(name = "ClientboundAttributeLayerSyncPacket RemoveEnvAttrs decode v{0}")
+    @MethodSource("versionsFrom944")
+    void clientboundAttributeLayerSyncRemoveEnvAttrsDecode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ClientboundAttributeLayerSyncPacket();
+
+        cb.setData(new org.cloudburstmc.protocol.bedrock.data.attributelayer.RemoveEnvironmentAttributesData(
+                "my_layer",
+                0,
+                List.of("attr_a", "attr_b")
+        ));
+
+        ClientboundAttributeLayerSyncPacket nk = crossEncode(cb, ClientboundAttributeLayerSyncPacket::new, protocol);
+
+        assertNotNull(nk.data);
+        assertTrue(nk.data instanceof cn.nukkit.network.protocol.types.attributelayer.RemoveEnvironmentAttributesData);
+        var removeData = (cn.nukkit.network.protocol.types.attributelayer.RemoveEnvironmentAttributesData) nk.data;
+        assertEquals("my_layer", removeData.layerName);
+        assertEquals(0, removeData.dimension);
+        assertEquals(2, removeData.attributes.size());
+        assertEquals("attr_a", removeData.attributes.get(0));
+        assertEquals("attr_b", removeData.attributes.get(1));
     }
 
 }

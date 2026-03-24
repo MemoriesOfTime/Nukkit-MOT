@@ -1,6 +1,5 @@
 package cn.nukkit.network.protocol.types.camera;
 
-import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,6 +21,29 @@ public class CameraSplineInstruction {
      */
     private List<SplineProgressOption> progressKeyFrames;
     private List<SplineRotationOption> rotationOption;
+    /**
+     * @since v944
+     */
+    private String splineIdentifier;
+    /**
+     * @since v944
+     */
+    private boolean loadFromJson;
+
+    /**
+     * Constructor without v944 fields for backwards compatibility.
+     */
+    @Deprecated(forRemoval = true)
+    public CameraSplineInstruction(float totalTime, CameraSplineType type, List<Vector3f> curve,
+                                   List<SplineProgressOption> progressKeyFrames, List<SplineRotationOption> rotationOption) {
+        this.totalTime = totalTime;
+        this.type = type;
+        this.curve = curve;
+        this.progressKeyFrames = progressKeyFrames;
+        this.rotationOption = rotationOption;
+        this.splineIdentifier = "";
+        this.loadFromJson = false;
+    }
 
     /**
      * Progress option with value, time and optional easing function.
@@ -56,5 +78,19 @@ public class CameraSplineInstruction {
 
         private Vector3f keyFrameValues;
         private float keyFrameTimes;
+        /**
+         * @since v944
+         */
+        private CameraEase ease;
+
+        /**
+         * Constructor without ease for backwards compatibility.
+         */
+        @Deprecated(forRemoval = true)
+        public SplineRotationOption(Vector3f keyFrameValues, float keyFrameTimes) {
+            this.keyFrameValues = keyFrameValues;
+            this.keyFrameTimes = keyFrameTimes;
+            this.ease = CameraEase.LINEAR;
+        }
     }
 }

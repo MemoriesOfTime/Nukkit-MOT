@@ -106,6 +106,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetSpawnPositionPacketFrom407(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.SetSpawnPositionPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.spawnType = cn.nukkit.network.protocol.SetSpawnPositionPacket.TYPE_WORLD_SPAWN;
         nukkitPacket.x = 100;
         nukkitPacket.y = 64;
@@ -128,6 +129,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetSpawnPositionPacketPre407(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.SetSpawnPositionPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.spawnType = cn.nukkit.network.protocol.SetSpawnPositionPacket.TYPE_WORLD_SPAWN;
         nukkitPacket.x = 100;
         nukkitPacket.y = 64;
@@ -150,6 +152,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testChangeDimensionPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.ChangeDimensionPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.dimension = 1; // Nether
         nukkitPacket.x = 100.5f;
         nukkitPacket.y = 64.0f;
@@ -177,6 +180,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testRespawnPacketFrom388(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.RespawnPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.x = 100.5f;
         nukkitPacket.y = 64.0f;
         nukkitPacket.z = 200.5f;
@@ -199,6 +203,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testRespawnPacketPre388(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.RespawnPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.x = 100.5f;
         nukkitPacket.y = 64.0f;
         nukkitPacket.z = 200.5f;
@@ -219,6 +224,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testContainerClosePacketPre419(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.ContainerClosePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.windowId = 5;
         nukkitPacket.encode();
 
@@ -233,6 +239,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testContainerClosePacketFrom419(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.ContainerClosePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.windowId = 5;
         nukkitPacket.wasServerInitiated = true;
         nukkitPacket.encode();
@@ -249,6 +256,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testContainerClosePacketFrom685(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.ContainerClosePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.windowId = 5;
         nukkitPacket.wasServerInitiated = true;
         nukkitPacket.encode();
@@ -267,6 +275,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testStopSoundPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.StopSoundPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.name = "random.click";
         nukkitPacket.stopAll = true;
         if (protocolVersion >= ProtocolInfo.v1_21_20) {
@@ -288,6 +297,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetEntityLinkPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.SetEntityLinkPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.vehicleUniqueId = 10;
         nukkitPacket.riderUniqueId = 20;
         nukkitPacket.type = cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
@@ -315,6 +325,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testMoveEntityAbsolutePacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.MoveEntityAbsolutePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.eid = 42;
         nukkitPacket.x = 100.5;
         nukkitPacket.y = 64.0;
@@ -345,6 +356,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetTitlePacketPre448(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.SetTitlePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.type = cn.nukkit.network.protocol.SetTitlePacket.TYPE_TITLE;
         nukkitPacket.text = "Hello";
         nukkitPacket.fadeInTime = 10;
@@ -367,6 +379,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetTitlePacketFrom448(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.SetTitlePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.type = cn.nukkit.network.protocol.SetTitlePacket.TYPE_TITLE;
         nukkitPacket.text = "Hello";
         nukkitPacket.fadeInTime = 10;
@@ -393,6 +406,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetTitlePacketFrom712(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.SetTitlePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.type = cn.nukkit.network.protocol.SetTitlePacket.TYPE_TITLE;
         nukkitPacket.text = "Hello";
         nukkitPacket.fadeInTime = 10;
@@ -423,6 +437,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testEmotePacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.EmotePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.runtimeId = 42;
         nukkitPacket.emoteID = "emote-test-id";
         nukkitPacket.flags = cn.nukkit.network.protocol.EmotePacket.FLAG_SERVER;
@@ -449,6 +464,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testNetworkChunkPublisherUpdatePacketFrom544(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.NetworkChunkPublisherUpdatePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.position = new BlockVector3(100, 64, 200);
         nukkitPacket.radius = 128;
         nukkitPacket.encode();
@@ -467,6 +483,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testNetworkChunkPublisherUpdatePacketPre544(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.NetworkChunkPublisherUpdatePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.position = new BlockVector3(100, 64, 200);
         nukkitPacket.radius = 128;
         nukkitPacket.encode();
@@ -487,6 +504,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testNetworkSettingsPacketFrom554(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.NetworkSettingsPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.compressionThreshold = 256;
         nukkitPacket.compressionAlgorithm = PacketCompressionAlgorithm.ZLIB;
         nukkitPacket.clientThrottleEnabled = false;
@@ -511,6 +529,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetScorePacketFake(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.SetScorePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.action = cn.nukkit.network.protocol.SetScorePacket.Action.SET;
 
         var info = new cn.nukkit.network.protocol.SetScorePacket.ScoreInfo(
@@ -536,6 +555,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetScorePacketRemove(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.SetScorePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.action = cn.nukkit.network.protocol.SetScorePacket.Action.REMOVE;
 
         var info = new cn.nukkit.network.protocol.SetScorePacket.ScoreInfo(
@@ -579,6 +599,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testHurtArmorPacketPre428(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.HurtArmorPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.damage = 10;
         nukkitPacket.encode();
 
@@ -593,6 +614,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testHurtArmorPacketFrom428(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.HurtArmorPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.cause = 1;
         nukkitPacket.damage = 10;
         nukkitPacket.encode();
@@ -609,6 +631,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testHurtArmorPacketFrom475(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.HurtArmorPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.cause = 1;
         nukkitPacket.damage = 10;
         nukkitPacket.armorSlots = 0b1111L; // all armor slots
@@ -629,6 +652,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testBossEventPacketShow(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.BossEventPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.bossEid = 100;
         nukkitPacket.type = cn.nukkit.network.protocol.BossEventPacket.TYPE_SHOW;
         nukkitPacket.title = "Dragon Boss";
@@ -652,6 +676,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testBossEventPacketHealthPercent(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.BossEventPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.bossEid = 100;
         nukkitPacket.type = cn.nukkit.network.protocol.BossEventPacket.TYPE_HEALTH_PERCENT;
         nukkitPacket.healthPercent = 0.5f;
@@ -670,6 +695,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testBossEventPacketTitle(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.BossEventPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.bossEid = 100;
         nukkitPacket.type = cn.nukkit.network.protocol.BossEventPacket.TYPE_TITLE;
         nukkitPacket.title = "New Title";
@@ -688,6 +714,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testBossEventPacketHide(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.BossEventPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.bossEid = 100;
         nukkitPacket.type = cn.nukkit.network.protocol.BossEventPacket.TYPE_HIDE;
         nukkitPacket.encode();
@@ -706,6 +733,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testPlayerActionPacketPre527(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.PlayerActionPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.entityId = 100;
         nukkitPacket.action = cn.nukkit.network.protocol.PlayerActionPacket.ACTION_JUMP;
         nukkitPacket.x = 10;
@@ -730,6 +758,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testPlayerActionPacketFrom527(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.PlayerActionPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.entityId = 100;
         nukkitPacket.action = cn.nukkit.network.protocol.PlayerActionPacket.ACTION_START_BREAK;
         nukkitPacket.x = 10;
@@ -772,6 +801,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testCameraAimAssistPacketPre766(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.CameraAimAssistPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setViewAngle(new Vector2f(45.0f, 90.0f));
         nukkitPacket.setDistance(10.5f);
         nukkitPacket.setTargetMode(cn.nukkit.network.protocol.CameraAimAssistPacket.TargetMode.ANGLE);
@@ -793,6 +823,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testCameraAimAssistPacketFrom766(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.CameraAimAssistPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setPresetId("aim_preset_1");
         nukkitPacket.setViewAngle(new Vector2f(45.0f, 90.0f));
         nukkitPacket.setDistance(10.5f);
@@ -816,6 +847,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testCameraAimAssistPacketFrom827(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.CameraAimAssistPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setPresetId("aim_preset_2");
         nukkitPacket.setViewAngle(new Vector2f(30.0f, 60.0f));
         nukkitPacket.setDistance(5.0f);
@@ -858,6 +890,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testUpdateBlockPacketFrom224(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.UpdateBlockPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.x = 100;
         nukkitPacket.y = 64;
         nukkitPacket.z = 200;
@@ -886,6 +919,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testUpdateBlockPacketWithDataLayer(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.UpdateBlockPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.x = 50;
         nukkitPacket.y = 32;
         nukkitPacket.z = 100;
@@ -932,6 +966,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testLevelChunkPacketBasic(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.LevelChunkPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.chunkX = 10;
         nukkitPacket.chunkZ = 20;
         nukkitPacket.subChunkCount = 8;
@@ -953,6 +988,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testLevelChunkPacketWithRequestSubChunks(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.LevelChunkPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.chunkX = 10;
         nukkitPacket.chunkZ = 20;
         nukkitPacket.requestSubChunks = true;
@@ -976,6 +1012,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testLevelChunkPacketWithDimension(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.LevelChunkPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.chunkX = 5;
         nukkitPacket.chunkZ = 15;
         nukkitPacket.dimension = 1; // Nether
@@ -1001,6 +1038,7 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
     void testLevelChunkPacketWithCache(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.LevelChunkPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.chunkX = 3;
         nukkitPacket.chunkZ = 7;
         nukkitPacket.dimension = 0;
