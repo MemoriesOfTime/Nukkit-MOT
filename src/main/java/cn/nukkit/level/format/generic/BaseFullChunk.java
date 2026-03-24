@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author MagicDroidX
@@ -72,7 +73,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     private int z;
     private long hash;
 
-    protected long changes;
+    protected AtomicLong changes = new AtomicLong();
 
     protected boolean isInit;
 
@@ -111,6 +112,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (this.heightMap != null) {
             chunk.heightMap = this.getHeightMapArray().clone();
         }
+        chunk.changes = new AtomicLong(this.changes.get());
         return chunk;
     }
 
@@ -121,6 +123,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         } catch (CloneNotSupportedException e) {
             return null;
         }
+        chunk.changes = new AtomicLong(this.changes.get());
 
         if (this.tiles != null) {
             chunk.tiles = new Long2ObjectNonBlockingMap<>();
@@ -277,6 +280,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void setBiomeId(int x, int z, int biomeId) {
         this.biomes[(x << 4) | z] = (byte) biomeId;
+        this.setChanged();
     }
 
     @Override
@@ -299,6 +303,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         //Bedrock Edition 3d-data saves the height map start from index of 0, so need to subtract the world minimum height here, see for details:
         //https://github.com/bedrock-dev/bedrock-level/blob/main/src/include/data_3d.h#L115
         this.heightMap[(z << 4) | x] = (short) (value - this.getProvider().getMinBlockY());
+        this.setChanged();
     }
 
     @Override
@@ -632,7 +637,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (provider == null) {
             return true;
         }
-        if (save && this.changes != 0) {
+        if (save && this.changes.get() != 0) {
             provider.saveChunk(this.x, this.z);
         }
         if (safe) {
@@ -684,6 +689,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void setBiomeIdArray(byte[] biomeIdArray) {
         this.biomes = biomeIdArray;
+        this.setChanged();
     }
 
     @Override
@@ -692,17 +698,17 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     public long getChanges() {
-        return changes;
+        return changes.get();
     }
 
     @Override
     public boolean hasChanged() {
-        return this.changes != 0;
+        return this.changes.get() != 0;
     }
 
     @Override
     public void setChanged() {
-        this.changes++;
+        this.changes.incrementAndGet();
         chunkPackets = null;
     }
 
@@ -711,8 +717,19 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (changed) {
             setChanged();
         } else {
-            changes = 0;
+            changes.set(0);
         }
+    }
+
+    /**
+     * Atomically clear dirty flag only if no new modifications occurred since the snapshot.
+     * Used by async save to avoid clearing changes made during the save window.
+     *
+     * @param snapshot the changes value captured before serialization
+     * @return true if successfully cleared, false if new changes were made
+     */
+    public boolean clearChangesIfUnmodified(long snapshot) {
+        return changes.compareAndSet(snapshot, 0);
     }
 
     @Override
@@ -733,6 +750,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void setLightPopulated(boolean value) {
         this.lightPopulated = value;
+        this.setChanged();
     }
 
     @Override
@@ -789,7 +807,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             setBlockId(x & 15, y, z & 15, layer, id);
         }
     }
-    
+
     @Override
     public void setBlockAt(int x, int y, int z, int id, int data) {
         if (x >> 4 == getX() && z >> 4 == getZ()) {

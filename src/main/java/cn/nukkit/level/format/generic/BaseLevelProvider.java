@@ -318,8 +318,8 @@ public abstract class BaseLevelProvider implements LevelProvider {
     public void saveChunks() {
         for (BaseFullChunk chunk : this.chunks.values()) {
             if (chunk.getChanges() != 0) {
-                chunk.setChanged(false);
                 this.saveChunk(chunk.getX(), chunk.getZ());
+                chunk.setChanged(false);
             }
         }
     }

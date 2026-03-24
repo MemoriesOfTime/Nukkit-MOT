@@ -157,6 +157,14 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
             if (powered == this.isEnabled()) {
                 this.setEnabled(!powered);
                 this.level.setBlock(this, this, true, false);
+
+                // Wake up the hopper block entity when unpowered
+                if (!powered) {
+                    BlockEntity be = this.level.getBlockEntity(this);
+                    if (be instanceof BlockEntityHopper hopper) {
+                        hopper.scheduleUpdate();
+                    }
+                }
             }
 
             return type;

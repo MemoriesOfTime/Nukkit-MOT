@@ -14,6 +14,7 @@ import com.google.common.collect.HashBiMap;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Constructor;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author MagicDroidX
@@ -72,6 +73,8 @@ public abstract class BlockEntity extends Position {
     public long id;
 
     public boolean movable;
+
+    public final AtomicBoolean scheduledForBlockEntityUpdate = new AtomicBoolean(false);
 
     public boolean closed = false;
     public CompoundTag namedTag;
