@@ -823,8 +823,18 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v924
      */
     public static final int SOUND_NETHERITE_SPEAR_USE = 596;
-
-    public static final int SOUND_UNDEFINED = Utils.dynamic(597);
+    /**
+     * @since v944
+     */
+    public static final int SOUND_PAUSE_GROWTH = 597;
+    /**
+     * @since v944
+     */
+    public static final int SOUND_RESET_GROWTH = 598;
+    /**
+     * @since v944
+     */
+    public static final int SOUND_UNDEFINED = Utils.dynamic(599);
 
     public int sound;
     public float x;

@@ -99,6 +99,9 @@ public class InventoryTransactionPacket extends DataPacket {
                         this.putUnsignedVarInt(useItemData.clientInteractPrediction);
                     }
                 }
+                if (this.protocol >= ProtocolInfo.v1_26_10) {
+                    this.putByte(useItemData.clientCooldownState);
+                }
                 break;
             case TYPE_USE_ITEM_ON_ENTITY:
                 UseItemOnEntityData useItemOnEntityData = (UseItemOnEntityData) this.transactionData;
@@ -172,6 +175,9 @@ public class InventoryTransactionPacket extends DataPacket {
                     if (this.protocol >= ProtocolInfo.v1_21_20) {
                         itemData.clientInteractPrediction = (int) this.getUnsignedVarInt();
                     }
+                }
+                if (this.protocol >= ProtocolInfo.v1_26_10) {
+                    itemData.clientCooldownState = (byte) this.getByte();
                 }
 
                 this.transactionData = itemData;

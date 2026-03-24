@@ -23,7 +23,9 @@ public enum EnchantmentType {
 
     CROSSBOW,
 
-    MACE;
+    MACE,
+
+    SPEAR;
 
     public boolean canEnchantItem(Item item) {
         if (this == ALL) {
@@ -65,6 +67,8 @@ public enum EnchantmentType {
                     return item instanceof ItemTrident;
                 case CROSSBOW:
                     return item instanceof ItemCrossbow;
+                case MACE:
+                    return item instanceof ItemMace;
                 default:
                     return false;
             }

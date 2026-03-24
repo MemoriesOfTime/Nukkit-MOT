@@ -18,6 +18,7 @@ public class UpdateClientInputLocksPacketTest {
         stream.putVector3f(new Vector3f(1.25f, 2.5f, 3.75f));
 
         UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
+        packet.protocol = GameVersion.V1_21_50_26.getProtocol();
         packet.setBuffer(stream.getBuffer());
         packet.decode();
 

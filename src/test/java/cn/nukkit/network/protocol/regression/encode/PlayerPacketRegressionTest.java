@@ -51,6 +51,7 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
     void testPlayerListPacketRemove(int protocolVersion) {
         var nukkitPacket = new PlayerListPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.type = PlayerListPacket.TYPE_REMOVE;
         nukkitPacket.entries = new PlayerListPacket.Entry[]{
                 new PlayerListPacket.Entry(UUID.randomUUID())
@@ -71,6 +72,7 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
     void testCorrectPlayerMovePredictionPacketPlayer(int protocolVersion) {
         var nukkitPacket = new CorrectPlayerMovePredictionPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setPosition(new Vector3f(100.5f, 64.0f, 200.5f));
         nukkitPacket.setDelta(new Vector3f(1.0f, 0.5f, 2.0f));
         nukkitPacket.setOnGround(true);
@@ -96,6 +98,7 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
     void testCorrectPlayerMovePredictionPacketVehicle(int protocolVersion) {
         var nukkitPacket = new CorrectPlayerMovePredictionPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setPosition(new Vector3f(100.5f, 64.0f, 200.5f));
         nukkitPacket.setDelta(new Vector3f(1.0f, 0.5f, 2.0f));
         nukkitPacket.setOnGround(false);
@@ -120,6 +123,7 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
     void testPlayerEnchantOptionsPacket(int protocolVersion) {
         var nukkitPacket = new PlayerEnchantOptionsPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         var enchantOption = new PlayerEnchantOptionsPacket.EnchantOptionData(
                 1, // minLevel
                 0, // primarySlot
@@ -154,6 +158,7 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
     void testAddPlayerPacket(int protocolVersion) {
         var nukkitPacket = new AddPlayerPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.uuid = UUID.fromString("12345678-1234-1234-1234-123456789abc");
         nukkitPacket.username = "TestPlayer";
         nukkitPacket.entityUniqueId = 1;
@@ -196,6 +201,7 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
     void testPlayerSkinPacket(int protocolVersion) {
         var nukkitPacket = new PlayerSkinPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.uuid = UUID.fromString("12345678-1234-1234-1234-123456789abc");
         nukkitPacket.newSkinName = "newSkin";
         nukkitPacket.oldSkinName = "oldSkin";
