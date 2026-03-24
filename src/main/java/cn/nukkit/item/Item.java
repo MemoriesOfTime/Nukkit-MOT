@@ -552,9 +552,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         int protocol = gameVersion.getProtocol();
         JsonObject root;
         JsonArray itemsArray;
-        String file = "CreativeItems/creative_items_" + protocol + ".json";
-
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(file)) {
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("creative_items.json")) {
             root = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject();
             itemsArray = root.getAsJsonArray("items");
             if (itemsArray.isEmpty()) {
