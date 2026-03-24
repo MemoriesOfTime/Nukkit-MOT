@@ -70,8 +70,8 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
 
     private long currentTick = 0;
 
-    // Cache for expensive calculations (recalculated every 5 update cycles = 400 ticks = 20 seconds)
-    private static final int CACHE_RECALC_INTERVAL = 5;
+    // Cache for expensive calculations (recalculated every 2 update cycles = 160 ticks = 8 seconds)
+    private static final int CACHE_RECALC_INTERVAL = 2;
     private int cacheCounter = 0;
     private int cachedPowerLevel = -1; // -1 = uninitialized
     private boolean cachedSkyAccess = false;

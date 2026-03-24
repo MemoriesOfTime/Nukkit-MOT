@@ -136,14 +136,14 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return true;
         }
 
-        // Sleep when redstone-locked
-        if (this.level.isBlockPowered(this.getBlock())) {
-            return false;
-        }
-
         this.transferCooldown = ev.getTransferCooldown() - 1;
 
         if (!this.isOnTransferCooldown()) {
+            // Sleep when redstone-locked (checked after cooldown decrement for plugin compatibility)
+            if (this.level.isBlockPowered(this.getBlock())) {
+                return false;
+            }
+
             // Check if there's a container above (for sleep decision later)
             boolean hasContainerAbove;
             BlockEntity blockEntityAbove = this.level.getBlockEntity(this.up());
@@ -179,6 +179,9 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             if (changed) {
                 this.setTransferCooldown(8);
                 this.setDirty();
+            } else if (searchEvent.isCancelled()) {
+                // Plugin cancelled the search — keep polling to match original behavior
+                this.setTransferCooldown(8);
             } else if (!hasContainerAbove && !this.inventory.isFull()) {
                 // No container above, may receive ground items — poll with vanilla 8-tick interval
                 this.setTransferCooldown(8);
