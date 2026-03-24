@@ -71,6 +71,7 @@ public class CraftingManager {
     private static BatchPacket packet844;
     private static BatchPacket packet859;
     private static BatchPacket packet898;
+    private static BatchPacket packet944;
 
     private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
@@ -803,6 +804,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet944 = null;
         packet898 = null;
         packet859 = null;
         packet844 = null;
@@ -892,7 +894,12 @@ public class CraftingManager {
             }
         }
 
-        if (protocol >= GameVersion.V1_21_130_28.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_10.getProtocol()) {
+            if (packet944 == null) {
+                packet944 = packetFor(GameVersion.V1_26_10);
+            }
+            return packet944;
+        } else if (protocol >= GameVersion.V1_21_130_28.getProtocol()) {
             if (packet898 == null) {
                 packet898 = packetFor(GameVersion.V1_21_130);
             }
