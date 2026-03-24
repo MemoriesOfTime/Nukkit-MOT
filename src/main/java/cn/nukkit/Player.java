@@ -150,6 +150,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * 在原版中id按顺序增加，但测试中采用固定id也可正常实现功能
      */
     public static final int LECTERN_WINDOW_ID = 7;
+    public static final int STONECUTTER_WINDOW_ID = 8;
 
     // 后续创建的窗口应该从此数值开始
     public static final int MINIMUM_OTHER_WINDOW_ID = Utils.dynamic(10);
@@ -215,6 +216,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected LoomTransaction loomTransaction;
     protected SmithingTransaction smithingTransaction;
     protected GrindstoneTransaction grindstoneTransaction;
+    protected StonecutterTransaction stonecutterTransaction;
     protected TradingTransaction tradingTransaction;
 
     protected long randomClientId;
@@ -4627,6 +4629,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         return;
                     }
 
+                    if (StonecutterTransaction.isIn(actions)) {
+                        if (this.stonecutterTransaction == null) {
+                            this.stonecutterTransaction = new StonecutterTransaction(this, actions);
+                        } else {
+                            for (InventoryAction action : actions) {
+                                this.stonecutterTransaction.addAction(action);
+                            }
+                        }
+                        if (this.stonecutterTransaction.canExecute()) {
+                            if (this.stonecutterTransaction.execute()) {
+                                level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_STONECUTTER_USE);
+                            }
+                            this.stonecutterTransaction = null;
+                        } else if (this.stonecutterTransaction.getActionList().size() >= 4) {
+                            // 切石机操作最多 4 个 action，超过说明数据已损坏
+                            this.setNeedSendInventory(true);
+                            this.stonecutterTransaction = null;
+                        }
+                        return;
+                    }
+
                     if (this.craftingTransaction == null) {
                         this.craftingTransaction = new CraftingTransaction(this, actions);
                     } else {
@@ -4690,6 +4713,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 players.remove(this);
                                 if (!players.isEmpty()) {
                                     level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_GRINDSTONE_USE);
+                                }
+                                int exp = this.grindstoneTransaction.getExperienceDropped();
+                                if (exp > 0) {
+                                    Inventory grindstoneInv = this.getWindowById(Player.GRINDSTONE_WINDOW_ID);
+                                    if (grindstoneInv instanceof GrindstoneInventory gInv) {
+                                        Position grindstonePos = gInv.getHolder();
+                                        level.dropExpOrb(grindstonePos.add(0.5, 0.5, 0.5), exp);
+                                    }
                                 }
                             }
                             this.grindstoneTransaction = null;
@@ -7035,6 +7066,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.moveBlockUIContents(Player.ENCHANT_WINDOW_ID);
             this.moveBlockUIContents(Player.BEACON_WINDOW_ID);
             this.moveBlockUIContents(Player.SMITHING_WINDOW_ID);
+            this.moveBlockUIContents(Player.STONECUTTER_WINDOW_ID);
 
             this.playerUIInventory.clearAll();
 
