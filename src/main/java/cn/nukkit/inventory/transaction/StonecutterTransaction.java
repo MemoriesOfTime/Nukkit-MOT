@@ -65,13 +65,29 @@ public class StonecutterTransaction extends InventoryTransaction {
             return false;
         }
 
+        for (InventoryAction action : this.actions) {
+            if (!action.isValid(this.source)) {
+                return false;
+            }
+        }
+
         Inventory inventory = getSource().getWindowById(Player.STONECUTTER_WINDOW_ID);
         if (!(inventory instanceof StonecutterInventory stonecutterInventory)) {
             return false;
         }
 
-        if (this.outputItem == null || this.outputItem.isNull() || this.inputItem == null || this.inputItem.isNull()) {
+        if (this.outputItem == null || this.outputItem.isNull()) {
             return false;
+        }
+
+        // 重复合成时，虚拟合成格只有消耗动作(target=Air)，不会触发 inputItem 赋值
+        // 此时从切石机库存中读取已有的输入物品
+        if (this.inputItem == null || this.inputItem.isNull()) {
+            Item existingInput = stonecutterInventory.getInput();
+            if (existingInput == null || existingInput.isNull()) {
+                return false;
+            }
+            this.inputItem = existingInput;
         }
 
         // 验证客户端声称的输出与库存中其他 action 的一致性
@@ -117,8 +133,12 @@ public class StonecutterTransaction extends InventoryTransaction {
         }
 
         for (InventoryAction action : this.actions) {
-            // 跳过玩家背包的 SlotChangeAction，由服务器端 addItem 处理产出物品的放置（自动合并）
-            if (action instanceof SlotChangeAction sca && !(sca.getInventory() instanceof StonecutterInventory)) {
+            if (action instanceof SlotChangeAction sca) {
+                if (!(sca.getInventory() instanceof StonecutterInventory)) {
+                    // 跳过玩家背包的 SlotChangeAction，由服务器端 addItem 处理产出物品的放置（自动合并）
+                    continue;
+                }
+            } else if (!(action instanceof StonecutterItemAction)) {
                 continue;
             }
             if (action.execute(this.source)) {
