@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
@@ -40,9 +41,13 @@ public class ChunkCacheTest {
     }
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         // 使用 Mockito 创建抽象类的 Mock，调用真实方法
         chunk = mock(BaseFullChunk.class, CALLS_REAL_METHODS);
+        // Mockito mock 不执行字段初始化器，需手动初始化 AtomicLong 字段
+        Field changesField = BaseFullChunk.class.getDeclaredField("changes");
+        changesField.setAccessible(true);
+        changesField.set(chunk, new AtomicLong());
     }
 
     // ==================== 缓存基础操作测试 ====================

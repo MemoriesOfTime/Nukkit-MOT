@@ -400,6 +400,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                     var be = this.level.getBlockEntity(tmpBV);
                     if (be instanceof BlockEntityHopper blockEntityHopper) {
                         blockEntityHopper.setMinecartInvPushTo(holder);
+                        blockEntityHopper.scheduleUpdate();
                         return true;
                     }
                 }
@@ -429,6 +430,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                     var be = this.level.getBlockEntity(tmpBV);
                     if (be instanceof BlockEntityHopper blockEntityHopper) {
                         blockEntityHopper.setMinecartInvPickupFrom(holder);
+                        blockEntityHopper.scheduleUpdate();
                         return true;
                     }
                 }

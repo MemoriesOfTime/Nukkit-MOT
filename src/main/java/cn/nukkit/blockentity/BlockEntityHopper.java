@@ -12,11 +12,13 @@ import cn.nukkit.inventory.HopperInventory;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import lombok.Getter;
@@ -137,8 +139,20 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
         this.transferCooldown = ev.getTransferCooldown() - 1;
 
         if (!this.isOnTransferCooldown()) {
+            // Sleep when redstone-locked (checked after cooldown decrement for plugin compatibility)
             if (this.level.isBlockPowered(this.getBlock())) {
-                return true;
+                return false;
+            }
+
+            // Check if there's a container above (for sleep decision later)
+            boolean hasContainerAbove;
+            BlockEntity blockEntityAbove = this.level.getBlockEntity(this.up());
+            Block blockAbove = null;
+            if (blockEntityAbove instanceof BlockEntityContainer) {
+                hasContainerAbove = true;
+            } else {
+                blockAbove = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() + 1, this.getFloorZ(), false);
+                hasContainerAbove = blockAbove instanceof BlockComposter;
             }
 
             HopperSearchItemEvent searchEvent = new HopperSearchItemEvent(this, false, this.pickupArea);
@@ -148,11 +162,8 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
 
             if (!searchEvent.isCancelled() && !searchEvent.isCancelPull()) {
                 if (!this.inventory.isFull()) {
-                    BlockEntity blockEntity = this.level.getBlockEntity(this.up());
-                    Block block = null;
-                    if (blockEntity instanceof BlockEntityContainer ||
-                            (block = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() + 1, this.getFloorZ(), false)) instanceof BlockComposter) {
-                        changed = this.pullItems(blockEntity, block);
+                    if (hasContainerAbove) {
+                        changed = this.pullItems(blockEntityAbove, blockAbove);
                     } else {
                         changed = this.pullItemsFromMinecart() || this.pickupItems(searchEvent.getPickupArea());
                     }
@@ -168,6 +179,15 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             if (changed) {
                 this.setTransferCooldown(8);
                 this.setDirty();
+            } else if (searchEvent.isCancelled()) {
+                // Plugin cancelled the search — keep polling to match original behavior
+                this.setTransferCooldown(8);
+            } else if (!hasContainerAbove && !this.inventory.isFull()) {
+                // No container above, may receive ground items — poll with vanilla 8-tick interval
+                this.setTransferCooldown(8);
+            } else {
+                // Sleep — woken by adjacent container changes or own inventory changes
+                return false;
             }
         }
 
@@ -433,5 +453,38 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
     @Override
     public Position getPosition() {
         return this;
+    }
+
+    /**
+     * Notify sleeping hoppers around the given position that a container's inventory changed.
+     * This wakes hoppers that pull from above or push into this container.
+     */
+    public static void wakeupHoppersAround(Level level, int x, int y, int z) {
+        wakeupHopperAt(level, x, y - 1, z);
+        wakeupHopperFacingTo(level, x, y + 1, z, BlockFace.DOWN.getIndex());
+        wakeupHopperFacingTo(level, x, y, z + 1, BlockFace.NORTH.getIndex());
+        wakeupHopperFacingTo(level, x, y, z - 1, BlockFace.SOUTH.getIndex());
+        wakeupHopperFacingTo(level, x + 1, y, z, BlockFace.WEST.getIndex());
+        wakeupHopperFacingTo(level, x - 1, y, z, BlockFace.EAST.getIndex());
+    }
+
+    private static void wakeupHopperAt(Level level, int x, int y, int z) {
+        if (level.getBlockIdAt(x, y, z) == Block.HOPPER_BLOCK) {
+            BlockEntity be = level.getBlockEntity(new Vector3(x, y, z));
+            if (be instanceof BlockEntityHopper hopper && !hopper.closed) {
+                hopper.scheduleUpdate();
+            }
+        }
+    }
+
+    private static void wakeupHopperFacingTo(Level level, int x, int y, int z, int requiredFacing) {
+        if (level.getBlockIdAt(x, y, z) == Block.HOPPER_BLOCK) {
+            if ((level.getBlockDataAt(x, y, z) & 0x7) == requiredFacing) {
+                BlockEntity be = level.getBlockEntity(new Vector3(x, y, z));
+                if (be instanceof BlockEntityHopper hopper && !hopper.closed) {
+                    hopper.scheduleUpdate();
+                }
+            }
+        }
     }
 }
