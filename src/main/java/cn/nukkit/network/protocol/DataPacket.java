@@ -142,29 +142,16 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
 
     @Override
     public BlockVector3 getBlockVector3() {
-        if (this.protocol >= ProtocolInfo.v1_26_10) {
-            return this.getSignedBlockPosition();
-        }
-        return super.getBlockVector3();
+        return super.getBlockVector3(this.gameVersion);
     }
 
     @Override
     public void putBlockVector3(BlockVector3 v) {
-        if (this.protocol >= ProtocolInfo.v1_26_10) {
-            this.putSignedBlockPosition(v);
-            return;
-        }
-        super.putBlockVector3(v);
+        super.putBlockVector3(this.gameVersion, v);
     }
 
     @Override
     public void putBlockVector3(int x, int y, int z) {
-        if (this.protocol >= ProtocolInfo.v1_26_10) {
-            this.putVarInt(x);
-            this.putVarInt(y);
-            this.putVarInt(z);
-            return;
-        }
-        super.putBlockVector3(x, y, z);
+        super.putBlockVector3(this.gameVersion, x, y, z);
     }
 }
