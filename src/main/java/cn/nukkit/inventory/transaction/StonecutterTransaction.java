@@ -24,6 +24,7 @@ public class StonecutterTransaction extends InventoryTransaction {
     @Getter
     private Item outputItem;
     private final List<Item> outputItemCheck = new ArrayList<>();
+    private StonecutterRecipe recipe;
 
     public StonecutterTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions);
@@ -102,13 +103,22 @@ public class StonecutterTransaction extends InventoryTransaction {
             return false;
         }
 
-        StonecutterRecipe recipe = Server.getInstance().getCraftingManager().matchStonecutterRecipe(this.inputItem, this.outputItem);
-        if (recipe == null) {
+        // 验证库存中输入物品数量足够
+        Item actualInput = stonecutterInventory.getInput();
+        if (actualInput.isNull()) {
             return false;
         }
 
-        // 验证输出数量与配方一致
-        if (this.outputItem.getCount() != recipe.getResult().getCount()) {
+        this.recipe = Server.getInstance().getCraftingManager().matchStonecutterRecipe(this.inputItem, this.outputItem);
+        if (this.recipe == null) {
+            return false;
+        }
+
+        if (this.outputItem.getCount() != this.recipe.getResult().getCount()) {
+            return false;
+        }
+
+        if (actualInput.getCount() < this.recipe.getIngredient().getCount()) {
             return false;
         }
 
@@ -132,21 +142,15 @@ public class StonecutterTransaction extends InventoryTransaction {
             return true;
         }
 
-        for (InventoryAction action : this.actions) {
-            if (action instanceof SlotChangeAction sca) {
-                if (!(sca.getInventory() instanceof StonecutterInventory)) {
-                    // 跳过玩家背包的 SlotChangeAction，由服务器端 addItem 处理产出物品的放置（自动合并）
-                    continue;
-                }
-            } else if (!(action instanceof StonecutterItemAction)) {
-                continue;
-            }
-            if (action.execute(this.source)) {
-                action.onExecuteSuccess(this.source);
-            } else {
-                action.onExecuteFail(this.source);
-            }
+        // 服务端主动扣除输入物品，不依赖客户端发送的 SlotChangeAction
+        Item currentInput = inventory.getInput();
+        int consumeCount = this.recipe.getIngredient().getCount();
+        if (currentInput.isNull() || currentInput.getCount() < consumeCount) {
+            this.sendInventories();
+            return false;
         }
+        currentInput.setCount(currentInput.getCount() - consumeCount);
+        inventory.setItem(0, currentInput.getCount() > 0 ? currentInput : Item.get(Item.AIR));
 
         // 使用 addItem 放置产出物品，自动合并到已有堆叠
         PlayerInventory playerInventory = source.getInventory();

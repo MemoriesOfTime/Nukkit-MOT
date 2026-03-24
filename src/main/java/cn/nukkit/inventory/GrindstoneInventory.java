@@ -23,21 +23,30 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
         super(playerUI, InventoryType.GRINDSTONE, 16, position);
     }
 
-    public Item getResult() {
+    /**
+     * Get effective inputs: when equipment is empty, use ingredient as primary input.
+     * @return [equipment, ingredient], both AIR if neither slot has items
+     */
+    private Item[] getEffectiveInputs() {
         Item eq = getEquipment();
         Item iq = getIngredient();
-
-        // 当 equipment 为空时，使用 ingredient 作为输入
         if (eq.isNull()) {
             eq = iq;
             iq = Item.get(Item.AIR);
         }
+        return new Item[]{eq, iq};
+    }
+
+    public Item getResult() {
+        Item[] inputs = getEffectiveInputs();
+        Item eq = inputs[0];
+        Item iq = inputs[1];
 
         if (eq.isNull()) {
             return Item.get(Item.AIR);
         }
 
-        // 附魔书处理
+        // Enchanted book handling
         if (eq.getId() == Item.ENCHANTED_BOOK) {
             return getEnchantedBookResult(eq);
         }
@@ -46,12 +55,12 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
             return Item.get(Item.AIR);
         }
 
-        // 两个输入物品必须相同
+        // Both input items must be the same type
         if (!iq.isNull() && eq.getId() != iq.getId()) {
             return Item.get(Item.AIR);
         }
 
-        // 移除非诅咒附魔，保留诅咒附魔
+        // Remove non-curse enchantments, keep curse enchantments
         Item result = eq.clone();
         removeNonCurseEnchantments(result);
 
@@ -61,7 +70,7 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
         tag.remove("custom_ench");
         result.setNamedTag(tag);
 
-        // 合并耐久度
+        // Merge durability
         if (!iq.isNull() && eq.getId() == iq.getId()) {
             // Output durability is the sum of the durabilities of the two input items
             // plus 5% of the maximum durability of the output item (rounded down)
@@ -85,12 +94,12 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
             }
         }
 
-        // 没有非诅咒附魔可移除时，砂轮无效果
+        // No non-curse enchantments to remove, grindstone has no effect
         if (!hasNonCurse) {
             return Item.get(Item.AIR);
         }
 
-        // 有诅咒附魔时保留为附魔书，只移除非诅咒附魔
+        // Has curse enchantments: keep as enchanted book, only remove non-curse
         if (hasCurse) {
             Item result = book.clone();
             removeNonCurseEnchantments(result);
@@ -103,7 +112,7 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
             return result;
         }
 
-        // 无诅咒附魔，转为普通书
+        // No curse enchantments, convert to normal book
         return Item.get(Item.BOOK, 0, book.getCount());
     }
 
@@ -133,16 +142,12 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
     }
 
     /**
-     * 计算砂轮移除附魔产生的经验值
+     * Calculate experience dropped when removing enchantments via grindstone.
      */
     public int calculateExperience() {
-        Item eq = getEquipment();
-        Item iq = getIngredient();
-
-        if (eq.isNull()) {
-            eq = iq;
-            iq = Item.get(Item.AIR);
-        }
+        Item[] inputs = getEffectiveInputs();
+        Item eq = inputs[0];
+        Item iq = inputs[1];
 
         if (eq.isNull()) {
             return 0;

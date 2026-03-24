@@ -38,11 +38,7 @@ public class CraftingTransaction extends InventoryTransaction {
         super(source, actions, false);
 
         this.craftingType = source.craftingType;
-        if (source.craftingType == Player.STONECUTTER_WINDOW_ID) {
-            this.gridSize = 1;
-        } else {
-            this.gridSize = (source.getCraftingGrid() instanceof BigCraftingGrid) ? 3 : 2;
-        }
+        this.gridSize = (source.getCraftingGrid() instanceof BigCraftingGrid) ? 3 : 2;
         this.inputs = new ArrayList<>();
         this.secondaryOutputs = new ArrayList<>();
 
@@ -50,7 +46,7 @@ public class CraftingTransaction extends InventoryTransaction {
     }
 
     public void setInput(Item item) {
-        if (inputs.size() < gridSize * gridSize || this.craftingType == Player.STONECUTTER_WINDOW_ID) {
+        if (inputs.size() < gridSize * gridSize) {
             for (Item existingInput : this.inputs) {
                 if (existingInput.equals(item, item.hasMeta(), item.hasCompoundTag())) {
                     existingInput.setCount(existingInput.getCount() + item.getCount());
@@ -68,7 +64,7 @@ public class CraftingTransaction extends InventoryTransaction {
     }
 
     public void setExtraOutput(Item item) {
-        if (secondaryOutputs.size() < gridSize * gridSize || this.craftingType == Player.STONECUTTER_WINDOW_ID) {
+        if (secondaryOutputs.size() < gridSize * gridSize) {
             secondaryOutputs.add(item.clone());
         } else {
             throw new RuntimeException("Output list is full can't add " + item);
