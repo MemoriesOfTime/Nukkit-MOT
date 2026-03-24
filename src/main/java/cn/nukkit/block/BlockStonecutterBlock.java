@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.inventory.StonecutterInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
@@ -74,8 +75,7 @@ public class BlockStonecutterBlock extends BlockSolidMeta implements Faceable {
         return super.place(item, block, target, face, fx, fy, fz, player);
     }
 
-    //TODO: Add Stonecutter functionality
-    /*@Override
+    @Override
     public boolean canBeActivated() {
         return true;
     }
@@ -86,7 +86,7 @@ public class BlockStonecutterBlock extends BlockSolidMeta implements Faceable {
             player.addWindow(new StonecutterInventory(player.getUIInventory(), this), Player.STONECUTTER_WINDOW_ID);
         }
         return true;
-    }*/
+    }
 
     @Override
     public BlockFace getBlockFace() {

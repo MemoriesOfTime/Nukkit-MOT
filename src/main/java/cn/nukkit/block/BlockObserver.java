@@ -68,7 +68,7 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
     public boolean canHarvestWithHand() {
         return false;
     }
-    
+
     @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
         if (player != null) {
@@ -136,8 +136,7 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
                 this.setPowered(true);
 
                 if (this.level.setBlock(this, this)) {
-                    getSide(getBlockFace().getOpposite()).onUpdate(Level.BLOCK_UPDATE_REDSTONE);
-                    this.level.updateAroundRedstone(this, this.getBlockFace().getOpposite());
+                    this.updateNeighborsInFront();
                     this.level.scheduleUpdate(this, 2);
                 }
             } else {
@@ -145,8 +144,7 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
                 this.setPowered(false);
 
                 this.level.setBlock(this, this);
-                getSide(getBlockFace().getOpposite()).onUpdate(Level.BLOCK_UPDATE_REDSTONE);
-                this.level.updateAroundRedstone(this, this.getBlockFace().getOpposite());
+                this.updateNeighborsInFront();
             }
             return type;
         }
@@ -166,6 +164,16 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
         }
 
         this.level.scheduleUpdate(this, 1);
+    }
+
+    /**
+     * Notify the output-side block and its neighbors about redstone changes.
+     */
+    private void updateNeighborsInFront() {
+        BlockFace facing = getBlockFace();
+        Block outputBlock = getSide(facing.getOpposite());
+        outputBlock.onUpdate(Level.BLOCK_UPDATE_REDSTONE);
+        this.level.updateAroundRedstone(outputBlock, facing);
     }
 
     public boolean isPowered() {
