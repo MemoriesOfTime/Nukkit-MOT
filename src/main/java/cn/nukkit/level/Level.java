@@ -4132,11 +4132,8 @@ public class Level implements ChunkManager, Metadatable {
                 }
                 for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
                     loader.onChunkUnloaded(chunk);
-                } catch (Exception e) {
-                    this.server.getLogger().error("Error notifying chunk loader", e);
                 }
             }
-
             levelProvider.unloadChunk(x, z, safe);
 
             chunk.setProvider(null);
