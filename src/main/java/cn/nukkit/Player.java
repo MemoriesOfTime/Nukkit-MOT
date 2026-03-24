@@ -17,6 +17,7 @@ import cn.nukkit.entity.data.property.EntityProperty;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
+import cn.nukkit.entity.passive.EntityHappyGhast;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
@@ -149,6 +150,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * 在原版中id按顺序增加，但测试中采用固定id也可正常实现功能
      */
     public static final int LECTERN_WINDOW_ID = 7;
+    public static final int STONECUTTER_WINDOW_ID = 8;
 
     // 后续创建的窗口应该从此数值开始
     public static final int MINIMUM_OTHER_WINDOW_ID = Utils.dynamic(10);
@@ -214,6 +216,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected LoomTransaction loomTransaction;
     protected SmithingTransaction smithingTransaction;
     protected GrindstoneTransaction grindstoneTransaction;
+    protected StonecutterTransaction stonecutterTransaction;
     protected TradingTransaction tradingTransaction;
 
     protected long randomClientId;
@@ -358,6 +361,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int lastChorusFruitTeleport = 20;
     public long lastSkinChange = -1;
     private double lastRightClickTime = 0.0;
+    private long lastClickAirTime = 0;
     private BlockVector3 lastRightClickPos = null;
     public EntityFishingHook fishing = null;
     public boolean formOpen;
@@ -447,14 +451,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return startAction;
     }
 
+    /**
+     * @deprecated use {@link #setUsingItem(boolean)} instead
+     */
+    @Deprecated(forRemoval = true)
     public void startAction() {
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, true);
-        this.startAction = this.server.getTick();
+        this.setUsingItem(true);
     }
 
+    /**
+     * @deprecated use {@link #setUsingItem(boolean)} instead
+     */
+    @Deprecated(forRemoval = true)
     public void stopAction() {
-        this.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, false);
-        this.startAction = -1;
+        this.setUsingItem(false);
     }
 
     public int getLastEnderPearlThrowingTick() {
@@ -3341,7 +3351,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 try {
-                    // TODO: Why do we read this separately?
                     this.loginChainData = ClientChainData.read(loginPacket);
                 } catch (ClientChainData.TooBigSkinException ex) {
                     this.close("", "disconnectionScreen.invalidSkin");
@@ -3363,13 +3372,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.version = loginChainData.getGameVersion();
 
-                // Apply username prefix for ViaProxy Java Edition clients
+                // Use verified identity data from ClientChainData (signature-validated) as the source of truth
+                String verifiedName = TextFormat.clean(loginChainData.getUsername());
+                if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
+                    verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
+                }
                 if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
-                    this.unverifiedUsername = server.viaProxyUsernamePrefix + this.unverifiedUsername;
+                    verifiedName = server.viaProxyUsernamePrefix + verifiedName;
                 }
 
-                // Do not set username before the user is authenticated
-                this.username = this.unverifiedUsername;
+                this.username = verifiedName;
                 this.unverifiedUsername = null;
                 this.displayName = this.username;
                 this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
@@ -3377,22 +3389,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
 
-                this.randomClientId = loginPacket.clientId;
+                this.randomClientId = loginChainData.getClientId();
 
-                this.uuid = loginPacket.clientUUID;
+                this.uuid = loginChainData.getClientUUID();
                 this.rawUUID = Binary.writeUUID(this.uuid);
-                this.minecraftId = loginPacket.minecraftId;
+                this.minecraftId = loginChainData.getMinecraftId();
 
                 boolean valid = true;
-                int len = loginPacket.username.length();
+                String rawVerifiedName = loginChainData.getUsername();
+                int len = rawVerifiedName.length();
                 if (((len > 16 || len < 3) && !gameVersion.isNetEase())
-                        || loginPacket.username.trim().isEmpty()) {
+                        || rawVerifiedName.trim().isEmpty()) {
                     valid = false;
                 }
 
                 if (valid && !gameVersion.isNetEase()) {
                     for (int i = 0; i < len; i++) {
-                        char c = loginPacket.username.charAt(i);
+                        char c = rawVerifiedName.charAt(i);
                         if ((c >= 'a' && c <= 'z') ||
                                 (c >= 'A' && c <= 'Z') ||
                                 (c >= '0' && c <= '9') ||
@@ -3594,6 +3607,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (this.teleportPosition != null) {
+                    if (this.lastTeleportTick != -1
+                            && authPacket.getInputData().contains(AuthInputAction.HANDLE_TELEPORT)) {
+                        this.lastTeleportTick = -1;
+                    }
                     return;
                 }
 
@@ -3603,6 +3620,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (inputY >= -1.001 && inputY <= 1.001) {
                         ((EntityMinecartAbstract) riding).setCurrentSpeed(inputY);
                     }
+                } else if (this.riding instanceof EntityHappyGhast ghast) {
+                    double moveVecX = NukkitMath.clamp(authPacket.getMotion().getX(), -1, 1);
+                    double moveVecY = NukkitMath.clamp(authPacket.getMotion().getY(), -1, 1);
+                    ghast.onPlayerInput(this, moveVecX, moveVecY);
+                    ignoreCoordinateMove = true;
                 } else if (this.riding instanceof EntityBoat boat) {
                     if (this.protocol >= ProtocolInfo.v1_21_130_28) {
                         double moveVecX = authPacket.getMotion().getX();
@@ -3646,8 +3668,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
+                        this.setUsingItem(false);
                     }
-                    this.setUsingItem(false);
                 }
 
                 if (authPacket.getInputData().contains(AuthInputAction.STOP_SPRINTING)) {
@@ -4607,6 +4629,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         return;
                     }
 
+                    if (StonecutterTransaction.isIn(actions)) {
+                        if (this.stonecutterTransaction == null) {
+                            this.stonecutterTransaction = new StonecutterTransaction(this, actions);
+                        } else {
+                            for (InventoryAction action : actions) {
+                                this.stonecutterTransaction.addAction(action);
+                            }
+                        }
+                        if (this.stonecutterTransaction.canExecute()) {
+                            if (this.stonecutterTransaction.execute()) {
+                                level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_STONECUTTER_USE);
+                            }
+                            this.stonecutterTransaction = null;
+                        } else if (this.stonecutterTransaction.getActionList().size() >= 4) {
+                            // 切石机操作最多 4 个 action，超过说明数据已损坏
+                            this.setNeedSendInventory(true);
+                            this.stonecutterTransaction = null;
+                        }
+                        return;
+                    }
+
                     if (this.craftingTransaction == null) {
                         this.craftingTransaction = new CraftingTransaction(this, actions);
                     } else {
@@ -4670,6 +4713,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 players.remove(this);
                                 if (!players.isEmpty()) {
                                     level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_GRINDSTONE_USE);
+                                }
+                                int exp = this.grindstoneTransaction.getExperienceDropped();
+                                if (exp > 0) {
+                                    Inventory grindstoneInv = this.getWindowById(Player.GRINDSTONE_WINDOW_ID);
+                                    if (grindstoneInv instanceof GrindstoneInventory gInv) {
+                                        Position grindstonePos = gInv.getHolder();
+                                        level.dropExpOrb(grindstonePos.add(0.5, 0.5, 0.5), exp);
+                                    }
                                 }
                             }
                             this.grindstoneTransaction = null;
@@ -4798,7 +4849,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     return;
                                 }
 
-                                this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
+                                this.setUsingItem(false);
 
                                 if (!(this.distance(blockVector.asVector3()) > (this.isCreative() ? 13 : 7))) {
                                     // 创造模式或假旁观模式（未启用客户端旁观）：允许触发事件但不消耗物品
@@ -4915,10 +4966,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 // 防止右键点击空气的重复触发
                                 // Prevent duplicate triggers of right-click on air
                                 long currentClickAirTime = System.currentTimeMillis();
-                                if (!server.doNotLimitInteractions && (currentClickAirTime - lastRightClickTime) < 100) {
+                                if (!server.doNotLimitInteractions && (currentClickAirTime - lastClickAirTime) < 100) {
                                     return;
                                 }
-                                lastRightClickTime = currentClickAirTime;
+                                lastClickAirTime = currentClickAirTime;
 
                                 Vector3 directionVector = this.getDirectionVector();
 
@@ -6415,7 +6466,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.level.dropItem(this.add(0, 1.3, 0), item, motion, 40);
 
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
+        this.setUsingItem(false);
         return true;
     }
 
@@ -6437,7 +6488,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         Vector3 motion = this.getDirectionVector().multiply(0.4);
 
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
+        this.setUsingItem(false);
 
         return this.level.dropAndGetItem(this.add(0, 1.3, 0), item, motion, 40);
     }
@@ -6620,6 +6671,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.removeAllWindows();
+            this.formOpen = false;
+
             this.lastX = this.x;
             this.lastY = this.y;
             this.lastZ = this.z;
@@ -6674,6 +6728,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         Location from = this.getLocation();
         if (super.teleport(location.add(0, 0.00001, 0), cause)) {
             this.removeAllWindows();
+            this.formOpen = false;
 
             if (from.getLevel().getId() != location.getLevel().getId()) { // Different level, update compass position
                 SetSpawnPositionPacket pk = new SetSpawnPositionPacket();
@@ -6737,11 +6792,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Close form windows sent with showFormWindow
      */
     public void closeFormWindows() {
-        if (this.protocol < ProtocolInfo.v1_21_2) {
-            return;
-        }
+        this.formOpen = false;
         this.formWindows.clear();
-        this.dataPacket(new ClientboundCloseFormPacket());
+        if (this.protocol >= ProtocolInfo.v1_21_2) {
+            this.dataPacket(new ClientboundCloseFormPacket());
+        }
     }
 
     public void showDialogWindow(FormWindowDialog dialog) {
@@ -7011,6 +7066,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.moveBlockUIContents(Player.ENCHANT_WINDOW_ID);
             this.moveBlockUIContents(Player.BEACON_WINDOW_ID);
             this.moveBlockUIContents(Player.SMITHING_WINDOW_ID);
+            this.moveBlockUIContents(Player.STONECUTTER_WINDOW_ID);
 
             this.playerUIInventory.clearAll();
 

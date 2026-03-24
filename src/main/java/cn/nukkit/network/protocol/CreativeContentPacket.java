@@ -1,9 +1,11 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemData;
 import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemGroup;
 import lombok.ToString;
+
+import java.util.Collection;
+import java.util.Map;
 
 @ToString
 public class CreativeContentPacket extends DataPacket {
@@ -22,6 +24,7 @@ public class CreativeContentPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -45,22 +48,30 @@ public class CreativeContentPacket extends DataPacket {
 
         if (this.protocol >= ProtocolInfo.v1_21_60) {
             this.putArray(this.creativeItems.getGroups(), this::writeGroup);
+
+            Map<Item, CreativeItemGroup> contents = this.creativeItems.getContents(this.gameVersion);
+            this.putUnsignedVarInt(contents.size());
+            int creativeNetId = 1; // 0 is not indexed by client
+            for (Map.Entry<Item, CreativeItemGroup> entry : contents.entrySet()) {
+                this.putUnsignedVarInt(creativeNetId++);
+                this.putSlot(gameVersion, entry.getKey(), true);
+                this.putUnsignedVarInt(entry.getValue() != null ? entry.getValue().getGroupId() : 0);
+            }
+        } else {
+            Collection<Item> items = this.creativeItems.getItems(this.gameVersion);
+            this.putUnsignedVarInt(items.size());
+            int creativeNetId = 1;
+            for (Item entry : items) {
+                this.putUnsignedVarInt(creativeNetId++);
+                this.putSlot(gameVersion, entry, this.protocol >= ProtocolInfo.v1_16_220);
+            }
         }
-        this.putArray(this.creativeItems.getCreativeItemDatas(), this::writeItem);
     }
 
     private void writeGroup(CreativeItemGroup group) {
         this.putLInt(group.getCategory().ordinal());
         this.putString(group.getName());
         this.putSlot(gameVersion, group.getIcon(), true);
-    }
-
-    private void writeItem(CreativeItemData data) {
-        this.putUnsignedVarInt(data.getNetId());
-        this.putSlot(gameVersion, data.getItem(), this.protocol >= ProtocolInfo.v1_16_220);
-        if (this.protocol >= ProtocolInfo.v1_21_60) {
-            this.putUnsignedVarInt(data.getGroupId());
-        }
     }
 
 }

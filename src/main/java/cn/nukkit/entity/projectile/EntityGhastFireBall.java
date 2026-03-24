@@ -3,10 +3,9 @@ package cn.nukkit.entity.projectile;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
-import cn.nukkit.event.entity.EntityDamageByEntityEvent;
-import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
+import cn.nukkit.event.entity.*;
 import cn.nukkit.level.GameRule;
+import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.WeakExplosion;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -83,10 +82,26 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
         super.onUpdate(currentTick);
         return !this.closed;
     }
-    
+
     @Override
     public void onCollideWithEntity(Entity entity) {
+        ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
+        this.server.getPluginManager().callEvent(hitEvent);
+        if (hitEvent.isCancelled()) {
+            return;
+        }
+
+        float damage = this.getResultDamage();
+        EntityDamageEvent ev;
+        if (this.shootingEntity == null) {
+            ev = new EntityDamageByEntityEvent(this, entity, EntityDamageEvent.DamageCause.PROJECTILE, damage);
+        } else {
+            ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, EntityDamageEvent.DamageCause.PROJECTILE, damage);
+        }
+
+        entity.attack(ev);
         this.isCollided = true;
+        entity.setOnFire(5);
     }
 
     @Override

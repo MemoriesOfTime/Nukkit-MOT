@@ -109,7 +109,7 @@ public class CameraPresetsPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_20) {
             if (this.protocol >= ProtocolInfo.v1_21_30) {
                 this.putOptionalNull(preset.getRotationSpeed(), this::putLFloat);
-                this.putOptionalNull(preset.getSnapToTarget(), (snapToTarget) -> this.putBoolean(snapToTarget.getAsBoolean()));
+                this.putOptional(o -> o != null && o.isPresent(), preset.getSnapToTarget(), (optional) -> this.putBoolean(optional.getAsBoolean()));
                 if (this.protocol >= ProtocolInfo.v1_21_40) {
                     this.putOptionalNull(preset.getHorizontalRotationLimit(), vector2f -> this.putVector2f(vector2f));
                     this.putOptionalNull(preset.getVerticalRotationLimit(), vector2f -> this.putVector2f(vector2f));

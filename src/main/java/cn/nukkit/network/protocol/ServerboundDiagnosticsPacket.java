@@ -67,6 +67,7 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putLFloat(this.avgFps);
         this.putLFloat(this.avgServerSimTickTimeMS);
         this.putLFloat(this.avgClientSimTickTimeMS);

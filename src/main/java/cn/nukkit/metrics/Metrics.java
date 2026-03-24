@@ -1,15 +1,16 @@
 package cn.nukkit.metrics;
 
 import cn.nukkit.utils.MainLogger;
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocketFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,17 +22,17 @@ import java.util.zip.GZIPOutputStream;
  * bStats collects some data for plugin authors.
  * <p>
  * Check out <a href="https://bStats.org/">...</a> to learn more about bStats!
+ * <p>
+ * DNS best IP selection and custom SSLSocketFactory adapted from
+ * <a href="https://github.com/mc-dreamland/Geyser/blob/netease/1.21/core/src/main/java/org/geysermc/geyser/util/Metrics.java">Geyser Metrics</a>
  */
 public class Metrics {
 
     private static final int B_STATS_VERSION = 1;
 
-    private static final Gson GSON = new Gson();
+    private static final String BSTATS_HOST = "bStats.org";
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-    // The url to which the data is sent
-    private static final String URL = "https://bStats.org/submitData/server-implementation";
 
     // A list with all custom charts
     private final List<CustomChart> charts = new ArrayList<>();
@@ -47,6 +48,11 @@ public class Metrics {
 
     // The logger for the failed requests
     private static MainLogger logger;
+
+    // Cache for DNS best-address selection (valid for 30 minutes)
+    private static final long ADDRESS_CACHE_DURATION_MS = 1000 * 60 * 30;
+    private static InetAddress cachedAddress;
+    private static long cacheExpireTime;
 
     public Metrics(String name, String serverUUID, boolean logFailedRequests, MainLogger logger) {
         this.name = name;
@@ -68,6 +74,13 @@ public class Metrics {
             throw new IllegalArgumentException("Chart cannot be null!");
         }
         charts.add(chart);
+    }
+
+    /**
+     * Shuts down the scheduler to prevent thread leaks.
+     */
+    public void shutdown() {
+        scheduler.shutdownNow();
     }
 
     /**
@@ -150,6 +163,100 @@ public class Metrics {
     }
 
     /**
+     * Resolves all IPs for the bStats host and selects the one with the lowest TCP connect latency.
+     * Falls back to the first resolved address if all TCP pings fail.
+     *
+     * @return The best InetAddress to connect to.
+     * @throws UnknownHostException If DNS resolution fails.
+     */
+    private static InetAddress selectBestAddress() throws UnknownHostException {
+        // Return cached result if still valid
+        if (cachedAddress != null && System.currentTimeMillis() < cacheExpireTime) {
+            return cachedAddress;
+        }
+
+        InetAddress[] addresses = InetAddress.getAllByName(BSTATS_HOST);
+        if (addresses.length == 1) {
+            cachedAddress = addresses[0];
+            cacheExpireTime = System.currentTimeMillis() + ADDRESS_CACHE_DURATION_MS;
+            return cachedAddress;
+        }
+
+        InetAddress bestAddress = addresses[0];
+        long bestLatency = Long.MAX_VALUE;
+
+        for (InetAddress address : addresses) {
+            long start = System.nanoTime();
+            try (Socket socket = new Socket()) {
+                socket.connect(new InetSocketAddress(address, 443), 3000);
+                long latency = System.nanoTime() - start;
+                if (latency < bestLatency) {
+                    bestLatency = latency;
+                    bestAddress = address;
+                }
+            } catch (IOException ignored) {
+                // This address is unreachable, skip it
+            }
+        }
+
+        // Only cache if at least one address was reachable
+        if (bestLatency < Long.MAX_VALUE) {
+            cachedAddress = bestAddress;
+            cacheExpireTime = System.currentTimeMillis() + ADDRESS_CACHE_DURATION_MS;
+        }
+
+        return bestAddress;
+    }
+
+    /**
+     * Creates an SSLSocketFactory decorator that routes hostname-based connections to the
+     * pre-selected best IP address, while preserving SNI for correct TLS handshake.
+     *
+     * @param targetAddress The pre-selected IP address to connect to.
+     * @return The routing SSLSocketFactory.
+     */
+    private static SSLSocketFactory createRoutingSocketFactory(InetAddress targetAddress) {
+        SSLSocketFactory delegate = (SSLSocketFactory) SSLSocketFactory.getDefault();
+        return new SSLSocketFactory() {
+            @Override
+            public String[] getDefaultCipherSuites() {
+                return delegate.getDefaultCipherSuites();
+            }
+
+            @Override
+            public String[] getSupportedCipherSuites() {
+                return delegate.getSupportedCipherSuites();
+            }
+
+            @Override
+            public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
+                return delegate.createSocket(s, host, port, autoClose);
+            }
+
+            @Override
+            public Socket createSocket(String host, int port) throws IOException {
+                // Route to pre-selected IP instead of resolving DNS again
+                return delegate.createSocket(targetAddress, port);
+            }
+
+            @Override
+            public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
+                return delegate.createSocket(targetAddress, port, localHost, localPort);
+            }
+
+            @Override
+            public Socket createSocket(InetAddress host, int port) throws IOException {
+                return delegate.createSocket(host, port);
+            }
+
+            @Override
+            public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
+                return delegate.createSocket(address, port, localAddress, localPort);
+            }
+        };
+    }
+
+    /**
      * Sends the data to the bStats server.
      *
      * @param data The data to send.
@@ -160,7 +267,19 @@ public class Metrics {
             throw new IllegalArgumentException("Data cannot be null!");
         }
 
-        HttpsURLConnection connection = (HttpsURLConnection) new java.net.URL(URL).openConnection();
+        InetAddress bestAddress = selectBestAddress();
+
+        // Use the real hostname in URL so Java's internal hostname check and SNI work naturally.
+        // The custom socket factory routes the connection to the pre-selected best IP.
+        URL url = URI.create("https://" + BSTATS_HOST + "/submitData/server-implementation").toURL();
+        HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+
+        // Route to best IP without re-resolving DNS
+        connection.setSSLSocketFactory(createRoutingSocketFactory(bestAddress));
+
+        // Set timeouts to avoid hanging requests
+        connection.setConnectTimeout(60000);
+        connection.setReadTimeout(60000);
 
         // Compress the data to save bandwidth
         byte[] compressedData = compress(data.toString());
@@ -176,12 +295,18 @@ public class Metrics {
 
         // Send data
         connection.setDoOutput(true);
-        DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream());
-        outputStream.write(compressedData);
-        outputStream.flush();
-        outputStream.close();
+        try (DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream())) {
+            outputStream.write(compressedData);
+            outputStream.flush();
+        }
 
-        connection.getInputStream().close(); // We don't care about the response - Just send our data :)
+        // Check response code for debugging
+        int responseCode = connection.getResponseCode();
+        if (responseCode != 200 && logFailedRequests) {
+            logger.warning("bStats returned HTTP " + responseCode);
+        }
+
+        connection.getInputStream().close();
     }
 
     /**
@@ -196,9 +321,9 @@ public class Metrics {
             return null;
         }
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        GZIPOutputStream gzip = new GZIPOutputStream(outputStream);
-        gzip.write(str.getBytes(StandardCharsets.UTF_8));
-        gzip.close();
+        try (GZIPOutputStream gzip = new GZIPOutputStream(outputStream)) {
+            gzip.write(str.getBytes(StandardCharsets.UTF_8));
+        }
         return outputStream.toByteArray();
     }
 

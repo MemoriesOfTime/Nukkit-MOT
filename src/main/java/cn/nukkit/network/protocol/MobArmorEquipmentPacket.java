@@ -12,17 +12,17 @@ public class MobArmorEquipmentPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.MOB_ARMOR_EQUIPMENT_PACKET;
 
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
     public long eid;
     public Item[] slots = new Item[4];
     /**
      * @since v712
      */
     public Item body = Item.AIR_ITEM;
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public void decode() {
@@ -41,12 +41,12 @@ public class MobArmorEquipmentPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putEntityRuntimeId(this.eid);
-        this.putSlot(gameVersion, this.slots[0]);
-        this.putSlot(gameVersion, this.slots[1]);
-        this.putSlot(gameVersion, this.slots[2]);
-        this.putSlot(gameVersion, this.slots[3]);
+        this.putSlot(this.gameVersion, this.slots[0]);
+        this.putSlot(this.gameVersion, this.slots[1]);
+        this.putSlot(this.gameVersion, this.slots[2]);
+        this.putSlot(this.gameVersion, this.slots[3]);
         if (this.protocol >= ProtocolInfo.v1_21_20) {
-            this.putSlot(gameVersion, this.body);
+            this.putSlot(this.gameVersion, this.body);
         }
     }
 }

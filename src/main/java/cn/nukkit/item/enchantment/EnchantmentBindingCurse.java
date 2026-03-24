@@ -20,4 +20,9 @@ public class EnchantmentBindingCurse extends Enchantment {
     public boolean isTreasure() {
         return true;
     }
+
+    @Override
+    public boolean isCurse() {
+        return true;
+    }
 }

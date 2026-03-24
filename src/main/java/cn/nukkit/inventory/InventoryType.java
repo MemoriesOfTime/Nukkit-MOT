@@ -27,7 +27,7 @@ public enum InventoryType {
     BEACON(1, "Beacon", 13), //1 INPUT
     LOOM(4, "Loom", 24), //4 CONTAINER
     CHEST_BOAT(27, "Chest Boat", 0),// 34 CONTAINER
-    ENTITY_ARMOR(4, "Entity Armor", -1), //4 ARMOR
+    ENTITY_ARMOR(5, "Entity Armor", -1), //4 ARMOR
     ENTITY_EQUIPMENT(36, "Entity Equipment", -1), //36 CONTAINER
     MINECART_CHEST(27, "Minecart with Chest", 0), //27 CONTAINER
     MINECART_HOPPER(5, "Minecart with Hopper", 8), //5 CONTAINER
@@ -35,7 +35,8 @@ public enum InventoryType {
     TRADING(3, "Villager Trade", 15), //3 CONTAINER
     BARREL(27, "Barrel", 0),
     SMITHING_TABLE(3, "Smithing Table", 33),
-    GRINDSTONE(3, "Grindstone", 26);;
+    GRINDSTONE(3, "Grindstone", 26),
+    STONECUTTER(2, "Stonecutter", 29);
 
     private final int size;
     private final String title;

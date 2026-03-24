@@ -82,7 +82,8 @@ public class CameraSplinePacket extends DataPacket {
             this.putString(spline.getName());
             CameraSplineInstruction instruction = spline.getInstruction();
             this.putLFloat(instruction.getTotalTime());
-            this.putByte((byte) instruction.getType().ordinal());
+            CameraSplineType splineType = instruction.getType() != null ? instruction.getType() : CameraSplineType.CATMULL_ROM;
+            this.putByte((byte) splineType.ordinal());
 
             // Write curve points
             this.putUnsignedVarInt(instruction.getCurve().size());
@@ -95,7 +96,8 @@ public class CameraSplinePacket extends DataPacket {
             for (CameraSplineInstruction.SplineProgressOption progress : instruction.getProgressKeyFrames()) {
                 this.putLFloat(progress.getValue());
                 this.putLFloat(progress.getTime());
-                this.putLInt(progress.getEasingFunc().ordinal());
+                CameraEase easingFunc = progress.getEasingFunc() != null ? progress.getEasingFunc() : CameraEase.LINEAR;
+                this.putLInt(easingFunc.ordinal());
             }
 
             // Write rotation options

@@ -82,6 +82,12 @@ dependencies {
 
     api(libs.block.state.updater)
 
+    testImplementation(libs.cloudburst.bedrock.codec) {
+        exclude("io.netty", "netty-buffer")
+    }
+    testImplementation(libs.cloudburst.math)
+    testImplementation(libs.allay.protocol.extension)
+
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.bundles.mockito)
     testRuntimeOnly(libs.junit.engine)

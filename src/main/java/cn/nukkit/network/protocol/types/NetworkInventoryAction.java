@@ -250,6 +250,15 @@ public class NetworkInventoryAction {
                             this.windowId = Player.GRINDSTONE_WINDOW_ID;
                             this.inventorySlot = 1;
                             break;
+                        //124:3 -> 8:0
+                        case StonecutterInventory.STONECUTTER_INPUT_UI_SLOT:
+                            if (!(player.getWindowById(Player.STONECUTTER_WINDOW_ID) instanceof StonecutterInventory)) {
+                                player.getServer().getLogger().debug(player.getName() + " does not have stonecutter window open");
+                                return null;
+                            }
+                            this.windowId = Player.STONECUTTER_WINDOW_ID;
+                            this.inventorySlot = 0;
+                            break;
                         //124:4 -> 500:0
                         case TradeInventory.TRADE_INPUT1_UI_SLOT:
                             if (player.getWindowById(Player.TRADE_WINDOW_ID) == null) {
@@ -326,8 +335,14 @@ public class NetworkInventoryAction {
                         }
                         return new SlotChangeAction(inventory.get(), this.inventorySlot, this.oldItem, this.newItem);
                     case SOURCE_TYPE_CRAFTING_RESULT:
+                        if (player.getWindowById(Player.STONECUTTER_WINDOW_ID) instanceof StonecutterInventory) {
+                            return new StonecutterItemAction(this.oldItem, this.newItem, SOURCE_TYPE_CRAFTING_RESULT);
+                        }
                         return new CraftingTakeResultAction(this.oldItem, this.newItem);
                     case SOURCE_TYPE_CRAFTING_USE_INGREDIENT:
+                        if (player.getWindowById(Player.STONECUTTER_WINDOW_ID) instanceof StonecutterInventory) {
+                            return new StonecutterItemAction(this.oldItem, this.newItem, SOURCE_TYPE_CRAFTING_USE_INGREDIENT);
+                        }
                         Inventory inv = player.getWindowById(Player.LOOM_WINDOW_ID);
                         if (inv instanceof LoomInventory loomInventory) {
                             return new LoomItemAction(this.oldItem, this.newItem, loomInventory);

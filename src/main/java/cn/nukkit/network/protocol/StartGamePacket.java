@@ -191,6 +191,7 @@ public class StartGamePacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override

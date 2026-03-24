@@ -62,4 +62,22 @@ public interface ItemNamespaceId {
     String COPPER_BOOTS = "minecraft:copper_boots";
     String COPPER_NUGGET = "minecraft:copper_nugget";
 
+    String WHITE_HARNESS = "minecraft:white_harness";
+    String LIGHT_GRAY_HARNESS = "minecraft:light_gray_harness";
+    String GRAY_HARNESS = "minecraft:gray_harness";
+    String BLACK_HARNESS = "minecraft:black_harness";
+    String BROWN_HARNESS = "minecraft:brown_harness";
+    String RED_HARNESS = "minecraft:red_harness";
+    String ORANGE_HARNESS = "minecraft:orange_harness";
+    String YELLOW_HARNESS = "minecraft:yellow_harness";
+    String LIME_HARNESS = "minecraft:lime_harness";
+    String GREEN_HARNESS = "minecraft:green_harness";
+    String CYAN_HARNESS = "minecraft:cyan_harness";
+    String LIGHT_BLUE_HARNESS = "minecraft:light_blue_harness";
+    String BLUE_HARNESS = "minecraft:blue_harness";
+    String PURPLE_HARNESS = "minecraft:purple_harness";
+    String MAGENTA_HARNESS = "minecraft:magenta_harness";
+    String PINK_HARNESS = "minecraft:pink_harness";
+
+    String HAPPY_GHAST_SPAWN_EGG = "minecraft:happy_ghast_spawn_egg";
 }

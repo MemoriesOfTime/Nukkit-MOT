@@ -28,6 +28,7 @@ public class ContainerRegistryCleanupPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override

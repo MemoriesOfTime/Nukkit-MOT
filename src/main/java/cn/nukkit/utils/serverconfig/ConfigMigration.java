@@ -2,11 +2,11 @@ package cn.nukkit.utils.serverconfig;
 
 import cn.nukkit.utils.Config;
 import lombok.extern.log4j.Log4j2;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.StringTokenizer;
+import java.io.*;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
@@ -16,6 +16,64 @@ import java.util.function.Consumer;
  */
 @Log4j2
 public class ConfigMigration {
+
+    /**
+     * Migrate renamed YAML keys in nukkit-mot.yml before OkaeriConfig loads it.
+     * This handles key renames within the YAML file itself (not server.properties migration).
+     */
+    @SuppressWarnings("unchecked")
+    public static void migrateYamlKeys(File configFile) {
+        if (!configFile.exists()) {
+            return;
+        }
+        try {
+            Yaml yaml = new Yaml();
+            Map<String, Object> root;
+            try (InputStream in = new FileInputStream(configFile)) {
+                root = yaml.load(in);
+            }
+            if (root == null) {
+                return;
+            }
+
+            boolean changed = false;
+
+            // Migrate enable-rak-send-cookie (boolean) -> rak-cookie-mode (string)
+            Object networkObj = root.get("network-settings");
+            if (networkObj instanceof Map<?, ?> networkMap) {
+                Map<String, Object> network = (Map<String, Object>) networkMap;
+                if (network.containsKey("enable-rak-send-cookie") && !network.containsKey("rak-cookie-mode")) {
+                    Object oldValue = network.remove("enable-rak-send-cookie");
+                    String mode;
+                    if (oldValue instanceof Boolean b) {
+                        mode = b ? "active" : "off";
+                    } else {
+                        String s = String.valueOf(oldValue).trim().toLowerCase(Locale.ROOT);
+                        mode = switch (s) {
+                            case "true", "on", "yes", "1" -> "active";
+                            case "false", "off", "no", "0" -> "off";
+                            default -> s;
+                        };
+                    }
+                    network.put("rak-cookie-mode", mode);
+                    changed = true;
+                    log.info("Migrated 'enable-rak-send-cookie: {}' to 'rak-cookie-mode: {}' in nukkit-mot.yml", oldValue, mode);
+                }
+            }
+
+            if (changed) {
+                DumperOptions options = new DumperOptions();
+                options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+                options.setPrettyFlow(true);
+                Yaml dumper = new Yaml(options);
+                try (Writer writer = new FileWriter(configFile)) {
+                    dumper.dump(root, writer);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to pre-migrate nukkit-mot.yml keys, will use defaults", e);
+        }
+    }
 
     private final Config properties;
     private final ServerConfig serverConfig;
@@ -54,7 +112,7 @@ public class ConfigMigration {
         migrated |= migrateInt("chunk-compression-level", serverConfig.networkSettings()::chunkCompressionLevel);
         migrated |= migrateBoolean("use-snappy-compression", serverConfig.networkSettings()::useSnappyCompression);
         migrated |= migrateInt("rak-packet-limit", serverConfig.networkSettings()::rakPacketLimit);
-        migrated |= migrateBoolean("enable-rak-send-cookie", serverConfig.networkSettings()::enableRakSendCookie);
+        migrated |= migrateRakCookieMode("enable-rak-send-cookie", serverConfig.networkSettings()::rakCookieMode);
         migrated |= migrateInt("timeout-milliseconds", serverConfig.networkSettings()::timeoutMilliseconds);
         migrated |= migrateBoolean("query-plugins", serverConfig.networkSettings()::queryPlugins);
         migrated |= migrateBoolean("use-waterdog", serverConfig.networkSettings()::useWaterdog);
@@ -212,6 +270,21 @@ public class ConfigMigration {
                 default -> "ignore";
             };
             setter.accept(normalized);
+            properties.remove(key);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean migrateRakCookieMode(String key, Consumer<String> setter) {
+        if (properties.exists(key)) {
+            String value = String.valueOf(properties.get(key)).trim().toLowerCase(Locale.ROOT);
+            String mode = switch (value) {
+                case "on", "true", "1", "yes" -> "active";
+                case "off", "false", "0", "no" -> "off";
+                default -> value;
+            };
+            setter.accept(mode);
             properties.remove(key);
             return true;
         }

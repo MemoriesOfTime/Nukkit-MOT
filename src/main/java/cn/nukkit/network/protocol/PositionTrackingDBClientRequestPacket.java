@@ -16,8 +16,16 @@ public class PositionTrackingDBClientRequestPacket extends DataPacket {
         return action;
     }
 
+    public void setAction(Action action) {
+        this.action = action;
+    }
+
     public int getTrackingId() {
         return trackingId;
+    }
+
+    public void setTrackingId(int trackingId) {
+        this.trackingId = trackingId;
     }
 
     @Override

@@ -221,7 +221,7 @@ public class ConfigTest {
         Assertions.assertEquals(2, config.networkSettings().zlibProvider());
         Assertions.assertEquals(5, config.networkSettings().compressionLevel());
         Assertions.assertFalse(config.networkSettings().useSnappyCompression());
-        Assertions.assertTrue(config.networkSettings().enableRakSendCookie());
+        Assertions.assertEquals("active", config.networkSettings().rakCookieMode());
 
         // Chunk
         Assertions.assertEquals(4, config.chunkSettings().sendingPerTick());

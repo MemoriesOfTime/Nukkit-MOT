@@ -9,7 +9,6 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.custom.CustomEntity;
 import cn.nukkit.level.Location;
 import cn.nukkit.network.protocol.AddEntityPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.common.collect.ImmutableMap;
 import org.jetbrains.annotations.Nullable;
 
@@ -26,7 +25,7 @@ public class Type extends CachedSimpleSelectorArgument {
     public static final Map<String, Integer> ENTITY_TYPE2ID;
 
     static {
-        AddEntityPacket.setupLegacyIdentifiers(ENTITY_ID2TYPE, ProtocolInfo.CURRENT_PROTOCOL);
+        AddEntityPacket.setupLegacyIdentifiers(ENTITY_ID2TYPE);
         ImmutableMap.Builder<String, Integer> builder = ImmutableMap.builder();
         ENTITY_ID2TYPE.forEach((id, name) -> builder.put(name, id));
         ENTITY_TYPE2ID = builder.build();

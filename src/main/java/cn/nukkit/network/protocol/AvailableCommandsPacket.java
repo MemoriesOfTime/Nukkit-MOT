@@ -496,7 +496,7 @@ public class AvailableCommandsPacket extends DataPacket {
         }
 
         // Constraints
-        if (protocol >= 407) {
+        if (protocol >= 388) {
             this.putUnsignedVarInt(0); //enumConstraints
         }
     }

@@ -17,12 +17,13 @@ public class ModalFormRequestPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putVarInt(this.formId);
+        this.putUnsignedVarInt(this.formId);
         this.putString(this.data);
     }
 }

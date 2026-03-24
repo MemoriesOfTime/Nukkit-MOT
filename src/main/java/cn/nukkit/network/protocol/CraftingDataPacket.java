@@ -31,6 +31,7 @@ public class CraftingDataPacket extends DataPacket {
     public static final String CRAFTING_TAG_SMITHING_TABLE = "smithing_table";
 
     private List<Recipe> entries = new ArrayList<>();
+    private final List<StonecutterRecipe> stonecutterEntries = new ArrayList<>();
     private final List<BrewingRecipe> brewingEntries = new ArrayList<>();
     private final List<ContainerRecipe> containerEntries = new ArrayList<>();
     public boolean cleanRecipes = true;
@@ -55,6 +56,10 @@ public class CraftingDataPacket extends DataPacket {
         Collections.addAll(entries, recipe);
     }
 
+    public void addStonecutterRecipe(StonecutterRecipe... recipe) {
+        Collections.addAll(stonecutterEntries, recipe);
+    }
+
     public void addContainerRecipe(ContainerRecipe... recipe) {
         Collections.addAll(containerEntries, recipe);
     }
@@ -62,17 +67,23 @@ public class CraftingDataPacket extends DataPacket {
     @Override
     public DataPacket clean() {
         entries = new ArrayList<>();
+        stonecutterEntries.clear();
         return super.clean();
     }
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(protocol >= ProtocolInfo.v1_20_0_23 ? entries.size() + 1 : entries.size());//1.20.0+ 有额外的smithing_trim
+        int totalCount = entries.size();
+        if (protocol >= 354) {
+            totalCount += stonecutterEntries.size();
+        }
+        this.putUnsignedVarInt(protocol >= ProtocolInfo.v1_20_0_23 ? totalCount + 1 : totalCount);//1.20.0+ 有额外的smithing_trim
 
         if (protocol < 354) {
             BinaryStream writer = new BinaryStream();
@@ -202,6 +213,35 @@ public class CraftingDataPacket extends DataPacket {
                             this.putUnsignedVarInt(((MultiRecipe) recipe).getNetworkId());
                             break;
                         }
+                }
+            }
+
+            // Stonecutter recipes (encoded as SHAPELESS with "stonecutter" tag)
+            for (StonecutterRecipe recipe : stonecutterEntries) {
+                this.putVarInt(RecipeType.SHAPELESS.getNetworkType(protocol));
+                if (protocol >= 361) {
+                    this.putString(recipe.getRecipeId());
+                }
+                this.putUnsignedVarInt(1); // 1 ingredient
+                if (protocol < 361) {
+                    this.putSlot(gameVersion, recipe.getIngredient());
+                } else {
+                    this.putRecipeIngredient(gameVersion, recipe.getIngredient());
+                }
+                this.putUnsignedVarInt(1); // 1 result
+                this.putSlot(gameVersion, recipe.getResult(), protocol >= ProtocolInfo.v1_16_100);
+                this.putUUID(recipe.getId());
+                if (protocol >= 354) {
+                    this.putString(CRAFTING_TAG_STONECUTTER);
+                    if (protocol >= 361) {
+                        this.putVarInt(recipe.getPriority());
+                        if (protocol >= 407) {
+                            if (protocol >= ProtocolInfo.v1_21_0) {
+                                this.putByte((byte) RecipeUnlockingRequirement.UnlockingContext.ALWAYS_UNLOCKED.ordinal());
+                            }
+                            this.putUnsignedVarInt(recipe.getNetworkId());
+                        }
+                    }
                 }
             }
 

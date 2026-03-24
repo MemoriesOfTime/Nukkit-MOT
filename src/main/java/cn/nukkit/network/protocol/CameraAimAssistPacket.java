@@ -42,7 +42,7 @@ public class CameraAimAssistPacket extends DataPacket {
             this.setPresetId(this.getString());
         }
         this.setViewAngle(this.getVector2f());
-        this.setDistance(this.getFloat());
+        this.setDistance(this.getLFloat());
         this.setTargetMode(CameraAimAssistPacket.TargetMode.values()[this.getByte()]);
         this.setAction(CameraAimAssistPacket.Action.values()[this.getByte()]);
         if (protocol >= ProtocolInfo.v1_21_100) {
@@ -52,11 +52,12 @@ public class CameraAimAssistPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         if (protocol >= ProtocolInfo.v1_21_50) {
             this.putString(this.presetId);
         }
         this.putVector2f(this.getViewAngle());
-        this.putFloat(this.getDistance());
+        this.putLFloat(this.getDistance());
         this.putByte((byte) this.getTargetMode().ordinal());
         this.putByte((byte) this.getAction().ordinal());
         if (protocol >= ProtocolInfo.v1_21_100) {
