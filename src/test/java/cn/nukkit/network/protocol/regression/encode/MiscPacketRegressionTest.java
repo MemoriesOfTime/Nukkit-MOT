@@ -76,6 +76,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testGameRulesChangedPacket(int protocolVersion) {
         var nukkitPacket = new GameRulesChangedPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.gameRules = new GameRules();
         nukkitPacket.encode();
 
@@ -90,6 +91,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testAvailableEntityIdentifiersPacket(int protocolVersion) {
         var nukkitPacket = new AvailableEntityIdentifiersPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -103,6 +105,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testBiomeDefinitionListPacket(int protocolVersion) {
         var nukkitPacket = new BiomeDefinitionListPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -116,6 +119,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testRiderJumpPacket(int protocolVersion) {
         var nukkitPacket = new RiderJumpPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.jumpStrength = 5;
         nukkitPacket.encode();
 
@@ -130,6 +134,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testResourcePacksInfoPacket(int protocolVersion) {
         var nukkitPacket = new ResourcePacksInfoPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -156,6 +161,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testHurtArmorPacket(int protocolVersion) {
         var nukkitPacket = new HurtArmorPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.damage = 10;
         nukkitPacket.encode();
 
@@ -172,6 +178,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testMovementEffectPacket(int protocolVersion) {
         var nukkitPacket = new MovementEffectPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.targetRuntimeID = 100;
         nukkitPacket.effectType = MovementEffectType.DOLPHIN_BOOST;
         nukkitPacket.effectDuration = 200;
@@ -194,6 +201,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testSetMovementAuthorityPacket(int protocolVersion) {
         var nukkitPacket = new SetMovementAuthorityPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.serverAuthMovementMode = ServerAuthMovementMode.SERVER_AUTHORITATIVE_V2;
         nukkitPacket.encode();
 
@@ -210,6 +218,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testPlayerLocationPacketCoordinates(int protocolVersion) {
         var nukkitPacket = new PlayerLocationPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.type = PlayerLocationPacket.Type.COORDINATES;
         nukkitPacket.targetEntityId = 100;
         nukkitPacket.position = new Vector3f(100.5f, 64.0f, 200.5f);
@@ -230,6 +239,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testPlayerLocationPacketHide(int protocolVersion) {
         var nukkitPacket = new PlayerLocationPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.type = PlayerLocationPacket.Type.HIDE;
         nukkitPacket.targetEntityId = 100;
         nukkitPacket.encode();
@@ -248,6 +258,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testToggleCrafterSlotRequestPacket(int protocolVersion) {
         var nukkitPacket = new ToggleCrafterSlotRequestPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setBlockPosition(new cn.nukkit.math.Vector3f(100, 64, 200));
         nukkitPacket.slot = 3;
         nukkitPacket.disabled = true;
@@ -270,6 +281,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testCommandBlockUpdatePacketBlock(int protocolVersion) {
         var nukkitPacket = new CommandBlockUpdatePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.isBlock = true;
         nukkitPacket.x = 100;
         nukkitPacket.y = 64;
@@ -303,6 +315,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testCommandBlockUpdatePacketMinecart(int protocolVersion) {
         var nukkitPacket = new CommandBlockUpdatePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.isBlock = false;
         nukkitPacket.minecartEid = 42;
         nukkitPacket.command = "say world";
@@ -336,6 +349,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testAwardAchievementPacket(int protocolVersion) {
         var nukkitPacket = new AwardAchievementPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.achievementId = 42;
         nukkitPacket.encode();
 
@@ -352,6 +366,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testChangeMobPropertyPacket(int protocolVersion) {
         var nukkitPacket = new ChangeMobPropertyPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setUniqueEntityId(12345L);
         nukkitPacket.setProperty("test_property");
         nukkitPacket.setBoolValue(true);
@@ -402,6 +417,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testUnlockedRecipesPacket(int protocolVersion) {
         var nukkitPacket = new UnlockedRecipesPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.action = UnlockedRecipesPacket.ActionType.NEWLY_UNLOCKED;
         nukkitPacket.getUnlockedRecipes().add("recipe1");
         nukkitPacket.getUnlockedRecipes().add("recipe2");
@@ -426,6 +442,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testTrimDataPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.TrimDataPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.getPatterns().add(new cn.nukkit.network.protocol.types.TrimPattern("item1", "pattern1"));
         nukkitPacket.getPatterns().add(new cn.nukkit.network.protocol.types.TrimPattern("item2", "pattern2"));
         nukkitPacket.getMaterials().add(new cn.nukkit.network.protocol.types.TrimMaterial("material1", "color1", "itemName1"));
@@ -448,6 +465,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testEventPacket(int protocolVersion) {
         var nukkitPacket = new EventPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.eid = 123456789L;
         nukkitPacket.unknown1 = 42;
         nukkitPacket.unknown2 = (byte) EventPacket.TYPE_BELL_BLOCK_USED;
@@ -469,6 +487,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testLevelEventGenericPacket(int protocolVersion) {
         var nukkitPacket = new LevelEventGenericPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.eventId = 17;
         nukkitPacket.tag = new CompoundTag("")
                 .putString("name", "test")
@@ -504,6 +523,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testAddVolumeEntityPacketMinimal(int protocolVersion) {
         var nukkitPacket = new AddVolumeEntityPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setId(100);
         nukkitPacket.setData(new CompoundTag("").putString("name", "test_volume"));
         nukkitPacket.encode();
@@ -519,6 +539,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testAddVolumeEntityPacketWithEngine(int protocolVersion) {
         var nukkitPacket = new AddVolumeEntityPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setId(100);
         nukkitPacket.setData(new CompoundTag("").putString("name", "test_volume"));
         nukkitPacket.setEngineVersion("1.17.40");
@@ -536,6 +557,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testAddVolumeEntityPacketFull(int protocolVersion) {
         var nukkitPacket = new AddVolumeEntityPacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.setId(100);
         nukkitPacket.setData(new CompoundTag("").putString("name", "test_volume"));
         nukkitPacket.setEngineVersion("1.20.0");
@@ -559,6 +581,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     void testUpdateTradePacket(int protocolVersion) {
         var nukkitPacket = new UpdateTradePacket();
         nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.windowId = 1;
         nukkitPacket.windowType = 15;
         nukkitPacket.size = 0;
