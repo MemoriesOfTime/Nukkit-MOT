@@ -1407,9 +1407,11 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         UpdateClientInputLocksPacket nk = crossEncode(cb, UpdateClientInputLocksPacket::new, protocol);
 
         assertEquals(0, nk.lockComponentData);
-        assertEquals(1.5f, nk.serverPosition.x, 0.001f);
-        assertEquals(64.5f, nk.serverPosition.y, 0.001f);
-        assertEquals(-2.5f, nk.serverPosition.z, 0.001f);
+        if (protocol < ProtocolInfo.v1_26_10) {
+            assertEquals(1.5f, nk.serverPosition.x, 0.001f);
+            assertEquals(64.5f, nk.serverPosition.y, 0.001f);
+            assertEquals(-2.5f, nk.serverPosition.z, 0.001f);
+        }
     }
 
     // ==================== UnlockedRecipesPacket ====================

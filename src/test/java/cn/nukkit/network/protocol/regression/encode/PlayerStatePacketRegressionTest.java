@@ -170,9 +170,11 @@ public class PlayerStatePacketRegressionTest extends AbstractPacketRegressionTes
 
         // CAMERA (1<<1=2) | MOVEMENT (1<<2=4) = 6
         assertEquals(6, cbPacket.getLockComponentData());
-        assertEquals(100.5f, cbPacket.getServerPosition().getX(), 0.001f);
-        assertEquals(64.0f, cbPacket.getServerPosition().getY(), 0.001f);
-        assertEquals(200.5f, cbPacket.getServerPosition().getZ(), 0.001f);
+        if (protocolVersion < ProtocolInfo.v1_26_10) {
+            assertEquals(100.5f, cbPacket.getServerPosition().getX(), 0.001f);
+            assertEquals(64.0f, cbPacket.getServerPosition().getY(), 0.001f);
+            assertEquals(200.5f, cbPacket.getServerPosition().getZ(), 0.001f);
+        }
     }
 
     // ==================== SetPlayerInventoryOptionsPacket ====================
