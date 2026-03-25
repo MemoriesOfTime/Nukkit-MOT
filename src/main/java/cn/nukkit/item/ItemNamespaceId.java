@@ -80,6 +80,4 @@ public interface ItemNamespaceId {
     String PURPLE_HARNESS = "minecraft:purple_harness";
     String MAGENTA_HARNESS = "minecraft:magenta_harness";
     String PINK_HARNESS = "minecraft:pink_harness";
-
-    String HAPPY_GHAST_SPAWN_EGG = "minecraft:happy_ghast_spawn_egg";
 }
