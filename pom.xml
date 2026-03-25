@@ -90,7 +90,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta12-20260313.231142-8</version>
+            <version>3.0.0.Beta12-20260324.161234-12</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -411,7 +411,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>bedrock-codec</artifactId>
-            <version>3.0.0.Beta12-20260313.231142-8</version>
+            <version>3.0.0.Beta12-20260324.161234-12</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>

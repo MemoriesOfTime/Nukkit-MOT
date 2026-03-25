@@ -314,7 +314,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
 
         var rotationOptions = new ArrayList<CameraSplineInstruction.SplineRotationOption>();
         rotationOptions.add(new CameraSplineInstruction.SplineRotationOption(
-                new Vector3f(45, 90, 0), 2.0f));
+                new Vector3f(45, 90, 0), 2.0f, CameraEase.LINEAR));
 
         var instruction = new CameraSplineInstruction(
                 5.0f, CameraSplineType.CATMULL_ROM,
@@ -336,7 +336,7 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
         assertEquals(1, spline.getInstruction().getProgressKeyFrames().size());
         assertEquals(0.5f, spline.getInstruction().getProgressKeyFrames().get(0).getValue(), 0.001f);
         assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.LINEAR,
-                spline.getInstruction().getProgressKeyFrames().get(0).getEasingFunc());
+                spline.getInstruction().getProgressKeyFrames().get(0).getEase());
         assertEquals(1, spline.getInstruction().getRotationOption().size());
         assertEquals(2.0f, spline.getInstruction().getRotationOption().get(0).getKeyFrameTimes(), 0.001f);
     }

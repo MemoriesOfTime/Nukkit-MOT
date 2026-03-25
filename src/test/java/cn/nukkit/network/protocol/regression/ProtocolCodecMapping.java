@@ -116,11 +116,11 @@ public final class ProtocolCodecMapping {
         codecs.put(818, Bedrock_v818.CODEC);   // 1.21.90
         codecs.put(819, Bedrock_v819.CODEC);   // 1.21.93
         codecs.put(827, Bedrock_v827.CODEC);   // 1.21.100
-        codecs.put(844, Bedrock_v844.CODEC);   // 1.21.110
-        codecs.put(859, Bedrock_v859.CODEC);   // 1.21.120
+        codecs.put(844, Bedrock_v844.CODEC);   // 1.21.111 - 1.21.114
+        codecs.put(859, Bedrock_v859.CODEC);   // 1.21.120 - 1.21.123
         codecs.put(860, Bedrock_v860.CODEC);   // 1.21.124
-        codecs.put(898, Bedrock_v898.CODEC);   // 1.21.130
-        codecs.put(924, Bedrock_v924.CODEC);   // 1.26.0
+        codecs.put(898, Bedrock_v898.CODEC);   // 1.21.130 - 1.21.132
+        codecs.put(924, Bedrock_v924.CODEC);   // 1.26.0 - 1.26.3
         codecs.put(944, Bedrock_v944.CODEC);   // 1.26.10
         CODECS = Collections.unmodifiableMap(codecs);
     }
