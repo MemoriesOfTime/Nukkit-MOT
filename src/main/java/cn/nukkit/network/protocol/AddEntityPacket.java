@@ -261,7 +261,20 @@ public class AddEntityPacket extends DataPacket {
         if (this.protocol < ProtocolInfo.v1_21_90) {
             if (this.type == EntityHappyGhast.NETWORK_ID) return "minecraft:ghast";
         }
+        if (this.protocol < ProtocolInfo.v1_21_50) {
+            if (this.type == EntityCreaking.NETWORK_ID) return "minecraft:enderman";
+            if (this.type == 145) return "minecraft:lingering_potion";
+        }
+        if (this.protocol < ProtocolInfo.v1_21_0) {
+            if (this.type == EntityBogged.NETWORK_ID) return "minecraft:skeleton";
+            if (this.type == EntityBreeze.NETWORK_ID) return "minecraft:blaze";
+            if (this.type == EntityWindCharge.NETWORK_ID || this.type == EntityBreezeWindCharge.NETWORK_ID) return "minecraft:snowball";
+        }
+        if (this.protocol < ProtocolInfo.v1_20_80) {
+            if (this.type == EntityArmadillo.NETWORK_ID) return "minecraft:pig";
+        }
         if (this.protocol < ProtocolInfo.v1_20_0_23) {
+            if (this.type == EntitySniffer.NETWORK_ID) return "minecraft:pig";
             if (this.type == EntityCamel.NETWORK_ID) return "minecraft:horse";
         }
         if (this.protocol < ProtocolInfo.v1_19_0) {
