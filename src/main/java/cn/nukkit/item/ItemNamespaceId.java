@@ -48,6 +48,8 @@ public interface ItemNamespaceId {
 
     String OMINOUS_BOTTLE = "minecraft:ominous_bottle";
 
+    String BREEZE_ROD = "minecraft:breeze_rod";
+
     String BLUE_EGG = "minecraft:blue_egg";
     String BROWN_EGG = "minecraft:brown_egg";
 
@@ -78,6 +80,4 @@ public interface ItemNamespaceId {
     String PURPLE_HARNESS = "minecraft:purple_harness";
     String MAGENTA_HARNESS = "minecraft:magenta_harness";
     String PINK_HARNESS = "minecraft:pink_harness";
-
-    String HAPPY_GHAST_SPAWN_EGG = "minecraft:happy_ghast_spawn_egg";
 }

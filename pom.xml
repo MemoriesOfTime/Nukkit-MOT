@@ -44,13 +44,13 @@
         <jose4j.version>0.9.6</jose4j.version>
         <nukkitx-natives.version>1.0.3</nukkitx-natives.version>
         <raknet.version>1.0.0.CR3-20260317.160234-28</raknet.version>
-        <cloudburst-common.version>3.0.0.Beta12-20260313.231142-8</cloudburst-common.version>
+        <cloudburst-common.version>3.0.0.Beta12-20260324.161234-12</cloudburst-common.version>
         <jackson-dataformat-toml.version>2.20.1</jackson-dataformat-toml.version>
         <eu.okaeri.version>6.1.0-beta.1</eu.okaeri.version>
 
         <!-- Test -->
-        <org.allaymc.version>0.1.6</org.allaymc.version>
-        <org.cloudburstmc.math.version>2.0-SNAPSHOT</org.cloudburstmc.math.version>
+        <allaymc.version>0.1.6</allaymc.version>
+        <cloudburstmc-math.version>2.0-SNAPSHOT</cloudburstmc-math.version>
         <junit.version>6.0.3</junit.version>
         <mockito.version>5.17.0</mockito.version>
         <bytebuddy.version>1.17.5</bytebuddy.version>
@@ -523,13 +523,13 @@
         <dependency>
             <groupId>org.cloudburstmc.math</groupId>
             <artifactId>immutable</artifactId>
-            <version>${org.cloudburstmc.math.version}</version>
+            <version>${cloudburstmc-math.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.allaymc</groupId>
             <artifactId>protocol-extension</artifactId>
-            <version>${org.allaymc.version}</version>
+            <version>${allaymc.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

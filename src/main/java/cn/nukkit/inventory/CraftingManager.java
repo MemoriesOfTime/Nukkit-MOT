@@ -228,22 +228,20 @@ public class CraftingManager {
         for (Map<String, Object> recipe : (List<Map<String, Object>>) smithing.get((Object) "smithing")) {
             String recipeId = (String) recipe.get("id");
             Map<String, Object> first = ((List<Map<String, Object>>) recipe.get("output")).get(0);
-            RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromIdentifier((String) first.get("id"));
-            if (legacyEntry == null) {
+            Item item = Item.fromString((String) first.get("id"));
+            if (item.isNull()) {
                 log.trace("Unknown smithing output: {}", recipe);
                 continue;
             }
 
-            Item item = Item.get(legacyEntry.getLegacyId(), 0, 1);
-
             List<Item> ingredients = new ArrayList<>();
             for (Map<String, Object> ingredient : ((List<Map<String, Object>>) recipe.get("input"))) {
-                legacyEntry = itemMapping.fromIdentifier((String) ingredient.get("id"));
-                if (legacyEntry == null) {
+                Item ingredientItem = Item.fromString((String) ingredient.get("id"));
+                if (ingredientItem.isNull()) {
                     log.trace("Unknown smithing input: {}", recipe);
                     continue top;
                 }
-                ingredients.add(Item.get(legacyEntry.getLegacyId(), 0, 1));
+                ingredients.add(ingredientItem);
             }
 
             this.registerSmithingRecipe(new SmithingRecipe(recipeId, 0, ingredients, item));

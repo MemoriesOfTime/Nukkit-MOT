@@ -2417,7 +2417,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
                                 0.5f, 1.0f, org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.EASE_IN_OUT_SINE
                         )),
                         List.of(new org.cloudburstmc.protocol.bedrock.data.camera.CameraSplineInstruction.SplineRotationOption(
-                                Vector3f.from(45.0f, 90.0f, 0.0f), 2.0f
+                                Vector3f.from(45.0f, 90.0f, 0.0f), 2.0f, org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.LINEAR
                         ))
                 )
         )));
