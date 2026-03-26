@@ -641,6 +641,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.LOCATOR_BAR_PACKET, LocatorBarPacket.class)
                 .registerPacket(ProtocolInfo.PARTY_CHANGED_PACKET, PartyChangedPacket.class)
                 .registerPacket(ProtocolInfo.SERVERBOUND_DATA_DRIVEN_SCREEN_CLOSED_PACKET, ServerboundDataDrivenScreenClosedPacket.class)
+                .registerPacket(ProtocolInfo.SERVERBOUND_DATA_STORE_PACKET, ServerboundDataStorePacket.class)
                 .registerPacket(ProtocolInfo.SYNC_WORLD_CLOCKS_PACKET, SyncWorldClocksPacket.class)
                 .registerPacket(ProtocolInfo.CLIENTBOUND_ATTRIBUTE_LAYER_SYNC_PACKET, ClientboundAttributeLayerSyncPacket.class)
                 .build();
