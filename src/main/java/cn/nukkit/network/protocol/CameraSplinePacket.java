@@ -40,7 +40,7 @@ public class CameraSplinePacket extends DataPacket {
         for (int i = 0; i < splineCount; i++) {
             String name = this.getString();
             float totalTime = this.getLFloat();
-            CameraSplineType type = CameraSplineType.values()[this.getByte()];
+            CameraSplineType type = CameraSplineType.fromName(this.getString());
 
             // Read curve points
             int curveCount = (int) this.getUnsignedVarInt();
@@ -55,7 +55,7 @@ public class CameraSplinePacket extends DataPacket {
             for (int j = 0; j < progressCount; j++) {
                 float value = this.getLFloat();
                 float time = this.getLFloat();
-                CameraEase easingFunc = CameraEase.values()[this.getLInt()];
+                CameraEase easingFunc = CameraEase.fromName(this.getString());
                 progressKeyFrames.add(new CameraSplineInstruction.SplineProgressOption(value, time, easingFunc));
             }
 
@@ -65,10 +65,18 @@ public class CameraSplinePacket extends DataPacket {
             for (int j = 0; j < rotationCount; j++) {
                 Vector3f keyFrameValues = this.getVector3f();
                 float keyFrameTimes = this.getLFloat();
-                rotationOptions.add(new CameraSplineInstruction.SplineRotationOption(keyFrameValues, keyFrameTimes));
+                CameraEase ease = CameraEase.fromName(this.getString());
+                rotationOptions.add(new CameraSplineInstruction.SplineRotationOption(keyFrameValues, keyFrameTimes, ease));
             }
 
-            CameraSplineInstruction instruction = new CameraSplineInstruction(totalTime, type, curve, progressKeyFrames, rotationOptions);
+            CameraSplineInstruction instruction;
+            if (this.protocol >= ProtocolInfo.v1_26_10) {
+                String splineIdentifier = this.getString();
+                boolean loadFromJson = this.getBoolean();
+                instruction = new CameraSplineInstruction(totalTime, type, curve, progressKeyFrames, rotationOptions, splineIdentifier, loadFromJson);
+            } else {
+                instruction = new CameraSplineInstruction(totalTime, type, curve, progressKeyFrames, rotationOptions);
+            }
             this.splines.add(new CameraSplineDefinition(name, instruction));
         }
     }
@@ -83,7 +91,7 @@ public class CameraSplinePacket extends DataPacket {
             CameraSplineInstruction instruction = spline.getInstruction();
             this.putLFloat(instruction.getTotalTime());
             CameraSplineType splineType = instruction.getType() != null ? instruction.getType() : CameraSplineType.CATMULL_ROM;
-            this.putByte((byte) splineType.ordinal());
+            this.putString(splineType.getSerializeName());
 
             // Write curve points
             this.putUnsignedVarInt(instruction.getCurve().size());
@@ -97,7 +105,7 @@ public class CameraSplinePacket extends DataPacket {
                 this.putLFloat(progress.getValue());
                 this.putLFloat(progress.getTime());
                 CameraEase easingFunc = progress.getEasingFunc() != null ? progress.getEasingFunc() : CameraEase.LINEAR;
-                this.putLInt(easingFunc.ordinal());
+                this.putString(easingFunc.getSerializeName());
             }
 
             // Write rotation options
@@ -105,6 +113,13 @@ public class CameraSplinePacket extends DataPacket {
             for (CameraSplineInstruction.SplineRotationOption rotation : instruction.getRotationOption()) {
                 this.putVector3f(rotation.getKeyFrameValues());
                 this.putLFloat(rotation.getKeyFrameTimes());
+                CameraEase ease = rotation.getEase() != null ? rotation.getEase() : CameraEase.LINEAR;
+                this.putString(ease.getSerializeName());
+            }
+
+            if (this.protocol >= ProtocolInfo.v1_26_10) {
+                this.putString(instruction.getSplineIdentifier() != null ? instruction.getSplineIdentifier() : "");
+                this.putBoolean(instruction.isLoadFromJson());
             }
         }
     }

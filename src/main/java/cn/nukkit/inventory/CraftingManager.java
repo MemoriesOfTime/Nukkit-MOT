@@ -228,22 +228,20 @@ public class CraftingManager {
         for (Map<String, Object> recipe : (List<Map<String, Object>>) smithing.get((Object) "smithing")) {
             String recipeId = (String) recipe.get("id");
             Map<String, Object> first = ((List<Map<String, Object>>) recipe.get("output")).get(0);
-            RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromIdentifier((String) first.get("id"));
-            if (legacyEntry == null) {
+            Item item = Item.fromString((String) first.get("id"));
+            if (item.isNull()) {
                 log.trace("Unknown smithing output: {}", recipe);
                 continue;
             }
 
-            Item item = Item.get(legacyEntry.getLegacyId(), 0, 1);
-
             List<Item> ingredients = new ArrayList<>();
             for (Map<String, Object> ingredient : ((List<Map<String, Object>>) recipe.get("input"))) {
-                legacyEntry = itemMapping.fromIdentifier((String) ingredient.get("id"));
-                if (legacyEntry == null) {
+                Item ingredientItem = Item.fromString((String) ingredient.get("id"));
+                if (ingredientItem.isNull()) {
                     log.trace("Unknown smithing input: {}", recipe);
                     continue top;
                 }
-                ingredients.add(Item.get(legacyEntry.getLegacyId(), 0, 1));
+                ingredients.add(ingredientItem);
             }
 
             this.registerSmithingRecipe(new SmithingRecipe(recipeId, 0, ingredients, item));
@@ -484,54 +482,55 @@ public class CraftingManager {
 
         Map input = (Map) recipe.get("input");
         Map output = (Map) recipe.get("output");
-        RuntimeItemMapping.LegacyEntry furnaceInputEntry = itemMapping.fromIdentifier((String) input.get("id"));
-        RuntimeItemMapping.LegacyEntry furnaceOutputEntry = itemMapping.fromIdentifier((String) output.get("id"));
 
-        if (furnaceInputEntry != null && furnaceOutputEntry != null && furnaceInputEntry.getLegacyId() != 0 && furnaceOutputEntry.getLegacyId() != 0) {
-            int inputDamage;
-            if (input.containsKey("damage")) {
-                inputDamage = ((Number) input.get("damage")).intValue();
-                if (inputDamage == 32767) {
-                    inputDamage = -1;
-                }
-            } else {
-                inputDamage = furnaceInputEntry.getDamage();
-            }
-            int outputDamage;
-            if (output.containsKey("damage")) {
-                int rawOutputDamage = ((Number) output.get("damage")).intValue();
-                outputDamage = (rawOutputDamage == 32767 || rawOutputDamage == -1) ? furnaceOutputEntry.getDamage() : rawOutputDamage;
-            } else {
-                outputDamage = furnaceOutputEntry.getDamage();
-            }
-            Item inputItem = Item.get(furnaceInputEntry.getLegacyId(), inputDamage, (Integer) input.getOrDefault("count", 1));
-            Item outputItem = Item.get(furnaceOutputEntry.getLegacyId(), outputDamage, (Integer) output.getOrDefault("count", 1));
+        Item inputItem = Item.fromString((String) input.get("id"));
+        Item outputItem = Item.fromString((String) output.get("id"));
 
-            switch (smeltingBlock) {
-                case "furnace": {
-                    FurnaceRecipe furnaceRecipe = new FurnaceRecipe(outputItem, inputItem);
-                    double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL) + ":" + inputItem.getDamage(), 0d);
-                    if (xp != 0) {
-                        this.setRecipeXp(furnaceRecipe, xp);
-                    }
-                    this.registerRecipe(furnaceRecipe);
-                    break;
-                }
-                case "blast_furnace": {
-                    BlastFurnaceRecipe furnaceRecipe = new BlastFurnaceRecipe(outputItem, inputItem);
-                    double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL) + ":" + inputItem.getDamage(), 0d);
-                    if (xp != 0) {
-                        this.setRecipeXp(furnaceRecipe, xp);
-                    }
-                    this.registerRecipe(furnaceRecipe);
-                    break;
-                }
-                case "campfire":
-                    this.registerRecipe(new CampfireRecipe(outputItem, inputItem));
-                    break;
-            }
-        } else {
+        if (inputItem.isNull() || outputItem.isNull()) {
             log.trace("Unknown smelting recipe: {}", recipe);
+            return;
+        }
+
+        if (input.containsKey("damage")) {
+            int inputDamage = ((Number) input.get("damage")).intValue();
+            if (inputDamage == 32767) {
+                inputDamage = -1;
+            }
+            inputItem.setDamage(inputDamage);
+        }
+
+        if (output.containsKey("damage")) {
+            int outputDamage = ((Number) output.get("damage")).intValue();
+            if (outputDamage != 32767 && outputDamage != -1) {
+                outputItem.setDamage(outputDamage);
+            }
+        }
+
+        inputItem.setCount((Integer) input.getOrDefault("count", 1));
+        outputItem.setCount((Integer) output.getOrDefault("count", 1));
+
+        switch (smeltingBlock) {
+            case "furnace": {
+                FurnaceRecipe furnaceRecipe = new FurnaceRecipe(outputItem, inputItem);
+                double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId() + ":" + inputItem.getDamage(), 0d);
+                if (xp != 0) {
+                    this.setRecipeXp(furnaceRecipe, xp);
+                }
+                this.registerRecipe(furnaceRecipe);
+                break;
+            }
+            case "blast_furnace": {
+                BlastFurnaceRecipe furnaceRecipe = new BlastFurnaceRecipe(outputItem, inputItem);
+                double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId() + ":" + inputItem.getDamage(), 0d);
+                if (xp != 0) {
+                    this.setRecipeXp(furnaceRecipe, xp);
+                }
+                this.registerRecipe(furnaceRecipe);
+                break;
+            }
+            case "campfire":
+                this.registerRecipe(new CampfireRecipe(outputItem, inputItem));
+                break;
         }
     }
 

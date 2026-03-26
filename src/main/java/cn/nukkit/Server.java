@@ -3092,8 +3092,8 @@ public class Server {
         Entity.registerEntity("Piglin", EntityPiglin.class);
         Entity.registerEntity("Zoglin", EntityZoglin.class);
         Entity.registerEntity("PiglinBrute", EntityPiglinBrute.class);
-        //Entity.registerEntity("Breeze", EntityBreeze.class);
-        //Entity.registerEntity("Bogged", EntityBogged.class);
+        Entity.registerEntity("Breeze", EntityBreeze.class);
+        Entity.registerEntity("Bogged", EntityBogged.class);
         Entity.registerEntity("Creaking", EntityCreaking.class);
         //Passive
         Entity.registerEntity("Bat", EntityBat.class);
@@ -3139,6 +3139,8 @@ public class Server {
         Entity.registerEntity("Camel", EntityCamel.class);
         Entity.registerEntity("HappyGhast", EntityHappyGhast.class);
         Entity.registerEntity("CopperGolem", EntityCopperGolem.class);
+        Entity.registerEntity("Sniffer", EntitySniffer.class);
+        Entity.registerEntity("Armadillo", EntityArmadillo.class);
         //Vehicles
         Entity.registerEntity("MinecartRideable", EntityMinecartEmpty.class);
         Entity.registerEntity("MinecartChest", EntityMinecartChest.class);
@@ -3152,6 +3154,7 @@ public class Server {
         Entity.registerEntity("AreaEffectCloud", EntityAreaEffectCloud.class);
 
         Entity.registerEntity("WindCharge", EntityWindCharge.class);
+        Entity.registerEntity("BreezeWindCharge", EntityBreezeWindCharge.class);
     }
 
     /**
