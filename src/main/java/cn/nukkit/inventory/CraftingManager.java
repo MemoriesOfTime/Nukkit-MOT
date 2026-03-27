@@ -459,9 +459,8 @@ public class CraftingManager {
                     int aux = (int) ingredientEntry.getValue().getOrDefault("auxValue", 0);
                     if (aux == 32767) {
                         aux = -1;
-                    } else if (aux == 0) {
-                        aux = legacyEntry.getDamage();
                     }
+
                     inputItem = Item.get(legacyEntry.getLegacyId(), aux, (Integer) ingredientEntry.getValue().getOrDefault("count", 1));
                 }
                 ingredients.put(ingredientEntry.getKey().charAt(0), inputItem);
@@ -598,8 +597,6 @@ public class CraftingManager {
                     int aux = (int) ingredient.getOrDefault("auxValue", 0);
                     if (aux == 32767) {
                         aux = -1;
-                    } else if (aux == 0) {
-                        aux = legacyEntry.getDamage();
                     }
                     inputItem = Item.get(legacyEntry.getLegacyId(), aux, (Integer) ingredient.getOrDefault("count", 1));
                 }
