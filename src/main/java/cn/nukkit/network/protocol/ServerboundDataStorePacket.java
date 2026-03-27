@@ -21,7 +21,6 @@ public class ServerboundDataStorePacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.reset();
         DataStoreUpdate update = new DataStoreUpdate();
         update.setDataStoreName(this.getString());
         update.setProperty(this.getString());
@@ -70,6 +69,4 @@ public class ServerboundDataStorePacket extends DataPacket {
     public void setUpdate(DataStoreUpdate update) {
         this.update = update;
     }
-
-
 }

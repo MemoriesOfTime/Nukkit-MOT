@@ -1,8 +1,8 @@
 package cn.nukkit.ddui.properties;
 
 import cn.nukkit.Player;
-import cn.nukkit.network.protocol.types.datastore.DataStorePropertyType;
 import cn.nukkit.ddui.DataDrivenScreen;
+import cn.nukkit.network.protocol.types.datastore.DataStorePropertyType;
 import lombok.Getter;
 import lombok.Setter;
 

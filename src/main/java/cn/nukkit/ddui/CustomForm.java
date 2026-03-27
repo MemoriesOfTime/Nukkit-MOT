@@ -9,17 +9,6 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class CustomForm extends DataDrivenScreen {
-
-    @Override
-    public String getIdentifier() {
-        return "minecraft:custom_form";
-    }
-
-    @Override
-    public String getProperty() {
-        return "custom_form_data";
-    }
-
     public CustomForm() { }
 
     public CustomForm(String title) {
@@ -168,5 +157,15 @@ public class CustomForm extends DataDrivenScreen {
     public CustomForm dropdown(String label, List<DropdownElement.Item> items, Observable<Long> selected, DropdownOptions options) {
         layout.setProperty(new DropdownElement(label, items, selected, options, layout));
         return this;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:custom_form";
+    }
+
+    @Override
+    public String getProperty() {
+        return "custom_form_data";
     }
 }

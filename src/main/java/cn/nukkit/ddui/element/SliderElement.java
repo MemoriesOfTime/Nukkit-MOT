@@ -1,7 +1,7 @@
 package cn.nukkit.ddui.element;
 
-import cn.nukkit.ddui.Observable;
 import cn.nukkit.Player;
+import cn.nukkit.ddui.Observable;
 import cn.nukkit.ddui.element.options.SliderElementOptions;
 import cn.nukkit.ddui.properties.BooleanProperty;
 import cn.nukkit.ddui.properties.LongProperty;
