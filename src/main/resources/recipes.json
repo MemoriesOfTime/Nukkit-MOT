@@ -38378,8 +38378,8 @@
                 "A": {
                     "type": "default",
                     "count": 1,
-                    "itemId": -570,
-                    "auxValue": 32767
+                    "itemId": 17,
+                    "auxValue": 2
                 }
             },
             "output": [
@@ -38393,7 +38393,7 @@
                 "A"
             ],
             "block": "crafting_table",
-            "priority": 0
+            "priority": 1
         },
         {
             "id": "minecraft:birch_planks_from_stripped",
@@ -63097,8 +63097,8 @@
                 "A": {
                     "type": "default",
                     "count": 1,
-                    "itemId": -569,
-                    "auxValue": 32767
+                    "itemId": 17,
+                    "auxValue": 1
                 }
             },
             "output": [
@@ -63112,7 +63112,7 @@
                 "A"
             ],
             "block": "crafting_table",
-            "priority": 0
+            "priority": 1
         },
         {
             "id": "minecraft:spruce_planks_from_stripped",
