@@ -106,7 +106,6 @@ public class SimpleCommandMap implements CommandMap {
         this.register("nukkit", new CloneCommand("clone"));
         this.register("nukkit", new ExecuteCommand("execute"));
         this.register("nukkit", new TickingAreaCommand("tickingarea"));
-        this.register("nukkit", new DDUITestCommand("ddui"));
     }
 
     @Override
