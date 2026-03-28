@@ -405,6 +405,22 @@ public interface ProtocolInfo {
      */
     int DEBUG_DRAWER_PACKET = 328;
     /**
+     * @since v843
+     */
+    int SERVERBOUND_PACK_SETTING_CHANGE_PACKET = 329;
+    /**
+     * @since v897
+     */
+    int CLIENTBOUND_DATA_STORE_PACKET = 330;
+    /**
+     * @since v859
+     */
+    int GRAPHICS_PARAMETER_OVERRIDE_PACKET = 331;
+    /**
+     * @since v897
+     */
+    int SERVERBOUND_DATA_STORE_PACKET = 332;
+    /**
      * @since v924
      */
     int CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET = 333;
