@@ -4,7 +4,9 @@ import cn.nukkit.Player;
 import cn.nukkit.ddui.properties.DataDrivenProperty;
 import cn.nukkit.network.protocol.ClientboundDataStorePacket;
 import cn.nukkit.network.protocol.types.datastore.DataStoreUpdate;
+import lombok.Getter;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -31,15 +33,12 @@ public class Observable<T> {
     }
 
     private final Set<Listener<T>> listeners = new LinkedHashSet<>();
+    @Getter
     private T value;
     private static final ThreadLocal<Integer> SUPPRESS_OUTBOUND = ThreadLocal.withInitial(() -> 0);
 
     public Observable(T value) {
         this.value = value;
-    }
-
-    public T getValue() {
-        return value;
     }
 
     /**
@@ -51,25 +50,31 @@ public class Observable<T> {
     public void setValue(T value) {
         this.value = value;
 
+        List<DataDrivenProperty<?, ?>> propertiesToUpdate = new ArrayList<>();
+
         for (Listener<T> listener : listeners) {
             DataDrivenProperty<?, ?> element = listener.onValue(value);
+            if (element != null) {
+                propertiesToUpdate.add(element);
+            }
+        }
 
-            if (element == null) continue;
+        if (SUPPRESS_OUTBOUND.get() > 0 || propertiesToUpdate.isEmpty()) {
+            return;
+        }
 
+        for (DataDrivenProperty<?, ?> element : propertiesToUpdate) {
             DataDrivenScreen screen = element.getRootScreen();
             if (screen == null) continue;
 
-            if (SUPPRESS_OUTBOUND.get() > 0) {
-                continue;
-            }
+            Object actualValue = element.getValue();
 
             DataStoreUpdate update = new DataStoreUpdate();
-
             update.setDataStoreName(screen.getIdentifier().split(":")[0]);
             update.setProperty(screen.getProperty());
             update.setPath(element.getPath());
             update.setType(element.getType());
-            update.setData(value);
+            update.setData(actualValue);
             update.setPropertyUpdateCount(1);
             update.setPathUpdateCount(1);
 
