@@ -21,6 +21,7 @@ import java.util.Map;
 public class RuntimeItems {
 
     private static final Map<String, Integer> legacyString2LegacyInt = new HashMap<>();
+    private static final Map<String, int[]> flattenedId2Legacy = new HashMap<>();
 
     private static RuntimeItemMapping mapping361;
     private static RuntimeItemMapping mapping419;
@@ -104,6 +105,19 @@ public class RuntimeItems {
                 String identifier = convertData.get(key).getAsString();
                 int damage = Integer.parseInt(key);
                 mappingEntries.put(identifier, new MappingEntry(legacyName, damage, protocol));
+            }
+        }
+
+        // Register flattened identifiers (e.g., minecraft:oak_log) to legacy ID + damage
+        for (Map.Entry<String, MappingEntry> entry : mappingEntries.entrySet()) {
+            String flattenedId = entry.getKey();
+            if (flattenedId.isEmpty()) {
+                continue;
+            }
+            MappingEntry mappingEntry = entry.getValue();
+            int legacyId = legacyString2LegacyInt.getOrDefault(mappingEntry.getLegacyName(), -1);
+            if (legacyId != -1 && !flattenedId2Legacy.containsKey(flattenedId)) {
+                flattenedId2Legacy.put(flattenedId, new int[]{legacyId, mappingEntry.getDamage()});
             }
         }
 
@@ -283,6 +297,13 @@ public class RuntimeItems {
 
     public static int getLegacyIdFromLegacyString(String identifier) {
         return legacyString2LegacyInt.getOrDefault(identifier, -1);
+    }
+
+    /**
+     * @return int[]{legacyId, damage} or null if not found
+     */
+    public static int[] getLegacyFromFlattenedId(String identifier) {
+        return flattenedId2Legacy.get(identifier);
     }
 
     /**
