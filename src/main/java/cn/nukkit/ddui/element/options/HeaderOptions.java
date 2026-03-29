@@ -6,7 +6,7 @@ import lombok.Getter;
 
 @Getter
 @Builder
-public class HeaderOptions {
+public class HeaderOptions implements ElementOptions {
 
     /**
      * Whether the header is visible in the UI.

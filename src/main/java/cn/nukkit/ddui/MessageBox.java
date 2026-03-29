@@ -60,11 +60,11 @@ public class MessageBox extends DataDrivenScreen {
     }
 
     public MessageBox button2(String label, Consumer<Player> listener) {
-        return button1(label, "", listener);
+        return button2(label, "", listener);
     }
 
     public MessageBox button2(String label, String tooltip, Consumer<Player> listener) {
-        MessageBoxButtonElement button = new MessageBoxButtonElement("button1", label, tooltip, this);
+        MessageBoxButtonElement button = new MessageBoxButtonElement("button2", label, tooltip, this);
         button.addListener(listener);
         setProperty(button);
         return this;
