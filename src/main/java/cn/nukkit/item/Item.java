@@ -1030,7 +1030,15 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             int id = RuntimeItems.getLegacyIdFromLegacyString(namespacedId);
             if (id != -1) { // id == -1 means not found
                 return get(id, meta.orElse(0));
-            } else if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
+            }
+
+            // Flattened identifier lookup (e.g., minecraft:oak_log -> minecraft:log + damage 0)
+            int[] flattenedEntry = RuntimeItems.getLegacyFromFlattenedId(namespacedId);
+            if (flattenedEntry != null) {
+                return get(flattenedEntry[0], meta.orElse(flattenedEntry[1]));
+            }
+
+            if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
                 return Item.AIR_ITEM.clone();
             }
         } else if (numericIdGroup != null) {
