@@ -9,6 +9,7 @@ import cn.nukkit.ddui.properties.DataDrivenProperty;
 import cn.nukkit.ddui.properties.LongProperty;
 import cn.nukkit.ddui.properties.StringProperty;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.ServerboundDataStorePacket;
 import org.jetbrains.annotations.NotNull;
@@ -60,7 +61,7 @@ public class ServerboundDataStoreProcessor extends DataPacketProcessor<Serverbou
     }
 
     @Override
-    public Class<? extends cn.nukkit.network.protocol.DataPacket> getPacketClass() {
+    public Class<? extends DataPacket> getPacketClass() {
         return ServerboundDataStorePacket.class;
     }
 
