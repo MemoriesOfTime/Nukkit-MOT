@@ -7,6 +7,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -66,6 +69,10 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
 
     static Stream<Arguments> versionsPre553() {
         return filteredVersionsRange(291, ProtocolInfo.v1_19_30);
+    }
+
+    static Stream<Arguments> versionsFrom898() {
+        return filteredVersions(ProtocolInfo.v1_21_130_28);
     }
 
     // ==================== RemoveEntityPacket ====================
@@ -1629,10 +1636,125 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(1, cbPacket.getPackIds().size());
     }
 
+    // ==================== ClientboundDataStorePacket ====================
+
+    @ParameterizedTest(name = "ClientboundDataStorePacket v{0}")
+    @MethodSource("versionsFrom898")
+    void testClientboundDataStorePacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ClientboundDataStorePacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+
+        var update = new cn.nukkit.network.protocol.types.datastore.DataStoreUpdate();
+        update.setDataStoreName("ui_state");
+        update.setProperty("volume");
+        update.setPath("audio.master");
+        update.setData(12.5d);
+        update.setPropertyUpdateCount(7);
+        update.setPathUpdateCount(9);
+
+        var change = new cn.nukkit.network.protocol.types.datastore.DataStoreChange();
+        change.setDataStoreName("ui_state");
+        change.setProperty("metadata");
+        change.setUpdateCount(3);
+        change.setNewValue(cn.nukkit.network.protocol.types.datastore.DataStorePropertyValue.ofObject(Map.of(
+                "enabled", cn.nukkit.network.protocol.types.datastore.DataStorePropertyValue.ofBoolean(true),
+                "title", cn.nukkit.network.protocol.types.datastore.DataStorePropertyValue.ofString("main")
+        )));
+
+        var removal = new cn.nukkit.network.protocol.types.datastore.DataStoreRemoval();
+        removal.setDataStoreName("legacy_state");
+
+        List<cn.nukkit.network.protocol.types.datastore.DataStoreAction> updates = new ArrayList<>();
+        updates.add(update);
+        updates.add(change);
+        updates.add(removal);
+        nukkitPacket.setUpdates(updates);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ClientboundDataStorePacket.class);
+
+        assertEquals(3, cbPacket.getUpdates().size());
+
+        var cbUpdate = (org.cloudburstmc.protocol.bedrock.data.datastore.DataStoreUpdate) cbPacket.getUpdates().get(0);
+        assertEquals("ui_state", cbUpdate.getDataStoreName());
+        assertEquals("volume", cbUpdate.getProperty());
+        assertEquals("audio.master", cbUpdate.getPath());
+        assertEquals(12.5d, (Double) cbUpdate.getData(), 0.0001d);
+        assertEquals(7, cbUpdate.getUpdateCount());
+        if (protocolVersion >= ProtocolInfo.v1_26_0) {
+            assertEquals(9, cbUpdate.getPathUpdateCount());
+        } else {
+            assertEquals(0, cbUpdate.getPathUpdateCount());
+        }
+
+        var cbChange = (org.cloudburstmc.protocol.bedrock.data.datastore.DataStoreChange) cbPacket.getUpdates().get(1);
+        assertEquals("ui_state", cbChange.getDataStoreName());
+        assertEquals("metadata", cbChange.getProperty());
+        assertEquals(3, cbChange.getUpdateCount());
+        assertInstanceOf(Map.class, cbChange.getNewValue());
+        Map<?, ?> changeValue = (Map<?, ?>) cbChange.getNewValue();
+        assertEquals(true, changeValue.get("enabled"));
+        assertEquals("main", changeValue.get("title"));
+
+        var cbRemoval = (org.cloudburstmc.protocol.bedrock.data.datastore.DataStoreRemoval) cbPacket.getUpdates().get(2);
+        assertEquals("legacy_state", cbRemoval.getDataStoreName());
+    }
+
     // ==================== ClientboundDataDrivenUIShowScreenPacket ====================
 
     static Stream<Arguments> versionsFrom924() {
         return filteredVersions(ProtocolInfo.v1_26_0);
+    }
+
+    @ParameterizedTest(name = "ClientboundDataDrivenUICloseAllScreensPacket v{0}")
+    @MethodSource("versionsFrom924")
+    void testClientboundDataDrivenUICloseAllScreensPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ClientboundDataDrivenUICloseAllScreensPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        if (protocolVersion >= ProtocolInfo.v1_26_10) {
+            nukkitPacket.formId = 21;
+        }
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ClientboundDataDrivenUICloseScreenPacket.class);
+
+        if (protocolVersion >= ProtocolInfo.v1_26_10) {
+            assertEquals(21, cbPacket.getFormId());
+        } else {
+            assertNull(cbPacket.getFormId());
+        }
+    }
+
+    @ParameterizedTest(name = "ClientboundDataDrivenUICloseAllScreensPacket null formId v{0}")
+    @MethodSource("versionsFrom944")
+    void testClientboundDataDrivenUICloseAllScreensPacketNullFormId(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ClientboundDataDrivenUICloseAllScreensPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ClientboundDataDrivenUICloseScreenPacket.class);
+
+        assertNull(cbPacket.getFormId());
+    }
+
+    @ParameterizedTest(name = "ClientboundDataDrivenUIReloadPacket v{0}")
+    @MethodSource("versionsFrom924")
+    void testClientboundDataDrivenUIReloadPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ClientboundDataDrivenUIReloadPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ClientboundDataDrivenUIReloadPacket.class);
+
+        assertNotNull(cbPacket);
     }
 
     @ParameterizedTest(name = "ClientboundDataDrivenUIShowScreenPacket v{0}")

@@ -32,6 +32,13 @@ public class PacketCoverageReportTest {
     private static final Pattern PACKET_NAME_PATTERN = Pattern.compile("(\\w+Packet)");
 
     /**
+     * Some Nukkit packet names intentionally keep the legacy name even when CB renamed the counterpart.
+     */
+    private static final Map<String, String> CB_NAME_ALIASES = Map.of(
+            "ClientboundDataDrivenUICloseScreenPacket", "ClientboundDataDrivenUICloseAllScreensPacket"
+    );
+
+    /**
      * Packet classes excluded from coverage tracking.
      * These are internal/structural packets that don't need cross-decode tests.
      */
@@ -396,7 +403,12 @@ public class PacketCoverageReportTest {
             for (int id = 0; id < 500; id++) {
                 BedrockPacketDefinition<?> def = codec.getPacketDefinition(id);
                 if (def != null) {
-                    names.add(def.getFactory().get().getClass().getSimpleName());
+                    String packetName = def.getFactory().get().getClass().getSimpleName();
+                    names.add(packetName);
+                    String alias = CB_NAME_ALIASES.get(packetName);
+                    if (alias != null) {
+                        names.add(alias);
+                    }
                 }
             }
         }

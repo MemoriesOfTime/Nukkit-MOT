@@ -28,4 +28,9 @@ public class ServerboundDataDrivenScreenClosedProcessor extends DataPacketProces
     public Class<? extends cn.nukkit.network.protocol.DataPacket> getPacketClass() {
         return ServerboundDataDrivenScreenClosedPacket.class;
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_26_10;
+    }
 }

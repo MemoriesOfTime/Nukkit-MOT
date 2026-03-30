@@ -63,4 +63,9 @@ public class ServerboundDataStoreProcessor extends DataPacketProcessor<Serverbou
     public Class<? extends cn.nukkit.network.protocol.DataPacket> getPacketClass() {
         return ServerboundDataStorePacket.class;
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_21_130_28;
+    }
 }

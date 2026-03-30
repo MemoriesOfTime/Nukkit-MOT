@@ -48,7 +48,11 @@ public class ServerboundDataStorePacket extends DataPacket {
                 throw new IllegalStateException("Invalid data store update control: " + control);
         }
         update.setPropertyUpdateCount(this.getLInt());
-        update.setPathUpdateCount(this.getLInt());
+        if (this.protocol >= ProtocolInfo.v1_26_0) {
+            update.setPathUpdateCount(this.getLInt());
+        } else {
+            update.setPathUpdateCount(0);
+        }
         this.update = update;
     }
 

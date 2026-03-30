@@ -1,11 +1,6 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.types.datastore.DataStoreAction;
-import cn.nukkit.network.protocol.types.datastore.DataStoreChange;
-import cn.nukkit.network.protocol.types.datastore.DataStorePropertyValue;
-import cn.nukkit.network.protocol.types.datastore.DataStorePropertyType;
-import cn.nukkit.network.protocol.types.datastore.DataStoreRemoval;
-import cn.nukkit.network.protocol.types.datastore.DataStoreUpdate;
+import cn.nukkit.network.protocol.types.datastore.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -114,7 +109,9 @@ public class ClientboundDataStorePacket extends DataPacket {
                 throw new IllegalStateException("Invalid data store update control: " + control);
         }
         this.putLInt(update.getPropertyUpdateCount());
-        this.putLInt(update.getPathUpdateCount());
+        if (this.protocol >= ProtocolInfo.v1_26_0) {
+            this.putLInt(update.getPathUpdateCount());
+        }
     }
 
     private void writeDataStoreChange(DataStoreChange change) {

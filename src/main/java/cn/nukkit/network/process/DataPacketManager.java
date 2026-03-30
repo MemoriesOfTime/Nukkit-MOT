@@ -188,9 +188,7 @@ public final class DataPacketManager {
                 ServerSettingsRequestProcessor.INSTANCE,
                 SetDifficultyProcessor.INSTANCE,
                 SetPlayerGameTypeProcessor.INSTANCE,
-                TextProcessor.INSTANCE,
-                ServerboundDataStoreProcessor.INSTANCE,
-                ServerboundDataDrivenScreenClosedProcessor.INSTANCE
+                TextProcessor.INSTANCE
         );
 
         registerProcessor(
@@ -231,6 +229,16 @@ public final class DataPacketManager {
         registerProcessor(
                 ProtocolInfo.v1_19_30,
                 RequestNetworkSettingsProcessor_v554.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_21_130_28,
+                ServerboundDataStoreProcessor.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_26_10,
+                ServerboundDataDrivenScreenClosedProcessor.INSTANCE
         );
     }
 }
