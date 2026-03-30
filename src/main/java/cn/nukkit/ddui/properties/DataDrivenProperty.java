@@ -79,12 +79,18 @@ public abstract class DataDrivenProperty<T, K> {
             return this.name;
         }
 
-        try {
-            Integer.parseInt(this.name);
+        if (isNumeric(this.name)) {
             return parentPath + "[" + this.name + "]";
-        } catch (NumberFormatException ignored) {
-            return parentPath + "." + this.name;
         }
+        return parentPath + "." + this.name;
+    }
+
+    private static boolean isNumeric(String s) {
+        if (s == null || s.isEmpty()) return false;
+        for (int i = 0; i < s.length(); i++) {
+            if (!Character.isDigit(s.charAt(i))) return false;
+        }
+        return true;
     }
 
     /**

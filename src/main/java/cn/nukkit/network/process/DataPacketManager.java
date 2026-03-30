@@ -1,6 +1,8 @@
 package cn.nukkit.network.process;
 
 import cn.nukkit.PlayerHandle;
+import cn.nukkit.network.process.processor.ServerboundDataDrivenScreenClosedProcessor;
+import cn.nukkit.network.process.processor.ServerboundDataStoreProcessor;
 import cn.nukkit.network.process.processor.common.*;
 import cn.nukkit.network.process.processor.v113.*;
 import cn.nukkit.network.process.processor.v137.CommandRequestProcessor_v137;
@@ -9,7 +11,6 @@ import cn.nukkit.network.process.processor.v340.LecternUpdateProcessor_v340;
 import cn.nukkit.network.process.processor.v422.FilterTextProcessor_v422;
 import cn.nukkit.network.process.processor.v527.RequestAbilityProcessor_v527;
 import cn.nukkit.network.process.processor.v554.RequestNetworkSettingsProcessor_v554;
-import cn.nukkit.network.process.processor.ServerboundDataStoreProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -188,7 +189,8 @@ public final class DataPacketManager {
                 SetDifficultyProcessor.INSTANCE,
                 SetPlayerGameTypeProcessor.INSTANCE,
                 TextProcessor.INSTANCE,
-                ServerboundDataStoreProcessor.INSTANCE
+                ServerboundDataStoreProcessor.INSTANCE,
+                ServerboundDataDrivenScreenClosedProcessor.INSTANCE
         );
 
         registerProcessor(

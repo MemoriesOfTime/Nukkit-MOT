@@ -9,8 +9,12 @@ import cn.nukkit.network.protocol.ClientboundDataDrivenUIShowScreenPacket;
 import cn.nukkit.network.protocol.ClientboundDataStorePacket;
 import cn.nukkit.network.protocol.types.datastore.DataStoreChange;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * Abstract base for all data-driven UI screens.
@@ -24,7 +28,7 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
 
     public abstract String getProperty();
 
-    private final Set<Player> viewers = new LinkedHashSet<>();
+    private final Set<Player> viewers = new CopyOnWriteArraySet<>();
 
     protected final LayoutElement layout;
 
@@ -70,6 +74,25 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
 
     public static DataDrivenScreen getActiveScreen(Player player) {
         return ACTIVE_SCREENS.get(player);
+    }
+
+    /**
+     * Removes a player from this screen's viewer set and the global active screen map.
+     * Called when the client closes the screen or the player disconnects.
+     */
+    public void removeViewer(Player player) {
+        viewers.remove(player);
+        ACTIVE_SCREENS.remove(player, this);
+    }
+
+    /**
+     * Removes the player's active screen entry. Called during player disconnect cleanup.
+     */
+    public static void removeActiveScreen(Player player) {
+        DataDrivenScreen screen = ACTIVE_SCREENS.remove(player);
+        if (screen != null) {
+            screen.viewers.remove(player);
+        }
     }
 
     public DataDrivenProperty<?, ?> resolvePath(String path) {

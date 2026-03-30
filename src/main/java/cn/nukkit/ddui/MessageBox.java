@@ -33,15 +33,15 @@ public class MessageBox extends DataDrivenScreen {
         return this;
     }
 
-    public MessageBox body(String title) {
-        setProperty(new StringProperty("body", title, this));
+    public MessageBox body(String body) {
+        setProperty(new StringProperty("body", body, this));
         return this;
     }
 
-    public MessageBox body(Observable<String> title) {
-        StringProperty property = new StringProperty("body", title.getValue(), this);
-        title.subscribe(value -> {
-            title(value);
+    public MessageBox body(Observable<String> body) {
+        StringProperty property = new StringProperty("body", body.getValue(), this);
+        body.subscribe(value -> {
+            body(value);
             return property;
         });
         setProperty(property);

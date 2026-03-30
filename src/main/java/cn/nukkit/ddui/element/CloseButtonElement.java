@@ -10,11 +10,6 @@ import java.util.function.Consumer;
 
 public class CloseButtonElement extends Element<Long> {
 
-    @Override
-    public String getName() {
-        return "closeButton";
-    }
-
     public CloseButtonElement(ObjectProperty parent) {
         this(CloseButtonOptions.builder().build(), parent);
     }
