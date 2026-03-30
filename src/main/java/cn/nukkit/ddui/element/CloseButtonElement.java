@@ -1,6 +1,7 @@
 package cn.nukkit.ddui.element;
 
 import cn.nukkit.Player;
+import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.ddui.Observable;
 import cn.nukkit.ddui.element.options.CloseButtonOptions;
 import cn.nukkit.ddui.properties.BooleanProperty;
@@ -33,6 +34,12 @@ public class CloseButtonElement extends Element<Long> {
         ButtonClickElement clickElement = new ButtonClickElement(this);
         setProperty(clickElement);
         clickElement.addListener(this::triggerListeners);
+        clickElement.addListener((player, data) -> {
+            DataDrivenScreen screen = DataDrivenScreen.getActiveScreen(player);
+            if (screen != null) {
+                screen.close(player);
+            }
+        });
     }
 
     @Override

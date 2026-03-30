@@ -3,6 +3,7 @@ package cn.nukkit.network.process.processor;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.ClientboundDataDrivenUICloseAllScreensPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.ServerboundDataDrivenScreenClosedPacket;
 import org.jetbrains.annotations.NotNull;
@@ -16,6 +17,10 @@ public class ServerboundDataDrivenScreenClosedProcessor extends DataPacketProces
         DataDrivenScreen screen = DataDrivenScreen.getActiveScreen(playerHandle.player);
         if (screen != null) {
             screen.removeViewer(playerHandle.player);
+
+            ClientboundDataDrivenUICloseAllScreensPacket closePacket = new ClientboundDataDrivenUICloseAllScreensPacket();
+            closePacket.formId = pk.formId;
+            playerHandle.player.dataPacket(closePacket);
         }
     }
 
