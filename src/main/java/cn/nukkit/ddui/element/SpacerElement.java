@@ -28,7 +28,7 @@ public class SpacerElement extends Element<Boolean> {
         super.setVisibility(visible);
         var property = new BooleanProperty("spacer_visible", visible.getValue(), this);
         visible.subscribe(value -> {
-            setVisibility(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);

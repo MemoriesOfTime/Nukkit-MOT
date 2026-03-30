@@ -46,7 +46,7 @@ public class LabelElement extends Element<String> {
         property.setValue(text.getValue());
 
         text.subscribe(value -> {
-            setText(value);
+            property.setValue(value);
             return property;
         });
 
@@ -66,7 +66,7 @@ public class LabelElement extends Element<String> {
         super.setVisibility(visible);
         var property = new BooleanProperty("label_visible", visible.getValue(), this);
         visible.subscribe(value -> {
-            setVisibility(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);

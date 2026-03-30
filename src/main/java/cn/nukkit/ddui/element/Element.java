@@ -27,7 +27,7 @@ public abstract class Element<T> extends ObjectProperty<T> {
     public Element<T> setLabel(Observable<String> label) {
         var property = new StringProperty("label", label.getValue(), this);
         label.subscribe(value -> {
-            setLabel(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -50,7 +50,7 @@ public abstract class Element<T> extends ObjectProperty<T> {
     public Element<T> setDisabled(Observable<Boolean> disabled) {
         var property = new BooleanProperty("disabled", disabled.getValue(), this);
         disabled.subscribe(value -> {
-            setDisabled(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -73,7 +73,7 @@ public abstract class Element<T> extends ObjectProperty<T> {
     public Element<T> setVisibility(Observable<Boolean> visible) {
         var property = new BooleanProperty("visible", visible.getValue(), this);
         visible.subscribe(value -> {
-            setVisibility(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);

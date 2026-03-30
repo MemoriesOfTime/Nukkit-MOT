@@ -59,10 +59,11 @@ public class ToggleElement extends Element<Boolean> {
 
     public ToggleElement setToggled(Observable<Boolean> value) {
         BooleanProperty property = resolveToggledProperty();
+        property.setClientWritable(value.isClientWritable());
         property.setValue(value.getValue());
 
         value.subscribe(v -> {
-            setToggled(v);
+            property.setValue(v);
             return property;
         });
 
@@ -88,7 +89,7 @@ public class ToggleElement extends Element<Boolean> {
         property.setValue(description.getValue());
 
         description.subscribe(value -> {
-            setDescription(value);
+            property.setValue(value);
             return property;
         });
 
@@ -108,7 +109,7 @@ public class ToggleElement extends Element<Boolean> {
         super.setVisibility(visible);
         var property = new BooleanProperty("toggle_visible", visible.getValue(), this);
         visible.subscribe(value -> {
-            setVisibility(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -120,7 +121,6 @@ public class ToggleElement extends Element<Boolean> {
         super.triggerListeners(player, data);
 
         if (data instanceof Boolean b) {
-            setToggled(b);
             toggled.setValue(b);
         }
     }

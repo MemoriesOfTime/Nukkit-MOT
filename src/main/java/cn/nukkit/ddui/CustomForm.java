@@ -27,7 +27,7 @@ public class CustomForm extends DataDrivenScreen {
     public CustomForm title(Observable<String> title) {
         StringProperty property = new StringProperty("title", title.getValue(), this);
         title.subscribe(value -> {
-            title(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -63,9 +63,10 @@ public class CustomForm extends DataDrivenScreen {
     public CustomForm button(Observable<String> label, Consumer<Player> listener,
                              ButtonOptions options) {
         ButtonElement button = new ButtonElement(label.getValue(), options, layout);
+        StringProperty property = (StringProperty) button.getProperty("label");
         label.subscribe(value -> {
-            button.setLabel(value);
-            return null;
+            property.setValue(value);
+            return property;
         });
         button.addListener(listener);
         layout.setProperty(button);
@@ -120,6 +121,19 @@ public class CustomForm extends DataDrivenScreen {
 
     public CustomForm spacer(SpacerOptions options) {
         layout.setProperty(new SpacerElement(options, layout));
+        return this;
+    }
+
+    public CustomForm divider() {
+        return divider(true);
+    }
+
+    public CustomForm divider(boolean visible) {
+        return divider(DividerOptions.builder().visible(visible).build());
+    }
+
+    public CustomForm divider(DividerOptions options) {
+        layout.setProperty(new DividerElement(options, layout));
         return this;
     }
 

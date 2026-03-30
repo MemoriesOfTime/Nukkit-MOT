@@ -35,10 +35,17 @@ public class Observable<T> {
     private final Set<Listener<T>> listeners = new LinkedHashSet<>();
     @Getter
     private T value;
+    @Getter
+    private final ObservableOptions options;
     private static final ThreadLocal<Integer> SUPPRESS_OUTBOUND = ThreadLocal.withInitial(() -> 0);
 
     public Observable(T value) {
+        this(value, ObservableOptions.builder().build());
+    }
+
+    public Observable(T value, ObservableOptions options) {
         this.value = value;
+        this.options = options;
     }
 
     /**
@@ -107,5 +114,9 @@ public class Observable<T> {
 
     public void unsubscribe(Listener<T> listener) {
         listeners.remove(listener);
+    }
+
+    public boolean isClientWritable() {
+        return this.options.isClientWritable();
     }
 }

@@ -26,11 +26,8 @@ public class TextFieldElement extends Element<String> {
 
         if (options.getVisible() instanceof Observable<?> obs) {
             setVisibility((Observable<Boolean>) obs);
-            setTextFieldVisible((Observable<Boolean>) obs);
         } else {
-            boolean v = (Boolean) options.getVisible();
-            setVisibility(v);
-            setTextFieldVisible(v);
+            setVisibility((Boolean) options.getVisible());
         }
 
         if (options.getDisabled() instanceof Observable<?> obs) {
@@ -53,12 +50,7 @@ public class TextFieldElement extends Element<String> {
     }
 
     public TextFieldElement setTextFieldVisible(boolean visible) {
-        var existing = getProperty("textfield_visible");
-        BooleanProperty property = (existing instanceof BooleanProperty bp)
-                ? bp
-                : new BooleanProperty("textfield_visible", true, this);
-        property.setValue(visible);
-        setProperty(property);
+        setProperty(new BooleanProperty("textfield_visible", visible, this));
         return this;
     }
 
@@ -69,7 +61,26 @@ public class TextFieldElement extends Element<String> {
                 : new BooleanProperty("textfield_visible", true, this);
         property.setValue(visible.getValue());
         visible.subscribe(value -> {
-            setTextFieldVisible(value);
+            property.setValue(value);
+            return property;
+        });
+        setProperty(property);
+        return this;
+    }
+
+    @Override
+    public TextFieldElement setVisibility(boolean visible) {
+        super.setVisibility(visible);
+        setProperty(new BooleanProperty("textfield_visible", visible, this));
+        return this;
+    }
+
+    @Override
+    public TextFieldElement setVisibility(Observable<Boolean> visible) {
+        super.setVisibility(visible);
+        var property = new BooleanProperty("textfield_visible", visible.getValue(), this);
+        visible.subscribe(value -> {
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -97,9 +108,10 @@ public class TextFieldElement extends Element<String> {
         StringProperty property = (existing instanceof StringProperty sp)
                 ? sp
                 : createTextProperty();
+        property.setClientWritable(text.isClientWritable());
         property.setValue(text.getValue());
         text.subscribe(value -> {
-            setText(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -135,7 +147,7 @@ public class TextFieldElement extends Element<String> {
                 : new StringProperty("description", "", this);
         property.setValue(description.getValue());
         description.subscribe(value -> {
-            setDescription(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -147,7 +159,6 @@ public class TextFieldElement extends Element<String> {
         super.triggerListeners(player, data);
 
         if (data instanceof String s) {
-            setText(s);
             text.setValue(s);
         }
     }

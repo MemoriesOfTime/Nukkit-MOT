@@ -10,7 +10,9 @@ import cn.nukkit.ddui.properties.StringProperty;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class DropdownElement extends Element<Long> {
 
@@ -21,10 +23,14 @@ public class DropdownElement extends Element<Long> {
 
         @Builder.Default
         private final String description = "";
+
+        @Builder.Default
+        private final Long value = null;
     }
 
     private final Observable<Long> selectedIndex;
     private final List<Item> items;
+    private final Map<Long, Integer> valueToIndexMap = new LinkedHashMap<>();
 
     public DropdownElement(String label, List<Item> items,
                            Observable<Long> selectedIndex, ObjectProperty parent) {
@@ -63,23 +69,30 @@ public class DropdownElement extends Element<Long> {
     }
 
     public long getSelectedIndex() {
+        long value = getSelectedValue();
+        Integer index = valueToIndexMap.get(value);
+        return index != null ? index : -1;
+    }
+
+    public long getSelectedValue() {
         var prop = getProperty("value");
         if (prop instanceof LongProperty lp) return lp.getValue();
         return 0L;
     }
 
-    public DropdownElement setSelectedIndex(long index) {
+    public DropdownElement setSelectedValue(long value) {
         LongProperty property = resolveValueProperty();
-        property.setValue(index);
+        property.setValue(value);
         setProperty(property);
         return this;
     }
 
     public DropdownElement setSelectedIndex(Observable<Long> index) {
         LongProperty property = resolveValueProperty();
+        property.setClientWritable(index.isClientWritable());
         property.setValue(index.getValue());
         index.subscribe(value -> {
-            setSelectedIndex(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -103,7 +116,7 @@ public class DropdownElement extends Element<Long> {
         StringProperty property = resolveDescriptionProperty();
         property.setValue(description.getValue());
         description.subscribe(value -> {
-            setDescription(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -122,7 +135,7 @@ public class DropdownElement extends Element<Long> {
         super.setVisibility(visible);
         var property = new BooleanProperty("dropdown_visible", visible.getValue(), this);
         visible.subscribe(value -> {
-            setVisibility(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -133,20 +146,24 @@ public class DropdownElement extends Element<Long> {
     public void triggerListeners(Player player, Object data) {
         super.triggerListeners(player, data);
         if (data instanceof Long l) {
-            setSelectedIndex(l);
+            if (!valueToIndexMap.containsKey(l)) return;
             selectedIndex.setValue(l);
         }
     }
 
     private void buildItemsProperty() {
         ObjectProperty<Object> itemsObj = new ObjectProperty<>("items", this);
+        valueToIndexMap.clear();
 
         for (int i = 0; i < items.size(); i++) {
             Item item = items.get(i);
+            long val = resolveItemValue(item, i);
+            valueToIndexMap.put(val, i);
+
             ObjectProperty<Object> itemObj = new ObjectProperty<>(String.valueOf(i), itemsObj);
             itemObj.setProperty(new StringProperty("label",       item.getLabel(),       itemObj));
             itemObj.setProperty(new StringProperty("description", item.getDescription(), itemObj));
-            itemObj.setProperty(new LongProperty("value", (long) i, itemObj));
+            itemObj.setProperty(new LongProperty("value", val, itemObj));
             itemsObj.setProperty(itemObj);
         }
 
@@ -160,6 +177,10 @@ public class DropdownElement extends Element<Long> {
         LongProperty property = new LongProperty("value", 0L, this);
         property.addListener(this::triggerListeners);
         return property;
+    }
+
+    private long resolveItemValue(Item item, int index) {
+        return item.getValue() != null ? item.getValue() : index;
     }
 
     private StringProperty resolveDescriptionProperty() {

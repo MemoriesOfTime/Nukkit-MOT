@@ -37,10 +37,15 @@ public abstract class DataDrivenProperty<T, K> {
     @Setter
     protected T value;
 
+    @Getter
+    @Setter
+    private boolean clientWritable;
+
     protected DataDrivenProperty(String name, T value, ObjectProperty parent) {
         this.name   = name;
         this.value  = value;
         this.parent = parent;
+        this.clientWritable = false;
     }
 
     public void addListener(BiConsumer<Player, Object> listener) {

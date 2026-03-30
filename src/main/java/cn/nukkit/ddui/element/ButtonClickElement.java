@@ -8,6 +8,7 @@ public class ButtonClickElement extends LongProperty {
 
     public ButtonClickElement(ObjectProperty parent) {
         super("onClick", 0L, parent);
+        this.setClientWritable(true);
     }
 
     @Override

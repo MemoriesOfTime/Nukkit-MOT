@@ -53,7 +53,7 @@ public class MessageBoxButtonElement extends Element<Long> {
     public MessageBoxButtonElement setToolTip(Observable<String> tooltip) {
         var property = new StringProperty("tooltip", tooltip.getValue(), this);
         tooltip.subscribe(value -> {
-            setToolTip(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);

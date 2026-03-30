@@ -66,7 +66,12 @@ public class SliderElement extends Element<Long> {
         var property = new LongProperty("maxValue", maxValue.getValue(), this);
         this.max = maxValue.getValue();
         maxValue.subscribe(value -> {
-            setMaxValue(value);
+            this.max = value;
+            property.setValue(value);
+            long currentVal = getSliderValue();
+            if (currentVal > value) {
+                setValueInternal(value);
+            }
             return property;
         });
         setProperty(property);
@@ -91,7 +96,12 @@ public class SliderElement extends Element<Long> {
         var property = new LongProperty("minValue", minValue.getValue(), this);
         this.min = minValue.getValue();
         minValue.subscribe(value -> {
-            setMinValue(value);
+            this.min = value;
+            property.setValue(value);
+            long currentVal = getSliderValue();
+            if (currentVal < value) {
+                setValueInternal(value);
+            }
             return property;
         });
         setProperty(property);
@@ -112,7 +122,7 @@ public class SliderElement extends Element<Long> {
     public SliderElement setStep(Observable<Long> step) {
         var property = new LongProperty("step", step.getValue(), this);
         step.subscribe(value -> {
-            setStep(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -145,6 +155,7 @@ public class SliderElement extends Element<Long> {
         long clampedInitial = clampValue(value.getValue());
         var existing = getProperty("value");
         LongProperty property = (existing instanceof LongProperty lp) ? lp : createValueProperty();
+        property.setClientWritable(value.isClientWritable());
 
         property.setValue(clampedInitial);
         setProperty(property);
@@ -210,7 +221,7 @@ public class SliderElement extends Element<Long> {
         StringProperty property = (existing instanceof StringProperty sp) ? sp : new StringProperty("description", "", this);
         property.setValue(description.getValue());
         description.subscribe(value -> {
-            setDescription(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);
@@ -229,7 +240,7 @@ public class SliderElement extends Element<Long> {
         super.setVisibility(visible);
         var property = new BooleanProperty("slider_visible", visible.getValue(), this);
         visible.subscribe(value -> {
-            setVisibility(value);
+            property.setValue(value);
             return property;
         });
         setProperty(property);

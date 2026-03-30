@@ -35,6 +35,7 @@ public class ServerboundDataStoreProcessor extends DataPacketProcessor<Serverbou
 
             DataDrivenProperty<?, ?> property = screen.resolvePath(update.getPath());
             if (property == null) return;
+            if (!property.isClientWritable()) return;
 
             Object data = update.getData();
             if (property instanceof LongProperty) {
