@@ -121,6 +121,10 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersions(818);
     }
 
+    static Stream<Arguments> versionsFrom898() {
+        return filteredVersions(ProtocolInfo.v1_21_130_28);
+    }
+
     static Stream<Arguments> versionsFrom431() {
         return filteredVersions(ProtocolInfo.v1_16_220);
     }
@@ -1778,7 +1782,55 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals("{\"type\":\"sequence\"}", nk.behaviorTreeJson);
     }
 
+    // ==================== ServerboundDataStorePacket ====================
+
+    @ParameterizedTest(name = "ServerboundDataStorePacket decode v{0}")
+    @MethodSource("versionsFrom898")
+    void serverboundDataStoreDecode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerboundDataStorePacket();
+        cb.getUpdate().setDataStoreName("screen_state");
+        cb.getUpdate().setProperty("search");
+        cb.getUpdate().setPath("filters.keyword");
+        cb.getUpdate().setData("village");
+        cb.getUpdate().setUpdateCount(4);
+        if (protocol >= ProtocolInfo.v1_26_0) {
+            cb.getUpdate().setPathUpdateCount(6);
+        }
+
+        ServerboundDataStorePacket nk = crossEncode(cb, ServerboundDataStorePacket::new, protocol);
+
+        assertNotNull(nk.getUpdate());
+        assertEquals("screen_state", nk.getUpdate().getDataStoreName());
+        assertEquals("search", nk.getUpdate().getProperty());
+        assertEquals("filters.keyword", nk.getUpdate().getPath());
+        assertEquals(cn.nukkit.network.protocol.types.datastore.DataStorePropertyType.STRING, nk.getUpdate().getPropertyType());
+        assertEquals("village", nk.getUpdate().getData());
+        assertEquals(4, nk.getUpdate().getPropertyUpdateCount());
+        if (protocol >= ProtocolInfo.v1_26_0) {
+            assertEquals(6, nk.getUpdate().getPathUpdateCount());
+        } else {
+            assertEquals(0, nk.getUpdate().getPathUpdateCount());
+        }
+    }
+
     // ==================== ClientboundDataDrivenUIShowScreenPacket ====================
+
+    @ParameterizedTest(name = "ClientboundDataDrivenUICloseScreenPacket decode v{0}")
+    @MethodSource("versionsFrom924")
+    void clientboundDataDrivenUICloseScreenDecode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ClientboundDataDrivenUICloseScreenPacket();
+        if (protocol >= ProtocolInfo.v1_26_10) {
+            cb.setFormId(44);
+        }
+
+        ClientboundDataDrivenUICloseScreenPacket nk = crossEncode(cb, ClientboundDataDrivenUICloseScreenPacket::new, protocol);
+
+        if (protocol >= ProtocolInfo.v1_26_10) {
+            assertEquals(44, nk.formId);
+        } else {
+            assertNull(nk.formId);
+        }
+    }
 
     @ParameterizedTest(name = "ClientboundDataDrivenUIShowScreenPacket v{0}")
     @MethodSource("versionsFrom924")
