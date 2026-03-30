@@ -10,6 +10,12 @@ public class ClientboundDataStorePacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.CLIENTBOUND_DATA_STORE_PACKET;
 
+    private static final int TYPE_NONE = 0;
+    private static final int TYPE_BOOL = 1;
+    private static final int TYPE_INT64 = 2;
+    private static final int TYPE_STRING = 4;
+    private static final int TYPE_OBJECT = 6;
+
     private List<DataStoreAction> updates = new ArrayList<>();
 
     @Override
@@ -56,7 +62,6 @@ public class ClientboundDataStorePacket extends DataPacket {
         this.updates = updates;
     }
 
-    // Helper methods for writing
     private void writeDataStoreUpdate(DataStoreUpdate update) {
         this.putString(update.getDataStoreName());
         this.putString(update.getProperty());
@@ -92,7 +97,6 @@ public class ClientboundDataStorePacket extends DataPacket {
         this.putUnsignedVarInt(control);
         switch (control) {
             case 0:
-                // 数字类型写入 double 的 IEEE 754 位表示（小端序）
                 if (value instanceof Number n) {
                     this.putLLong(Double.doubleToRawLongBits(n.doubleValue()));
                 } else {
@@ -118,79 +122,34 @@ public class ClientboundDataStorePacket extends DataPacket {
         this.putString(change.getDataStoreName());
         this.putString(change.getProperty());
         this.putLInt(change.getUpdateCount());
-        // newValue is Object, we need to write as DataStorePropertyValue
-        // For simplicity, assume newValue is DataStorePropertyValue
-        if (change.getNewValue() instanceof DataStorePropertyValue) {
-            DataStorePropertyValue value = (DataStorePropertyValue) change.getNewValue();
-            this.putLInt(value.getType().getId());
-            writeDataStorePropertyValue(value.getValue(), convertPropertyValueToPropertyType(value.getType()));
-        } else {
-            // Fallback: write as string
-            this.putLInt(DataStorePropertyValue.Type.STRING.getId());
-            this.putString(String.valueOf(change.getNewValue()));
-        }
+        writeChangeValue(change.getNewValue());
     }
 
-    private DataStorePropertyType convertPropertyValueToPropertyType(DataStorePropertyValue.Type valueType) {
-        switch (valueType) {
-            case BOOL:
-                return DataStorePropertyType.BOOLEAN;
-            case INT64:
-                return DataStorePropertyType.INT64;
-            case STRING:
-                return DataStorePropertyType.STRING;
-            case TYPE:
-                return DataStorePropertyType.OBJECT;
-            case NONE:
-                // Not sure what to map NONE to, maybe throw or default to STRING
-                throw new IllegalArgumentException("Cannot convert NONE to DataStorePropertyType");
-            default:
-                throw new IllegalArgumentException("Unknown DataStorePropertyValue.Type: " + valueType);
+    private void writeChangeValue(Object value) {
+        if (value == null) {
+            this.putLInt(TYPE_NONE);
+        } else if (value instanceof Boolean b) {
+            this.putLInt(TYPE_BOOL);
+            this.putBoolean(b);
+        } else if (value instanceof Number n) {
+            this.putLInt(TYPE_INT64);
+            this.putLLong(n.longValue());
+        } else if (value instanceof String s) {
+            this.putLInt(TYPE_STRING);
+            this.putString(s);
+        } else if (value instanceof Map<?, ?> map) {
+            this.putLInt(TYPE_OBJECT);
+            this.putUnsignedVarInt(map.size());
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                this.putString((String) entry.getKey());
+                writeChangeValue(entry.getValue());
+            }
+        } else {
+            this.putLInt(TYPE_NONE);
         }
     }
 
     private void writeDataStoreRemoval(DataStoreRemoval removal) {
         this.putString(removal.getDataStoreName());
-    }
-
-    private void writeDataStorePropertyValue(Object value, DataStorePropertyType propertyType) {
-        DataStorePropertyValue.Type type = convertPropertyType(propertyType);
-        switch (type) {
-            case NONE:
-                break;
-            case BOOL:
-                this.putBoolean((Boolean) value);
-                break;
-            case INT64:
-                this.putLLong((Long) value);
-                break;
-            case STRING:
-                this.putString((String) value);
-                break;
-            case TYPE:
-                Map<String, DataStorePropertyValue> map = (Map<String, DataStorePropertyValue>) value;
-                this.putUnsignedVarInt(map.size());
-                for (Map.Entry<String, DataStorePropertyValue> entry : map.entrySet()) {
-                    this.putString(entry.getKey());
-                    this.putLInt(entry.getValue().getType().getId());
-                    writeDataStorePropertyValue(entry.getValue().getValue(), convertPropertyValueToPropertyType(entry.getValue().getType()));
-                }
-                break;
-        }
-    }
-
-    private DataStorePropertyValue.Type convertPropertyType(DataStorePropertyType propertyType) {
-        switch (propertyType) {
-            case BOOLEAN:
-                return DataStorePropertyValue.Type.BOOL;
-            case INT64:
-                return DataStorePropertyValue.Type.INT64;
-            case STRING:
-                return DataStorePropertyValue.Type.STRING;
-            case OBJECT:
-                return DataStorePropertyValue.Type.TYPE;
-            default:
-                throw new IllegalArgumentException("Unknown DataStorePropertyType: " + propertyType);
-        }
     }
 }

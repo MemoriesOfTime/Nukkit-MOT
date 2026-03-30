@@ -1,7 +1,6 @@
 package cn.nukkit.ddui.properties;
 
 import cn.nukkit.network.protocol.types.datastore.DataStorePropertyType;
-import cn.nukkit.network.protocol.types.datastore.DataStorePropertyValue;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -29,31 +28,25 @@ public class ObjectProperty<T> extends DataDrivenProperty<Map<String, DataDriven
         this.value.put(property.getName(), property);
     }
 
-    public DataStorePropertyValue toPropertyValue() {
-        Map<String, DataStorePropertyValue> children = new LinkedHashMap<>();
-
+    public Map<String, Object> toChangeValue() {
+        Map<String, Object> children = new LinkedHashMap<>();
         for (Map.Entry<String, DataDrivenProperty<?, ?>> entry : this.value.entrySet()) {
-            String key = entry.getKey();
-            DataDrivenProperty<?, ?> prop = entry.getValue();
-
-            DataStorePropertyValue child = convertProperty(prop);
-            children.put(key, child);
+            children.put(entry.getKey(), convertToRawValue(entry.getValue()));
         }
-
-        return DataStorePropertyValue.ofObject(children);
+        return children;
     }
 
-    private static DataStorePropertyValue convertProperty(DataDrivenProperty<?, ?> prop) {
-        if (prop instanceof ObjectProperty) {
-            return ((ObjectProperty<?>) prop).toPropertyValue();
-        } else if (prop instanceof BooleanProperty) {
-            return DataStorePropertyValue.ofBoolean(((BooleanProperty) prop).getValue());
-        } else if (prop instanceof LongProperty) {
-            return DataStorePropertyValue.ofLong(((LongProperty) prop).getValue());
-        } else if (prop instanceof StringProperty) {
-            return DataStorePropertyValue.ofString(((StringProperty) prop).getValue());
+    private static Object convertToRawValue(DataDrivenProperty<?, ?> prop) {
+        if (prop instanceof ObjectProperty<?> obj) {
+            return obj.toChangeValue();
+        } else if (prop instanceof BooleanProperty bp) {
+            return bp.getValue();
+        } else if (prop instanceof LongProperty lp) {
+            return lp.getValue();
+        } else if (prop instanceof StringProperty sp) {
+            return sp.getValue();
         } else {
-            return DataStorePropertyValue.ofString(String.valueOf(prop.getValue()));
+            return String.valueOf(prop.getValue());
         }
     }
 }

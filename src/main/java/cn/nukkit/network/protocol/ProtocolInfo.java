@@ -427,7 +427,7 @@ public interface ProtocolInfo {
     /**
      * @since v924
      */
-    int CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_ALL_SCREENS_PACKET = 334;
+    int CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_SCREEN_PACKET = 334;
     /**
      * @since v924
      */

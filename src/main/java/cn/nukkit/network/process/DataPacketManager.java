@@ -232,7 +232,7 @@ public final class DataPacketManager {
         );
 
         registerProcessor(
-                ProtocolInfo.v1_21_130_28,
+                ProtocolInfo.v1_21_130,
                 ServerboundDataStoreProcessor.INSTANCE
         );
 

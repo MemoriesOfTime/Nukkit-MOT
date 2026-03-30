@@ -1815,15 +1815,15 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
 
     // ==================== ClientboundDataDrivenUIShowScreenPacket ====================
 
-    @ParameterizedTest(name = "ClientboundDataDrivenUICloseAllScreensPacket decode v{0}")
+    @ParameterizedTest(name = "ClientboundDataDrivenUICloseScreenPacket decode v{0}")
     @MethodSource("versionsFrom924")
-    void clientboundDataDrivenUICloseAllScreensDecode(int protocol) {
+    void clientboundDataDrivenUICloseScreenDecode(int protocol) {
         var cb = new org.cloudburstmc.protocol.bedrock.packet.ClientboundDataDrivenUICloseScreenPacket();
         if (protocol >= ProtocolInfo.v1_26_10) {
             cb.setFormId(44);
         }
 
-        ClientboundDataDrivenUICloseAllScreensPacket nk = crossEncode(cb, ClientboundDataDrivenUICloseAllScreensPacket::new, protocol);
+        ClientboundDataDrivenUICloseScreenPacket nk = crossEncode(cb, ClientboundDataDrivenUICloseScreenPacket::new, protocol);
 
         if (protocol >= ProtocolInfo.v1_26_10) {
             assertEquals(44, nk.formId);

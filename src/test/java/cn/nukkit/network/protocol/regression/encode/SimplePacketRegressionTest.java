@@ -1657,10 +1657,10 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         change.setDataStoreName("ui_state");
         change.setProperty("metadata");
         change.setUpdateCount(3);
-        change.setNewValue(cn.nukkit.network.protocol.types.datastore.DataStorePropertyValue.ofObject(Map.of(
-                "enabled", cn.nukkit.network.protocol.types.datastore.DataStorePropertyValue.ofBoolean(true),
-                "title", cn.nukkit.network.protocol.types.datastore.DataStorePropertyValue.ofString("main")
-        )));
+        change.setNewValue(Map.of(
+                "enabled", true,
+                "title", "main"
+        ));
 
         var removal = new cn.nukkit.network.protocol.types.datastore.DataStoreRemoval();
         removal.setDataStoreName("legacy_state");
@@ -1708,10 +1708,10 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersions(ProtocolInfo.v1_26_0);
     }
 
-    @ParameterizedTest(name = "ClientboundDataDrivenUICloseAllScreensPacket v{0}")
+    @ParameterizedTest(name = "ClientboundDataDrivenUICloseScreenPacket v{0}")
     @MethodSource("versionsFrom924")
-    void testClientboundDataDrivenUICloseAllScreensPacket(int protocolVersion) {
-        var nukkitPacket = new cn.nukkit.network.protocol.ClientboundDataDrivenUICloseAllScreensPacket();
+    void testClientboundDataDrivenUICloseScreenPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ClientboundDataDrivenUICloseScreenPacket();
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         if (protocolVersion >= ProtocolInfo.v1_26_10) {
@@ -1729,10 +1729,10 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
-    @ParameterizedTest(name = "ClientboundDataDrivenUICloseAllScreensPacket null formId v{0}")
+    @ParameterizedTest(name = "ClientboundDataDrivenUICloseScreenPacket null formId v{0}")
     @MethodSource("versionsFrom944")
-    void testClientboundDataDrivenUICloseAllScreensPacketNullFormId(int protocolVersion) {
-        var nukkitPacket = new cn.nukkit.network.protocol.ClientboundDataDrivenUICloseAllScreensPacket();
+    void testClientboundDataDrivenUICloseScreenPacketNullFormId(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ClientboundDataDrivenUICloseScreenPacket();
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.encode();

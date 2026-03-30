@@ -4,7 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.ddui.element.LayoutElement;
 import cn.nukkit.ddui.properties.DataDrivenProperty;
 import cn.nukkit.ddui.properties.ObjectProperty;
-import cn.nukkit.network.protocol.ClientboundDataDrivenUICloseAllScreensPacket;
+import cn.nukkit.network.protocol.ClientboundDataDrivenUICloseScreenPacket;
 import cn.nukkit.network.protocol.ClientboundDataDrivenUIShowScreenPacket;
 import cn.nukkit.network.protocol.ClientboundDataStorePacket;
 import cn.nukkit.network.protocol.types.datastore.DataStoreChange;
@@ -44,7 +44,7 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
         change.setDataStoreName(dataStore);
         change.setProperty(getProperty());
         change.setUpdateCount(1);
-        change.setNewValue(toPropertyValue());
+        change.setNewValue(toChangeValue());
 
         ClientboundDataStorePacket data = new ClientboundDataStorePacket();
         data.setUpdates(List.of(change));
@@ -63,7 +63,7 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
         viewers.remove(player);
         ACTIVE_SCREENS.remove(player);
 
-        ClientboundDataDrivenUICloseAllScreensPacket packet = new ClientboundDataDrivenUICloseAllScreensPacket();
+        ClientboundDataDrivenUICloseScreenPacket packet = new ClientboundDataDrivenUICloseScreenPacket();
         packet.formId = 0;
         player.dataPacket(packet);
     }

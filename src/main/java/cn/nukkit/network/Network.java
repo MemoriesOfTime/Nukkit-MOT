@@ -630,7 +630,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
                 // v924 packets
                 .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET, ClientboundDataDrivenUIShowScreenPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_ALL_SCREENS_PACKET, ClientboundDataDrivenUICloseAllScreensPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_SCREEN_PACKET, ClientboundDataDrivenUICloseScreenPacket.class)
                 .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_RELOAD_PACKET, ClientboundDataDrivenUIReloadPacket.class)
                 .registerPacket(ProtocolInfo.CLIENTBOUND_TEXTURE_SHIFT_PACKET, ClientboundTextureShiftPacket.class)
                 .registerPacket(ProtocolInfo.VOXEL_SHAPES_PACKET, VoxelShapesPacket.class)

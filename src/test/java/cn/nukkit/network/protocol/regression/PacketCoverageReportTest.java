@@ -34,9 +34,7 @@ public class PacketCoverageReportTest {
     /**
      * Some Nukkit packet names intentionally keep the legacy name even when CB renamed the counterpart.
      */
-    private static final Map<String, String> CB_NAME_ALIASES = Map.of(
-            "ClientboundDataDrivenUICloseScreenPacket", "ClientboundDataDrivenUICloseAllScreensPacket"
-    );
+    private static final Map<String, String> CB_NAME_ALIASES = Map.of();
 
     /**
      * Packet classes excluded from coverage tracking.
