@@ -1,6 +1,8 @@
 package cn.nukkit.network.process;
 
 import cn.nukkit.PlayerHandle;
+import cn.nukkit.network.process.processor.ServerboundDataDrivenScreenClosedProcessor;
+import cn.nukkit.network.process.processor.ServerboundDataStoreProcessor;
 import cn.nukkit.network.process.processor.common.*;
 import cn.nukkit.network.process.processor.v113.*;
 import cn.nukkit.network.process.processor.v137.CommandRequestProcessor_v137;
@@ -227,6 +229,16 @@ public final class DataPacketManager {
         registerProcessor(
                 ProtocolInfo.v1_19_30,
                 RequestNetworkSettingsProcessor_v554.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_21_130,
+                ServerboundDataStoreProcessor.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_26_10,
+                ServerboundDataDrivenScreenClosedProcessor.INSTANCE
         );
     }
 }

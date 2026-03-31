@@ -1,15 +1,20 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
 /**
- * Allows the server to tell the client to close all the Data Driven UI screens.
+ * Allows the server to tell the client to close Data Driven UI screens.
+ * <p>
+ * When {@code formId} is provided, closes the specific screen identified by that ID.
+ * When {@code formId} is {@code null}, closes all open DDUI screens.
+ *
  * @since v924
  */
 @ToString
-public class ClientboundDataDrivenUICloseAllScreensPacket extends DataPacket {
+public class ClientboundDataDrivenUICloseScreenPacket extends DataPacket {
 
-    public static final int NETWORK_ID = ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_ALL_SCREENS_PACKET;
+    public static final int NETWORK_ID = ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_SCREEN_PACKET;
 
     /**
      * @since v944
@@ -30,10 +35,7 @@ public class ClientboundDataDrivenUICloseAllScreensPacket extends DataPacket {
     @Override
     public void decode() {
         if (this.protocol >= ProtocolInfo.v1_26_10) {
-            boolean hasFormId = this.getBoolean();
-            if (hasFormId) {
-                this.formId = this.getLInt();
-            }
+            this.formId = this.getOptional(null, BinaryStream::getLInt);
         }
     }
 
@@ -41,12 +43,7 @@ public class ClientboundDataDrivenUICloseAllScreensPacket extends DataPacket {
     public void encode() {
         this.reset();
         if (this.protocol >= ProtocolInfo.v1_26_10) {
-            if (this.formId != null) {
-                this.putBoolean(true);
-                this.putLInt(this.formId);
-            } else {
-                this.putBoolean(false);
-            }
+            this.putOptionalNull(this.formId, this::putLInt);
         }
     }
 }
