@@ -382,7 +382,7 @@ public class StatusCommand extends VanillaCommand {
     }
 
     private static String buildWorldInfo(Level level) {
-        return TextFormat.GOLD + "World \"" + level.getFolderName() + "\""
+        String worldInfo = TextFormat.GOLD + "World \"" + level.getFolderName() + "\""
                 + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": "
                 + TextFormat.RED + level.getChunks().size() + TextFormat.GREEN + " chunks, "
                 + TextFormat.RED + level.getEntities().length + TextFormat.GREEN + " entities, "
@@ -390,6 +390,14 @@ public class StatusCommand extends VanillaCommand {
                 + " Time " + ((level.getTickRate() > 1 || level.getTickRateTime() > 40) ? TextFormat.RED : TextFormat.YELLOW)
                 + NukkitMath.round(level.getTickRateTime(), 2) + "ms"
                 + (level.getTickRate() > 1 ? " (tick rate " + (19 - level.getTickRate()) + ")" : "");
+        if (level.isParallelTickEnabled()) {
+            float levelTps = level.getLevelTPS();
+            TextFormat levelTpsColor = levelTps >= 17 ? TextFormat.GREEN : levelTps >= 12 ? TextFormat.GOLD : TextFormat.RED;
+            worldInfo += TextFormat.AQUA + " [Parallel TPS: " + levelTpsColor + NukkitMath.round(levelTps, 2)
+                    + TextFormat.AQUA + " MSPT: " + TextFormat.YELLOW + NukkitMath.round(level.getLevelMSPT(), 2)
+                    + TextFormat.AQUA + "]";
+        }
+        return worldInfo;
     }
 
     public enum ComputerSystemEntry {

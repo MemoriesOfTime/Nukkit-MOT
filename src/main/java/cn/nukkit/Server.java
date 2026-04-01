@@ -191,6 +191,7 @@ public class Server {
     private int autoTickRateLimit;
     private boolean alwaysTickPlayers;
     private int baseTickRate;
+    private boolean parallelLevelTick;
     private int difficulty;
     private int defaultGameMode = Integer.MAX_VALUE;
     int c_s_spawnThreshold;
@@ -1138,7 +1139,11 @@ public class Server {
         log.info("Saving levels...");
 
         for (Level level : this.levelArray) {
-            level.save();
+            if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                level.scheduleSyncTask(() -> level.save());
+            } else {
+                level.save();
+            }
         }
 
         this.pluginManager.clearPlugins();
@@ -1333,7 +1338,12 @@ public class Server {
                                 offset = (i + lastLevelGC) % levelArray.length;
                                 Level level = levelArray[offset];
                                 if (!level.isBeingConverted) {
-                                    level.doGarbageCollection(allocated - 1);
+                                    if (level.isParallelTickEnabled()) {
+                                        final long alloc = allocated - 1;
+                                        level.scheduleSyncTask(() -> level.doGarbageCollection(alloc));
+                                    } else {
+                                        level.doGarbageCollection(allocated - 1);
+                                    }
                                 }
                                 allocated = next - System.currentTimeMillis();
                                 if (allocated <= 0) break;
@@ -1481,7 +1491,17 @@ public class Server {
 
         // Do level ticks
         for (Level level : this.levelArray) {
-            if (level.isBeingConverted || (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0)) {
+            if (level.isBeingConverted) {
+                continue;
+            }
+
+            // Parallel tick: skip levels that have their own thread
+            if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                // Level ticks in its own GameLoop thread; autoTickRate is not applicable
+                continue;
+            }
+
+            if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
                 continue;
             }
 
@@ -1534,7 +1554,11 @@ public class Server {
 
             for (Level level : this.levelArray) {
                 if (!nonAutoSaveWorlds.contains(level.getName())) {
-                    level.save();
+                    if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                        level.scheduleSyncTask(() -> level.save());
+                    } else {
+                        level.save();
+                    }
                 }
             }
         }
@@ -1602,7 +1626,11 @@ public class Server {
         if (this.tickCounter % 100 == 0) {
             for (Level level : this.levelArray) {
                 if (!level.isBeingConverted) {
-                    level.doChunkGarbageCollection();
+                    if (level.isParallelTickEnabled()) {
+                        level.scheduleSyncTask(level::doChunkGarbageCollection);
+                    } else {
+                        level.doChunkGarbageCollection();
+                    }
                 }
             }
         }
@@ -2449,6 +2477,11 @@ public class Server {
         level.setTickRate(this.baseTickRate);
 
         this.pluginManager.callEvent(new LevelLoadEvent(level));
+
+        if (this.parallelLevelTick) {
+            level.startLevelThread();
+        }
+
         return true;
     }
 
@@ -2550,6 +2583,11 @@ public class Server {
 
         this.pluginManager.callEvent(new LevelInitEvent(level));
         this.pluginManager.callEvent(new LevelLoadEvent(level));
+
+        if (this.parallelLevelTick) {
+            level.startLevelThread();
+        }
+
         return true;
     }
 
@@ -3329,6 +3367,7 @@ public class Server {
         this.autoTickRateLimit = config.performanceSettings().autoTickRateLimit();
         this.alwaysTickPlayers = config.performanceSettings().alwaysTickPlayers();
         this.baseTickRate = config.performanceSettings().baseTickRate();
+        this.parallelLevelTick = config.performanceSettings().parallelLevelTick();
         this.doLevelGC = config.performanceSettings().doLevelGc();
         this.enableSpark = config.performanceSettings().enableSpark();
         this.levelDbCache = config.performanceSettings().leveldbCacheMb();

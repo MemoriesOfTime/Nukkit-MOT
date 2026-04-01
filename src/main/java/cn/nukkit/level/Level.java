@@ -67,6 +67,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -379,6 +380,12 @@ public class Level implements ChunkManager, Metadatable {
 
     private final boolean antiXray;
 
+    // === Parallel level tick fields ===
+    private volatile boolean parallelTickEnabled;
+    private GameLoop gameLoop;
+    private volatile Thread levelThread;
+    private final Queue<Runnable> syncTaskQueue = PlatformDependent.newMpscQueue();
+
     // 用于实现世界监听的回调
     private static final AtomicInteger callbackIdCounter = new AtomicInteger();
     private final Int2ObjectMap<Consumer<Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
@@ -586,7 +593,92 @@ public class Level implements ChunkManager, Metadatable {
         return this.levelId;
     }
 
+    // === Parallel level tick methods ===
+
+    public void startLevelThread() {
+        if (this.parallelTickEnabled) return;
+        this.parallelTickEnabled = true;
+        this.gameLoop = GameLoop.builder()
+                .currentTick(this.levelCurrentTick)
+                .onStart(() -> server.getLogger().info("Level thread started: " + this.getName()))
+                .onTick(loop -> this.levelThreadTick((int) loop.getTick()))
+                .onIdle(this::processScheduledTasks)
+                .onStop(() -> {
+                    this.parallelTickEnabled = false;
+                    server.getLogger().info("Level thread stopped: " + this.getName());
+                })
+                .build();
+        this.levelThread = new Thread(gameLoop::startLoop, "Level Thread - " + this.getName());
+        this.levelThread.setDaemon(true);
+        this.levelThread.start();
+    }
+
+    public void stopLevelThread() {
+        if (this.gameLoop != null && this.gameLoop.isRunning()) {
+            this.gameLoop.stop();
+            try {
+                this.levelThread.join(5000);
+                if (this.levelThread.isAlive()) {
+                    server.getLogger().warning("Level thread for '" + this.getName() + "' did not stop within 5s, interrupting");
+                    this.levelThread.interrupt();
+                }
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private void levelThreadTick(int currentTick) {
+        processScheduledTasks();
+        this.providerLock.readLock().lock();
+        try {
+            if (this.getProvider() == null) {
+                this.gameLoop.stop();
+                return;
+            }
+            long start = System.currentTimeMillis();
+            this.doTick(currentTick);
+            this.tickRateTime = (int) (System.currentTimeMillis() - start);
+        } finally {
+            this.providerLock.readLock().unlock();
+        }
+    }
+
+    private void processScheduledTasks() {
+        Runnable task;
+        while ((task = syncTaskQueue.poll()) != null) {
+            try {
+                task.run();
+            } catch (Exception e) {
+                server.getLogger().logException(e);
+            }
+        }
+    }
+
+    public void scheduleSyncTask(Runnable task) {
+        syncTaskQueue.offer(task);
+        if (gameLoop != null) gameLoop.wakeUp();
+    }
+
+    public boolean isOwnThread() {
+        if (!parallelTickEnabled) return true;
+        return Thread.currentThread() == this.levelThread;
+    }
+
+    public boolean isParallelTickEnabled() {
+        return parallelTickEnabled;
+    }
+
+    public float getLevelTPS() {
+        return gameLoop != null ? gameLoop.getTPS() : -1;
+    }
+
+    public float getLevelMSPT() {
+        return gameLoop != null ? gameLoop.getMSPT() : -1;
+    }
+
     public void close() {
+        stopLevelThread();
         this.providerLock.writeLock().lock();
         try {
             if (this.asyncChuckExecutor != null) {
