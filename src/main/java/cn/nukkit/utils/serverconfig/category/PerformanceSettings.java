@@ -67,4 +67,9 @@ public class PerformanceSettings extends OkaeriConfig {
     @Comment("Enable Spark profiler")
     @CustomKey("enable-spark")
     private boolean enableSpark = false;
+
+    @Comment("Enable parallel level ticking (experimental)")
+    @Comment("Each world runs in its own thread for better multi-world performance")
+    @CustomKey("parallel-level-tick")
+    private boolean parallelLevelTick = false;
 }
