@@ -11,6 +11,7 @@ import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
 import cn.nukkit.command.defaults.HelpCommand;
 import cn.nukkit.command.utils.RawText;
+import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.data.property.EntityProperty;
@@ -5847,6 +5848,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.hiddenPlayers.clear();
 
             this.removeAllWindows(true);
+
+            DataDrivenScreen.removeActiveScreen(this);
 
             this.unloadChunks(false);
 

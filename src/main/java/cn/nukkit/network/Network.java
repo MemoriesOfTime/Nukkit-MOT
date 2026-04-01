@@ -630,12 +630,14 @@ public class Network {
                 .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
                 // v924 packets
                 .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET, ClientboundDataDrivenUIShowScreenPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_ALL_SCREENS_PACKET, ClientboundDataDrivenUICloseAllScreensPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_SCREEN_PACKET, ClientboundDataDrivenUICloseScreenPacket.class)
                 .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_RELOAD_PACKET, ClientboundDataDrivenUIReloadPacket.class)
                 .registerPacket(ProtocolInfo.CLIENTBOUND_TEXTURE_SHIFT_PACKET, ClientboundTextureShiftPacket.class)
                 .registerPacket(ProtocolInfo.VOXEL_SHAPES_PACKET, VoxelShapesPacket.class)
                 .registerPacket(ProtocolInfo.CAMERA_SPLINE_PACKET, CameraSplinePacket.class)
                 .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_ACTOR_PRIORITY_PACKET, CameraAimAssistActorPriorityPacket.class)
+                // v897 packets
+                .registerPacket(ProtocolInfo.SERVERBOUND_DATA_STORE_PACKET, ServerboundDataStorePacket.class)
                 // v944 packets
                 .registerPacket(ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET, ResourcePacksReadyForValidationPacket.class)
                 .registerPacket(ProtocolInfo.LOCATOR_BAR_PACKET, LocatorBarPacket.class)
