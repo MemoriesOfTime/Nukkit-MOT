@@ -16,6 +16,7 @@ public enum ItemTrimMaterialType {
     MATERIAL_COPPER("copper"),
     MATERIAL_GOLD("gold"),
     MATERIAL_EMERALD("emerald"),
+    MATERIAL_DIAMOND("diamond"),
     MATERIAL_LAPIS("lapis"),
     MATERIAL_AMETHYST("amethyst");
 
