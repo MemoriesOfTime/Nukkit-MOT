@@ -3,6 +3,7 @@ package cn.nukkit.network.session;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.level.Level;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.protocol.BatchPacket;
@@ -272,7 +273,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         DataPacket packet;
         while ((packet = this.inbound.poll()) != null) {
             try {
-                this.player.handleDataPacket(packet);
+                Level level = this.player != null ? this.player.level : null;
+                if (level != null && level.isParallelTickEnabled()) {
+                    level.addSyncPacketToQueue(this.player, packet, this.player.level.getCurrentTick());
+                } else {
+                    this.player.handleDataPacket(packet);
+                }
             } catch (Throwable e) {
                 log.error(new FormattedMessage("An error occurred whilst handling {} for {}",
                         new Object[]{packet.getClass().getSimpleName(), this.player.getName()}, e));
