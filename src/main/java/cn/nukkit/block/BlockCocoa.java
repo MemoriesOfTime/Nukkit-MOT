@@ -70,12 +70,12 @@ public class BlockCocoa extends BlockTransparentMeta implements Faceable {
     protected AxisAlignedBB recalculateBoundingBox() {
         AxisAlignedBB[] bbs;
 
-        int damage = this.getDamage();
-        if (damage > 11) {
-            this.setDamage(11);
+        int damage = this.getSafeDamage();
+        if (damage != this.getDamage()) {
+            this.setDamage(damage);
         }
 
-        switch (getDamage()) {
+        switch (damage) {
             case 1:
             case 5:
             case 9:
@@ -96,7 +96,7 @@ public class BlockCocoa extends BlockTransparentMeta implements Faceable {
                 break;
         }
 
-        return bbs[(this.getDamage() >> 2)].getOffsetBoundingBox(x, y, z);
+        return bbs[(damage >> 2)].getOffsetBoundingBox(x, y, z);
     }
 
     @Override
@@ -114,9 +114,10 @@ public class BlockCocoa extends BlockTransparentMeta implements Faceable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            Block side = this.getSide(BlockFace.fromIndex(faces2[this.getDamage()]));
+            int damage = this.getSafeDamage();
+            Block side = this.getSide(BlockFace.fromIndex(faces2[damage]));
 
-            if (side.getId() != Block.WOOD && (side.getDamage() & 0x03) != BlockWood.JUNGLE) {
+            if (side.getId() != Block.WOOD || (side.getDamage() & 0x03) != BlockWood.JUNGLE) {
                 this.getLevel().useBreakOn(this);
                 return Level.BLOCK_UPDATE_NORMAL;
             }
@@ -140,6 +141,10 @@ public class BlockCocoa extends BlockTransparentMeta implements Faceable {
         }
 
         return 0;
+    }
+
+    private int getSafeDamage() {
+        return Math.max(0, Math.min(this.getDamage(), faces2.length - 1));
     }
 
     @Override
