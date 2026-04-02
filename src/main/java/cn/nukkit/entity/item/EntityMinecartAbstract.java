@@ -479,7 +479,9 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             isSlowed = !block.isActive();
         }
 
-        switch (Orientation.byMetadata(block.getRealMeta())) {
+        int railMeta = normalizeRailMeta(block.getRealMeta());
+
+        switch (Orientation.byMetadata(railMeta)) {
             case ASCENDING_NORTH:
                 motionX -= 0.0078125D;
                 y += 1;
@@ -498,7 +500,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 break;
         }
 
-        int[][] facing = matrix[block.getRealMeta()];
+        int[][] facing = matrix[railMeta];
         double facing1 = facing[1][0] - facing[0][0];
         double facing2 = facing[1][2] - facing[0][2];
         double speedOnTurns = Math.sqrt(facing1 * facing1 + facing2 * facing2);
@@ -668,7 +670,8 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         Block block = level.getBlock(new Vector3(checkX, checkY, checkZ));
 
         if (Rail.isRailBlock(block)) {
-            int[][] facing = matrix[((BlockRail) block).getRealMeta()];
+            int railMeta = normalizeRailMeta(((BlockRail) block).getRealMeta());
+            int[][] facing = matrix[railMeta];
             double rail;
             // Genisys mistake (Doesn't check surrounding more exactly)
             double nextOne = (double) checkX + 0.5D + (double) facing[0][0] * 0.5D;
@@ -707,6 +710,10 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         } else {
             return null;
         }
+    }
+
+    static int normalizeRailMeta(int railMeta) {
+        return Orientation.byMetadata(railMeta).metadata();
     }
 
     @Override
