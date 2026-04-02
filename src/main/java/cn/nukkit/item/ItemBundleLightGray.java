@@ -1,8 +1,8 @@
 package cn.nukkit.item;
 
-public class ItemLightGrayBundle extends ItemBundle {
+public class ItemBundleLightGray extends ItemBundle {
 
-    public ItemLightGrayBundle() {
+    public ItemBundleLightGray() {
         super(LIGHT_GRAY_BUNDLE, "Light Gray Bundle");
     }
 }
