@@ -80,4 +80,22 @@ public interface ItemNamespaceId {
     String PURPLE_HARNESS = "minecraft:purple_harness";
     String MAGENTA_HARNESS = "minecraft:magenta_harness";
     String PINK_HARNESS = "minecraft:pink_harness";
+
+    String BUNDLE = "minecraft:bundle";
+    String WHITE_BUNDLE = "minecraft:white_bundle";
+    String LIGHT_GRAY_BUNDLE = "minecraft:light_gray_bundle";
+    String GRAY_BUNDLE = "minecraft:gray_bundle";
+    String BLACK_BUNDLE = "minecraft:black_bundle";
+    String BROWN_BUNDLE = "minecraft:brown_bundle";
+    String RED_BUNDLE = "minecraft:red_bundle";
+    String ORANGE_BUNDLE = "minecraft:orange_bundle";
+    String YELLOW_BUNDLE = "minecraft:yellow_bundle";
+    String LIME_BUNDLE = "minecraft:lime_bundle";
+    String GREEN_BUNDLE = "minecraft:green_bundle";
+    String CYAN_BUNDLE = "minecraft:cyan_bundle";
+    String LIGHT_BLUE_BUNDLE = "minecraft:light_blue_bundle";
+    String BLUE_BUNDLE = "minecraft:blue_bundle";
+    String PURPLE_BUNDLE = "minecraft:purple_bundle";
+    String MAGENTA_BUNDLE = "minecraft:magenta_bundle";
+    String PINK_BUNDLE = "minecraft:pink_bundle";
 }
