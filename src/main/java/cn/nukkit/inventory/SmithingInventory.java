@@ -131,7 +131,7 @@ public class SmithingInventory extends FakeBlockUIComponent {
         Item input = this.getEquipment().clone();
         ItemTrimMaterialType material = resolveTrimMaterial(this.getIngredient());
         if (material != null && this.getTemplate() instanceof ItemTrimPattern) {
-            if (!input.isNull() && input instanceof ItemArmor) {
+            if (isTrimmableArmor(input)) {
                 ItemArmor trimmedArmor = (ItemArmor) input.clone();
                 ItemTrimPattern pattern = (ItemTrimPattern) this.getTemplate();
                 return trimmedArmor.setArmorTrim(pattern.getPattern(), material);
@@ -153,13 +153,19 @@ public class SmithingInventory extends FakeBlockUIComponent {
         return null;
     }
 
+    static boolean isTrimmableArmor(Item item) {
+        return item instanceof ItemArmor
+                && item.isArmor()
+                && (item.isHelmet() || item.isChestplate() || item.isLeggings() || item.isBoots());
+    }
+
     @Override
     public boolean allowedToAdd(Item item) {
         if (item.isNull()) {
             return true;
         }
 
-        if (item instanceof ItemArmor) {
+        if (isTrimmableArmor(item)) {
             return true;
         }
 
