@@ -510,6 +510,24 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemHarnessMagenta.class);
             registerNamespacedIdItem(ItemHarnessPink.class);
 
+            registerNamespacedIdItem(ItemBundle.class);
+            registerNamespacedIdItem(ItemWhiteBundle.class);
+            registerNamespacedIdItem(ItemLightGrayBundle.class);
+            registerNamespacedIdItem(ItemGrayBundle.class);
+            registerNamespacedIdItem(ItemBlackBundle.class);
+            registerNamespacedIdItem(ItemBrownBundle.class);
+            registerNamespacedIdItem(ItemRedBundle.class);
+            registerNamespacedIdItem(ItemOrangeBundle.class);
+            registerNamespacedIdItem(ItemYellowBundle.class);
+            registerNamespacedIdItem(ItemLimeBundle.class);
+            registerNamespacedIdItem(ItemGreenBundle.class);
+            registerNamespacedIdItem(ItemCyanBundle.class);
+            registerNamespacedIdItem(ItemLightBlueBundle.class);
+            registerNamespacedIdItem(ItemBlueBundle.class);
+            registerNamespacedIdItem(ItemPurpleBundle.class);
+            registerNamespacedIdItem(ItemMagentaBundle.class);
+            registerNamespacedIdItem(ItemPinkBundle.class);
+
             // 添加原版物品到NAMESPACED_ID_ITEM
             // Add vanilla items to NAMESPACED_ID_ITEM
             RuntimeItemMapping mapping = RuntimeItems.getMapping(GameVersion.getLastVersion());
