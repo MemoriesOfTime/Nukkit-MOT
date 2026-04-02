@@ -5250,7 +5250,9 @@ public class Level implements ChunkManager, Metadatable {
     private GameVersion getChunkProtocol(GameVersion version) {
         int protocol = version.getProtocol();
         if (version.isNetEase()) {
-            if (protocol >= GameVersion.V1_21_50_NETEASE.getProtocol()) {
+            if (protocol >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
+                return GameVersion.V1_21_93_NETEASE;
+            } else if (protocol >= GameVersion.V1_21_50_NETEASE.getProtocol()) {
                 return GameVersion.V1_21_50_NETEASE;
             } else if (protocol >= GameVersion.V1_21_2_NETEASE.getProtocol()) {
                 return GameVersion.V1_21_2_NETEASE;

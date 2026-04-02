@@ -42,6 +42,8 @@ public class BiomeDefinitionListPacket extends DataPacket {
     private static final BatchPacket CACHED_PACKET_827;
     private static final BatchPacket CACHED_PACKET;
 
+    private static final BatchPacket CACHED_PACKET_819_NETEASE;
+
     private static final byte[] TAG_361;
     private static final byte[] TAG_419;
     private static final byte[] TAG_486;
@@ -136,8 +138,14 @@ public class BiomeDefinitionListPacket extends DataPacket {
             );
             pk.protocol = ProtocolInfo.v1_21_80;
             pk.gameVersion = GameVersion.V1_21_80;
+            DataPacket pkNetEase = pk.clone();
             pk.tryEncode();
             CACHED_PACKET_800 = pk.compress(Deflater.BEST_COMPRESSION);
+
+            pkNetEase.protocol = ProtocolInfo.v1_21_93;
+            pkNetEase.gameVersion = GameVersion.V1_21_93_NETEASE;
+            pkNetEase.tryEncode();
+            CACHED_PACKET_819_NETEASE = pkNetEase.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
             throw new AssertionError("Error whilst loading biome definitions 800", e);
         }
@@ -178,6 +186,12 @@ public class BiomeDefinitionListPacket extends DataPacket {
         int protocol = gameVersion.getProtocol();
         if (protocol < ProtocolInfo.v1_12_0) {
             throw new UnsupportedOperationException("Unsupported protocol version: " + protocol);
+        }
+
+        if (gameVersion.isNetEase()) {
+            if (protocol >= ProtocolInfo.v1_21_93) {
+                return CACHED_PACKET_819_NETEASE;
+            }
         }
 
         if (protocol >= ProtocolInfo.v1_21_110_26) {
@@ -273,6 +287,10 @@ public class BiomeDefinitionListPacket extends DataPacket {
         this.putLFloat(definition.getScale());
         this.putLInt(definition.getMapWaterColor().getRGB());
         this.putBoolean(definition.isRain());
+        if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
+            this.putLInt(definition.getDimension());
+            this.putString(definition.getVanilla() == null ? "" : definition.getVanilla());
+        }
         this.putOptionalNull(definition.getTags(), tags -> {
             this.putUnsignedVarInt(tags.size());
             for (String tag : tags) {
