@@ -1,10 +1,12 @@
 package cn.nukkit.item;
 
+import cn.nukkit.item.trim.ItemTrimMaterialType;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
-public class ItemDiamond extends Item {
+public class ItemDiamond extends Item implements ItemTrimMaterial {
 
     public ItemDiamond() {
         this(0, 1);
@@ -16,5 +18,10 @@ public class ItemDiamond extends Item {
 
     public ItemDiamond(Integer meta, int count) {
         super(DIAMOND, 0, count, "Diamond");
+    }
+
+    @Override
+    public ItemTrimMaterialType getMaterial() {
+        return ItemTrimMaterialType.MATERIAL_DIAMOND;
     }
 }
