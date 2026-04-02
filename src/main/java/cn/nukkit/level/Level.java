@@ -385,6 +385,7 @@ public class Level implements ChunkManager, Metadatable {
     private GameLoop gameLoop;
     private volatile Thread levelThread;
     private final Queue<Runnable> syncTaskQueue = PlatformDependent.newMpscQueue();
+    private final Queue<SyncPacketEntry> syncPacketQueue = PlatformDependent.newMpscQueue();
 
     // 用于实现世界监听的回调
     private static final AtomicInteger callbackIdCounter = new AtomicInteger();
@@ -602,7 +603,7 @@ public class Level implements ChunkManager, Metadatable {
                 .currentTick(this.levelCurrentTick)
                 .onStart(() -> server.getLogger().info("Level thread started: " + this.getName()))
                 .onTick(loop -> this.levelThreadTick((int) loop.getTick()))
-                .onIdle(this::processScheduledTasks)
+                .onIdle(this::handleSyncPackets)
                 .onStop(() -> {
                     this.parallelTickEnabled = false;
                     server.getLogger().info("Level thread stopped: " + this.getName());
@@ -630,6 +631,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private void levelThreadTick(int currentTick) {
         processScheduledTasks();
+        handleSyncPackets();
         this.providerLock.readLock().lock();
         try {
             if (this.getProvider() == null) {
@@ -651,6 +653,27 @@ public class Level implements ChunkManager, Metadatable {
                 task.run();
             } catch (Exception e) {
                 server.getLogger().logException(e);
+            }
+        }
+    }
+
+    public void addSyncPacketToQueue(Player player, DataPacket packet, long time) {
+        this.syncPacketQueue.offer(new SyncPacketEntry(player, packet, time));
+        if (this.gameLoop != null) this.gameLoop.wakeUp();
+    }
+
+    protected void handleSyncPackets() {
+        SyncPacketEntry entry;
+        while ((entry = this.syncPacketQueue.poll()) != null) {
+            if (entry.player().level != this || !entry.player().isConnected()) {
+                continue;
+            }
+
+            try {
+                entry.player().handleDataPacket(entry.packet());
+            } catch (Throwable t) {
+                server.getLogger().error("Error while handling sync packet in world " + this.getName()
+                        + " for player " + entry.player().getName(), t);
             }
         }
     }
@@ -5521,4 +5544,6 @@ public class Level implements ChunkManager, Metadatable {
         private Block block;
         private BlockFace neighbor;
     }
+
+    private record SyncPacketEntry(Player player, DataPacket packet, long time) {}
 }
