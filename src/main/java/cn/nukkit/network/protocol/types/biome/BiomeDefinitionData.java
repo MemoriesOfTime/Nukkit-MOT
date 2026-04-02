@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol.types.biome;
 
 
+import cn.nukkit.api.OnlyNetEase;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -53,6 +54,17 @@ public class BiomeDefinitionData {
     public float scale;
     public Color mapWaterColor;
     public boolean rain;
+    /**
+     * @since 1.21.90-netease
+     */
+    @OnlyNetEase
+    public int dimension = 0;
+    /**
+     * @since 1.21.90-netease
+     */
+    @OnlyNetEase
+    @Nullable
+    public String vanilla = "";
     @Nullable
     @Getter(AccessLevel.NONE)
     public transient Indexable<List<String>> tags;

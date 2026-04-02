@@ -3156,7 +3156,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         this.dataPacket(itemComponentPacket);
                     }
-                    this.dataPacket(BiomeDefinitionListPacket.getCachedPacket(this.protocol));
+                    this.dataPacket(BiomeDefinitionListPacket.getCachedPacket(this.gameVersion));
                 }
                 this.dataPacket(new AvailableEntityIdentifiersPacket());
             }

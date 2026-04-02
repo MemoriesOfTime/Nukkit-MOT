@@ -976,12 +976,6 @@
         "oldData": 11
     },
     {
-        "name": "minecraft:board",
-        "id": 629,
-        "version": 2,
-        "oldId": 454
-    },
-    {
         "name": "minecraft:boat",
         "id": 812,
         "version": 2,
@@ -1506,12 +1500,6 @@
         "oldId": 304
     },
     {
-        "name": "minecraft:chalkboard",
-        "id": 230,
-        "version": 2,
-        "oldId": 230
-    },
-    {
         "name": "minecraft:charcoal",
         "id": 327,
         "version": 2,
@@ -1978,7 +1966,7 @@
     },
     {
         "name": "minecraft:command_block_minecart",
-        "id": 596,
+        "id": 594,
         "version": 2,
         "oldId": 443
     },
@@ -9584,7 +9572,7 @@
     },
     {
         "name": "minecraft:splash_potion",
-        "id": 594,
+        "id": 596,
         "version": 2,
         "oldId": 438
     },
