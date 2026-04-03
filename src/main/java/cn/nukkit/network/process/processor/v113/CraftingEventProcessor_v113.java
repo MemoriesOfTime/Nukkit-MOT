@@ -106,6 +106,11 @@ public class CraftingEventProcessor_v113 extends DataPacketProcessor<CraftingEve
 
         if (pk.input.length == 0) {
             // 没有输入物品，尝试根据输出查找配方
+            if (pk.output == null || pk.output.length == 0) {
+                Server.getInstance().getLogger().debug("Invalid CraftingEventPacket: no input and no output from player " + player.getName());
+                player.getInventory().sendContents(player);
+                return;
+            }
             Collection<Recipe> recipes = player.getServer().getCraftingManager().getRecipes();
             recipe = null;
 

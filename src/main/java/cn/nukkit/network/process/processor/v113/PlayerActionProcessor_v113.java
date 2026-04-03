@@ -13,6 +13,8 @@ import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.event.entity.EntityShootBowEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerRespawnEvent;
+import cn.nukkit.event.player.PlayerToggleSneakEvent;
+import cn.nukkit.event.player.PlayerToggleSprintEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemArrow;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -261,19 +263,35 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
                 break;
 
             case PlayerActionPacket.ACTION_START_SPRINT:
-                player.setSprinting(true);
+                PlayerToggleSprintEvent startSprintEvent = new PlayerToggleSprintEvent(player, true);
+                player.getServer().getPluginManager().callEvent(startSprintEvent);
+                if (!startSprintEvent.isCancelled()) {
+                    player.setSprinting(true);
+                }
                 break;
 
             case PlayerActionPacket.ACTION_STOP_SPRINT:
-                player.setSprinting(false);
+                PlayerToggleSprintEvent stopSprintEvent = new PlayerToggleSprintEvent(player, false);
+                player.getServer().getPluginManager().callEvent(stopSprintEvent);
+                if (!stopSprintEvent.isCancelled()) {
+                    player.setSprinting(false);
+                }
                 break;
 
             case PlayerActionPacket.ACTION_START_SNEAK:
-                player.setSneaking(true);
+                PlayerToggleSneakEvent startSneakEvent = new PlayerToggleSneakEvent(player, true);
+                player.getServer().getPluginManager().callEvent(startSneakEvent);
+                if (!startSneakEvent.isCancelled()) {
+                    player.setSneaking(true);
+                }
                 break;
 
             case PlayerActionPacket.ACTION_STOP_SNEAK:
-                player.setSneaking(false);
+                PlayerToggleSneakEvent stopSneakEvent = new PlayerToggleSneakEvent(player, false);
+                player.getServer().getPluginManager().callEvent(stopSneakEvent);
+                if (!stopSneakEvent.isCancelled()) {
+                    player.setSneaking(false);
+                }
                 break;
 
             case PlayerActionPacket.ACTION_CREATIVE_PLAYER_DESTROY_BLOCK:
