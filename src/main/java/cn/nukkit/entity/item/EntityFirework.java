@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class EntityFirework extends Entity {
 
     public static final int NETWORK_ID = 72;
+    private static final int SHOOTER_COLLISION_GRACE_TICKS = 5;
 
     private static final Vector3f DEFAULT_DIRECTION = new Vector3f(0, 1, 0);
 
@@ -43,14 +44,20 @@ public class EntityFirework extends Entity {
 
     protected boolean isProjectile;
     protected boolean hadCollision;
+    protected Entity shootingEntity;
 
     public EntityFirework(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
     }
 
     public EntityFirework(FullChunk chunk, CompoundTag nbt, boolean projectile) {
+        this(chunk, nbt, projectile, null);
+    }
+
+    public EntityFirework(FullChunk chunk, CompoundTag nbt, boolean projectile, Entity shootingEntity) {
         super(chunk, nbt);
         this.isProjectile = projectile;
+        this.shootingEntity = shootingEntity;
 
         ThreadLocalRandom rand = ThreadLocalRandom.current();
 
@@ -183,6 +190,7 @@ public class EntityFirework extends Entity {
                 || !entity.isAlive()
                 || !entity.canCollideWith(this)
                 || entity == this
+                || entity == this.shootingEntity && this.age < SHOOTER_COLLISION_GRACE_TICKS
                 || entity instanceof Player player && player.getGamemode() == Player.SPECTATOR;
     }
 
