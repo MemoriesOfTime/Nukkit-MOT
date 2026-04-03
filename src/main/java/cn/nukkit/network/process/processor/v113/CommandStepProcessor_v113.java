@@ -4,6 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.data.args.CommandArg;
+import cn.nukkit.command.data.args.CommandArgBlockVector;
 import cn.nukkit.event.player.PlayerCommandPreprocessEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
@@ -28,7 +30,6 @@ public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPa
         }
         player.craftingType = Player.CRAFTING_SMALL;
 
-
         StringBuilder commandText = new StringBuilder(pk.command);
         Command command = player.getServer().getCommandMap().getCommand(commandText.toString());
         if (command != null) {
@@ -40,14 +41,14 @@ public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPa
                         if (arg != null) {
                             switch (par.type) {
                                 case TARGET:
-                                    //TODO
-                                    /*CommandArg rules = new Gson().fromJson(arg, CommandArg.class);
-                                    commandText += " " + rules.getRules()[0].getValue();*/
+                                    CommandArg rules = new Gson().fromJson(arg, CommandArg.class);
+                                    if (rules.getRules() != null && rules.getRules().length > 0) {
+                                        commandText.append(" ").append(rules.getRules()[0].getValue());
+                                    }
                                     break;
                                 case BLOCK_POSITION:
-                                    //TODO
-                                    /*CommandArgBlockVector bv = new Gson().fromJson(arg, CommandArgBlockVector.class);
-                                    commandText += " " + bv.getX() + " " + bv.getY() + " " + bv.getZ();*/
+                                    CommandArgBlockVector bv = new Gson().fromJson(arg, CommandArgBlockVector.class);
+                                    commandText.append(" ").append(bv.getX()).append(" ").append(bv.getY()).append(" ").append(bv.getZ());
                                     break;
                                 case STRING:
                                 case RAWTEXT:
