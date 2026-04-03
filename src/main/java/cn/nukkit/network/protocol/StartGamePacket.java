@@ -134,6 +134,10 @@ public class StartGamePacket extends DataPacket {
      */
     public CompoundTag playerPropertyData = new CompoundTag("");
     /**
+     * @since v475
+     */
+    public long blockRegistryChecksum;
+    /**
      * If true, the server will inform clients that they have the ability to generate visual level chunks outside of player interaction distances.
      */
     public boolean clientSideGenerationEnabled;
@@ -398,7 +402,7 @@ public class StartGamePacket extends DataPacket {
             } else if (protocol >= ProtocolInfo.v1_16_0) {
                 this.putBoolean(false); // isInventoryServerAuthoritative
                 if (protocol >= ProtocolInfo.v1_16_230_50) {
-                    this.putString(""); // serverEngine
+                    this.putString(Utils.getVersionByProtocol(this.protocol)); // serverEngine
                     if (protocol >= ProtocolInfo.v1_18_0) {
                         if (protocol >= ProtocolInfo.v1_19_0_29) {
                             try {
@@ -407,7 +411,7 @@ public class StartGamePacket extends DataPacket {
                                 throw new RuntimeException(e);
                             }
                         }
-                        this.putLLong(0L); // BlockRegistryChecksum
+                        this.putLLong(this.blockRegistryChecksum); // BlockRegistryChecksum
                         if (protocol >= ProtocolInfo.v1_19_0_29) {
                             //this.putUUID(new UUID(0, 0)); // worldTemplateId
                             this.put(EMPTY_UUID); // worldTemplateId
