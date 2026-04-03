@@ -1,5 +1,6 @@
 package cn.nukkit.entity.item;
 
+import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.LongEntityData;
 import cn.nukkit.entity.data.NBTEntityData;
@@ -8,12 +9,17 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
+import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.utils.BlockIterator;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
@@ -36,6 +42,7 @@ public class EntityFirework extends Entity {
     protected Item firework;
 
     protected boolean isProjectile;
+    protected boolean hadCollision;
 
     public EntityFirework(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -47,13 +54,7 @@ public class EntityFirework extends Entity {
 
         ThreadLocalRandom rand = ThreadLocalRandom.current();
 
-        int lifetime;
-        boolean contains = namedTag.contains("FireworkLifeTime");
-        if (contains) {
-            lifetime = namedTag.getInt("FireworkLifeTime");
-        } else {
-            lifetime = 30 + rand.nextInt(12);
-        }
+        int lifetime = namedTag.contains("FireworkLifeTime") ? namedTag.getInt("FireworkLifeTime") : 30 + rand.nextInt(12);
         this.setLifetime(lifetime);
 
         if (namedTag.contains("FireworkItem")) {
@@ -110,7 +111,24 @@ public class EntityFirework extends Entity {
             this.motionY = this.motionY * 1.05 + dir.y * 0.03;
             this.motionZ = this.motionZ * 1.05 + dir.z * 0.03;
 
+            Vector3 moveVector = new Vector3(this.x + this.motionX, this.y + this.motionY, this.z + this.motionZ);
+            Entity collisionEntity = this.findCollisionEntity(moveVector);
+            if (collisionEntity != null) {
+                this.explode();
+                return true;
+            }
+
             this.move(this.motionX, this.motionY, this.motionZ);
+
+            if (this.isCollided && !this.hadCollision) {
+                this.hadCollision = true;
+                if (this.hasExplosions()) {
+                    this.explode();
+                    return true;
+                }
+            } else if (!this.isCollided && this.hadCollision) {
+                this.hadCollision = false;
+            }
 
             this.updateMovement();
 
@@ -133,6 +151,41 @@ public class EntityFirework extends Entity {
         return hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
     }
 
+    protected Entity findCollisionEntity(Vector3 moveVector) {
+        Entity[] entities = this.getLevel().getCollidingEntities(this.boundingBox.addCoord(this.motionX, this.motionY, this.motionZ).expand(1, 1, 1), this);
+
+        double nearestDistance = Double.MAX_VALUE;
+        Entity nearestEntity = null;
+
+        for (Entity entity : entities) {
+            if (this.shouldIgnoreCollisionEntity(entity)) {
+                continue;
+            }
+
+            AxisAlignedBB boundingBox = entity.boundingBox.grow(0.3, 0.3, 0.3);
+            MovingObjectPosition intercept = boundingBox.calculateIntercept(this, moveVector);
+            if (intercept == null) {
+                continue;
+            }
+
+            double distance = this.distanceSquared(intercept.hitVector);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestEntity = entity;
+            }
+        }
+
+        return nearestEntity;
+    }
+
+    protected boolean shouldIgnoreCollisionEntity(Entity entity) {
+        return entity == null
+                || !entity.isAlive()
+                || !entity.canCollideWith(this)
+                || entity == this
+                || entity instanceof Player player && player.getGamemode() == Player.SPECTATOR;
+    }
+
     protected void explode() {
         EntityEventPacket pk = new EntityEventPacket();
         pk.event = EntityEventPacket.FIREWORK_EXPLOSION;
@@ -141,6 +194,8 @@ public class EntityFirework extends Entity {
         this.level.addChunkPacket(this.getFloorX() >> 4, this.getFloorZ() >> 4, pk);
 
         level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_LARGE_BLAST, -1, NETWORK_ID);
+
+        this.dealExplosionDamage();
 
         this.kill(); // Using close() here would remove the firework before the explosion is displayed
     }
@@ -157,9 +212,101 @@ public class EntityFirework extends Entity {
     public void setFirework(Item item) {
         this.firework = item;
         this.setDataProperty(new NBTEntityData(Entity.DATA_DISPLAY_ITEM, firework));
-        int flight = Math.max(1, this.firework instanceof ItemFirework ? ((ItemFirework) this.firework).getFlight() : 1);
+        this.lifetime = computeLifetime(item);
+    }
+
+    protected int computeLifetime(Item item) {
+        return computeLifetimeForItem(item);
+    }
+
+    public static int computeLifetimeForItem(Item item) {
+        int flight = Math.max(1, item instanceof ItemFirework ? ((ItemFirework) item).getFlight() : 1);
         ThreadLocalRandom threadLocalRandom = ThreadLocalRandom.current();
-        this.lifetime = 10 * (flight + 1) + threadLocalRandom.nextInt(5) + threadLocalRandom.nextInt(6);
+        return 10 * (flight + 1) + threadLocalRandom.nextInt(6) + threadLocalRandom.nextInt(7);
+    }
+
+    protected int getExplosionCount() {
+        if (!(this.firework instanceof ItemFirework itemFirework)) {
+            return 0;
+        }
+
+        CompoundTag tag = itemFirework.getNamedTag();
+        if (tag == null || !tag.contains("Fireworks")) {
+            return 0;
+        }
+
+        ListTag<CompoundTag> explosions = tag.getCompound("Fireworks").getList("Explosions", CompoundTag.class);
+        return explosions == null ? 0 : explosions.size();
+    }
+
+    protected boolean hasExplosions() {
+        return this.getExplosionCount() > 0;
+    }
+
+    protected void dealExplosionDamage() {
+        int explosionCount = this.getExplosionCount();
+        if (explosionCount <= 0) {
+            return;
+        }
+
+        float baseDamage = 5 + explosionCount * 2;
+        AxisAlignedBB damageBox = this.getBoundingBox().grow(5, 5, 5);
+
+        for (Entity target : this.level.getNearbyEntities(damageBox, this)) {
+            if (!target.isAlive() || target == this || this.shouldSkipExplosionDamageTarget(target)) {
+                continue;
+            }
+
+            double distance = this.distance(target);
+            if (distance > 5) {
+                continue;
+            }
+
+            if (!canDamage(target)) {
+                continue;
+            }
+
+            float damage = (float) (baseDamage * Math.sqrt((5 - distance) / 5));
+            if (damage <= 0) {
+                continue;
+            }
+
+            target.attack(new EntityDamageEvent(target, DamageCause.ENTITY_EXPLOSION, damage));
+        }
+    }
+
+    protected boolean shouldSkipExplosionDamageTarget(Entity target) {
+        return false;
+    }
+
+    protected boolean canDamage(Entity target) {
+        if (target == null) {
+            return false;
+        }
+
+        Vector3 start = this.add(0, this.getHeight() * 0.5, 0);
+        Vector3 lowerTargetPoint = target.add(0, 0, 0);
+        Vector3 middleTargetPoint = target.add(0, target.getHeight() * 0.5, 0);
+        return this.hasClearDamagePath(start, lowerTargetPoint) || this.hasClearDamagePath(start, middleTargetPoint);
+    }
+
+    protected boolean hasClearDamagePath(Vector3 start, Vector3 end) {
+        Vector3 direction = end.subtract(start);
+        double length = direction.length();
+        if (length <= 0.00001) {
+            return true;
+        }
+
+        BlockIterator iterator = new BlockIterator(this.level, start, direction.normalize(), 0, (int) Math.ceil(length));
+        while (iterator.hasNext()) {
+            var block = iterator.next();
+            if (!block.canPassThrough()) {
+                return block.getFloorX() == end.getFloorX()
+                        && block.getFloorY() == end.getFloorY()
+                        && block.getFloorZ() == end.getFloorZ();
+            }
+        }
+        return true;
     }
 
     @Override

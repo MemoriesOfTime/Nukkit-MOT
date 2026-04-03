@@ -2,6 +2,7 @@ package cn.nukkit.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityElytraFirework;
 import cn.nukkit.entity.item.EntityFirework;
@@ -12,8 +13,8 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.DyeColor;
-import org.apache.commons.math3.util.FastMath;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -56,6 +57,10 @@ public class ItemFirework extends Item {
 
     @Override
     public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
+        if (this.tryBoostGlidingPlayer(player)) {
+            return true;
+        }
+
         if (block.canPassThrough()) {
             this.spawnFirework(level, block);
 
@@ -71,22 +76,41 @@ public class ItemFirework extends Item {
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        if (player.getInventory().getChestplateFast() instanceof ItemElytra && player.isGliding()) {
-            this.spawnElytraFirework(player.getLevel(), player, player);
+        return this.tryBoostGlidingPlayer(player);
+    }
 
-            if (!player.isCreative()) {
-                this.count--;
-            }
-
-            player.setMotion(new Vector3(
-                    -Math.sin(FastMath.toRadians(player.yaw)) * Math.cos(FastMath.toRadians(player.pitch)) * 2,
-                    -Math.sin(FastMath.toRadians(player.pitch)) * 2,
-                    Math.cos(FastMath.toRadians(player.yaw)) * Math.cos(FastMath.toRadians(player.pitch)) * 2));
-
-            return true;
+    private boolean tryBoostGlidingPlayer(Player player) {
+        if (!(player.getInventory().getChestplateFast() instanceof ItemElytra) || !player.isGliding()) {
+            return false;
         }
 
-        return false;
+        this.dropPlayerLeashes(player);
+        this.spawnElytraFirework(player.getLevel(), player, player);
+
+        if (!player.isCreative()) {
+            this.count--;
+        }
+
+        return true;
+    }
+
+    private void dropPlayerLeashes(Player player) {
+        boolean droppedAnyLeash = false;
+        Entity[] entities = player.getLevel().getEntities();
+        if (entities == null || entities.length == 0) {
+            return;
+        }
+
+        for (Entity entity : entities) {
+            if (entity instanceof BaseEntity baseEntity && baseEntity.getLeadHolderId() == player.getId()) {
+                baseEntity.unleash();
+                droppedAnyLeash = true;
+            }
+        }
+
+        if (droppedAnyLeash) {
+            player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_LEAD_BREAK);
+        }
     }
 
     public void addExplosion(FireworkExplosion explosion) {

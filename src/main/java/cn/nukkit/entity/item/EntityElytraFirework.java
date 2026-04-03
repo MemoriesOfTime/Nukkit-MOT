@@ -3,17 +3,13 @@ package cn.nukkit.entity.item;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.LongEntityData;
-import cn.nukkit.entity.data.NBTEntityData;
 import cn.nukkit.entity.data.Vector3fEntityData;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
-import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
-
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 鞘翅烟花火箭实体 - 跟随玩家移动
@@ -27,13 +23,7 @@ public class EntityElytraFirework extends EntityFirework {
         super(chunk, nbt, true);
         this.followingPlayer = player;
 
-        // 鞘翅烟花生命周期较短：20-32 tick (约1-1.6秒)
-        ThreadLocalRandom rand = ThreadLocalRandom.current();
-        this.setLifetime(20 + rand.nextInt(13));
-
-        if (namedTag.contains("FireworkItem")) {
-            this.setFirework(NBTIO.getItemHelper(this.namedTag.getCompound("FireworkItem")));
-        }
+        this.setDataFlag(Entity.DATA_FLAGS, Entity.DATA_FLAG_INVISIBLE, true);
     }
 
     @Override
@@ -54,11 +44,21 @@ public class EntityElytraFirework extends EntityFirework {
 
         if (this.isAlive() && this.followingPlayer != null && !this.followingPlayer.closed) {
             Vector3 motion = this.followingPlayer.getMotion();
+            if (this.followingPlayer.isGliding()) {
+                Vector3 look = this.followingPlayer.getDirectionVector();
+                this.followingPlayer.setMotion(motion.add(
+                        look.x * 0.1 + (look.x * 1.5 - motion.x) * 0.5,
+                        look.y * 0.1 + (look.y * 1.5 - motion.y) * 0.5,
+                        look.z * 0.1 + (look.z * 1.5 - motion.z) * 0.5
+                ));
+                motion = this.followingPlayer.getMotion();
+            }
+
             this.motionX = motion.x;
             this.motionY = motion.y;
             this.motionZ = motion.z;
 
-            this.setPosition(this.followingPlayer.getNextPosition().add(0, -0.5, 0));
+            this.setPosition(this.followingPlayer.add(0, this.followingPlayer.getEyeHeight() * 0.5, 0));
 
             updateRotation();
 
@@ -89,11 +89,31 @@ public class EntityElytraFirework extends EntityFirework {
 
     @Override
     public void setFirework(Item item) {
-        this.firework = item;
-        this.setDataProperty(new NBTEntityData(Entity.DATA_DISPLAY_ITEM, firework));
+        super.setFirework(item);
         this.setDataProperty(new LongEntityData(Entity.DATA_HAS_DISPLAY, -1), false);
         this.setDataProperty(new Vector3fEntityData(Entity.DATA_FIREWORK_DIRECTION,
                 new Vector3f((float) motionX, (float) motionY, (float) motionZ)), false);
+    }
+
+    @Override
+    protected void dealExplosionDamage() {
+        int explosionCount = this.getExplosionCount();
+        if (explosionCount <= 0) {
+            return;
+        }
+
+        if (this.followingPlayer != null && this.followingPlayer.isAlive()) {
+            this.followingPlayer.attack(new cn.nukkit.event.entity.EntityDamageEvent(this.followingPlayer,
+                    cn.nukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_EXPLOSION,
+                    5 + explosionCount * 2));
+        }
+
+        super.dealExplosionDamage();
+    }
+
+    @Override
+    protected boolean shouldSkipExplosionDamageTarget(Entity target) {
+        return target == this.followingPlayer;
     }
 
     public Player getFollowingPlayer() {
