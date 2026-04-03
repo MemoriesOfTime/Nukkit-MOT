@@ -2,6 +2,7 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityLiving;
 import cn.nukkit.entity.data.LongEntityData;
 import cn.nukkit.entity.data.NBTEntityData;
 import cn.nukkit.entity.data.Vector3fEntityData;
@@ -11,6 +12,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
+import cn.nukkit.level.GameRule;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
@@ -34,7 +36,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class EntityFirework extends Entity {
 
     public static final int NETWORK_ID = 72;
-    private static final int SHOOTER_COLLISION_GRACE_TICKS = 5;
+    private static final int SHOOTER_COLLISION_GRACE_TICKS = 10;
 
     private static final Vector3f DEFAULT_DIRECTION = new Vector3f(0, 1, 0);
 
@@ -47,6 +49,7 @@ public class EntityFirework extends Entity {
     protected boolean isProjectile;
     protected boolean hadCollision;
     protected Entity shootingEntity;
+    protected boolean leftShooterCollisionRange;
 
     public EntityFirework(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -121,10 +124,12 @@ public class EntityFirework extends Entity {
             this.motionZ = this.motionZ * 1.05 + dir.z * 0.03;
 
             Vector3 moveVector = new Vector3(this.x + this.motionX, this.y + this.motionY, this.z + this.motionZ);
-            Entity collisionEntity = this.findCollisionEntity(moveVector);
-            if (collisionEntity != null) {
-                this.explode();
-                return true;
+            if (this.isProjectile) {
+                Entity collisionEntity = this.findCollisionEntity(moveVector);
+                if (collisionEntity != null) {
+                    this.explode();
+                    return true;
+                }
             }
 
             this.move(this.motionX, this.motionY, this.motionZ);
@@ -187,13 +192,34 @@ public class EntityFirework extends Entity {
         return nearestEntity;
     }
 
+    @Override
+    public boolean canCollideWith(Entity entity) {
+        return this.isFireworkImpactTarget(entity) && !this.onGround;
+    }
+
     protected boolean shouldIgnoreCollisionEntity(Entity entity) {
         return entity == null
                 || !entity.isAlive()
-                || !entity.canCollideWith(this)
                 || entity == this
-                || entity == this.shootingEntity && this.age < SHOOTER_COLLISION_GRACE_TICKS
+                || this.shouldIgnoreShooterCollision(entity)
                 || entity instanceof Player player && player.getGamemode() == Player.SPECTATOR;
+    }
+
+    protected boolean shouldIgnoreShooterCollision(Entity entity) {
+        if (entity != this.shootingEntity || this.leftShooterCollisionRange) {
+            return false;
+        }
+
+        AxisAlignedBB shooterBoundingBox = entity.boundingBox.grow(0.3, 0.3, 0.3);
+        Vector3 moveVector = this.add(this.motionX, this.motionY, this.motionZ);
+        if (this.age < SHOOTER_COLLISION_GRACE_TICKS
+                || shooterBoundingBox.intersectsWith(this.boundingBox)
+                || shooterBoundingBox.calculateIntercept(this, moveVector) != null) {
+            return true;
+        }
+
+        this.leftShooterCollisionRange = true;
+        return false;
     }
 
     protected void explode() {
@@ -263,7 +289,7 @@ public class EntityFirework extends Entity {
         AxisAlignedBB damageBox = this.getBoundingBox().grow(5, 5, 5);
 
         for (Entity target : this.level.getNearbyEntities(damageBox, this)) {
-            if (!target.isAlive() || target == this || this.shouldSkipExplosionDamageTarget(target)) {
+            if (!this.isFireworkImpactTarget(target) || !target.isAlive() || target == this || this.shouldSkipExplosionDamageTarget(target)) {
                 continue;
             }
 
@@ -276,6 +302,13 @@ public class EntityFirework extends Entity {
                 continue;
             }
 
+            if (target instanceof Player && this.shootingEntity instanceof Player) {
+                Player shooter = (Player) this.shootingEntity;
+                if (!shooter.getServer().pvpEnabled || !shooter.getLevel().getGameRules().getBoolean(GameRule.PVP)) {
+                    continue;
+                }
+            }
+
             float damage = (float) (baseDamage * Math.sqrt((5 - distance) / 5));
             if (damage <= 0) {
                 continue;
@@ -283,6 +316,13 @@ public class EntityFirework extends Entity {
 
             target.attack(this.createExplosionDamageEvent(target, damage));
         }
+    }
+
+    protected boolean isFireworkImpactTarget(Entity entity) {
+        return entity instanceof EntityLiving
+                || entity instanceof EntityEndCrystal
+                || entity instanceof EntityMinecartAbstract
+                || entity instanceof EntityBoat;
     }
 
     protected EntityDamageEvent createExplosionDamageEvent(Entity target, float damage) {

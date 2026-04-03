@@ -24,6 +24,7 @@ import java.util.List;
  * @author CreeperFace
  */
 public class ItemFirework extends Item {
+    private static final double PLAYER_LEASH_SCAN_RANGE = 16;
 
     public ItemFirework() {
         this(0);
@@ -57,11 +58,11 @@ public class ItemFirework extends Item {
 
     @Override
     public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
-        if (this.tryBoostGlidingPlayer(player)) {
-            return true;
-        }
-
         if (block.canPassThrough()) {
+            if (this.tryBoostGlidingPlayer(player)) {
+                return true;
+            }
+
             this.spawnFirework(level, block);
 
             if (!player.isCreative()) {
@@ -96,11 +97,7 @@ public class ItemFirework extends Item {
 
     private void dropPlayerLeashes(Player player) {
         boolean droppedAnyLeash = false;
-        Entity[] entities = player.getLevel().getEntities();
-        if (entities == null || entities.length == 0) {
-            return;
-        }
-
+        Entity[] entities = player.getLevel().getNearbyEntities(player.getBoundingBox().grow(PLAYER_LEASH_SCAN_RANGE, PLAYER_LEASH_SCAN_RANGE, PLAYER_LEASH_SCAN_RANGE), player);
         for (Entity entity : entities) {
             if (entity instanceof BaseEntity baseEntity && baseEntity.getLeadHolderId() == player.getId()) {
                 baseEntity.unleash();

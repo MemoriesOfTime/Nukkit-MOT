@@ -20,7 +20,7 @@ public class EntityElytraFirework extends EntityFirework {
     private int fireworkAge = 0;
 
     public EntityElytraFirework(FullChunk chunk, CompoundTag nbt, Player player) {
-        super(chunk, nbt, true);
+        super(chunk, nbt, true, player);
         this.followingPlayer = player;
 
         this.setDataFlag(Entity.DATA_FLAGS, Entity.DATA_FLAG_INVISIBLE, true);
@@ -43,16 +43,19 @@ public class EntityElytraFirework extends EntityFirework {
         boolean hasUpdate = this.entityBaseTick(tickDiff);
 
         if (this.isAlive() && this.followingPlayer != null && !this.followingPlayer.closed) {
-            Vector3 motion = this.followingPlayer.getMotion();
-            if (this.followingPlayer.isGliding()) {
-                Vector3 look = this.followingPlayer.getDirectionVector();
-                this.followingPlayer.setMotion(motion.add(
-                        look.x * 0.1 + (look.x * 1.5 - motion.x) * 0.5,
-                        look.y * 0.1 + (look.y * 1.5 - motion.y) * 0.5,
-                        look.z * 0.1 + (look.z * 1.5 - motion.z) * 0.5
-                ));
-                motion = this.followingPlayer.getMotion();
+            if (!this.followingPlayer.isGliding()) {
+                this.explode();
+                return true;
             }
+
+            Vector3 motion = this.followingPlayer.getMotion();
+            Vector3 look = this.followingPlayer.getDirectionVector();
+            this.followingPlayer.setMotion(motion.add(
+                    look.x * 0.1 + (look.x * 1.5 - motion.x) * 0.5,
+                    look.y * 0.1 + (look.y * 1.5 - motion.y) * 0.5,
+                    look.z * 0.1 + (look.z * 1.5 - motion.z) * 0.5
+            ));
+            motion = this.followingPlayer.getMotion();
 
             this.motionX = motion.x;
             this.motionY = motion.y;
@@ -63,6 +66,26 @@ public class EntityElytraFirework extends EntityFirework {
             updateRotation();
 
             this.updateMovement();
+
+            if (this.hasExplosions()) {
+                Vector3 moveVector = new Vector3(this.x + this.motionX, this.y + this.motionY, this.z + this.motionZ);
+                Entity collisionEntity = this.findCollisionEntity(moveVector);
+                if (collisionEntity != null) {
+                    this.explode();
+                    return true;
+                }
+
+                boolean isCollidedWithBlock = this.level
+                        .getCollisionCubes(this, this.boundingBox.addCoord(this.motionX, this.motionY, this.motionZ))
+                        .length > 0;
+                if (isCollidedWithBlock && !this.hadCollision) {
+                    this.hadCollision = true;
+                    this.explode();
+                    return true;
+                } else if (!isCollidedWithBlock && this.hadCollision) {
+                    this.hadCollision = false;
+                }
+            }
 
             if (this.fireworkAge == 0) {
                 this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_LAUNCH);
