@@ -70,7 +70,7 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
 
         switch (pk.action) {
             case PlayerActionPacket.ACTION_START_BREAK:
-                if (player.lastBreak != Long.MAX_VALUE || pos.distanceSquared(player) > 10000) {
+                if (player.lastBreak >= 0 || pos.distanceSquared(player) > 10000) {
                     break;
                 }
                 Block target = player.level.getBlock(pos);
@@ -101,8 +101,6 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
                 break;
 
             case PlayerActionPacket.ACTION_ABORT_BREAK:
-                player.lastBreak = Long.MAX_VALUE;
-                // fallthrough
             case PlayerActionPacket.ACTION_STOP_BREAK:
                 LevelEventPacket stopBreakPk = new LevelEventPacket();
                 stopBreakPk.evid = LevelEventPacket.EVENT_BLOCK_STOP_BREAK;

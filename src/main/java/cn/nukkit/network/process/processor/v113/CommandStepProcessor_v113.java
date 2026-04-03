@@ -13,6 +13,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.v113.CommandStepPacketV113;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonSyntaxException;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -39,25 +40,34 @@ public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPa
                     for (CommandParameter par : pars) {
                         JsonElement arg = pk.args.get(par.name);
                         if (arg != null) {
-                            switch (par.type) {
-                                case TARGET:
-                                    CommandArg rules = new Gson().fromJson(arg, CommandArg.class);
-                                    if (rules.getRules() != null && rules.getRules().length > 0) {
-                                        commandText.append(" ").append(rules.getRules()[0].getValue());
-                                    }
-                                    break;
-                                case BLOCK_POSITION:
-                                    CommandArgBlockVector bv = new Gson().fromJson(arg, CommandArgBlockVector.class);
-                                    commandText.append(" ").append(bv.getX()).append(" ").append(bv.getY()).append(" ").append(bv.getZ());
-                                    break;
-                                case STRING:
-                                case RAWTEXT:
-                                    String string = new Gson().fromJson(arg, String.class);
-                                    commandText.append(" ").append(string);
-                                    break;
-                                default:
-                                    commandText.append(" ").append(arg);
-                                    break;
+                            try {
+                                switch (par.type) {
+                                    case TARGET:
+                                        CommandArg rules = new Gson().fromJson(arg, CommandArg.class);
+                                        if (rules != null && rules.getRules() != null && rules.getRules().length > 0) {
+                                            commandText.append(" ").append(rules.getRules()[0].getValue());
+                                        }
+                                        break;
+                                    case BLOCK_POSITION:
+                                        CommandArgBlockVector bv = new Gson().fromJson(arg, CommandArgBlockVector.class);
+                                        if (bv != null) {
+                                            commandText.append(" ").append(bv.getX()).append(" ").append(bv.getY()).append(" ").append(bv.getZ());
+                                        }
+                                        break;
+                                    case STRING:
+                                    case RAWTEXT:
+                                        String string = new Gson().fromJson(arg, String.class);
+                                        if (string != null) {
+                                            commandText.append(" ").append(string);
+                                        }
+                                        break;
+                                    default:
+                                        commandText.append(" ").append(arg);
+                                        break;
+                                }
+                            } catch (JsonSyntaxException e) {
+                                // 忽略无效的JSON参数，使用原始JsonElement
+                                commandText.append(" ").append(arg);
                             }
                         }
                     }
