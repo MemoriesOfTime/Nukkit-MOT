@@ -5,6 +5,8 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.LongEntityData;
 import cn.nukkit.entity.data.NBTEntityData;
 import cn.nukkit.entity.data.Vector3fEntityData;
+import cn.nukkit.event.entity.EntityDamageByChildEntityEvent;
+import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.item.Item;
@@ -279,8 +281,25 @@ public class EntityFirework extends Entity {
                 continue;
             }
 
-            target.attack(new EntityDamageEvent(target, DamageCause.ENTITY_EXPLOSION, damage));
+            target.attack(this.createExplosionDamageEvent(target, damage));
         }
+    }
+
+    protected EntityDamageEvent createExplosionDamageEvent(Entity target, float damage) {
+        EntityDamageByEntityEvent event = this.shootingEntity == null
+                ? new EntityDamageByEntityEvent(this, target, DamageCause.ENTITY_EXPLOSION, damage)
+                : new EntityDamageByChildEntityEvent(this.shootingEntity, this, target, DamageCause.ENTITY_EXPLOSION, damage);
+
+        event.setKnockBack(0f);
+
+        if (event.isApplicable(EntityDamageEvent.DamageModifier.STRENGTH)) {
+            event.setDamage(0f, EntityDamageEvent.DamageModifier.STRENGTH);
+        }
+        if (event.isApplicable(EntityDamageEvent.DamageModifier.WEAKNESS)) {
+            event.setDamage(0f, EntityDamageEvent.DamageModifier.WEAKNESS);
+        }
+
+        return event;
     }
 
     protected boolean shouldSkipExplosionDamageTarget(Entity target) {
