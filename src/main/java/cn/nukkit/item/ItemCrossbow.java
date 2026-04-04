@@ -211,7 +211,7 @@ public class ItemCrossbow extends ItemBow {
                 for (int i = 0; i < launchCount; i++) {
                     float angleOffset = launchCount == 1 ? 0 : i * MULTISHOT_ANGLE_DELTA - MULTISHOT_ANGLE_DELTA;
                     Vector3 dir = aimDir.yRot(angleOffset * NukkitMath.DEG_TO_RAD);
-                    ((ItemFirework) chargedItem).spawnFirework(player.level, pos, dir);
+                    ((ItemFirework) chargedItem).spawnFirework(player.level, pos, dir, player);
                 }
                 this.useArrow(player);
             }
