@@ -7,10 +7,8 @@ import cn.nukkit.block.BlockID;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.utils.Config;
 import cn.nukkit.utils.Hash;
 import cn.nukkit.utils.NetEaseConverter;
-import cn.nukkit.utils.Utils;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
@@ -23,8 +21,9 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 
@@ -42,6 +41,7 @@ public class BlockPalette {
     private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
     private volatile boolean locked;
+    private volatile long checksum = -1;
 
     @Deprecated
     public BlockPalette(int protocol) {
@@ -57,8 +57,9 @@ public class BlockPalette {
         legacyToHashId.defaultReturnValue(-1);
         hashIdToLegacy.defaultReturnValue(-1);
 
-        loadBlockStates(paletteFor(protocol));
-        loadBlockStatesExtras();
+        ListTag<CompoundTag> blockStates = paletteFor(protocol);
+        this.checksum = calculateChecksum(blockStates);
+        loadBlockStates(blockStates);
     }
 
     private ListTag<CompoundTag> paletteFor(int protocol) {
@@ -178,37 +179,33 @@ public class BlockPalette {
         return true;
     }
 
-    /**
-     * 加载扩展数据，用于在不修改runtime_block_states.dat文件的情况下额外增加一些内容
-     */
-    private void loadBlockStatesExtras() {
-        try (InputStream resourceAsStream = Server.class.getClassLoader().getResourceAsStream("RuntimeBlockStatesExtras/" + protocol + ".json")) {
-            if (resourceAsStream == null) {
-                return;
-            }
-            List<Map> extras = new Config().loadFromStream(resourceAsStream).getMapList("extras");
-            //noinspection unchecked
-            for (Map<String, Object> map : extras) {
-                int id = Utils.toInt(map.get("id"));
-                int data = Utils.toInt(map.getOrDefault("data", 0));
-                int runtimeId = Utils.toInt(map.get("runtimeId"));
-                int legacyId = id << Block.DATA_BITS | data;
-                legacyToRuntimeId.put(legacyId, runtimeId);
-                if (!runtimeIdToLegacy.containsKey(runtimeId)) {
-                    runtimeIdToLegacy.put(runtimeId, legacyId);
-                }
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public int getProtocol() {
         return this.protocol;
     }
 
     public GameVersion getGameVersion() {
         return this.gameVersion;
+    }
+
+    public long getChecksum() {
+        return this.checksum;
+    }
+
+    private long calculateChecksum(ListTag<CompoundTag> blockStates) {
+        ListTag<CompoundTag> blocks = new ListTag<>();
+        for (CompoundTag state : blockStates.getAll()) {
+            CompoundTag states = state.contains("states") ? state.getCompound("states") : new CompoundTag();
+            blocks.add(new CompoundTag(new LinkedHashMap<>())
+                    .putString("name", state.getString("name"))
+                    .putCompound("states", new CompoundTag(new TreeMap<>(states.getTags())))
+                    .putShort("id", state.getInt("id"))
+                    .putShort("val", state.getShort("data")));
+        }
+        try {
+            return Hash.xxh64(NBTIO.write(blocks, ByteOrder.LITTLE_ENDIAN, true));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public Int2IntMap getLegacyToRuntimeIdMap() {

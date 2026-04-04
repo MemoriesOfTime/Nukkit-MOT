@@ -1229,7 +1229,7 @@
     },
     {
         "name": "minecraft:command_block_minecart",
-        "id": 596
+        "id": 594
     },
     {
         "name": "minecraft:comparator",
@@ -5997,7 +5997,7 @@
     },
     {
         "name": "minecraft:splash_potion",
-        "id": 594
+        "id": 596
     },
     {
         "name": "minecraft:sponge",
