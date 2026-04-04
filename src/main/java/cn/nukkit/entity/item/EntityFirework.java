@@ -194,7 +194,7 @@ public class EntityFirework extends Entity {
 
     @Override
     public boolean canCollideWith(Entity entity) {
-        return this.isFireworkImpactTarget(entity) && !this.onGround;
+        return this.isProjectile && this.isFireworkImpactTarget(entity) && !this.onGround;
     }
 
     protected boolean shouldIgnoreCollisionEntity(Entity entity) {
@@ -298,15 +298,15 @@ public class EntityFirework extends Entity {
                 continue;
             }
 
-            if (!canDamage(target)) {
-                continue;
-            }
-
             if (target instanceof Player && this.shootingEntity instanceof Player) {
                 Player shooter = (Player) this.shootingEntity;
-                if (!shooter.getServer().pvpEnabled || !shooter.getLevel().getGameRules().getBoolean(GameRule.PVP)) {
+                if (!shooter.getServer().pvpEnabled || !this.level.getGameRules().getBoolean(GameRule.PVP)) {
                     continue;
                 }
+            }
+
+            if (!canDamage(target)) {
+                continue;
             }
 
             float damage = (float) (baseDamage * Math.sqrt((5 - distance) / 5));
@@ -352,8 +352,8 @@ public class EntityFirework extends Entity {
         }
 
         Vector3 start = this.add(0, this.getHeight() * 0.5, 0);
-        Vector3 lowerTargetPoint = target.add(0, 0, 0);
-        Vector3 middleTargetPoint = target.add(0, target.getHeight() * 0.5, 0);
+        Vector3 lowerTargetPoint = new Vector3(target.x, target.y, target.z);
+        Vector3 middleTargetPoint = new Vector3(target.x, target.y + target.getHeight() * 0.5, target.z);
         return this.hasClearDamagePath(start, lowerTargetPoint) || this.hasClearDamagePath(start, middleTargetPoint);
     }
 

@@ -59,10 +59,6 @@ public class ItemFirework extends Item {
     @Override
     public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
         if (block.canPassThrough()) {
-            if (this.tryBoostGlidingPlayer(player)) {
-                return true;
-            }
-
             this.spawnFirework(level, block);
 
             if (!player.isCreative()) {

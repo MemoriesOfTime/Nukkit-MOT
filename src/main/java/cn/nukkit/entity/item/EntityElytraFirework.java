@@ -44,37 +44,40 @@ public class EntityElytraFirework extends EntityFirework {
 
         if (this.isAlive() && this.followingPlayer != null && !this.followingPlayer.closed) {
             if (!this.followingPlayer.isGliding()) {
+                this.setPosition(this.followingPlayer.add(0, this.followingPlayer.getEyeHeight() * 0.5, 0));
+                this.motionX = 0;
+                this.motionY = 0;
+                this.motionZ = 0;
+                this.updateMovement();
+            } else {
+                Vector3 motion = this.followingPlayer.getMotion();
+                Vector3 look = this.followingPlayer.getDirectionVector();
+                this.followingPlayer.setMotion(motion.add(
+                        look.x * 0.1 + (look.x * 1.5 - motion.x) * 0.5,
+                        look.y * 0.1 + (look.y * 1.5 - motion.y) * 0.5,
+                        look.z * 0.1 + (look.z * 1.5 - motion.z) * 0.5
+                ));
+                motion = this.followingPlayer.getMotion();
+
+                this.motionX = motion.x;
+                this.motionY = motion.y;
+                this.motionZ = motion.z;
+
+                this.setPosition(this.followingPlayer.add(0, this.followingPlayer.getEyeHeight() * 0.5, 0));
+
+                updateRotation();
+
+                this.updateMovement();
+            }
+
+            Vector3 moveVector = new Vector3(this.x + this.motionX, this.y + this.motionY, this.z + this.motionZ);
+            Entity collisionEntity = this.findCollisionEntity(moveVector);
+            if (collisionEntity != null) {
                 this.explode();
                 return true;
             }
 
-            Vector3 motion = this.followingPlayer.getMotion();
-            Vector3 look = this.followingPlayer.getDirectionVector();
-            this.followingPlayer.setMotion(motion.add(
-                    look.x * 0.1 + (look.x * 1.5 - motion.x) * 0.5,
-                    look.y * 0.1 + (look.y * 1.5 - motion.y) * 0.5,
-                    look.z * 0.1 + (look.z * 1.5 - motion.z) * 0.5
-            ));
-            motion = this.followingPlayer.getMotion();
-
-            this.motionX = motion.x;
-            this.motionY = motion.y;
-            this.motionZ = motion.z;
-
-            this.setPosition(this.followingPlayer.add(0, this.followingPlayer.getEyeHeight() * 0.5, 0));
-
-            updateRotation();
-
-            this.updateMovement();
-
             if (this.hasExplosions()) {
-                Vector3 moveVector = new Vector3(this.x + this.motionX, this.y + this.motionY, this.z + this.motionZ);
-                Entity collisionEntity = this.findCollisionEntity(moveVector);
-                if (collisionEntity != null) {
-                    this.explode();
-                    return true;
-                }
-
                 boolean isCollidedWithBlock = this.level
                         .getCollisionCubes(this, this.boundingBox.addCoord(this.motionX, this.motionY, this.motionZ))
                         .length > 0;
@@ -126,9 +129,7 @@ public class EntityElytraFirework extends EntityFirework {
         }
 
         if (this.followingPlayer != null && this.followingPlayer.isAlive()) {
-            this.followingPlayer.attack(new cn.nukkit.event.entity.EntityDamageEvent(this.followingPlayer,
-                    cn.nukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_EXPLOSION,
-                    5 + explosionCount * 2));
+            this.followingPlayer.attack(this.createExplosionDamageEvent(this.followingPlayer, 5 + explosionCount * 2));
         }
 
         super.dealExplosionDamage();
