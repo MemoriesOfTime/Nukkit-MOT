@@ -1,5 +1,6 @@
 package cn.nukkit.network.session;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
@@ -451,7 +452,6 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         this.player = player;
         this.state.getConnection().setPlayerBound(true);
         this.state.getConnection().setPlayerBoundNanos(System.nanoTime());
-        this.state.getProtocol().setBedrockProtocol(player.protocol);
         this.state.getProtocol().setGameVersion(player.getGameVersion());
         this.state.getLogin().setShouldLogin(player.shouldLogin());
     }
@@ -470,7 +470,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     public boolean isLoginPhaseTimedOut(long nowNanos, int timeoutMillis) {
-        return isLoginPhaseTimedOut(this.state.getLogin().getPhase(), this.state.getLogin().getLastPhaseChangeNanos(), nowNanos, timeoutMillis);
+        return isLoginPhaseTimedOut(this.state.getLogin().getPhase(), this.state.getLogin().getLastActivityNanos(), nowNanos, timeoutMillis);
     }
 
     @Override
@@ -508,11 +508,14 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     private int getBedrockProtocol() {
-        int protocol = this.state.getProtocol().getBedrockProtocol();
-        if (protocol == Integer.MAX_VALUE && this.player != null) {
-            protocol = this.player.protocol;
+        GameVersion gameVersion = this.state.getProtocol().getGameVersion();
+        if (gameVersion != null) {
+            return gameVersion.getProtocol();
         }
-        return protocol;
+        if (this.player != null) {
+            return this.player.protocol;
+        }
+        return Integer.MAX_VALUE;
     }
 
     private boolean shouldUsePrefixedCompression() {
@@ -591,11 +594,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         }
     }
 
-    static boolean isLoginPhaseTimedOut(SessionLoginPhase phase, long lastPhaseChangeNanos, long nowNanos, int timeoutMillis) {
+    static boolean isLoginPhaseTimedOut(SessionLoginPhase phase, long lastActivityNanos, long nowNanos, int timeoutMillis) {
         if (timeoutMillis <= 0 || phase == SessionLoginPhase.LOGGED_IN || phase == SessionLoginPhase.DISCONNECTED) {
             return false;
         }
-        return nowNanos - lastPhaseChangeNanos >= TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        return nowNanos - lastActivityNanos >= TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
     }
 
     static boolean shouldBlockAddressAfterMalformed(SessionLoginPhase phase, InetAddress address) {

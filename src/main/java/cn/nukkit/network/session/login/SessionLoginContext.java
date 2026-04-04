@@ -10,7 +10,7 @@ public class SessionLoginContext {
     private volatile boolean loginPacketReceived;
     private volatile boolean awaitingEncryptionHandshake;
     private volatile boolean shouldLogin;
-    private volatile long lastPhaseChangeNanos = System.nanoTime();
+    private volatile long lastActivityNanos = System.nanoTime();
     private volatile String disconnectCauseHint;
 
     public SessionLoginPhase getPhase() {
@@ -19,7 +19,15 @@ public class SessionLoginContext {
 
     public void setPhase(SessionLoginPhase phase) {
         this.phase = phase;
-        this.lastPhaseChangeNanos = System.nanoTime();
+        this.lastActivityNanos = System.nanoTime();
+    }
+
+    /**
+     * Update the last activity timestamp to prevent login timeout
+     * while the client is still actively communicating (e.g. downloading resource packs).
+     */
+    public void touchActivity() {
+        this.lastActivityNanos = System.nanoTime();
     }
 
     public boolean isLoginVerified() {
@@ -54,8 +62,8 @@ public class SessionLoginContext {
         this.shouldLogin = shouldLogin;
     }
 
-    public long getLastPhaseChangeNanos() {
-        return lastPhaseChangeNanos;
+    public long getLastActivityNanos() {
+        return lastActivityNanos;
     }
 
     public String getDisconnectCauseHint() {

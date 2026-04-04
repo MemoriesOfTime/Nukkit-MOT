@@ -8,7 +8,6 @@ import cn.nukkit.GameVersion;
 public class SessionProtocolState {
 
     private volatile int raknetProtocol = -1;
-    private volatile int bedrockProtocol = Integer.MAX_VALUE;
     private volatile GameVersion gameVersion;
     private volatile boolean protocolLocked;
 
@@ -18,14 +17,6 @@ public class SessionProtocolState {
 
     public void setRaknetProtocol(int raknetProtocol) {
         this.raknetProtocol = raknetProtocol;
-    }
-
-    public int getBedrockProtocol() {
-        return bedrockProtocol;
-    }
-
-    public void setBedrockProtocol(int bedrockProtocol) {
-        this.bedrockProtocol = bedrockProtocol;
     }
 
     public GameVersion getGameVersion() {

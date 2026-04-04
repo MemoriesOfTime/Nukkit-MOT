@@ -132,6 +132,9 @@ public class RakNetInterface implements AdvancedSourceInterface {
         RakNetPlayerSession session;
         while ((session = this.sessionCreationQueue.poll()) != null) {
             this.pendingSessions.remove(session);
+            if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
+                continue;
+            }
             InetSocketAddress address = session.getChannel().remoteAddress();
             try {
                 PlayerCreationEvent event = new PlayerCreationEvent(this, Player.class, Player.class, null, address);

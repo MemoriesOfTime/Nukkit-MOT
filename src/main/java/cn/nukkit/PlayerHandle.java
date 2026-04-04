@@ -38,8 +38,8 @@ public final class PlayerHandle {
 
     public int getProtocol() {
         NetworkSessionState state = getSessionState();
-        if (state != null && state.getProtocol().getBedrockProtocol() != Integer.MAX_VALUE) {
-            return state.getProtocol().getBedrockProtocol();
+        if (state != null && state.getProtocol().getGameVersion() != null) {
+            return state.getProtocol().getGameVersion().getProtocol();
         }
         return player.protocol;
     }
@@ -50,7 +50,6 @@ public final class PlayerHandle {
         NetworkSessionState state = getSessionState();
         if (state != null) {
             state.getProtocol().setGameVersion(gameVersion);
-            state.getProtocol().setBedrockProtocol(gameVersion.getProtocol());
         }
     }
 

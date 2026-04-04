@@ -3267,7 +3267,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 LoginPacket loginPacket = (LoginPacket) packet;
 
                 this.protocol = loginPacket.getProtocol();
-                this.syncProtocol(this.protocol);
                 if (this.gameVersion == null) {
                     // 低版本仅兼容国际版，高于554的版本在RequestNetworkSettingsProcessor_v554中处理
                     this.gameVersion = GameVersion.byProtocol(this.protocol, false);
@@ -7862,12 +7861,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private void syncLoginPhase(SessionLoginPhase phase) {
         if (this.networkSession != null && this.networkSession.getState() != null) {
             this.networkSession.getState().getLogin().setPhase(phase);
-        }
-    }
-
-    private void syncProtocol(int protocol) {
-        if (this.networkSession != null && this.networkSession.getState() != null) {
-            this.networkSession.getState().getProtocol().setBedrockProtocol(protocol);
         }
     }
 
