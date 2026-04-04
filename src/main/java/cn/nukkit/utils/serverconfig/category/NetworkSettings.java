@@ -40,7 +40,7 @@ public class NetworkSettings extends OkaeriConfig {
     @CustomKey("rak-packet-limit")
     private int rakPacketLimit = RakConstants.DEFAULT_PACKET_LIMIT;
 
-    @Comment("RakNet cookie mode (active, offloaded, offloaded_psk, off, invalid)")
+    @Comment("RakNet cookie mode (active, offloaded, offloaded_psk, off, none, stateless)")
     @CustomKey("rak-cookie-mode")
     private String rakCookieMode = "active";
 

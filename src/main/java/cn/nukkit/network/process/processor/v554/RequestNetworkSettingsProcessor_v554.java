@@ -11,6 +11,8 @@ import cn.nukkit.network.protocol.NetworkSettingsPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
 import cn.nukkit.network.protocol.types.PacketCompressionAlgorithm;
+import cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode;
+import cn.nukkit.network.session.login.SessionLoginPhase;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -46,6 +48,9 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
         } else {
             playerHandle.setGameVersion(GameVersion.byProtocol(pk.protocolVersion, false));
         }
+        if (playerHandle.getNetworkSession().getState() != null) {
+            playerHandle.getNetworkSession().getState().getLogin().setPhase(SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED);
+        }
 
         NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();
         PacketCompressionAlgorithm algorithm;
@@ -54,11 +59,13 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
         } else {
             algorithm = PacketCompressionAlgorithm.ZLIB;
         }
+        CompressionProvider negotiatedCompression = CompressionProvider.from(algorithm, player.raknetProtocol);
+        playerHandle.getNetworkSession().beginLegacyInboundCompressionGraceWindow(negotiatedCompression);
         settingsPacket.compressionAlgorithm = algorithm;
         settingsPacket.compressionThreshold = 1; // compress everything
         player.forceDataPacket(settingsPacket, () -> {
-            playerHandle.getNetworkSession().setCompression(CompressionProvider.from(algorithm, player.raknetProtocol));
-        });
+            playerHandle.getNetworkSession().setCompression(negotiatedCompression);
+        }, ImmediatePacketMode.DIRECT_WRITE);
 
         if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(player.protocol)) {
             player.close("", "You are running unsupported Minecraft version");
