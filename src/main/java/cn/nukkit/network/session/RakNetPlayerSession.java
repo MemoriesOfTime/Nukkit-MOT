@@ -21,6 +21,7 @@ import com.nukkitx.natives.util.Natives;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.internal.PlatformDependent;
@@ -162,7 +163,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     try {
                         InetAddress address = this.channel.remoteAddress().getAddress();
                         this.channel.unsafe().close(this.channel.voidPromise());
-                        if (!address.isSiteLocalAddress()) {
+                        if (shouldBlockAddressAfterMalformed(this.state.getLogin().getPhase(), address)) {
                             this.server.blockAddress(address, 60);
                         }
                     } catch (Throwable throwable) {
@@ -171,7 +172,6 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                         }
                     }
                 }, 10);
-                log.error("[{}] Unable to process batch packet", (this.player == null ? this.channel.remoteAddress() : this.player.getName()));
             }
         } else if (Nukkit.DEBUG > 1) {
             log.info("Unknown EncapsulatedPacket: {}", packetId);
@@ -218,15 +218,43 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     @Override
     public void sendImmediatePacket(DataPacket packet, Runnable callback) {
+        this.sendImmediatePacket(packet, callback, ImmediatePacketMode.QUEUED_FLUSH);
+    }
+
+    @Override
+    public void sendImmediatePacket(DataPacket packet, Runnable callback, ImmediatePacketMode mode) {
         if (!this.channel.isActive()) {
             return;
         }
 
-        this.sendPacket(packet);
-        this.channel.eventLoop().execute(() -> {
-            this.networkTick();
-            callback.run();
-        });
+        switch (mode) {
+            case QUEUED_FLUSH -> {
+                this.sendPacket(packet);
+                this.channel.eventLoop().execute(() -> {
+                    this.networkTick();
+                    callback.run();
+                });
+            }
+            case DIRECT_WRITE -> this.channel.eventLoop().execute(() -> {
+                try {
+                    packet.tryEncode();
+                    ChannelFuture future = this.sendSinglePacketNow(packet);
+                    future.addListener(result -> {
+                        if (result.isSuccess()) {
+                            callback.run();
+                        } else {
+                            log.warn("Failed to send direct packet {} to {}",
+                                    packet.getClass().getSimpleName(), this.channel.remoteAddress(), result.cause());
+                            this.disconnect("Internal Server Error");
+                        }
+                    });
+                } catch (Throwable throwable) {
+                    log.warn("Failed to prepare direct packet {} for {}",
+                            packet.getClass().getSimpleName(), this.channel.remoteAddress(), throwable);
+                    this.disconnect("Internal Server Error");
+                }
+            });
+        }
     }
 
     private void networkTick() {
@@ -312,7 +340,19 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         }
     }
 
-    private void sendPacket(byte[] compressedPayload) {
+    /**
+     * Compresses and sends a single packet immediately.
+     * Compression prefix handling is delegated to {@link #sendPacket(byte[])}.
+     */
+    private ChannelFuture sendSinglePacketNow(DataPacket packet) throws Exception {
+        BinaryStream batched = new BinaryStream();
+        byte[] buf = packet.getBuffer();
+        batched.putUnsignedVarInt(buf.length);
+        batched.put(buf);
+        return this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel));
+    }
+
+    private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
 
         ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
@@ -343,7 +383,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             finalPayload.writeBytes(compressedPayload);
         }
 
-        this.channel.writeAndFlush(finalPayload);
+        return this.channel.writeAndFlush(finalPayload);
     }
 
     @Override
@@ -429,6 +469,10 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         return this.disconnectReason;
     }
 
+    public boolean isLoginPhaseTimedOut(long nowNanos, int timeoutMillis) {
+        return isLoginPhaseTimedOut(this.state.getLogin().getPhase(), this.state.getLogin().getLastPhaseChangeNanos(), nowNanos, timeoutMillis);
+    }
+
     @Override
     public void setEncryption(SecretKey encryptionKey, Cipher encryptionCipher, Cipher decryptionCipher) {
         this.encryptionKey = encryptionKey;
@@ -484,29 +528,34 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     private boolean processInboundBatch(byte[] packetBuffer, boolean ci) {
-        if (!ci) {
-            return this.server.getNetwork().processBatch(packetBuffer, this.inbound, this.compressionIn, this.channel.config().getProtocolVersion(), this.player);
-        }
+        try {
+            if (!ci) {
+                return this.server.getNetwork().processBatch(packetBuffer, this.inbound, this.compressionIn, this.channel.config().getProtocolVersion(), this.player);
+            }
 
-        InboundBatchDecodeResult result = decodeInboundPrefixedBatch(
-                this.server.getNetwork(),
-                packetBuffer,
-                this.state.getSecurity().getLegacyInboundCompression(),
-                this.state.getSecurity().isLegacyInboundGraceWindow(),
-                this.channel.config().getProtocolVersion(),
-                this.player
-        );
-        if (!result.success()) {
+            InboundBatchDecodeResult result = decodeInboundPrefixedBatch(
+                    this.server.getNetwork(),
+                    packetBuffer,
+                    this.state.getSecurity().getLegacyInboundCompression(),
+                    this.state.getSecurity().isLegacyInboundGraceWindow(),
+                    this.channel.config().getProtocolVersion(),
+                    this.player
+            );
+            if (!result.success()) {
+                return false;
+            }
+
+            this.compressionIn = result.compression();
+            this.state.getSecurity().setCompressionIn(result.compression());
+            if (result.prefixed()) {
+                this.endLegacyInboundCompressionGraceWindow();
+            }
+            this.inbound.addAll(result.packets());
+            return true;
+        } catch (Exception e) {
+            log.error("[{}] Unable to process batch packet", (this.player == null ? this.channel.remoteAddress() : this.player.getName()), e);
             return false;
         }
-
-        this.compressionIn = result.compression();
-        this.state.getSecurity().setCompressionIn(result.compression());
-        if (result.prefixed()) {
-            this.endLegacyInboundCompressionGraceWindow();
-        }
-        this.inbound.addAll(result.packets());
-        return true;
     }
 
     static InboundBatchDecodeResult decodeInboundPrefixedBatch(Network network, byte[] packetBuffer, CompressionProvider legacyCompression,
@@ -518,6 +567,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         CompressionProvider prefixedCompression = tryResolveCompressionByPrefix(packetBuffer[0], raknetProtocol);
         if (prefixedCompression != null && packetBuffer.length > 1) {
             List<DataPacket> prefixedPackets = new ObjectArrayList<>();
+            // Skip the 1-byte compression prefix; copy cost is negligible vs decompression
             byte[] prefixedPayload = Arrays.copyOfRange(packetBuffer, 1, packetBuffer.length);
             if (network.processBatch(prefixedPayload, prefixedPackets, prefixedCompression, raknetProtocol, player)) {
                 return InboundBatchDecodeResult.prefixed(prefixedCompression, prefixedPackets);
@@ -539,6 +589,19 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    static boolean isLoginPhaseTimedOut(SessionLoginPhase phase, long lastPhaseChangeNanos, long nowNanos, int timeoutMillis) {
+        if (timeoutMillis <= 0 || phase == SessionLoginPhase.LOGGED_IN || phase == SessionLoginPhase.DISCONNECTED) {
+            return false;
+        }
+        return nowNanos - lastPhaseChangeNanos >= TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+    }
+
+    static boolean shouldBlockAddressAfterMalformed(SessionLoginPhase phase, InetAddress address) {
+        return address != null
+                && !address.isSiteLocalAddress()
+                && phase.ordinal() >= SessionLoginPhase.LOGIN_RECEIVED.ordinal();
     }
 
     record InboundBatchDecodeResult(boolean success, CompressionProvider compression, boolean prefixed, List<DataPacket> packets) {

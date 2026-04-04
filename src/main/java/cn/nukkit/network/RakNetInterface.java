@@ -33,6 +33,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
@@ -51,6 +52,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private final ProxyProtocolHandler proxyProtocolHandler;
     private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
+    private final Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final long serverId = ThreadLocalRandom.current().nextLong();
 
@@ -99,6 +101,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
                         RakNetPlayerSession nukkitSession = new RakNetPlayerSession(RakNetInterface.this, (RakChildChannel) channel);
                         nukkitSession.getState().getConnection().setQueuedForPlayerCreation(true);
                         nukkitSession.getState().getConnection().setQueuedForPlayerCreationNanos(System.nanoTime());
+                        RakNetInterface.this.pendingSessions.add(nukkitSession);
                         channel.pipeline().addLast("nukkit-handler", nukkitSession);
                         RakNetInterface.this.sessionCreationQueue.offer(nukkitSession);
                     }
@@ -124,8 +127,11 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     @Override
     public boolean process() {
+        this.expireLoginSessions();
+
         RakNetPlayerSession session;
         while ((session = this.sessionCreationQueue.poll()) != null) {
+            this.pendingSessions.remove(session);
             InetSocketAddress address = session.getChannel().remoteAddress();
             try {
                 PlayerCreationEvent event = new PlayerCreationEvent(this, Player.class, Player.class, null, address);
@@ -194,12 +200,14 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     @Override
     public void shutdown() {
+        this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
     }
 
     @Override
     public void emergencyShutdown() {
+        this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
     }
@@ -217,6 +225,40 @@ public class RakNetInterface implements AdvancedSourceInterface {
     @Override
     public void unblockAddress(InetAddress address) {
         this.channel.pipeline().get(RakServerRateLimiter.class).unblockAddress(address);
+    }
+
+    private void expireLoginSessions() {
+        int timeoutMillis = this.server.networkLoginTimeoutMilliseconds;
+
+        // Always clean up disconnected or inactive pending sessions
+        long nowNanos = System.nanoTime();
+        this.pendingSessions.removeIf(session -> {
+            if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
+                return true;
+            }
+            if (timeoutMillis <= 0) {
+                return false;
+            }
+            if (!session.isLoginPhaseTimedOut(nowNanos, timeoutMillis)) {
+                return false;
+            }
+
+            log.warn("Disconnecting timed out pending session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            session.disconnect("disconnectionScreen.timeout");
+            return true;
+        });
+
+        if (timeoutMillis <= 0) {
+            return;
+        }
+
+        for (RakNetPlayerSession session : this.sessions.values()) {
+            if (session.getDisconnectReason() != null || !session.isLoginPhaseTimedOut(nowNanos, timeoutMillis)) {
+                continue;
+            }
+            log.warn("Disconnecting timed out session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            session.disconnect("disconnectionScreen.timeout");
+        }
     }
 
     @Override

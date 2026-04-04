@@ -10,8 +10,17 @@ import javax.crypto.SecretKey;
 
 public interface NetworkPlayerSession {
 
+    enum ImmediatePacketMode {
+        QUEUED_FLUSH,
+        DIRECT_WRITE
+    }
+
     void sendPacket(DataPacket packet);
-    void sendImmediatePacket(DataPacket packet, Runnable callback);
+    default void sendImmediatePacket(DataPacket packet, Runnable callback) {
+        this.sendImmediatePacket(packet, callback, ImmediatePacketMode.QUEUED_FLUSH);
+    }
+
+    void sendImmediatePacket(DataPacket packet, Runnable callback, ImmediatePacketMode mode);
 
     @Deprecated
     default void flush() {

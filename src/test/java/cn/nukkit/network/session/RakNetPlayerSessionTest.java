@@ -4,8 +4,12 @@ import cn.nukkit.MockServer;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
+import cn.nukkit.network.session.login.SessionLoginPhase;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import java.net.InetAddress;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -62,6 +66,24 @@ class RakNetPlayerSessionTest {
         assertSame(CompressionProvider.SNAPPY, result.compression());
         assertEquals(1, result.packets().size());
         assertInstanceOf(ClientToServerHandshakePacket.class, result.packets().get(0));
+    }
+
+    @Test
+    void loginTimeoutOnlyAppliesBeforeLoggedIn() {
+        long now = System.nanoTime();
+        assertTrue(RakNetPlayerSession.isLoginPhaseTimedOut(SessionLoginPhase.CONNECTED,
+                now - TimeUnit.MILLISECONDS.toNanos(200), now, 100));
+        assertFalse(RakNetPlayerSession.isLoginPhaseTimedOut(SessionLoginPhase.LOGGED_IN,
+                now - TimeUnit.MILLISECONDS.toNanos(200), now, 100));
+    }
+
+    @Test
+    void malformedPreLoginPacketsDoNotTriggerIpBlock() throws Exception {
+        InetAddress address = InetAddress.getByName("1.2.3.4");
+        assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.CONNECTED, address));
+        assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED, address));
+        assertTrue(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.LOGIN_RECEIVED, address));
+        assertTrue(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.LOGGED_IN, address));
     }
 
     private static byte[] createLegacyHandshakeBatch() {
