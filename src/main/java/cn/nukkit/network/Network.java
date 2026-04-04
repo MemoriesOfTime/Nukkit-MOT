@@ -217,7 +217,7 @@ public class Network {
         return hardWareNetworkInterfaces;
     }
 
-    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
+    public boolean processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
         int maxSize = 3145728; // 3 * 1024 * 1024
         if (player != null && player.getSkin() == null) {
             maxSize = 6291456; // 6 * 1024 * 1024
@@ -227,12 +227,12 @@ public class Network {
             data = compression.decompress(payload, maxSize);
         } catch (Exception e) {
             log.debug("Exception while inflating batch packet", e);
-            return;
+            return false;
         }
 
         BinaryStream stream = new BinaryStream(data);
+        int count = 0;
         try {
-            int count = 0;
             while (!stream.feof()) {
                 count++;
                 if (count >= 1000) {
@@ -298,7 +298,9 @@ public class Network {
             if (log.isDebugEnabled()) {
                 log.debug("Error whilst decoding batch packet", e);
             }
+            return false;
         }
+        return count > 0;
     }
 
     /**

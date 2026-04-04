@@ -97,6 +97,8 @@ public class RakNetInterface implements AdvancedSourceInterface {
                     @Override
                     protected void initChannel(Channel channel) {
                         RakNetPlayerSession nukkitSession = new RakNetPlayerSession(RakNetInterface.this, (RakChildChannel) channel);
+                        nukkitSession.getState().getConnection().setQueuedForPlayerCreation(true);
+                        nukkitSession.getState().getConnection().setQueuedForPlayerCreationNanos(System.nanoTime());
                         channel.pipeline().addLast("nukkit-handler", nukkitSession);
                         RakNetInterface.this.sessionCreationQueue.offer(nukkitSession);
                     }
@@ -132,7 +134,9 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 this.sessions.put(event.getSocketAddress(), session);
 
                 Constructor<? extends Player> constructor = event.getPlayerClass().getConstructor(SourceInterface.class, Long.class, InetSocketAddress.class);
+                session.getState().getConnection().setPlayerCreatedNanos(System.nanoTime());
                 Player player = constructor.newInstance(this, event.getClientId(), event.getSocketAddress());
+                session.getState().getConnection().setPlayerCreated(true);
                 player.raknetProtocol = session.getChannel().config().getProtocolVersion();
                 session.setPlayer(player);
                 this.server.addPlayer(address, player);

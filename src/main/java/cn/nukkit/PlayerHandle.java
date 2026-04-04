@@ -11,6 +11,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.PlayerFogPacket;
 import cn.nukkit.network.session.NetworkPlayerSession;
+import cn.nukkit.network.session.login.NetworkSessionState;
 import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.LoginChainData;
@@ -36,15 +37,28 @@ public final class PlayerHandle {
     }
 
     public int getProtocol() {
+        NetworkSessionState state = getSessionState();
+        if (state != null && state.getProtocol().getBedrockProtocol() != Integer.MAX_VALUE) {
+            return state.getProtocol().getBedrockProtocol();
+        }
         return player.protocol;
     }
 
     public void setGameVersion(GameVersion gameVersion) {
         player.gameVersion = gameVersion;
         player.protocol = gameVersion.getProtocol();
+        NetworkSessionState state = getSessionState();
+        if (state != null) {
+            state.getProtocol().setGameVersion(gameVersion);
+            state.getProtocol().setBedrockProtocol(gameVersion.getProtocol());
+        }
     }
 
     public GameVersion getGameVersion() {
+        NetworkSessionState state = getSessionState();
+        if (state != null && state.getProtocol().getGameVersion() != null) {
+            return state.getProtocol().getGameVersion();
+        }
         return player.gameVersion;
     }
 
@@ -386,11 +400,19 @@ public final class PlayerHandle {
     }
 
     public boolean isShouldLogin() {
+        NetworkSessionState state = getSessionState();
+        if (state != null) {
+            return state.getLogin().isShouldLogin();
+        }
         return player.shouldLogin;
     }
 
     public void setShouldLogin(boolean shouldLogin) {
         player.shouldLogin = shouldLogin;
+        NetworkSessionState state = getSessionState();
+        if (state != null) {
+            state.getLogin().setShouldLogin(shouldLogin);
+        }
     }
 
     /*public double getLastRightClickTime() {
@@ -446,19 +468,35 @@ public final class PlayerHandle {
     }
 
     public boolean isVerified() {
+        NetworkSessionState state = getSessionState();
+        if (state != null) {
+            return state.getLogin().isLoginVerified();
+        }
         return player.loginVerified;
     }
 
     public void setVerified(boolean verified) {
         player.loginVerified = verified;
+        NetworkSessionState state = getSessionState();
+        if (state != null) {
+            state.getLogin().setLoginVerified(verified);
+        }
     }
 
     public boolean isAwaitingEncryptionHandshake() {
+        NetworkSessionState state = getSessionState();
+        if (state != null) {
+            return state.getLogin().isAwaitingEncryptionHandshake();
+        }
         return player.awaitingEncryptionHandshake;
     }
 
     public void setAwaitingEncryptionHandshake(boolean awaitingEncryptionHandshake) {
         player.awaitingEncryptionHandshake = awaitingEncryptionHandshake;
+        NetworkSessionState state = getSessionState();
+        if (state != null) {
+            state.getLogin().setAwaitingEncryptionHandshake(awaitingEncryptionHandshake);
+        }
     }
 
     public AsyncTask getPreLoginEventTask() {
@@ -486,7 +524,15 @@ public final class PlayerHandle {
     }
 
     public boolean isLoginPacketReceived() {
+        NetworkSessionState state = getSessionState();
+        if (state != null) {
+            return state.getLogin().isLoginPacketReceived();
+        }
         return player.loginPacketReceived;
+    }
+
+    private NetworkSessionState getSessionState() {
+        return player.networkSession != null ? player.networkSession.getState() : null;
     }
 
     public int getFailedMobEquipmentPacket() {

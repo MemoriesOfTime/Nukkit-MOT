@@ -4,6 +4,7 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.session.login.SessionLoginPhase;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -25,6 +26,10 @@ public class ClientToServerHandshakeProcessor extends DataPacketProcessor<Client
             }
 
             playerHandle.setAwaitingEncryptionHandshake(false);
+            playerHandle.getNetworkSession().endLegacyInboundEncryptionGraceWindow();
+            if (playerHandle.getNetworkSession().getState() != null) {
+                playerHandle.getNetworkSession().getState().getLogin().setPhase(SessionLoginPhase.ENCRYPTION_RESPONSE_RECEIVED);
+            }
             playerHandle.processPreLogin();
         }
     }

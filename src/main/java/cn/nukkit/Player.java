@@ -69,6 +69,7 @@ import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.session.NetworkPlayerSession;
+import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.permission.Permission;
 import cn.nukkit.permission.PermissionAttachment;
@@ -1421,11 +1422,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             log.trace("Outbound {}: {}", this.getName(), packet);
         }
 
-        if (packet instanceof BatchPacket) {
-            this.networkSession.sendPacket(packet);
-        } else {
-            this.server.batchPackets(new Player[]{this}, new DataPacket[]{packet});
-        }
+        this.networkSession.sendPacket(packet);
         return true;
     }
 
@@ -3037,6 +3034,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
+        if (this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().setPhase(SessionLoginPhase.RESOURCE_PACK);
+        }
     }
 
     protected void completeLoginSequence() {
@@ -3086,6 +3086,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.forceDataPacket(startGamePacket, null);
 
         this.loggedIn = true;
+        if (this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().setPhase(SessionLoginPhase.LOGGED_IN);
+        }
         this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logIn",
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
@@ -3282,13 +3285,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 this.loginPacketReceived = true;
+                this.networkSession.endLegacyInboundCompressionGraceWindow();
+                if (this.networkSession.getState() != null) {
+                    this.networkSession.getState().getLogin().setLoginPacketReceived(true);
+                    this.networkSession.getState().getLogin().setPhase(SessionLoginPhase.LOGIN_RECEIVED);
+                }
 
                 LoginPacket loginPacket = (LoginPacket) packet;
 
                 this.protocol = loginPacket.getProtocol();
+                if (this.networkSession.getState() != null) {
+                    this.networkSession.getState().getProtocol().setBedrockProtocol(this.protocol);
+                }
                 if (this.gameVersion == null) {
                     // 低版本仅兼容国际版，高于554的版本在RequestNetworkSettingsProcessor_v554中处理
                     this.gameVersion = GameVersion.byProtocol(this.protocol, false);
+                    if (this.networkSession.getState() != null) {
+                        this.networkSession.getState().getProtocol().setGameVersion(this.gameVersion);
+                    }
                 }
 
                 switch (this.server.spaceMode) {
@@ -3454,8 +3468,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
                             pk.setJwt(this.getHandshakeJwt());
+                            if (Player.this.networkSession.getState() != null) {
+                                Player.this.networkSession.getState().getLogin().setPhase(SessionLoginPhase.ENCRYPTION_REQUEST_SENT);
+                            }
                             Player.this.forceDataPacket(pk, () -> {
                                 Player.this.awaitingEncryptionHandshake = true;
+                                if (Player.this.networkSession.getState() != null) {
+                                    Player.this.networkSession.getState().getLogin().setAwaitingEncryptionHandshake(true);
+                                    Player.this.networkSession.getState().getLogin().setPhase(SessionLoginPhase.AWAITING_ENCRYPTION_RESPONSE);
+                                }
+                                Player.this.getNetworkSession().beginLegacyInboundEncryptionGraceWindow();
                                 Player.this.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
                             });
                         }
@@ -3502,6 +3524,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     case ResourcePackClientResponsePacket.STATUS_COMPLETED:
                         this.shouldLogin = true;
+                        if (this.networkSession.getState() != null) {
+                            this.networkSession.getState().getLogin().setShouldLogin(true);
+                            this.networkSession.getState().getLogin().setPhase(SessionLoginPhase.READY_TO_LOGIN);
+                        }
 
                         if (this.preLoginEventTask.isFinished()) {
                             this.preLoginEventTask.onCompletion(server);
@@ -7769,6 +7795,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected void processPreLogin() {
         this.loginVerified = true;
+        if (this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().setLoginVerified(true);
+            this.networkSession.getState().getLogin().setPhase(SessionLoginPhase.PRE_LOGIN);
+        }
         final Player playerInstance = this;
 
         this.preLoginEventTask = new AsyncTask() {
