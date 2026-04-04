@@ -4,6 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.network.encryption.ChainValidationResult;
 import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.LoginPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.auth.AuthPayload;
 import cn.nukkit.network.protocol.types.auth.AuthType;
 import cn.nukkit.network.protocol.types.auth.CertificateChainPayload;
@@ -43,7 +44,19 @@ public final class ClientChainData implements LoginChainData {
     }
 
     public static ClientChainData read(LoginPacket pk) {
-        return of(pk.getBuffer());
+        try {
+            ClientChainData data = of(pk.getBuffer());
+            data.applyLoginPacketFallback(pk);
+            return data;
+        } catch (IllegalArgumentException e) {
+            if (!isLegacyLoginProtocol(pk.getProtocol())) {
+                throw e;
+            }
+
+            ClientChainData data = new ClientChainData();
+            data.applyLoginPacketFallback(pk);
+            return data;
+        }
     }
 
     @Override
@@ -280,10 +293,59 @@ public final class ClientChainData implements LoginChainData {
 
     private final BinaryStream bs = new BinaryStream();
 
+    private ClientChainData() {
+    }
+
     private ClientChainData(byte[] buffer) {
         bs.setBuffer(buffer, 0);
         decodeChainData();
         decodeSkinData();
+    }
+
+    private static boolean isLegacyLoginProtocol(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0 && protocol < ProtocolInfo.v1_2_0;
+    }
+
+    private void applyLoginPacketFallback(LoginPacket pk) {
+        if (this.username == null || this.username.isEmpty()) {
+            this.username = pk.username;
+        }
+        if (this.clientUUID == null) {
+            this.clientUUID = pk.clientUUID;
+        }
+        if (this.clientId == 0L) {
+            this.clientId = pk.clientId;
+        }
+        if (this.minecraftId == null || this.minecraftId.isEmpty()) {
+            this.minecraftId = pk.minecraftId;
+        }
+        if (this.gameVersion == null || this.gameVersion.isEmpty()) {
+            this.gameVersion = Utils.getVersionByProtocol(pk.getProtocol());
+        }
+        if (this.languageCode == null || this.languageCode.isEmpty()) {
+            this.languageCode = "en_US";
+        }
+        if (this.serverAddress == null) {
+            this.serverAddress = "";
+        }
+        if (this.deviceModel == null) {
+            this.deviceModel = "";
+        }
+        if (this.deviceId == null) {
+            this.deviceId = "";
+        }
+        if (this.identityPublicKey == null) {
+            this.identityPublicKey = "";
+        }
+        if (this.capeData == null) {
+            this.capeData = "";
+        }
+        if (this.titleId == null) {
+            this.titleId = "";
+        }
+        if (this.rawData == null) {
+            this.rawData = new JsonObject();
+        }
     }
 
     @Override

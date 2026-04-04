@@ -201,6 +201,11 @@ public class StartGamePacket extends DataPacket {
         }
 
         this.reset();
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.encodeLegacyStartGame();
+            return;
+        }
+
         this.putEntityUniqueId(this.entityUniqueId);
         this.putEntityRuntimeId(this.entityRuntimeId);
         this.putVarInt(this.playerGamemode);
@@ -436,6 +441,32 @@ public class StartGamePacket extends DataPacket {
                 }
             }
         }
+    }
+
+    private void encodeLegacyStartGame() {
+        this.putEntityUniqueId(this.entityUniqueId);
+        this.putEntityRuntimeId(this.entityRuntimeId);
+        this.putVarInt(this.playerGamemode);
+        this.putVector3f(this.x, this.y, this.z);
+        this.putLFloat(this.pitch);
+        this.putLFloat(this.yaw);
+        this.putVarInt(this.seed);
+        this.putVarInt(this.dimension);
+        this.putVarInt(this.generator);
+        this.putVarInt(this.worldGamemode);
+        this.putVarInt(this.difficulty);
+        this.putBlockVector3(this.spawnX, this.spawnY, this.spawnZ);
+        this.putBoolean(this.hasAchievementsDisabled);
+        this.putVarInt(this.dayCycleStopTime);
+        this.putBoolean(this.eduMode);
+        this.putLFloat(this.rainLevel);
+        this.putLFloat(this.lightningLevel);
+        this.putBoolean(this.commandsEnabled);
+        this.putBoolean(this.isTexturePacksRequired);
+        this.putGameRules(this.gameVersion, this.gameRules, true);
+        this.putString(this.levelId);
+        this.putString(this.worldName);
+        this.putString(this.premiumWorldTemplateId);
     }
 
     @SuppressWarnings("unused")

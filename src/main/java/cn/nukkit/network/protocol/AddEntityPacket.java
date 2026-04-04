@@ -210,6 +210,25 @@ public class AddEntityPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.entityUniqueId);
+            this.putEntityUniqueId(this.entityRuntimeId);
+            this.putUnsignedVarInt(this.type);
+            this.putVector3f(this.x, this.y, this.z);
+            this.putVector3f(this.speedX, this.speedY, this.speedZ);
+            this.putLFloat(this.pitch * (256f / 360f));
+            this.putLFloat(this.yaw * (256f / 360f));
+            this.putLegacyAttributeList();
+            this.put(Binary.writeMetadata(gameVersion, this.metadata));
+            this.putUnsignedVarInt(this.links.length);
+            for (EntityLink link : links) {
+                this.putEntityUniqueId(link.fromEntityUniquieId);
+                this.putEntityUniqueId(link.toEntityUniquieId);
+                this.putByte(link.type);
+            }
+            return;
+        }
+
         this.putEntityUniqueId(this.entityUniqueId);
         this.putEntityRuntimeId(this.entityRuntimeId);
         if (this.protocol < ProtocolInfo.v1_8_0) {
@@ -246,6 +265,16 @@ public class AddEntityPacket extends DataPacket {
         this.putUnsignedVarInt(this.links.length);
         for (EntityLink link : links) {
             putEntityLink(protocol, link);
+        }
+    }
+
+    private void putLegacyAttributeList() {
+        this.putUnsignedVarInt(this.attributes.length);
+        for (Attribute attribute : this.attributes) {
+            this.putString(attribute.getName());
+            this.putLFloat(attribute.getMinValue());
+            this.putLFloat(attribute.getValue());
+            this.putLFloat(attribute.getMaxValue());
         }
     }
 

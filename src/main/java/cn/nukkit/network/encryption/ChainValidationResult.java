@@ -72,7 +72,7 @@ public final class ChainValidationResult {
 
         String displayName = childAsType(extraData, "displayName", String.class);
         String identityString = childAsType(extraData, "identity", String.class);
-        String xuid = childAsType(extraData, "XUID", String.class);
+        String xuid = extraData.containsKey("XUID") ? (String) extraData.get("XUID") : null;
         Object titleId = extraData.get("titleId");
 
         UUID identity;

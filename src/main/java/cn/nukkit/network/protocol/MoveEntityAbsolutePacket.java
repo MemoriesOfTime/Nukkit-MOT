@@ -34,6 +34,22 @@ public class MoveEntityAbsolutePacket extends DataPacket {
 
     @Override
     public void decode() {
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.eid = this.getEntityUniqueId();
+            Vector3f v = this.getVector3f();
+            this.x = v.x;
+            this.y = v.y;
+            this.z = v.z;
+            this.pitch = this.getRotationByte();
+            this.yaw = this.getRotationByte();
+            this.headYaw = this.getRotationByte();
+            int flags = this.getByte();
+            onGround = (flags & FLAG_GROUND) != 0;
+            teleport = (flags & FLAG_TELEPORT) != 0;
+            forceMoveLocalEntity = (flags & FLAG_FORCE_MOVE_LOCAL_ENTITY) != 0;
+            return;
+        }
+
         this.eid = this.getEntityRuntimeId();
         if (protocol >= 274) {
             int flags = this.getByte();
@@ -53,6 +69,26 @@ public class MoveEntityAbsolutePacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.eid);
+            this.putVector3f((float) this.x, (float) this.y, (float) this.z);
+            this.putRotationByte(this.pitch);
+            this.putRotationByte(this.yaw);
+            this.putRotationByte(this.headYaw);
+            byte flags = 0;
+            if (onGround) {
+                flags |= FLAG_GROUND;
+            }
+            if (teleport) {
+                flags |= FLAG_TELEPORT;
+            }
+            if (forceMoveLocalEntity) {
+                flags |= FLAG_FORCE_MOVE_LOCAL_ENTITY;
+            }
+            this.putByte(flags);
+            return;
+        }
+
         this.putEntityRuntimeId(this.eid);
         if (protocol >= 274) {
             byte flags = 0;
