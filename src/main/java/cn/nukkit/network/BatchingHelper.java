@@ -45,6 +45,12 @@ public class BatchingHelper {
             return;
         }
 
+        // Single-recipient packets are expected to preserve main-thread ordering.
+        if (players.length == 1) {
+            this.batchAndSendPackets(players, packets);
+            return;
+        }
+
         this.threadedExecutor.execute(() -> this.batchAndSendPackets(players, packets));
     }
 

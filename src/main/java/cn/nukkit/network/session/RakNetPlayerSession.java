@@ -211,9 +211,6 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             log.warn("Wrong protocol used for {}! expected {} got{}", packet.getClass().getSimpleName(), this.player.protocol, packet.protocol);
         }
 
-        if (!(packet instanceof BatchPacket)) {
-            packet.tryEncode();
-        }
         this.outbound.offer(packet);
     }
 
@@ -268,6 +265,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             DataPacket packet;
             while ((packet = this.outbound.poll()) != null) {
                 if (packet instanceof DisconnectPacket) {
+                    packet.tryEncode();
                     BinaryStream batched = new BinaryStream();
                     byte[] buf = packet.getBuffer();
                     batched.putUnsignedVarInt(buf.length);
@@ -317,9 +315,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             if (packet instanceof BatchPacket) {
                 throw new IllegalArgumentException("Cannot batch BatchPacket");
             }
-            if (!packet.isEncoded) {
-                throw new IllegalStateException("Packet should have already been encoded");
-            }
+            packet.tryEncode();
 
             byte[] buf = packet.getBuffer();
             if (batched.getCount() + buf.length > 3145728) { // 3 * 1024 * 1024
