@@ -390,6 +390,8 @@ public class CustomBlockManager {
             result = true;
         }
 
+        GlobalBlockPalette.compactCaches();
+
         log.info("Custom block registry closed in {}ms", (System.currentTimeMillis() - startTime));
         this.saveIdMapping();
         return result;
@@ -499,6 +501,8 @@ public class CustomBlockManager {
                 runtimeId++;
             }
         }
+
+        palette.lock();
     }
 
     private List<NbtMap> loadVanillaPalette(GameVersion version) throws FileNotFoundException {

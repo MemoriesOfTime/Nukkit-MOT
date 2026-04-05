@@ -31,15 +31,19 @@ import java.util.zip.GZIPInputStream;
 @Log4j2
 public class BlockPalette {
 
+    private static final int MISSING_LEGACY_MAPPING_CACHE_SIZE = 1024;
+
     private final int protocol;
     private final GameVersion gameVersion;
-    private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
-    private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
-    private final Int2IntMap stateHashToLegacy = new Int2IntOpenHashMap();
-    private final Int2IntMap legacyToHashId = new Int2IntOpenHashMap();
-    private final Int2IntMap hashIdToLegacy = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap legacyToRuntimeId = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap runtimeIdToLegacy = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap stateHashToLegacy = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap legacyToHashId = new Int2IntOpenHashMap();
 
-    private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
+    private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder()
+            .maximumSize(MISSING_LEGACY_MAPPING_CACHE_SIZE)
+            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .build();
 
     private volatile boolean locked;
 
@@ -54,11 +58,12 @@ public class BlockPalette {
 
         legacyToRuntimeId.defaultReturnValue(-1);
         runtimeIdToLegacy.defaultReturnValue(-1);
+        stateHashToLegacy.defaultReturnValue(-1);
         legacyToHashId.defaultReturnValue(-1);
-        hashIdToLegacy.defaultReturnValue(-1);
 
         loadBlockStates(paletteFor(protocol));
         loadBlockStatesExtras();
+        this.lock();
     }
 
     private ListTag<CompoundTag> paletteFor(int protocol) {
@@ -192,6 +197,7 @@ public class BlockPalette {
                 int id = Utils.toInt(map.get("id"));
                 int data = Utils.toInt(map.getOrDefault("data", 0));
                 int runtimeId = Utils.toInt(map.get("runtimeId"));
+                Block.registerKnownState(id, data);
                 int legacyId = id << Block.DATA_BITS | data;
                 legacyToRuntimeId.put(legacyId, runtimeId);
                 if (!runtimeIdToLegacy.containsKey(runtimeId)) {
@@ -221,7 +227,7 @@ public class BlockPalette {
         this.runtimeIdToLegacy.clear();
         this.stateHashToLegacy.clear();
         this.legacyToHashId.clear();
-        this.hashIdToLegacy.clear();
+        this.legacyToRuntimeIdCache.invalidateAll();
     }
 
     public void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
@@ -229,13 +235,14 @@ public class BlockPalette {
             throw new IllegalStateException("Block palette is already locked!");
         }
 
+        Block.registerKnownState(blockId, data);
+
         int legacyId = blockId << Block.DATA_BITS | data;
         this.legacyToRuntimeId.put(legacyId, runtimeId);
         this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
         int stateHash = Hash.hashBlock(blockState);
         this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
-        this.hashIdToLegacy.putIfAbsent(stateHash, legacyId);
 
         // Hack: Map IDs for item frame up & down states
         if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
@@ -259,6 +266,17 @@ public class BlockPalette {
 
     public void lock() {
         this.locked = true;
+        this.trim();
+    }
+
+    /**
+     * Shrinks the internal fastutil maps after bulk registration to release unused capacity.
+     */
+    public void trim() {
+        this.legacyToRuntimeId.trim();
+        this.runtimeIdToLegacy.trim();
+        this.stateHashToLegacy.trim();
+        this.legacyToHashId.trim();
     }
 
     public int getRuntimeId(int id) {
@@ -300,11 +318,11 @@ public class BlockPalette {
      * @return 完整的旧方块ID (blockId << Block.DATA_BITS | meta)，如果找不到则返回-1 / full legacy block ID, returns -1 if not found
      */
     public int getLegacyFullIdFromHashId(int hashId) {
-        return hashIdToLegacy.get(hashId);
+        return stateHashToLegacy.get(hashId);
     }
 
     public int getLegacyFullId(CompoundTag blockState) {
-        return stateHashToLegacy.getOrDefault(Hash.hashBlock(blockState), -1);
+        return stateHashToLegacy.get(Hash.hashBlock(blockState));
     }
 
     /**
