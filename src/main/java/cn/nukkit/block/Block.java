@@ -210,24 +210,17 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return defaultBlock;
         }
 
-        Object lock = statePrototypeLocks[id];
-        synchronized (lock) {
+        synchronized (statePrototypeLocks[id]) {
             Block cached = prototypes.get(meta);
             if (cached != null) {
                 return cached;
             }
-        }
 
-        Block created = instantiatePrototype(id, meta);
-        if (created == null) {
-            return null;
-        }
-
-        synchronized (lock) {
-            Block cached = prototypes.get(meta);
-            if (cached != null) {
-                return cached;
+            Block created = instantiatePrototype(id, meta);
+            if (created == null) {
+                return null;
             }
+
             prototypes.put(meta, created);
             return created;
         }
