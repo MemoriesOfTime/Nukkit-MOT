@@ -3060,6 +3060,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         startGamePacket.isServerAuthoritativeBlockBreaking = this.isServerAuthoritativeBlockBreaking();
         startGamePacket.blockNetworkIdsHashed = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(this.gameVersion);
         startGamePacket.playerPropertyData = EntityProperty.getPlayerPropertyCache();
+        startGamePacket.blockRegistryChecksum = GlobalBlockPalette.getPaletteByProtocol(this.gameVersion).getChecksum();
         this.forceDataPacket(startGamePacket, null);
 
         this.loggedIn = true;

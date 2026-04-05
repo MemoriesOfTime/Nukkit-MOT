@@ -12,12 +12,111 @@ import java.util.TreeMap;
 /**
  * Hash utils
  */
-public class Hash {
+public final class Hash {
 
     private static final int FNV1_32_INIT = 0x811c9dc5;
     private static final int FNV1_PRIME_32 = 0x01000193;
     private static final long FNV1_64_INIT = 0xcbf29ce484222325L;
     private static final long FNV1_PRIME_64 = 0x100000001b3L;
+
+    private static final long XXH_PRIME64_1 = 0x9E3779B185EBCA87L;
+    private static final long XXH_PRIME64_2 = 0x14DEF9DEA2F79CD6L;
+    private static final long XXH_PRIME64_3 = 0x0000000165E84489L;
+    private static final long XXH_PRIME64_4 = 0x27D4EB2F165B7D01L;
+    private static final long XXH_PRIME64_5 = 0x0000000285EBCA87L;
+
+    public static long xxh64(byte[] buffer) {
+        return xxh64(buffer, 0, buffer.length);
+    }
+
+    public static long xxh64(byte[] buffer, int offset, int length) {
+        long seed = 0;
+        if (length >= 32) {
+            long v1 = seed + XXH_PRIME64_1 + XXH_PRIME64_2;
+            long v2 = seed + XXH_PRIME64_2;
+            long v3 = seed;
+            long v4 = seed - XXH_PRIME64_1;
+            int remaining = length;
+            int pos = offset;
+            do {
+                v1 = xxh64Round(v1, getLong(buffer, pos)); pos += 8;
+                v2 = xxh64Round(v2, getLong(buffer, pos)); pos += 8;
+                v3 = xxh64Round(v3, getLong(buffer, pos)); pos += 8;
+                v4 = xxh64Round(v4, getLong(buffer, pos)); pos += 8;
+                remaining -= 32;
+            } while (remaining >= 32);
+            long hash = Long.rotateLeft(v1, 1) + Long.rotateLeft(v2, 7) + Long.rotateLeft(v3, 12) + Long.rotateLeft(v4, 18);
+            hash = xxh64MergeRound(hash, v1);
+            hash = xxh64MergeRound(hash, v2);
+            hash = xxh64MergeRound(hash, v3);
+            hash = xxh64MergeRound(hash, v4);
+            hash += length;
+            return xxh64Finalize(hash, buffer, pos, remaining);
+        } else {
+            long hash = seed + XXH_PRIME64_5 + length;
+            return xxh64Finalize(hash, buffer, offset, length);
+        }
+    }
+
+    private static long xxh64Round(long acc, long input) {
+        acc += input * XXH_PRIME64_2;
+        acc = Long.rotateLeft(acc, 31);
+        acc *= XXH_PRIME64_1;
+        return acc;
+    }
+
+    private static long xxh64MergeRound(long hash, long val) {
+        val = xxh64Round(0, val);
+        hash ^= val;
+        hash = hash * XXH_PRIME64_1 + XXH_PRIME64_4;
+        return hash;
+    }
+
+    private static long xxh64Finalize(long hash, byte[] buffer, int pos, int remaining) {
+        if (remaining >= 8) {
+            long k1 = xxh64Round(0, getLong(buffer, pos));
+            hash ^= k1;
+            hash = Long.rotateLeft(hash, 27) * XXH_PRIME64_1 + XXH_PRIME64_4;
+            pos += 8;
+            remaining -= 8;
+        }
+        if (remaining >= 4) {
+            hash ^= (getInt(buffer, pos) & 0xFFFFFFFFL) * XXH_PRIME64_1;
+            hash = Long.rotateLeft(hash, 23) * XXH_PRIME64_2 + XXH_PRIME64_3;
+            pos += 4;
+            remaining -= 4;
+        }
+        while (remaining > 0) {
+            hash ^= (buffer[pos] & 0xFFL) * XXH_PRIME64_5;
+            hash = Long.rotateLeft(hash, 11) * XXH_PRIME64_1;
+            pos++;
+            remaining--;
+        }
+        hash ^= hash >>> 33;
+        hash *= XXH_PRIME64_2;
+        hash ^= hash >>> 29;
+        hash *= XXH_PRIME64_3;
+        hash ^= hash >>> 32;
+        return hash;
+    }
+
+    private static long getLong(byte[] buf, int off) {
+        return (buf[off] & 0xFFL)
+                | ((buf[off + 1] & 0xFFL) << 8)
+                | ((buf[off + 2] & 0xFFL) << 16)
+                | ((buf[off + 3] & 0xFFL) << 24)
+                | ((buf[off + 4] & 0xFFL) << 32)
+                | ((buf[off + 5] & 0xFFL) << 40)
+                | ((buf[off + 6] & 0xFFL) << 48)
+                | ((buf[off + 7] & 0xFFL) << 56);
+    }
+
+    private static int getInt(byte[] buf, int off) {
+        return (buf[off] & 0xFF)
+                | ((buf[off + 1] & 0xFF) << 8)
+                | ((buf[off + 2] & 0xFF) << 16)
+                | ((buf[off + 3] & 0xFF) << 24);
+    }
 
     public static long hashBlock(int x, int y, int z) {
         return ((long) y << 52) + (((long) z & 0x3ffffff) << 26) + ((long) x & 0x3ffffff);
