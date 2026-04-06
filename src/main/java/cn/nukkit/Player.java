@@ -69,6 +69,8 @@ import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.session.NetworkPlayerSession;
+import cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode;
+import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.permission.Permission;
 import cn.nukkit.permission.PermissionAttachment;
@@ -394,32 +396,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * 用于修复1.20.0连续执行despawnFromAll和spawnToAll导致玩家移动不显示问题
      */
     private boolean needSpawnToAll;
-
-    /**
-     * Packets that can be received before the player has logged verified
-     */
-    private static final List<Integer> PRE_LOGIN_VERIFIED_PACKETS = Arrays.asList(
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.LOGIN_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET)
-    );
-
-    /**
-     * Packets that can be received before the player has logged in
-     */
-    private static final List<Integer> PRE_LOGIN_PACKETS = Arrays.asList(
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.LOGIN_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_CHUNK_RADIUS_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.CLIENT_CACHE_STATUS_PACKET),
-            ProtocolInfo.toNewProtocolID(ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET)
-    );
 
     @Getter
     @Setter
@@ -1421,11 +1397,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             log.trace("Outbound {}: {}", this.getName(), packet);
         }
 
-        if (packet instanceof BatchPacket) {
-            this.networkSession.sendPacket(packet);
-        } else {
-            this.server.batchPackets(new Player[]{this}, new DataPacket[]{packet});
-        }
+        this.networkSession.sendPacket(packet);
         return true;
     }
 
@@ -1452,6 +1424,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void forceDataPacket(DataPacket packet, Runnable callback) {
+        this.forceDataPacket(packet, callback, ImmediatePacketMode.QUEUED_FLUSH);
+    }
+
+    public void forceDataPacket(DataPacket packet, Runnable callback, ImmediatePacketMode mode) {
         packet.protocol = this.protocol;
         packet.gameVersion = this.gameVersion;
 
@@ -1461,7 +1437,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
-        } : callback));
+        } : callback), mode);
     }
 
     /**
@@ -3037,6 +3013,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
+        this.syncLoginPhase(SessionLoginPhase.RESOURCE_PACK);
     }
 
     protected void completeLoginSequence() {
@@ -3086,6 +3063,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.forceDataPacket(startGamePacket, null);
 
         this.loggedIn = true;
+        this.syncLoginPhase(SessionLoginPhase.LOGGED_IN);
         this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logIn",
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
@@ -3234,7 +3212,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         int pid = packet.packetId();
-        if (!loginVerified && !PRE_LOGIN_VERIFIED_PACKETS.contains(pid)) {
+        SessionLoginPhase loginPhase = this.getCurrentLoginPhase();
+        if (!loginVerified && !isPreLoginVerifiedPacketAllowed(loginPhase, pid)) {
             server.getLogger().warning("Ignoring " + packet.getClass().getSimpleName() + " from " + getAddress() + " due to player not verified yet");
             if (unverifiedPackets++ > 100) {
                 this.close("", "Too many failed login attempts");
@@ -3242,7 +3221,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (!loggedIn && !PRE_LOGIN_PACKETS.contains(pid)) {
+        if (!loggedIn && !isPreLoginPacketAllowed(loginPhase, pid)) {
             server.getLogger().warning("Ignoring " + packet.getClass().getSimpleName() + " from " + username + " due to player not logged in yet");
             return;
         }
@@ -3281,7 +3260,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                this.loginPacketReceived = true;
+                this.syncLoginPacketReceived(true);
+                this.networkSession.endLegacyInboundCompressionGraceWindow();
+                this.syncLoginPhase(SessionLoginPhase.LOGIN_RECEIVED);
 
                 LoginPacket loginPacket = (LoginPacket) packet;
 
@@ -3289,6 +3270,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (this.gameVersion == null) {
                     // 低版本仅兼容国际版，高于554的版本在RequestNetworkSettingsProcessor_v554中处理
                     this.gameVersion = GameVersion.byProtocol(this.protocol, false);
+                    this.syncGameVersion(this.gameVersion);
                 }
 
                 switch (this.server.spaceMode) {
@@ -3454,10 +3436,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
                             pk.setJwt(this.getHandshakeJwt());
+                            Player.this.syncLoginPhase(SessionLoginPhase.ENCRYPTION_REQUEST_SENT);
                             Player.this.forceDataPacket(pk, () -> {
-                                Player.this.awaitingEncryptionHandshake = true;
+                                Player.this.syncAwaitingEncryptionHandshake(true);
+                                Player.this.syncLoginPhase(SessionLoginPhase.AWAITING_ENCRYPTION_RESPONSE);
+                                Player.this.getNetworkSession().beginLegacyInboundEncryptionGraceWindow();
                                 Player.this.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
-                            });
+                            }, ImmediatePacketMode.DIRECT_WRITE);
                         }
                     });
                 } else {
@@ -3501,7 +3486,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.dataPacket(stackPacket);
                         break;
                     case ResourcePackClientResponsePacket.STATUS_COMPLETED:
-                        this.shouldLogin = true;
+                        this.syncShouldLogin(true);
+                        this.syncLoginPhase(SessionLoginPhase.READY_TO_LOGIN);
 
                         if (this.preLoginEventTask.isFinished()) {
                             this.preLoginEventTask.onCompletion(server);
@@ -7768,7 +7754,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     protected void processPreLogin() {
-        this.loginVerified = true;
+        this.syncLoginVerified(true);
+        this.syncLoginPhase(SessionLoginPhase.PRE_LOGIN);
         final Player playerInstance = this;
 
         this.preLoginEventTask = new AsyncTask<Void>() {
@@ -7800,6 +7787,87 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, this.preLoginEventTask);
         this.processLogin();
+    }
+
+    static boolean isPreLoginVerifiedPacketAllowed(SessionLoginPhase phase, int packetId) {
+        return switch (phase) {
+            case CONNECTED, NETWORK_SETTINGS_NEGOTIATED -> packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET)
+                    || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.LOGIN_PACKET)
+                    || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
+            case LOGIN_RECEIVED, ENCRYPTION_REQUEST_SENT, AWAITING_ENCRYPTION_RESPONSE -> packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET)
+                    || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
+            case ENCRYPTION_RESPONSE_RECEIVED, PRE_LOGIN, RESOURCE_PACK, READY_TO_LOGIN -> packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET)
+                    || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET)
+                    || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
+            case LOGGED_IN, DISCONNECTED -> false;
+        };
+    }
+
+    static boolean isPreLoginPacketAllowed(SessionLoginPhase phase, int packetId) {
+        if (isPreLoginVerifiedPacketAllowed(phase, packetId)) {
+            return true;
+        }
+
+        // PacketViolationWarningPacket can arrive at any pre-login phase
+        if (packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET)) {
+            return phase != SessionLoginPhase.LOGGED_IN && phase != SessionLoginPhase.DISCONNECTED;
+        }
+
+        return switch (phase) {
+            case RESOURCE_PACK, READY_TO_LOGIN -> packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET)
+                    || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET)
+                    || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
+            case CONNECTED, NETWORK_SETTINGS_NEGOTIATED, LOGIN_RECEIVED, ENCRYPTION_REQUEST_SENT,
+                    AWAITING_ENCRYPTION_RESPONSE, ENCRYPTION_RESPONSE_RECEIVED, PRE_LOGIN,
+                    LOGGED_IN, DISCONNECTED -> false;
+        };
+    }
+
+    private SessionLoginPhase getCurrentLoginPhase() {
+        if (this.networkSession == null || this.networkSession.getState() == null) {
+            return SessionLoginPhase.CONNECTED;
+        }
+        return this.networkSession.getState().getLogin().getPhase();
+    }
+
+    private void syncLoginVerified(boolean value) {
+        this.loginVerified = value;
+        if (this.networkSession != null && this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().setLoginVerified(value);
+        }
+    }
+
+    private void syncLoginPacketReceived(boolean value) {
+        this.loginPacketReceived = value;
+        if (this.networkSession != null && this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().setLoginPacketReceived(value);
+        }
+    }
+
+    private void syncAwaitingEncryptionHandshake(boolean value) {
+        this.awaitingEncryptionHandshake = value;
+        if (this.networkSession != null && this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().setAwaitingEncryptionHandshake(value);
+        }
+    }
+
+    private void syncShouldLogin(boolean value) {
+        this.shouldLogin = value;
+        if (this.networkSession != null && this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().setShouldLogin(value);
+        }
+    }
+
+    private void syncLoginPhase(SessionLoginPhase phase) {
+        if (this.networkSession != null && this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().setPhase(phase);
+        }
+    }
+
+    private void syncGameVersion(GameVersion gameVersion) {
+        if (this.networkSession != null && this.networkSession.getState() != null) {
+            this.networkSession.getState().getProtocol().setGameVersion(gameVersion);
+        }
     }
 
     public boolean shouldLogin() {

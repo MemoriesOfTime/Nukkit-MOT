@@ -589,6 +589,10 @@ public class Server {
      */
     public int rakPacketLimit;
     /**
+     * Login stage timeout in milliseconds.
+     */
+    public int networkLoginTimeoutMilliseconds;
+    /**
      * Temporary disable world saving to allow safe backup of leveldb worlds.
      */
     public boolean holdWorldSave;
@@ -1278,6 +1282,7 @@ public class Server {
         this.tickCounter = 0;
 
         log.info(this.baseLang.translateString("nukkit.server.startFinished", String.valueOf((double) (System.currentTimeMillis() - Nukkit.START_TIME) / 1000)));
+        this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, System::gc, 20);
 
         this.tickProcessor();
         this.forceShutdown();
@@ -3345,6 +3350,7 @@ public class Server {
         this.networkCompressionThreshold = config.networkSettings().compressionThreshold();
         this.useSnappy = config.networkSettings().useSnappyCompression();
         this.rakPacketLimit = config.networkSettings().rakPacketLimit();
+        this.networkLoginTimeoutMilliseconds = config.networkSettings().timeoutMilliseconds();
         this.rakCookieMode = parseRakCookieMode(config.networkSettings().rakCookieMode());
         this.queryPlugins = config.networkSettings().queryPlugins();
         this.useWaterdog = config.networkSettings().useWaterdog();

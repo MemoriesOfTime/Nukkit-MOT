@@ -131,6 +131,10 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return this.leadHolder != -1L;
     }
 
+    public long getLeadHolderId() {
+        return this.leadHolder;
+    }
+
     public void leash(Entity leadHolder) {
         this.leadHolder = leadHolder.getId();
         this.setDataProperty(new LongEntityData(DATA_LEAD_HOLDER_EID, this.leadHolder));

@@ -33,6 +33,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
@@ -51,6 +52,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private final ProxyProtocolHandler proxyProtocolHandler;
     private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
+    private final Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final long serverId = ThreadLocalRandom.current().nextLong();
 
@@ -97,8 +99,8 @@ public class RakNetInterface implements AdvancedSourceInterface {
                     @Override
                     protected void initChannel(Channel channel) {
                         RakNetPlayerSession nukkitSession = new RakNetPlayerSession(RakNetInterface.this, (RakChildChannel) channel);
+                        RakNetInterface.this.pendingSessions.add(nukkitSession);
                         channel.pipeline().addLast("nukkit-handler", nukkitSession);
-                        RakNetInterface.this.sessionCreationQueue.offer(nukkitSession);
                     }
                 });
 
@@ -122,8 +124,14 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     @Override
     public boolean process() {
+        this.expireLoginSessions();
+
         RakNetPlayerSession session;
         while ((session = this.sessionCreationQueue.poll()) != null) {
+            this.pendingSessions.remove(session);
+            if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
+                continue;
+            }
             InetSocketAddress address = session.getChannel().remoteAddress();
             try {
                 PlayerCreationEvent event = new PlayerCreationEvent(this, Player.class, Player.class, null, address);
@@ -132,7 +140,9 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 this.sessions.put(event.getSocketAddress(), session);
 
                 Constructor<? extends Player> constructor = event.getPlayerClass().getConstructor(SourceInterface.class, Long.class, InetSocketAddress.class);
+                session.getState().getConnection().setPlayerCreatedNanos(System.nanoTime());
                 Player player = constructor.newInstance(this, event.getClientId(), event.getSocketAddress());
+                session.getState().getConnection().setPlayerCreated(true);
                 player.raknetProtocol = session.getChannel().config().getProtocolVersion();
                 session.setPlayer(player);
                 this.server.addPlayer(address, player);
@@ -165,6 +175,13 @@ public class RakNetInterface implements AdvancedSourceInterface {
         return true;
     }
 
+    public void queueSessionForPlayerCreation(RakNetPlayerSession session) {
+        session.getState().getConnection().setQueuedForPlayerCreation(true);
+        session.getState().getConnection().setQueuedForPlayerCreationNanos(System.nanoTime());
+        this.pendingSessions.add(session);
+        this.sessionCreationQueue.offer(session);
+    }
+
     @Override
     public int getNetworkLatency(Player player) {
         return (int) player.getNetworkSession().getPing();
@@ -190,12 +207,14 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     @Override
     public void shutdown() {
+        this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
     }
 
     @Override
     public void emergencyShutdown() {
+        this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
     }
@@ -213,6 +232,40 @@ public class RakNetInterface implements AdvancedSourceInterface {
     @Override
     public void unblockAddress(InetAddress address) {
         this.channel.pipeline().get(RakServerRateLimiter.class).unblockAddress(address);
+    }
+
+    private void expireLoginSessions() {
+        int timeoutMillis = this.server.networkLoginTimeoutMilliseconds;
+
+        // Always clean up disconnected pending sessions and expire stale pending sessions.
+        long nowNanos = System.nanoTime();
+        this.pendingSessions.removeIf(session -> {
+            if (session.getDisconnectReason() != null || !session.getChannel().isOpen()) {
+                return true;
+            }
+            if (timeoutMillis <= 0) {
+                return false;
+            }
+            if (!session.isPendingLoginTimedOut(nowNanos, timeoutMillis)) {
+                return false;
+            }
+
+            log.warn("Disconnecting timed out pending session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            session.disconnect("disconnectionScreen.timeout");
+            return true;
+        });
+
+        if (timeoutMillis <= 0) {
+            return;
+        }
+
+        for (RakNetPlayerSession session : this.sessions.values()) {
+            if (session.getDisconnectReason() != null || !session.isLoginPhaseTimedOut(nowNanos, timeoutMillis)) {
+                continue;
+            }
+            log.warn("Disconnecting timed out session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            session.disconnect("disconnectionScreen.timeout");
+        }
     }
 
     @Override
