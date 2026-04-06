@@ -11,19 +11,25 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode.DIRECT_WRITE;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -37,6 +43,13 @@ class RakNetPlayerSessionTest {
     static void setUp() {
         MockServer.init();
         network = new Network(MockServer.get());
+    }
+
+    @BeforeEach
+    void resetServerState() {
+        MockServer.reset();
+        MockServer.get().networkLoginTimeoutMilliseconds = 0;
+        MockServer.get().netEaseMode = false;
     }
 
     @Test
@@ -93,6 +106,75 @@ class RakNetPlayerSessionTest {
     }
 
     @Test
+    void pendingLoginTimeoutUsesAcceptedTimeBeforeChannelActivation() {
+        long now = System.nanoTime();
+
+        assertTrue(RakNetPlayerSession.isPendingLoginTimedOut(
+                false,
+                SessionLoginPhase.CONNECTED,
+                now,
+                now - TimeUnit.MILLISECONDS.toNanos(200),
+                now,
+                100
+        ));
+    }
+
+    @Test
+    void pendingLoginTimeoutUsesLoginActivityAfterChannelActivation() {
+        long now = System.nanoTime();
+
+        assertFalse(RakNetPlayerSession.isPendingLoginTimedOut(
+                true,
+                SessionLoginPhase.CONNECTED,
+                now - TimeUnit.MILLISECONDS.toNanos(50),
+                now - TimeUnit.MILLISECONDS.toNanos(200),
+                now,
+                100
+        ));
+    }
+
+    @Test
+    void expireLoginSessionsDisconnectsTimedOutInactivePendingSession() throws Exception {
+        MockServer.get().networkLoginTimeoutMilliseconds = 100;
+
+        Queue<RakNetPlayerSession> sessionCreationQueue = new ArrayDeque<>();
+        Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        RakNetInterface interfaceUnderTest = createRakNetInterface(MockServer.get(), sessionCreationQueue, pendingSessions);
+
+        SessionFixture fixture = createSession(mock(RakNetInterface.class, RETURNS_DEEP_STUBS), false, false, false);
+        fixture.session.getState().getConnection()
+                .setChildChannelAcceptedNanos(System.nanoTime() - TimeUnit.MILLISECONDS.toNanos(200));
+        pendingSessions.add(fixture.session);
+
+        invokeExpireLoginSessions(interfaceUnderTest);
+
+        assertEquals("disconnectionScreen.timeout", fixture.session.getDisconnectReason());
+        assertFalse(pendingSessions.contains(fixture.session));
+        verify(fixture.tickFuture).cancel(false);
+    }
+
+    @Test
+    void channelActiveQueuesPlayerCreationOnlyOnce() throws Exception {
+        Queue<RakNetPlayerSession> sessionCreationQueue = new ArrayDeque<>();
+        Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        RakNetInterface interfaceUnderTest = createRakNetInterface(MockServer.get(), sessionCreationQueue, pendingSessions);
+
+        SessionFixture fixture = createSession(interfaceUnderTest, false, false, false);
+        pendingSessions.add(fixture.session);
+
+        ChannelHandlerContext context = mock(ChannelHandlerContext.class);
+        when(context.fireChannelActive()).thenReturn(context);
+
+        fixture.session.channelActive(context);
+        fixture.session.channelActive(context);
+
+        assertTrue(fixture.session.getState().getConnection().isQueuedForPlayerCreation());
+        assertEquals(1, sessionCreationQueue.size());
+        assertSame(fixture.session, sessionCreationQueue.peek());
+        assertEquals(1, pendingSessions.size());
+    }
+
+    @Test
     void malformedPreLoginPacketsDoNotTriggerIpBlock() throws Exception {
         InetAddress address = InetAddress.getByName("1.2.3.4");
         assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.CONNECTED, address));
@@ -136,10 +218,20 @@ class RakNetPlayerSessionTest {
     }
 
     private static SessionFixture createSession(boolean executeImmediately) {
+        return createSession(mock(RakNetInterface.class, RETURNS_DEEP_STUBS), executeImmediately, true, true);
+    }
+
+    private static SessionFixture createSession(RakNetInterface server, boolean executeImmediately, boolean channelActive) {
+        return createSession(server, executeImmediately, channelActive, true);
+    }
+
+    private static SessionFixture createSession(RakNetInterface server, boolean executeImmediately, boolean channelActive, boolean bindPlayer) {
         EventLoop eventLoop = mock(EventLoop.class);
         ScheduledFuture<?> scheduledFuture = mock(ScheduledFuture.class);
         doReturn(scheduledFuture).when(eventLoop)
                 .scheduleAtFixedRate(any(Runnable.class), anyLong(), anyLong(), eq(TimeUnit.MILLISECONDS));
+        doReturn(scheduledFuture).when(eventLoop)
+                .schedule(any(Runnable.class), anyLong(), eq(TimeUnit.MILLISECONDS));
         if (executeImmediately) {
             doAnswer(invocation -> {
                 ((Runnable) invocation.getArgument(0)).run();
@@ -152,24 +244,49 @@ class RakNetPlayerSessionTest {
         RakChildChannel channel = mock(RakChildChannel.class, RETURNS_DEEP_STUBS);
         when(channel.eventLoop()).thenReturn(eventLoop);
         when(channel.config().getProtocolVersion()).thenReturn(RAKNET_PROTOCOL);
-        when(channel.isActive()).thenReturn(true);
+        when(channel.isActive()).thenReturn(channelActive);
+        when(channel.isOpen()).thenReturn(true);
         when(channel.remoteAddress()).thenReturn(new InetSocketAddress("127.0.0.1", 19132));
         when(channel.writeAndFlush(any(ByteBuf.class))).thenReturn(channelFuture);
 
-        RakNetPlayerSession session = new RakNetPlayerSession(mock(RakNetInterface.class, RETURNS_DEEP_STUBS), channel);
+        RakNetPlayerSession session = new RakNetPlayerSession(server, channel);
 
-        Player player = mock(Player.class);
-        player.protocol = GameVersion.V1_21_130.getProtocol();
-        when(player.getGameVersion()).thenReturn(GameVersion.V1_21_130);
-        when(player.shouldLogin()).thenReturn(false);
-        session.setPlayer(player);
-        return new SessionFixture(session, channel);
+        if (bindPlayer) {
+            Player player = mock(Player.class);
+            player.protocol = GameVersion.V1_21_130.getProtocol();
+            when(player.getGameVersion()).thenReturn(GameVersion.V1_21_130);
+            when(player.shouldLogin()).thenReturn(false);
+            session.setPlayer(player);
+        }
+        return new SessionFixture(session, channel, eventLoop, scheduledFuture);
     }
 
     private static void invokeNetworkTick(RakNetPlayerSession session) throws Exception {
         Method method = RakNetPlayerSession.class.getDeclaredMethod("networkTick");
         method.setAccessible(true);
         method.invoke(session);
+    }
+
+    private static RakNetInterface createRakNetInterface(cn.nukkit.Server server, Queue<RakNetPlayerSession> sessionCreationQueue,
+                                                         Set<RakNetPlayerSession> pendingSessions) throws Exception {
+        RakNetInterface interfaceUnderTest = mock(RakNetInterface.class, CALLS_REAL_METHODS);
+        setField(interfaceUnderTest, "server", server);
+        setField(interfaceUnderTest, "sessionCreationQueue", sessionCreationQueue);
+        setField(interfaceUnderTest, "pendingSessions", pendingSessions);
+        setField(interfaceUnderTest, "sessions", new HashMap<InetSocketAddress, RakNetPlayerSession>());
+        return interfaceUnderTest;
+    }
+
+    private static void invokeExpireLoginSessions(RakNetInterface interfaceUnderTest) throws Exception {
+        Method method = RakNetInterface.class.getDeclaredMethod("expireLoginSessions");
+        method.setAccessible(true);
+        method.invoke(interfaceUnderTest);
+    }
+
+    private static void setField(Object target, String fieldName, Object value) throws Exception {
+        Field field = RakNetInterface.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 
     private static byte[] createLegacyHandshakeBatch() {
@@ -179,7 +296,8 @@ class RakNetPlayerSessionTest {
         };
     }
 
-    private record SessionFixture(RakNetPlayerSession session, RakChildChannel channel) {
+    private record SessionFixture(RakNetPlayerSession session, RakChildChannel channel, EventLoop eventLoop,
+                                  ScheduledFuture<?> tickFuture) {
     }
 
     private static final class TestPacket extends DataPacket {

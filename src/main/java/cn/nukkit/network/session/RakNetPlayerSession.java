@@ -180,6 +180,14 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        if (!this.state.getConnection().isQueuedForPlayerCreation()) {
+            this.server.queueSessionForPlayerCreation(this);
+        }
+        super.channelActive(ctx);
+    }
+
+    @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         this.disconnect("Disconnected from Server"); // TODO: timeout reason
     }
@@ -465,6 +473,17 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         return this.disconnectReason;
     }
 
+    public boolean isPendingLoginTimedOut(long nowNanos, int timeoutMillis) {
+        return isPendingLoginTimedOut(
+                this.channel.isActive(),
+                this.state.getLogin().getPhase(),
+                this.state.getLogin().getLastActivityNanos(),
+                this.state.getConnection().getChildChannelAcceptedNanos(),
+                nowNanos,
+                timeoutMillis
+        );
+    }
+
     public boolean isLoginPhaseTimedOut(long nowNanos, int timeoutMillis) {
         return isLoginPhaseTimedOut(this.state.getLogin().getPhase(), this.state.getLogin().getLastActivityNanos(), nowNanos, timeoutMillis);
     }
@@ -595,6 +614,17 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             return false;
         }
         return nowNanos - lastActivityNanos >= TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+    }
+
+    static boolean isPendingLoginTimedOut(boolean channelActive, SessionLoginPhase phase, long lastActivityNanos,
+                                          long childChannelAcceptedNanos, long nowNanos, int timeoutMillis) {
+        if (channelActive) {
+            return isLoginPhaseTimedOut(phase, lastActivityNanos, nowNanos, timeoutMillis);
+        }
+        if (timeoutMillis <= 0 || phase == SessionLoginPhase.LOGGED_IN || phase == SessionLoginPhase.DISCONNECTED) {
+            return false;
+        }
+        return nowNanos - childChannelAcceptedNanos >= TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
     }
 
     static boolean shouldBlockAddressAfterMalformed(SessionLoginPhase phase, InetAddress address) {

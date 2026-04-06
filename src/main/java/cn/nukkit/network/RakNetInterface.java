@@ -99,11 +99,8 @@ public class RakNetInterface implements AdvancedSourceInterface {
                     @Override
                     protected void initChannel(Channel channel) {
                         RakNetPlayerSession nukkitSession = new RakNetPlayerSession(RakNetInterface.this, (RakChildChannel) channel);
-                        nukkitSession.getState().getConnection().setQueuedForPlayerCreation(true);
-                        nukkitSession.getState().getConnection().setQueuedForPlayerCreationNanos(System.nanoTime());
                         RakNetInterface.this.pendingSessions.add(nukkitSession);
                         channel.pipeline().addLast("nukkit-handler", nukkitSession);
-                        RakNetInterface.this.sessionCreationQueue.offer(nukkitSession);
                     }
                 });
 
@@ -178,6 +175,13 @@ public class RakNetInterface implements AdvancedSourceInterface {
         return true;
     }
 
+    public void queueSessionForPlayerCreation(RakNetPlayerSession session) {
+        session.getState().getConnection().setQueuedForPlayerCreation(true);
+        session.getState().getConnection().setQueuedForPlayerCreationNanos(System.nanoTime());
+        this.pendingSessions.add(session);
+        this.sessionCreationQueue.offer(session);
+    }
+
     @Override
     public int getNetworkLatency(Player player) {
         return (int) player.getNetworkSession().getPing();
@@ -233,16 +237,16 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private void expireLoginSessions() {
         int timeoutMillis = this.server.networkLoginTimeoutMilliseconds;
 
-        // Always clean up disconnected or inactive pending sessions
+        // Always clean up disconnected pending sessions and expire stale pending sessions.
         long nowNanos = System.nanoTime();
         this.pendingSessions.removeIf(session -> {
-            if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
+            if (session.getDisconnectReason() != null || !session.getChannel().isOpen()) {
                 return true;
             }
             if (timeoutMillis <= 0) {
                 return false;
             }
-            if (!session.isLoginPhaseTimedOut(nowNanos, timeoutMillis)) {
+            if (!session.isPendingLoginTimedOut(nowNanos, timeoutMillis)) {
                 return false;
             }
 
