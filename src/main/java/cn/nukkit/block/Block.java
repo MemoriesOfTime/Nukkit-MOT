@@ -25,6 +25,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -58,7 +59,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     @SuppressWarnings("rawtypes")
     public static Class[] list = null;
-    public static Block[] fullList = null;
     public static int[] light = null;
     public static int[] lightFilter = null;
     public static boolean[] solid = null;
@@ -66,6 +66,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static boolean[] transparent = null;
     public static boolean[] diffusesSkyLight = null;
     public static boolean[] hasMeta = null;
+    private static Block[] defaultStateList = null;
+    @SuppressWarnings("rawtypes")
+    private static Constructor[] metaConstructors = null;
+    @SuppressWarnings("unchecked")
+    private static Int2ObjectOpenHashMap<Block>[] statePrototypes = null;
+    private static Object[] statePrototypeLocks = null;
 
     public AxisAlignedBB boundingBox = null;
     public int layer = 0;
@@ -80,7 +86,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static void init() {
         if (list == null) {
             list = new Class[MAX_BLOCK_ID];
-            fullList = new Block[MAX_BLOCK_ID * (1 << DATA_BITS)];
             light = new int[MAX_BLOCK_ID];
             lightFilter = new int[MAX_BLOCK_ID];
             solid = new boolean[MAX_BLOCK_ID];
@@ -88,6 +93,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             transparent = new boolean[MAX_BLOCK_ID];
             diffusesSkyLight = new boolean[MAX_BLOCK_ID];
             hasMeta = new boolean[MAX_BLOCK_ID];
+            defaultStateList = new Block[MAX_BLOCK_ID];
+            metaConstructors = new Constructor[MAX_BLOCK_ID];
+            statePrototypes = new Int2ObjectOpenHashMap[MAX_BLOCK_ID];
+            statePrototypeLocks = new Object[MAX_BLOCK_ID];
 
             Blocks.init();
 
@@ -99,38 +108,20 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                     Block block;
                     try {
                         block = (Block) c.getDeclaredConstructor().newInstance();
+                        defaultStateList[id] = block;
+                        statePrototypeLocks[id] = new Object();
                         try {
                             @SuppressWarnings("rawtypes")
                             Constructor constructor = c.getDeclaredConstructor(int.class);
                             constructor.setAccessible(true);
-                            for (int data = 0; data < DATA_SIZE; ++data) {
-                                int fullId = (id << DATA_BITS) | data;
-                                Block b;
-                                try {
-                                    b = (Block) constructor.newInstance(data);
-                                    if (b.getDamage() != data) {
-                                        //b = new BlockUnknown(id, data);
-                                        continue;
-                                    }
-                                } catch (Exception e) {
-                                    Server.getInstance().getLogger().error("Error while registering " + c.getName(), e);
-                                    //b = new BlockUnknown(id, data);
-                                    continue;
-                                }
-                                fullList[fullId] = b;
-                            }
+                            metaConstructors[id] = constructor;
+                            statePrototypes[id] = new Int2ObjectOpenHashMap<>();
                             hasMeta[id] = true;
                         } catch (NoSuchMethodException ignore) {
-                            for (int data = 0; data < DATA_SIZE; ++data) {
-                                int fullId = (id << DATA_BITS) | data;
-                                fullList[fullId] = block;
-                            }
+                            // Blocks without an int constructor expose a single immutable default state.
                         }
                     } catch (Exception e) {
                         Server.getInstance().getLogger().error("Error while registering " + c.getName(), e);
-                        /*for (int data = 0; data < DATA_SIZE; ++data) {
-                            fullList[(id << DATA_BITS) | data] = new BlockUnknown(id, data);
-                        }*/
                         return;
                     }
 
@@ -159,12 +150,144 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                     }
                 } else {
                     lightFilter[id] = 1;
-                    /*for (int data = 0; data < DATA_SIZE; ++data) {
-                        fullList[(id << DATA_BITS) | data] = new BlockUnknown(id, data);
-                    }*/
                 }
             });
         }
+    }
+
+    /**
+     * Warms up the sparse prototype cache for a legacy state discovered from palettes or mappings.
+     */
+    public static void registerKnownState(int id, int meta) {
+        if (defaultStateList == null || id < 0 || id >= MAX_BLOCK_ID || meta < 0 || meta > DATA_MASK) {
+            return;
+        }
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return;
+        }
+        getOrCreatePrototype(id, meta);
+    }
+
+    /**
+     * Exposes the current prototype count for tests without leaking the cache implementation.
+     */
+    static int getCachedStateCountForTesting(int id) {
+        if (statePrototypes == null || id < 0 || id >= statePrototypes.length || statePrototypes[id] == null) {
+            return 0;
+        }
+        synchronized (statePrototypeLocks[id]) {
+            return statePrototypes[id].size();
+        }
+    }
+
+    /**
+     * Returns the canonical default prototype registered for the given block id.
+     */
+    @Nullable
+    private static Block getDefaultPrototype(int id) {
+        if (defaultStateList == null || id < 0 || id >= defaultStateList.length) {
+            return null;
+        }
+        return defaultStateList[id];
+    }
+
+    /**
+     * Returns a cached prototype for the requested meta, creating it lazily on first observation.
+     */
+    @Nullable
+    private static Block getOrCreatePrototype(int id, int meta) {
+        Block defaultBlock = getDefaultPrototype(id);
+        if (defaultBlock == null) {
+            return null;
+        }
+
+        if (!hasMeta[id] || meta == defaultBlock.getDamage()) {
+            return defaultBlock;
+        }
+
+        Int2ObjectOpenHashMap<Block> prototypes = statePrototypes[id];
+        if (prototypes == null) {
+            return defaultBlock;
+        }
+
+        synchronized (statePrototypeLocks[id]) {
+            Block cached = prototypes.get(meta);
+            if (cached != null) {
+                return cached;
+            }
+
+            Block created = instantiatePrototype(id, meta);
+            if (created == null) {
+                return null;
+            }
+
+            prototypes.put(meta, created);
+            return created;
+        }
+    }
+
+    /**
+     * Builds a detached prototype for a specific meta value before it is stored in the cache.
+     */
+    @Nullable
+    private static Block instantiatePrototype(int id, int meta) {
+        Block defaultBlock = getDefaultPrototype(id);
+        if (defaultBlock == null) {
+            return null;
+        }
+
+        try {
+            Block prototype;
+            @SuppressWarnings("rawtypes")
+            Constructor constructor = metaConstructors[id];
+            if (constructor != null) {
+                prototype = (Block) constructor.newInstance(meta);
+            } else {
+                prototype = defaultBlock.clone();
+                prototype.setDamage(meta);
+            }
+
+            if (prototype.getDamage() != meta) {
+                return null;
+            }
+
+            prototype.x = 0;
+            prototype.y = 0;
+            prototype.z = 0;
+            prototype.level = null;
+            prototype.layer = 0;
+            prototype.boundingBox = null;
+            return prototype;
+        } catch (Exception e) {
+            Server.getInstance().getLogger().error("Error while creating block state prototype for " + list[id].getName() + " meta " + meta, e);
+            return null;
+        }
+    }
+
+    /**
+     * Clones the requested prototype or falls back to {@link BlockUnknown} when the state is unsupported.
+     */
+    @NotNull
+    private static Block cloneOrUnknown(int id, int meta) {
+        Block prototype = getOrCreatePrototype(id, meta);
+        if (prototype == null) {
+            log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
+            return new BlockUnknown(id, meta);
+        }
+        return prototype.clone();
+    }
+
+    /**
+     * Clones the default prototype for a block id or returns {@link BlockUnknown} if the id is unknown.
+     */
+    @NotNull
+    private static Block cloneDefaultOrUnknown(int id, int metaForUnknown) {
+        Block prototype = getDefaultPrototype(id);
+        if (prototype == null) {
+            log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, metaForUnknown);
+            return new BlockUnknown(id, metaForUnknown);
+        }
+        return prototype.clone();
     }
 
     @NotNull
@@ -182,35 +305,17 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return CustomBlockManager.get().getBlock(id, meta == null ? 0 : meta);
         }
 
-        int fullId = id << DATA_BITS;
         if (meta != null) {
             int iMeta = meta;
-            if (iMeta <= DATA_SIZE) {
-                fullId = fullId | meta;
-                if (fullId >= fullList.length || fullList[fullId] == null) {
-                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, iMeta);
-                    BlockUnknown blockUnknown = new BlockUnknown(id, iMeta);
-                    fullList[fullId] = blockUnknown;
-                    return blockUnknown.clone();
-                }
-                return fullList[fullId].clone();
+            if (iMeta >= 0 && iMeta < DATA_SIZE) {
+                return cloneOrUnknown(id, iMeta);
             } else {
-                if (fullId >= fullList.length || fullList[fullId] == null) {
-                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, iMeta);
-                    BlockUnknown blockUnknown = new BlockUnknown(id, iMeta);
-                    fullList[fullId] = blockUnknown;
-                    return blockUnknown.clone();
-                }
-                Block block = fullList[fullId].clone();
+                Block block = cloneDefaultOrUnknown(id, iMeta);
                 block.setDamage(iMeta);
                 return block;
             }
         } else {
-            if (fullId >= fullList.length || fullList[fullId] == null) {
-                log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, 0);
-                return new BlockUnknown(id, 0);
-            }
-            return fullList[fullId].clone();
+            return cloneOrUnknown(id, 0);
         }
     }
 
@@ -229,26 +334,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
             block = CustomBlockManager.get().getBlock(id, meta == null ? 0 : meta);
         } else {
-            int fullId = id << DATA_BITS;
-            if (meta != null && meta > DATA_SIZE) {
-                if (fullId >= fullList.length || fullList[fullId] == null) {
-                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-                    BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-                    fullList[fullId] = blockUnknown;
-                    return blockUnknown.clone();
-                }
-                block = fullList[fullId].clone();
+            if (meta != null && (meta < 0 || meta >= DATA_SIZE)) {
+                block = cloneDefaultOrUnknown(id, meta);
                 block.setDamage(meta);
             } else {
-                meta = meta == null ? 0 : meta;
-                fullId = fullId | meta;
-                if (fullId >= fullList.length || fullList[fullId] == null) {
-                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-                    BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-                    fullList[fullId] = blockUnknown;
-                    return blockUnknown.clone();
-                }
-                block = fullList[fullId].clone();
+                block = cloneOrUnknown(id, meta == null ? 0 : meta);
             }
         }
 
@@ -272,22 +362,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return CustomBlockManager.get().getBlock(id, data);
         }
 
-        int fullId = id << DATA_BITS;
-        if (fullId >= fullList.length) {
-            log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, data);
-            return new BlockUnknown(id, data);
-        }
-        if (data < DATA_SIZE) {
-            fullId = fullId | data;
-            if (fullList[fullId] == null) {
-                log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, data);
-                BlockUnknown blockUnknown = new BlockUnknown(id, data);
-                fullList[fullId] = blockUnknown;
-                return blockUnknown.clone();
-            }
-            return fullList[fullId].clone();
+        if (data >= 0 && data < DATA_SIZE) {
+            return cloneOrUnknown(id, data);
         } else {
-            Block block = fullList[fullId].clone();
+            Block block = cloneDefaultOrUnknown(id, data);
             block.setDamage(data);
             return block;
         }
@@ -306,14 +384,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
             block = CustomBlockManager.get().getBlock(id, fullId & DATA_MASK);
         } else {
-            if (fullId >= fullList.length || fullList[fullId] == null) {
-                int meta = fullId & DATA_MASK;
-                log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-                BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-                fullList[fullId] = blockUnknown;
-                return blockUnknown.clone();
-            }
-            block = fullList[fullId].clone();
+            block = cloneOrUnknown(id, fullId & DATA_MASK);
         }
         block.x = x;
         block.y = y;
@@ -334,24 +405,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
             block = CustomBlockManager.get().getBlock(id, meta);
         } else {
-            if (meta <= DATA_SIZE) {
-                int index = id << DATA_BITS | meta;
-                if (fullList[index] == null) {
-                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-                    BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-                    fullList[index] = blockUnknown;
-                    return blockUnknown.clone();
-                }
-                block = fullList[index].clone();
+            if (meta >= 0 && meta < DATA_SIZE) {
+                block = cloneOrUnknown(id, meta);
             } else {
-                int index = id << DATA_BITS;
-                if (fullList[index] == null) {
-                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-                    BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-                    fullList[index] = blockUnknown;
-                    return blockUnknown.clone();
-                }
-                block = fullList[index].clone();
+                block = cloneDefaultOrUnknown(id, meta);
                 block.setDamage(meta);
             }
         }
