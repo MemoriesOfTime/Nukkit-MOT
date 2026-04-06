@@ -55,4 +55,14 @@ class BlockStateCacheTest {
         Assertions.assertFalse(valid instanceof BlockUnknown);
         Assertions.assertEquals(5, valid.getDamage());
     }
+
+    @Test
+    /**
+     * Ensures `Block.get(id)` preserves the historical `meta 0` default state instead of cloning the no-arg prototype.
+     */
+    void getWithoutMetaUsesMetaZeroState() {
+        Block tallGrass = Block.get(Block.TALL_GRASS);
+
+        Assertions.assertEquals(0, tallGrass.getDamage());
+    }
 }

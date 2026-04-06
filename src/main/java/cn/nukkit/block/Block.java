@@ -315,7 +315,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                 return block;
             }
         } else {
-            return cloneDefaultOrUnknown(id, 0);
+            return cloneOrUnknown(id, 0);
         }
     }
 
