@@ -41,7 +41,7 @@ public class BlockDoubleSlabBambooMosaic extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(BAMBOO_MOSAIC_SLAB), this.getDamage() & 0x07);
+        return Item.fromString("minecraft:bamboo_mosaic_slab");
     }
 
     @Override

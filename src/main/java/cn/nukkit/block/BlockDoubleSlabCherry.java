@@ -41,7 +41,7 @@ public class BlockDoubleSlabCherry extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(CHERRY_SLAB), this.getDamage() & 0x07);
+        return Item.fromString("minecraft:cherry_slab");
     }
 
     @Override
