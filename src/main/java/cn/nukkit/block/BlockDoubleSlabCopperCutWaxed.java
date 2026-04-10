@@ -21,14 +21,18 @@ public class BlockDoubleSlabCopperCutWaxed extends BlockDoubleSlabCopperCut {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(WAXED_CUT_COPPER_SLAB));
+        return new ItemBlock(Block.get(WAXED_CUT_COPPER_SLAB), this.getDamage() & 0x07);
     }
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{
-                new ItemBlock(Block.get(WAXED_CUT_COPPER_SLAB), 0, 2)
-        };
+        if (item.isPickaxe()) {
+            Item slab = toItem();
+            slab.setCount(2);
+            return new Item[]{ slab };
+        } else {
+            return Item.EMPTY_ARRAY;
+        }
     }
 
     @Override

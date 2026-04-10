@@ -18,7 +18,7 @@ public class BlockDoubleSlabCopperCutOxidizedWaxed extends BlockDoubleSlabCopper
     public int getId() {
         return WAXED_OXIDIZED_DOUBLE_CUT_COPPER_SLAB;
     }
-    
+
     @Override
     public int onUpdate(int type) {
         return 0;
@@ -31,14 +31,18 @@ public class BlockDoubleSlabCopperCutOxidizedWaxed extends BlockDoubleSlabCopper
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(WAXED_OXIDIZED_CUT_COPPER_SLAB));
+        return new ItemBlock(Block.get(WAXED_OXIDIZED_CUT_COPPER_SLAB), this.getDamage() & 0x07);
     }
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{
-                new ItemBlock(Block.get(WAXED_OXIDIZED_CUT_COPPER_SLAB), 0, 2)
-        };
+        if (item.isPickaxe()) {
+            Item slab = toItem();
+            slab.setCount(2);
+            return new Item[]{ slab };
+        } else {
+            return Item.EMPTY_ARRAY;
+        }
     }
 
     @Override

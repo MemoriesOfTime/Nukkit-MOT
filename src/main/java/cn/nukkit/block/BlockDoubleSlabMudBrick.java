@@ -45,22 +45,23 @@ public class BlockDoubleSlabMudBrick extends BlockSolidMeta {
     }
 
     @Override
-    public Item toItem() {
-        return new ItemBlock(Block.get(MUD_BRICK_SLAB));
-    }
-
-    @Override
     public boolean canHarvestWithHand() {
         return false;
     }
 
     @Override
+    public Item toItem() {
+        return new ItemBlock(Block.get(MUD_BRICK_SLAB), this.getDamage() & 0x07);
+    }
+
+    @Override
     public Item[] getDrops(Item item) {
-        if (item.isPickaxe() && item.getTier() >= ItemTool.TIER_STONE) {
-            return new Item[]{
-                new ItemBlock(Block.get(MUD_BRICK_SLAB), 0, 2)
-            };
+        if (item.isPickaxe()) {
+            Item slab = toItem();
+            slab.setCount(2);
+            return new Item[]{ slab };
+        } else {
+            return Item.EMPTY_ARRAY;
         }
-        return Item.EMPTY_ARRAY;
     }
 }

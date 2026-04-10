@@ -48,18 +48,19 @@ public class BlockDoubleSlabCopperCut extends BlockDoubleSlab implements CopperB
     }
 
     @Override
-    public Item[] getDrops(Item item) {
-        if (item.isPickaxe() && item.getTier() >= ItemTool.TIER_STONE) {
-            return new Item[]{
-                    new ItemBlock(Block.get(CUT_COPPER_SLAB), 0, 2)
-            };
-        }
-        return Item.EMPTY_ARRAY;
+    public Item toItem() {
+        return new ItemBlock(Block.get(CUT_COPPER_SLAB), this.getDamage() & 0x07);
     }
 
     @Override
-    public Item toItem() {
-        return new ItemBlock(Block.get(CUT_COPPER_SLAB));
+    public Item[] getDrops(Item item) {
+        if (item.isPickaxe()) {
+            Item slab = toItem();
+            slab.setCount(2);
+            return new Item[]{ slab };
+        } else {
+            return Item.EMPTY_ARRAY;
+        }
     }
 
     @Override
