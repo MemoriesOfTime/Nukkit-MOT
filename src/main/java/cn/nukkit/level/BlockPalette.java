@@ -317,12 +317,20 @@ public class BlockPalette {
      * @param hashId 方块状态的哈希ID / hash ID of the block state
      * @return 完整的旧方块ID (blockId << Block.DATA_BITS | meta)，如果找不到则返回-1 / full legacy block ID, returns -1 if not found
      */
-    public int getLegacyFullIdFromHashId(int hashId) {
-        return stateHashToLegacy.get(hashId);
+   public int getLegacyFullIdFromHashId(int hashId) {
+        int hash = stateHashToLegacy.get(hashId);
+        if (hash == -1) {
+            return 0; 
+        }
+        return hash;
     }
 
     public int getLegacyFullId(CompoundTag blockState) {
-        return stateHashToLegacy.get(Hash.hashBlock(blockState));
+        int hash = stateHashToLegacy.get(Hash.hashBlock(blockState));
+        if (hash == -1) {
+            return 0;
+        }
+        return hash;
     }
 
     /**
