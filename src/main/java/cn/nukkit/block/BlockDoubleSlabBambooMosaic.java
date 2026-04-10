@@ -46,8 +46,12 @@ public class BlockDoubleSlabBambooMosaic extends BlockSolidMeta {
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{
-                Item.get(Item.BAMBOO_MOSAIC_SLAB, 0, 2)
-        };
+        if (item.isPickaxe()) {
+            Item slab = toItem();
+            slab.setCount(2);
+            return new Item[]{ slab };
+        } else {
+            return Item.EMPTY_ARRAY;
+        }
     }
 }
