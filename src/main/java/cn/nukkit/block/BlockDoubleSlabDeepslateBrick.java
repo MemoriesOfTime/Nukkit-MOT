@@ -46,7 +46,7 @@ public class BlockDoubleSlabDeepslateBrick extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(DEEPSLATE_TILE_SLAB), this.getDamage() & 0x07);
+        return new ItemBlock(Block.get(DEEPSLATE_BRICK_SLAB), this.getDamage() & 0x07);
     }
 
     @Override
