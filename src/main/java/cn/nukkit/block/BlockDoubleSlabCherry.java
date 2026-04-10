@@ -46,12 +46,11 @@ public class BlockDoubleSlabCherry extends BlockSolidMeta {
 
     @Override
     public Item[] getDrops(Item item) {
-        if (item.isPickaxe()) {
-            Item slab = toItem();
-            slab.setCount(2);
-            return new Item[]{ slab };
-        } else {
-            return Item.EMPTY_ARRAY;
+        if (item.isPickaxe() && item.getTier() >= ItemTool.TIER_STONE) {
+            return new Item[]{
+                new ItemBlock(Block.get(CHERRY_SLAB), 0, 2)
+            };
         }
+        return Item.EMPTY_ARRAY;
     }
 }
