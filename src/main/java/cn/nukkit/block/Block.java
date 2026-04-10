@@ -274,7 +274,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
             return new BlockUnknown(id, meta);
         }
-        return prototype.clone();
+        Block result = prototype.clone();
+        if (result.getDamage() != meta) {
+            result.setDamage(meta);
+        }
+        return result;
     }
 
     /**
