@@ -80,6 +80,10 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersionsRange(332, ProtocolInfo.v1_21_70);
     }
 
+    static Stream<Arguments> versionsFrom407To503() {
+        return filteredVersionsRange(ProtocolInfo.v1_16_0, ProtocolInfo.v1_18_30);
+    }
+
     // ==================== MobEffectPacket ====================
 
     @ParameterizedTest(name = "MobEffectPacket v{0} (<662)")
@@ -755,6 +759,53 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals("world-1", cbPacket.getWorldId());
         assertEquals("scenario-1", cbPacket.getScenarioId());
         assertEquals("owner-1", cbPacket.getOwnerId());
+    }
+
+    @ParameterizedTest(name = "StartGamePacket v{0} (legacy minimal)")
+    @MethodSource("versionsFrom407To503")
+    void testStartGamePacketLegacy(int protocolVersion) {
+        var nukkitPacket = new StartGamePacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.entityUniqueId = 1;
+        nukkitPacket.entityRuntimeId = 1;
+        nukkitPacket.playerGamemode = 0;
+        nukkitPacket.x = 0.0f;
+        nukkitPacket.y = 64.0f;
+        nukkitPacket.z = 0.0f;
+        nukkitPacket.yaw = 0.0f;
+        nukkitPacket.pitch = 0.0f;
+        nukkitPacket.seed = 12345;
+        nukkitPacket.dimension = 0;
+        nukkitPacket.generator = 1;
+        nukkitPacket.worldGamemode = 0;
+        nukkitPacket.difficulty = 2;
+        nukkitPacket.spawnX = 0;
+        nukkitPacket.spawnY = 64;
+        nukkitPacket.spawnZ = 0;
+        nukkitPacket.gameRules = new GameRules();
+        nukkitPacket.levelId = "level-legacy";
+        nukkitPacket.worldName = "LegacyWorld";
+        nukkitPacket.premiumWorldTemplateId = "";
+        nukkitPacket.currentTick = 123L;
+        nukkitPacket.enchantmentSeed = 0;
+        nukkitPacket.multiplayerCorrelationId = "corr-legacy";
+        nukkitPacket.vanillaVersion = cn.nukkit.utils.Utils.getVersionByProtocol(protocolVersion);
+        nukkitPacket.authoritativeMovementMode = AuthoritativeMovementMode.SERVER;
+        nukkitPacket.rewindHistorySize = 40;
+        nukkitPacket.blockDefinitions = java.util.Collections.emptyList();
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.StartGamePacket.class);
+
+        assertEquals(1, cbPacket.getUniqueEntityId());
+        assertEquals(1, cbPacket.getRuntimeEntityId());
+        assertEquals("LegacyWorld", cbPacket.getLevelName());
+        assertEquals("level-legacy", cbPacket.getLevelId());
+        assertEquals(123L, cbPacket.getCurrentTick());
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.AuthoritativeMovementMode.SERVER,
+                cbPacket.getAuthoritativeMovementMode());
     }
 
     // ==================== ClientboundMapItemDataPacket ====================

@@ -67,9 +67,9 @@ public class BlockDoubleSlabRedSandstone extends BlockSolidMeta {
     @Override
     public Item[] getDrops(Item item) {
         if (item.isPickaxe()) {
-            return new Item[]{
-                    Item.get(Item.RED_SANDSTONE_SLAB, this.getDamage() & 0x07, 2)
-            };
+            Item slab = toItem();
+            slab.setCount(2);
+            return new Item[]{ slab };
         } else {
             return Item.EMPTY_ARRAY;
         }
