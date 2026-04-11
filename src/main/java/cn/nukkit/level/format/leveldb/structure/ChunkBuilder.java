@@ -123,7 +123,7 @@ public class ChunkBuilder {
     public LevelDBChunk build() {
         Preconditions.checkNotNull(provider);
         if (state == null) state = ChunkState.NEW;
-        if (sections == null) sections = new ChunkSection[provider.getLevel().getDimensionData().getHeight()];
+        if (sections == null) sections = new ChunkSection[provider.getLevel().getDimensionData().getHeight() >> 4];
         if (heightMap == null) heightMap = new int[256];
         if (entities == null) entities = new ArrayList<>();
         if (blockEntities == null) blockEntities = new ArrayList<>();

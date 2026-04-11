@@ -3029,6 +3029,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+        if (this.protocol >= ProtocolInfo.v1_18_30) {
+            DimensionDataPacket dimensionDataPacket = DimensionDataPacket.createIfModified();
+            if (dimensionDataPacket != null) {
+                this.forceDataPacket(dimensionDataPacket, null);
+            }
+        }
+
         StartGamePacket startGamePacket = new StartGamePacket();
         startGamePacket.entityUniqueId = this.id;
         startGamePacket.entityRuntimeId = this.id;
