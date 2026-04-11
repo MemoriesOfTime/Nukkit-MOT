@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -91,7 +92,7 @@ public class ItemDye extends Item {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return this.getDamage() < 20 || protocolId >= ProtocolInfo.v1_17_0;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return this.getDamage() < 20 || protocolId.getProtocol() >= ProtocolInfo.v1_17_0;
     }
 }

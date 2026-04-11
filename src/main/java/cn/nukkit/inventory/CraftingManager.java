@@ -735,14 +735,14 @@ public class CraftingManager {
             if (recipe instanceof ShapedRecipe shapedRecipe) {
                 boolean isSupported = true;
                 for (Item item : shapedRecipe.getAllResults()) {
-                    if (!item.isSupportedOn(protocol)) {
+                    if (!item.isSupportedOn(gameVersion)) {
                         isSupported = false;
                         break;
                     }
                 }
                 if (isSupported) {
                     for (Item ingredient : shapedRecipe.getIngredientList()) {
-                        if (!ingredient.isSupportedOn(protocol)) {
+                        if (!ingredient.isSupportedOn(gameVersion)) {
                             isSupported = false;
                             break;
                         }
@@ -753,12 +753,12 @@ public class CraftingManager {
                 }
             } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
                 boolean isSupported = true;
-                if (!shapelessRecipe.getResult().isSupportedOn(protocol)) {
+                if (!shapelessRecipe.getResult().isSupportedOn(gameVersion)) {
                     isSupported = false;
                 }
                 if (isSupported) {
                     for (Item ingredient : shapelessRecipe.getIngredientList()) {
-                        if (!ingredient.isSupportedOn(protocol)) {
+                        if (!ingredient.isSupportedOn(gameVersion)) {
                             isSupported = false;
                             break;
                         }
@@ -771,45 +771,45 @@ public class CraftingManager {
         }
         if (protocol >= ProtocolInfo.v1_20_0_23) {
             for (SmithingRecipe recipe : this.getSmithingRecipes().values()) {
-                if (recipe.getIngredient().isSupportedOn(protocol)
-                        && recipe.getEquipment().isSupportedOn(protocol)
-                        && recipe.getTemplate().isSupportedOn(protocol)
-                        && recipe.getResult().isSupportedOn(protocol)) {
+                if (recipe.getIngredient().isSupportedOn(gameVersion)
+                        && recipe.getEquipment().isSupportedOn(gameVersion)
+                        && recipe.getTemplate().isSupportedOn(gameVersion)
+                        && recipe.getResult().isSupportedOn(gameVersion)) {
                     pk.addShapelessRecipe(recipe);
                 }
             }
         }
         for (StonecutterRecipe recipe : this.getStonecutterRecipes()) {
-            if (recipe.getIngredient().isSupportedOn(protocol) && recipe.getResult().isSupportedOn(protocol)) {
+            if (recipe.getIngredient().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
                 pk.addStonecutterRecipe(recipe);
             }
         }
         //TODO Fix 1.10.0 - 1.14.0 client crash
         if (protocol < ProtocolInfo.v1_10_0 || protocol > ProtocolInfo.v1_13_0) {
             for (FurnaceRecipe recipe : this.getFurnaceRecipes().values()) {
-                if (recipe.getInput().isSupportedOn(protocol) && recipe.getResult().isSupportedOn(protocol)) {
+                if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
                     pk.addFurnaceRecipe(recipe);
                 }
             }
         }
         if (protocol >= ProtocolInfo.v1_13_0) {
             for (BrewingRecipe recipe : this.getBrewingRecipes().values()) {
-                if (recipe.getIngredient().isSupportedOn(protocol)
-                        && recipe.getInput().isSupportedOn(protocol)
-                        && recipe.getResult().isSupportedOn(protocol)) {
+                if (recipe.getIngredient().isSupportedOn(gameVersion)
+                        && recipe.getInput().isSupportedOn(gameVersion)
+                        && recipe.getResult().isSupportedOn(gameVersion)) {
                     pk.addBrewingRecipe(recipe);
                 }
             }
             for (ContainerRecipe recipe : this.getContainerRecipes().values()) {
-                if (recipe.getIngredient().isSupportedOn(protocol)
-                        && recipe.getInput().isSupportedOn(protocol)
-                        && recipe.getResult().isSupportedOn(protocol)) {
+                if (recipe.getIngredient().isSupportedOn(gameVersion)
+                        && recipe.getInput().isSupportedOn(gameVersion)
+                        && recipe.getResult().isSupportedOn(gameVersion)) {
                     pk.addContainerRecipe(recipe);
                 }
             }
             if (protocol >= ProtocolInfo.v1_16_0) {
                 for (MultiRecipe recipe : this.getMultiRecipes().values()) {
-                    if (recipe.isSupportedOn(protocol)) {
+                    if (recipe.isSupportedOn(gameVersion)) {
                         pk.addMultiRecipe(recipe);
                     }
                 }

@@ -17,7 +17,7 @@
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
 
         <!-- Main -->
-        <log4j2.version>2.25.3</log4j2.version>
+        <log4j2.version>2.25.4</log4j2.version>
         <jline.version>3.30.6</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.10</leveldb-mcpe-jni.version>

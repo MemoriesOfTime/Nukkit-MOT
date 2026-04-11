@@ -7,7 +7,7 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockDoubleSlabBlackstonePolished extends BlockSolid {
     public BlockDoubleSlabBlackstonePolished() {
-        
+
     }
 
     @Override
@@ -44,7 +44,7 @@ public class BlockDoubleSlabBlackstonePolished extends BlockSolid {
     public Item toItem() {
         return new ItemBlock(Block.get(POLISHED_BLACKSTONE_SLAB), this.getDamage() & 0x07);
     }
-    
+
     @Override
     public Item[] getDrops(Item item) {
         if (item.isPickaxe()) {
@@ -55,7 +55,7 @@ public class BlockDoubleSlabBlackstonePolished extends BlockSolid {
             return Item.EMPTY_ARRAY;
         }
     }
-    
+
     @Override
     public BlockColor getColor() {
         return BlockColor.BLACK_BLOCK_COLOR;

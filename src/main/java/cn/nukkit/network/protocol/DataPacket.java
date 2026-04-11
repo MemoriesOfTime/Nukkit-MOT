@@ -5,6 +5,7 @@ import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.Network;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.SnappyCompression;
 import cn.nukkit.utils.Zlib;
@@ -32,6 +33,11 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     public abstract void decode();
 
     public abstract void encode();
+
+    @Override
+    public void writeFullContainerName(FullContainerName fullContainerName) {
+        super.writeFullContainerName(fullContainerName, this.gameVersion);
+    }
 
     public final void tryEncode() {
         if (!this.isEncoded) {

@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -146,18 +147,18 @@ public class ItemSpawnEgg extends Item {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
+    public boolean isSupportedOn(GameVersion protocolId) {
         int meta = this.getDamage();
         if (meta < 138) {
             return true;
         }
         return switch (meta) {
-            case 138, 139 -> protocolId >= ProtocolInfo.v1_20_0_23;
-            case 142 -> protocolId >= ProtocolInfo.v1_20_80;
-            case 140, 144 -> protocolId >= ProtocolInfo.v1_21_0;
-            case 141, 143, 145, 146 -> protocolId >= ProtocolInfo.v1_21_50;
-            case 147 -> protocolId >= ProtocolInfo.v1_21_90;
-            case 148 -> protocolId >= ProtocolInfo.v1_21_100;
+            case 138, 139 -> protocolId.getProtocol() >= ProtocolInfo.v1_20_0_23;
+            case 142 -> protocolId.getProtocol() >= ProtocolInfo.v1_20_80;
+            case 140, 144 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_0;
+            case 141, 143, 145, 146 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_50;
+            case 147 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_90;
+            case 148 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_100;
             default -> true;
         };
     }

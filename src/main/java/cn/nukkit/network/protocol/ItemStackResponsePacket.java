@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus;
 import lombok.NoArgsConstructor;
@@ -24,17 +25,27 @@ public class ItemStackResponsePacket extends DataPacket {
             putVarInt(r.getRequestId());
             if (r.getResult() != ItemStackResponseStatus.OK) return;
             putArray(r.getContainers(), (container) -> {
-                putByte((byte) container.getContainer().getId());
+                if (this.protocol >= ProtocolInfo.v1_21_20) {
+                    writeFullContainerName(container.getContainerName() != null
+                            ? container.getContainerName()
+                            : new FullContainerName(container.getContainer(), null));
+                } else {
+                    putByte((byte) container.getContainer().getId(this.gameVersion));
+                }
                 putArray(container.getItems(), (item) -> {
                     putByte((byte) item.getSlot());
                     putByte((byte) item.getHotbarSlot());
                     putByte((byte) item.getCount());
                     putVarInt(item.getStackNetworkId());
-                    putString(item.getCustomName());
+                    if (this.protocol >= ProtocolInfo.v1_16_200) {
+                        putString(item.getCustomName());
+                    }
                     if (this.protocol >= ProtocolInfo.v1_21_50) {
                         putString(item.getFilteredCustomName());
                     }
-                    putVarInt(item.getDurabilityCorrection());
+                    if (this.protocol >= ProtocolInfo.v1_16_210) {
+                        putVarInt(item.getDurabilityCorrection());
+                    }
                 });
             });
         });
