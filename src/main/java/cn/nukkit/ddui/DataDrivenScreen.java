@@ -81,7 +81,13 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
         Integer formId = playerFormIds.get(player);
         if (formId == null) return;
 
-        PLAYER_DDUI_SCREENS.getOrDefault(player, Collections.emptyMap()).remove(formId);
+        Map<Integer, DataDrivenScreen> screens = PLAYER_DDUI_SCREENS.get(player);
+        if (screens != null) {
+            screens.remove(formId);
+            if (screens.isEmpty()) {
+                PLAYER_DDUI_SCREENS.remove(player);
+            }
+        }
         playerFormIds.remove(player);
         viewers.remove(player);
 
@@ -97,7 +103,10 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
     public static DataDrivenScreen getActiveScreen(Player player) {
         Map<Integer, DataDrivenScreen> screens = PLAYER_DDUI_SCREENS.get(player);
         if (screens == null || screens.isEmpty()) return null;
-        return screens.values().iterator().next();
+        return screens.entrySet().stream()
+                .max(Map.Entry.comparingByKey())
+                .map(Map.Entry::getValue)
+                .orElse(null);
     }
 
     public static DataDrivenScreen getScreenByFormId(Player player, int formId) {
@@ -107,7 +116,13 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
     public void removeViewer(Player player) {
         Integer formId = playerFormIds.get(player);
         if (formId != null) {
-            PLAYER_DDUI_SCREENS.getOrDefault(player, Collections.emptyMap()).remove(formId);
+            Map<Integer, DataDrivenScreen> screens = PLAYER_DDUI_SCREENS.get(player);
+            if (screens != null) {
+                screens.remove(formId);
+                if (screens.isEmpty()) {
+                    PLAYER_DDUI_SCREENS.remove(player);
+                }
+            }
             playerFormIds.remove(player);
         }
         viewers.remove(player);
