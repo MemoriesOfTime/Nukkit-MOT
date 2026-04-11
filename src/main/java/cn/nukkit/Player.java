@@ -6127,6 +6127,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.extinguish();
             this.health = 0;
+            this.removeAllEffects(EntityPotionEffectEvent.Cause.DEATH);
             this.scheduleUpdate();
             this.timeSinceRest = 0;
 
