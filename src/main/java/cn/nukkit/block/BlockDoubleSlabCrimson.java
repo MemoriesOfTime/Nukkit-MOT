@@ -6,7 +6,7 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockDoubleSlabCrimson extends BlockSolid {
     public BlockDoubleSlabCrimson() {
-        
+
     }
 
     @Override
@@ -33,18 +33,14 @@ public class BlockDoubleSlabCrimson extends BlockSolid {
     public Item toItem() {
         return new ItemBlock(Block.get(CRIMSON_SLAB), this.getDamage() & 0x07);
     }
-    
+
     @Override
     public Item[] getDrops(Item item) {
-        if (item.isPickaxe()) {
-            Item slab = toItem();
-            slab.setCount(2);
-            return new Item[]{ slab };
-        } else {
-            return Item.EMPTY_ARRAY;
-        }
+        Item slab = toItem();
+        slab.setCount(2);
+        return new Item[]{ slab };
     }
-    
+
     @Override
     public BlockColor getColor() {
         return BlockColor.CRIMSON_STEM_BLOCK_COLOR;
