@@ -1,5 +1,6 @@
 package cn.nukkit.inventory;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -76,7 +77,7 @@ public class MultiRecipe implements Recipe {
         return new ShapelessRecipe(outputItem, inputs);
     }
 
-    public boolean isSupportedOn(int protocol) {
-        return protocol >= ProtocolInfo.v1_16_0;
+    public boolean isSupportedOn(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_16_0;
     }
 }

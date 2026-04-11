@@ -1,7 +1,6 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
-import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
 import java.util.ArrayList;
@@ -26,7 +25,7 @@ public class ItemStackRequestPacket extends DataPacket {
 
     @Override
     public void decode() {
-        requests.addAll(List.of(getArray(ItemStackRequest.class, BinaryStream::readItemStackRequest)));
+        requests.addAll(List.of(getArray(ItemStackRequest.class, stream -> stream.readItemStackRequest(this.gameVersion))));
     }
 
     @Override

@@ -1,5 +1,6 @@
 package cn.nukkit.inventory.special;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.inventory.MultiRecipe;
@@ -39,7 +40,7 @@ public class DecoratedPotRecipe extends MultiRecipe {
     }
 
     @Override
-    public boolean isSupportedOn(int protocol) {
-        return protocol >= ProtocolInfo.v1_20_0;
+    public boolean isSupportedOn(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_20_0;
     }
 }
