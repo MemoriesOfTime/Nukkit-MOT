@@ -162,6 +162,22 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersionsRange(ProtocolInfo.v1_21_50, ProtocolInfo.v1_21_80);
     }
 
+    static Stream<Arguments> versionsV712ToV748() {
+        return filteredVersionsRange(ProtocolInfo.v1_21_20, ProtocolInfo.v1_21_40);
+    }
+
+    static Stream<Arguments> versionsAtV662() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_20_70));
+    }
+
+    static Stream<Arguments> versionsAtV527() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_19_0));
+    }
+
+    static Stream<Arguments> versionsAtV944() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_26_10));
+    }
+
     // ==================== NetworkStackLatencyPacket ====================
 
     @ParameterizedTest(name = "NetworkStackLatencyPacket pre-v332 v{0}")
@@ -2418,9 +2434,228 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(2, itemUse.face.getIndex());
         assertEquals(1, itemUse.hotbarSlot);
         assertEquals(42, itemUse.blockRuntimeId);
+        assertEquals(1.25f, itemUse.playerPos.x, 0.001f);
+        assertEquals(64.0f, itemUse.playerPos.y, 0.001f);
+        assertEquals(-3.5f, itemUse.playerPos.z, 0.001f);
+        assertEquals(0.5f, itemUse.clickPos.x, 0.001f);
+        assertEquals(1.0f, itemUse.clickPos.y, 0.001f);
+        assertEquals(0.25f, itemUse.clickPos.z, 0.001f);
+        assertNotNull(itemUse.itemInHand);
+        assertTrue(itemUse.itemInHand.isNull());
         assertNotNull(nk.getItemStackRequest());
         assertEquals(77, nk.getItemStackRequest().getRequestId());
         assertEquals(1, nk.getBlockActionData().size());
+        assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with item interaction triggerType and clientInteractPrediction")
+    @MethodSource("versionsV712ToV748")
+    void playerAuthInputWithItemInteractionV712(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket();
+        cb.setRotation(Vector3f.from(10.5f, 20.5f, 30.5f));
+        cb.setPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        cb.setMotion(org.cloudburstmc.math.vector.Vector2f.from(0.25f, -0.5f));
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.UP);
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.PERFORM_ITEM_INTERACTION);
+        cb.setInputMode(org.cloudburstmc.protocol.bedrock.data.InputMode.TOUCH);
+        cb.setPlayMode(org.cloudburstmc.protocol.bedrock.data.ClientPlayMode.NORMAL);
+        cb.setInputInteractionModel(org.cloudburstmc.protocol.bedrock.data.InputInteractionModel.CROSSHAIR);
+        cb.setTick(123L);
+        cb.setDelta(Vector3f.from(0.1f, 0.2f, 0.3f));
+        cb.setAnalogMoveVector(org.cloudburstmc.math.vector.Vector2f.from(0.6f, -0.4f));
+
+        var itemUseTransaction = new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction();
+        itemUseTransaction.setLegacyRequestId(0);
+        itemUseTransaction.getActions().add(new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryActionData(
+                org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventorySource.fromContainerWindowId(0),
+                2,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR
+        ));
+        itemUseTransaction.setActionType(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR);
+        itemUseTransaction.setTriggerType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.TriggerType.PLAYER_INPUT);
+        itemUseTransaction.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(5, 60, -10));
+        itemUseTransaction.setBlockFace(0);
+        itemUseTransaction.setHotbarSlot(3);
+        itemUseTransaction.setItemInHand(org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR);
+        itemUseTransaction.setPlayerPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        itemUseTransaction.setClickPosition(Vector3f.from(0.5f, 0.5f, 0.5f));
+        itemUseTransaction.setBlockDefinition(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                "test:block_7",
+                7,
+                org.cloudburstmc.nbt.NbtMap.EMPTY
+        ));
+        itemUseTransaction.setClientInteractPrediction(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.PredictedResult.SUCCESS);
+        cb.setItemUseTransaction(itemUseTransaction);
+
+        PlayerAuthInputPacket nk = crossEncode(cb, PlayerAuthInputPacket::new, protocol, helper -> helper.setBlockDefinitions(
+                org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                        .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder()
+                        .add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                                "test:block_7",
+                                7,
+                                org.cloudburstmc.nbt.NbtMap.EMPTY
+                        ))
+                        .build()
+        ));
+
+        assertTrue(nk.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.PERFORM_ITEM_INTERACTION));
+        assertNotNull(nk.getItemUseTransaction());
+        assertEquals(InventoryTransactionPacket.TYPE_USE_ITEM, nk.getItemUseTransaction().transactionType);
+        assertInstanceOf(UseItemData.class, nk.getItemUseTransaction().transactionData);
+        var itemUse = (UseItemData) nk.getItemUseTransaction().transactionData;
+        assertEquals(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR, itemUse.actionType);
+        assertEquals(1, itemUse.triggerType); // PLAYER_INPUT ordinal
+        assertEquals(5, itemUse.blockPos.x);
+        assertEquals(60, itemUse.blockPos.y);
+        assertEquals(-10, itemUse.blockPos.z);
+        assertEquals(3, itemUse.hotbarSlot);
+        assertEquals(1.25f, itemUse.playerPos.x, 0.001f);
+        assertEquals(64.0f, itemUse.playerPos.y, 0.001f);
+        assertEquals(-3.5f, itemUse.playerPos.z, 0.001f);
+        assertEquals(0.5f, itemUse.clickPos.x, 0.001f);
+        assertEquals(0.5f, itemUse.clickPos.y, 0.001f);
+        assertEquals(0.5f, itemUse.clickPos.z, 0.001f);
+        assertEquals(7, itemUse.blockRuntimeId);
+        assertEquals(1, itemUse.clientInteractPrediction); // SUCCESS ordinal
+        assertNotNull(itemUse.itemInHand);
+        assertTrue(itemUse.itemInHand.isNull());
+        assertNotNull(nk.getAnalogMoveVector());
+        assertEquals(0.6f, nk.getAnalogMoveVector().x, 0.001f);
+        assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with item interaction clientCooldownState")
+    @MethodSource("versionsAtV944")
+    void playerAuthInputWithItemInteractionV944(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket();
+        cb.setRotation(Vector3f.from(10.5f, 20.5f, 30.5f));
+        cb.setPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        cb.setMotion(org.cloudburstmc.math.vector.Vector2f.from(0.25f, -0.5f));
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.UP);
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.PERFORM_ITEM_INTERACTION);
+        cb.setInputMode(org.cloudburstmc.protocol.bedrock.data.InputMode.TOUCH);
+        cb.setPlayMode(org.cloudburstmc.protocol.bedrock.data.ClientPlayMode.NORMAL);
+        cb.setInputInteractionModel(org.cloudburstmc.protocol.bedrock.data.InputInteractionModel.CROSSHAIR);
+        cb.setInteractRotation(org.cloudburstmc.math.vector.Vector2f.from(5.0f, 6.0f));
+        cb.setTick(123L);
+        cb.setDelta(Vector3f.from(0.1f, 0.2f, 0.3f));
+        cb.setAnalogMoveVector(org.cloudburstmc.math.vector.Vector2f.from(0.6f, -0.4f));
+        cb.setCameraOrientation(Vector3f.from(0.0f, 1.0f, 0.0f));
+        cb.setRawMoveVector(org.cloudburstmc.math.vector.Vector2f.from(-0.25f, 0.75f));
+
+        var itemUseTransaction = new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction();
+        itemUseTransaction.setLegacyRequestId(0);
+        itemUseTransaction.getActions().add(new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryActionData(
+                org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventorySource.fromContainerWindowId(0),
+                0,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR
+        ));
+        itemUseTransaction.setActionType(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK);
+        itemUseTransaction.setTriggerType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.TriggerType.SIMULATION_TICK);
+        itemUseTransaction.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(10, 50, 20));
+        itemUseTransaction.setBlockFace(1);
+        itemUseTransaction.setHotbarSlot(0);
+        itemUseTransaction.setItemInHand(org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR);
+        itemUseTransaction.setPlayerPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        itemUseTransaction.setClickPosition(Vector3f.from(0.5f, 1.0f, 0.25f));
+        itemUseTransaction.setBlockDefinition(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                "test:block_42",
+                42,
+                org.cloudburstmc.nbt.NbtMap.EMPTY
+        ));
+        itemUseTransaction.setClientInteractPrediction(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.PredictedResult.FAILURE);
+        itemUseTransaction.setClientCooldownState(5);
+        cb.setItemUseTransaction(itemUseTransaction);
+
+        PlayerAuthInputPacket nk = crossEncode(cb, PlayerAuthInputPacket::new, protocol, helper -> helper.setBlockDefinitions(
+                org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                        .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder()
+                        .add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                                "test:block_42",
+                                42,
+                                org.cloudburstmc.nbt.NbtMap.EMPTY
+                        ))
+                        .build()
+        ));
+
+        assertNotNull(nk.getItemUseTransaction());
+        assertInstanceOf(UseItemData.class, nk.getItemUseTransaction().transactionData);
+        var itemUse = (UseItemData) nk.getItemUseTransaction().transactionData;
+        assertEquals(2, itemUse.triggerType); // SIMULATION_TICK ordinal
+        assertEquals(0, itemUse.clientInteractPrediction); // FAILURE ordinal
+        assertEquals((byte) 5, itemUse.clientCooldownState);
+        assertEquals(10, itemUse.blockPos.x);
+        assertEquals(50, itemUse.blockPos.y);
+        assertEquals(20, itemUse.blockPos.z);
+        assertEquals(1.25f, itemUse.playerPos.x, 0.001f);
+        assertEquals(64.0f, itemUse.playerPos.y, 0.001f);
+        assertEquals(-3.5f, itemUse.playerPos.z, 0.001f);
+        assertEquals(0.5f, itemUse.clickPos.x, 0.001f);
+        assertEquals(1.0f, itemUse.clickPos.y, 0.001f);
+        assertEquals(0.25f, itemUse.clickPos.z, 0.001f);
+        assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with vehicle prediction")
+    @MethodSource("versionsAtV662")
+    void playerAuthInputWithVehiclePrediction(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket();
+        cb.setRotation(Vector3f.from(10.5f, 20.5f, 30.5f));
+        cb.setPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        cb.setMotion(org.cloudburstmc.math.vector.Vector2f.from(0.25f, -0.5f));
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.UP);
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.IN_CLIENT_PREDICTED_IN_VEHICLE);
+        cb.setInputMode(org.cloudburstmc.protocol.bedrock.data.InputMode.MOUSE);
+        cb.setPlayMode(org.cloudburstmc.protocol.bedrock.data.ClientPlayMode.NORMAL);
+        cb.setInputInteractionModel(org.cloudburstmc.protocol.bedrock.data.InputInteractionModel.CLASSIC);
+        cb.setTick(999L);
+        cb.setDelta(Vector3f.from(0.0f, 0.0f, 0.0f));
+        cb.setVehicleRotation(org.cloudburstmc.math.vector.Vector2f.from(45.0f, -30.0f));
+        cb.setPredictedVehicle(12345L);
+        cb.setAnalogMoveVector(org.cloudburstmc.math.vector.Vector2f.from(0.8f, 0.2f));
+
+        PlayerAuthInputPacket nk = crossEncode(cb, PlayerAuthInputPacket::new, protocol);
+
+        assertTrue(nk.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE));
+        assertNotNull(nk.getVehicleRotation());
+        assertEquals(45.0f, nk.getVehicleRotation().x, 0.001f);
+        assertEquals(-30.0f, nk.getVehicleRotation().y, 0.001f);
+        assertEquals(12345L, nk.getPredictedVehicle());
+        assertNotNull(nk.getAnalogMoveVector());
+        assertEquals(0.8f, nk.getAnalogMoveVector().x, 0.001f);
+        assertEquals(0.2f, nk.getAnalogMoveVector().y, 0.001f);
+        assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with VR gaze direction")
+    @MethodSource("versionsAtV527")
+    void playerAuthInputVRMode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket();
+        cb.setRotation(Vector3f.from(15.0f, 25.0f, 35.0f));
+        cb.setPosition(Vector3f.from(2.0f, 65.0f, -4.0f));
+        cb.setMotion(org.cloudburstmc.math.vector.Vector2f.from(0.5f, -0.3f));
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.JUMPING);
+        cb.setInputMode(org.cloudburstmc.protocol.bedrock.data.InputMode.MOUSE);
+        cb.setPlayMode(org.cloudburstmc.protocol.bedrock.data.ClientPlayMode.REALITY);
+        cb.setInputInteractionModel(org.cloudburstmc.protocol.bedrock.data.InputInteractionModel.CLASSIC);
+        cb.setVrGazeDirection(Vector3f.from(1.0f, 0.0f, 0.0f));
+        cb.setTick(50L);
+        cb.setDelta(Vector3f.from(0.0f, 0.1f, 0.0f));
+
+        PlayerAuthInputPacket nk = crossEncode(cb, PlayerAuthInputPacket::new, protocol);
+
+        assertEquals(15.0f, nk.getPitch(), 0.001f);
+        assertEquals(25.0f, nk.getYaw(), 0.001f);
+        assertEquals(35.0f, nk.getHeadYaw(), 0.001f);
+        assertTrue(nk.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.JUMPING));
+        assertEquals(cn.nukkit.network.protocol.types.ClientPlayMode.REALITY, nk.getPlayMode());
+        assertNotNull(nk.getVrGazeDirection());
+        assertEquals(1.0f, nk.getVrGazeDirection().x, 0.001f);
+        assertEquals(0.0f, nk.getVrGazeDirection().y, 0.001f);
+        assertEquals(0.0f, nk.getVrGazeDirection().z, 0.001f);
+        assertEquals(50L, nk.getTick());
         assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
     }
 

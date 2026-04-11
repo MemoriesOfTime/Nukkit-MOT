@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector2f;
@@ -41,6 +42,7 @@ public class PlayerAuthInputPacket extends DataPacket {
     /**
      * netease only
      */
+    @OnlyNetEase
     private boolean cameraDeparted;
     private InventoryTransactionPacket itemUseTransaction;
     private ItemStackRequest itemStackRequest;
