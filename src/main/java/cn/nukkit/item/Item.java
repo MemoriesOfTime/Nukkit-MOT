@@ -1931,10 +1931,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * @return 是否支持 whether supported
      */
     public boolean isSupportedOn(GameVersion protocolId) {
-        return this.isSupportedOnMapping(protocolId);
-    }
-
-    private boolean isSupportedOnMapping(GameVersion protocolId) {
         int itemId = this.getId();
         if (itemId == AIR) {
             return true;
