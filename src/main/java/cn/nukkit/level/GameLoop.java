@@ -3,10 +3,8 @@ package cn.nukkit.level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
-import java.util.function.Consumer;
 
 /**
  * Independent game loop for Level parallel ticking.
@@ -19,7 +17,7 @@ public final class GameLoop {
 
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final Runnable onStart;
-    private final Consumer<GameLoop> onTick;
+    private final GameLoopTickCallback onTickCallback;
     private final Runnable onIdle;
     private final Runnable onStop;
     private volatile Thread loopThread;
@@ -29,21 +27,21 @@ public final class GameLoop {
     private int ringIndex;
     private long tick;
 
-    private GameLoop(Runnable onStart, Consumer<GameLoop> onTick,
+    private GameLoop(Runnable onStart, GameLoopTickCallback onTick,
                      Runnable onIdle, Runnable onStop,
                      int loopCountPerSec, long currentTick) {
         if (loopCountPerSec <= 0) {
             throw new IllegalArgumentException("loopCountPerSec must be > 0");
         }
         this.onStart = onStart;
-        this.onTick = onTick;
+        this.onTickCallback = onTick;
         this.onIdle = onIdle;
         this.onStop = onStop;
         this.loopCountPerSec = loopCountPerSec;
         this.tick = currentTick;
         this.tickSummary = new float[loopCountPerSec];
         this.msptSummary = new float[loopCountPerSec];
-        Arrays.fill(tickSummary, loopCountPerSec);
+        // Default to 0; getTPS/getMSPT skip unset entries
     }
 
     public static GameLoopBuilder builder() {
@@ -57,17 +55,19 @@ public final class GameLoop {
         long idealNanoPerTick = 1_000_000_000L / loopCountPerSec;
         while (running.get()) {
             long startTime = System.nanoTime();
+            long elapsedNanos = -1;
             try {
-                onTick.accept(this);
+                elapsedNanos = (long) onTickCallback.onTick(this, startTime);
             } catch (Exception e) {
                 log.error("Exception in game loop tick " + tick, e);
             }
-            tick++;
-            long elapsed = System.nanoTime() - startTime;
-            updateTPS(elapsed);
-            updateMSPT(elapsed);
+            if (elapsedNanos >= 0) {
+                tick++;
+                updateTPS(elapsedNanos);
+                updateMSPT(elapsedNanos);
+            }
 
-            nanoSleepTime += idealNanoPerTick - elapsed;
+            nanoSleepTime += idealNanoPerTick - (elapsedNanos >= 0 ? elapsedNanos : 0);
             // Limit catch-up to 1 tick to prevent burst after lag spikes
             nanoSleepTime = Math.max(nanoSleepTime, -idealNanoPerTick);
             while (nanoSleepTime > 0 && running.get()) {
@@ -105,18 +105,20 @@ public final class GameLoop {
 
     public float getTPS() {
         float sum = 0;
+        int count = 0;
         for (float t : tickSummary) {
-            sum += t;
+            if (t > 0) { sum += t; count++; }
         }
-        return sum / tickSummary.length;
+        return count > 0 ? sum / count : 0;
     }
 
     public float getMSPT() {
         float sum = 0;
+        int count = 0;
         for (float m : msptSummary) {
-            sum += m;
+            if (m > 0) { sum += m; count++; }
         }
-        return sum / msptSummary.length;
+        return count > 0 ? sum / count : 0;
     }
 
     public float getTickUsage() {
@@ -136,7 +138,7 @@ public final class GameLoop {
 
     public static class GameLoopBuilder {
         private Runnable onStart = () -> {};
-        private Consumer<GameLoop> onTick = gl -> {};
+        private GameLoopTickCallback onTick = (gl, startNanos) -> 0L;
         private Runnable onIdle;
         private Runnable onStop = () -> {};
         private int loopCountPerSec = 20;
@@ -147,7 +149,7 @@ public final class GameLoop {
             return this;
         }
 
-        public GameLoopBuilder onTick(Consumer<GameLoop> onTick) {
+        public GameLoopBuilder onTick(GameLoopTickCallback onTick) {
             this.onTick = onTick;
             return this;
         }
@@ -175,5 +177,14 @@ public final class GameLoop {
         public GameLoop build() {
             return new GameLoop(onStart, onTick, onIdle, onStop, loopCountPerSec, currentTick);
         }
+    }
+
+    /**
+     * Callback for game loop tick.
+     * @return elapsed nanoseconds, or negative value to skip TPS/MSPT update
+     */
+    @FunctionalInterface
+    public interface GameLoopTickCallback {
+        long onTick(GameLoop loop, long startNanos);
     }
 }

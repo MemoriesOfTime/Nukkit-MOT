@@ -121,10 +121,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -1138,11 +1135,19 @@ public class Server {
 
         log.info("Saving levels...");
 
+        List<CompletableFuture<java.lang.Void>> saveFutures = new ArrayList<>();
         for (Level level : this.levelArray) {
             if (this.parallelLevelTick && level.isParallelTickEnabled()) {
-                level.scheduleSyncTask(() -> level.save());
+                saveFutures.add(level.scheduleSyncTaskAndWait(() -> level.save()));
             } else {
                 level.save();
+            }
+        }
+        for (CompletableFuture<java.lang.Void> future : saveFutures) {
+            try {
+                future.get(30, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                log.error("Failed to wait for level save during reload", e);
             }
         }
 
@@ -3368,6 +3373,10 @@ public class Server {
         this.alwaysTickPlayers = config.performanceSettings().alwaysTickPlayers();
         this.baseTickRate = config.performanceSettings().baseTickRate();
         this.parallelLevelTick = config.performanceSettings().parallelLevelTick();
+        if (this.parallelLevelTick) {
+            log.warn("Parallel level ticking is enabled (experimental). " +
+                    "Plugins expecting main-thread event execution may behave unexpectedly.");
+        }
         this.doLevelGC = config.performanceSettings().doLevelGc();
         this.enableSpark = config.performanceSettings().enableSpark();
         this.levelDbCache = config.performanceSettings().leveldbCacheMb();

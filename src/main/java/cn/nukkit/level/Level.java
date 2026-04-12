@@ -67,7 +67,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -329,7 +328,7 @@ public class Level implements ChunkManager, Metadatable {
     private static final int LCG_CONSTANT = 1013904223;
 
     private int tickRate;
-    public int tickRateTime = 0;
+    public volatile int tickRateTime = 0;
     public int tickRateCounter = 0;
 
     // Notice: These shouldn't be used in the internal methods
@@ -364,7 +363,7 @@ public class Level implements ChunkManager, Metadatable {
     private boolean thundering;
     private int thunderTime;
 
-    private long levelCurrentTick;
+    private volatile long levelCurrentTick;
 
     private DimensionData dimensionData;
 
@@ -382,10 +381,11 @@ public class Level implements ChunkManager, Metadatable {
 
     // === Parallel level tick fields ===
     private volatile boolean parallelTickEnabled;
+    private volatile boolean intentionalStop;
     private GameLoop gameLoop;
     private volatile Thread levelThread;
-    private final Queue<Runnable> syncTaskQueue = PlatformDependent.newMpscQueue();
-    private final Queue<SyncPacketEntry> syncPacketQueue = PlatformDependent.newMpscQueue();
+    private final Queue<Runnable> syncTaskQueue = new ConcurrentLinkedQueue<>();
+    private final Queue<SyncPacketEntry> syncPacketQueue = new ConcurrentLinkedQueue<>();
 
     // 用于实现世界监听的回调
     private static final AtomicInteger callbackIdCounter = new AtomicInteger();
@@ -599,14 +599,21 @@ public class Level implements ChunkManager, Metadatable {
     public void startLevelThread() {
         if (this.parallelTickEnabled) return;
         this.parallelTickEnabled = true;
+        this.intentionalStop = false;
         this.gameLoop = GameLoop.builder()
                 .currentTick(this.levelCurrentTick)
                 .onStart(() -> server.getLogger().info("Level thread started: " + this.getName()))
-                .onTick(loop -> this.levelThreadTick((int) loop.getTick()))
+                .onTick((loop, startNanos) -> this.levelThreadTick((int) loop.getTick(), startNanos))
                 .onIdle(this::handleSyncPackets)
                 .onStop(() -> {
                     this.parallelTickEnabled = false;
-                    server.getLogger().info("Level thread stopped: " + this.getName());
+                    if (!this.intentionalStop) {
+                        server.getLogger().error("Level thread for '" + this.getName()
+                                + "' stopped unexpectedly! This world is no longer ticking.");
+                    } else {
+                        server.getLogger().info("Level thread stopped: " + this.getName());
+                    }
+                    this.intentionalStop = false;
                 })
                 .build();
         this.levelThread = new Thread(gameLoop::startLoop, "Level Thread - " + this.getName());
@@ -616,6 +623,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public void stopLevelThread() {
         if (this.gameLoop != null && this.gameLoop.isRunning()) {
+            this.intentionalStop = true;
             this.gameLoop.stop();
             try {
                 this.levelThread.join(5000);
@@ -629,14 +637,26 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
-    private void levelThreadTick(int currentTick) {
+    /**
+     * @return elapsed nanoseconds if tick executed, or -1 if skipped (tick rate limiting)
+     */
+    private long levelThreadTick(int currentTick, long startNanos) {
         processScheduledTasks();
-        handleSyncPackets();
+        handleSyncPackets(); // Process queued packets at tick start; GameLoop onIdle also calls this to reduce latency
+
+        // Tick rate limiting
+        if (this.tickRate > 1 && --this.tickRateCounter > 0) {
+            return -1;
+        }
+        if (this.tickRate > 1) {
+            this.tickRateCounter = this.tickRate;
+        }
+
         this.providerLock.readLock().lock();
         try {
             if (this.getProvider() == null) {
                 this.gameLoop.stop();
-                return;
+                return -1;
             }
             long start = System.currentTimeMillis();
             this.doTick(currentTick);
@@ -644,6 +664,7 @@ public class Level implements ChunkManager, Metadatable {
         } finally {
             this.providerLock.readLock().unlock();
         }
+        return System.nanoTime() - startNanos;
     }
 
     private void processScheduledTasks() {
@@ -657,8 +678,8 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
-    public void addSyncPacketToQueue(Player player, DataPacket packet, long time) {
-        this.syncPacketQueue.offer(new SyncPacketEntry(player, packet, time));
+    public void addSyncPacketToQueue(Player player, DataPacket packet) {
+        this.syncPacketQueue.offer(new SyncPacketEntry(player, packet));
         if (this.gameLoop != null) this.gameLoop.wakeUp();
     }
 
@@ -681,6 +702,24 @@ public class Level implements ChunkManager, Metadatable {
     public void scheduleSyncTask(Runnable task) {
         syncTaskQueue.offer(task);
         if (gameLoop != null) gameLoop.wakeUp();
+    }
+
+    public CompletableFuture<Void> scheduleSyncTaskAndWait(Runnable task) {
+        if (!this.parallelTickEnabled || Thread.currentThread() == this.levelThread) {
+            task.run();
+            return CompletableFuture.completedFuture(null);
+        }
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        syncTaskQueue.offer(() -> {
+            try {
+                task.run();
+                future.complete(null);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        if (gameLoop != null) gameLoop.wakeUp();
+        return future;
     }
 
     public boolean isOwnThread() {
@@ -5545,5 +5584,5 @@ public class Level implements ChunkManager, Metadatable {
         private BlockFace neighbor;
     }
 
-    private record SyncPacketEntry(Player player, DataPacket packet, long time) {}
+    private record SyncPacketEntry(Player player, DataPacket packet) {}
 }
