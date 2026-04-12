@@ -239,14 +239,7 @@ public class StatusCommand extends VanillaCommand {
                     TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
 
             for (Level level : server.getLevels().values()) {
-                sender.sendMessage(
-                        TextFormat.GOLD + "World \"" + level.getFolderName() + "\"" + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": " +
-                                TextFormat.RED + level.getChunks().size() + TextFormat.GREEN + " chunks, " +
-                                TextFormat.RED + level.getEntities().length + TextFormat.GREEN + " entities, " +
-                                TextFormat.RED + level.getBlockEntities().size() + TextFormat.GREEN + " blockEntities." +
-                                " Time " + ((level.getTickRate() > 1 || level.getTickRateTime() > 40) ? TextFormat.RED : TextFormat.YELLOW) + NukkitMath.round(level.getTickRateTime(), 2) + "ms" +
-                                (level.getTickRate() > 1 ? " (tick rate " + (19 - level.getTickRate()) + ")" : "")
-                );
+                sender.sendMessage(buildWorldInfo(level));
             }
         } else {
             // 完整模式
@@ -278,14 +271,7 @@ public class StatusCommand extends VanillaCommand {
                         TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
                 // 各个世界的情况
                 for (Level level : server.getLevels().values()) {
-                    sender.sendMessage(
-                            TextFormat.GOLD + "World \"" + level.getFolderName() + "\"" + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": " +
-                                    TextFormat.RED + level.getChunks().size() + TextFormat.GREEN + " chunks, " +
-                                    TextFormat.RED + level.getEntities().length + TextFormat.GREEN + " entities, " +
-                                    TextFormat.RED + level.getBlockEntities().size() + TextFormat.GREEN + " blockEntities." +
-                                    " Time " + ((level.getTickRate() > 1 || level.getTickRateTime() > 40) ? TextFormat.RED : TextFormat.YELLOW) + NukkitMath.round(level.getTickRateTime(), 2) + "ms" +
-                                    (level.getTickRate() > 1 ? " (tick rate " + (19 - level.getTickRate()) + ")" : "")
-                    );
+                    sender.sendMessage(buildWorldInfo(level));
                 }
                 sender.sendMessage("");
             }
@@ -393,6 +379,17 @@ public class StatusCommand extends VanillaCommand {
 
 
         return true;
+    }
+
+    private static String buildWorldInfo(Level level) {
+        return TextFormat.GOLD + "World \"" + level.getFolderName() + "\""
+                + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": "
+                + TextFormat.RED + level.getChunks().size() + TextFormat.GREEN + " chunks, "
+                + TextFormat.RED + level.getEntities().length + TextFormat.GREEN + " entities, "
+                + TextFormat.RED + level.getBlockEntities().size() + TextFormat.GREEN + " blockEntities."
+                + " Time " + ((level.getTickRate() > 1 || level.getTickRateTime() > 40) ? TextFormat.RED : TextFormat.YELLOW)
+                + NukkitMath.round(level.getTickRateTime(), 2) + "ms"
+                + (level.getTickRate() > 1 ? " (tick rate " + (19 - level.getTickRate()) + ")" : "");
     }
 
     public enum ComputerSystemEntry {
