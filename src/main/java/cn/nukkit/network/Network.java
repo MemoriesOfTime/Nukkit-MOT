@@ -582,6 +582,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.PLAYER_ENCHANT_OPTIONS_PACKET, PlayerEnchantOptionsPacket.class)
                 .registerPacket(ProtocolInfo.UPDATE_PLAYER_GAME_TYPE_PACKET, UpdatePlayerGameTypePacket.class)
                 .registerPacket(ProtocolInfo.UPDATE_ABILITIES_PACKET, UpdateAbilitiesPacket.class)
+                .registerPacket(ProtocolInfo.DIMENSION_DATA_PACKET, DimensionDataPacket.class)
                 .registerPacket(ProtocolInfo.REQUEST_ABILITY_PACKET, RequestAbilityPacket.class)
                 .registerPacket(ProtocolInfo.UPDATE_ADVENTURE_SETTINGS_PACKET, UpdateAdventureSettingsPacket.class)
                 .registerPacket(ProtocolInfo.DEATH_INFO_PACKET, DeathInfoPacket.class)

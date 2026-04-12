@@ -73,7 +73,7 @@ public class LevelDBChunk extends BaseChunk {
                 this.heightMap[i] = (short) heightmap[i];
             }
         } else {
-            Arrays.fill(this.heightMap, (short) 319);
+            Arrays.fill(this.heightMap, (short) this.dimensionData.getMaxHeight());
         }
 
         if (biomes2d != null && biomes2d.length == SUB_CHUNK_2D_SIZE) {
