@@ -498,11 +498,11 @@ public final class PlayerHandle {
         }
     }
 
-    public AsyncTask getPreLoginEventTask() {
+    public AsyncTask<?> getPreLoginEventTask() {
         return player.preLoginEventTask;
     }
 
-    public void setPreLoginEventTask(AsyncTask preLoginEventTask) {
+    public void setPreLoginEventTask(AsyncTask<?> preLoginEventTask) {
         player.preLoginEventTask = preLoginEventTask;
     }
 

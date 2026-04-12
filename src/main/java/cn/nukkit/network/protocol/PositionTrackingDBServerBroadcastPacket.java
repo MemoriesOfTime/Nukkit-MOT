@@ -120,8 +120,8 @@ public class PositionTrackingDBServerBroadcastPacket extends DataPacket {
     public void decode() {
         action = ACTIONS[getByte()];
         trackingId = getVarInt();
-        try (FastByteArrayInputStream inputStream = new FastByteArrayInputStream(get())) {
-            tag = NBTIO.readNetworkCompressed(inputStream);
+        try {
+            tag = NBTIO.readNetworkCompressed(get());
         } catch (IOException e) {
             throw new EncoderException(e);
         }

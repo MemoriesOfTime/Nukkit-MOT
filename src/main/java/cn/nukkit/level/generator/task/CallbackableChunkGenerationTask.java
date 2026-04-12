@@ -8,7 +8,7 @@ import cn.nukkit.scheduler.AsyncTask;
 
 import java.util.function.Consumer;
 
-public class CallbackableChunkGenerationTask<T> extends AsyncTask {
+public class CallbackableChunkGenerationTask<T> extends AsyncTask<Void> {
     private final Level level;
     private final T structure;
     private final Consumer<T> callback;

@@ -7,16 +7,18 @@ import java.util.LinkedList;
 /**
  * @author MagicDroidX
  * Nukkit Project
+ * @deprecated Use {@link AsyncPool} or virtual threads instead
  */
+@Deprecated
 public class AsyncWorker extends Thread implements InterruptibleThread {
 
-    private final LinkedList<AsyncTask> stack = new LinkedList<>();
+    private final LinkedList<AsyncTask<?>> stack = new LinkedList<>();
 
     public AsyncWorker() {
         this.setName("Asynchronous Worker");
     }
 
-    public void stack(AsyncTask task) {
+    public void stack(AsyncTask<?> task) {
         synchronized (stack) {
             stack.addFirst(task);
         }
@@ -28,7 +30,7 @@ public class AsyncWorker extends Thread implements InterruptibleThread {
         }
     }
 
-    public void unstack(AsyncTask task) {
+    public void unstack(AsyncTask<?> task) {
         synchronized (stack) {
             stack.remove(task);
         }
@@ -38,7 +40,7 @@ public class AsyncWorker extends Thread implements InterruptibleThread {
     public void run() {
         while (true) {
             synchronized (stack) {
-                for (AsyncTask task : stack) {
+                for (AsyncTask<?> task : stack) {
                     if (!task.isFinished()) {
                         task.run();
                     }

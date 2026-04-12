@@ -65,7 +65,7 @@ public class MapInfoRequestProcessor extends DataPacketProcessor<MapInfoRequestP
                 }
 
                 ItemMap finalMapItem = mapItem;
-                player.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
+                player.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask<Void>() {
                     @Override
                     public void onRun() {
                         finalMapItem.renderMap(player.getLevel(), (player.getFloorX() / 128) << 7, (player.getFloorZ() / 128) << 7, 1);
