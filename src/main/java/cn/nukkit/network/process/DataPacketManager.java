@@ -195,8 +195,10 @@ public final class DataPacketManager {
                 ProtocolInfo.v1_1_0,
                 CommandStepProcessor_v113.INSTANCE,
                 ContainerSetSlotProcessor_v113.INSTANCE,
+                CraftingEventProcessor_v113.INSTANCE,
                 DropItemProcessor_v113.INSTANCE,
                 InteractProcessor_v113.INSTANCE,
+                PlayerActionProcessor_v113.INSTANCE,
                 RemoveBlockProcessor_v113.INSTANCE,
                 UseItemProcessor_v113.INSTANCE
         );
