@@ -75,15 +75,11 @@ public class ConfigComments {
             String key = prefix == null ? fieldName : prefix + "." + fieldName;
             String comment = comments.getProperty(key);
             if (comment != null) {
-                String[] lines = comment.split("\n");
                 // Add blank line before top-level category sections for readability
-                if (prefix == null) {
-                    String[] withBlank = new String[lines.length + 1];
-                    withBlank[0] = "";
-                    System.arraycopy(lines, 0, withBlank, 1, lines.length);
-                    lines = withBlank;
-                }
-                field.setComment(lines);
+                String[] commentArray = prefix == null
+                        ? new String[]{"", comment}
+                        : new String[]{comment};
+                field.setComment(commentArray);
             }
         }
 
@@ -115,7 +111,7 @@ public class ConfigComments {
                 String key = prefix + "." + cached.getField().getName();
                 String comment = comments.getProperty(key);
                 if (comment != null) {
-                    cached.setComment(comment.split("\n"));
+                    cached.setComment(new String[]{comment});
                 }
             }
         } catch (ReflectiveOperationException e) {

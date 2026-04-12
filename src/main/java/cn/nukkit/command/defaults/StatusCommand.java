@@ -239,7 +239,21 @@ public class StatusCommand extends VanillaCommand {
                     TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
 
             for (Level level : server.getLevels().values()) {
-                sender.sendMessage(buildWorldInfo(level));
+                String worldInfo =
+                        TextFormat.GOLD + "World \"" + level.getFolderName() + "\"" + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": " +
+                                TextFormat.RED + level.getChunks().size() + TextFormat.GREEN + " chunks, " +
+                                TextFormat.RED + level.getEntities().length + TextFormat.GREEN + " entities, " +
+                                TextFormat.RED + level.getBlockEntities().size() + TextFormat.GREEN + " blockEntities." +
+                                " Time " + ((level.getTickRate() > 1 || level.getTickRateTime() > 40) ? TextFormat.RED : TextFormat.YELLOW) + NukkitMath.round(level.getTickRateTime(), 2) + "ms" +
+                                (level.getTickRate() > 1 ? " (tick rate " + (19 - level.getTickRate()) + ")" : "");
+                if (level.isParallelTickEnabled()) {
+                    float levelTps = level.getLevelTPS();
+                    TextFormat levelTpsColor = levelTps >= 17 ? TextFormat.GREEN : levelTps >= 12 ? TextFormat.GOLD : TextFormat.RED;
+                    worldInfo += TextFormat.AQUA + " [Parallel TPS: " + levelTpsColor + NukkitMath.round(levelTps, 2)
+                            + TextFormat.AQUA + " MSPT: " + TextFormat.YELLOW + NukkitMath.round(level.getLevelMSPT(), 2)
+                            + TextFormat.AQUA + "]";
+                }
+                sender.sendMessage(worldInfo);
             }
         } else {
             // 完整模式
@@ -271,7 +285,21 @@ public class StatusCommand extends VanillaCommand {
                         TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
                 // 各个世界的情况
                 for (Level level : server.getLevels().values()) {
-                    sender.sendMessage(buildWorldInfo(level));
+                    String worldInfo =
+                            TextFormat.GOLD + "World \"" + level.getFolderName() + "\"" + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": " +
+                                    TextFormat.RED + level.getChunks().size() + TextFormat.GREEN + " chunks, " +
+                                    TextFormat.RED + level.getEntities().length + TextFormat.GREEN + " entities, " +
+                                    TextFormat.RED + level.getBlockEntities().size() + TextFormat.GREEN + " blockEntities." +
+                                    " Time " + ((level.getTickRate() > 1 || level.getTickRateTime() > 40) ? TextFormat.RED : TextFormat.YELLOW) + NukkitMath.round(level.getTickRateTime(), 2) + "ms" +
+                                    (level.getTickRate() > 1 ? " (tick rate " + (19 - level.getTickRate()) + ")" : "");
+                    if (level.isParallelTickEnabled()) {
+                        float levelTps = level.getLevelTPS();
+                        TextFormat levelTpsColor = levelTps >= 17 ? TextFormat.GREEN : levelTps >= 12 ? TextFormat.GOLD : TextFormat.RED;
+                        worldInfo += TextFormat.AQUA + " [Parallel TPS: " + levelTpsColor + NukkitMath.round(levelTps, 2)
+                                + TextFormat.AQUA + " MSPT: " + TextFormat.YELLOW + NukkitMath.round(level.getLevelMSPT(), 2)
+                                + TextFormat.AQUA + "]";
+                    }
+                    sender.sendMessage(worldInfo);
                 }
                 sender.sendMessage("");
             }
@@ -379,25 +407,6 @@ public class StatusCommand extends VanillaCommand {
 
 
         return true;
-    }
-
-    private static String buildWorldInfo(Level level) {
-        String worldInfo = TextFormat.GOLD + "World \"" + level.getFolderName() + "\""
-                + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": "
-                + TextFormat.RED + level.getChunks().size() + TextFormat.GREEN + " chunks, "
-                + TextFormat.RED + level.getEntities().length + TextFormat.GREEN + " entities, "
-                + TextFormat.RED + level.getBlockEntities().size() + TextFormat.GREEN + " blockEntities."
-                + " Time " + ((level.getTickRate() > 1 || level.getTickRateTime() > 40) ? TextFormat.RED : TextFormat.YELLOW)
-                + NukkitMath.round(level.getTickRateTime(), 2) + "ms"
-                + (level.getTickRate() > 1 ? " (tick rate " + (19 - level.getTickRate()) + ")" : "");
-        if (level.isParallelTickEnabled()) {
-            float levelTps = level.getLevelTPS();
-            TextFormat levelTpsColor = levelTps >= 17 ? TextFormat.GREEN : levelTps >= 12 ? TextFormat.GOLD : TextFormat.RED;
-            worldInfo += TextFormat.AQUA + " [Parallel TPS: " + levelTpsColor + NukkitMath.round(levelTps, 2)
-                    + TextFormat.AQUA + " MSPT: " + TextFormat.YELLOW + NukkitMath.round(level.getLevelMSPT(), 2)
-                    + TextFormat.AQUA + "]";
-        }
-        return worldInfo;
     }
 
     public enum ComputerSystemEntry {
