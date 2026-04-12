@@ -65,9 +65,11 @@ public final class GameLoop {
                 tick++;
                 updateTPS(elapsedNanos);
                 updateMSPT(elapsedNanos);
+                nanoSleepTime += idealNanoPerTick - elapsedNanos;
+            } else {
+                // Skipped or errored tick - still account for actual elapsed time
+                nanoSleepTime += idealNanoPerTick - (System.nanoTime() - startTime);
             }
-
-            nanoSleepTime += idealNanoPerTick - (elapsedNanos >= 0 ? elapsedNanos : 0);
             // Limit catch-up to 1 tick to prevent burst after lag spikes
             nanoSleepTime = Math.max(nanoSleepTime, -idealNanoPerTick);
             while (nanoSleepTime > 0 && running.get()) {

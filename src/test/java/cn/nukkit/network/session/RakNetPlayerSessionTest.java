@@ -8,6 +8,8 @@ import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.LecternUpdatePacket;
+import cn.nukkit.network.protocol.MoveEntityAbsolutePacket;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
@@ -217,6 +219,13 @@ class RakNetPlayerSessionTest {
         verify(fixture.channel).writeAndFlush(any(ByteBuf.class));
     }
 
+    @Test
+    void levelSyncPacketWhitelistIncludesLecternAndLegacyVehiclePackets() throws Exception {
+        assertTrue(invokeIsLevelSyncPacket(new LecternUpdatePacket()));
+        assertTrue(invokeIsLevelSyncPacket(new MoveEntityAbsolutePacket()));
+        assertFalse(invokeIsLevelSyncPacket(new ClientToServerHandshakePacket()));
+    }
+
     private static SessionFixture createSession(boolean executeImmediately) {
         return createSession(mock(RakNetInterface.class, RETURNS_DEEP_STUBS), executeImmediately, true, true);
     }
@@ -265,6 +274,12 @@ class RakNetPlayerSessionTest {
         Method method = RakNetPlayerSession.class.getDeclaredMethod("networkTick");
         method.setAccessible(true);
         method.invoke(session);
+    }
+
+    private static boolean invokeIsLevelSyncPacket(DataPacket packet) throws Exception {
+        Method method = RakNetPlayerSession.class.getDeclaredMethod("isLevelSyncPacket", DataPacket.class);
+        method.setAccessible(true);
+        return (boolean) method.invoke(null, packet);
     }
 
     private static RakNetInterface createRakNetInterface(cn.nukkit.Server server, Queue<RakNetPlayerSession> sessionCreationQueue,

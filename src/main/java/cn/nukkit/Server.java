@@ -189,6 +189,7 @@ public class Server {
     private boolean alwaysTickPlayers;
     private int baseTickRate;
     private boolean parallelLevelTick;
+    private volatile boolean levelThreadsStartAllowed;
     private int difficulty;
     private int defaultGameMode = Integer.MAX_VALUE;
     int c_s_spawnThreshold;
@@ -930,6 +931,7 @@ public class Server {
         if (loadPlugins) {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
+        this.allowLevelThreadsAndStartExisting();
 
         EntityProperty.init();
         EntityProperty.buildPacket();
@@ -1102,6 +1104,27 @@ public class Server {
         }
     }
 
+    private void allowLevelThreadsAndStartExisting() {
+        this.levelThreadsStartAllowed = true;
+        this.startDeferredLevelThreads();
+    }
+
+    private void startDeferredLevelThreads() {
+        if (!this.parallelLevelTick || !this.levelThreadsStartAllowed) {
+            return;
+        }
+
+        for (Level level : this.levelArray) {
+            level.startLevelThread();
+        }
+    }
+
+    private void startLevelThreadIfReady(Level level) {
+        if (this.parallelLevelTick && this.levelThreadsStartAllowed) {
+            level.startLevelThread();
+        }
+    }
+
     public void enablePlugin(Plugin plugin) {
         this.pluginManager.enablePlugin(plugin);
     }
@@ -1151,6 +1174,14 @@ public class Server {
             }
         }
 
+        this.levelThreadsStartAllowed = false;
+
+        // Stop all level threads before clearing plugins to prevent
+        // concurrent event firing and command dispatch during reload
+        for (Level level : this.levelArray) {
+            level.stopLevelThread();
+        }
+
         this.pluginManager.clearPlugins();
         this.commandMap.clearCommands();
 
@@ -1188,6 +1219,7 @@ public class Server {
         }
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
+        this.allowLevelThreadsAndStartExisting();
     }
 
     public void shutdown() {
@@ -1599,6 +1631,9 @@ public class Server {
         this.checkTickUpdates(this.tickCounter);
 
         for (Player player : new ArrayList<>(this.players.values())) {
+            if (this.parallelLevelTick && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
+                continue;
+            }
             player.checkNetwork();
         }
 
@@ -2482,10 +2517,7 @@ public class Server {
         level.setTickRate(this.baseTickRate);
 
         this.pluginManager.callEvent(new LevelLoadEvent(level));
-
-        if (this.parallelLevelTick) {
-            level.startLevelThread();
-        }
+        this.startLevelThreadIfReady(level);
 
         return true;
     }
@@ -2588,10 +2620,7 @@ public class Server {
 
         this.pluginManager.callEvent(new LevelInitEvent(level));
         this.pluginManager.callEvent(new LevelLoadEvent(level));
-
-        if (this.parallelLevelTick) {
-            level.startLevelThread();
-        }
+        this.startLevelThreadIfReady(level);
 
         return true;
     }
