@@ -310,7 +310,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         DataPacket packet;
         while ((packet = this.inbound.poll()) != null) {
             try {
-                Level level = this.player != null ? this.player.level : null;
+                Level level = this.player.getLevel();
                 if (level != null && level.isParallelTickEnabled()) {
                     level.addSyncPacketToQueue(this.player, packet);
                 } else {
