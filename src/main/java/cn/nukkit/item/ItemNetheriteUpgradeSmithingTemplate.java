@@ -14,6 +14,6 @@ public class ItemNetheriteUpgradeSmithingTemplate extends StringItemBase {
 
     @Override
     public boolean isSupportedOn(GameVersion protocolId) {
-        return protocolId.getProtocol() >= ProtocolInfo.v1_20_0;
+        return protocolId.getProtocol() >= ProtocolInfo.v1_19_80;
     }
 }
