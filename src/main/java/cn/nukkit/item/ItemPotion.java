@@ -107,7 +107,7 @@ public class ItemPotion extends Item {
         if (meta < 0) {
             return false;
         }
-        if (meta <= Potion.SLOWNESS_LONG_II) {
+        if (meta <= Potion.SLOWNESS_IV) {
             return true;
         }
         if (meta <= Potion.INFESTED) {

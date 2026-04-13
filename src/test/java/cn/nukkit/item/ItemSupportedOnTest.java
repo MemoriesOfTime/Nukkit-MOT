@@ -3,6 +3,7 @@ package cn.nukkit.item;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.item.RuntimeItemMapping.LegacyEntry;
+import cn.nukkit.potion.Potion;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -108,6 +109,29 @@ public class ItemSupportedOnTest {
             assertTrue(air.isSupportedOn(context.gameVersion()),
                     "AIR should be supported on " + context.gameVersion());
         }
+    }
+
+    @Test
+    public void testPotionMetaSupportBoundaries() {
+        assertEquals(42, Potion.SLOWNESS_IV);
+        assertEquals(43, Potion.WIND_CHARGED);
+        assertEquals(44, Potion.WEAVING);
+        assertEquals(45, Potion.OOZING);
+        assertEquals(46, Potion.INFESTED);
+
+        assertTrue(new ItemPotion(Potion.SLOWNESS_IV).isSupportedOn(GameVersion.V1_20_80));
+        assertTrue(new ItemPotionSplash(Potion.SLOWNESS_IV).isSupportedOn(GameVersion.V1_20_80));
+        assertTrue(new ItemPotionLingering(Potion.SLOWNESS_IV).isSupportedOn(GameVersion.V1_20_80));
+
+        assertFalse(new ItemPotion(Potion.WIND_CHARGED).isSupportedOn(GameVersion.V1_20_80));
+        assertFalse(new ItemPotionSplash(Potion.WEAVING).isSupportedOn(GameVersion.V1_20_80));
+        assertFalse(new ItemPotionLingering(Potion.INFESTED).isSupportedOn(GameVersion.V1_20_80));
+
+        assertTrue(new ItemPotion(Potion.WIND_CHARGED).isSupportedOn(GameVersion.V1_21_0));
+        assertTrue(new ItemPotionSplash(Potion.WEAVING).isSupportedOn(GameVersion.V1_21_0));
+        assertTrue(new ItemPotionLingering(Potion.INFESTED).isSupportedOn(GameVersion.V1_21_0));
+
+        assertFalse(new ItemPotion(Potion.INFESTED + 1).isSupportedOn(GameVersion.V1_21_0));
     }
 
     /**
