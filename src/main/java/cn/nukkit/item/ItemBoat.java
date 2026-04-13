@@ -70,11 +70,11 @@ public class ItemBoat extends Item {
     @Override
     public boolean isSupportedOn(GameVersion protocolId) {
         return switch (this.getDamage()) {
-            case 6 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_0 && super.isSupportedOn(protocolId);
-            case 7 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_50 && super.isSupportedOn(protocolId);
-            case 8 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_80 && super.isSupportedOn(protocolId);
-            case 9 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_50 && super.isSupportedOn(protocolId);
-            default -> this.getDamage() >= 0 && this.getDamage() <= 5 && super.isSupportedOn(protocolId);
+            case 6 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_0;
+            case 7 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_50;
+            case 8 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_80;
+            case 9 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_50;
+            default -> this.getDamage() >= 0 && this.getDamage() <= 5;
         };
     }
 }

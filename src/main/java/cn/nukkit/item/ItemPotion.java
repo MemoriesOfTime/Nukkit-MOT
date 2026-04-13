@@ -118,6 +118,6 @@ public class ItemPotion extends Item {
 
     @Override
     public boolean isSupportedOn(GameVersion protocolId) {
-        return isPotionMetaSupported(this.getDamage(), protocolId) && super.isSupportedOn(protocolId);
+        return isPotionMetaSupported(this.getDamage(), protocolId);
     }
 }

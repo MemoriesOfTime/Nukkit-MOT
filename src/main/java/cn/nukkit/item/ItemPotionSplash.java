@@ -44,6 +44,6 @@ public class ItemPotionSplash extends ProjectileItem {
 
     @Override
     public boolean isSupportedOn(GameVersion protocolId) {
-        return ItemPotion.isPotionMetaSupported(this.getDamage(), protocolId) && super.isSupportedOn(protocolId);
+        return ItemPotion.isPotionMetaSupported(this.getDamage(), protocolId);
     }
 }
