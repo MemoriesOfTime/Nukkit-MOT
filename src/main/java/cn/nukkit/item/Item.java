@@ -1929,9 +1929,9 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * <p>
      * Returns whether the item supports the specified version
      *
-    * @param protocolId 协议版本 protocol version
-    * @return 是否支持 whether supported
-    */
+     * @param protocolId 协议版本 protocol version
+     * @return 是否支持 whether supported
+     */
     public boolean isSupportedOn(GameVersion protocolId) {
         return this.isSupportedOnMapping(protocolId);
     }
@@ -1981,17 +1981,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static class CreativeItems {
 
-        private final boolean versionSpecific;
         private final List<CreativeItemGroup> groups = new ArrayList<>();
         private final Map<Item, CreativeItemGroup> contents = new LinkedHashMap<>();
-
-        public CreativeItems() {
-            this(false);
-        }
-
-        public CreativeItems(boolean versionSpecific) {
-            this.versionSpecific = versionSpecific;
-        }
 
         public void clear() {
             groups.clear();
@@ -2044,7 +2035,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
          * Get creative groups referenced by items supported on the specified protocol version.
          */
         public List<CreativeItemGroup> getGroups(GameVersion protocol) {
-            if (versionSpecific || protocol == GameVersion.getLastVersion()) {
+            if (protocol == GameVersion.getLastVersion()) {
                 return groups;
             }
             Set<CreativeItemGroup> referencedGroups = new HashSet<>();
@@ -2079,17 +2070,15 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
          * Get creative items supported by the specified protocol version
          */
         public Collection<Item> getItems(GameVersion protocol) {
-            if (versionSpecific || protocol == GameVersion.getLastVersion()) {
+            if (protocol == GameVersion.getLastVersion()) {
                 return contents.keySet();
             }
             ArrayList<Item> list = new ArrayList<>();
             for (Item item : contents.keySet()) {
-                Item projected = projectForCreativeProtocol(item, protocol);
-                if (projected != null && projected.isSupportedOn(protocol)) {
-                    addIfAbsent(list, projected);
+                if (item.isSupportedOn(protocol)) {
+                    list.add(item);
                 }
             }
-            appendProtocolCompatItems(protocol, list);
             return list;
         }
 
@@ -2097,7 +2086,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
          * Get item-to-group mapping supported by the specified protocol version
          */
         public Map<Item, CreativeItemGroup> getContents(GameVersion protocol) {
-            if (versionSpecific || protocol == GameVersion.getLastVersion()) {
+            if (protocol == GameVersion.getLastVersion()) {
                 return contents;
             }
             Map<Item, CreativeItemGroup> map = new LinkedHashMap<>();
@@ -2107,152 +2096,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 }
             }
             return map;
-        }
-
-        private void appendProtocolCompatItems(GameVersion protocol, List<Item> items) {
-            if (protocol != GameVersion.V1_17_40) {
-                return;
-            }
-
-            addIfAbsent(items, Item.get(LODESTONE_COMPASS));
-            addIfAbsent(items, Item.get(255 - OXIDIZED_CUT_COPPER_SLAB));
-            items.add(Item.get(255 - OXIDIZED_CUT_COPPER_SLAB));
-            addIfAbsent(items, Item.get(DOUBLE_PLANT, 2));
-
-            // Legacy 1.17.40 creative palette includes three identical brown mushroom block entries.
-            items.add(Item.get(BROWN_MUSHROOM_BLOCK, 14));
-            items.add(Item.get(BROWN_MUSHROOM_BLOCK, 14));
-        }
-
-        private Item projectForCreativeProtocol(Item item, GameVersion protocol) {
-            if (protocol != GameVersion.V1_17_40) {
-                return item;
-            }
-            Item projected = remapLegacyEntryForProtocol(item.clone(), protocol);
-            if (shouldFilterOutForLegacy471(item)) {
-                return null;
-            }
-            switch (projected.getId()) {
-                case DROPPER, DISPENSER -> projected.setDamage(3);
-                case PISTON, STICKY_PISTON -> projected.setDamage(1);
-                case BANNER -> normalizeLegacy471Banner(projected);
-                default -> {
-                }
-            }
-            return projected;
-        }
-
-        private boolean shouldFilterOutForLegacy471(Item item) {
-            int itemId = item.getId();
-            int damage = item.getDamage();
-
-            if (isNamespaced(item, "minecraft:raw_iron")) {
-                return true;
-            }
-            if (isNamespaced(item, "minecraft:sculk_sensor")) {
-                return true;
-            }
-            if (itemId == SUSPICIOUS_STEW) {
-                return true;
-            }
-            if ((itemId == POTION || itemId == SPLASH_POTION || itemId == LINGERING_POTION) && damage > 42) {
-                return true;
-            }
-            if (itemId == BOAT && damage >= 6) {
-                return true;
-            }
-            if (itemId == BANNER_PATTERN && damage == 7) {
-                return true;
-            }
-            if (itemId == SPAWN_EGG && (damage == 20 || damage == 21 || damage == 131 || damage == 132 || damage == 133 || damage == 134)) {
-                return true;
-            }
-            if (itemId == ENCHANTED_BOOK) {
-                return hasEnchantmentAboveLegacy471(item);
-            }
-            return false;
-        }
-
-        private Item remapLegacyEntryForProtocol(Item item, GameVersion protocol) {
-            String namespaceId = getLatestNamespaceId(item);
-            if (namespaceId == null) {
-                return item;
-            }
-
-            RuntimeItemMapping.LegacyEntry targetLegacy = RuntimeItems.getMapping(protocol).fromIdentifier(namespaceId);
-            int targetId;
-            int targetDamage = item.getDamage();
-            if (targetLegacy != null) {
-                targetId = targetLegacy.getLegacyId();
-                if (targetLegacy.isHasDamage()) {
-                    targetDamage = targetLegacy.getDamage();
-                }
-            } else {
-                targetId = RuntimeItems.getLegacyIdFromLegacyString(namespaceId);
-            }
-
-            if (!Utils.hasItemOrBlock(targetId)) {
-                return item;
-            }
-            if (item.getId() == targetId && item.getDamage() == targetDamage) {
-                return item;
-            }
-
-            return Item.get(targetId, targetDamage, item.getCount(), item.getCompoundTag());
-        }
-
-        private boolean isNamespaced(Item item, String namespaceId) {
-            String itemNamespaceId = getLatestNamespaceId(item);
-            return namespaceId.equals(itemNamespaceId);
-        }
-
-        private String getLatestNamespaceId(Item item) {
-            try {
-                return item.getNamespaceId(GameVersion.getLastVersion());
-            } catch (Exception ignored) {
-                if (item instanceof StringItem stringItem) {
-                    return stringItem.getNamespaceId();
-                }
-                return null;
-            }
-        }
-
-        private boolean hasEnchantmentAboveLegacy471(Item item) {
-            if (!item.hasCompoundTag()) {
-                return false;
-            }
-
-            CompoundTag tag = item.getNamedTag();
-            if (tag == null || !tag.containsList("ench", CompoundTag.TAG_Compound)) {
-                return false;
-            }
-
-            for (CompoundTag enchantmentTag : tag.getList("ench", CompoundTag.class).getAll()) {
-                if (enchantmentTag.getShort("id") >= 37) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private void normalizeLegacy471Banner(Item item) {
-            if (!item.hasCompoundTag()) {
-                return;
-            }
-
-            CompoundTag tag = item.getNamedTag();
-            if (tag != null && tag.getTags().size() == 1 && tag.containsInt("Type") && tag.getInt("Type") == 0) {
-                item.clearNamedTag();
-            }
-        }
-
-        private void addIfAbsent(List<Item> items, Item candidate) {
-            for (Item item : items) {
-                if (item.equals(candidate, true, true)) {
-                    return;
-                }
-            }
-            items.add(candidate);
         }
     }
 
