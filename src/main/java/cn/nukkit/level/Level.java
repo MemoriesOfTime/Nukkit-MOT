@@ -2110,7 +2110,7 @@ public class Level implements ChunkManager, Metadatable {
 
     @Override
     public void setBlockFullIdAt(int x, int y, int z, int layer, int fullId) {
-        this.setBlock(x, y, z, layer, Block.fullList[fullId], false, false);
+        this.setBlock(x, y, z, layer, Block.getForFull(fullId), false, false);
     }
 
     public boolean setBlock(Vector3 pos, Block block) {
