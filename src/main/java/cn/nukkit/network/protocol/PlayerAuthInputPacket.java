@@ -77,6 +77,19 @@ public class PlayerAuthInputPacket extends DataPacket {
         return NETWORK_ID;
     }
 
+    private int getNetEaseExtraInputFlags() {
+        if (!this.gameVersion.isNetEase()) {
+            return 0;
+        }
+        if (this.protocol >= ProtocolInfo.v1_21_93) {
+            return 2;
+        }
+        if (this.protocol >= ProtocolInfo.v1_21_2) {
+            return 1;
+        }
+        return 0;
+    }
+
     @Override
     public void decode() {
         this.pitch = this.getLFloat();
@@ -86,11 +99,16 @@ public class PlayerAuthInputPacket extends DataPacket {
         this.headYaw = this.getLFloat();
 
         long inputData = this.getUnsignedVarLong();
-        int inClientPredictedInVehicleOrdinal = AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE.ordinal();
+        int netEaseExtraInputFlags = this.getNetEaseExtraInputFlags();
+        int firstNetEaseOnlyInputOrdinal = AuthInputAction.RECEIVED_SERVER_DATA.ordinal();
+        int firstShiftedInputOrdinal = firstNetEaseOnlyInputOrdinal + netEaseExtraInputFlags;
         for (int i = 0; i < Math.min(AuthInputAction.size(), Long.SIZE); i++) {
             int offset = 0;
-            if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_2 && i >= inClientPredictedInVehicleOrdinal) {
-                offset = -1;
+            if (netEaseExtraInputFlags > 0 && i >= firstNetEaseOnlyInputOrdinal) {
+                if (i < firstShiftedInputOrdinal) {
+                    continue;
+                }
+                offset = -netEaseExtraInputFlags;
             }
             if ((inputData & (1L << i)) != 0) {
                 this.inputData.add(AuthInputAction.from(i + offset));

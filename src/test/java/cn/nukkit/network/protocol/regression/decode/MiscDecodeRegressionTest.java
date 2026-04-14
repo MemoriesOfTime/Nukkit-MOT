@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol.regression.decode;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
@@ -9,6 +10,7 @@ import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.types.inventory.InventoryLayout;
 import cn.nukkit.network.protocol.types.inventory.InventoryTabLeft;
 import cn.nukkit.network.protocol.types.inventory.InventoryTabRight;
+import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.Unpooled;
 import org.cloudburstmc.math.vector.Vector3f;
 import org.cloudburstmc.math.vector.Vector3i;
@@ -19,6 +21,7 @@ import org.cloudburstmc.protocol.bedrock.data.LevelEvent;
 import org.cloudburstmc.protocol.bedrock.data.ResourcePackType;
 import org.cloudburstmc.protocol.bedrock.data.entity.EntityEventType;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -176,6 +179,46 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
 
     static Stream<Arguments> versionsAtV944() {
         return Stream.of(Arguments.of(ProtocolInfo.v1_26_10));
+    }
+
+    private PlayerAuthInputPacket decodeNetEasePlayerAuthInput(int protocol, GameVersion gameVersion, long inputFlags) {
+        BinaryStream stream = new BinaryStream();
+        stream.putLFloat(10.5f);
+        stream.putLFloat(20.5f);
+        stream.putVector3f(1.25f, 64.0f, -3.5f);
+        stream.putLFloat(0.25f);
+        stream.putLFloat(-0.5f);
+        stream.putLFloat(30.5f);
+        stream.putUnsignedVarLong(inputFlags);
+        stream.putUnsignedVarInt(cn.nukkit.network.protocol.types.InputMode.TOUCH.ordinal());
+        stream.putUnsignedVarInt(cn.nukkit.network.protocol.types.ClientPlayMode.NORMAL.ordinal());
+        if (protocol >= ProtocolInfo.v1_19_0_29) {
+            stream.putUnsignedVarInt(cn.nukkit.network.protocol.types.AuthInteractionModel.CROSSHAIR.ordinal());
+        }
+        if (protocol >= ProtocolInfo.v1_21_40) {
+            stream.putVector2f(5.0f, 6.0f);
+        }
+        stream.putUnsignedVarLong(123L);
+        stream.putVector3f(0.1f, 0.2f, 0.3f);
+        if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_16_200) {
+            stream.putBoolean(false);
+        }
+        if (protocol >= ProtocolInfo.v1_19_70_24) {
+            stream.putVector2f(0.6f, -0.4f);
+            if (protocol >= ProtocolInfo.v1_21_40) {
+                stream.putVector3f(0.0f, 1.0f, 0.0f);
+            }
+            if (protocol >= ProtocolInfo.v1_21_50) {
+                stream.putVector2f(-0.25f, 0.75f);
+            }
+        }
+
+        PlayerAuthInputPacket packet = new PlayerAuthInputPacket();
+        packet.protocol = protocol;
+        packet.gameVersion = gameVersion;
+        packet.setBuffer(stream.getBuffer());
+        packet.decode();
+        return packet;
     }
 
     // ==================== NetworkStackLatencyPacket ====================
@@ -2350,6 +2393,65 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
             assertEquals(0.75f, nk.getRawMoveVector().y, 0.001f);
         }
         assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    @Test
+    void playerAuthInputNetEase12150UsesSingleFlagOffset() {
+        PlayerAuthInputPacket packet = decodeNetEasePlayerAuthInput(
+                ProtocolInfo.v1_21_50,
+                GameVersion.V1_21_50_NETEASE,
+                1L << 55
+        );
+
+        assertTrue(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.CAMERA_RELATIVE_MOVEMENT_ENABLED));
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.START_USING_ITEM));
+        assertNotNull(packet.getRawMoveVector());
+        assertEquals(-0.25f, packet.getRawMoveVector().x, 0.001f);
+        assertEquals(0.75f, packet.getRawMoveVector().y, 0.001f);
+        assertEquals(packet.getCount(), packet.getOffset(), "NetEase v766 PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    @Test
+    void playerAuthInputNetEase12150SkipsHiddenFlags() {
+        PlayerAuthInputPacket packet = decodeNetEasePlayerAuthInput(
+                ProtocolInfo.v1_21_50,
+                GameVersion.V1_21_50_NETEASE,
+                1L << 44
+        );
+
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.RECEIVED_SERVER_DATA));
+        assertTrue(packet.getInputData().isEmpty());
+        assertEquals(packet.getCount(), packet.getOffset(), "NetEase v766 hidden flags should be ignored during PlayerAuthInputPacket decode");
+    }
+
+    @Test
+    void playerAuthInputNetEase12193UsesDoubleFlagOffset() {
+        PlayerAuthInputPacket packet = decodeNetEasePlayerAuthInput(
+                ProtocolInfo.v1_21_93,
+                GameVersion.V1_21_93_NETEASE,
+                1L << 55
+        );
+
+        assertTrue(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.START_USING_ITEM));
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.CAMERA_RELATIVE_MOVEMENT_ENABLED));
+        assertNotNull(packet.getRawMoveVector());
+        assertEquals(-0.25f, packet.getRawMoveVector().x, 0.001f);
+        assertEquals(0.75f, packet.getRawMoveVector().y, 0.001f);
+        assertEquals(packet.getCount(), packet.getOffset(), "NetEase v819 PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    @Test
+    void playerAuthInputNetEase12193SkipsHiddenFlags() {
+        PlayerAuthInputPacket packet = decodeNetEasePlayerAuthInput(
+                ProtocolInfo.v1_21_93,
+                GameVersion.V1_21_93_NETEASE,
+                (1L << 44) | (1L << 45)
+        );
+
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.RECEIVED_SERVER_DATA));
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE));
+        assertTrue(packet.getInputData().isEmpty());
+        assertEquals(packet.getCount(), packet.getOffset(), "NetEase v819 hidden flags should be ignored during PlayerAuthInputPacket decode");
     }
 
     @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with embedded item interaction")
