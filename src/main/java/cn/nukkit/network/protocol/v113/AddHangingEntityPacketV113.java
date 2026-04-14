@@ -19,8 +19,8 @@ public class AddHangingEntityPacketV113 extends DataPacket_v113 {
 
     @Override
     public void decode() {
-        this.entityUniqueId = this.getVarLong();
-        this.entityRuntimeId = this.getVarLong();
+        this.entityUniqueId = this.getEntityUniqueId();
+        this.entityRuntimeId = this.getEntityRuntimeId();
         BlockVector3 v3 = this.getBlockVector3();
         this.x = v3.x;
         this.y = v3.y;
@@ -31,8 +31,8 @@ public class AddHangingEntityPacketV113 extends DataPacket_v113 {
     @Override
     public void encode() {
         this.reset();
-        this.putVarLong(this.entityUniqueId);
-        this.putVarLong(this.entityRuntimeId);
+        this.putEntityUniqueId(this.entityUniqueId);
+        this.putEntityRuntimeId(this.entityRuntimeId);
         this.putBlockVector3(this.x, this.y, this.z);
         this.putVarInt(this.unknown);
     }

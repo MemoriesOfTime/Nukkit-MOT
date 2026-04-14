@@ -45,7 +45,7 @@ public class CommandStepPacketV113 extends DataPacket_v113 {
         this.uvarint1 = this.getUnsignedVarInt();
         this.currentStep = this.getUnsignedVarInt();
         this.done = this.getBoolean();
-        this.clientId = this.getVarLong();
+        this.clientId = this.getUnsignedVarInt();
         String argsString = this.getString();
         this.args = new Gson().fromJson(argsString, CommandArgsV113.class);
         this.outputJson = this.getString();

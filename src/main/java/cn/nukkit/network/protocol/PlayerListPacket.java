@@ -35,7 +35,7 @@ public class PlayerListPacket extends DataPacket {
                 for (Entry entry : this.entries) {
                     if (protocol < ProtocolInfo.v1_2_0) {
                         this.putUUID(entry.uuid);
-                        this.putVarLong(entry.entityId);
+                        this.putEntityUniqueId(entry.entityId);
                         this.putString(entry.name);
                         this.putSkin(protocol, entry.skin);
                         continue;

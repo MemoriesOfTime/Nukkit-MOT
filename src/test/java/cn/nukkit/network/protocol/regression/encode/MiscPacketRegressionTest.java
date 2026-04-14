@@ -4,12 +4,16 @@ import cn.nukkit.MockServer;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.MovementEffectType;
 import cn.nukkit.network.protocol.types.ServerAuthMovementMode;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
+import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -20,9 +24,21 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
 
+    private static final int LEGACY_PROTOCOL_113 = ProtocolInfo.v1_1_0;
+    private static final String LEGACY_113_MOVE_PLAYER_HEX =
+            "0B0000A03F00008042000020C0000048410000624200000A42000163";
+    private static final String LEGACY_113_START_GAME_HEX =
+            "0102060000A03F00008142000070C0000028410000A241540204080A14400F0101000000803E0000003F01000008776F726C642D696405526574726F00";
+    private static final String LEGACY_113_CONTAINER_SET_CONTENT_HEX = "000B0000";
+    private static final java.util.UUID LEGACY_PLAYER_LIST_UUID =
+            java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static Network network;
+
     @BeforeAll
     static void setUp() {
         MockServer.init();
+        network = new Network(MockServer.get());
+        org.mockito.Mockito.lenient().when(MockServer.get().getNetwork()).thenReturn(network);
     }
 
     static Stream<Arguments> versionsFrom313to799() {
@@ -69,6 +85,129 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
 
     static Stream<Arguments> versionsFrom800() {
         return filteredVersions(800);
+    }
+
+    private static String encodeLegacy113BodyHex(DataPacket packet) {
+        packet.encode();
+        byte[] raw = packet.getBuffer();
+        return Binary.bytesToHexString(Binary.subBytes(raw, 1, raw.length - 1));
+    }
+
+    @Test
+    void testMovePlayerPacketLegacy113MatchesGenisysProHex() {
+        var nukkitPacket = new MovePlayerPacket();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.eid = 11;
+        nukkitPacket.x = 1.25f;
+        nukkitPacket.y = 64.0f;
+        nukkitPacket.z = -2.5f;
+        nukkitPacket.pitch = 12.5f;
+        nukkitPacket.yaw = 56.5f;
+        nukkitPacket.headYaw = 34.5f;
+        nukkitPacket.mode = MovePlayerPacket.MODE_NORMAL;
+        nukkitPacket.onGround = true;
+        nukkitPacket.ridingEid = 99;
+
+        assertEquals(LEGACY_113_MOVE_PLAYER_HEX, encodeLegacy113BodyHex(nukkitPacket));
+    }
+
+    @Test
+    void testMovePlayerPacketLegacy113DecodesGenisysProHex() {
+        var nukkitPacket = new MovePlayerPacket();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.setBuffer(Binary.hexStringToBytes(LEGACY_113_MOVE_PLAYER_HEX));
+        nukkitPacket.decode();
+
+        assertEquals(11, nukkitPacket.eid);
+        assertEquals(1.25f, nukkitPacket.x);
+        assertEquals(64.0f, nukkitPacket.y);
+        assertEquals(-2.5f, nukkitPacket.z);
+        assertEquals(12.5f, nukkitPacket.pitch);
+        assertEquals(56.5f, nukkitPacket.yaw);
+        assertEquals(34.5f, nukkitPacket.headYaw);
+        assertEquals(MovePlayerPacket.MODE_NORMAL, nukkitPacket.mode);
+        assertTrue(nukkitPacket.onGround);
+        assertEquals(99, nukkitPacket.ridingEid);
+    }
+
+    @Test
+    void testStartGamePacketLegacy113MatchesGenisysProHex() {
+        var nukkitPacket = new StartGamePacket();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.entityUniqueId = 1;
+        nukkitPacket.entityRuntimeId = 2;
+        nukkitPacket.playerGamemode = 3;
+        nukkitPacket.x = 1.25f;
+        nukkitPacket.y = 64.5f;
+        nukkitPacket.z = -3.75f;
+        nukkitPacket.pitch = 10.5f;
+        nukkitPacket.yaw = 20.25f;
+        nukkitPacket.seed = 42;
+        nukkitPacket.dimension = 1;
+        nukkitPacket.generator = 2;
+        nukkitPacket.worldGamemode = 4;
+        nukkitPacket.difficulty = 5;
+        nukkitPacket.spawnX = 10;
+        nukkitPacket.spawnY = 64;
+        nukkitPacket.spawnZ = -8;
+        nukkitPacket.hasAchievementsDisabled = true;
+        nukkitPacket.dayCycleStopTime = -1;
+        nukkitPacket.eduMode = false;
+        nukkitPacket.rainLevel = 0.25f;
+        nukkitPacket.lightningLevel = 0.5f;
+        nukkitPacket.commandsEnabled = true;
+        nukkitPacket.isTexturePacksRequired = false;
+        nukkitPacket.gameRules = new GameRules();
+        nukkitPacket.levelId = "world-id";
+        nukkitPacket.worldName = "Retro";
+        nukkitPacket.premiumWorldTemplateId = "";
+
+        assertEquals(LEGACY_113_START_GAME_HEX, encodeLegacy113BodyHex(nukkitPacket));
+    }
+
+    @Test
+    void testContainerSetContentPacketLegacy113MatchesGenisysProEntityIdEncoding() {
+        var nukkitPacket = new ContainerSetContentPacketV113();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.windowid = ContainerSetContentPacketV113.SPECIAL_INVENTORY;
+        nukkitPacket.eid = 11;
+        nukkitPacket.slots = cn.nukkit.item.Item.EMPTY_ARRAY;
+        nukkitPacket.hotbar = new int[0];
+
+        assertEquals(LEGACY_113_CONTAINER_SET_CONTENT_HEX, encodeLegacy113BodyHex(nukkitPacket));
+    }
+
+    @Test
+    void testContainerSetContentPacketLegacy113DecodesLegacyEntityIdEncoding() {
+        var nukkitPacket = new ContainerSetContentPacketV113();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.setBuffer(Binary.hexStringToBytes(LEGACY_113_CONTAINER_SET_CONTENT_HEX));
+        nukkitPacket.decode();
+
+        assertEquals(ContainerSetContentPacketV113.SPECIAL_INVENTORY, nukkitPacket.windowid);
+        assertEquals(11, nukkitPacket.eid);
+        assertEquals(0, nukkitPacket.slots.length);
+        assertEquals(0, nukkitPacket.hotbar.length);
+    }
+
+    @Test
+    void testPlayerListPacketLegacy113UsesLegacyEntityIdEncoding() {
+        var nukkitPacket = new PlayerListPacket();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.type = PlayerListPacket.TYPE_ADD;
+        nukkitPacket.entries = new PlayerListPacket.Entry[]{
+                new PlayerListPacket.Entry(LEGACY_PLAYER_LIST_UUID, 11, "Tester", cn.nukkit.entity.data.Skin.NO_PERSONA_SKIN)
+        };
+
+        String bodyHex = encodeLegacy113BodyHex(nukkitPacket);
+        String expectedPrefix = "00" + "01" + Binary.bytesToHexString(Binary.writeUUID(LEGACY_PLAYER_LIST_UUID)) + "0B";
+        assertTrue(bodyHex.startsWith(expectedPrefix), bodyHex);
     }
 
     @ParameterizedTest(name = "GameRulesChangedPacket v{0}")
