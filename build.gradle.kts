@@ -8,7 +8,7 @@ plugins {
     id("com.gorylenko.gradle-git-properties") version "2.4.2"
 }
 
-group = "com.koshakmine"
+group = "com.reider745.nukkit-mot"
 version = "1.5.0-SNAPSHOT"
 application.mainClass.set("cn.nukkit.Nukkit")
 
@@ -129,7 +129,7 @@ tasks {
     }
 
     shadowJar {
-        archiveBaseName.set("Lumi")
+        archiveBaseName.set("Nukkit-MOT")
         archiveClassifier.set("")
         manifest {
             attributes(
@@ -169,7 +169,7 @@ publishing {
 gitProperties {
     dateFormat = "dd.MM.yyyy '@' HH:mm:ss z"
     failOnNoGitDirectory = false
-    customProperty("github.repo", "KoshakMineDev/Lumi")
+    customProperty("github.repo", "ZoteTeam/Nukkit-MOT")
 }
 
 tasks.processResources {

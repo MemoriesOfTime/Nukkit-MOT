@@ -109,12 +109,14 @@ public class RecipeRegistry {
     }
 
     public static void registerShapedRecipe(ShapedRecipe recipe) {
+        recipe.setId(UUID.randomUUID());
         String resultHash = RecipeUtils.getItemHash(recipe.getResult());
         SHAPED.computeIfAbsent(resultHash, (key) -> new ArrayList<>()).add(recipe);
         RECIPES.add(recipe);
     }
 
     public static void registerShapelessRecipe(ShapelessRecipe recipe) {
+        recipe.setId(UUID.randomUUID());
         String resultHash = RecipeUtils.getItemHash(recipe.getResult());
         SHAPELESS.computeIfAbsent(resultHash, (key) -> new ArrayList<>()).add(recipe);
         RECIPES.add(recipe);
