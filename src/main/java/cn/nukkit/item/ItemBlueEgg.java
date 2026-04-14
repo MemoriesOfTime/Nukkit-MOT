@@ -21,8 +21,8 @@ public class ItemBlueEgg extends ItemEgg implements StringItem {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_21_70;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_21_70;
     }
 
     @Override

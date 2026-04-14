@@ -40,7 +40,7 @@ public abstract class StringItemProjectileBase extends ProjectileItem implements
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_16_100;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_16_100;
     }
 }

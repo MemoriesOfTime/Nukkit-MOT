@@ -2,6 +2,7 @@ package cn.nukkit.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityElytraFirework;
 import cn.nukkit.entity.item.EntityFirework;
@@ -12,8 +13,8 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.DyeColor;
-import org.apache.commons.math3.util.FastMath;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import java.util.List;
  * @author CreeperFace
  */
 public class ItemFirework extends Item {
+    private static final double PLAYER_LEASH_SCAN_RANGE = 16;
 
     public ItemFirework() {
         this(0);
@@ -71,22 +73,37 @@ public class ItemFirework extends Item {
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        if (player.getInventory().getChestplateFast() instanceof ItemElytra && player.isGliding()) {
-            this.spawnElytraFirework(player.getLevel(), player, player);
+        return this.tryBoostGlidingPlayer(player);
+    }
 
-            if (!player.isCreative()) {
-                this.count--;
-            }
-
-            player.setMotion(new Vector3(
-                    -Math.sin(FastMath.toRadians(player.yaw)) * Math.cos(FastMath.toRadians(player.pitch)) * 2,
-                    -Math.sin(FastMath.toRadians(player.pitch)) * 2,
-                    Math.cos(FastMath.toRadians(player.yaw)) * Math.cos(FastMath.toRadians(player.pitch)) * 2));
-
-            return true;
+    private boolean tryBoostGlidingPlayer(Player player) {
+        if (!(player.getInventory().getChestplateFast() instanceof ItemElytra) || !player.isGliding()) {
+            return false;
         }
 
-        return false;
+        this.dropPlayerLeashes(player);
+        this.spawnElytraFirework(player.getLevel(), player, player);
+
+        if (!player.isCreative()) {
+            this.count--;
+        }
+
+        return true;
+    }
+
+    private void dropPlayerLeashes(Player player) {
+        boolean droppedAnyLeash = false;
+        Entity[] entities = player.getLevel().getNearbyEntities(player.getBoundingBox().grow(PLAYER_LEASH_SCAN_RANGE, PLAYER_LEASH_SCAN_RANGE, PLAYER_LEASH_SCAN_RANGE), player);
+        for (Entity entity : entities) {
+            if (entity instanceof BaseEntity baseEntity && baseEntity.getLeadHolderId() == player.getId()) {
+                baseEntity.unleash();
+                droppedAnyLeash = true;
+            }
+        }
+
+        if (droppedAnyLeash) {
+            player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_LEAD_BREAK);
+        }
     }
 
     public void addExplosion(FireworkExplosion explosion) {
@@ -127,11 +144,15 @@ public class ItemFirework extends Item {
     }
 
     public EntityFirework spawnFirework(Level level, Vector3 pos, @Nullable Vector3 motion) {
+        return spawnFirework(level, pos, motion, null);
+    }
+
+    public EntityFirework spawnFirework(Level level, Vector3 pos, @Nullable Vector3 motion, @Nullable Entity shootingEntity) {
         boolean projectile = motion != null;
         CompoundTag nbt = Entity.getDefaultNBT(pos, motion, projectile ? (float) motion.yRotFromDirection() : 0, projectile ? (float) motion.xRotFromDirection() : 0)
                 .putCompound("FireworkItem", NBTIO.putItemHelper(this));
 
-        EntityFirework entity = new EntityFirework(level.getChunk(pos.getChunkX(), pos.getChunkZ()), nbt, projectile);
+        EntityFirework entity = new EntityFirework(level.getChunk(pos.getChunkX(), pos.getChunkZ()), nbt, projectile, shootingEntity);
         entity.spawnToAll();
         return entity;
     }

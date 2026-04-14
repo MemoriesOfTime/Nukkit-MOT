@@ -44,7 +44,8 @@ public class Data3dSerializer {
         }
 
         int[] heightMap = new int[512];
-        PalettedBlockStorage[] biomes = new PalettedBlockStorage[dimensionData.getHeight() >> 4];
+        int sectionCount = dimensionData.getHeight() >> 4;
+        PalettedBlockStorage[] biomes = new PalettedBlockStorage[sectionCount];
 
         ByteBuf buffer = ByteBufAllocator.DEFAULT.ioBuffer(data3d.length);
         try {
@@ -54,6 +55,11 @@ public class Data3dSerializer {
             }
 
             for (int i = 0; i < biomes.length; i++) {
+                if (!buffer.isReadable(1)) {
+                    biomes[i] = i > 0 ? biomes[i - 1].copy() : PalettedBlockStorage.createWithDefaultState(BitArrayVersion.V0, 0);
+                    continue;
+                }
+
                 PalettedBlockStorage storage = readPalettedBiomes(buffer);
                 if (storage == null && i == 0) {
                     throw new IllegalStateException("First biome palette can not point to previous!");

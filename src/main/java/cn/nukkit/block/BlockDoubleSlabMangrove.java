@@ -42,14 +42,14 @@ public class BlockDoubleSlabMangrove extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(MANGROVE_SLAB));
+        return Item.fromString("minecraft:mangrove_slab");
     }
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{
-                Item.get(Item.MANGROVE_SLAB, 0, 2)
-        };
+        Item slab = toItem();
+        slab.setCount(2);
+        return new Item[]{ slab };
     }
 
     @Override

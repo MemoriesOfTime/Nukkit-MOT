@@ -37,7 +37,11 @@ jobs:
     - name: Format ChangeLog
       id: get-changelog
       if: success() && github.event_name == 'push' && github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
-      run: echo "changelog=$(echo '${{ github.event.commits[0].message }}' | sed ':a;N;$!ba;s/\n/\\n/g')" >> $GITHUB_OUTPUT
+      env:
+        CHANGELOG: ${{ github.event.commits[0].message }}
+      run: |
+        escaped=${CHANGELOG//$'\n'/\\n}
+        printf 'changelog=%s\n' "$escaped" >> "$GITHUB_OUTPUT"
     - name: Get Time
       id: time
       uses: nanzm/get-time-action@v1.1

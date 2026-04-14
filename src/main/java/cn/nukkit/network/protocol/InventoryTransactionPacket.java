@@ -67,7 +67,7 @@ public class InventoryTransactionPacket extends DataPacket {
         }
 
         this.putUnsignedVarInt(this.transactionType);
-        if (protocol >= 407) {
+        if (protocol >= 407 && protocol < ProtocolInfo.v1_16_220) {
             this.putBoolean(this.hasNetworkIds);
         }
         this.putUnsignedVarInt(this.actions.length);

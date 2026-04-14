@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.BlockSweetBerryBush;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
@@ -19,7 +20,7 @@ public class ItemSweetBerries extends ItemEdible {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_11_0;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_11_0;
     }
 }

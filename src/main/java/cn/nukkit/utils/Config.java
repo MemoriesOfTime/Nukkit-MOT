@@ -341,11 +341,14 @@ public class Config {
             }
             if (async) {
                 Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new FileWriteTask(this.file, content.toString()));
+                // Async save can only report task submission, not the eventual filesystem result.
+                return true;
             } else {
                 try {
                     Utils.writeFile(this.file, content.toString());
                 } catch (IOException e) {
                     Server.getInstance().getLogger().logException(e);
+                    return false;
                 }
             }
             return true;

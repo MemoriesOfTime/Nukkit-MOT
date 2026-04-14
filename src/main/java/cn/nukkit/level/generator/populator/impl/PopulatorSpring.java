@@ -3,7 +3,6 @@ package cn.nukkit.level.generator.populator.impl;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
-import cn.nukkit.block.BlockUnknown;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
@@ -98,15 +97,7 @@ public class PopulatorSpring extends Populator {
 
             LevelProvider provider = chunk.getProvider();
             if (provider != null) {
-                Block block1 = Block.fullList[this.block << Block.DATA_BITS];
-                if (block1 == null) {
-                    block1 = new BlockUnknown(this.block, 0);
-                }
-                Block state = block1.clone();
-                state.x = x;
-                state.y = y;
-                state.z = z;
-                state.level = provider.getLevel();
+                Block state = Block.get(this.block, 0, provider.getLevel(), x, y, z);
                 if (state.level != null) {
                     state.level.scheduleUpdate(state, state, 1, 0, false);
                 }

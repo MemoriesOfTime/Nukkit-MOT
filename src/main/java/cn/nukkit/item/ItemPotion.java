@@ -1,8 +1,10 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.event.player.PlayerItemConsumeEvent;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Potion;
 
 public class ItemPotion extends Item {
@@ -99,5 +101,23 @@ public class ItemPotion extends Item {
     @Override
     public int getUseDuration() {
         return 32;
+    }
+
+    static boolean isPotionMetaSupported(int meta, GameVersion protocolId) {
+        if (meta < 0) {
+            return false;
+        }
+        if (meta <= Potion.SLOWNESS_IV) {
+            return true;
+        }
+        if (meta <= Potion.INFESTED) {
+            return protocolId.getProtocol() >= ProtocolInfo.v1_21_0;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return isPotionMetaSupported(this.getDamage(), protocolId);
     }
 }

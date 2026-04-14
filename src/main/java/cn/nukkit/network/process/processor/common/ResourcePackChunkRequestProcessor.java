@@ -7,6 +7,7 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.ResourcePackChunkDataPacket;
 import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
+import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.resourcepacks.ResourcePack;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -29,6 +30,11 @@ public class ResourcePackChunkRequestProcessor extends DataPacketProcessor<Resou
         if (resourcePack == null) {
             player.close("", "disconnectionScreen.resourcePack");
             return;
+        }
+
+        NetworkPlayerSession networkSession = player.getNetworkSession();
+        if (networkSession != null && networkSession.getState() != null) {
+            networkSession.getState().getLogin().touchActivity();
         }
 
         ResourcePackChunkDataPacket dataPacket = new ResourcePackChunkDataPacket();

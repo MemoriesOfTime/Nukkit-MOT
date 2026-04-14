@@ -1129,18 +1129,18 @@ public class BinaryStream {
         this.putVarInt(0); //CanDestroy entry count
     }
 
-    private void putSlotNew(GameVersion protocolId, Item item, boolean instanceItem) {
+    private void putSlotNew(GameVersion gameVersion, Item item, boolean instanceItem) {
         if (item == null || item.getId() == Item.AIR) {
             this.putByte((byte) 0);
             return;
         }
 
-        RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+        RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
         boolean isErrorItem = false;
         boolean isStringItem = item instanceof StringItem;
         try {
             if (isStringItem && mapping.getNetworkIdByNamespaceId(item.getNamespaceId()).isEmpty()) {
-                throw new IllegalArgumentException("Unknown StringItem : NamespaceId=" + item.getNamespaceId() + " protocol=" + protocolId);
+                throw new IllegalArgumentException("Unknown StringItem : NamespaceId=" + item.getNamespaceId() + " protocol=" + gameVersion);
             } else {
                 mapping.toRuntime(item.getId(), item.getDamage());
             }
@@ -1149,7 +1149,7 @@ public class BinaryStream {
             isErrorItem = true;
         }
 
-        if (!item.isSupportedOn(protocolId) || isErrorItem) {
+        if (!item.isSupportedOn(gameVersion) || isErrorItem) {
             Item originItem = item;
             item = Item.get(Item.INFO_UPDATE, 0, originItem.getCount());
             CompoundTag compoundTag = originItem.getNamedTag();
@@ -1159,7 +1159,7 @@ public class BinaryStream {
             item.setCustomName(originItem.getName());
             item.setNamedTag(item.getNamedTag().putInt(MV_ORIGIN_ID, originItem.getId()).putInt(MV_ORIGIN_META, originItem.getDamage()));
             if (isStringItem) {
-                item.setNamedTag(item.getNamedTag().putString(MV_ORIGIN_NAMESPACE, originItem.getNamespaceId(protocolId)));
+                item.setNamedTag(item.getNamedTag().putString(MV_ORIGIN_NAMESPACE, originItem.getNamespaceId(gameVersion)));
             }
         }
 
@@ -1189,7 +1189,7 @@ public class BinaryStream {
         }
 
         Block block = isBlock ? item.getBlockUnsafe() : null;
-        int blockRuntimeId = block == null ? 0 : GlobalBlockPalette.getOrCreateRuntimeId(protocolId, block.getId(), block.getDamage());
+        int blockRuntimeId = block == null ? 0 : GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, block.getId(), block.getDamage());
         this.putVarInt(blockRuntimeId);
 
         ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
@@ -1682,8 +1682,17 @@ public class BinaryStream {
     }
 
     public void writeFullContainerName(FullContainerName fullContainerName) {
-        this.putByte((byte) fullContainerName.getContainer().getId());
-        this.putOptionalNull(fullContainerName.getDynamicId(), this::putLInt);
+        this.writeFullContainerName(fullContainerName, GameVersion.getLastVersion());
+    }
+
+    public void writeFullContainerName(FullContainerName fullContainerName, GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
+        this.putByte((byte) fullContainerName.getContainer().getId(gameVersion));
+        if (protocol >= ProtocolInfo.v1_21_30) {
+            this.putOptionalNull(fullContainerName.getDynamicId(), this::putLInt);
+        } else {
+            this.putLInt(fullContainerName.getDynamicId() == null ? 0 : fullContainerName.getDynamicId());
+        }
     }
 
     public boolean isReadable(int length) {
@@ -1759,23 +1768,33 @@ public class BinaryStream {
     }
 
     public ItemStackRequest readItemStackRequest() {
-        return readItemStackRequest(ProtocolInfo.CURRENT_PROTOCOL);
+        return readItemStackRequest(GameVersion.getLastVersion());
     }
 
-    public ItemStackRequest readItemStackRequest(int protocol) {
+    public ItemStackRequest readItemStackRequest(GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
         int requestId = getVarInt();
         ItemStackRequestAction[] actions = getArray(ItemStackRequestAction.class, (s) -> {
-            ItemStackRequestActionType itemStackRequestActionType = ItemStackRequestActionType.fromId(s.getByte());
-            return readRequestActionData(protocol, itemStackRequestActionType);
+            ItemStackRequestActionType itemStackRequestActionType = ItemStackRequestActionType.fromId(s.getByte(), gameVersion);
+            if (itemStackRequestActionType == null) {
+                throw new UnsupportedOperationException("Unhandled stack request action type id for protocol "
+                        + protocol + " at offset " + (s.getOffset() - 1));
+            }
+            return readRequestActionData(gameVersion, itemStackRequestActionType);
         });
-        String[] filteredStrings = getArray(String.class, BinaryStream::getString);
+        String[] filteredStrings = protocol >= ProtocolInfo.v1_16_200
+                ? getArray(String.class, BinaryStream::getString)
+                : new String[0];
 
-        int originVal = getLInt();
-        TextProcessingEventOrigin origin = originVal == -1 ? null : TextProcessingEventOrigin.fromId(originVal);  // new for v552
-        return new ItemStackRequest(requestId, actions, filteredStrings, origin);
+        if (protocol >= ProtocolInfo.v1_19_30) {
+            int originVal = getLInt();
+            TextProcessingEventOrigin origin = originVal == -1 ? null : TextProcessingEventOrigin.fromId(originVal);  // new for v552
+            return new ItemStackRequest(requestId, actions, filteredStrings, origin);
+        }
+        return new ItemStackRequest(requestId, actions, filteredStrings);
     }
 
-    protected ItemStackRequestAction readRequestActionData(int protocol, ItemStackRequestActionType type) {
+    protected ItemStackRequestAction readRequestActionData(GameVersion gameVersion, ItemStackRequestActionType type) {
         return switch (type) {
             case CRAFT_REPAIR_AND_DISENCHANT -> new CraftGrindstoneAction((int) getUnsignedVarInt(), getVarInt());
             case CRAFT_LOOM -> new CraftLoomAction(getString());
@@ -1783,37 +1802,37 @@ public class BinaryStream {
                     (int) getUnsignedVarInt(), getByte(), Collections.emptyList()
             );
             case CRAFT_RESULTS_DEPRECATED -> new CraftResultsDeprecatedAction(
-                    getArray(Item.class, (s) -> s.getSlot(protocol)),
+                    getArray(Item.class, (s) -> s.getSlot(gameVersion)),
                     getByte()
             );
             case MINE_BLOCK -> new MineBlockAction(getVarInt(), getVarInt(), getVarInt());
             case CRAFT_RECIPE_OPTIONAL -> new CraftRecipeOptionalAction((int) getUnsignedVarInt(), getLInt());
             case TAKE -> new TakeAction(
                     getByte(),
-                    readStackRequestSlotInfo(),
-                    readStackRequestSlotInfo()
+                    readStackRequestSlotInfo(gameVersion),
+                    readStackRequestSlotInfo(gameVersion)
             );
             case PLACE -> new PlaceAction(
                     getByte(),
-                    readStackRequestSlotInfo(),
-                    readStackRequestSlotInfo()
+                    readStackRequestSlotInfo(gameVersion),
+                    readStackRequestSlotInfo(gameVersion)
             );
             case SWAP -> new SwapAction(
-                    readStackRequestSlotInfo(),
-                    readStackRequestSlotInfo()
+                    readStackRequestSlotInfo(gameVersion),
+                    readStackRequestSlotInfo(gameVersion)
             );
             case DROP -> new DropAction(
                     getByte(),
-                    readStackRequestSlotInfo(),
+                    readStackRequestSlotInfo(gameVersion),
                     getBoolean()
             );
             case DESTROY -> new DestroyAction(
                     getByte(),
-                    readStackRequestSlotInfo()
+                    readStackRequestSlotInfo(gameVersion)
             );
             case CONSUME -> new ConsumeAction(
                     getByte(),
-                    readStackRequestSlotInfo()
+                    readStackRequestSlotInfo(gameVersion)
             );
             case CREATE -> new CreateAction(
                     getByte()
@@ -1834,9 +1853,14 @@ public class BinaryStream {
         };
     }
 
-    private ItemStackRequestSlotData readStackRequestSlotInfo() {
+    private ItemStackRequestSlotData readStackRequestSlotInfo(GameVersion gameVersion) {
+        ContainerSlotType containerSlotType = ContainerSlotType.fromId(getByte(), gameVersion);
+        if (containerSlotType == null) {
+            throw new UnsupportedOperationException("Unhandled container slot type id for protocol "
+                    + gameVersion + " at offset " + (getOffset() - 1));
+        }
         return new ItemStackRequestSlotData(
-                ContainerSlotType.fromId(getByte()),
+                containerSlotType,
                 getByte(),
                 getVarInt()
         );

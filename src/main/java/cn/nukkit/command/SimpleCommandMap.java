@@ -270,7 +270,7 @@ public class SimpleCommandMap implements CommandMap {
         int start = 0;
 
         for (int i = 0; i < sb.length(); i++) {
-            if ((sb.charAt(i) == '{' && curlyBraceCount >= 1) || (sb.charAt(i) == '{' && sb.charAt(i - 1) == ' ' && curlyBraceCount == 0)) {
+            if ((sb.charAt(i) == '{' && curlyBraceCount >= 1) || (sb.charAt(i) == '{' && (i == 0 || sb.charAt(i - 1) == ' ') && curlyBraceCount == 0)) {
                 curlyBraceCount++;
             } else if (sb.charAt(i) == '}' && curlyBraceCount > 0) {
                 curlyBraceCount--;

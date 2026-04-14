@@ -12,7 +12,6 @@ import cn.nukkit.utils.BinaryStream;
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
@@ -42,19 +41,19 @@ public class GlobalBlockPalette {
     private static final AtomicInteger runtimeIdAllocator389 = new AtomicInteger(0);
     private static final AtomicInteger runtimeIdAllocator407 = new AtomicInteger(0);
 
-    private static final Int2IntMap legacyToRuntimeId223 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId261 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId274 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId282 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId291 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId313 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId332 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId340 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId354 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId361 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId388 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId389 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId407 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId223 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId261 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId274 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId282 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId291 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId313 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId332 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId340 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId354 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId361 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId388 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId389 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId407 = new Int2IntOpenHashMap();
 
     private static final Map<GameVersion, BlockPalette> paletteCache = new ConcurrentHashMap<>();
 
@@ -150,7 +149,7 @@ public class GlobalBlockPalette {
         if (stream223 == null) throw new AssertionError("Unable to locate RuntimeID table 223");
         Collection<TableEntryOld> entries223 = GSON.fromJson(new InputStreamReader(stream223, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
         for (TableEntryOld entry : entries223) {
-            legacyToRuntimeId223.put((entry.id << 4) | entry.data, entry.runtimeID);
+            registerLegacyState(legacyToRuntimeId223, 4, entry.id, entry.data, entry.runtimeID);
         }
         // Compiled table not needed for 223
         // 261
@@ -158,7 +157,7 @@ public class GlobalBlockPalette {
         if (stream261 == null) throw new AssertionError("Unable to locate RuntimeID table 261");
         Collection<TableEntryOld> entries261 = GSON.fromJson(new InputStreamReader(stream261, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
         for (TableEntryOld entry : entries261) {
-            legacyToRuntimeId261.put((entry.id << 4) | entry.data, entry.runtimeID);
+            registerLegacyState(legacyToRuntimeId261, 4, entry.id, entry.data, entry.runtimeID);
         }
         // Compiled table not needed 261
         // 274
@@ -166,7 +165,7 @@ public class GlobalBlockPalette {
         if (stream274 == null) throw new AssertionError("Unable to locate RuntimeID table 274");
         Collection<TableEntryOld> entries274 = GSON.fromJson(new InputStreamReader(stream274, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
         for (TableEntryOld entry : entries274) {
-            legacyToRuntimeId274.put((entry.id << 4) | entry.data, entry.runtimeID);
+            registerLegacyState(legacyToRuntimeId274, 4, entry.id, entry.data, entry.runtimeID);
         }
         // Compiled table not needed 274
         // 282
@@ -176,7 +175,7 @@ public class GlobalBlockPalette {
         BinaryStream table282 = new BinaryStream();
         table282.putUnsignedVarInt(entries282.size());
         for (TableEntry entry : entries282) {
-            legacyToRuntimeId282.put((entry.id << 4) | entry.data, runtimeIdAllocator282.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId282, 4, entry.id, entry.data, runtimeIdAllocator282.getAndIncrement());
             table282.putString(entry.name);
             table282.putLShort(entry.data);
         }
@@ -188,7 +187,7 @@ public class GlobalBlockPalette {
         BinaryStream table291 = new BinaryStream();
         table291.putUnsignedVarInt(entries291.size());
         for (TableEntry entry : entries291) {
-            legacyToRuntimeId291.put((entry.id << 4) | entry.data, runtimeIdAllocator291.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId291, 4, entry.id, entry.data, runtimeIdAllocator291.getAndIncrement());
             table291.putString(entry.name);
             table291.putLShort(entry.data);
         }
@@ -200,7 +199,7 @@ public class GlobalBlockPalette {
         BinaryStream table313 = new BinaryStream();
         table313.putUnsignedVarInt(entries313.size());
         for (TableEntry entry : entries313) {
-            legacyToRuntimeId313.put((entry.id << 4) | entry.data, runtimeIdAllocator313.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId313, 4, entry.id, entry.data, runtimeIdAllocator313.getAndIncrement());
             table313.putString(entry.name);
             table313.putLShort(entry.data);
         }
@@ -212,7 +211,7 @@ public class GlobalBlockPalette {
         BinaryStream table332 = new BinaryStream();
         table332.putUnsignedVarInt(entries332.size());
         for (TableEntry entry : entries332) {
-            legacyToRuntimeId332.put((entry.id << 4) | entry.data, runtimeIdAllocator332.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId332, 4, entry.id, entry.data, runtimeIdAllocator332.getAndIncrement());
             table332.putString(entry.name);
             table332.putLShort(entry.data);
         }
@@ -224,7 +223,7 @@ public class GlobalBlockPalette {
         BinaryStream table340 = new BinaryStream();
         table340.putUnsignedVarInt(entries340.size());
         for (TableEntry entry : entries340) {
-            legacyToRuntimeId340.put((entry.id << 4) | entry.data, runtimeIdAllocator340.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId340, 4, entry.id, entry.data, runtimeIdAllocator340.getAndIncrement());
             table340.putString(entry.name);
             table340.putLShort(entry.data);
         }
@@ -236,7 +235,7 @@ public class GlobalBlockPalette {
         BinaryStream table354 = new BinaryStream();
         table354.putUnsignedVarInt(entries354.size());
         for (TableEntry entry : entries354) {
-            legacyToRuntimeId354.put((entry.id << 4) | entry.data, runtimeIdAllocator354.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId354, 4, entry.id, entry.data, runtimeIdAllocator354.getAndIncrement());
             table354.putString(entry.name);
             table354.putLShort(entry.data);
         }
@@ -248,7 +247,7 @@ public class GlobalBlockPalette {
         BinaryStream table361 = new BinaryStream();
         table361.putUnsignedVarInt(entries361.size());
         for (TableEntry entry : entries361) {
-            legacyToRuntimeId361.put((entry.id << 4) | entry.data, runtimeIdAllocator361.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId361, 4, entry.id, entry.data, runtimeIdAllocator361.getAndIncrement());
             table361.putString(entry.name);
             table361.putLShort(entry.data);
             table361.putLShort(entry.id);
@@ -269,7 +268,7 @@ public class GlobalBlockPalette {
             int runtimeId = runtimeIdAllocator388.getAndIncrement();
             if (!state.contains("meta")) continue;
             for (int val : state.getIntArray("meta")) {
-                legacyToRuntimeId388.put(state.getShort("id") << 6 | val, runtimeId);
+                registerLegacyState(legacyToRuntimeId388, 6, state.getShort("id"), val, runtimeId);
             }
             state.remove("meta");
         }
@@ -287,7 +286,7 @@ public class GlobalBlockPalette {
             int runtimeId = runtimeIdAllocator389.getAndIncrement();
             if (!state.contains("meta")) continue;
             for (int val : state.getIntArray("meta")) {
-                legacyToRuntimeId389.put(state.getShort("id") << 6 | val, runtimeId);
+                registerLegacyState(legacyToRuntimeId389, 6, state.getShort("id"), val, runtimeId);
             }
             state.remove("meta");
         }
@@ -311,8 +310,7 @@ public class GlobalBlockPalette {
             int id = state.getInt("id");
             int data = state.getShort("data");
             int runtimeId = runtimeIdAllocator407.getAndIncrement();
-            int legacyId = id << 6 | data;
-            legacyToRuntimeId407.put(legacyId, runtimeId);
+            registerLegacyState(legacyToRuntimeId407, 6, id, data, runtimeId);
             state.remove("data");
         }
         try {
@@ -320,6 +318,46 @@ public class GlobalBlockPalette {
         } catch (IOException e) {
             throw new AssertionError("Unable to write block palette 407", e);
         }
+
+        compactCaches();
+    }
+
+    /**
+     * Trims global palette lookup tables after registration so long-lived caches keep a smaller footprint.
+     */
+    public static void compactCaches() {
+        trimLegacyMap(legacyToRuntimeId223);
+        trimLegacyMap(legacyToRuntimeId261);
+        trimLegacyMap(legacyToRuntimeId274);
+        trimLegacyMap(legacyToRuntimeId282);
+        trimLegacyMap(legacyToRuntimeId291);
+        trimLegacyMap(legacyToRuntimeId313);
+        trimLegacyMap(legacyToRuntimeId332);
+        trimLegacyMap(legacyToRuntimeId340);
+        trimLegacyMap(legacyToRuntimeId354);
+        trimLegacyMap(legacyToRuntimeId361);
+        trimLegacyMap(legacyToRuntimeId388);
+        trimLegacyMap(legacyToRuntimeId389);
+        trimLegacyMap(legacyToRuntimeId407);
+
+        for (BlockPalette palette : paletteCache.values()) {
+            palette.trim();
+        }
+    }
+
+    /**
+     * Applies fastutil's in-place trim operation to a legacy lookup map.
+     */
+    private static void trimLegacyMap(Int2IntOpenHashMap map) {
+        map.trim();
+    }
+
+    /**
+     * Registers a legacy state mapping and records the block state as observed for sparse prototype caching.
+     */
+    private static void registerLegacyState(Int2IntOpenHashMap map, int dataBits, int id, int data, int runtimeId) {
+        map.put((id << dataBits) | data, runtimeId);
+        Block.registerKnownState(id, data);
     }
 
     @Deprecated

@@ -1,6 +1,7 @@
 package cn.nukkit.ddui.element;
 
 import cn.nukkit.Player;
+import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.ddui.Observable;
 import cn.nukkit.ddui.properties.ObjectProperty;
 import cn.nukkit.ddui.properties.StringProperty;
@@ -31,7 +32,15 @@ public class MessageBoxButtonElement extends Element<Long> {
 
         ButtonClickElement clickElement = new ButtonClickElement(this);
         setProperty(clickElement);
-        clickElement.addListener((player, data) -> triggerListeners(player, data));
+        clickElement.addListener(this::triggerListeners);
+        // Auto-close the screen after user-defined listeners complete,
+        // matching vanilla Bedrock behavior where MessageBox dismisses on button click.
+        clickElement.addListener((player, data) -> {
+            DataDrivenScreen screen = DataDrivenScreen.getActiveScreen(player);
+            if (screen != null) {
+                screen.close(player);
+            }
+        });
     }
 
     public void addListener(Consumer<Player> listener) {

@@ -1,5 +1,6 @@
 package cn.nukkit.command.defaults;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
@@ -42,7 +43,7 @@ public class TestForBlockCommand extends VanillaCommand {
             dataValue = list.getResult(2);
         }
         try {
-            GlobalBlockPalette.getOrCreateRuntimeId(tileId, dataValue);
+            GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getFeatureVersion(), tileId, dataValue);
         } catch (NoSuchElementException e) {
             log.addError("commands.give.block.notFound", String.valueOf(tileId)).output();
             return 0;

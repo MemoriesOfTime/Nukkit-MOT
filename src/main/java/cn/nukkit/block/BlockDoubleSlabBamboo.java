@@ -41,13 +41,13 @@ public class BlockDoubleSlabBamboo extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(BAMBOO_SLAB));
+        return Item.fromString("minecraft:bamboo_slab");
     }
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{
-                Item.get(Item.BAMBOO_SLAB, 0, 2)
-        };
+        Item slab = toItem();
+        slab.setCount(2);
+        return new Item[]{ slab };
     }
 }

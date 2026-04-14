@@ -56,14 +56,14 @@ public class BlockDoubleSlabWood extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(WOOD_SLAB), this.getDamage() & 0x07);
+        return Item.get(Item.WOOD_SLAB, this.getDamage() & 0x07);
     }
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{
-                Item.get(Item.WOOD_SLAB, this.getDamage() & 0x07, 2)
-        };
+        Item slab = toItem();
+        slab.setCount(2);
+        return new Item[]{ slab };
     }
 
     @Override

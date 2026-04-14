@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
 public class BlockDoubleSlabCopperCutExposed extends BlockDoubleSlabCopperCut {
@@ -26,14 +27,18 @@ public class BlockDoubleSlabCopperCutExposed extends BlockDoubleSlabCopperCut {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(EXPOSED_CUT_COPPER_SLAB));
+        return new ItemBlock(Block.get(EXPOSED_CUT_COPPER_SLAB), this.getDamage() & 0x07);
     }
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{
-                new ItemBlock(Block.get(EXPOSED_CUT_COPPER_SLAB), 0, 2)
-        };
+        if (item.isPickaxe() && item.getTier() >= ItemTool.TIER_STONE) {
+            Item slab = toItem();
+            slab.setCount(2);
+            return new Item[]{ slab };
+        } else {
+            return Item.EMPTY_ARRAY;
+        }
     }
 
     @Override

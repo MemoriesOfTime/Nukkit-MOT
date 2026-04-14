@@ -6,7 +6,7 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockDoubleSlabWarped extends BlockSolid {
     public BlockDoubleSlabWarped() {
-        
+
     }
 
     @Override
@@ -31,20 +31,16 @@ public class BlockDoubleSlabWarped extends BlockSolid {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(WARPED_SLAB), this.getDamage() & 0x07);
+        return Item.fromString("minecraft:warped_slab");
     }
-    
+
     @Override
     public Item[] getDrops(Item item) {
-        if (item.isPickaxe()) {
-            Item slab = toItem();
-            slab.setCount(2);
-            return new Item[]{ slab };
-        } else {
-            return Item.EMPTY_ARRAY;
-        }
+        Item slab = toItem();
+        slab.setCount(2);
+        return new Item[]{ slab };
     }
-    
+
     @Override
     public BlockColor getColor() {
         return BlockColor.WARPED_STEM_BLOCK_COLOR;

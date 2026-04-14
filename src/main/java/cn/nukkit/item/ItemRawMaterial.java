@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import org.jetbrains.annotations.NotNull;
 
@@ -16,7 +17,7 @@ public abstract class ItemRawMaterial extends StringItemBase {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_17_0;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_17_0;
     }
 }

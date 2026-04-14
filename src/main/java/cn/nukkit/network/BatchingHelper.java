@@ -45,6 +45,12 @@ public class BatchingHelper {
             return;
         }
 
+        // Single-recipient packets are expected to preserve main-thread ordering.
+        if (players.length == 1) {
+            this.batchAndSendPackets(players, packets);
+            return;
+        }
+
         this.threadedExecutor.execute(() -> this.batchAndSendPackets(players, packets));
     }
 
@@ -118,14 +124,24 @@ public class BatchingHelper {
                 } else {
                     pk.payload = Zlib.deflatePre16Packet(bytes, Server.getInstance().networkCompressionLevel);
                 }
+                pk.protocol = gameVersion.getProtocol();
+                pk.gameVersion = gameVersion;
                 for (Player player : finalTargets) {
                     CompressionProvider compressionProvider = player.getNetworkSession().getCompression();
                     if (compressionProvider == CompressionProvider.NONE) {
                         BatchPacket batchPacket = new BatchPacket();
                         batchPacket.payload = bytes;
-                        player.dataPacket(batchPacket);
-                    }else {
+                        batchPacket.protocol = player.protocol;
+                        batchPacket.gameVersion = player.getGameVersion();
+                        if (Server.getInstance().callDataPkSendEv) {
+                            player.dataPacket(batchPacket);
+                        } else {
+                            player.getNetworkSession().sendPacket(batchPacket);
+                        }
+                    } else if (Server.getInstance().callDataPkSendEv) {
                         player.dataPacket(pk);
+                    } else {
+                        player.getNetworkSession().sendPacket(pk);
                     }
                 }
             } catch (Exception e) {

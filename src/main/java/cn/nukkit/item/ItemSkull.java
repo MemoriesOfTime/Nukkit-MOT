@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import org.jetbrains.annotations.NotNull;
@@ -67,8 +68,8 @@ public class ItemSkull extends Item {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return this.getDamage() < 6 || protocolId >= ProtocolInfo.v1_20_0_23;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return this.getDamage() < 6 || protocolId.getProtocol() >= ProtocolInfo.v1_20_0_23;
     }
 
     @Override

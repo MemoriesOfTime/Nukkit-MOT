@@ -1,5 +1,6 @@
 package cn.nukkit.level.generator.block.state;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.generator.math.Rotation;
@@ -42,7 +43,7 @@ public class BlockState {
     }
 
     public int getRuntimeId() {
-        return GlobalBlockPalette.getOrCreateRuntimeId(id, meta);
+        return GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getFeatureVersion(), id, meta);
     }
 
     public Block getBlock() {

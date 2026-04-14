@@ -1325,10 +1325,23 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         var nukkitPacket = new cn.nukkit.network.protocol.ItemStackResponsePacket();
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.entries.add(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse(
-                cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus.ERROR,
+        var responseSlot = new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot(
+                4,
                 1,
-                new java.util.ArrayList<>()
+                32,
+                1234,
+                "renamed-item",
+                7,
+                protocolVersion >= ProtocolInfo.v1_21_50 ? "filtered-name" : ""
+        );
+        nukkitPacket.entries.add(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse(
+                cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus.OK,
+                1,
+                java.util.List.of(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer(
+                        cn.nukkit.network.protocol.types.inventory.ContainerSlotType.HOTBAR,
+                        java.util.List.of(responseSlot),
+                        null
+                ))
         ));
         nukkitPacket.encode();
 
@@ -1336,6 +1349,33 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
                 org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket.class);
 
         assertEquals(1, cbPacket.getEntries().size());
+        var response = cbPacket.getEntries().get(0);
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.response.ItemStackResponseStatus.OK, response.getResult());
+        assertEquals(1, response.getRequestId());
+        assertEquals(1, response.getContainers().size());
+        var container = response.getContainers().get(0);
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.HOTBAR, container.getContainer());
+        assertEquals(1, container.getItems().size());
+        var item = container.getItems().get(0);
+        assertEquals(4, item.getSlot());
+        assertEquals(1, item.getHotbarSlot());
+        assertEquals(32, item.getCount());
+        assertEquals(1234, item.getStackNetworkId());
+        if (protocolVersion >= ProtocolInfo.v1_16_200) {
+            assertEquals("renamed-item", item.getCustomName());
+        } else {
+            assertEquals("", item.getCustomName());
+        }
+        if (protocolVersion >= ProtocolInfo.v1_16_210) {
+            assertEquals(7, item.getDurabilityCorrection());
+        } else {
+            assertEquals(0, item.getDurabilityCorrection());
+        }
+        if (protocolVersion >= ProtocolInfo.v1_21_50) {
+            assertEquals("filtered-name", item.getFilteredCustomName());
+        } else {
+            assertEquals("", item.getFilteredCustomName());
+        }
     }
 
     // ==================== CraftingDataPacket ====================

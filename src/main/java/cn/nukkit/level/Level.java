@@ -459,10 +459,11 @@ public class Level implements ChunkManager, Metadatable {
 
     @Deprecated
     public static long blockHash(int x, int y, int z) {
-        if (y < -64 || y >= 384) {
+        DimensionData overworld = DimensionEnum.OVERWORLD.getDimensionData();
+        if (y < overworld.getMinHeight() || y > overworld.getMaxHeight()) {
             throw new IllegalArgumentException("Y coordinate " + y + " is out of range!");
         }
-        return blockHash(x, y, z, DimensionEnum.OVERWORLD.getDimensionData());
+        return blockHash(x, y, z, overworld);
     }
 
     public static long blockHash(int x, int y, int z, DimensionData dimensionData) {
@@ -2196,10 +2197,7 @@ public class Level implements ChunkManager, Metadatable {
 
     @Override
     public void setBlockFullIdAt(int x, int y, int z, int layer, int fullId) {
-        Block block = Block.fullList[fullId];
-        if (block == null) {
-            block = new BlockUnknown(fullId >> Block.DATA_BITS, fullId & Block.DATA_MASK);
-        }
+        Block block = Block.get(fullId >> Block.DATA_BITS, fullId & Block.DATA_MASK);
         this.setBlock(x, y, z, layer, block, false, false);
     }
 

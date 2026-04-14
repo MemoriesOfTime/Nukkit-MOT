@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
@@ -211,7 +212,7 @@ public class ItemCrossbow extends ItemBow {
                 for (int i = 0; i < launchCount; i++) {
                     float angleOffset = launchCount == 1 ? 0 : i * MULTISHOT_ANGLE_DELTA - MULTISHOT_ANGLE_DELTA;
                     Vector3 dir = aimDir.yRot(angleOffset * NukkitMath.DEG_TO_RAD);
-                    ((ItemFirework) chargedItem).spawnFirework(player.level, pos, dir);
+                    ((ItemFirework) chargedItem).spawnFirework(player.level, pos, dir, player);
                 }
                 this.useArrow(player);
             }
@@ -282,7 +283,7 @@ public class ItemCrossbow extends ItemBow {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_8_0;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_8_0;
     }
 }

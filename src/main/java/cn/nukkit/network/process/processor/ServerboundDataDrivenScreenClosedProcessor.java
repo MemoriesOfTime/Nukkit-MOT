@@ -14,14 +14,19 @@ public class ServerboundDataDrivenScreenClosedProcessor extends DataPacketProces
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull ServerboundDataDrivenScreenClosedPacket pk) {
-        DataDrivenScreen screen = DataDrivenScreen.getActiveScreen(playerHandle.player);
-        if (screen != null) {
-            screen.removeViewer(playerHandle.player);
-
-            ClientboundDataDrivenUICloseScreenPacket closePacket = new ClientboundDataDrivenUICloseScreenPacket();
-            closePacket.formId = pk.formId;
-            playerHandle.player.dataPacket(closePacket);
+        // Look up the screen by formId from the close packet, NOT by active screen
+        DataDrivenScreen screen = DataDrivenScreen.getScreenByFormId(playerHandle.player, pk.formId);
+        if (screen == null) {
+            // Screen already closed or invalid formId, ignore
+            return;
         }
+
+        screen.removeViewer(playerHandle.player);
+
+        // Send close confirmation packet with the formId from the client's close request
+        ClientboundDataDrivenUICloseScreenPacket closePacket = new ClientboundDataDrivenUICloseScreenPacket();
+        closePacket.formId = pk.formId;
+        playerHandle.player.dataPacket(closePacket);
     }
 
     @Override

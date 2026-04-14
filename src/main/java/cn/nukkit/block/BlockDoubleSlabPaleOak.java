@@ -42,14 +42,14 @@ public class BlockDoubleSlabPaleOak extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(PALE_OAK_SLAB));
+        return Item.fromString("minecraft:pale_oak_slab");
     }
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{
-                Item.get(Item.PALE_OAK_SLAB, 0, 2)
-        };
+        Item slab = toItem();
+        slab.setCount(2);
+        return new Item[]{ slab };
     }
 
     @Override

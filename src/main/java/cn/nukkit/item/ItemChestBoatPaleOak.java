@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemChestBoatPaleOak extends ItemChestBoatBase {
@@ -22,7 +23,7 @@ public class ItemChestBoatPaleOak extends ItemChestBoatBase {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_21_50;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_21_50;
     }
 }

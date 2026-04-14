@@ -350,15 +350,20 @@ public class RuntimeItemMapping {
         int protocolId = gameVersion.getProtocol();
         String identifier = json.get("id").getAsString();
         LegacyEntry legacyEntry = this.fromIdentifier(identifier);
+        int[] flattenedEntry = null;
         if (legacyEntry == null || !Utils.hasItemOrBlock(legacyEntry.getLegacyId())) {
+            flattenedEntry = RuntimeItems.getLegacyFromFlattenedId(identifier);
+            if (flattenedEntry != null && !Utils.hasItemOrBlock(flattenedEntry[0])) {
+                flattenedEntry = null;
+            }
             OptionalInt networkId = this.getNetworkIdByNamespaceId(identifier);
-            if (networkId.isEmpty() || !Item.NAMESPACED_ID_ITEM.containsKey(identifier)) {
+            if (flattenedEntry == null && (networkId.isEmpty() || !Item.NAMESPACED_ID_ITEM.containsKey(identifier))) {
                 if (!ignoreUnknown) {
                     throw new IllegalStateException("Can not find legacyEntry for " + identifier);
                 }
                 log.trace("Can not find legacyEntry for " + identifier);
                 return null;
-            } else {
+            } else if (flattenedEntry == null) {
                 legacyEntry = null;
             }
         }
@@ -375,25 +380,50 @@ public class RuntimeItemMapping {
         int legacyId = ItemID.STRING_IDENTIFIED_ITEM;
         if (legacyEntry != null) {
             legacyId = legacyEntry.getLegacyId();
+        } else if (flattenedEntry != null) {
+            legacyId = flattenedEntry[0];
         }
         int damage = 0;
         if (json.has("damage")) {
             damage = json.get("damage").getAsInt();
         } else if (legacyEntry != null && legacyEntry.isHasDamage()) {
             damage = legacyEntry.getDamage();
+        } else if (json.has("block_state_b64")) {
+            byte[] blockStateBytes = Base64.getDecoder().decode(json.get("block_state_b64").getAsString());
+            int fullId = resolveLegacyFullIdFromBlockState(gameVersion, identifier, blockStateBytes, ignoreUnknown);
+            if (fullId == -1) {
+                if (flattenedEntry != null) {
+                    damage = flattenedEntry[1];
+                } else if (legacyEntry == null) {
+                    return null;
+                }
+                damage = resolveLegacyDamageFromBlockStateFallback(legacyId, damage, blockStateBytes);
+            } else {
+                damage = fullId & Block.DATA_MASK;
+            }
         } else if (json.has("blockRuntimeId")) {
             int runtimeId = json.get("blockRuntimeId").getAsInt();
             if (runtimeId != 0) {
                 int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, runtimeId);
                 if (fullId == -1) {
-                    if (ignoreUnknown) {
-                        return null;
+                    if (flattenedEntry != null) {
+                        damage = flattenedEntry[1];
+                    } else if (legacyEntry != null) {
+                        // Keep the default item meta when the runtime block state no longer
+                        // matches the target protocol's block palette.
                     } else {
-                        throw new IllegalStateException("Can not find blockRuntimeId for " + identifier + " (" + runtimeId + ")");
+                        if (ignoreUnknown) {
+                            return null;
+                        } else {
+                            throw new IllegalStateException("Can not find blockRuntimeId for " + identifier + " (" + runtimeId + ")");
+                        }
                     }
+                } else {
+                    damage = fullId & Block.DATA_MASK;
                 }
-                damage = fullId & Block.DATA_MASK;
             }
+        } else if (flattenedEntry != null) {
+            damage = flattenedEntry[1];
         }
 
         if (legacyId == BlockID.RED_MUSHROOM_BLOCK || legacyId == BlockID.BROWN_MUSHROOM_BLOCK) {
@@ -401,15 +431,77 @@ public class RuntimeItemMapping {
         }
 
         int count = json.has("count") ? json.get("count").getAsInt() : 1;
+        Item item;
         if (legacyEntry != null) {
-            return Item.get(legacyId, damage, count, nbtBytes);
+            item = Item.get(legacyId, damage, count, nbtBytes);
         } else {
-            Item item = Item.fromString(identifier);
+            item = Item.fromString(identifier);
             item.setDamage(damage);
             item.setCount(count);
             item.setCompoundTag(nbtBytes);
+        }
+        return normalizeCreativeItemForTargetVersion(gameVersion, item);
+    }
+
+    private int resolveLegacyFullIdFromBlockState(GameVersion gameVersion, String identifier, byte[] blockStateBytes, boolean ignoreUnknown) {
+        try {
+            CompoundTag blockState = NBTIO.read(blockStateBytes, ByteOrder.BIG_ENDIAN, false);
+            int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, blockState);
+            if (fullId != -1) {
+                return fullId;
+            }
+        } catch (Exception e) {
+            if (!ignoreUnknown) {
+                throw new IllegalStateException("Can not decode block_state_b64 for " + identifier, e);
+            }
+            log.trace("Can not decode block_state_b64 for {}", identifier, e);
+            return -1;
+        }
+
+        if (!ignoreUnknown) {
+            throw new IllegalStateException("Can not find block state for " + identifier + " on " + gameVersion);
+        }
+        log.trace("Can not find block state for {} on {}", identifier, gameVersion);
+        return -1;
+    }
+
+    private int resolveLegacyDamageFromBlockStateFallback(int legacyId, int currentDamage, byte[] blockStateBytes) {
+        if (blockStateBytes.length == 0) {
+            return currentDamage;
+        }
+
+        try {
+            CompoundTag blockState = NBTIO.read(blockStateBytes, ByteOrder.BIG_ENDIAN, false);
+            CompoundTag states = blockState.getCompound("states");
+            int facingDirection;
+            if (states.containsInt("facing_direction")) {
+                facingDirection = states.getInt("facing_direction");
+            } else if (states.containsByte("facing_direction")) {
+                facingDirection = states.getByte("facing_direction");
+            } else {
+                return currentDamage;
+            }
+
+            return switch (legacyId) {
+                case BlockID.DROPPER, BlockID.DISPENSER, BlockID.PISTON, BlockID.STICKY_PISTON -> facingDirection;
+                default -> currentDamage;
+            };
+        } catch (Exception e) {
+            log.trace("Can not derive legacy damage from block_state_b64 for legacy id {}", legacyId, e);
+            return currentDamage;
+        }
+    }
+
+    private Item normalizeCreativeItemForTargetVersion(GameVersion gameVersion, Item item) {
+        if (gameVersion.getProtocol() > ProtocolInfo.v1_17_40 || item.getId() != Item.BANNER || !item.hasCompoundTag()) {
             return item;
         }
+
+        CompoundTag tag = item.getNamedTag();
+        if (tag != null && tag.getTags().size() == 1 && tag.containsInt("Type") && tag.getInt("Type") == 0) {
+            item.clearNamedTag();
+        }
+        return item;
     }
 
 

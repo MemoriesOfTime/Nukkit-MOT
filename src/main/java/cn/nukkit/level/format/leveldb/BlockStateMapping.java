@@ -18,13 +18,14 @@ import org.cloudburstmc.blockstateupdater.util.tagupdater.CompoundTagUpdaterCont
 import org.cloudburstmc.nbt.NbtMap;
 import org.cloudburstmc.protocol.common.util.Preconditions;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Log4j2
 public class BlockStateMapping {
+
+    static final int MAX_CUSTOM_STATE_CACHE_SIZE = 4096;
 
     private static final BlockStateMapping INSTANCE = new BlockStateMapping(GameVersion.getFeatureVersion());
     private static final CompoundTagUpdaterContext CONTEXT;
@@ -54,17 +55,17 @@ public class BlockStateMapping {
             return Objects.equals(nbtMap, nbtMap2);
         }
     });
-    private final Object2ObjectMap<NbtMap, BlockStateSnapshot> customCacheMap = new Object2ObjectOpenCustomHashMap<>(new Hash.Strategy<>() {
+    private final AtomicInteger customCacheEvictions = new AtomicInteger();
+    private final Map<NbtMap, BlockStateSnapshot> customCacheMap = new LinkedHashMap<>(256, 0.75f, true) {
         @Override
-        public int hashCode(NbtMap nbtMap) {
-            return nbtMap.hashCode();
+        protected boolean removeEldestEntry(Map.Entry<NbtMap, BlockStateSnapshot> eldest) {
+            boolean shouldRemove = this.size() > MAX_CUSTOM_STATE_CACHE_SIZE;
+            if (shouldRemove) {
+                customCacheEvictions.incrementAndGet();
+            }
+            return shouldRemove;
         }
-
-        @Override
-        public boolean equals(NbtMap nbtMap, NbtMap nbtMap2) {
-            return Objects.equals(nbtMap, nbtMap2);
-        }
-    });
+    };
 
     static {
         INSTANCE.setLegacyMapper(new NukkitLegacyMapper());
@@ -148,6 +149,10 @@ public class BlockStateMapping {
     public void clearMapping() {
         this.runtime2State.clear();
         this.paletteMap.clear();
+        synchronized (this.customCacheMap) {
+            this.customCacheMap.clear();
+        }
+        this.customCacheEvictions.set(0);
     }
 
     public void setLegacyMapper(LegacyStateMapper legacyStateMapper) {
@@ -314,18 +319,36 @@ public class BlockStateMapping {
             return blockState;
         }
 
-        blockState = this.customCacheMap.get(state);
-        if (blockState != null) {
+        synchronized (this.customCacheMap) {
+            blockState = this.customCacheMap.get(state);
+            if (blockState != null) {
+                return blockState;
+            }
+
+            blockState = BlockStateSnapshot.builder()
+                    .vanillaState(state)
+                    .runtimeId(this.getDefaultState().getRuntimeId())
+                    .version(this.version)
+                    .custom(true)
+                    .build();
+            this.customCacheMap.put(state, blockState);
             return blockState;
         }
+    }
 
-        blockState = BlockStateSnapshot.builder()
-                .vanillaState(state)
-                .runtimeId(this.getDefaultState().getRuntimeId())
-                .version(this.version)
-                .custom(true)
-                .build();
-        this.customCacheMap.put(state, blockState);
-        return blockState;
+    /**
+     * Returns the current number of cached custom states for bounded-cache assertions in tests.
+     */
+    int getCustomCacheSizeForTesting() {
+        synchronized (this.customCacheMap) {
+            return this.customCacheMap.size();
+        }
+    }
+
+    /**
+     * Returns how many custom cache entries were evicted by the LRU policy during tests.
+     */
+    int getCustomCacheEvictionsForTesting() {
+        return this.customCacheEvictions.get();
     }
 }

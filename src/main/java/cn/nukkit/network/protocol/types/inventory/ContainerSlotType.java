@@ -1,5 +1,7 @@
 package cn.nukkit.network.protocol.types.inventory;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 
 public enum ContainerSlotType {
@@ -92,8 +94,56 @@ public enum ContainerSlotType {
         return id;
     }
 
+    public int getId(GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
+        if (protocol >= ProtocolInfo.v1_21_20) {
+            return this.id;
+        }
+        if (protocol >= ProtocolInfo.v1_20_50) {
+            if (this == DYNAMIC_CONTAINER) {
+                throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+            }
+            return this.id;
+        }
+        if (protocol >= ProtocolInfo.v1_19_80) {
+            if (this == CRAFTER_BLOCK_CONTAINER || this == DYNAMIC_CONTAINER) {
+                throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+            }
+            return this.id;
+        }
+        if (protocol >= ProtocolInfo.v1_19_50) {
+            if (this == SMITHING_TABLE_TEMPLATE || this == CRAFTER_BLOCK_CONTAINER || this == DYNAMIC_CONTAINER) {
+                throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+            }
+            return this.id;
+        }
+        if (this == RECIPE_BOOK || this == SMITHING_TABLE_TEMPLATE || this == CRAFTER_BLOCK_CONTAINER || this == DYNAMIC_CONTAINER) {
+            throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+        }
+        return this.id >= RECIPE_BOOK.id ? this.id - 1 : this.id;
+    }
 
     public static ContainerSlotType fromId(int id) {
         return VALUES.get(id);
+    }
+
+    public static ContainerSlotType fromId(int id, GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
+        if (protocol >= ProtocolInfo.v1_21_20) {
+            return fromId(id);
+        }
+        if (protocol >= ProtocolInfo.v1_20_50) {
+            return id == DYNAMIC_CONTAINER.id ? null : fromId(id);
+        }
+        if (protocol >= ProtocolInfo.v1_19_80) {
+            return id >= CRAFTER_BLOCK_CONTAINER.id ? null : fromId(id);
+        }
+        if (protocol >= ProtocolInfo.v1_19_50) {
+            return id >= SMITHING_TABLE_TEMPLATE.id ? null : fromId(id);
+        }
+        if (id < 0 || id > CREATED_OUTPUT.id - 1) {
+            return null;
+        }
+        return fromId(id >= RECIPE_BOOK.id ? id + 1 : id);
     }
 }

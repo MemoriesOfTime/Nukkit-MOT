@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemDiscFragment5 extends Item {
@@ -17,7 +18,7 @@ public class ItemDiscFragment5 extends Item {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_19_0_29;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_19_0_29;
     }
 }

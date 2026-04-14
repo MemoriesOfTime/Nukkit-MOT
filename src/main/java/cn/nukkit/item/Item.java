@@ -659,7 +659,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static CreativeItems getCreativeItemsAndGroups(int protocol) {
-        return CREATIVE_ITEMS;
+        return getCreativeItemsAndGroups();
     }
 
     /**
@@ -667,7 +667,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static CreativeItems getCreativeItemsAndGroups(GameVersion protocol) {
-        return CREATIVE_ITEMS;
+        return getCreativeItemsAndGroups();
     }
 
     public static void addCreativeItem(Item item) {
@@ -743,14 +743,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
-    /**
-     * @deprecated Use {@link #isCreativeItem(Item)} instead, version parameter is no longer used
-     */
-    @Deprecated
-    public static boolean isCreativeItem(int protocol, Item item) {
-        return isCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
-    }
-
     public static boolean isCreativeItem(GameVersion gameVersion, Item item) {
         for (Item aCreative : Item.getCreativeItemsAndGroups().getItems(gameVersion)) {
             if (item.equals(aCreative, !item.isTool())) {
@@ -760,9 +752,16 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    /**
+     * @deprecated Use {@link #isCreativeItem(Item)} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static boolean isCreativeItem(int protocol, Item item) {
+        return isCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
+    }
+
     public static Item getCreativeItem(int index) {
-        ArrayList<Item> items = Item.getCreativeItems();
-        return (index >= 0 && index < items.size()) ? items.get(index) : null;
+        return getCreativeItem(Item.getCreativeItems(), index);
     }
 
     /**
@@ -770,7 +769,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static Item getCreativeItem(int protocol, int index) {
-        return getCreativeItem(index);
+        return getCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), index);
     }
 
     /**
@@ -778,17 +777,15 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static Item getCreativeItem(GameVersion gameVersion, int index) {
-        return getCreativeItem(index);
+        return getCreativeItem(Item.getCreativeItems(gameVersion), index);
     }
 
     public static int getCreativeItemIndex(Item item) {
-        ArrayList<Item> items = Item.getCreativeItems();
-        for (int i = 0; i < items.size(); i++) {
-            if (item.equals(items.get(i), !item.isTool())) {
-                return i;
-            }
-        }
-        return -1;
+        return getCreativeItemIndex(Item.getCreativeItems(), item);
+    }
+
+    public static int getCreativeItemIndex(GameVersion gameVersion, Item item) {
+        return getCreativeItemIndex(Item.getCreativeItems(gameVersion), item);
     }
 
     /**
@@ -796,15 +793,20 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static int getCreativeItemIndex(int protocol, Item item) {
-        return getCreativeItemIndex(item);
+        return getCreativeItemIndex(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
     }
 
-    /**
-     * @deprecated Use {@link #getCreativeItemIndex(Item)} instead, version parameter is no longer used
-     */
-    @Deprecated
-    public static int getCreativeItemIndex(GameVersion gameVersion, Item item) {
-        return getCreativeItemIndex(item);
+    private static Item getCreativeItem(ArrayList<Item> items, int index) {
+        return (index >= 0 && index < items.size()) ? items.get(index) : null;
+    }
+
+    private static int getCreativeItemIndex(ArrayList<Item> items, Item item) {
+        for (int i = 0; i < items.size(); i++) {
+            if (item.equals(items.get(i), !item.isTool())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     @SneakyThrows
@@ -1917,6 +1919,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * @param protocolId 协议版本 protocol version
      * @return 是否支持 whether supported
      */
+    @Deprecated
     public boolean isSupportedOn(int protocolId) {
         return this.isSupportedOn(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
     }
@@ -1930,12 +1933,14 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * @return 是否支持 whether supported
      */
     public boolean isSupportedOn(GameVersion protocolId) {
-        int itemId = this.getId();
+        return this.isSupportedOnMapping(protocolId);
+    }
 
-        if (itemId >= 0 && itemId <= 255) {
+    private boolean isSupportedOnMapping(GameVersion protocolId) {
+        int itemId = this.getId();
+        if (itemId == AIR) {
             return true;
         }
-
         return RuntimeItems.getMapping(protocolId).isRegistered(itemId, this.getDamage());
     }
 
@@ -2024,6 +2029,28 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
         public List<CreativeItemGroup> getGroups() {
             return groups;
+        }
+
+        /**
+         * Get creative groups referenced by items supported on the specified protocol version.
+         */
+        public List<CreativeItemGroup> getGroups(GameVersion protocol) {
+            if (protocol == GameVersion.getLastVersion()) {
+                return groups;
+            }
+            Set<CreativeItemGroup> referencedGroups = new HashSet<>();
+            for (CreativeItemGroup group : getContents(protocol).values()) {
+                if (group != null) {
+                    referencedGroups.add(group);
+                }
+            }
+            ArrayList<CreativeItemGroup> versionGroups = new ArrayList<>(referencedGroups.size());
+            for (CreativeItemGroup group : groups) {
+                if (referencedGroups.contains(group)) {
+                    versionGroups.add(group);
+                }
+            }
+            return versionGroups;
         }
 
         public Map<Item, CreativeItemGroup> getContents() {
