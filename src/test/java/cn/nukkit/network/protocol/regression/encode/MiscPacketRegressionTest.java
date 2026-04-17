@@ -1,9 +1,11 @@
 package cn.nukkit.network.protocol.regression.encode;
 
 import cn.nukkit.MockServer;
+import cn.nukkit.Player;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
@@ -18,6 +20,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,6 +44,56 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
         MockServer.init();
         network = new Network(MockServer.get());
         org.mockito.Mockito.lenient().when(MockServer.get().getNetwork()).thenReturn(network);
+    }
+
+    @Test
+    void testLegacy113LoginPacketBatchDecodesWhenPlayerProtocolUnknown() {
+        Player player = org.mockito.Mockito.mock(Player.class);
+        player.protocol = Integer.MAX_VALUE;
+
+        byte[] skinBytes = new byte[64 * 32 * 4];
+        java.util.UUID clientUuid = java.util.UUID.fromString("12345678-1234-5678-9abc-def012345678");
+        byte[] batchPayload = buildLegacy113LoginBatch("TestUser", clientUuid, 12345L, skinBytes);
+
+        var packets = new ArrayList<DataPacket>();
+        assertTrue(network.processBatch(batchPayload, packets, CompressionProvider.NONE, 7, player));
+        assertEquals(1, packets.size());
+        assertInstanceOf(LoginPacket.class, packets.get(0));
+
+        LoginPacket loginPacket = (LoginPacket) packets.get(0);
+        assertEquals(ProtocolInfo.v1_1_0, loginPacket.getProtocol());
+        assertEquals("TestUser", loginPacket.username);
+        assertEquals(clientUuid, loginPacket.clientUUID);
+        assertEquals(12345L, loginPacket.clientId);
+        assertNotNull(loginPacket.skin);
+        assertEquals("legacy-skin", loginPacket.skin.getSkinId());
+        assertEquals(64, loginPacket.skin.getSkinData().width);
+        assertEquals(32, loginPacket.skin.getSkinData().height);
+    }
+
+    @Test
+    void testLegacy137LoginPacketBatchDecodesWhenPlayerProtocolUnknown() {
+        Player player = org.mockito.Mockito.mock(Player.class);
+        player.protocol = Integer.MAX_VALUE;
+
+        byte[] skinBytes = new byte[64 * 32 * 4];
+        java.util.UUID clientUuid = java.util.UUID.fromString("87654321-4321-8765-cba9-876543210fed");
+        byte[] batchPayload = buildLegacy137LoginBatch("TestUser137", clientUuid, 54321L, skinBytes);
+
+        var packets = new ArrayList<DataPacket>();
+        assertTrue(network.processBatch(batchPayload, packets, CompressionProvider.NONE, 8, player));
+        assertEquals(1, packets.size());
+        assertInstanceOf(LoginPacket.class, packets.get(0));
+
+        LoginPacket loginPacket = (LoginPacket) packets.get(0);
+        assertEquals(ProtocolInfo.v1_2_0, loginPacket.getProtocol());
+        assertEquals("TestUser137", loginPacket.username);
+        assertEquals(clientUuid, loginPacket.clientUUID);
+        assertEquals(54321L, loginPacket.clientId);
+        assertNotNull(loginPacket.skin);
+        assertEquals("legacy137-skin", loginPacket.skin.getSkinId());
+        assertEquals(64, loginPacket.skin.getSkinData().width);
+        assertEquals(32, loginPacket.skin.getSkinData().height);
     }
 
     static Stream<Arguments> versionsFrom313to799() {
@@ -91,6 +146,72 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
         packet.encode();
         byte[] raw = packet.getBuffer();
         return Binary.bytesToHexString(Binary.subBytes(raw, 1, raw.length - 1));
+    }
+
+    private static byte[] buildLegacy113LoginBatch(String username, java.util.UUID clientUuid, long clientId, byte[] skinBytes) {
+        String authJwt = fakeJwt("{\"extraData\":{\"displayName\":\"" + username + "\",\"identity\":\"" + clientUuid + "\"}}");
+        String authPayload = "{\"chain\":[\"" + authJwt + "\"]}";
+        String skinJwt = fakeJwt("{\"ClientRandomId\":" + clientId
+                + ",\"SkinId\":\"legacy-skin\",\"SkinData\":\""
+                + Base64.getEncoder().encodeToString(skinBytes) + "\"}");
+
+        BinaryStream loginPayload = new BinaryStream();
+        byte[] authBytes = authPayload.getBytes(StandardCharsets.UTF_8);
+        byte[] skinTokenBytes = skinJwt.getBytes(StandardCharsets.UTF_8);
+        loginPayload.putLInt(authBytes.length);
+        loginPayload.put(authBytes);
+        loginPayload.putLInt(skinTokenBytes.length);
+        loginPayload.put(skinTokenBytes);
+
+        BinaryStream loginPacket = new BinaryStream();
+        loginPacket.putInt(ProtocolInfo.v1_1_0);
+        loginPacket.putByte((byte) 0); // gameEdition
+        loginPacket.putByteArray(loginPayload.getBuffer());
+
+        BinaryStream rawPacket = new BinaryStream();
+        rawPacket.putByte(LoginPacket.NETWORK_ID);
+        rawPacket.put(loginPacket.getBuffer());
+
+        BinaryStream batch = new BinaryStream();
+        batch.putByteArray(rawPacket.getBuffer());
+        return batch.getBuffer();
+    }
+
+    private static byte[] buildLegacy137LoginBatch(String username, java.util.UUID clientUuid, long clientId, byte[] skinBytes) {
+        String authJwt = fakeJwt("{\"extraData\":{\"displayName\":\"" + username + "\",\"identity\":\"" + clientUuid + "\"}}");
+        String authPayload = "{\"chain\":[\"" + authJwt + "\"]}";
+        String skinJwt = fakeJwt("{\"ClientRandomId\":" + clientId
+                + ",\"SkinId\":\"legacy137-skin\",\"SkinData\":\""
+                + Base64.getEncoder().encodeToString(skinBytes) + "\"}");
+
+        BinaryStream loginPayload = new BinaryStream();
+        byte[] authBytes = authPayload.getBytes(StandardCharsets.UTF_8);
+        byte[] skinTokenBytes = skinJwt.getBytes(StandardCharsets.UTF_8);
+        loginPayload.putLInt(authBytes.length);
+        loginPayload.put(authBytes);
+        loginPayload.putLInt(skinTokenBytes.length);
+        loginPayload.put(skinTokenBytes);
+
+        BinaryStream loginPacket = new BinaryStream();
+        loginPacket.putInt(ProtocolInfo.v1_2_0);
+        loginPacket.putByteArray(loginPayload.getBuffer());
+
+        BinaryStream rawPacket = new BinaryStream();
+        rawPacket.putByte(LoginPacket.NETWORK_ID);
+        rawPacket.putShort(0);
+        rawPacket.put(loginPacket.getBuffer());
+
+        BinaryStream batch = new BinaryStream();
+        batch.putByteArray(rawPacket.getBuffer());
+        return batch.getBuffer();
+    }
+
+    private static String fakeJwt(String payloadJson) {
+        return encodeBase64("{}") + "." + encodeBase64(payloadJson) + ".signature";
+    }
+
+    private static String encodeBase64(String value) {
+        return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
     @Test

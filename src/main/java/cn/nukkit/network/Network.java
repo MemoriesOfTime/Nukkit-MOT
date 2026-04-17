@@ -263,12 +263,18 @@ public class Network {
                         break;
                 }
 
-                DataPacket pk = this.getPacket(packetId, player == null ? ProtocolInfo.CURRENT_PROTOCOL : player.protocol);
+                int decodeProtocol = player == null ? ProtocolInfo.CURRENT_PROTOCOL : player.protocol;
+                if (decodeProtocol == Integer.MAX_VALUE && raknetProtocol <= 8) {
+                    decodeProtocol = raknetProtocol == 7 ? ProtocolInfo.v1_1_0 : ProtocolInfo.v1_2_0;
+                }
+
+                DataPacket pk = this.getPacket(packetId, decodeProtocol);
 
                 if (pk != null) {
                     if (player != null) {
-                        pk.protocol = player.protocol;
-                        pk.gameVersion = player.getGameVersion();
+                        pk.protocol = player.protocol == Integer.MAX_VALUE ? decodeProtocol : player.protocol;
+                        GameVersion playerGameVersion = player.getGameVersion();
+                        pk.gameVersion = playerGameVersion != null ? playerGameVersion : GameVersion.byProtocol(pk.protocol, false);
                     } else {
                         pk.protocol = Integer.MAX_VALUE;
                         pk.gameVersion = GameVersion.getLastVersion();
@@ -278,7 +284,15 @@ public class Network {
                         if (raknetProtocol > 8) {
                             pk.decode();
                         } else { // version < 1.6
-                            pk.setBuffer(buf, pk.protocol < ProtocolInfo.v1_2_0 ? 1 : 3);
+                            int headerLength;
+                            if (player != null && player.protocol == Integer.MAX_VALUE) {
+                                // Pre-login legacy clients have not negotiated a concrete MCPE protocol yet.
+                                // Infer the packet header width from the RakNet protocol to avoid misaligned LoginPacket decoding.
+                                headerLength = raknetProtocol == 7 ? 1 : 3;
+                            } else {
+                                headerLength = pk.protocol < ProtocolInfo.v1_2_0 ? 1 : 3;
+                            }
+                            pk.setBuffer(buf, headerLength);
                             pk.decode();
                         }
                     } catch (Exception e) {
