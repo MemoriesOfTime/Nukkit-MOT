@@ -759,6 +759,7 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals("world-1", cbPacket.getWorldId());
         assertEquals("scenario-1", cbPacket.getScenarioId());
         assertEquals("owner-1", cbPacket.getOwnerId());
+        assertFalse(cbPacket.isInventoriesServerAuthoritative());
     }
 
     @ParameterizedTest(name = "StartGamePacket v{0} (legacy minimal)")
@@ -806,6 +807,9 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(123L, cbPacket.getCurrentTick());
         assertEquals(org.cloudburstmc.protocol.bedrock.data.AuthoritativeMovementMode.SERVER,
                 cbPacket.getAuthoritativeMovementMode());
+        if (protocolVersion >= ProtocolInfo.v1_16_100) {
+            assertFalse(cbPacket.isInventoriesServerAuthoritative());
+        }
     }
 
     // ==================== ClientboundMapItemDataPacket ====================

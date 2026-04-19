@@ -70,6 +70,14 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersions(ProtocolInfo.v1_16_100);
     }
 
+    static Stream<Arguments> versionsAt712() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_21_20));
+    }
+
+    static Stream<Arguments> versionsAt729() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_21_30));
+    }
+
     static Stream<Arguments> versionsFrom465() {
         return filteredVersions(465);
     }
@@ -1465,6 +1473,82 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         } else {
             assertEquals("", item.getFilteredCustomName());
         }
+    }
+
+    @ParameterizedTest(name = "ItemStackResponsePacket v{0} should preserve full container name")
+    @MethodSource("versionsAt712")
+    void testItemStackResponsePacketV712ContainerName(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ItemStackResponsePacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        var responseSlot = new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot(
+                0,
+                0,
+                1,
+                77,
+                "",
+                0,
+                ""
+        );
+        nukkitPacket.entries.add(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse(
+                cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus.OK,
+                2,
+                java.util.List.of(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer(
+                        cn.nukkit.network.protocol.types.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                        java.util.List.of(responseSlot),
+                        new cn.nukkit.network.protocol.types.inventory.FullContainerName(
+                                cn.nukkit.network.protocol.types.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                                21
+                        )
+                ))
+        ));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket.class);
+
+        var container = cbPacket.getEntries().get(0).getContainers().get(0);
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                container.getContainerName().getContainer());
+        assertEquals(21, container.getContainerName().getDynamicId());
+    }
+
+    @ParameterizedTest(name = "ItemStackResponsePacket v{0} should preserve optional container dynamic id")
+    @MethodSource("versionsAt729")
+    void testItemStackResponsePacketV729OptionalContainerDynamicId(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ItemStackResponsePacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        var responseSlot = new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot(
+                1,
+                0,
+                2,
+                88,
+                "",
+                0,
+                ""
+        );
+        nukkitPacket.entries.add(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse(
+                cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus.OK,
+                3,
+                java.util.List.of(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer(
+                        cn.nukkit.network.protocol.types.inventory.ContainerSlotType.INVENTORY,
+                        java.util.List.of(responseSlot),
+                        new cn.nukkit.network.protocol.types.inventory.FullContainerName(
+                                cn.nukkit.network.protocol.types.inventory.ContainerSlotType.INVENTORY,
+                                null
+                        )
+                ))
+        ));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket.class);
+
+        var container = cbPacket.getEntries().get(0).getContainers().get(0);
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.INVENTORY,
+                container.getContainerName().getContainer());
+        assertNull(container.getContainerName().getDynamicId());
     }
 
     // ==================== CraftingDataPacket ====================

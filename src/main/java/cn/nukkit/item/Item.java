@@ -44,6 +44,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -80,6 +81,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
+    private static final AtomicInteger STACK_NETWORK_ID_COUNTER = new AtomicInteger(0);
     /**
      * 存储需要在 initCreativeItems 后重新添加的创造物品
      * Stores creative items that need to be re-added after initCreativeItems
@@ -96,6 +98,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private CompoundTag cachedNBT = null;
     public int count;
     protected String name;
+    /**
+     * Stack network id used by Server Authoritative Inventory (ItemStackRequest) to
+     * track a specific item instance across client-server round trips. Named
+     * {@code stackNetId} to avoid confusion with block/item runtime ids. 0 means the
+     * stack is not being tracked.
+     */
+    protected int stackNetId = 0;
 
     public Item(int id) {
         this(id, 0, 1, UNKNOWN_STR);
@@ -1858,6 +1867,58 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         } catch (CloneNotSupportedException e) {
             return null;
         }
+    }
+
+    /**
+     * Returns the stack network id assigned to this item instance. Stack network
+     * ids are allocated by Item's internal counter and used by the Server
+     * Authoritative Inventory (ItemStackRequest) flow to identify a specific
+     * stack across client-server round trips. Returns 0 when the stack is not
+     * being tracked (for example, items produced by legacy
+     * {@code InventoryTransactionPacket} paths).
+     *
+     * @return the stack network id, or 0 when unassigned
+     */
+    public int getStackNetId() {
+        return this.stackNetId;
+    }
+
+    /**
+     * Sets the stack network id for this item instance. Used by the
+     * ItemStackRequest handler to echo the client-supplied id back in the
+     * response, or by callers that want to reuse an existing id after cloning.
+     * Pass 0 to mark the stack as untracked.
+     *
+     * @param stackNetId the stack network id to assign (0 to clear)
+     * @return this item for chaining
+     */
+    public Item setStackNetId(int stackNetId) {
+        this.stackNetId = stackNetId;
+        return this;
+    }
+
+    /**
+     * Indicates whether this item instance carries a valid stack network id.
+     * Allocated ids are always positive; 0 means untracked.
+     *
+     * @return {@code true} when {@link #stackNetId} is greater than 0
+     */
+    public boolean isUsingStackNetId() {
+        return this.stackNetId > 0;
+    }
+
+    /**
+     * Allocates a fresh positive stack network id from Item's internal counter
+     * and assigns it to this item. Call this whenever a new, distinct stack is
+     * produced server-side (for example, the output of a crafting / enchanting
+     * / grindstone operation) so the client can reference it in subsequent
+     * {@code ItemStackRequest} actions.
+     *
+     * @return this item for chaining
+     */
+    public Item autoAssignStackNetworkId() {
+        this.stackNetId = STACK_NETWORK_ID_COUNTER.updateAndGet(current -> current == Integer.MAX_VALUE ? 1 : current + 1);
+        return this;
     }
 
     /**

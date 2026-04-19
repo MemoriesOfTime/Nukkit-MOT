@@ -42,11 +42,12 @@ public class InventoryContentPacket extends DataPacket {
     /**
      * @since v748
      */
-    public Item storageItem;
+    public Item storageItem = Item.AIR_ITEM.clone();
 
     @Override
     public DataPacket clean() {
         this.slots = Item.EMPTY_ARRAY;
+        this.storageItem = Item.AIR_ITEM.clone();
         return super.clean();
     }
 

@@ -592,6 +592,8 @@ public class Network {
                 .registerPacket(ProtocolInfo.CORRECT_PLAYER_MOVE_PREDICTION_PACKET, CorrectPlayerMovePredictionPacket.class)
                 .registerPacket(ProtocolInfo.ITEM_COMPONENT_PACKET, ItemComponentPacket.class)
                 .registerPacket(ProtocolInfo.FILTER_TEXT_PACKET, FilterTextPacket.class)
+                .registerPacket(ProtocolInfo.ITEM_STACK_REQUEST_PACKET, ItemStackRequestPacket.class)
+                .registerPacket(ProtocolInfo.ITEM_STACK_RESPONSE_PACKET, ItemStackResponsePacket.class)
                 .registerPacket(ProtocolInfo.SYNC_ENTITY_PROPERTY_PACKET, SyncEntityPropertyPacket.class)
                 .registerPacket(ProtocolInfo.NPC_DIALOGUE_PACKET, NPCDialoguePacket.class)
                 .registerPacket(ProtocolInfo.TOAST_REQUEST_PACKET, ToastRequestPacket.class)

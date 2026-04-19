@@ -1,16 +1,45 @@
 package cn.nukkit.network.protocol;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
 import lombok.Value;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @ToString
 public class PlayerEnchantOptionsPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.PLAYER_ENCHANT_OPTIONS_PACKET;
+
+    /**
+     * Base recipe ID for enchantment options. Values >= this are treated as
+     * enchantment recipes by the ItemStackRequest CraftRecipe flow.
+     */
+    public static final int ENCH_RECIPEID = 0x10000000;
+
+    private static final AtomicInteger ENCH_COUNTER = new AtomicInteger(0);
+
+    /**
+     * Lookup table of enchantment option data by assigned enchant net ID. Populated
+     * by the server when sending enchantment options to a player so the subsequent
+     * CraftRecipeAction can resolve the selected option.
+     */
+    public static final Int2ObjectMap<EnchantOptionData> RECIPE_MAP = new Int2ObjectOpenHashMap<>();
+
+    /**
+     * Allocate a new enchant recipe ID and register the option in RECIPE_MAP.
+     * The caller should ensure the returned ID is written into the option's
+     * enchantNetId field before sending the packet to the client.
+     */
+    public static int assignRecipeId(EnchantOptionData option) {
+        int id = ENCH_RECIPEID + ENCH_COUNTER.incrementAndGet();
+        RECIPE_MAP.put(id, option);
+        return id;
+    }
 
     public final List<EnchantOptionData> options = new ArrayList<>();
 
@@ -27,7 +56,7 @@ public class PlayerEnchantOptionsPacket extends DataPacket {
         }
         for (int i = 0; i < size; i++) {
             int minLevel = (int) this.getUnsignedVarInt();
-            int slot = this.getInt();
+            int slot = this.getLInt();
 
             int eSize = (int) this.getUnsignedVarInt();
             if (eSize > 1000) {
@@ -71,7 +100,7 @@ public class PlayerEnchantOptionsPacket extends DataPacket {
         this.putUnsignedVarInt(this.options.size());
         for (EnchantOptionData option : this.options) {
             this.putUnsignedVarInt(option.getMinLevel());
-            this.putInt(option.getPrimarySlot());
+            this.putLInt(option.getPrimarySlot());
             this.putUnsignedVarInt(option.getEnchants0().size());
             for (EnchantData data : option.getEnchants0()) {
                 this.putByte((byte) data.getType());
