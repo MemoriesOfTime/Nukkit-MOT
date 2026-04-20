@@ -6,6 +6,8 @@ import cn.nukkit.entity.EntityControllable;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityRideable;
 import cn.nukkit.entity.data.Vector3fEntityData;
+import cn.nukkit.inventory.HorseInventory;
+import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
@@ -24,9 +26,12 @@ import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
 /**
  * @author PetteriM1
  */
-public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideable, EntityControllable {
+public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideable, EntityControllable, InventoryHolder {
+
+    private static final String TAG_CHEST_ITEMS = "ChestItems";
 
     private boolean saddled;
+    private HorseInventory horseInventory;
 
     public EntityHorseBase(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -46,8 +51,18 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
     protected void initEntity() {
         super.initEntity();
 
-        if (this.namedTag.contains("Saddle")) {
-            this.setSaddled(this.namedTag.getBoolean("Saddle"));
+        this.horseInventory = new HorseInventory(this, this.getChestSize());
+        if (this.namedTag.containsList(TAG_CHEST_ITEMS)) {
+            this.horseInventory.loadFromNBT(this.namedTag.getList(TAG_CHEST_ITEMS, CompoundTag.class));
+        }
+
+        boolean hasSaddleItem = !this.horseInventory.getItem(HorseInventory.SLOT_SADDLE).isNull();
+        boolean legacySaddle = this.namedTag.contains("Saddle") && this.namedTag.getBoolean("Saddle");
+        if (hasSaddleItem || legacySaddle) {
+            this.setSaddled(true);
+            if (!hasSaddleItem) {
+                this.horseInventory.applySaddleWithoutSync(Item.get(Item.SADDLE));
+            }
         }
     }
 
@@ -55,6 +70,22 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
     public void saveNBT() {
         super.saveNBT();
         this.namedTag.putBoolean("Saddle", this.isSaddled());
+        if (this.horseInventory != null) {
+            this.namedTag.putList(TAG_CHEST_ITEMS, this.horseInventory.saveToNBT());
+        }
+    }
+
+    @Override
+    public HorseInventory getInventory() {
+        return this.horseInventory;
+    }
+
+    /**
+     * Number of additional storage slots beyond saddle (0) and armor (1).
+     * Defaults to 0; chested horses (donkey/mule/llama) override.
+     */
+    protected int getChestSize() {
+        return 0;
     }
 
     @Override
@@ -118,6 +149,14 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
         if (this.canBeSaddled()) {
             this.saddled = saddled;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_SADDLED, saddled);
+            if (this.horseInventory != null) {
+                Item current = this.horseInventory.getItem(HorseInventory.SLOT_SADDLE);
+                boolean slotHasSaddle = !current.isNull();
+                if (saddled != slotHasSaddle) {
+                    Item target = saddled ? Item.get(Item.SADDLE) : Item.get(Item.AIR);
+                    this.horseInventory.applySaddleWithoutSync(target);
+                }
+            }
         }
     }
 

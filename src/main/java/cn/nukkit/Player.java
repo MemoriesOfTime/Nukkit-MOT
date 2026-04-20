@@ -39,6 +39,7 @@ import cn.nukkit.event.server.DataPacketSendEvent;
 import cn.nukkit.form.window.FormWindow;
 import cn.nukkit.form.window.FormWindowDialog;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.request.ItemStackRequestHandler;
 import cn.nukkit.inventory.transaction.*;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.data.ReleaseItemData;
@@ -3065,6 +3066,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         startGamePacket.authoritativeMovementMode = this.getAuthoritativeMovementMode();
         startGamePacket.isServerAuthoritativeBlockBreaking = this.isServerAuthoritativeBlockBreaking();
+        startGamePacket.isInventoryServerAuthoritative = this.isInventoryServerAuthoritative();
         startGamePacket.blockNetworkIdsHashed = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(this.gameVersion);
         startGamePacket.playerPropertyData = EntityProperty.getPlayerPropertyCache();
         this.forceDataPacket(startGamePacket, null);
@@ -3925,6 +3927,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.newPosition = clientPosition;
                     }
                     this.forceMovement = null;
+                }
+
+                // 处理 ItemStackRequest（v1.16.100+ 客户端通过 PlayerAuthInputPacket 发送物品栏操作）
+                if (this.isInventoryServerAuthoritative() && authPacket.getItemStackRequest() != null) {
+                    ItemStackRequestHandler.handleRequests(this, List.of(authPacket.getItemStackRequest()));
                 }
                 break;
             case ProtocolInfo.PLAYER_ACTION_PACKET:
@@ -7944,6 +7951,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public boolean isServerAuthoritativeBlockBreaking() {
         return this.server.serverAuthoritativeBlockBreaking && this.isMovementServerAuthoritative();
+    }
+
+    /**
+     * Check if server authoritative inventory is enabled for this player
+     * @return true if enabled and protocol supports it
+     */
+    public boolean isInventoryServerAuthoritative() {
+        return this.server.serverAuthoritativeInventory && this.protocol >= ProtocolInfo.v1_16_100;
     }
 
     public boolean isEnableNetworkEncryption() {

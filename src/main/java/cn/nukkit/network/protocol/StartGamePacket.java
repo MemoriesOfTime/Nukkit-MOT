@@ -123,6 +123,11 @@ public class StartGamePacket extends DataPacket {
     public AuthoritativeMovementMode authoritativeMovementMode;
     public int rewindHistorySize;
     public boolean isServerAuthoritativeBlockBreaking;
+    /**
+     * Server authoritative inventory mode
+     * @since v1.16.100 (protocol 407+)
+     */
+    public boolean isInventoryServerAuthoritative;
     public long currentTick;
     public int enchantmentSeed;
     public Collection<CustomBlockDefinition> blockDefinitions = CustomBlockManager.get().getBlockDefinitions();
@@ -396,7 +401,7 @@ public class StartGamePacket extends DataPacket {
             if (protocol == 354 && version != null && version.startsWith("1.11.4")) {
                 this.putBoolean(this.isOnlySpawningV1Villagers);
             } else if (protocol >= ProtocolInfo.v1_16_0) {
-                this.putBoolean(false); // isInventoryServerAuthoritative
+                this.putBoolean(this.isInventoryServerAuthoritative);
                 if (protocol >= ProtocolInfo.v1_16_230_50) {
                     this.putString(""); // serverEngine
                     if (protocol >= ProtocolInfo.v1_18_0) {

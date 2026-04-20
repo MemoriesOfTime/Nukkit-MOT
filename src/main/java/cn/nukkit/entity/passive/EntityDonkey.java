@@ -118,4 +118,9 @@ public class EntityDonkey extends EntityHorseBase {
         this.chested = chested;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CHESTED, chested);
     }
+
+    @Override
+    protected int getChestSize() {
+        return this.chested ? 15 : 0;
+    }
 }

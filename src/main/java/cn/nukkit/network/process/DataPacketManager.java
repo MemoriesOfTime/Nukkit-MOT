@@ -222,6 +222,11 @@ public final class DataPacketManager {
         );
 
         registerProcessor(
+                ProtocolInfo.v1_16_100,
+                ItemStackRequestProcessor.INSTANCE
+        );
+
+        registerProcessor(
                 ProtocolInfo.v1_19_0,
                 RequestAbilityProcessor_v527.INSTANCE
         );
