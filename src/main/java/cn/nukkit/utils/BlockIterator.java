@@ -27,6 +27,7 @@ public class BlockIterator implements Iterator<Block> {
 
     private final Vector3[] vector3Queue;
     private int currentBlock;
+    private Vector3 pendingBlock;
 
     private int currentDistance;
     private final int maxDistanceInt;
@@ -190,7 +191,8 @@ public class BlockIterator implements Iterator<Block> {
         }
 
         if (!startBlockFound) {
-            throw new IllegalStateException("Start block missed in BlockIterator");
+            this.pendingBlock = new Vector3(startBlock.x, startBlock.y, startBlock.z);
+            this.currentBlock = 0;
         }
 
         this.maxDistanceInt = (int) Math.round(maxDistance / (Math.sqrt(mainDirection * mainDirection + secondDirection * secondDirection + thirdDirection * thirdDirection) / mainDirection));
@@ -243,6 +245,12 @@ public class BlockIterator implements Iterator<Block> {
      */
     @Override
     public Block next() {
+        if (this.pendingBlock != null) {
+            Vector3 block = this.pendingBlock;
+            this.pendingBlock = null;
+            return Objects.requireNonNull(this.level.get(), "Level has been unloaded").getBlock(block);
+        }
+
         this.scan();
 
         if (this.currentBlock <= -1) {
@@ -256,6 +264,10 @@ public class BlockIterator implements Iterator<Block> {
      */
     @Override
     public boolean hasNext() {
+        if (this.pendingBlock != null) {
+            return true;
+        }
+
         this.scan();
         return this.currentBlock != -1;
     }

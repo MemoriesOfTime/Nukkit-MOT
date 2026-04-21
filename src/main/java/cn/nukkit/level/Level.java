@@ -1153,8 +1153,10 @@ public class Level implements ChunkManager, Metadatable {
                         int chunkZ = Level.getHashZ(index);
                         if (blocks == null || blocks.size() > MAX_BLOCK_CACHE) {
                             FullChunk chunk = this.getChunk(chunkX, chunkZ);
-                            for (Player p : this.getChunkPlayers(chunkX, chunkZ).values()) {
-                                p.onChunkChanged(chunk);
+                            if (chunk != null) {
+                                for (Player p : this.getChunkPlayers(chunkX, chunkZ).values()) {
+                                    p.onChunkChanged(chunk);
+                                }
                             }
                         } else {
                             Player[] playerArray = this.getChunkPlayers(chunkX, chunkZ).values().toArray(Player.EMPTY_ARRAY);
