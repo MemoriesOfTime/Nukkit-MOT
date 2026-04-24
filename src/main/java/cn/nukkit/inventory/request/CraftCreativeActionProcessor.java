@@ -43,7 +43,8 @@ public class CraftCreativeActionProcessor implements ItemStackRequestActionProce
         }
 
         item = item.clone();
-        item.setCount(item.getMaxStackSize());
+        int requestedCount = Math.max(1, action.getNumberOfRequestedCrafts());
+        item.setCount(Math.min(item.getMaxStackSize(), requestedCount));
         item.autoAssignStackNetworkId();
 
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, item, false);

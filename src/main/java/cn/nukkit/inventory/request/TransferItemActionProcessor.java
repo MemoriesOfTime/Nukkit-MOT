@@ -3,7 +3,11 @@ package cn.nukkit.inventory.request;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.InventoryClickEvent;
+import cn.nukkit.event.player.PlayerTransferItemEvent;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.PlayerInventory;
+import cn.nukkit.inventory.PlayerUIComponent;
+import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
@@ -39,13 +43,15 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         int dstSlot = dstInv == null ? -1 : NetworkMapping.toInternalSlot(dst.getContainer(), dst.getSlot());
         int count = action.getCount();
 
-        log.info("{}: {} src={}[net={}->int={},netId={}] dst={}[net={}->int={},netId={}] count={} srcItem={} dstItem={}",
-                player.getName(), getType(),
-                src.getContainer(), src.getSlot(), srcSlot, src.getStackNetworkId(),
-                dst.getContainer(), dst.getSlot(), dstSlot, dst.getStackNetworkId(),
-                count,
-                srcInv == null ? "null-inv" : srcInv.getItem(srcSlot),
-                dstInv == null ? "null-inv" : dstInv.getItem(dstSlot));
+        if (log.isInfoEnabled()) {
+            log.info("{}: {} src={}[net={}->int={},netId={}] dst={}[net={}->int={},netId={}] count={} srcItem={} dstItem={}",
+                    player.getName(), getType(),
+                    src.getContainer(), src.getSlot(), srcSlot, src.getStackNetworkId(),
+                    dst.getContainer(), dst.getSlot(), dstSlot, dst.getStackNetworkId(),
+                    count,
+                    srcInv == null ? "null-inv" : srcInv.getUnclonedItem(srcSlot),
+                    dstInv == null ? "null-inv" : dstInv.getUnclonedItem(dstSlot));
+        }
 
         if (srcInv == null || dstInv == null) {
             log.info("{}: transfer rejected - inventory missing src={}({}) dst={}({})",
@@ -58,7 +64,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             return context.error();
         }
 
-        Item sourceItem = srcInv.getItem(srcSlot);
+        Item sourceItem = srcInv.getUnclonedItem(srcSlot);
         if (sourceItem.isNull() || sourceItem.getCount() < count) {
             log.info("{}: transfer rejected - src invalid (slot {} item={} count needed {})",
                     player.getName(), srcSlot, sourceItem, count);
@@ -70,7 +76,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             return context.error();
         }
 
-        Item destItem = dstInv.getItem(dstSlot);
+        Item destItem = dstInv.getUnclonedItem(dstSlot);
         if (!destItem.isNull() && !destItem.equals(sourceItem, true, true)) {
             log.info("{}: transfer rejected - dst item differs (dst {} vs src {})",
                     player.getName(), destItem, sourceItem);
@@ -89,28 +95,49 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             return context.error();
         }
 
+        if (!isSlotCompatible(dstInv, dstSlot, sourceItem)) {
+            log.info("{}: transfer rejected - item {} cannot be placed in slot {} of {}",
+                    player.getName(), sourceItem, dstSlot, dstInv.getClass().getSimpleName());
+            return context.error();
+        }
+
         // Equipment containers (OFFHAND/ARMOR) must emit network packets so other
         // players see MobEquipment/MobArmor updates; other containers can stay
         // quiet to avoid double-send with the ItemStackResponse echo.
         boolean sendSource = isEquipmentSlot(src.getContainer());
         boolean sendDest = isEquipmentSlot(dst.getContainer());
 
+        boolean fullTransfer = sourceItem.getCount() == count;
+        boolean srcIsCreatedOutput = isCreatedOutput(srcInv, srcSlot);
+
+        // stackNetId allocation strategy aligned with Allay/PNX:
+        // - full transfer + empty dst   : keep source stackId (whole stack moves)
+        // - any transfer + non-empty dst: keep dest stackId (merge into existing)
+        // - partial transfer + empty dst: assign new stackId (split creates new stack)
+        // - CREATED_OUTPUT full transfer: assign new stackId so every creative take
+        //   is an independent stack (prevents id reuse across creative sessions).
         Item newDest;
         if (destItem.isNull()) {
             newDest = sourceItem.clone();
             newDest.setCount(count);
-            newDest.autoAssignStackNetworkId();
+            if (!fullTransfer || srcIsCreatedOutput) {
+                newDest.autoAssignStackNetworkId();
+            }
         } else {
             newDest = destItem.clone();
             newDest.setCount(destCount + count);
         }
 
         Item newSrc;
-        if (sourceItem.getCount() == count) {
+        if (fullTransfer) {
             newSrc = Item.get(Item.AIR);
         } else {
             newSrc = sourceItem.clone();
             newSrc.setCount(sourceItem.getCount() - count);
+        }
+
+        if (!fireTransferEvent(player, srcInv, srcSlot, dstInv, dstSlot, sourceItem, destItem, count)) {
+            return context.error();
         }
 
         // Fire InventoryClickEvent for each affected slot (matches legacy
@@ -123,12 +150,32 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             return context.error();
         }
 
-        dstInv.setItem(dstSlot, newDest, sendDest);
+        // 原子性写入：先 dst，再 src；任一失败则回滚已写入的另一端。
+        // PlayerInventory.setItem 可能在 EntityInventoryChangeEvent/EntityArmorChangeEvent
+        // 被插件取消时返回 false —— 需要把 dst 恢复到原状态避免出现悬挂写入。
+        Item originalDestItem = destItem.clone();
+        Item originalSourceItem = sourceItem.clone();
 
-        if (sourceItem.getCount() == count) {
-            srcInv.clear(srcSlot, sendSource);
-        } else {
-            srcInv.setItem(srcSlot, newSrc, sendSource);
+        if (!dstInv.setItem(dstSlot, newDest, sendDest)) {
+            return context.error();
+        }
+
+        boolean srcOk = fullTransfer
+                ? srcInv.clear(srcSlot, sendSource)
+                : srcInv.setItem(srcSlot, newSrc, sendSource);
+        if (!srcOk) {
+            if (originalDestItem.isNull()) {
+                dstInv.clear(dstSlot, sendDest);
+            } else {
+                dstInv.setItem(dstSlot, originalDestItem, sendDest);
+            }
+            return context.error();
+        }
+
+        // 防御：如果 src 的底层 setItem 不知为何把原物品写没了（如插件篡改为 AIR），
+        // 也要把 src 恢复，避免客户端回滚看到不一致状态。
+        if (srcInv.getItem(srcSlot).isNull() && !fullTransfer) {
+            srcInv.setItem(srcSlot, originalSourceItem, sendSource);
         }
 
         List<ItemStackResponseContainer> containers = new ArrayList<>();
@@ -141,6 +188,31 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
 
     private static boolean isEquipmentSlot(ContainerSlotType type) {
         return type == ContainerSlotType.OFFHAND || type == ContainerSlotType.ARMOR;
+    }
+
+    /**
+     * Check whether {@code item} is allowed in the given {@code slot} of
+     * {@code inventory}. ARMOR slots reject non-matching equipment; all other
+     * inventories accept any item.
+     */
+    private static boolean isSlotCompatible(Inventory inventory, int slot, Item item) {
+        if (inventory instanceof PlayerInventory playerInv) {
+            int size = playerInv.getSize();
+            if (slot == size) {
+                return item.canBePutInHelmetSlot();
+            } else if (slot == size + 1) {
+                return item.isChestplate();
+            } else if (slot == size + 2) {
+                return item.isLeggings();
+            } else if (slot == size + 3) {
+                return item.isBoots();
+            }
+        }
+        return true;
+    }
+
+    private static boolean isCreatedOutput(Inventory inventory, int slot) {
+        return inventory instanceof PlayerUIInventory && slot == PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT;
     }
 
     /**
@@ -160,14 +232,31 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         return !event.isCancelled();
     }
 
+    static boolean fireTransferEvent(Player actor, Inventory sourceInventory, int sourceSlot,
+                                     Inventory destinationInventory, int destinationSlot,
+                                     Item sourceItem, Item destinationItem, int count) {
+        PlayerTransferItemEvent event = new PlayerTransferItemEvent(
+                actor,
+                sourceInventory,
+                sourceSlot,
+                destinationInventory,
+                destinationSlot,
+                sourceItem.clone(),
+                destinationItem.clone(),
+                count
+        );
+        Server.getInstance().getPluginManager().callEvent(event);
+        return !event.isCancelled();
+    }
+
     static ItemStackResponseContainer buildContainer(Inventory inv, int internalSlot, ItemStackRequestSlotData slotData) {
-        Item current = inv.getItem(internalSlot);
+        Item current = inv.getUnclonedItem(internalSlot);
         int networkSlot = slotData.getSlot();
-        int hotbarSlot = (slotData.getContainer() == ContainerSlotType.HOTBAR
-                || slotData.getContainer() == ContainerSlotType.HOTBAR_AND_INVENTORY) ? networkSlot : 0;
+        // hotbarSlot 与 slot 保持一致，与 Allay/PNX 对齐。部分客户端对"非 HOTBAR 容器
+        // 填 hotbarSlot=0"会误判需要刷新热栏槽 0 造成视觉错位。
         ItemStackResponseSlot slot = new ItemStackResponseSlot(
                 networkSlot,
-                hotbarSlot,
+                networkSlot,
                 current.isNull() ? 0 : current.getCount(),
                 current.getStackNetId(),
                 current.hasCustomName() ? current.getCustomName() : "",

@@ -7,6 +7,7 @@ import lombok.Setter;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +25,7 @@ public class ItemStackRequestContext {
     @Setter
     private int currentActionIndex;
     private final Map<String, Object> extraData = new HashMap<>();
+    private final List<Runnable> commitActions = new ArrayList<>();
 
     public ItemStackRequestContext(ItemStackRequest itemStackRequest) {
         this.itemStackRequest = itemStackRequest;
@@ -40,6 +42,25 @@ public class ItemStackRequestContext {
 
     public boolean has(String key) {
         return extraData.containsKey(key);
+    }
+
+    public void onCommit(Runnable action) {
+        if (action != null) {
+            commitActions.add(action);
+        }
+    }
+
+    public boolean commit() {
+        try {
+            for (Runnable action : commitActions) {
+                action.run();
+            }
+            commitActions.clear();
+            return true;
+        } catch (Throwable t) {
+            commitActions.clear();
+            return false;
+        }
     }
 
     public ActionResponse error() {

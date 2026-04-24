@@ -31,8 +31,8 @@ public class SwapActionProcessor implements ItemStackRequestActionProcessor<Swap
         int srcSlot = NetworkMapping.toInternalSlot(src.getContainer(), src.getSlot());
         int dstSlot = NetworkMapping.toInternalSlot(dst.getContainer(), dst.getSlot());
 
-        Item sourceItem = srcInv.getItem(srcSlot);
-        Item destItem = dstInv.getItem(dstSlot);
+        Item sourceItem = srcInv.getUnclonedItem(srcSlot);
+        Item destItem = dstInv.getUnclonedItem(dstSlot);
 
         if (validateStackNetworkId(sourceItem.getStackNetId(), src.getStackNetworkId())) {
             return context.error();
@@ -50,8 +50,16 @@ public class SwapActionProcessor implements ItemStackRequestActionProcessor<Swap
             return context.error();
         }
 
-        srcInv.setItem(srcSlot, destItem.clone(), false);
-        dstInv.setItem(dstSlot, sourceItem.clone(), false);
+        Item originalSource = sourceItem.clone();
+        Item originalDest = destItem.clone();
+
+        if (!srcInv.setItem(srcSlot, destItem.clone(), false)) {
+            return context.error();
+        }
+        if (!dstInv.setItem(dstSlot, sourceItem.clone(), false)) {
+            srcInv.setItem(srcSlot, originalSource, false);
+            return context.error();
+        }
 
         ItemStackResponseContainer srcResp = TransferItemActionProcessor.buildContainer(srcInv, srcSlot, src);
         ItemStackResponseContainer dstResp = TransferItemActionProcessor.buildContainer(dstInv, dstSlot, dst);

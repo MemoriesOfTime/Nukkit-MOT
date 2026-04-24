@@ -1,8 +1,15 @@
 package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
+import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.event.inventory.ItemStackRequestActionEvent;
+import cn.nukkit.inventory.BaseInventory;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.PlayerInventory;
+import cn.nukkit.inventory.PlayerUIComponent;
+import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.item.ItemBundle;
+import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.ItemStackResponsePacket;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
@@ -33,6 +40,8 @@ public final class ItemStackRequestHandler {
     static {
         register(new TakeActionProcessor());
         register(new PlaceActionProcessor());
+        register(new TakeFromItemContainerActionProcessor());
+        register(new PlaceInItemContainerActionProcessor());
         register(new SwapActionProcessor());
         register(new DropActionProcessor());
         register(new DestroyActionProcessor());
@@ -68,6 +77,7 @@ public final class ItemStackRequestHandler {
             List<ItemStackResponseContainer> responseContainers = new ArrayList<>();
             Set<Inventory> affectedInventories = new LinkedHashSet<>();
             Set<NetworkMapping.BundleHolderRef> affectedBundleOuters = new LinkedHashSet<>();
+            LinkedHashMap<Inventory, Map<Integer, Item>> snapshots = new LinkedHashMap<>();
             boolean error = false;
 
             if (log.isInfoEnabled()) {
@@ -85,6 +95,7 @@ public final class ItemStackRequestHandler {
                 context.setCurrentActionIndex(i);
                 affectedInventories.addAll(resolveAffectedInventories(player, action));
                 affectedBundleOuters.addAll(resolveAffectedBundleOuters(player, action));
+                captureSnapshots(snapshots, affectedInventories);
 
                 ItemStackRequestActionProcessor<ItemStackRequestAction> processor =
                         (ItemStackRequestActionProcessor<ItemStackRequestAction>) PROCESSORS.get(action.getType());
@@ -96,6 +107,21 @@ public final class ItemStackRequestHandler {
                 }
 
                 try {
+                    ItemStackRequestActionEvent event = new ItemStackRequestActionEvent(player, action, i);
+                    player.getServer().getPluginManager().callEvent(event);
+                    if (event.isCancelled()) {
+                        error = true;
+                        break;
+                    }
+                    if (event.getResponse() != null) {
+                        if (!event.getResponse().success()) {
+                            error = true;
+                            break;
+                        }
+                        responseContainers.addAll(event.getResponse().containers());
+                        continue;
+                    }
+
                     ActionResponse response = processor.handle(action, player, context);
                     if (response == null) {
                         continue;
@@ -110,6 +136,15 @@ public final class ItemStackRequestHandler {
                     error = true;
                     break;
                 }
+            }
+
+            if (!error && !context.commit()) {
+                error = true;
+            }
+
+            if (error) {
+                rollbackSnapshots(snapshots);
+                resyncActor(player, snapshots.keySet());
             }
 
             syncAffectedInventories(player, affectedInventories);
@@ -145,6 +180,8 @@ public final class ItemStackRequestHandler {
                 addAffectedInventory(affected, player, destroy.getSource());
             } else if (action instanceof ConsumeAction consume) {
                 addAffectedInventory(affected, player, consume.getSource());
+            } else if (writesCreatedOutput(action)) {
+                affected.add(player.getUIInventory());
             }
         } catch (Throwable t) {
             log.debug("{}: failed to resolve affected inventories for action {}", player.getName(), action.getType(), t);
@@ -155,8 +192,90 @@ public final class ItemStackRequestHandler {
 
     private static void addAffectedInventory(Set<Inventory> affected, Player player, ItemStackRequestSlotData slotData) {
         Inventory inventory = NetworkMapping.getInventory(player, slotData.getContainer(), slotData.getDynamicId());
-        if (inventory != null) {
-            affected.add(inventory);
+        Inventory canonical = canonicalizeInventory(inventory);
+        if (canonical != null) {
+            affected.add(canonical);
+        }
+    }
+
+    private static boolean writesCreatedOutput(ItemStackRequestAction action) {
+        return action instanceof CreateAction
+                || action instanceof CraftRecipeAction
+                || action instanceof AutoCraftRecipeAction
+                || action instanceof CraftCreativeAction
+                || action instanceof CraftRecipeOptionalAction
+                || action instanceof CraftGrindstoneAction
+                || action instanceof CraftLoomAction
+                || action instanceof CraftResultsDeprecatedAction;
+    }
+
+    private static Inventory canonicalizeInventory(Inventory inventory) {
+        if (inventory instanceof PlayerUIComponent component && component.getHolder() instanceof Player player) {
+            return player.getUIInventory();
+        }
+        return inventory;
+    }
+
+    private static void captureSnapshots(Map<Inventory, Map<Integer, Item>> snapshots, Set<Inventory> inventories) {
+        for (Inventory inventory : inventories) {
+            Inventory canonical = canonicalizeInventory(inventory);
+            if (canonical != null && !snapshots.containsKey(canonical)) {
+                snapshots.put(canonical, copyContents(canonical));
+            }
+        }
+    }
+
+    private static Map<Integer, Item> copyContents(Inventory inventory) {
+        LinkedHashMap<Integer, Item> snapshot = new LinkedHashMap<>();
+        for (var entry : inventory.getContents().entrySet()) {
+            Item item = entry.getValue();
+            if (item != null && !item.isNull() && item.getCount() > 0) {
+                snapshot.put(entry.getKey(), item.clone());
+            }
+        }
+        return snapshot;
+    }
+
+    private static void rollbackSnapshots(Map<Inventory, Map<Integer, Item>> snapshots) {
+        for (var entry : snapshots.entrySet()) {
+            restoreInventory(entry.getKey(), entry.getValue());
+        }
+    }
+
+    private static void restoreInventory(Inventory inventory, Map<Integer, Item> snapshot) {
+        Inventory canonical = canonicalizeInventory(inventory);
+        if (!(canonical instanceof BaseInventory baseInventory)) {
+            return;
+        }
+
+        for (int slot : new ArrayList<>(baseInventory.slots.keySet())) {
+            if (!snapshot.containsKey(slot)) {
+                baseInventory.clear(slot, false);
+            }
+        }
+
+        for (var entry : snapshot.entrySet()) {
+            Item item = entry.getValue();
+            if (item != null && !item.isNull() && item.getCount() > 0) {
+                baseInventory.setItem(entry.getKey(), item.clone(), false);
+            } else {
+                baseInventory.clear(entry.getKey(), false);
+            }
+        }
+    }
+
+    private static void resyncActor(Player actor, Collection<Inventory> inventories) {
+        actor.getCursorInventory().sendContents(actor);
+        actor.sendAllInventories();
+        actor.getInventory().sendHeldItem(actor);
+        actor.getInventory().sendArmorContents(actor);
+        actor.getOffhandInventory().sendContents(actor);
+
+        for (Inventory inventory : inventories) {
+            if (inventory == null || inventory instanceof PlayerInventory || inventory instanceof PlayerUIInventory) {
+                continue;
+            }
+            inventory.sendContents(actor);
         }
     }
 
@@ -225,15 +344,18 @@ public final class ItemStackRequestHandler {
     }
 
     private static List<ItemStackResponseContainer> compactContainers(List<ItemStackResponseContainer> containers) {
-        LinkedHashMap<FullContainerName, LinkedHashMap<Integer, ItemStackResponseSlot>> merged = new LinkedHashMap<>();
+        LinkedHashMap<FullContainerName, LinkedHashMap<Long, ItemStackResponseSlot>> merged = new LinkedHashMap<>();
 
         for (ItemStackResponseContainer container : containers) {
             FullContainerName containerName = container.getContainerName() != null
                     ? container.getContainerName()
                     : new FullContainerName(container.getContainer(), null);
-            LinkedHashMap<Integer, ItemStackResponseSlot> items = merged.computeIfAbsent(containerName, ignored -> new LinkedHashMap<>());
+            LinkedHashMap<Long, ItemStackResponseSlot> items = merged.computeIfAbsent(containerName, ignored -> new LinkedHashMap<>());
             for (ItemStackResponseSlot slot : container.getItems()) {
-                items.put(Objects.hash(slot.getSlot(), slot.getHotbarSlot()), slot);
+                // 用 (slot<<32)|hotbarSlot 作为组合 key，避免 Objects.hash 碰撞导致
+                // 同一容器不同 slot 的响应被相互覆盖（这会让客户端丢失更新并回滚对应 slot）。
+                long key = ((long) slot.getSlot() << 32) | (slot.getHotbarSlot() & 0xFFFFFFFFL);
+                items.put(key, slot);
             }
         }
 

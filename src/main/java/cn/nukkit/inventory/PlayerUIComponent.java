@@ -2,6 +2,7 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.util.*;
 
@@ -44,6 +45,12 @@ public class PlayerUIComponent extends BaseInventory {
     @Override
     public Item getItem(int index) {
         return this.playerUI.getItem(index + this.offset);
+    }
+
+    @Override
+    @ApiStatus.Internal
+    public Item getUnclonedItem(int index) {
+        return this.playerUI.getUnclonedItem(index + this.offset);
     }
 
     @Override

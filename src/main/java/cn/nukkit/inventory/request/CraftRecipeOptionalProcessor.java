@@ -94,10 +94,14 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
                 if (player.getExperienceLevel() < finalCost) {
                     return context.error();
                 }
-                player.setExperience(player.getExperience(), player.getExperienceLevel() - finalCost);
             }
-
-            applyAnvilDamage(player, anvilInventory);
+            final int commitCost = finalCost;
+            context.onCommit(() -> {
+                if (!player.isCreative() && commitCost > 0) {
+                    player.setExperience(player.getExperience(), player.getExperienceLevel() - commitCost);
+                }
+                applyAnvilDamage(player, anvilInventory);
+            });
         } else if (inventory instanceof CartographyTableInventory cartographyInventory) {
             result = updateCartographyTableResult(cartographyInventory, filterString);
             if (result == null || result.isNull()) {

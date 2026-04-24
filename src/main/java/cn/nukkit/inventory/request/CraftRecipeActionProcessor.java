@@ -16,6 +16,9 @@ import cn.nukkit.network.protocol.PlayerEnchantOptionsPacket;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftRecipeAction;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CreateAction;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftResultsDeprecatedAction;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot;
@@ -87,6 +90,13 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
 
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
 
+        if (recipe instanceof MultiRecipe) {
+            if (!hasFollowupOutputAction(context.getItemStackRequest().getActions(), context.getCurrentActionIndex() + 1)) {
+                return context.error();
+            }
+            return context.success();
+        }
+
         // Smithing dispatch: trim recipes delegate to the inventory's trim logic;
         // transform recipes preserve the equipment's NBT onto the result.
         if (recipe instanceof SmithingTrimRecipe) {
@@ -101,6 +111,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return null;
         }
         int times = Math.max(1, action.getNumberOfRequestedCrafts());
+        if (!validateCraftingRecipe(player, recipe, recipeResult, times)) {
+            return context.error();
+        }
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
         output.autoAssignStackNetworkId();
@@ -162,10 +175,10 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         }
 
         if (!player.isCreative()) {
-            player.setExperience(player.getExperience(), player.getExperienceLevel() - cost);
+            context.onCommit(() -> player.setExperience(player.getExperience(), player.getExperienceLevel() - cost));
         }
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
-        PlayerEnchantOptionsPacket.RECIPE_MAP.remove(action.getRecipeNetworkId());
+        context.onCommit(() -> PlayerEnchantOptionsPacket.RECIPE_MAP.remove(action.getRecipeNetworkId()));
         context.put(ENCH_RECIPE_KEY, true);
 
         ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
@@ -197,8 +210,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return context.error();
         }
 
-        Item buyA = tradeInventory.getItem(TradeInventory.TRADE_INPUT1_UI_SLOT);
-        Item buyB = tradeInventory.getItem(TradeInventory.TRADE_INPUT2_UI_SLOT);
+        Item buyA = tradeInventory.getUnclonedItem(TradeInventory.TRADE_INPUT1_UI_SLOT);
+        Item buyB = tradeInventory.getUnclonedItem(TradeInventory.TRADE_INPUT2_UI_SLOT);
         boolean hasBuyA = recipe.contains("buyA");
         boolean hasBuyB = recipe.contains("buyB");
 
@@ -217,18 +230,18 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         output.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
 
-        recipe.putInt("uses", uses + times);
         int rewardExp = recipe.contains("rewardExp") ? recipe.getInt("rewardExp") : 0;
-        if (rewardExp > 0) {
-            player.addExperience(rewardExp * times);
-        }
         EntityVillager villager = tradeInventory.getHolder();
-        if (villager != null) {
-            int traderExp = recipe.contains("traderExp") ? recipe.getInt("traderExp") : 0;
-            if (traderExp > 0) {
+        int traderExp = recipe.contains("traderExp") ? recipe.getInt("traderExp") : 0;
+        context.onCommit(() -> {
+            recipe.putInt("uses", uses + times);
+            if (rewardExp > 0) {
+                player.addExperience(rewardExp * times);
+            }
+            if (villager != null && traderExp > 0) {
                 villager.addExperience(traderExp * times);
             }
-        }
+        });
 
         ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
                 0, 0, output.getCount(), output.getStackNetId(),
@@ -275,6 +288,11 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
      * inspect what the client intends to consume.
      */
     private static Item[] collectCraftingInput(Player player) {
+        List<Item> items = collectCraftingInputList(player);
+        return items.toArray(Item.EMPTY_ARRAY);
+    }
+
+    static List<Item> collectCraftingInputList(Player player) {
         Inventory top = player.getTopWindow().orElse(null);
         CraftingGrid grid = top instanceof CraftingGrid openGrid
                 ? openGrid
@@ -282,12 +300,51 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         int size = grid.getSize();
         List<Item> items = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            Item item = grid.getItem(i);
+            Item item = grid.getUnclonedItem(i);
             if (item != null && !item.isNull()) {
                 items.add(item.clone());
             }
         }
-        return items.toArray(Item.EMPTY_ARRAY);
+        return items;
+    }
+
+    static boolean validateCraftingRecipe(Player player, Recipe recipe, Item output, int multiplier) {
+        List<Item> inputs = collectCraftingInputList(player);
+        if (recipe instanceof MultiRecipe multiRecipe) {
+            return multiRecipe.canExecute(player, output.clone(), inputs);
+        }
+        if (!(recipe instanceof CraftingRecipe craftingRecipe)) {
+            return true;
+        }
+
+        Item primaryOutput = output.clone();
+        primaryOutput.setCount(primaryOutput.getCount() * Math.max(1, multiplier));
+        List<Item> extraOutputs = scaleItems(craftingRecipe.getExtraResults(), Math.max(1, multiplier));
+        Recipe matched = player.getServer().getCraftingManager().matchRecipe(inputs, primaryOutput, extraOutputs);
+        return matched == recipe;
+    }
+
+    static List<Item> scaleItems(List<Item> items, int multiplier) {
+        List<Item> scaled = new ArrayList<>(items.size());
+        for (Item item : items) {
+            if (item == null || item.isNull()) {
+                continue;
+            }
+            Item clone = item.clone();
+            clone.setCount(clone.getCount() * multiplier);
+            scaled.add(clone);
+        }
+        return scaled;
+    }
+
+    private static boolean hasFollowupOutputAction(ItemStackRequestAction[] actions, int startIndex) {
+        for (int i = startIndex; i < actions.length; i++) {
+            ItemStackRequestAction action = actions[i];
+            if (action instanceof CreateAction || action instanceof CraftResultsDeprecatedAction) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

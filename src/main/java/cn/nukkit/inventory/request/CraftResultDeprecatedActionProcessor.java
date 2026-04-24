@@ -21,6 +21,8 @@ import java.util.List;
  */
 public class CraftResultDeprecatedActionProcessor implements ItemStackRequestActionProcessor<CraftResultsDeprecatedAction> {
 
+    public static final String MULTI_RESULTS_KEY = "multiResults";
+
     @Override
     public ItemStackRequestActionType getType() {
         return ItemStackRequestActionType.CRAFT_RESULTS_DEPRECATED;
@@ -33,6 +35,10 @@ public class CraftResultDeprecatedActionProcessor implements ItemStackRequestAct
             Item[] results = action.getResultItems();
             if (results != null && results.length > 0) {
                 Item output = results[0].clone();
+                if (!CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, output, 1)) {
+                    return context.error();
+                }
+                context.put(MULTI_RESULTS_KEY, List.of(results));
                 output.autoAssignStackNetworkId();
                 player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
                 ItemStackResponseSlot slot = new ItemStackResponseSlot(

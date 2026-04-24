@@ -32,7 +32,7 @@ public class DropActionProcessor implements ItemStackRequestActionProcessor<Drop
             return context.error();
         }
 
-        Item item = inventory.getItem(slot);
+        Item item = inventory.getUnclonedItem(slot);
         if (item.isNull() || item.getCount() < count) {
             return context.error();
         }
@@ -50,11 +50,15 @@ public class DropActionProcessor implements ItemStackRequestActionProcessor<Drop
         }
 
         if (item.getCount() == count) {
-            inventory.clear(slot, false);
+            if (!inventory.clear(slot, false)) {
+                return context.error();
+            }
         } else {
             Item remaining = item.clone();
             remaining.setCount(item.getCount() - count);
-            inventory.setItem(slot, remaining, false);
+            if (!inventory.setItem(slot, remaining, false)) {
+                return context.error();
+            }
         }
 
         player.dropItem(dropItem);

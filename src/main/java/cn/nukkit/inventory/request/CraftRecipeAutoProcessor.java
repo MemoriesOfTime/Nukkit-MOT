@@ -11,6 +11,7 @@ import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.descriptor.ItemDescriptorWithCount;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.AutoCraftRecipeAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ConsumeAction;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftResultsDeprecatedAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
@@ -78,11 +79,32 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
             return context.error();
         }
 
-        Item recipeResult = recipe instanceof MultiRecipe multi ? multi.getResult() : recipe.getResult();
+        if (!validateConsumePlan(player, ingredients, consumeActions)) {
+            return context.error();
+        }
+
+        if (recipe instanceof MultiRecipe multiRecipe) {
+            CraftResultsDeprecatedAction resultsAction = findCraftResultsAction(
+                    context.getItemStackRequest().getActions(), context.getCurrentActionIndex() + 1);
+            if (resultsAction == null || resultsAction.getResultItems() == null || resultsAction.getResultItems().length == 0) {
+                return context.error();
+            }
+            Item output = resultsAction.getResultItems()[0];
+            if (output == null || output.isNull() || !CraftRecipeActionProcessor.validateCraftingRecipe(player, multiRecipe, output, 1)) {
+                return context.error();
+            }
+            context.put(CraftResultDeprecatedActionProcessor.MULTI_RESULTS_KEY, List.of(resultsAction.getResultItems()));
+            return context.success();
+        }
+
+        Item recipeResult = recipe.getResult();
         if (recipeResult == null || recipeResult.isNull()) {
             return null;
         }
         int times = Math.max(1, action.getTimesCrafted());
+        if (!CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, recipeResult, times)) {
+            return context.error();
+        }
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
         output.autoAssignStackNetworkId();
@@ -108,5 +130,51 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
             }
         }
         return found;
+    }
+
+    private static CraftResultsDeprecatedAction findCraftResultsAction(ItemStackRequestAction[] actions, int startIndex) {
+        for (int i = startIndex; i < actions.length; i++) {
+            if (actions[i] instanceof CraftResultsDeprecatedAction craftResults) {
+                return craftResults;
+            }
+        }
+        return null;
+    }
+
+    private static boolean validateConsumePlan(Player player, List<ItemDescriptorWithCount> ingredients, List<ConsumeAction> consumeActions) {
+        List<Item> expected = new ArrayList<>();
+        for (ItemDescriptorWithCount ingredient : ingredients) {
+            if (ingredient == null || ingredient.getCount() <= 0) {
+                continue;
+            }
+            Item expectedItem = ingredient.getDescriptor().toItem();
+            if (expectedItem == null || expectedItem.isNull()) {
+                return false;
+            }
+            expectedItem.setCount(ingredient.getCount());
+            expected.add(expectedItem);
+        }
+
+        List<Item> actual = new ArrayList<>();
+        for (ConsumeAction consume : consumeActions) {
+            if (consume.getCount() <= 0) {
+                return false;
+            }
+            var source = consume.getSource();
+            var inventory = NetworkMapping.getInventory(player, source.getContainer(), source.getDynamicId());
+            if (inventory == null) {
+                return false;
+            }
+            int slot = NetworkMapping.toInternalSlot(source.getContainer(), source.getSlot());
+            Item item = inventory.getItem(slot);
+            if (item.isNull() || item.getCount() < consume.getCount()) {
+                return false;
+            }
+            Item consumed = item.clone();
+            consumed.setCount(consume.getCount());
+            actual.add(consumed);
+        }
+
+        return Recipe.matchItemList(actual, expected);
     }
 }

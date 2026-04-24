@@ -170,6 +170,7 @@ public final class DataPacketManager {
                 ClientToServerHandshakeProcessor.INSTANCE,
                 EmotePacketProcessor.INSTANCE,
                 ItemFrameDropItemProcessor.INSTANCE,
+                InventoryTransactionProcessor.INSTANCE,
                 LevelSoundEventProcessor.INSTANCE,
                 LevelSoundEventProcessorV1.INSTANCE,
                 LevelSoundEventProcessorV2.INSTANCE,

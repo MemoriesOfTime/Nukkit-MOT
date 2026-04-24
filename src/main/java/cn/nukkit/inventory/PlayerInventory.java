@@ -15,7 +15,9 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.ContainerType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
 
@@ -549,6 +551,13 @@ public class PlayerInventory extends BaseInventory {
         InventorySlotPacket pk = new InventorySlotPacket();
         pk.slot = index;
         pk.item = this.getItem(index).clone();
+        if (index < 9) {
+            pk.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR, null);
+        } else if (index < 36) {
+            pk.containerNameData = new FullContainerName(ContainerSlotType.INVENTORY, null);
+        } else {
+            pk.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, null);
+        }
 
         ContainerSetSlotPacketV113 pk2 = new ContainerSetSlotPacketV113();
         pk2.slot = index;

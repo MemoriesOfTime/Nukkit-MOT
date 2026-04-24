@@ -17,6 +17,7 @@ import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.util.*;
 
@@ -106,12 +107,37 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public Item getItem(int index) {
-        return this.slots.containsKey(index) ? this.slots.get(index).clone() : new ItemBlock(Block.get(BlockID.AIR), null, 0);
+        Item original = this.slots.get(index);
+        if (original != null) {
+            // Ensure every non-empty stack carries a valid stackNetworkId for SAI.
+            if (!original.isNull() && original.getStackNetId() == 0) {
+                original.autoAssignStackNetworkId();
+            }
+            return original.clone();
+        }
+        return new ItemBlock(Block.get(BlockID.AIR), null, 0);
+    }
+
+    @Override
+    @ApiStatus.Internal
+    public Item getUnclonedItem(int index) {
+        Item item = this.slots.get(index);
+        if (item != null) {
+            if (!item.isNull() && item.getStackNetId() == 0) {
+                item.autoAssignStackNetworkId();
+            }
+            return item;
+        }
+        return new ItemBlock(Block.get(BlockID.AIR), null, 0);
     }
 
     @Override
     public Item getItemFast(int index) {
-        return this.slots.getOrDefault(index, air);
+        Item item = this.slots.getOrDefault(index, air);
+        if (item != air && !item.isNull() && item.getStackNetId() == 0) {
+            item.autoAssignStackNetworkId();
+        }
+        return item;
     }
 
     @Override
@@ -172,6 +198,14 @@ public abstract class BaseInventory implements Inventory {
 
         if (holder instanceof BlockEntity) {
             ((BlockEntity) holder).setDirty();
+        }
+
+        // Server-Authoritative Inventory requires every non-empty stack to carry a
+        // positive stackNetworkId. Items created before SAI (e.g. loaded from NBT or
+        // spawned by plugins) may still have id==0, which Bedrock clients interpret as
+        // "empty slot" in ItemStackResponse packets and causes cursor/inventory desync.
+        if (!item.isNull() && item.getStackNetId() == 0) {
+            item.autoAssignStackNetworkId();
         }
 
         Item old = this.getItem(index);

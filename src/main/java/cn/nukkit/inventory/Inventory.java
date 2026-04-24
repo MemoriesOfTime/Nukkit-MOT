@@ -2,6 +2,7 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.util.Collection;
 import java.util.Map;
@@ -26,6 +27,11 @@ public interface Inventory {
     String getTitle();
 
     Item getItem(int index);
+
+    @ApiStatus.Internal
+    default Item getUnclonedItem(int index) {
+        return getItem(index);
+    }
 
     default Item getItemFast(int index) {
         return getItem(index);

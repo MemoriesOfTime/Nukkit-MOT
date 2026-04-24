@@ -51,15 +51,24 @@ public class CreateActionProcessor implements ItemStackRequestActionProcessor<Cr
             }
         }
 
-        List<Item> results = recipe instanceof MultiRecipe multi
-                ? List.of(multi.getResult())
-                : List.of(recipe.getResult());
+        List<Item> results;
+        if (recipe instanceof MultiRecipe) {
+            results = context.get(CraftResultDeprecatedActionProcessor.MULTI_RESULTS_KEY);
+            if (results == null || results.isEmpty()) {
+                return context.error();
+            }
+        } else {
+            results = List.of(recipe.getResult());
+        }
         int slot = action.getSlot();
         if (slot < 0 || slot >= results.size()) {
             return context.error();
         }
 
         Item output = results.get(slot).clone();
+        if (!CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, output, 1)) {
+            return context.error();
+        }
         output.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
 

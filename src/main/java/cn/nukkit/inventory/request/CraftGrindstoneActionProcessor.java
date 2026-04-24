@@ -57,7 +57,7 @@ public class CraftGrindstoneActionProcessor implements ItemStackRequestActionPro
         // Stock vanilla behaviour: grinding emits the stored enchantment XP to the
         // player. Missing this was a regression from the previous implementation.
         if (experience > 0) {
-            player.addExperience(experience);
+            context.onCommit(() -> player.addExperience(experience));
         }
 
         Item resultClone = result.clone().autoAssignStackNetworkId();

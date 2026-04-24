@@ -6,6 +6,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.MobArmorEquipmentPacket;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -97,6 +99,7 @@ public class EntityArmorInventory extends BaseInventory {
             inventorySlotPacket.inventoryId = player.getWindowId(this);
             inventorySlotPacket.slot = index;
             inventorySlotPacket.item = this.getItem(index);
+            inventorySlotPacket.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, null);
             player.dataPacket(inventorySlotPacket);
         } else {
             MobArmorEquipmentPacket mobArmorEquipmentPacket = new MobArmorEquipmentPacket();

@@ -32,6 +32,11 @@ public final class NetworkMapping {
      */
     @Nullable
     public static Inventory getInventory(Player player, ContainerSlotType type, @Nullable Integer dynamicId) {
+        Inventory topWindow = player.getTopWindow().orElse(null);
+        if (topWindow instanceof FakeBlockUIComponent fakeUI && isSlotTypeCompatibleWithFakeUI(fakeUI, type)) {
+            return fakeUI;
+        }
+
         PlayerUIInventory ui = player.getUIInventory();
         return switch (type) {
             case CURSOR -> ui.getCursorInventory();
@@ -40,7 +45,7 @@ public final class NetworkMapping {
                 // Follow the window the player currently has open (e.g. a crafting
                 // table) so 3x3 recipes route to BigCraftingGrid; fall back to the
                 // 2x2 personal grid otherwise.
-                yield player.getTopWindow().orElseGet(ui::getCraftingGrid);
+                yield topWindow != null ? topWindow : ui.getCraftingGrid();
             }
             case HOTBAR, INVENTORY, HOTBAR_AND_INVENTORY, ARMOR -> player.getInventory();
             case OFFHAND -> player.getOffhandInventory();
@@ -53,18 +58,50 @@ public final class NetworkMapping {
             case LOOM_INPUT, LOOM_DYE, LOOM_MATERIAL, LOOM_RESULT -> player.getWindowById(Player.LOOM_WINDOW_ID);
             case STONECUTTER_INPUT, STONECUTTER_RESULT -> player.getWindowById(Player.STONECUTTER_WINDOW_ID);
             case CARTOGRAPHY_INPUT, CARTOGRAPHY_ADDITIONAL, CARTOGRAPHY_RESULT ->
-                    player.getTopWindow().filter(inv -> inv instanceof CartographyTableInventory).orElse(null);
+                    topWindow instanceof CartographyTableInventory ? topWindow : null;
             case BEACON_PAYMENT -> player.getWindowById(Player.BEACON_WINDOW_ID);
+            case COMPOUND_CREATOR_INPUT, COMPOUND_CREATOR_OUTPUT,
+                 ELEMENT_CONSTRUCTOR_OUTPUT,
+                 MATERIAL_REDUCER_INPUT, MATERIAL_REDUCER_OUTPUT,
+                 LAB_TABLE_INPUT -> topWindow;
             case TRADE_INGREDIENT_1, TRADE_INGREDIENT_2, TRADE_RESULT,
                  TRADE2_INGREDIENT_1, TRADE2_INGREDIENT_2, TRADE2_RESULT ->
-                    player.getTopWindow().orElse(null);
+                    topWindow;
             case FURNACE_FUEL, FURNACE_INGREDIENT, FURNACE_RESULT,
                  BLAST_FURNACE_INGREDIENT, SMOKER_INGREDIENT,
                  BREWING_INPUT, BREWING_RESULT, BREWING_FUEL,
                  SHULKER_BOX, BARREL,
-                 LEVEL_ENTITY, CRAFTER_BLOCK_CONTAINER -> player.getTopWindow().orElse(null);
+                 LEVEL_ENTITY, CRAFTER_BLOCK_CONTAINER -> topWindow;
             case DYNAMIC_CONTAINER -> resolveDynamicContainer(player, dynamicId);
             default -> null;
+        };
+    }
+
+    private static boolean isSlotTypeCompatibleWithFakeUI(FakeBlockUIComponent fakeUI, ContainerSlotType type) {
+        return switch (fakeUI.getFakeBlockType()) {
+            case ANVIL -> type == ContainerSlotType.ANVIL_INPUT
+                    || type == ContainerSlotType.ANVIL_MATERIAL
+                    || type == ContainerSlotType.ANVIL_RESULT;
+            case ENCHANT_TABLE -> type == ContainerSlotType.ENCHANTING_INPUT
+                    || type == ContainerSlotType.ENCHANTING_MATERIAL;
+            case BEACON -> type == ContainerSlotType.BEACON_PAYMENT;
+            case LOOM -> type == ContainerSlotType.LOOM_INPUT
+                    || type == ContainerSlotType.LOOM_DYE
+                    || type == ContainerSlotType.LOOM_MATERIAL
+                    || type == ContainerSlotType.LOOM_RESULT;
+            case SMITHING_TABLE -> type == ContainerSlotType.SMITHING_TABLE_INPUT
+                    || type == ContainerSlotType.SMITHING_TABLE_MATERIAL
+                    || type == ContainerSlotType.SMITHING_TABLE_RESULT
+                    || type == ContainerSlotType.SMITHING_TABLE_TEMPLATE;
+            case GRINDSTONE -> type == ContainerSlotType.GRINDSTONE_INPUT
+                    || type == ContainerSlotType.GRINDSTONE_ADDITIONAL
+                    || type == ContainerSlotType.GRINDSTONE_RESULT;
+            case STONECUTTER -> type == ContainerSlotType.STONECUTTER_INPUT
+                    || type == ContainerSlotType.STONECUTTER_RESULT;
+            case CARTOGRAPHY -> type == ContainerSlotType.CARTOGRAPHY_INPUT
+                    || type == ContainerSlotType.CARTOGRAPHY_ADDITIONAL
+                    || type == ContainerSlotType.CARTOGRAPHY_RESULT;
+            default -> false;
         };
     }
 
@@ -130,7 +167,11 @@ public final class NetworkMapping {
             return ContainerSlotType.ARMOR;
         }
         if (inventory instanceof PlayerUIInventory) {
-            return internalSlot == 50 ? ContainerSlotType.CREATED_OUTPUT : ContainerSlotType.CURSOR;
+            return switch (internalSlot) {
+                case 0 -> ContainerSlotType.CURSOR;
+                case 50 -> ContainerSlotType.CREATED_OUTPUT;
+                default -> ContainerSlotType.CRAFTING_INPUT;
+            };
         }
         if (inventory instanceof AnvilInventory) {
             return switch (internalSlot) {
@@ -196,6 +237,9 @@ public final class NetworkMapping {
     private static Inventory resolveHorseInventory(Player player) {
         Inventory topWindow = player.getTopWindow().orElse(null);
         if (topWindow instanceof HorseInventory) {
+            // Explicit horse windows resolve here even when the player is not
+            // currently mounted; the riding lookup below is only the fallback
+            // for the current mount-backed interaction flow.
             return topWindow;
         }
 

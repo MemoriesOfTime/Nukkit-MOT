@@ -13,6 +13,8 @@ import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 
 public class PlayerOffhandInventory extends BaseInventory {
 
@@ -73,6 +75,7 @@ public class PlayerOffhandInventory extends BaseInventory {
                 InventorySlotPacket pk2 = new InventorySlotPacket();
                 pk2.inventoryId = ContainerIds.OFFHAND;
                 pk2.item = item;
+                pk2.containerNameData = new FullContainerName(ContainerSlotType.OFFHAND, null);
                 player.dataPacket(pk2);
             } else {
                 player.dataPacket(pk);

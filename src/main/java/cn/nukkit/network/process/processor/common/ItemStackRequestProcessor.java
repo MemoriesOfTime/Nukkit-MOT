@@ -2,7 +2,6 @@ package cn.nukkit.network.process.processor.common;
 
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
-import cn.nukkit.inventory.request.ItemStackRequestHandler;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ItemStackRequestPacket;
@@ -34,7 +33,7 @@ public class ItemStackRequestProcessor extends DataPacketProcessor<ItemStackRequ
 
         // Handle the requests
         if (!pk.getRequests().isEmpty()) {
-            ItemStackRequestHandler.handleRequests(player, pk.getRequests());
+            player.handleItemStackRequests(pk.getRequests());
         }
     }
 

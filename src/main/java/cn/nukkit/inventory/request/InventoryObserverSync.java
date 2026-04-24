@@ -3,6 +3,7 @@ package cn.nukkit.inventory.request;
 import cn.nukkit.Player;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.InventoryHolder;
+import cn.nukkit.inventory.PlayerInventory;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -30,7 +31,14 @@ public final class InventoryObserverSync {
         }
 
         if (!observers.isEmpty()) {
-            inventory.sendContents(observers);
+            if (inventory instanceof PlayerInventory playerInventory) {
+                Player[] targets = observers.toArray(Player.EMPTY_ARRAY);
+                playerInventory.sendContents(targets);
+                playerInventory.sendArmorContents(targets);
+                playerInventory.sendHeldItem(targets);
+            } else {
+                inventory.sendContents(observers);
+            }
         }
     }
 

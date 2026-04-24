@@ -6,6 +6,8 @@ import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 
 import java.util.HashMap;
 
@@ -60,6 +62,16 @@ public class PlayerUIInventory extends BaseInventory {
         pk.slot = index;
         pk.item = this.getItem(index);
 
+        // v1.21.30+ requires the correct container type in InventorySlotPacket,
+        // otherwise the client ignores the update (default is ANVIL_INPUT).
+        if (index == 0) {
+            pk.containerNameData = new FullContainerName(ContainerSlotType.CURSOR, null);
+        } else if (index == PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT) {
+            pk.containerNameData = new FullContainerName(ContainerSlotType.CREATED_OUTPUT, null);
+        } else {
+            pk.containerNameData = new FullContainerName(ContainerSlotType.CRAFTING_INPUT, null);
+        }
+
         for (Player p : target) {
             if (p == this.getHolder()) {
                 pk.inventoryId = ContainerIds.UI;
@@ -112,9 +124,9 @@ public class PlayerUIInventory extends BaseInventory {
                     p.dataPacket(pk);
                 }
             }
-            /*if (p.protocol >= ProtocolInfo.v1_16_0) {
+            if (p.protocol >= ProtocolInfo.v1_16_0) {
                 p.dataPacket(pk);
-            }*/
+            }
             //https://github.com/CloudburstMC/Nukkit/commit/f96ce6eb90d47ab99ced368dd7129601f14c0b2b
         }
     }
