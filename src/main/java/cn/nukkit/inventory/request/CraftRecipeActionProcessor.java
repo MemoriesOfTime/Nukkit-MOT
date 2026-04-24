@@ -15,11 +15,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.PlayerEnchantOptionsPacket;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
-import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftRecipeAction;
-import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CreateAction;
-import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftResultsDeprecatedAction;
-import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestAction;
-import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot;
 import cn.nukkit.utils.TradeRecipeBuildUtils;
@@ -114,6 +110,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (!validateCraftingRecipe(player, recipe, recipeResult, times)) {
             return context.error();
         }
+        if (recipe instanceof CraftingRecipe craftingRecipe && !validateCraftingConsumePlan(player, craftingRecipe, times, context)) {
+            return context.error();
+        }
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
         output.autoAssignStackNetworkId();
@@ -154,8 +153,14 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             }
         }
         int cost = option.getPrimarySlot() + 1;
-        if (!player.isCreative() && player.getExperienceLevel() < cost) {
-            return context.error();
+        if (!player.isCreative()) {
+            if (player.getExperienceLevel() < cost) {
+                return context.error();
+            }
+            Item reagent = enchantInventory.getReagentSlot();
+            if (reagent.isNull() || reagent.getCount() < cost || !reagent.equals(Item.get(Item.DYE, 4), true, false)) {
+                return context.error();
+            }
         }
 
         Item output = first.clone();
@@ -176,6 +181,17 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
 
         if (!player.isCreative()) {
             context.onCommit(() -> player.setExperience(player.getExperience(), player.getExperienceLevel() - cost));
+            context.onCommit(() -> {
+                Item reagent = enchantInventory.getReagentSlot();
+                if (!reagent.isNull() && reagent.equals(Item.get(Item.DYE, 4), true, false) && reagent.getCount() >= cost) {
+                    if (reagent.getCount() > cost) {
+                        reagent.setCount(reagent.getCount() - cost);
+                        enchantInventory.setItem(1, reagent, false);
+                    } else {
+                        enchantInventory.clear(1, false);
+                    }
+                }
+            });
         }
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
         context.onCommit(() -> PlayerEnchantOptionsPacket.RECIPE_MAP.remove(action.getRecipeNetworkId()));
@@ -215,10 +231,10 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         boolean hasBuyA = recipe.contains("buyA");
         boolean hasBuyB = recipe.contains("buyB");
 
-        if (hasBuyA && checkTrade(recipe.getCompound("buyA"), buyA, 0)) {
+        if (hasBuyA && checkTrade(recipe.getCompound("buyA"), buyA, times)) {
             return context.error();
         }
-        if (hasBuyB && checkTrade(recipe.getCompound("buyB"), buyB, 0)) {
+        if (hasBuyB && checkTrade(recipe.getCompound("buyB"), buyB, times)) {
             return context.error();
         }
 
@@ -255,11 +271,11 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         )));
     }
 
-    private boolean checkTrade(CompoundTag expected, Item actual, int subtract) {
+    private boolean checkTrade(CompoundTag expected, Item actual, int multiplier) {
         if (actual == null || actual.isNull()) {
             return true;
         }
-        int required = Math.max(expected.getByte("Count") - subtract, 1);
+        int required = Math.max(expected.getByte("Count") * Math.max(1, multiplier), 1);
         if (actual.getCount() < required) {
             return true;
         }
@@ -335,6 +351,44 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             scaled.add(clone);
         }
         return scaled;
+    }
+
+    private static boolean validateCraftingConsumePlan(Player player, CraftingRecipe recipe, int times, ItemStackRequestContext context) {
+        List<Item> expected = new ArrayList<>();
+        for (Item ingredient : recipe.getIngredientsAggregate()) {
+            if (ingredient == null || ingredient.isNull()) {
+                continue;
+            }
+            Item expectedItem = ingredient.clone();
+            expectedItem.setCount(expectedItem.getCount() * times);
+            expected.add(expectedItem);
+        }
+
+        List<ConsumeAction> consumeActions = CraftRecipeAutoProcessor.findAllConsumeActions(
+                context.getItemStackRequest().getActions(),
+                context.getCurrentActionIndex() + 1);
+
+        List<Item> actual = new ArrayList<>();
+        for (ConsumeAction consume : consumeActions) {
+            if (consume.getCount() <= 0) {
+                return false;
+            }
+            var source = consume.getSource();
+            var inventory = NetworkMapping.getInventory(player, source.getContainer(), source.getDynamicId());
+            if (inventory == null) {
+                return false;
+            }
+            int slot = NetworkMapping.toInternalSlot(source.getContainer(), source.getSlot());
+            Item item = inventory.getItem(slot);
+            if (item.isNull() || item.getCount() < consume.getCount()) {
+                return false;
+            }
+            Item consumed = item.clone();
+            consumed.setCount(consume.getCount());
+            actual.add(consumed);
+        }
+
+        return Recipe.matchItemList(actual, expected);
     }
 
     private static boolean hasFollowupOutputAction(ItemStackRequestAction[] actions, int startIndex) {

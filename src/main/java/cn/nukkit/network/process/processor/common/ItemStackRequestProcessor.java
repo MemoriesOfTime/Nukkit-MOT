@@ -26,6 +26,10 @@ public class ItemStackRequestProcessor extends DataPacketProcessor<ItemStackRequ
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull ItemStackRequestPacket pk) {
         Player player = playerHandle.player;
 
+        if (!player.isAlive() || !player.spawned) {
+            return;
+        }
+
         // Only process if server authoritative inventory is enabled
         if (!player.isInventoryServerAuthoritative()) {
             return;

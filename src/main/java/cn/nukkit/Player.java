@@ -68,10 +68,10 @@ import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.*;
+import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
-import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode;
 import cn.nukkit.network.session.login.SessionLoginPhase;
@@ -4497,6 +4497,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void handleItemStackRequests(List<ItemStackRequest> requests) {
+        if (!this.spawned || !this.isAlive()) {
+            log.debug("Player {} sent item stack request packet while not spawned or not alive", this.username);
+            return;
+        }
         if (!this.isInventoryServerAuthoritative() || requests.isEmpty()) {
             return;
         }
