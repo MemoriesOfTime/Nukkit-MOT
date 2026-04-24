@@ -47,61 +47,36 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         int dstSlot = dstInv == null ? -1 : NetworkMapping.toInternalSlot(dst.getContainer(), dst.getSlot());
         int count = action.getCount();
 
-        if (log.isInfoEnabled()) {
-            log.info("{}: {} src={}[net={}->int={},netId={}] dst={}[net={}->int={},netId={}] count={} srcItem={} dstItem={}",
-                    player.getName(), getType(),
-                    src.getContainer(), src.getSlot(), srcSlot, src.getStackNetworkId(),
-                    dst.getContainer(), dst.getSlot(), dstSlot, dst.getStackNetworkId(),
-                    count,
-                    srcInv == null ? "null-inv" : srcInv.getUnclonedItem(srcSlot),
-                    dstInv == null ? "null-inv" : dstInv.getUnclonedItem(dstSlot));
-        }
-
         if (srcInv == null || dstInv == null) {
-            log.info("{}: transfer rejected - inventory missing src={}({}) dst={}({})",
-                    player.getName(), src.getContainer(), srcInv, dst.getContainer(), dstInv);
             return context.error();
         }
 
         if (count <= 0) {
-            log.info("{}: transfer rejected - non-positive count {}", player.getName(), count);
             return context.error();
         }
 
         Item sourceItem = srcInv.getUnclonedItem(srcSlot);
         if (sourceItem.isNull() || sourceItem.getCount() < count) {
-            log.info("{}: transfer rejected - src invalid (slot {} item={} count needed {})",
-                    player.getName(), srcSlot, sourceItem, count);
             return context.error();
         }
         if (validateStackNetworkId(sourceItem.getStackNetId(), src.getStackNetworkId())) {
-            log.info("{}: transfer rejected - src stackNetId mismatch server={} client={}",
-                    player.getName(), sourceItem.getStackNetId(), src.getStackNetworkId());
             return context.error();
         }
 
         Item destItem = dstInv.getUnclonedItem(dstSlot);
         if (!destItem.isNull() && !destItem.equals(sourceItem, true, true)) {
-            log.info("{}: transfer rejected - dst item differs (dst {} vs src {})",
-                    player.getName(), destItem, sourceItem);
             return context.error();
         }
         if (validateStackNetworkId(destItem.getStackNetId(), dst.getStackNetworkId())) {
-            log.info("{}: transfer rejected - dst stackNetId mismatch server={} client={}",
-                    player.getName(), destItem.getStackNetId(), dst.getStackNetworkId());
             return context.error();
         }
 
         int destCount = destItem.isNull() ? 0 : destItem.getCount();
         if (destCount + count > sourceItem.getMaxStackSize()) {
-            log.info("{}: transfer rejected - would overflow max stack (destCount={} + count={} > max={})",
-                    player.getName(), destCount, count, sourceItem.getMaxStackSize());
             return context.error();
         }
 
         if (!isSlotCompatible(dstInv, dstSlot, sourceItem)) {
-            log.info("{}: transfer rejected - item {} cannot be placed in slot {} of {}",
-                    player.getName(), sourceItem, dstSlot, dstInv.getClass().getSimpleName());
             return context.error();
         }
 

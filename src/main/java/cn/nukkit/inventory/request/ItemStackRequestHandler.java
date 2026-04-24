@@ -75,16 +75,6 @@ public final class ItemStackRequestHandler {
             LinkedHashMap<Inventory, Map<Integer, Item>> snapshots = new LinkedHashMap<>();
             boolean error = false;
 
-            if (log.isInfoEnabled()) {
-                StringBuilder types = new StringBuilder();
-                for (int i = 0; i < actions.length; i++) {
-                    if (i > 0) types.append(',');
-                    types.append(actions[i].getType());
-                }
-                log.info("{}: handling item stack request id={} actions=[{}]",
-                        player.getName(), request.getRequestId(), types);
-            }
-
             for (int i = 0; i < actions.length; i++) {
                 ItemStackRequestAction action = actions[i];
                 context.setCurrentActionIndex(i);
