@@ -590,6 +590,75 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(InventoryLayout.NONE, nk.craftingLayout);
     }
 
+    @ParameterizedTest(name = "SetPlayerInventoryOptionsPacket all left tabs v{0}")
+    @MethodSource("versionsFrom630")
+    void setPlayerInventoryOptionsAllLeftTabs(int protocol) {
+        for (var leftTab : InventoryTabLeft.VALUES) {
+            var cb = new org.cloudburstmc.protocol.bedrock.packet.SetPlayerInventoryOptionsPacket();
+            cb.setLeftTab(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryTabLeft.VALUES[leftTab.ordinal()]);
+            cb.setRightTab(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryTabRight.NONE);
+            cb.setFiltering(false);
+            cb.setLayout(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryLayout.NONE);
+            cb.setCraftingLayout(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryLayout.NONE);
+
+            SetPlayerInventoryOptionsPacket nk = crossEncode(cb, SetPlayerInventoryOptionsPacket::new, protocol);
+            assertEquals(leftTab, nk.leftTab, "LeftTab mismatch for ordinal " + leftTab.ordinal());
+        }
+    }
+
+    @ParameterizedTest(name = "SetPlayerInventoryOptionsPacket all right tabs v{0}")
+    @MethodSource("versionsFrom630")
+    void setPlayerInventoryOptionsAllRightTabs(int protocol) {
+        for (var rightTab : InventoryTabRight.VALUES) {
+            var cb = new org.cloudburstmc.protocol.bedrock.packet.SetPlayerInventoryOptionsPacket();
+            cb.setLeftTab(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryTabLeft.NONE);
+            cb.setRightTab(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryTabRight.VALUES[rightTab.ordinal()]);
+            cb.setFiltering(false);
+            cb.setLayout(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryLayout.NONE);
+            cb.setCraftingLayout(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryLayout.NONE);
+
+            SetPlayerInventoryOptionsPacket nk = crossEncode(cb, SetPlayerInventoryOptionsPacket::new, protocol);
+            assertEquals(rightTab, nk.rightTab, "RightTab mismatch for ordinal " + rightTab.ordinal());
+        }
+    }
+
+    @ParameterizedTest(name = "SetPlayerInventoryOptionsPacket all layouts v{0}")
+    @MethodSource("versionsFrom630")
+    void setPlayerInventoryOptionsAllLayouts(int protocol) {
+        for (var layout : InventoryLayout.VALUES) {
+            var cb = new org.cloudburstmc.protocol.bedrock.packet.SetPlayerInventoryOptionsPacket();
+            cb.setLeftTab(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryTabLeft.NONE);
+            cb.setRightTab(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryTabRight.NONE);
+            cb.setFiltering(false);
+            cb.setLayout(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryLayout.VALUES[layout.ordinal()]);
+            cb.setCraftingLayout(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryLayout.VALUES[layout.ordinal()]);
+
+            SetPlayerInventoryOptionsPacket nk = crossEncode(cb, SetPlayerInventoryOptionsPacket::new, protocol);
+            assertEquals(layout, nk.layout, "Layout mismatch for ordinal " + layout.ordinal());
+            assertEquals(layout, nk.craftingLayout, "CraftingLayout mismatch for ordinal " + layout.ordinal());
+        }
+    }
+
+    @ParameterizedTest(name = "SetPlayerInventoryOptionsPacket creative search v{0}")
+    @MethodSource("versionsFrom630")
+    void setPlayerInventoryOptionsCreativeSearch(int protocol) {
+        // This is the exact scenario from issue #703: Creative mode search
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.SetPlayerInventoryOptionsPacket();
+        cb.setLeftTab(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryTabLeft.RECIPE_SEARCH);
+        cb.setRightTab(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryTabRight.FULL_SCREEN);
+        cb.setFiltering(true);
+        cb.setLayout(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryLayout.RECIPE_BOOK_ONLY);
+        cb.setCraftingLayout(org.cloudburstmc.protocol.bedrock.data.inventory.InventoryLayout.NONE);
+
+        SetPlayerInventoryOptionsPacket nk = crossEncode(cb, SetPlayerInventoryOptionsPacket::new, protocol);
+
+        assertEquals(InventoryTabLeft.RECIPE_SEARCH, nk.leftTab);
+        assertEquals(InventoryTabRight.FULL_SCREEN, nk.rightTab);
+        assertTrue(nk.filtering);
+        assertEquals(InventoryLayout.CREATIVE, nk.layout);
+        assertEquals(InventoryLayout.NONE, nk.craftingLayout);
+    }
+
     // ==================== ServerboundDiagnosticsPacket ====================
 
     @ParameterizedTest(name = "ServerboundDiagnosticsPacket v{0}")
