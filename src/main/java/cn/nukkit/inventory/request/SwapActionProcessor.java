@@ -2,12 +2,15 @@ package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequestSlotData;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.SwapAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class SwapActionProcessor implements ItemStackRequestActionProcessor<SwapAction> {
@@ -47,6 +50,16 @@ public class SwapActionProcessor implements ItemStackRequestActionProcessor<Swap
             return context.error();
         }
         if (!TransferItemActionProcessor.fireClickEvent(player, dstInv, dstSlot, destItem, sourceItem)) {
+            return context.error();
+        }
+
+        // 向后兼容：旧路径中每次库存交互都会触发 InventoryTransactionEvent，
+        // 但 SAI 路径默认不触发。
+        List<InventoryAction> transactionActions = new ArrayList<>();
+        transactionActions.add(new SlotChangeAction(srcInv, srcSlot, sourceItem, destItem));
+        transactionActions.add(new SlotChangeAction(dstInv, dstSlot, destItem, sourceItem));
+        var transaction = new TransferItemActionProcessor.EventOnlyInventoryTransaction(player, transactionActions, context);
+        if (!transaction.execute()) {
             return context.error();
         }
 

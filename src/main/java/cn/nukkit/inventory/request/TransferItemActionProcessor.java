@@ -3,11 +3,15 @@ package cn.nukkit.inventory.request;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.InventoryClickEvent;
+import cn.nukkit.event.inventory.InventoryTransactionEvent;
 import cn.nukkit.event.player.PlayerTransferItemEvent;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.PlayerUIComponent;
 import cn.nukkit.inventory.PlayerUIInventory;
+import cn.nukkit.inventory.transaction.InventoryTransaction;
+import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
@@ -150,6 +154,18 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             return context.error();
         }
 
+        // 向后兼容：旧路径中每次库存交互都会触发 InventoryTransactionEvent，
+        // 但 SAI 路径默认不触发。为保持与旧插件的兼容性，在此处补发事件。
+        List<InventoryAction> transactionActions = new ArrayList<>();
+        transactionActions.add(new SlotChangeAction(srcInv, srcSlot, sourceItem, newSrc));
+        if (srcInv != dstInv || srcSlot != dstSlot) {
+            transactionActions.add(new SlotChangeAction(dstInv, dstSlot, destItem, newDest));
+        }
+        InventoryTransaction transaction = new EventOnlyInventoryTransaction(player, transactionActions, context);
+        if (!transaction.execute()) {
+            return context.error();
+        }
+
         // 原子性写入：先 dst，再 src；任一失败则回滚已写入的另一端。
         // PlayerInventory.setItem 可能在 EntityInventoryChangeEvent/EntityArmorChangeEvent
         // 被插件取消时返回 false —— 需要把 dst 恢复到原状态避免出现悬挂写入。
@@ -247,6 +263,58 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         );
         Server.getInstance().getPluginManager().callEvent(event);
         return !event.isCancelled();
+    }
+
+    /**
+     * InventoryTransaction subclass used solely to emit
+     * {@link InventoryTransactionEvent} for server-authoritative item stack
+     * requests that involve block-entity containers (e.g. chests).  It does
+     * <b>not</b> execute any actions – the real mutation is already performed
+     * by {@link #doTransfer} – so calling {@link #execute} only fires the
+     * event and returns whether a plugin cancelled it.
+     */
+    static class EventOnlyInventoryTransaction extends InventoryTransaction {
+        private final ItemStackRequestContext context;
+
+        public EventOnlyInventoryTransaction(Player source, List<InventoryAction> actions, ItemStackRequestContext context) {
+            super(source, actions, false);
+            this.context = context;
+            init(source, actions);
+        }
+
+        @Override
+        protected void init(Player source, List<InventoryAction> actions) {
+            this.source = source;
+            for (InventoryAction action : actions) {
+                this.actions.add(action);
+                if (action instanceof SlotChangeAction slotChange) {
+                    this.inventories.add(slotChange.getInventory());
+                }
+            }
+        }
+
+        @Override
+        protected boolean callExecuteEvent() {
+            InventoryTransactionEvent ev = new InventoryTransactionEvent(this);
+            this.source.getServer().getPluginManager().callEvent(ev);
+            return !ev.isCancelled();
+        }
+
+        @Override
+        public boolean execute() {
+            if (!callExecuteEvent()) {
+                if (context != null) {
+                    for (InventoryAction action : this.actions) {
+                        if (action instanceof SlotChangeAction slotChange) {
+                            context.addPluginModifiedInventory(slotChange.getInventory());
+                        }
+                    }
+                }
+                return false;
+            }
+            this.hasExecuted = true;
+            return true;
+        }
     }
 
     static ItemStackResponseContainer buildContainer(Inventory inv, int internalSlot, ItemStackRequestSlotData slotData) {

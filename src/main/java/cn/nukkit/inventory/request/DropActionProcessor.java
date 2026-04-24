@@ -3,12 +3,15 @@ package cn.nukkit.inventory.request;
 import cn.nukkit.Player;
 import cn.nukkit.event.player.PlayerDropItemEvent;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequestSlotData;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.DropAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class DropActionProcessor implements ItemStackRequestActionProcessor<DropAction> {
@@ -46,6 +49,22 @@ public class DropActionProcessor implements ItemStackRequestActionProcessor<Drop
         PlayerDropItemEvent event = new PlayerDropItemEvent(player, dropItem);
         player.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
+            return context.error();
+        }
+
+        // 向后兼容：旧路径中每次库存交互都会触发 InventoryTransactionEvent，
+        // 但 SAI 路径默认不触发。
+        List<InventoryAction> transactionActions = new ArrayList<>();
+        Item targetItem;
+        if (item.getCount() == count) {
+            targetItem = Item.get(Item.AIR);
+        } else {
+            targetItem = item.clone();
+            targetItem.setCount(item.getCount() - count);
+        }
+        transactionActions.add(new SlotChangeAction(inventory, slot, item, targetItem));
+        var transaction = new TransferItemActionProcessor.EventOnlyInventoryTransaction(player, transactionActions, context);
+        if (!transaction.execute()) {
             return context.error();
         }
 

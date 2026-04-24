@@ -1,15 +1,10 @@
 package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
-import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.event.inventory.ItemStackRequestActionEvent;
-import cn.nukkit.inventory.BaseInventory;
-import cn.nukkit.inventory.Inventory;
-import cn.nukkit.inventory.PlayerInventory;
-import cn.nukkit.inventory.PlayerUIComponent;
-import cn.nukkit.inventory.PlayerUIInventory;
-import cn.nukkit.item.ItemBundle;
+import cn.nukkit.inventory.*;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBundle;
 import cn.nukkit.network.protocol.ItemStackResponsePacket;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
@@ -143,7 +138,7 @@ public final class ItemStackRequestHandler {
             }
 
             if (error) {
-                rollbackSnapshots(snapshots);
+                rollbackSnapshots(snapshots, context.getPluginModifiedInventories());
                 resyncActor(player, snapshots.keySet());
             }
 
@@ -236,8 +231,12 @@ public final class ItemStackRequestHandler {
         return snapshot;
     }
 
-    private static void rollbackSnapshots(Map<Inventory, Map<Integer, Item>> snapshots) {
+    private static void rollbackSnapshots(Map<Inventory, Map<Integer, Item>> snapshots, Set<Inventory> pluginModifiedInventories) {
         for (var entry : snapshots.entrySet()) {
+            Inventory canonical = canonicalizeInventory(entry.getKey());
+            if (canonical != null && pluginModifiedInventories.contains(canonical)) {
+                continue;
+            }
             restoreInventory(entry.getKey(), entry.getValue());
         }
     }

@@ -1,15 +1,12 @@
 package cn.nukkit.inventory.request;
 
+import cn.nukkit.inventory.Inventory;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Per-request processing context shared across all action processors of a single
@@ -26,6 +23,7 @@ public class ItemStackRequestContext {
     private int currentActionIndex;
     private final Map<String, Object> extraData = new HashMap<>();
     private final List<Runnable> commitActions = new ArrayList<>();
+    private final Set<Inventory> pluginModifiedInventories = new LinkedHashSet<>();
 
     public ItemStackRequestContext(ItemStackRequest itemStackRequest) {
         this.itemStackRequest = itemStackRequest;
@@ -61,6 +59,16 @@ public class ItemStackRequestContext {
             commitActions.clear();
             return false;
         }
+    }
+
+    public void addPluginModifiedInventory(Inventory inventory) {
+        if (inventory != null) {
+            this.pluginModifiedInventories.add(inventory);
+        }
+    }
+
+    public Set<Inventory> getPluginModifiedInventories() {
+        return this.pluginModifiedInventories;
     }
 
     public ActionResponse error() {
