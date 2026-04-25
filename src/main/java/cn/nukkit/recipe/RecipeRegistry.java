@@ -3,7 +3,6 @@ package cn.nukkit.recipe;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.inventory.SmithingInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.CraftingDataPacket;
@@ -17,11 +16,9 @@ import cn.nukkit.utils.RecipeUtils;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.Getter;
-import org.apache.logging.log4j.core.net.Protocol;
 import org.jetbrains.annotations.ApiStatus;
 
 import javax.annotation.Nullable;
@@ -98,6 +95,68 @@ public class RecipeRegistry {
         buildPackets();
     }
 
+    public static Collection<Recipe> getRecipes() {
+        return RECIPES;
+    }
+
+    public static boolean removeRecipe(UUID uuid) {
+        {
+            boolean isRemoved = false;
+            Iterator<Recipe> it = RECIPES.iterator();
+            while (it.hasNext()) {
+                var recipe = it.next();
+                if (recipe instanceof CraftingRecipe craftingRecipe && craftingRecipe.getId().equals(uuid)) {
+                    it.remove();
+                    isRemoved = true;
+                    break;
+                }
+
+                if (recipe instanceof MultiRecipe craftingRecipe && craftingRecipe.getId().equals(uuid)) {
+                    it.remove();
+                    isRemoved = true;
+                    break;
+                }
+            }
+
+            if (!isRemoved) {
+                return false;
+            }
+        }
+
+        SHAPED.forEach((hash, list) -> {
+            Iterator<ShapedRecipe> it = list.iterator();
+            while (it.hasNext()) {
+                if(it.next().getId().equals(uuid)) {
+                    it.remove();
+                    return;
+                }
+            }
+        });
+
+        SHAPELESS.forEach((hash, list) -> {
+            Iterator<ShapelessRecipe> it = list.iterator();
+            while (it.hasNext()) {
+                if(it.next().getId().equals(uuid)) {
+                    it.remove();
+                    return;
+                }
+            }
+        });
+
+        SMITHING.remove(uuid);
+        MULTI.remove(uuid);
+
+        var it = STONECUTTER.entrySet().iterator();
+        while (it.hasNext()) {
+            if(it.next().getValue().getId().equals(uuid)) {
+                it.remove();
+                break;
+            }
+        }
+
+        return true;
+    }
+
     public static void registerFurnaceRecipe(FurnaceRecipe recipe, double xp) {
         FURNACE.put(RecipeUtils.getItemHash(recipe.getInput()), recipe);
         FURNACE_XP.put(recipe, xp);
@@ -124,6 +183,7 @@ public class RecipeRegistry {
 
     public static void registerSmithingRecipe(SmithingRecipe recipe) {
         SMITHING.put(UUID.randomUUID(), recipe);
+        RECIPES.add(recipe);
     }
 
     public static void registerBrewingRecipe(BrewingRecipe recipe) {
