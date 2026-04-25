@@ -19,6 +19,7 @@ import cn.nukkit.utils.BannerPattern;
 import cn.nukkit.utils.DyeColor;
 import lombok.extern.log4j.Log4j2;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -84,6 +85,13 @@ public class CraftLoomActionProcessor implements ItemStackRequestActionProcessor
         LoomItemEvent event = new LoomItemEvent(loomInventory, result.clone(), player);
         Server.getInstance().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
+            return context.error();
+        }
+
+        List<Item> expectedConsumes = new ArrayList<>(2);
+        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, banner, times);
+        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, dye, times);
+        if (!CraftRecipeActionProcessor.validateExpectedConsumePlan(player, expectedConsumes, context)) {
             return context.error();
         }
 

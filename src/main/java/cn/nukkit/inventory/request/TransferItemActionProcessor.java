@@ -22,8 +22,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackRe
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot;
 import lombok.extern.log4j.Log4j2;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * Base handler for TAKE and PLACE actions — both structurally a partial/full
@@ -186,7 +185,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
      * {@code inventory}. ARMOR slots reject non-matching equipment; all other
      * inventories accept any item.
      */
-    private static boolean isSlotCompatible(Inventory inventory, int slot, Item item) {
+    static boolean isSlotCompatible(Inventory inventory, int slot, Item item) {
         if (inventory instanceof PlayerInventory playerInv) {
             int size = playerInv.getSize();
             if (slot == size) {
@@ -277,11 +276,28 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
 
         @Override
         public boolean execute() {
+            // Snapshot affected slots before firing the event so we can tell
+            // whether a plugin actually mutated the inventory when cancelling.
+            Map<Inventory, Map<Integer, Item>> preStates = new HashMap<>();
+            for (InventoryAction action : this.actions) {
+                if (action instanceof SlotChangeAction slotChange) {
+                    Inventory inv = slotChange.getInventory();
+                    int slot = slotChange.getSlot();
+                    preStates.computeIfAbsent(inv, k -> new HashMap<>()).put(slot, inv.getItem(slot).clone());
+                }
+            }
+
             if (!callExecuteEvent()) {
                 if (context != null) {
                     for (InventoryAction action : this.actions) {
                         if (action instanceof SlotChangeAction slotChange) {
-                            context.addPluginModifiedInventory(slotChange.getInventory());
+                            Inventory inv = slotChange.getInventory();
+                            int slot = slotChange.getSlot();
+                            Item before = preStates.getOrDefault(inv, Collections.emptyMap()).get(slot);
+                            Item after = inv.getItem(slot);
+                            if (before == null || after == null || !before.equals(after, true, true)) {
+                                context.addPluginModifiedInventory(inv);
+                            }
                         }
                     }
                 }

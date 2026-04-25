@@ -44,6 +44,13 @@ public class SwapActionProcessor implements ItemStackRequestActionProcessor<Swap
             return context.error();
         }
 
+        if (!TransferItemActionProcessor.isSlotCompatible(srcInv, srcSlot, destItem)) {
+            return context.error();
+        }
+        if (!TransferItemActionProcessor.isSlotCompatible(dstInv, dstSlot, sourceItem)) {
+            return context.error();
+        }
+
         // Fire InventoryClickEvent for both slots before mutation, matching the
         // legacy InventoryTransaction path (one event per swapped slot).
         if (!TransferItemActionProcessor.fireClickEvent(player, srcInv, srcSlot, sourceItem, destItem)) {

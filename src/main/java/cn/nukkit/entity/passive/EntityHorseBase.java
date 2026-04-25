@@ -80,6 +80,12 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
         return this.horseInventory;
     }
 
+    protected void syncHorseInventoryChestSize() {
+        if (this.horseInventory != null) {
+            this.horseInventory.setChestSize(this.getChestSize());
+        }
+    }
+
     /**
      * Number of additional storage slots beyond saddle (0) and armor (1).
      * Defaults to 0; chested horses (donkey/mule/llama) override.

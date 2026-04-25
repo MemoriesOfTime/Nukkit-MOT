@@ -12,6 +12,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.CraftingDataPacket;
 import cn.nukkit.network.protocol.PlayerEnchantOptionsPacket;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
@@ -62,6 +63,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         }
         if (recipeNetId >= PlayerEnchantOptionsPacket.ENCH_RECIPEID) {
             return handleEnchant(action, player, context);
+        }
+        if (recipeNetId == CraftingDataPacket.SMITHING_ARMOR_TRIM_NETWORK_ID) {
+            return handleSmithingTrim(player, context);
         }
 
         Recipe recipe = player.getServer().getCraftingManager().getRecipeByNetworkId(recipeNetId);
@@ -161,6 +165,12 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             if (reagent.isNull() || reagent.getCount() < cost || !reagent.equals(Item.get(Item.DYE, 4), true, false)) {
                 return context.error();
             }
+            List<Item> expectedConsumes = new ArrayList<>(2);
+            addExpectedConsumeItem(expectedConsumes, first, 1);
+            addExpectedConsumeItem(expectedConsumes, reagent, cost);
+            if (!validateExpectedConsumePlan(player, expectedConsumes, context)) {
+                return context.error();
+            }
         }
 
         Item output = first.clone();
@@ -173,34 +183,26 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         }
         output.autoAssignStackNetworkId();
 
-        EnchantItemEvent event = new EnchantItemEvent(enchantInventory, first.clone(), output, option.getMinLevel(), player);
+        EnchantItemEvent event = new EnchantItemEvent(enchantInventory, first.clone(), output, cost, player);
         Server.getInstance().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             return context.error();
         }
 
+        Item finalOutput = event.getNewItem();
+        int finalCost = event.getXpCost();
+
         if (!player.isCreative()) {
-            context.onCommit(() -> player.setExperience(player.getExperience(), player.getExperienceLevel() - cost));
-            context.onCommit(() -> {
-                Item reagent = enchantInventory.getReagentSlot();
-                if (!reagent.isNull() && reagent.equals(Item.get(Item.DYE, 4), true, false) && reagent.getCount() >= cost) {
-                    if (reagent.getCount() > cost) {
-                        reagent.setCount(reagent.getCount() - cost);
-                        enchantInventory.setItem(1, reagent, false);
-                    } else {
-                        enchantInventory.clear(1, false);
-                    }
-                }
-            });
+            context.onCommit(() -> player.setExperience(player.getExperience(), player.getExperienceLevel() - finalCost));
         }
-        player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
+        player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, finalOutput, false);
         context.onCommit(() -> PlayerEnchantOptionsPacket.RECIPE_MAP.remove(action.getRecipeNetworkId()));
         context.put(ENCH_RECIPE_KEY, true);
 
         ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
-                0, 0, output.getCount(), output.getStackNetId(),
-                output.hasCustomName() ? output.getCustomName() : "",
-                output.getDamage(), ""
+                0, 0, finalOutput.getCount(), finalOutput.getStackNetId(),
+                finalOutput.hasCustomName() ? finalOutput.getCustomName() : "",
+                finalOutput.getDamage(), ""
         );
         return context.success(List.of(new ItemStackResponseContainer(
                 ContainerSlotType.CREATED_OUTPUT,
@@ -226,8 +228,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return context.error();
         }
 
-        Item buyA = tradeInventory.getUnclonedItem(TradeInventory.TRADE_INPUT1_UI_SLOT);
-        Item buyB = tradeInventory.getUnclonedItem(TradeInventory.TRADE_INPUT2_UI_SLOT);
+        Item buyA = tradeInventory.getUnclonedItem(0);
+        Item buyB = tradeInventory.getUnclonedItem(1);
         boolean hasBuyA = recipe.contains("buyA");
         boolean hasBuyB = recipe.contains("buyB");
 
@@ -235,6 +237,17 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return context.error();
         }
         if (hasBuyB && checkTrade(recipe.getCompound("buyB"), buyB, times)) {
+            return context.error();
+        }
+
+        List<Item> expectedConsumes = new ArrayList<>(2);
+        if (hasBuyA) {
+            addExpectedTradeConsumeItem(expectedConsumes, recipe.getCompound("buyA"), times);
+        }
+        if (hasBuyB) {
+            addExpectedTradeConsumeItem(expectedConsumes, recipe.getCompound("buyB"), times);
+        }
+        if (!validateExpectedConsumePlan(player, expectedConsumes, context)) {
             return context.error();
         }
 
@@ -254,8 +267,11 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             if (rewardExp > 0) {
                 player.addExperience(rewardExp * times);
             }
-            if (villager != null && traderExp > 0) {
-                villager.addExperience(traderExp * times);
+            if (villager != null) {
+                villager.namedTag.putBoolean("traded", true);
+                if (traderExp > 0) {
+                    villager.addExperience(traderExp * times);
+                }
             }
         });
 
@@ -295,6 +311,14 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             }
         }
         return false;
+    }
+
+    private static void addExpectedTradeConsumeItem(List<Item> expectedConsumes, CompoundTag tag, int times) {
+        Item item = NBTIO.getItemHelper(tag);
+        if (item == null || item.isNull()) {
+            return;
+        }
+        addExpectedConsumeItem(expectedConsumes, item, Math.max(1, item.getCount()) * Math.max(1, times));
     }
 
     /**
@@ -356,12 +380,31 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
     private static boolean validateCraftingConsumePlan(Player player, CraftingRecipe recipe, int times, ItemStackRequestContext context) {
         List<Item> expected = new ArrayList<>();
         for (Item ingredient : recipe.getIngredientsAggregate()) {
-            if (ingredient == null || ingredient.isNull()) {
+            addExpectedConsumeItem(expected, ingredient, ingredient == null ? 0 : ingredient.getCount() * times);
+        }
+
+        return validateExpectedConsumePlan(player, expected, context);
+    }
+
+    static void addExpectedConsumeItem(List<Item> expected, Item item, int count) {
+        if (item == null || item.isNull() || count <= 0) {
+            return;
+        }
+        Item expectedItem = item.clone();
+        expectedItem.setCount(count);
+        expected.add(expectedItem);
+    }
+
+    static boolean validateExpectedConsumePlan(Player player, List<Item> expected, ItemStackRequestContext context) {
+        List<Item> expectedConsumes = new ArrayList<>(expected.size());
+        for (Item item : expected) {
+            if (item == null || item.isNull() || item.getCount() <= 0) {
                 continue;
             }
-            Item expectedItem = ingredient.clone();
-            expectedItem.setCount(expectedItem.getCount() * times);
-            expected.add(expectedItem);
+            expectedConsumes.add(item.clone());
+        }
+        if (expectedConsumes.isEmpty()) {
+            return true;
         }
 
         List<ConsumeAction> consumeActions = CraftRecipeAutoProcessor.findAllConsumeActions(
@@ -388,7 +431,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             actual.add(consumed);
         }
 
-        return Recipe.matchItemList(actual, expected);
+        return Recipe.matchItemList(actual, expectedConsumes);
     }
 
     private static boolean hasFollowupOutputAction(ItemStackRequestAction[] actions, int startIndex) {
@@ -412,9 +455,19 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return context.error();
         }
         Item equipment = smithingInventory.getEquipment();
-        Item result = recipe.getResult().clone();
-        if (equipment != null && !equipment.isNull() && equipment.hasCompoundTag()) {
-            result.setCompoundTag(equipment.getCompoundTag());
+        Item ingredient = smithingInventory.getIngredient();
+        Item template = smithingInventory.getTemplate();
+        SmithingRecipe matchedRecipe = player.getServer().getCraftingManager()
+                .matchSmithingRecipe(new ArrayList<>(List.of(equipment, ingredient, template)));
+        if (matchedRecipe != recipe) {
+            return context.error();
+        }
+        Item result = recipe.getFinalResult(equipment, template);
+        if (result == null || result.isNull()) {
+            return context.error();
+        }
+        if (!validateSmithingConsumePlan(player, context, equipment, ingredient, template)) {
+            return context.error();
         }
         if (!fireSmithingEvent(smithingInventory, result, player)) {
             return context.error();
@@ -438,12 +491,25 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (result == null || result.isNull()) {
             return context.error();
         }
+        if (!validateSmithingConsumePlan(player, context,
+                smithingInventory.getEquipment(), smithingInventory.getIngredient(), smithingInventory.getTemplate())) {
+            return context.error();
+        }
         if (!fireSmithingEvent(smithingInventory, result, player)) {
             return context.error();
         }
         result.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, result, false);
         return buildCreatedOutputResponse(context, result);
+    }
+
+    private static boolean validateSmithingConsumePlan(Player player, ItemStackRequestContext context,
+                                                       Item equipment, Item ingredient, Item template) {
+        List<Item> expectedConsumes = new ArrayList<>(3);
+        addExpectedConsumeItem(expectedConsumes, equipment, 1);
+        addExpectedConsumeItem(expectedConsumes, ingredient, 1);
+        addExpectedConsumeItem(expectedConsumes, template, 1);
+        return validateExpectedConsumePlan(player, expectedConsumes, context);
     }
 
     /**
@@ -481,8 +547,19 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return context.error();
         }
         int times = Math.max(1, action.getNumberOfRequestedCrafts());
+        Item ingredient = recipe.getIngredient();
+        if (!ingredient.equals(input, ingredient.hasMeta(), false)
+                || input.getCount() < ingredient.getCount() * times) {
+            return context.error();
+        }
         Item output = recipe.getResult();
         output.setCount(output.getCount() * times);
+
+        List<Item> expectedConsumes = new ArrayList<>(1);
+        addExpectedConsumeItem(expectedConsumes, ingredient, ingredient.getCount() * times);
+        if (!validateExpectedConsumePlan(player, expectedConsumes, context)) {
+            return context.error();
+        }
 
         StonecutterItemEvent event = new StonecutterItemEvent(stonecutterInventory, input, output.clone(), player);
         Server.getInstance().getPluginManager().callEvent(event);

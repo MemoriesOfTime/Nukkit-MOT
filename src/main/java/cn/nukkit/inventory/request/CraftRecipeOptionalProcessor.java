@@ -69,6 +69,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
 
         Item result;
         int levelCost = 0;
+        List<Item> expectedConsumes = new ArrayList<>(2);
         if (inventory instanceof AnvilInventory anvilInventory) {
             AnvilResult pair = updateAnvilResult(player, anvilInventory, filterString);
             if (pair == null || pair.result.isNull()) {
@@ -76,6 +77,8 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
             }
             result = pair.result;
             levelCost = pair.levelCost;
+            CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, anvilInventory.getInputSlot(), 1);
+            CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, anvilInventory.getMaterialSlot(), pair.materialCost);
 
             // Mirror legacy RepairItemTransaction: fire RepairItemEvent before any
             // state mutation so plugins can veto the anvil operation or override
@@ -107,7 +110,13 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
             if (result == null || result.isNull()) {
                 return context.error();
             }
+            CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, cartographyInventory.getInput(), 1);
+            CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, cartographyInventory.getAdditional(), 1);
         } else {
+            return context.error();
+        }
+
+        if (!CraftRecipeActionProcessor.validateExpectedConsumePlan(player, expectedConsumes, context)) {
             return context.error();
         }
 
@@ -126,7 +135,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
         )));
     }
 
-    private record AnvilResult(Item result, int levelCost) {}
+    private record AnvilResult(Item result, int levelCost, int materialCost) {}
 
     /**
      * Apply the vanilla 12% chance that an anvil loses one durability level on
@@ -185,6 +194,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
         int costHelper = 0;
         int repairMaterial = getRepairMaterial(target);
         Item result = target.clone();
+        int materialCost = 0;
 
         Set<Enchantment> enchantments = new LinkedHashSet<>(Arrays.asList(target.getEnchantments()));
         if (!sacrifice.isNull()) {
@@ -204,11 +214,13 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
                     ++extraCost;
                     repair = Math.min(result.getDamage(), result.getMaxDurability() / 4);
                 }
+                materialCost = repair2;
             } else {
                 if (!enchantedBook && (result.getId() != sacrifice.getId() || result.getMaxDurability() == -1)) {
                     player.getLevel().addSound(player, Sound.RANDOM_ANVIL_USE, 1f, 1f);
                     return null;
                 }
+                materialCost = 1;
 
                 if (result.getMaxDurability() != -1 && !enchantedBook) {
                     // Anvil - combine durability from same-type item
@@ -316,14 +328,14 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
         int levelCost = getRepairCost(result) + (sacrifice.isNull() ? 0 : getRepairCost(sacrifice));
         levelCost += extraCost;
         if (extraCost <= 0) {
-            return new AnvilResult(Item.get(Item.AIR), levelCost);
+            return new AnvilResult(Item.get(Item.AIR), levelCost, materialCost);
         }
 
         if (costHelper == extraCost && costHelper > 0 && levelCost >= 40) {
             levelCost = 39;
         }
         if (levelCost >= 40 && !player.isCreative()) {
-            return new AnvilResult(Item.get(Item.AIR), levelCost);
+            return new AnvilResult(Item.get(Item.AIR), levelCost, materialCost);
         }
 
         int repairCost = getRepairCost(result);
@@ -340,7 +352,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
         if (!enchantments.isEmpty()) {
             result.addEnchantment(enchantments.toArray(Enchantment.EMPTY_ARRAY));
         }
-        return new AnvilResult(result, levelCost);
+        return new AnvilResult(result, levelCost, materialCost);
     }
 
     private Item updateCartographyTableResult(CartographyTableInventory inventory, String filterString) {

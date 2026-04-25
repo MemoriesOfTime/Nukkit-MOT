@@ -64,13 +64,7 @@ public class PlayerUIInventory extends BaseInventory {
 
         // v1.21.30+ requires the correct container type in InventorySlotPacket,
         // otherwise the client ignores the update (default is ANVIL_INPUT).
-        if (index == 0) {
-            pk.containerNameData = new FullContainerName(ContainerSlotType.CURSOR, null);
-        } else if (index == PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT) {
-            pk.containerNameData = new FullContainerName(ContainerSlotType.CREATED_OUTPUT, null);
-        } else {
-            pk.containerNameData = new FullContainerName(ContainerSlotType.CRAFTING_INPUT, null);
-        }
+        pk.containerNameData = new FullContainerName(resolveUISlotType(index), null);
 
         for (Player p : target) {
             if (p == this.getHolder()) {
@@ -129,6 +123,34 @@ public class PlayerUIInventory extends BaseInventory {
             }
             //https://github.com/CloudburstMC/Nukkit/commit/f96ce6eb90d47ab99ced368dd7129601f14c0b2b
         }
+    }
+
+    private static ContainerSlotType resolveUISlotType(int slot) {
+        if (slot == 0) {
+            return ContainerSlotType.CURSOR;
+        }
+        if (slot == PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT) {
+            return ContainerSlotType.CREATED_OUTPUT;
+        }
+        return switch (slot) {
+            case 1 -> ContainerSlotType.ANVIL_INPUT;
+            case 2 -> ContainerSlotType.ANVIL_MATERIAL;
+            case 3 -> ContainerSlotType.STONECUTTER_INPUT;
+            case 9 -> ContainerSlotType.LOOM_INPUT;
+            case 10 -> ContainerSlotType.LOOM_DYE;
+            case 11 -> ContainerSlotType.LOOM_MATERIAL;
+            case 12 -> ContainerSlotType.CARTOGRAPHY_INPUT;
+            case 13 -> ContainerSlotType.CARTOGRAPHY_ADDITIONAL;
+            case 14 -> ContainerSlotType.ENCHANTING_INPUT;
+            case 15 -> ContainerSlotType.ENCHANTING_MATERIAL;
+            case 16 -> ContainerSlotType.GRINDSTONE_INPUT;
+            case 17 -> ContainerSlotType.GRINDSTONE_ADDITIONAL;
+            case 27 -> ContainerSlotType.BEACON_PAYMENT;
+            case 51 -> ContainerSlotType.SMITHING_TABLE_INPUT;
+            case 52 -> ContainerSlotType.SMITHING_TABLE_MATERIAL;
+            case 53 -> ContainerSlotType.SMITHING_TABLE_TEMPLATE;
+            default -> ContainerSlotType.CRAFTING_INPUT;
+        };
     }
 
     @Override

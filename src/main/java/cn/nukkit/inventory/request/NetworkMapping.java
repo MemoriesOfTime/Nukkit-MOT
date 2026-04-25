@@ -42,10 +42,10 @@ public final class NetworkMapping {
             case CURSOR -> ui.getCursorInventory();
             case CREATED_OUTPUT -> ui; // slot 50 of PlayerUIInventory hosts the created output
             case CRAFTING_INPUT, CRAFTING_OUTPUT -> {
-                // Follow the window the player currently has open (e.g. a crafting
-                // table) so 3x3 recipes route to BigCraftingGrid; fall back to the
-                // 2x2 personal grid otherwise.
-                yield topWindow != null ? topWindow : ui.getCraftingGrid();
+                // Crafting tables are tracked through Player.craftingGrid rather
+                // than a normal top window. Only use topWindow when it is already a
+                // crafting-grid view; otherwise return the player's active grid.
+                yield topWindow instanceof CraftingGrid ? topWindow : player.getCraftingGrid();
             }
             case HOTBAR, INVENTORY, HOTBAR_AND_INVENTORY, ARMOR -> player.getInventory();
             case OFFHAND -> player.getOffhandInventory();
@@ -122,13 +122,37 @@ public final class NetworkMapping {
             case ARMOR -> networkSlot + 36;
             case CURSOR, OFFHAND, BEACON_PAYMENT -> 0;
             case CREATED_OUTPUT -> 50;
+            case CRAFTING_INPUT, CRAFTING_OUTPUT -> {
+                if (networkSlot >= 32 && networkSlot <= 40) {
+                    yield networkSlot - 32;
+                }
+                if (networkSlot >= 28 && networkSlot <= 31) {
+                    yield networkSlot - 28;
+                }
+                yield networkSlot;
+            }
+            case ANVIL_INPUT, ANVIL_MATERIAL, ANVIL_RESULT -> mapRange(networkSlot, 1, 3);
+            case STONECUTTER_INPUT, STONECUTTER_RESULT -> mapRange(networkSlot, 3, 4);
+            case LOOM_INPUT, LOOM_DYE, LOOM_MATERIAL, LOOM_RESULT -> mapRange(networkSlot, 9, 12);
+            case CARTOGRAPHY_INPUT, CARTOGRAPHY_ADDITIONAL, CARTOGRAPHY_RESULT -> mapRange(networkSlot, 12, 14);
+            case ENCHANTING_INPUT, ENCHANTING_MATERIAL -> mapRange(networkSlot, 14, 15);
+            case GRINDSTONE_INPUT, GRINDSTONE_ADDITIONAL, GRINDSTONE_RESULT -> mapRange(networkSlot, 16, 18);
+            case SMITHING_TABLE_INPUT, SMITHING_TABLE_MATERIAL, SMITHING_TABLE_TEMPLATE, SMITHING_TABLE_RESULT ->
+                    mapRange(networkSlot, 51, 54);
             // Villager trade inventory places the two input slots at fixed
             // physical indices; map both the 1.16+ TRADE2_* and legacy TRADE_*
             // aliases to the same slots.
-            case TRADE_INGREDIENT_1, TRADE2_INGREDIENT_1 -> TradeInventory.TRADE_INPUT1_UI_SLOT;
-            case TRADE_INGREDIENT_2, TRADE2_INGREDIENT_2 -> TradeInventory.TRADE_INPUT2_UI_SLOT;
+            case TRADE_INGREDIENT_1, TRADE2_INGREDIENT_1 -> 0;
+            case TRADE_INGREDIENT_2, TRADE2_INGREDIENT_2 -> 1;
             default -> networkSlot;
         };
+    }
+
+    private static int mapRange(int networkSlot, int firstNetworkSlot, int lastNetworkSlot) {
+        if (networkSlot >= firstNetworkSlot && networkSlot <= lastNetworkSlot) {
+            return networkSlot - firstNetworkSlot;
+        }
+        return networkSlot;
     }
 
     /**

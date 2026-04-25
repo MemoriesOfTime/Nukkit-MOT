@@ -223,7 +223,7 @@ public final class DataPacketManager {
         );
 
         registerProcessor(
-                ProtocolInfo.v1_16_100,
+                ProtocolInfo.v1_16_0,
                 ItemStackRequestProcessor.INSTANCE
         );
 

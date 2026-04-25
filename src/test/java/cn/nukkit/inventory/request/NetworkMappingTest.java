@@ -39,6 +39,32 @@ class NetworkMappingTest {
     }
 
     @Test
+    void craftingInputResolvesToCurrentPlayerCraftingGrid() {
+        Player player = Mockito.mock(Player.class);
+        Inventory unrelatedTopWindow = Mockito.mock(Inventory.class);
+        CraftingGrid activeGrid = Mockito.mock(CraftingGrid.class);
+
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(unrelatedTopWindow));
+        Mockito.when(player.getCraftingGrid()).thenReturn(activeGrid);
+
+        assertSame(activeGrid, NetworkMapping.getInventory(player, ContainerSlotType.CRAFTING_INPUT, null));
+    }
+
+    @Test
+    void uiNetworkSlotsMapToComponentLocalSlots() {
+        assertEquals(0, NetworkMapping.toInternalSlot(ContainerSlotType.CRAFTING_INPUT, 28));
+        assertEquals(3, NetworkMapping.toInternalSlot(ContainerSlotType.CRAFTING_INPUT, 31));
+        assertEquals(0, NetworkMapping.toInternalSlot(ContainerSlotType.CRAFTING_INPUT, 32));
+        assertEquals(8, NetworkMapping.toInternalSlot(ContainerSlotType.CRAFTING_INPUT, 40));
+        assertEquals(0, NetworkMapping.toInternalSlot(ContainerSlotType.ENCHANTING_INPUT, 14));
+        assertEquals(1, NetworkMapping.toInternalSlot(ContainerSlotType.ENCHANTING_MATERIAL, 15));
+        assertEquals(0, NetworkMapping.toInternalSlot(ContainerSlotType.SMITHING_TABLE_INPUT, 51));
+        assertEquals(1, NetworkMapping.toInternalSlot(ContainerSlotType.SMITHING_TABLE_MATERIAL, 52));
+        assertEquals(2, NetworkMapping.toInternalSlot(ContainerSlotType.SMITHING_TABLE_TEMPLATE, 53));
+        assertEquals(0, NetworkMapping.toInternalSlot(ContainerSlotType.STONECUTTER_INPUT, 3));
+    }
+
+    @Test
     void dynamicContainerCanResolveNestedBundleFromAccessibleInventories() {
         Player player = Mockito.mock(Player.class);
         PlayerInventory inventory = Mockito.mock(PlayerInventory.class);

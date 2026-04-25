@@ -5,6 +5,7 @@ import cn.nukkit.event.inventory.GrindItemEvent;
 import cn.nukkit.inventory.GrindstoneInventory;
 import cn.nukkit.inventory.PlayerUIComponent;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Position;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftGrindstoneAction;
@@ -12,6 +13,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemS
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -54,15 +56,24 @@ public class CraftGrindstoneActionProcessor implements ItemStackRequestActionPro
             return context.error();
         }
 
-        // Stock vanilla behaviour: grinding emits the stored enchantment XP to the
-        // player. Missing this was a regression from the previous implementation.
-        if (experience > 0) {
-            context.onCommit(() -> player.addExperience(experience));
+        List<Item> expectedConsumes = new ArrayList<>(2);
+        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, grindstone.getEquipment(), 1);
+        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, grindstone.getIngredient(), 1);
+        if (!CraftRecipeActionProcessor.validateExpectedConsumePlan(player, expectedConsumes, context)) {
+            return context.error();
+        }
+
+        int experienceDropped = event.getExperienceDropped();
+        if (experienceDropped > 0) {
+            context.onCommit(() -> {
+                Position pos = grindstone.getHolder();
+                player.getLevel().dropExpOrb(pos.add(0.5, 0.5, 0.5), experienceDropped);
+            });
         }
 
         Item resultClone = result.clone().autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, resultClone, false);
-        context.put(GRINDSTONE_EXP_KEY, experience);
+        context.put(GRINDSTONE_EXP_KEY, experienceDropped);
 
         ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
                 0, 0, resultClone.getCount(), resultClone.getStackNetId(),

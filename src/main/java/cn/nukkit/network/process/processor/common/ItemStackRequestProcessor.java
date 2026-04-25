@@ -15,7 +15,7 @@ import org.jetbrains.annotations.NotNull;
  * Handles server-authoritative inventory requests from clients
  *
  * @author Nukkit-MOT Team
- * @since v1.16.100 (protocol 407+)
+ * @since v1.16.100 (protocol 419+)
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ItemStackRequestProcessor extends DataPacketProcessor<ItemStackRequestPacket> {
@@ -53,7 +53,7 @@ public class ItemStackRequestProcessor extends DataPacketProcessor<ItemStackRequ
 
     @Override
     public boolean isSupported(int protocol) {
-        // ItemStackRequest was introduced in v1.16.100
+        // Protocols before v419 use the old ItemStackResponse success boolean.
         return protocol >= ProtocolInfo.v1_16_100;
     }
 }

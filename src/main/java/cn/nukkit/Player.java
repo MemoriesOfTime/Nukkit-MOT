@@ -4501,6 +4501,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             log.debug("Player {} sent item stack request packet while not spawned or not alive", this.username);
             return;
         }
+        if (this.isSpectator() && this.server.useClientSpectator) {
+            this.needSendInventory = true;
+            return;
+        }
         if (!this.isInventoryServerAuthoritative() || requests.isEmpty()) {
             return;
         }

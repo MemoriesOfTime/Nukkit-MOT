@@ -26,7 +26,7 @@ public class HorseInventory extends BaseInventory {
     public static final int SLOT_ARMOR = 1;
     public static final int SLOT_CHEST_BASE = 2;
 
-    private final int chestSize;
+    private int chestSize;
     private boolean suppressSaddleSync;
 
     public HorseInventory(EntityHorseBase holder, int chestSize) {
@@ -41,6 +41,20 @@ public class HorseInventory extends BaseInventory {
 
     public int getChestSize() {
         return chestSize;
+    }
+
+    public void setChestSize(int chestSize) {
+        int normalized = Math.max(0, chestSize);
+        if (this.chestSize == normalized) {
+            return;
+        }
+        int oldSize = this.getSize();
+        this.chestSize = normalized;
+        this.setSize(SLOT_CHEST_BASE + normalized);
+        for (int slot = this.getSize(); slot < oldSize; slot++) {
+            this.clear(slot, false);
+        }
+        this.sendContents(this.viewers.toArray(Player.EMPTY_ARRAY));
     }
 
     public boolean isSaddleSlot(int slot) {

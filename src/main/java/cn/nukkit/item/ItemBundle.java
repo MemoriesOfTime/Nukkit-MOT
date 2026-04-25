@@ -67,6 +67,15 @@ public class ItemBundle extends StringItemBase implements InventoryHolder {
     }
 
     @Override
+    public Item setNamedTag(CompoundTag tag) {
+        super.setNamedTag(tag);
+        if (tag != null && tag.contains(TAG_BUNDLE_ID)) {
+            NEXT_BUNDLE_ID.updateAndGet(current -> Math.max(current, tag.getInt(TAG_BUNDLE_ID) + 1));
+        }
+        return this;
+    }
+
+    @Override
     public ItemBundle clone() {
         ItemBundle cloned = (ItemBundle) super.clone();
         cloned.inventory = null;

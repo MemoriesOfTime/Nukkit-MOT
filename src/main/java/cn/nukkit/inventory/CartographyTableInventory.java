@@ -17,7 +17,7 @@ public class CartographyTableInventory extends FakeBlockUIComponent {
     public static final int CARTOGRAPHY_ADDITIONAL_UI_SLOT = 13;
 
     public CartographyTableInventory(PlayerUIInventory playerUI, Position position) {
-        super(playerUI, InventoryType.CARTOGRAPHY, 2, position);
+        super(playerUI, InventoryType.CARTOGRAPHY, CARTOGRAPHY_INPUT_UI_SLOT, position);
     }
 
     @Override

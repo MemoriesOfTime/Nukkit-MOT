@@ -3,11 +3,9 @@ package cn.nukkit.inventory.request;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntityBeacon;
 import cn.nukkit.inventory.BeaconInventory;
-import cn.nukkit.item.ItemID;
 import cn.nukkit.level.Position;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.BeaconPaymentAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType;
-import cn.nukkit.potion.Effect;
 
 public class BeaconPaymentActionProcessor implements ItemStackRequestActionProcessor<BeaconPaymentAction> {
 
@@ -21,44 +19,30 @@ public class BeaconPaymentActionProcessor implements ItemStackRequestActionProce
         if (!(player.getTopWindow().orElse(null) instanceof BeaconInventory beaconInventory)) {
             return context.error();
         }
-        if (!isValidPayment(beaconInventory.getItem(0).getId())) {
+        if (!BlockEntityBeacon.isPaymentItem(beaconInventory.getItem(0).getId())) {
             return context.error();
         }
 
         int primary = action.getPrimaryEffect();
         int secondary = action.getSecondaryEffect();
-        if (primary != 0 && !isValidEffect(primary)) {
+        if (!BlockEntityBeacon.isAllowedEffect(primary)) {
             return context.error();
         }
-        if (secondary != 0 && !isValidEffect(secondary)) {
+        if (!BlockEntityBeacon.isAllowedEffect(secondary)) {
             return context.error();
         }
 
         Position holder = beaconInventory.getHolder();
-        if (holder != null) {
-            if (holder.level.getBlockEntity(holder) instanceof BlockEntityBeacon beacon) {
-                context.onCommit(() -> {
-                    beacon.setPrimaryPower(primary);
-                    beacon.setSecondaryPower(secondary);
-                });
-            }
+        if (holder == null || !(holder.level.getBlockEntity(holder) instanceof BlockEntityBeacon beacon)) {
+            return context.error();
         }
+        if (beacon.getPowerLevel() < 1) {
+            return context.error();
+        }
+        context.onCommit(() -> {
+            beacon.setPrimaryPower(primary);
+            beacon.setSecondaryPower(secondary);
+        });
         return null;
-    }
-
-    private static boolean isValidEffect(int effectId) {
-        try {
-            return Effect.getEffect(effectId) != null;
-        } catch (Exception ex) {
-            return false;
-        }
-    }
-
-    private static boolean isValidPayment(int itemId) {
-        return itemId == ItemID.NETHERITE_INGOT
-                || itemId == ItemID.EMERALD
-                || itemId == ItemID.DIAMOND
-                || itemId == ItemID.GOLD_INGOT
-                || itemId == ItemID.IRON_INGOT;
     }
 }
