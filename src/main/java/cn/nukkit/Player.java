@@ -41,7 +41,9 @@ import cn.nukkit.form.window.FormWindowDialog;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.request.ItemStackRequestHandler;
 import cn.nukkit.inventory.transaction.*;
+import cn.nukkit.inventory.transaction.action.DropItemAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
@@ -3557,11 +3559,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 break;
             case ProtocolInfo.PLAYER_AUTH_INPUT_PACKET:
+                PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
+                this.handleAuthInputItemStackRequest(authPacket);
+
                 if (!this.isMovementServerAuthoritative()) {
                     return;
                 }
-
-                PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
 
                 if (!authPacket.getBlockActionData().isEmpty()) {
                     for (PlayerBlockActionData action : authPacket.getBlockActionData().values()) {
@@ -3937,10 +3940,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = null;
                 }
 
-                // 处理 ItemStackRequest（v1.16.100+ 客户端通过 PlayerAuthInputPacket 发送物品栏操作）
-                if (this.isInventoryServerAuthoritative() && authPacket.getItemStackRequest() != null) {
-                    this.handleItemStackRequests(List.of(authPacket.getItemStackRequest()));
-                }
                 break;
             case ProtocolInfo.PLAYER_ACTION_PACKET:
                 PlayerActionPacket playerActionPacket = (PlayerActionPacket) packet;
@@ -4530,6 +4529,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    private void handleAuthInputItemStackRequest(PlayerAuthInputPacket authPacket) {
+        if (authPacket.getItemStackRequest() != null) {
+            this.handleItemStackRequests(List.of(authPacket.getItemStackRequest()));
+        }
+    }
+
     public void handleInventoryTransactionPacket(InventoryTransactionPacket transactionPacket) {
         if (!this.spawned || !this.isAlive()) {
             log.debug("Player {} sent inventory transaction packet while not spawned or not alive", this.username);
@@ -4659,6 +4664,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             actions.add(a);
+        }
+
+        if (this.isInventoryServerAuthoritative()
+                && transactionPacket.transactionType == InventoryTransactionPacket.TYPE_NORMAL
+                && isServerAuthoritativeLegacyDropTransaction(transactionPacket, actions)) {
+            InventoryTransaction transaction = new InventoryTransaction(this, actions);
+            if (!transaction.execute()) {
+                this.server.getLogger().debug("Failed to execute SAI legacy drop transaction from " + this.username
+                        + " with actions: " + Arrays.toString(transactionPacket.actions));
+                this.needSendInventory = true;
+            }
+            return;
+        }
+
+        if (this.shouldRejectLegacyInventoryUiTransaction(transactionPacket)) {
+            this.server.getLogger().debug(this.username + ": dropping legacy InventoryTransaction UI transaction while SAI is enabled");
+            this.needSendInventory = true;
+            return;
         }
 
         if (transactionPacket.isCraftingPart) {
@@ -5275,6 +5298,63 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.needSendInventory = true;
             }
         }
+    }
+
+    private boolean shouldRejectLegacyInventoryUiTransaction(InventoryTransactionPacket packet) {
+        return this.isInventoryServerAuthoritative()
+                && (packet.transactionType == InventoryTransactionPacket.TYPE_NORMAL
+                || packet.isCraftingPart
+                || packet.isEnchantingPart
+                || packet.isRepairItemPart
+                || packet.isTradeItemPart);
+    }
+
+    static boolean isServerAuthoritativeLegacyDropTransaction(InventoryTransactionPacket packet, List<InventoryAction> actions) {
+        if (packet.transactionType != InventoryTransactionPacket.TYPE_NORMAL
+                || packet.actions == null
+                || packet.actions.length != 2
+                || actions.size() != 2) {
+            return false;
+        }
+        if (!(actions.get(0) instanceof DropItemAction) || !(actions.get(1) instanceof SlotChangeAction slotChange)) {
+            return false;
+        }
+
+        NetworkInventoryAction worldAction = packet.actions[0];
+        NetworkInventoryAction containerAction = packet.actions[1];
+        if (worldAction.sourceType != NetworkInventoryAction.SOURCE_WORLD
+                || worldAction.inventorySlot != InventoryTransactionPacket.ACTION_MAGIC_SLOT_DROP_ITEM
+                || containerAction.sourceType != NetworkInventoryAction.SOURCE_CONTAINER
+                || containerAction.windowId != ContainerIds.INVENTORY
+                || slotChange.getSlot() != containerAction.inventorySlot
+                || !(slotChange.getInventory() instanceof PlayerInventory)) {
+            return false;
+        }
+
+        Item droppedItem = worldAction.newItem;
+        Item oldItem = containerAction.oldItem;
+        Item newItem = containerAction.newItem;
+        if (droppedItem == null || droppedItem.isNull()
+                || oldItem == null || oldItem.isNull()
+                || newItem == null) {
+            return false;
+        }
+        int droppedCount = droppedItem.getCount();
+        if (droppedCount <= 0 || oldItem.getCount() < droppedCount) {
+            return false;
+        }
+        if (!slotChange.getSourceItem().equalsExact(oldItem) || !slotChange.getTargetItem().equalsExact(newItem)) {
+            return false;
+        }
+
+        Item expectedDrop = oldItem.clone();
+        expectedDrop.setCount(droppedCount);
+        Item expectedRemainder = oldItem.clone();
+        expectedRemainder.setCount(oldItem.getCount() - droppedCount);
+        if (expectedRemainder.getCount() <= 0) {
+            expectedRemainder = Item.get(Item.AIR);
+        }
+        return droppedItem.equalsExact(expectedDrop) && newItem.equalsExact(expectedRemainder);
     }
 
     private boolean handleQuickCraft(InventoryTransactionPacket packet, List<InventoryAction> actions, InventoryTransaction transaction) {
@@ -6202,6 +6282,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     int id = this.getWindowId(this.getOffhandInventory());
                     if (id != -1) {
                         pk.inventoryId = id;
+                        pk.containerNameData = new FullContainerName(ContainerSlotType.OFFHAND, ContainerIds.INVENTORY);
                         this.dataPacket(pk);
                     }
                 }
@@ -6213,6 +6294,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             pk.slot = entry.getKey();
                             pk.item = Item.AIR_ITEM;
                             pk.inventoryId = id;
+                            pk.containerNameData = new FullContainerName(
+                                    pk.slot < 9 ? ContainerSlotType.HOTBAR : ContainerSlotType.INVENTORY,
+                                    id
+                            );
                             this.dataPacket(pk);
                         }
                     }
@@ -8134,7 +8219,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.slot = this.inventory.getHeldItemIndex();
         pk.item = this.inventory.getItem(pk.slot);
         pk.inventoryId = ContainerIds.INVENTORY;
-        pk.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR, null);
+        pk.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR, ContainerIds.INVENTORY);
         this.dataPacket(pk);
     }
 

@@ -3,14 +3,8 @@ package cn.nukkit.inventory.request;
 import cn.nukkit.Player;
 import cn.nukkit.inventory.PlayerUIComponent;
 import cn.nukkit.item.Item;
-import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
-import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftCreativeAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType;
-import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
-import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot;
-
-import java.util.List;
 
 /**
  * Handles creative-mode item creation. The client sends this when it wants to
@@ -43,22 +37,14 @@ public class CraftCreativeActionProcessor implements ItemStackRequestActionProce
         }
 
         item = item.clone();
-        int requestedCount = Math.max(1, action.getNumberOfRequestedCrafts());
+        int requestedCount = action.getNumberOfRequestedCrafts() <= 0
+                ? item.getMaxStackSize()
+                : action.getNumberOfRequestedCrafts();
         item.setCount(Math.min(item.getMaxStackSize(), requestedCount));
         item.autoAssignStackNetworkId();
 
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, item, false);
         context.put(CRAFT_CREATIVE_KEY, true);
-
-        ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
-                0, 0, item.getCount(), item.getStackNetId(),
-                item.hasCustomName() ? item.getCustomName() : "",
-                item.getDamage(), ""
-        );
-        return context.success(List.of(new ItemStackResponseContainer(
-                ContainerSlotType.CREATED_OUTPUT,
-                List.of(responseSlot),
-                new FullContainerName(ContainerSlotType.CREATED_OUTPUT, null)
-        )));
+        return null;
     }
 }

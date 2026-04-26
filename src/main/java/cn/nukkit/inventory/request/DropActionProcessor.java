@@ -80,7 +80,8 @@ public class DropActionProcessor implements ItemStackRequestActionProcessor<Drop
             }
         }
 
-        player.dropItem(dropItem);
+        Item committedDrop = event.getItem().clone();
+        context.onCommit(() -> player.dropItem(committedDrop));
 
         ItemStackResponseContainer container = TransferItemActionProcessor.buildContainer(inventory, slot, src);
         return context.success(List.of(container));

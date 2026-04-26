@@ -7,6 +7,9 @@ import cn.nukkit.level.Level;
 import cn.nukkit.network.protocol.BlockEventPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -59,17 +62,30 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
 
     @Override
     public Item getItem(int index) {
-        return index < this.left.getSize() ? this.left.getItem(index) : this.right.getItem(index - this.right.getSize());
+        return index < this.left.getSize() ? this.left.getItem(index) : this.right.getItem(index - this.left.getSize());
+    }
+
+    @Override
+    @ApiStatus.Internal
+    public Item getUnclonedItem(int index) {
+        return index < this.left.getSize()
+                ? this.left.getUnclonedItem(index)
+                : this.right.getUnclonedItem(index - this.left.getSize());
     }
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
-        return index < this.left.getSize() ? this.left.setItem(index, item, send) : this.right.setItem(index - this.right.getSize(), item, send);
+        return index < this.left.getSize() ? this.left.setItem(index, item, send) : this.right.setItem(index - this.left.getSize(), item, send);
     }
 
     @Override
     public boolean clear(int index) {
-        return index < this.left.getSize() ? this.left.clear(index) : this.right.clear(index - this.right.getSize());
+        return this.clear(index, true);
+    }
+
+    @Override
+    public boolean clear(int index, boolean send) {
+        return index < this.left.getSize() ? this.left.clear(index, send) : this.right.clear(index - this.left.getSize(), send);
     }
 
     @Override
@@ -188,6 +204,7 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
                 continue;
             }
             pk.inventoryId = id;
+            pk.containerNameData = new FullContainerName(ContainerSlotType.LEVEL_ENTITY, id);
             player.dataPacket(pk);
         }
     }

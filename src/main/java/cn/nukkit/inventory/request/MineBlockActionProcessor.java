@@ -45,7 +45,7 @@ public class MineBlockActionProcessor implements ItemStackRequestActionProcessor
                 packet.inventoryId = ContainerIds.INVENTORY;
                 packet.slot = heldItemIndex;
                 packet.item = itemInHand;
-                packet.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR, null);
+                packet.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR, ContainerIds.INVENTORY);
                 player.dataPacket(packet);
             }
         }
@@ -61,7 +61,7 @@ public class MineBlockActionProcessor implements ItemStackRequestActionProcessor
         return context.success(List.of(new ItemStackResponseContainer(
                 ContainerSlotType.HOTBAR_AND_INVENTORY,
                 List.of(responseSlot),
-                new FullContainerName(ContainerSlotType.HOTBAR_AND_INVENTORY, null)
+                new FullContainerName(ContainerSlotType.HOTBAR_AND_INVENTORY, ContainerIds.INVENTORY)
         )));
     }
 }

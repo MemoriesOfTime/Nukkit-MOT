@@ -63,10 +63,21 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         }
 
         Item destItem = dstInv.getUnclonedItem(dstSlot);
-        if (!destItem.isNull() && !destItem.equals(sourceItem, true, true)) {
+        if (validateStackNetworkId(destItem.getStackNetId(), dst.getStackNetworkId())) {
             return context.error();
         }
-        if (validateStackNetworkId(destItem.getStackNetId(), dst.getStackNetworkId())) {
+
+        boolean fullTransfer = sourceItem.getCount() == count;
+        boolean srcIsCreatedOutput = isCreatedOutput(srcInv, srcSlot);
+        boolean creativeCreatedOutputTransfer = player.isCreative()
+                && srcIsCreatedOutput
+                && Boolean.TRUE.equals(context.get(CraftCreativeActionProcessor.CRAFT_CREATIVE_KEY));
+        if (creativeCreatedOutputTransfer) {
+            return transferCreativeCreatedOutput(action, player, context, srcInv, srcSlot, dstInv, dstSlot,
+                    sourceItem, destItem, fullTransfer);
+        }
+
+        if (!destItem.isNull() && !destItem.equals(sourceItem, true, true)) {
             return context.error();
         }
 
@@ -84,9 +95,6 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         // quiet to avoid double-send with the ItemStackResponse echo.
         boolean sendSource = isEquipmentSlot(src.getContainer());
         boolean sendDest = isEquipmentSlot(dst.getContainer());
-
-        boolean fullTransfer = sourceItem.getCount() == count;
-        boolean srcIsCreatedOutput = isCreatedOutput(srcInv, srcSlot);
 
         // stackNetId allocation strategy aligned with Allay/PNX:
         // - full transfer + empty dst   : keep source stackId (whole stack moves)
@@ -170,10 +178,77 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
 
         List<ItemStackResponseContainer> containers = new ArrayList<>();
         containers.add(buildContainer(srcInv, srcSlot, src));
-        if (src.getContainer() != dst.getContainer() || src.getSlot() != dst.getSlot()) {
+        if (!sameNetworkSlot(src, dst)) {
             containers.add(buildContainer(dstInv, dstSlot, dst));
         }
         return context.success(containers);
+    }
+
+    private ActionResponse transferCreativeCreatedOutput(T action, Player player, ItemStackRequestContext context,
+                                                         Inventory srcInv, int srcSlot,
+                                                         Inventory dstInv, int dstSlot,
+                                                         Item sourceItem, Item destItem,
+                                                         boolean fullTransfer) {
+        ItemStackRequestSlotData dst = action.getDestination();
+        int count = action.getCount();
+        if (srcInv == dstInv && srcSlot == dstSlot) {
+            return context.error();
+        }
+        if (!isSlotCompatible(dstInv, dstSlot, sourceItem)) {
+            return context.error();
+        }
+
+        boolean sendSource = isEquipmentSlot(action.getSource().getContainer());
+        boolean sendDest = isEquipmentSlot(dst.getContainer());
+
+        Item newDest = sourceItem.clone();
+        newDest.setCount(count);
+        newDest.autoAssignStackNetworkId();
+
+        Item newSrc;
+        if (fullTransfer) {
+            newSrc = Item.get(Item.AIR);
+        } else {
+            newSrc = sourceItem.clone();
+            newSrc.setCount(sourceItem.getCount() - count);
+        }
+
+        if (!fireTransferEvent(player, srcInv, srcSlot, dstInv, dstSlot, sourceItem, destItem, count)) {
+            return context.error();
+        }
+        if (!fireClickEvent(player, srcInv, srcSlot, sourceItem, newSrc)) {
+            return context.error();
+        }
+        if (!fireClickEvent(player, dstInv, dstSlot, destItem, newDest)) {
+            return context.error();
+        }
+
+        List<InventoryAction> transactionActions = new ArrayList<>();
+        transactionActions.add(new SlotChangeAction(srcInv, srcSlot, sourceItem, newSrc));
+        transactionActions.add(new SlotChangeAction(dstInv, dstSlot, destItem, newDest));
+        InventoryTransaction transaction = new EventOnlyInventoryTransaction(player, transactionActions, context);
+        if (!transaction.execute()) {
+            return context.error();
+        }
+
+        Item originalDestItem = destItem.clone();
+        if (!dstInv.setItem(dstSlot, newDest, sendDest)) {
+            return context.error();
+        }
+
+        boolean srcOk = fullTransfer
+                ? srcInv.clear(srcSlot, sendSource)
+                : srcInv.setItem(srcSlot, newSrc, sendSource);
+        if (!srcOk) {
+            if (originalDestItem.isNull()) {
+                dstInv.clear(dstSlot, sendDest);
+            } else {
+                dstInv.setItem(dstSlot, originalDestItem, sendDest);
+            }
+            return context.error();
+        }
+
+        return context.success(List.of(buildContainer(dstInv, dstSlot, dst)));
     }
 
     private static boolean isEquipmentSlot(ContainerSlotType type) {
@@ -239,6 +314,12 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         return !event.isCancelled();
     }
 
+    static boolean sameNetworkSlot(ItemStackRequestSlotData first, ItemStackRequestSlotData second) {
+        return first.getContainer() == second.getContainer()
+                && first.getSlot() == second.getSlot()
+                && Objects.equals(first.getDynamicId(), second.getDynamicId());
+    }
+
     /**
      * InventoryTransaction subclass used solely to emit
      * {@link InventoryTransactionEvent} for server-authoritative item stack
@@ -260,10 +341,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         protected void init(Player source, List<InventoryAction> actions) {
             this.source = source;
             for (InventoryAction action : actions) {
-                this.actions.add(action);
-                if (action instanceof SlotChangeAction slotChange) {
-                    this.inventories.add(slotChange.getInventory());
-                }
+                this.addAction(action);
             }
         }
 
@@ -276,6 +354,10 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
 
         @Override
         public boolean execute() {
+            if (this.invalid || this.actions.isEmpty()) {
+                return false;
+            }
+
             // Snapshot affected slots before firing the event so we can tell
             // whether a plugin actually mutated the inventory when cancelling.
             Map<Inventory, Map<Integer, Item>> preStates = new HashMap<>();

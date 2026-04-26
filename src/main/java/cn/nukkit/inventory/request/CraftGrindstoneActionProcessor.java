@@ -76,7 +76,9 @@ public class CraftGrindstoneActionProcessor implements ItemStackRequestActionPro
         context.put(GRINDSTONE_EXP_KEY, experienceDropped);
 
         ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
-                0, 0, resultClone.getCount(), resultClone.getStackNetId(),
+                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
+                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
+                resultClone.getCount(), resultClone.getStackNetId(),
                 resultClone.hasCustomName() ? resultClone.getCustomName() : "",
                 resultClone.getDamage(), ""
         );

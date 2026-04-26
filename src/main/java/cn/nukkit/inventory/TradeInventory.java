@@ -113,4 +113,22 @@ public class TradeInventory extends BaseInventory {
         }
         assignedRecipeIds.clear();
     }
+
+    public CompoundTag getAssignedRecipe(int recipeNetId) {
+        if (!assignedRecipeIds.contains(recipeNetId)) {
+            return null;
+        }
+        ListTag<Tag> recipes = this.getHolder().getRecipes();
+        if (recipes == null) {
+            return null;
+        }
+        for (Tag tag : recipes.getAll()) {
+            if (tag instanceof CompoundTag recipe
+                    && recipe.contains("netId")
+                    && recipe.getInt("netId") == recipeNetId) {
+                return recipe;
+            }
+        }
+        return null;
+    }
 }

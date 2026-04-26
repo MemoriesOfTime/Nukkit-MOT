@@ -383,8 +383,10 @@ public class PlayerInventory extends BaseInventory {
             if (player.equals(this.getHolder())) {
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     InventoryContentPacket pk2 = new InventoryContentPacket();
-                    pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
+                    int id = InventoryContentPacket.SPECIAL_ARMOR;
+                    pk2.inventoryId = id;
                     pk2.slots = armor;
+                    pk2.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, id);
                     player.dataPacket(pk2);
                 } else {
                     ContainerSetContentPacketV113 pk2 = new ContainerSetContentPacketV113();
@@ -448,9 +450,11 @@ public class PlayerInventory extends BaseInventory {
             if (player.equals(this.getHolder())) {
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     InventorySlotPacket pk2 = new InventorySlotPacket();
-                    pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
+                    int id = InventoryContentPacket.SPECIAL_ARMOR;
+                    pk2.inventoryId = id;
                     pk2.slot = index - this.getSize();
                     pk2.item = this.getItem(index);
+                    pk2.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, id);
                     player.dataPacket(pk2);
                 } else {
                     ContainerSetSlotPacketV113 pk3 = new ContainerSetSlotPacketV113();
@@ -525,6 +529,7 @@ public class PlayerInventory extends BaseInventory {
                 continue;
             }
             pk.inventoryId = id;
+            pk.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR_AND_INVENTORY, id);
             player.dataPacket(pk.clone());
         }
     }
@@ -551,13 +556,6 @@ public class PlayerInventory extends BaseInventory {
         InventorySlotPacket pk = new InventorySlotPacket();
         pk.slot = index;
         pk.item = this.getItem(index).clone();
-        if (index < 9) {
-            pk.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR, null);
-        } else if (index < 36) {
-            pk.containerNameData = new FullContainerName(ContainerSlotType.INVENTORY, null);
-        } else {
-            pk.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, null);
-        }
 
         ContainerSetSlotPacketV113 pk2 = new ContainerSetSlotPacketV113();
         pk2.slot = index;
@@ -566,6 +564,7 @@ public class PlayerInventory extends BaseInventory {
         for (Player player : players) {
             if (player.equals(this.getHolder())) {
                 pk.inventoryId = ContainerIds.INVENTORY;
+                pk.containerNameData = resolvePlayerSlotContainerName(index, ContainerIds.INVENTORY);
                 pk2.windowid = 0;
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     player.dataPacket(pk);
@@ -579,6 +578,7 @@ public class PlayerInventory extends BaseInventory {
                     continue;
                 }
                 pk.inventoryId = id;
+                pk.containerNameData = resolvePlayerSlotContainerName(index, id);
                 pk2.windowid = id;
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     player.dataPacket(pk.clone());
@@ -587,6 +587,16 @@ public class PlayerInventory extends BaseInventory {
                 }
             }
         }
+    }
+
+    private FullContainerName resolvePlayerSlotContainerName(int index, int dynamicId) {
+        if (index < 9) {
+            return new FullContainerName(ContainerSlotType.HOTBAR, dynamicId);
+        }
+        if (index < 36) {
+            return new FullContainerName(ContainerSlotType.INVENTORY, dynamicId);
+        }
+        return new FullContainerName(ContainerSlotType.ARMOR, dynamicId);
     }
 
     public void sendCreativeContents() {

@@ -13,6 +13,8 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -544,6 +546,7 @@ public abstract class BaseInventory implements Inventory {
                 continue;
             }
             pk.inventoryId = id;
+            pk.containerNameData = this.resolveFullContainerName(0, id);
             player.dataPacket(pk);
         }
     }
@@ -617,6 +620,7 @@ public abstract class BaseInventory implements Inventory {
                 return;
             }
             pk.inventoryId = id;
+            pk.containerNameData = this.resolveFullContainerName(index, id);
             player.dataPacket(pk);
         } else {
             ContainerSetSlotPacketV113 pk = new ContainerSetSlotPacketV113();
@@ -651,6 +655,7 @@ public abstract class BaseInventory implements Inventory {
             pk.inventoryId = id;
             pk2.windowid = id;
             if (player.protocol >= ProtocolInfo.v1_2_0) {
+                pk.containerNameData = this.resolveFullContainerName(index, id);
                 player.dataPacket(pk);
             } else {
                 player.dataPacket(pk2);
@@ -666,5 +671,64 @@ public abstract class BaseInventory implements Inventory {
     @Override
     public InventoryType getType() {
         return type;
+    }
+
+    protected FullContainerName resolveFullContainerName(int index) {
+        return new FullContainerName(resolveContainerSlotType(index), null);
+    }
+
+    protected FullContainerName resolveFullContainerName(int index, int dynamicId) {
+        return new FullContainerName(resolveContainerSlotType(index), dynamicId);
+    }
+
+    protected ContainerSlotType resolveContainerSlotType(int index) {
+        return switch (this.type) {
+            case PLAYER -> {
+                if (index < 9) {
+                    yield ContainerSlotType.HOTBAR;
+                }
+                if (index < 36) {
+                    yield ContainerSlotType.INVENTORY;
+                }
+                yield ContainerSlotType.ARMOR;
+            }
+            case OFFHAND -> ContainerSlotType.OFFHAND;
+            case ENTITY_ARMOR -> ContainerSlotType.ARMOR;
+            case BARREL -> ContainerSlotType.BARREL;
+            case SHULKER_BOX -> ContainerSlotType.SHULKER_BOX;
+            case FURNACE -> switch (index) {
+                case 0 -> ContainerSlotType.FURNACE_INGREDIENT;
+                case 1 -> ContainerSlotType.FURNACE_FUEL;
+                default -> ContainerSlotType.FURNACE_RESULT;
+            };
+            case BLAST_FURNACE -> switch (index) {
+                case 0 -> ContainerSlotType.BLAST_FURNACE_INGREDIENT;
+                case 1 -> ContainerSlotType.FURNACE_FUEL;
+                default -> ContainerSlotType.FURNACE_RESULT;
+            };
+            case SMOKER -> switch (index) {
+                case 0 -> ContainerSlotType.SMOKER_INGREDIENT;
+                case 1 -> ContainerSlotType.FURNACE_FUEL;
+                default -> ContainerSlotType.FURNACE_RESULT;
+            };
+            case BREWING_STAND -> {
+                if (index == 0) {
+                    yield ContainerSlotType.BREWING_INPUT;
+                }
+                if (index == 4) {
+                    yield ContainerSlotType.BREWING_FUEL;
+                }
+                yield ContainerSlotType.BREWING_RESULT;
+            }
+            case BEACON -> ContainerSlotType.BEACON_PAYMENT;
+            case TRADING -> switch (index) {
+                case 0 -> ContainerSlotType.TRADE2_INGREDIENT_1;
+                case 1 -> ContainerSlotType.TRADE2_INGREDIENT_2;
+                default -> ContainerSlotType.TRADE2_RESULT;
+            };
+            case HORSE -> index <= HorseInventory.SLOT_ARMOR ? ContainerSlotType.HORSE_EQUIP : ContainerSlotType.LEVEL_ENTITY;
+            case UI -> ContainerSlotType.CRAFTING_INPUT;
+            default -> ContainerSlotType.LEVEL_ENTITY;
+        };
     }
 }

@@ -25,10 +25,7 @@ public class DestroyActionProcessor implements ItemStackRequestActionProcessor<D
 
     @Override
     public ActionResponse handle(DestroyAction action, Player player, ItemStackRequestContext context) {
-        Boolean suppress = context.get(NO_RESPONSE_DESTROY_KEY);
-        if (suppress != null && suppress) {
-            return null;
-        }
+        boolean suppressResponse = Boolean.TRUE.equals(context.get(NO_RESPONSE_DESTROY_KEY));
 
         ItemStackRequestSlotData src = action.getSource();
         Inventory inventory = NetworkMapping.getInventory(player, src.getContainer(), src.getDynamicId());
@@ -80,6 +77,9 @@ public class DestroyActionProcessor implements ItemStackRequestActionProcessor<D
         }
 
         ItemStackResponseContainer container = TransferItemActionProcessor.buildContainer(inventory, slot, src);
+        if (suppressResponse) {
+            return null;
+        }
         return context.success(List.of(container));
     }
 }

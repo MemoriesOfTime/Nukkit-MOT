@@ -112,6 +112,16 @@ public class EnchantInventory extends FakeBlockUIComponent {
         publishedOptionIds.clear();
     }
 
+    public boolean hasPublishedOption(int recipeNetId) {
+        return publishedOptionIds.contains(recipeNetId);
+    }
+
+    public void releasePublishedOption(int recipeNetId) {
+        if (publishedOptionIds.remove(recipeNetId)) {
+            PlayerEnchantOptionsPacket.RECIPE_MAP.remove(recipeNetId);
+        }
+    }
+
     public Item getInputSlot() {
         return this.getItem(0);
     }

@@ -96,10 +96,11 @@ public class EntityArmorInventory extends BaseInventory {
     public void sendSlot(int index, Player player) {
         if (player == this.holder) {
             InventorySlotPacket inventorySlotPacket = new InventorySlotPacket();
-            inventorySlotPacket.inventoryId = player.getWindowId(this);
+            int id = player.getWindowId(this);
+            inventorySlotPacket.inventoryId = id;
             inventorySlotPacket.slot = index;
             inventorySlotPacket.item = this.getItem(index);
-            inventorySlotPacket.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, null);
+            inventorySlotPacket.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, id);
             player.dataPacket(inventorySlotPacket);
         } else {
             MobArmorEquipmentPacket mobArmorEquipmentPacket = new MobArmorEquipmentPacket();
@@ -121,8 +122,10 @@ public class EntityArmorInventory extends BaseInventory {
     public void sendContents(Player player) {
         if (player == this.holder) {
             InventoryContentPacket inventoryContentPacket = new InventoryContentPacket();
-            inventoryContentPacket.inventoryId = player.getWindowId(this);
+            int id = player.getWindowId(this);
+            inventoryContentPacket.inventoryId = id;
             inventoryContentPacket.slots = new Item[]{this.getHelmet(), this.getChestplate(), this.getLeggings(), this.getBoots()};
+            inventoryContentPacket.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, id);
             player.dataPacket(inventoryContentPacket);
         } else {
             MobArmorEquipmentPacket mobArmorEquipmentPacket = new MobArmorEquipmentPacket();

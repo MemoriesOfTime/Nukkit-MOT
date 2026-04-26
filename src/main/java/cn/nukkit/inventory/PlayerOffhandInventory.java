@@ -17,6 +17,7 @@ import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 
 public class PlayerOffhandInventory extends BaseInventory {
+    private static final int OFFHAND_CONTAINER_DYNAMIC_ID = 0;
 
     /**
      * Items that can be put to offhand inventory on Bedrock Edition
@@ -58,6 +59,7 @@ public class PlayerOffhandInventory extends BaseInventory {
                 InventoryContentPacket pk2 = new InventoryContentPacket();
                 pk2.inventoryId = ContainerIds.OFFHAND;
                 pk2.slots = new Item[]{item};
+                pk2.containerNameData = new FullContainerName(ContainerSlotType.OFFHAND, OFFHAND_CONTAINER_DYNAMIC_ID);
                 player.dataPacket(pk2);
             } else {
                 player.dataPacket(pk);
@@ -75,7 +77,7 @@ public class PlayerOffhandInventory extends BaseInventory {
                 InventorySlotPacket pk2 = new InventorySlotPacket();
                 pk2.inventoryId = ContainerIds.OFFHAND;
                 pk2.item = item;
-                pk2.containerNameData = new FullContainerName(ContainerSlotType.OFFHAND, null);
+                pk2.containerNameData = new FullContainerName(ContainerSlotType.OFFHAND, OFFHAND_CONTAINER_DYNAMIC_ID);
                 player.dataPacket(pk2);
             } else {
                 player.dataPacket(pk);

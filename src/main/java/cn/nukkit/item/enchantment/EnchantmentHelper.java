@@ -92,7 +92,10 @@ public final class EnchantmentHelper {
     private static List<Enchantment> filterApplicable(Item input, int power) {
         List<Enchantment> result = new ArrayList<>();
         for (Enchantment enchantment : Enchantment.getEnchantments()) {
-            if (enchantment == null || !enchantment.canEnchant(input)) {
+            if (enchantment == null
+                    || enchantment.isTreasure()
+                    || enchantment.isCurse()
+                    || !enchantment.canEnchant(input)) {
                 continue;
             }
             for (int lvl = enchantment.getMaxLevel(); lvl > 0; lvl--) {

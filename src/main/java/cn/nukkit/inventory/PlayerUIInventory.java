@@ -99,6 +99,7 @@ public class PlayerUIInventory extends BaseInventory {
         for (int i = 0; i < this.getSize(); ++i) {
             pk.slots[i] = this.getItem(i);
         }
+        pk.containerNameData = new FullContainerName(ContainerSlotType.CRAFTING_INPUT, null);
 
         for (Player p : target) {
             if (p == this.getHolder()) {

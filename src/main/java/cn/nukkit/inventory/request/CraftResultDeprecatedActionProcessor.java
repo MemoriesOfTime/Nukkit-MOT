@@ -42,7 +42,9 @@ public class CraftResultDeprecatedActionProcessor implements ItemStackRequestAct
                 output.autoAssignStackNetworkId();
                 player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
                 ItemStackResponseSlot slot = new ItemStackResponseSlot(
-                        0, 0, output.getCount(), output.getStackNetId(),
+                        PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
+                        PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
+                        output.getCount(), output.getStackNetId(),
                         output.hasCustomName() ? output.getCustomName() : "",
                         output.getDamage(), ""
                 );

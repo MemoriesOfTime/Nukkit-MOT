@@ -2,7 +2,10 @@ package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
 import cn.nukkit.event.inventory.ItemStackRequestActionEvent;
-import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.PlayerInventory;
+import cn.nukkit.inventory.PlayerUIComponent;
+import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBundle;
 import cn.nukkit.network.protocol.ItemStackResponsePacket;
@@ -233,22 +236,30 @@ public final class ItemStackRequestHandler {
 
     private static void restoreInventory(Inventory inventory, Map<Integer, Item> snapshot) {
         Inventory canonical = canonicalizeInventory(inventory);
-        if (!(canonical instanceof BaseInventory baseInventory)) {
+        if (canonical == null) {
             return;
         }
 
-        for (int slot : new ArrayList<>(baseInventory.slots.keySet())) {
+        LinkedHashSet<Integer> currentSlots = new LinkedHashSet<>(canonical.getContents().keySet());
+        for (int slot = 0; slot < canonical.getSize(); slot++) {
+            currentSlots.add(slot);
+        }
+
+        for (int slot : currentSlots) {
             if (!snapshot.containsKey(slot)) {
-                baseInventory.clear(slot, false);
+                Item current = canonical.getItem(slot);
+                if (current != null && !current.isNull()) {
+                    canonical.clear(slot, false);
+                }
             }
         }
 
         for (var entry : snapshot.entrySet()) {
             Item item = entry.getValue();
             if (item != null && !item.isNull() && item.getCount() > 0) {
-                baseInventory.setItem(entry.getKey(), item.clone(), false);
+                canonical.setItem(entry.getKey(), item.clone(), false);
             } else {
-                baseInventory.clear(entry.getKey(), false);
+                canonical.clear(entry.getKey(), false);
             }
         }
     }

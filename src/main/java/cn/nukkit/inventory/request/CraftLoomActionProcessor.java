@@ -99,7 +99,9 @@ public class CraftLoomActionProcessor implements ItemStackRequestActionProcessor
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, result, false);
 
         ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
-                0, 0, result.getCount(), result.getStackNetId(),
+                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
+                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
+                result.getCount(), result.getStackNetId(),
                 result.hasCustomName() ? result.getCustomName() : "",
                 result.getDamage(), ""
         );

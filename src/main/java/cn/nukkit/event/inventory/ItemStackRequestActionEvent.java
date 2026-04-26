@@ -2,6 +2,7 @@ package cn.nukkit.event.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.event.Cancellable;
+import cn.nukkit.event.Event;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.inventory.request.ActionResponse;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestAction;
@@ -10,7 +11,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemS
  * Called before an ItemStackRequest action is processed.
  * Allows plugins to cancel or provide a custom response.
  */
-public class ItemStackRequestActionEvent extends InventoryEvent implements Cancellable {
+public class ItemStackRequestActionEvent extends Event implements Cancellable {
 
     private static final HandlerList handlers = new HandlerList();
 
@@ -24,7 +25,6 @@ public class ItemStackRequestActionEvent extends InventoryEvent implements Cance
     private ActionResponse response;
 
     public ItemStackRequestActionEvent(Player player, ItemStackRequestAction action, int actionIndex) {
-        super(null);
         this.player = player;
         this.action = action;
         this.actionIndex = actionIndex;
