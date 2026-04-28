@@ -1170,8 +1170,8 @@ public class BinaryStream {
         int blockRuntimeId = block == null ? 0 : GlobalBlockPalette.getOrCreateRuntimeId(protocolId, block.getId(), block.getDamage());
         this.putVarInt(blockRuntimeId);
 
-        ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
-        try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
+        try {
+            BinaryStream stream = new BinaryStream();
             if (!instanceItem && (isDurable || block != null && block.getDamage() > 0)) {
                 byte[] nbt = item.getCompoundTag();
                 CompoundTag tag;
@@ -1184,39 +1184,40 @@ public class BinaryStream {
                     tag.put("__DamageConflict__", tag.removeAndGet("Damage"));
                 }
                 tag.putInt("Damage", meta);
-                stream.writeShort(-1);
-                stream.writeByte(1); // Hardcoded in current version
-                stream.write(NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN));
+                stream.putLShort(-1);
+                stream.putByte((byte) 1); // Hardcoded in current version
+                stream.put(NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN));
             } else if (item.hasCompoundTag()) {
-                stream.writeShort(-1);
-                stream.writeByte(1); // Hardcoded in current version
-                stream.write(item.getCompoundTag());
+                stream.putLShort(-1);
+                stream.putByte((byte) 1); // Hardcoded in current version
+                stream.put(item.getCompoundTag());
             } else {
-                userDataBuf.writeShortLE(0);
+                stream.putLShort(0);
             }
 
             List<String> canPlaceOn = extractStringList(item, "CanPlaceOn");
-            stream.writeInt(canPlaceOn.size());
+            stream.putLInt(canPlaceOn.size());
             for (String string : canPlaceOn) {
-                stream.writeUTF(string);
+                byte[] b = string.getBytes(StandardCharsets.UTF_8);
+                stream.putLShort(string.length());
+                stream.put(b);
             }
 
             List<String> canDestroy = extractStringList(item, "CanDestroy");
-            stream.writeInt(canDestroy.size());
+            stream.putLInt(canDestroy.size());
             for (String string : canDestroy) {
-                stream.writeUTF(string);
+                byte[] b = string.getBytes(StandardCharsets.UTF_8);
+                stream.putLShort(string.length());
+                stream.put(b);
             }
 
             if (id == ItemID.SHIELD) {
-                stream.writeLong(0);
+                stream.putLLong(0);
             }
 
-            byte[] bytes = Utils.convertByteBuf2Array(userDataBuf);
-            putByteArray(bytes);
+            this.putByteArray(stream.getBuffer());
         } catch (IOException e) {
             throw new IllegalStateException("Unable to write item user data", e);
-        } finally {
-            userDataBuf.release();
         }
     }
 
