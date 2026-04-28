@@ -1,4 +1,4 @@
-package cn.nukkit.utils;
+package cn.nukkit.utils.compression;
 
 import cn.nukkit.Server;
 
@@ -11,7 +11,7 @@ public abstract class Zlib {
     private static ZlibProvider provider;
 
     static {
-        providers = new ZlibProvider[3];
+        providers = new ZlibProvider[4];
         providers[2] = new ZlibThreadLocal();
         provider = providers[2];
     }
@@ -21,7 +21,8 @@ public abstract class Zlib {
      *
      * 0 = ZlibOriginal
      * 1 = ZlibSingleThreadLowMem
-     * 2 = ZlibThreadLocal (default)
+     * 2 = ZlibThreadLocal
+     * 3 = LibDeflateThreadLocal (default)
      */
     public static void setProvider(int providerIndex) {
         switch (providerIndex) {
@@ -36,6 +37,10 @@ public abstract class Zlib {
             case 2:
                 if (providers[providerIndex] == null)
                     providers[providerIndex] = new ZlibThreadLocal();
+                break;
+            case 3:
+                if (providers[providerIndex] == null)
+                    providers[providerIndex] = new LibDeflateThreadLocal();
                 break;
             default:
                 throw new UnsupportedOperationException("Invalid provider: " + providerIndex);

@@ -1,7 +1,8 @@
-package cn.nukkit.utils;
+package cn.nukkit.utils.compression;
 
 import cn.nukkit.Server;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
+import cn.nukkit.utils.ThreadCache;
 
 import java.io.IOException;
 import java.util.zip.DataFormatException;

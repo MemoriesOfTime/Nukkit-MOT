@@ -18,7 +18,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.BlockUpdateEntry;
-import cn.nukkit.utils.Zlib;
+import cn.nukkit.utils.compression.Zlib;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;

@@ -2,8 +2,8 @@ package cn.nukkit.network;
 
 import cn.nukkit.network.protocol.types.PacketCompressionAlgorithm;
 import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.utils.SnappyCompression;
-import cn.nukkit.utils.Zlib;
+import cn.nukkit.utils.compression.SnappyCompression;
+import cn.nukkit.utils.compression.Zlib;
 
 public interface CompressionProvider {
 

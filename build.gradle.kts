@@ -105,6 +105,7 @@ dependencies {
     implementation("org.cloudburstmc:block-state-updater:$blockStateUpdaterVersion")
     implementation("com.github.daniellansun:fast-reflection:08ec134a5c")
     implementation("org.jctools:jctools-core:4.0.5")
+    implementation("com.fulcrumgenomics:jlibdeflate:0.1.0")
 
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")

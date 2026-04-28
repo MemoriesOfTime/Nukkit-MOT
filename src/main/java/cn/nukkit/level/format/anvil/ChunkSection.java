@@ -10,6 +10,7 @@ import cn.nukkit.nbt.tag.ByteArrayTag;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.*;
+import cn.nukkit.utils.compression.Zlib;
 import com.google.common.base.Preconditions;
 import lombok.extern.log4j.Log4j2;
 

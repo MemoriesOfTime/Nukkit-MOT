@@ -12,7 +12,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
-import cn.nukkit.utils.Zlib;
+import cn.nukkit.utils.compression.Zlib;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;

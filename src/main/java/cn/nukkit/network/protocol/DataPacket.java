@@ -4,8 +4,8 @@ import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.network.Network;
 import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.utils.SnappyCompression;
-import cn.nukkit.utils.Zlib;
+import cn.nukkit.utils.compression.SnappyCompression;
+import cn.nukkit.utils.compression.Zlib;
 import lombok.extern.log4j.Log4j2;
 
 /**
