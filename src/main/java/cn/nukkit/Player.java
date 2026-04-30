@@ -7449,6 +7449,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         TransferPacket pk = new TransferPacket();
         pk.address = hostName;
         pk.port = port;
+        pk.reloadWorld = true;
         if (!this.dataPacket(pk)) {
             return;
         }
