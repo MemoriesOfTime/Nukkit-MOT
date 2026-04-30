@@ -115,6 +115,13 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
 
         BlockEntityCauldron cauldron = (BlockEntityCauldron) be;
 
+        if (item instanceof ItemWolfArmor) {
+            if (dyeColorableArmor(item, player, cauldron)) {
+                this.level.updateComparatorOutputLevel(this);
+            }
+            return true;
+        }
+
         switch (item.getId()) {
             case Item.BUCKET:
                 if (item.getDamage() == 0) {//empty bucket
@@ -202,18 +209,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
             case Item.LEATHER_PANTS:
             case Item.LEATHER_BOOTS:
             case Item.LEATHER_HORSE_ARMOR:
-                if (isEmpty() || cauldron.hasPotion()) {
-                    break;
-                }
-
-                CompoundTag compoundTag = item.hasCompoundTag() ? item.getNamedTag() : new CompoundTag();
-                compoundTag.putInt("customColor", cauldron.getCustomColor().getRGB());
-                item.setCompoundTag(compoundTag);
-                player.getInventory().setItemInHand(item);
-
-                setFillLevel(getFillLevel() - 1);
-                this.level.setBlock(this, this, true, true);
-                this.level.addSoundToViewers(this, Sound.CAULDRON_DYEARMOR);
+                dyeColorableArmor(item, player, cauldron);
                 break;
             case Item.POTION:
             case Item.SPLASH_POTION:
@@ -305,6 +301,24 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
         }
 
         this.level.updateComparatorOutputLevel(this);
+        return true;
+    }
+
+    private boolean dyeColorableArmor(Item item, Player player, BlockEntityCauldron cauldron) {
+        if (isEmpty() || cauldron.hasPotion() || !cauldron.isCustomColor()) {
+            return false;
+        }
+
+        CompoundTag compoundTag = item.hasCompoundTag() ? item.getNamedTag() : new CompoundTag();
+        compoundTag.putInt("customColor", cauldron.getCustomColor().getRGB());
+        item.setCompoundTag(compoundTag);
+        if (player != null) {
+            player.getInventory().setItemInHand(item);
+        }
+
+        setFillLevel(getFillLevel() - 1);
+        this.level.setBlock(this, this, true, true);
+        this.level.addSoundToViewers(this, Sound.CAULDRON_DYEARMOR);
         return true;
     }
 

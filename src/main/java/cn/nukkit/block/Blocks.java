@@ -459,6 +459,7 @@ public class Blocks {
 
         list[COPPER_ORE] = BlockOreCopper.class; //566
         list[LIGHTNING_ROD] = BlockLightningRod.class; //567
+        list[CRAFTER] = BlockCrafter.class; //568
 
         list[HEAVY_CORE] = BlockHeavyCore.class; //571
         list[DRIPSTONE_BLOCK] = BlockDripstone.class; //572
@@ -657,6 +658,7 @@ public class Blocks {
         list[BAMBOO_FENCE] = BlockFenceBamboo.class; //769
         list[BAMBOO_FENCE_GATE] = BlockFenceGateBamboo.class; //771
 
+        list[BAMBOO_DOOR] = BlockDoorBamboo.class; //772
         list[BAMBOO_STANDING_SIGN] = BlockBambooSignPost.class; //773
         list[BAMBOO_WALL_SIGN] = BlockBambooWallSign.class; //774
         list[BAMBOO_TRAPDOOR] = BlockTrapdoorBamboo.class; //775
@@ -666,6 +668,7 @@ public class Blocks {
         list[BAMBOO_MOSAIC_SLAB] = BlockSlabBambooMosaic.class; //779
         list[BAMBOO_MOSAIC_DOUBLE_SLAB] = BlockDoubleSlabBambooMosaic.class; //780
 
+        list[CHISELED_BOOKSHELF] = BlockChiseledBookshelf.class; //781
         list[BAMBOO_BLOCK] = BlockBambooBlock.class; //782
         list[STRIPPED_BAMBOO_BLOCK] = BlockStrippedBambooBlock.class; //783
         list[SUSPICIOUS_SAND] = BlockSuspiciousSand.class; //784
@@ -692,11 +695,16 @@ public class Blocks {
 
         list[DECORATED_POT] = BlockDecoratedPot.class; //806
 
+        list[TORCHFLOWER_CROP] = BlockTorchflowerCrop.class; //822
+        list[TORCHFLOWER] = BlockTorchflower.class; //823
+
         list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; //828
+        list[PITCHER_CROP] = BlockPitcherCrop.class; //829
 
         list[CALIBRATED_SCULK_SENSOR] = BlockCalibratedSculkSensor.class; //835
 
         list[SNIFFER_EGG] = BlockSnifferEgg.class; //851
+        list[PITCHER_PLANT] = BlockPitcherPlant.class; //867
 
         list[TUFF_SLAB] = BlockSlabTuff.class; //999
         list[TUFF_DOUBLE_SLAB] = BlockDoubleSlabTuff.class; //1000

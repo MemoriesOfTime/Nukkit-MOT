@@ -52,6 +52,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping786;
     private static RuntimeItemMapping mapping800;
     private static RuntimeItemMapping mapping818;
+    private static RuntimeItemMapping mapping819;
     private static RuntimeItemMapping mapping827;
     private static RuntimeItemMapping mapping844;
     private static RuntimeItemMapping mapping859;
@@ -151,6 +152,7 @@ public class RuntimeItems {
         mapping786 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_70);
         mapping800 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_80);
         mapping818 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_90);
+        mapping819 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_93);
         mapping827 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_100);
         mapping844 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_110);
         mapping859 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_120);
@@ -193,6 +195,7 @@ public class RuntimeItems {
                 mapping786,
                 mapping800,
                 mapping818,
+                mapping819,
                 mapping827,
                 mapping844,
                 mapping859,
@@ -229,6 +232,8 @@ public class RuntimeItems {
             return mapping844;
         } else if (protocolId >= ProtocolInfo.v1_21_100) {
             return mapping827;
+        } else if (protocolId >= ProtocolInfo.v1_21_93) {
+            return mapping819;
         } else if (protocolId >= ProtocolInfo.v1_21_90) {
             return mapping818;
         } else if (protocolId >= ProtocolInfo.v1_21_80) {

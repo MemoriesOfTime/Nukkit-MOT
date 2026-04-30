@@ -2,6 +2,7 @@ package cn.nukkit.level;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
+import cn.nukkit.block.Block;
 import cn.nukkit.nbt.tag.CompoundTag;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,5 +54,21 @@ class BlockPaletteTest {
 
         Assertions.assertEquals(fullId, palette.getLegacyFullIdFromHashId(hashId));
         Assertions.assertEquals(fullId, palette.getLegacyFullId(customState));
+    }
+
+    @Test
+    /**
+     * Verifies that crafter states using the triggered bit are mapped instead of falling back to data 0.
+     */
+    void crafterTriggeredStatesHaveRuntimeMappings() {
+        assertCrafterTriggeredStateMapped(new BlockPalette(GameVersion.getLastVersion()));
+        assertCrafterTriggeredStateMapped(new BlockPalette(GameVersion.V1_21_50_NETEASE));
+    }
+
+    private static void assertCrafterTriggeredStateMapped(BlockPalette palette) {
+        int defaultRuntimeId = palette.getRuntimeId(Block.CRAFTER, 0);
+        int triggeredCraftingRuntimeId = palette.getRuntimeId(Block.CRAFTER, 0x37);
+
+        Assertions.assertNotEquals(defaultRuntimeId, triggeredCraftingRuntimeId);
     }
 }

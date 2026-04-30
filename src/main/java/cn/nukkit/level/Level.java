@@ -145,6 +145,8 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.WHEAT_BLOCK] = true;
         randomTickBlocks[Block.SUGARCANE_BLOCK] = true;
         randomTickBlocks[Block.NETHER_WART_BLOCK] = true;
+        randomTickBlocks[Block.TORCHFLOWER_CROP] = true;
+        randomTickBlocks[Block.PITCHER_CROP] = true;
         randomTickBlocks[Block.FIRE] = true;
         randomTickBlocks[Block.GLOWING_REDSTONE_ORE] = true;
         randomTickBlocks[Block.COCOA_BLOCK] = true;
@@ -2747,7 +2749,9 @@ public class Level implements ChunkManager, Metadatable {
             this.server.getPluginManager().callEvent(ev);
 
             if (!ev.isCancelled()) {
-                target.onTouch(player, ev.getAction());
+                if (target.onTouch(vector, item, face, fx, fy, fz, player, ev.getAction()) != 0) {
+                    return item;
+                }
 
                 if ((!player.isSneaking() || player.getInventory().getItemInHand().isNull()) && target.canBeActivated() && target.onActivate(item, player)) {
                     if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {

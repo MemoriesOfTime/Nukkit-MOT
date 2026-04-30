@@ -21,8 +21,13 @@ package com.nimbusds.jose.shaded.json;
  * Adding compressions and formating features
  * 
  * @author Uriel Chemouni &lt;uchemouni@gmail.com&gt;
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
 
+@Deprecated(forRemoval = true)
 public interface JSONAwareEx extends JSONAware {
 	/**
 	 * @return JSON text

@@ -8,6 +8,12 @@ import com.nimbusds.jose.shaded.json.JSONUtil;
 
 import java.io.IOException;
 
+/**
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
+ */
+@Deprecated(forRemoval = true)
 public class BeansWriterASM implements JsonWriterI<Object> {
 	public <E> void writeJSONString(E value, Appendable out, JSONStyle compression) throws IOException {
 		try {
