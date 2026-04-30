@@ -429,7 +429,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemEchoShard.class);
             registerNamespacedIdItem(ItemRecoveryCompass.class);
             registerNamespacedIdItem(ItemDoorMangrove.class);
+            registerNamespacedIdItem(ItemDoorBamboo.class);
             registerNamespacedIdItem(ItemDoorCherry.class);
+            registerNamespacedIdItem(ItemChiseledBookshelf.class);
+            registerNamespacedIdItem(ItemCrafter.class);
             //TODO 修改类名格式为ItemSmithingTemplateXXX
             registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
             registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
@@ -488,6 +491,28 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemOminousBottle.class);
             registerNamespacedIdItem(ItemBlueEgg.class);
             registerNamespacedIdItem(ItemBrownEgg.class);
+
+            registerNamespacedIdItem(ItemTorchflowerSeeds.class);
+            registerNamespacedIdItem(ItemPitcherPod.class);
+            registerNamespacedIdItem(ItemArmadilloScute.class);
+            registerNamespacedIdItem(ItemWolfArmor.class);
+            registerNamespacedIdItem(ItemResinBrick.class);
+            registerNamespacedIdItem(ItemHorseArmorCopper.class);
+            registerNamespacedIdItem(ItemHorseArmorNetherite.class);
+            registerNamespacedIdItem(ItemRecordTears.class);
+            registerNamespacedIdItem(ItemRecordLavaChicken.class);
+            registerNamespacedIdItem(ItemSpearWood.class);
+            registerNamespacedIdItem(ItemSpearStone.class);
+            registerNamespacedIdItem(ItemSpearIron.class);
+            registerNamespacedIdItem(ItemSpearGold.class);
+            registerNamespacedIdItem(ItemSpearDiamond.class);
+            registerNamespacedIdItem(ItemSpearCopper.class);
+            registerNamespacedIdItem(ItemSpearNetherite.class);
+            registerNamespacedIdItem(ItemNautilusArmorCopper.class);
+            registerNamespacedIdItem(ItemNautilusArmorIron.class);
+            registerNamespacedIdItem(ItemNautilusArmorGold.class);
+            registerNamespacedIdItem(ItemNautilusArmorDiamond.class);
+            registerNamespacedIdItem(ItemNautilusArmorNetherite.class);
 
             registerNamespacedIdItem(ItemSwordCopper.class);
             registerNamespacedIdItem(ItemAxeCopper.class);
@@ -1652,6 +1677,14 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public boolean isMace() {
+        return false;
+    }
+
+    public boolean isSpear() {
+        return false;
+    }
+
+    public boolean isHorseArmor() {
         return false;
     }
 

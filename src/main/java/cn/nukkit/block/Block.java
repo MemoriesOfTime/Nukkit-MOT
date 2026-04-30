@@ -525,6 +525,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return 0;
     }
 
+    public int onTouch(@NotNull Vector3 vector, @NotNull Item item, @NotNull BlockFace face, float fx, float fy, float fz,
+                       @Nullable Player player, PlayerInteractEvent.Action action) {
+        return this.onTouch(player, action);
+    }
+
     public boolean onActivate(Item item) {
         return this.onActivate(item, null);
     }

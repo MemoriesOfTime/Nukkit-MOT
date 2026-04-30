@@ -70,6 +70,11 @@ public class EntityHorse extends EntityHorseBase {
     }
 
     @Override
+    public boolean canWearHorseArmor() {
+        return !this.isBaby();
+    }
+
+    @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         boolean canTarget = super.targetOption(creature, distance);
 
@@ -96,6 +101,10 @@ public class EntityHorse extends EntityHorseBase {
 
         if (this.isSaddled()) {
             drops.add(Item.get(Item.SADDLE, 0, 1));
+        }
+
+        if (this.hasHorseArmor()) {
+            drops.add(this.getHorseArmor());
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);

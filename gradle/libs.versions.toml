@@ -25,9 +25,10 @@ oshi = "5.8.7"
 annotations = "24.1.0"
 jose4j = "0.9.6"
 junit = "5.10.2"
-mockito = "5.11.0"
+junit_platform = "1.10.2"
+mockito = "5.23.0"
 nukkitx_natives = "1.0.3"
-raknet = "1.0.0.CR4-20260406.120344-3"
+raknet = "1.0.0.CR4-20260426.145646-4"
 cloudburst_common = "3.0.0.Beta12-20260420.182526-15"
 jackson_dataformat_toml = "2.20.1"
 okaeri_configs = "6.1.0-beta.1"
@@ -84,6 +85,7 @@ terminal-console = { module = "net.minecrell:terminalconsoleappender", version.r
 
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit_platform" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
 

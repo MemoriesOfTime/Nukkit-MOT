@@ -10,6 +10,15 @@ plugins {
     alias(libs.plugins.git)
 }
 
+abstract class JavaAgentArgumentProvider : CommandLineArgumentProvider {
+    @get:Classpath
+    abstract val classpath: ConfigurableFileCollection
+
+    override fun asArguments(): Iterable<String> {
+        return classpath.files.map { "-javaagent:${it.absolutePath}" }
+    }
+}
+
 group = "cn.nukkit"
 version = "MOT-SNAPSHOT"
 
@@ -28,6 +37,12 @@ repositories {
     maven("https://repo.opencollab.dev/maven-snapshots/")
     maven("https://repo.lanink.cn/repository/maven-public/")
     maven("https://repo.okaeri.cloud/releases")
+}
+
+val mockitoAgent by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
 }
 
 dependencies {
@@ -91,6 +106,8 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.bundles.mockito)
     testRuntimeOnly(libs.junit.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    add("mockitoAgent", libs.mockito.core.get())
 }
 
 application {
@@ -128,6 +145,11 @@ tasks {
 
     test {
         useJUnitPlatform()
+        jvmArgumentProviders.add(
+            objects.newInstance<JavaAgentArgumentProvider>().apply {
+                classpath.from(mockitoAgent)
+            }
+        )
     }
 
     jar {

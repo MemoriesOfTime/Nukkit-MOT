@@ -6,15 +6,19 @@ import cn.nukkit.entity.EntityControllable;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityRideable;
 import cn.nukkit.entity.data.Vector3fEntityData;
+import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.inventory.HorseInventory;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
+import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.MobArmorEquipmentPacket;
 import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
@@ -30,8 +34,11 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
 
     private static final String TAG_CHEST_ITEMS = "ChestItems";
 
+    private static final String NBT_KEY_ARMOR_ITEM = "ArmorItem";
+
     private boolean saddled;
     private HorseInventory horseInventory;
+    private Item horseArmor = Item.AIR_ITEM;
 
     public EntityHorseBase(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -64,6 +71,10 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
                 this.horseInventory.applySaddleWithoutSync(Item.get(Item.SADDLE));
             }
         }
+
+        if (this.namedTag.containsCompound(NBT_KEY_ARMOR_ITEM)) {
+            this.setHorseArmor(NBTIO.getItemHelper(this.namedTag.getCompound(NBT_KEY_ARMOR_ITEM)), false);
+        }
     }
 
     @Override
@@ -72,6 +83,11 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
         this.namedTag.putBoolean("Saddle", this.isSaddled());
         if (this.horseInventory != null) {
             this.namedTag.putList(TAG_CHEST_ITEMS, this.horseInventory.saveToNBT());
+        }
+        if (this.hasHorseArmor()) {
+            this.namedTag.putCompound(NBT_KEY_ARMOR_ITEM, NBTIO.putItemHelper(this.horseArmor));
+        } else {
+            this.namedTag.remove(NBT_KEY_ARMOR_ITEM);
         }
     }
 
@@ -134,6 +150,13 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_SADDLE);
             this.setSaddled(true);
+        } else if (this.canWearHorseArmor() && !this.hasHorseArmor() && item.isHorseArmor()) {
+            Item armor = item.clone();
+            armor.setCount(1);
+            this.setHorseArmor(armor);
+            if (!player.isCreative()) {
+                player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
+            }
         } else if (this.passengers.isEmpty() && !this.isBaby() && !player.isSneaking() && (!this.canBeSaddled() || this.isSaddled())) {
             if (player.riding == null) {
                 this.mountEntity(player);
@@ -145,6 +168,10 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
 
     public boolean canBeSaddled() {
         return !this.isBaby();
+    }
+
+    public boolean canWearHorseArmor() {
+        return false;
     }
 
     public boolean isSaddled() {
@@ -164,6 +191,43 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
                 }
             }
         }
+    }
+
+    public boolean hasHorseArmor() {
+        return !this.horseArmor.isNull();
+    }
+
+    public Item getHorseArmor() {
+        return this.horseArmor;
+    }
+
+    public void setHorseArmor(Item armor) {
+        this.setHorseArmor(armor, true);
+    }
+
+    private void setHorseArmor(Item armor, boolean send) {
+        if (this.canWearHorseArmor() && armor != null && armor.isHorseArmor()) {
+            this.horseArmor = armor.clone();
+            this.horseArmor.setCount(1);
+            if (send) {
+                this.level.addSound(this, Sound.MOB_HORSE_ARMOR);
+            }
+        } else {
+            this.horseArmor = Item.AIR_ITEM;
+        }
+
+        if (send) {
+            this.sendHorseArmor(this.getViewers().values().toArray(Player.EMPTY_ARRAY));
+        }
+    }
+
+    @Override
+    public boolean attack(EntityDamageEvent source) {
+        if (this.hasHorseArmor() && source.canBeReducedByArmor()) {
+            float reduction = source.getFinalDamage() * this.horseArmor.getArmorPoints() * 0.04f;
+            source.setDamage(-reduction, EntityDamageEvent.DamageModifier.ARMOR);
+        }
+        return super.attack(source);
     }
 
     @Override
@@ -239,11 +303,33 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
 
     @Override
     public boolean canDespawn() {
-        if (this.isSaddled()) {
+        if (this.isSaddled() || this.hasHorseArmor()) {
             return false;
         }
 
         return super.canDespawn();
+    }
+
+    @Override
+    public void spawnTo(Player player) {
+        super.spawnTo(player);
+        this.sendHorseArmor(player);
+    }
+
+    private void sendHorseArmor(Player... players) {
+        if (players.length == 0) {
+            return;
+        }
+
+        Item armor = this.hasHorseArmor() ? this.horseArmor : Item.AIR_ITEM;
+        MobArmorEquipmentPacket packet = new MobArmorEquipmentPacket();
+        packet.eid = this.getId();
+        packet.slots = new Item[]{Item.AIR_ITEM, armor, Item.AIR_ITEM, Item.AIR_ITEM};
+        packet.body = armor;
+
+        for (Player player : players) {
+            player.dataPacket(packet);
+        }
     }
 
     @Override

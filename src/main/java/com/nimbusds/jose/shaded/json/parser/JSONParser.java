@@ -23,6 +23,12 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 
+/**
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
+ */
+@Deprecated(forRemoval = true)
 public class JSONParser {
 	/**
 	 * allow simple quote as String quoting char

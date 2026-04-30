@@ -5,6 +5,7 @@ import cn.nukkit.block.custom.properties.BlockProperty;
 import cn.nukkit.block.custom.properties.BooleanBlockProperty;
 import cn.nukkit.block.custom.properties.EnumBlockProperty;
 import cn.nukkit.block.properties.enums.CrackedState;
+import cn.nukkit.block.properties.enums.CrafterOrientation;
 import cn.nukkit.math.BlockFace;
 
 public interface VanillaProperties {
@@ -15,7 +16,8 @@ public interface VanillaProperties {
             new BlockFace[]{ BlockFace.SOUTH, BlockFace.WEST, BlockFace.NORTH, BlockFace.EAST }).ordinal(true);
 
     BlockProperty<BlockFace> CARDINAL_DIRECTION = new EnumBlockProperty<>("minecraft:cardinal_direction", false,
-            new BlockFace[]{ BlockFace.SOUTH, BlockFace.WEST, BlockFace.NORTH, BlockFace.EAST }).ordinal(true);
+            new BlockFace[]{ BlockFace.SOUTH, BlockFace.WEST, BlockFace.NORTH, BlockFace.EAST },
+            2, "minecraft:cardinal_direction", false, new String[]{ "south", "west", "north", "east" });
 
     BlockProperty<BlockFace> FACING_DIRECTION = new EnumBlockProperty<>("facing_direction", false,
             new BlockFace[] { BlockFace.DOWN, BlockFace.UP, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.WEST, BlockFace.EAST }).ordinal(true);
@@ -24,6 +26,12 @@ public interface VanillaProperties {
             new BlockFace[]{ BlockFace.EAST, BlockFace.WEST, BlockFace.SOUTH, BlockFace.NORTH }).ordinal(true);
 
     EnumBlockProperty<CrackedState> CRACKED_STATE = new EnumBlockProperty<>("cracked_state", false, CrackedState.class);
+
+    EnumBlockProperty<CrafterOrientation> CRAFTER_ORIENTATION = new EnumBlockProperty<>("orientation", false, CrafterOrientation.class);
+
+    BooleanBlockProperty CRAFTING = new BooleanBlockProperty("crafting", false);
+
+    BooleanBlockProperty TRIGGERED = new BooleanBlockProperty("triggered_bit", false);
 
     BlockProperty<BlockWall.WallConnectionType> WALL_CONNECTION_TYPE_EAST = new EnumBlockProperty<>("wall_connection_type_east",
             false,

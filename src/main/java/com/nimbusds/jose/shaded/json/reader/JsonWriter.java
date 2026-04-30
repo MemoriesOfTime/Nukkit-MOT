@@ -10,6 +10,12 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
+ */
+@Deprecated(forRemoval = true)
 public class JsonWriter {
 	private ConcurrentHashMap<Class<?>, JsonWriterI<?>> data;
 	private LinkedList<WriterByInterface> writerInterfaces;

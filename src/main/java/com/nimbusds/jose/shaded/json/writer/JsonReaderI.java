@@ -27,7 +27,12 @@ import java.lang.reflect.Type;
  * @author uriel Chemouni
  *
  * @param <T> result type
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
+@Deprecated(forRemoval = true)
 public abstract class JsonReaderI<T> {
 	public final JsonReader base;
 

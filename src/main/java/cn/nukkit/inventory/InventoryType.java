@@ -38,7 +38,8 @@ public enum InventoryType {
     GRINDSTONE(3, "Grindstone", 26),
     STONECUTTER(2, "Stonecutter", 29),
     CARTOGRAPHY(2, "Cartography Table", 32),
-    HORSE(17, "Horse", 12); //1 SADDLE, 1 ARMOR, up to 15 CHEST
+    HORSE(17, "Horse", 12), //1 SADDLE, 1 ARMOR, up to 15 CHEST
+    CRAFTER(9, "Crafter", 36);
 
     private final int size;
     private final String title;
