@@ -54,6 +54,7 @@ import org.cloudburstmc.protocol.bedrock.codec.v860.Bedrock_v860;
 import org.cloudburstmc.protocol.bedrock.codec.v898.Bedrock_v898;
 import org.cloudburstmc.protocol.bedrock.codec.v924.Bedrock_v924;
 import org.cloudburstmc.protocol.bedrock.codec.v944.Bedrock_v944;
+import org.cloudburstmc.protocol.bedrock.codec.v975.Bedrock_v975;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -122,6 +123,7 @@ public final class ProtocolCodecMapping {
         codecs.put(898, Bedrock_v898.CODEC);   // 1.21.130 - 1.21.132
         codecs.put(924, Bedrock_v924.CODEC);   // 1.26.0 - 1.26.3
         codecs.put(944, Bedrock_v944.CODEC);   // 1.26.10
+        codecs.put(975, Bedrock_v975.CODEC);   // 1.26.20
         CODECS = Collections.unmodifiableMap(codecs);
     }
 

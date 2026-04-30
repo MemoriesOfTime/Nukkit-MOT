@@ -31,6 +31,16 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
      * @since v924
      */
     public List<MemoryCategoryCounter> memoryCategoryValues = new ArrayList<>();
+    /**
+     * Entity diagnostic timing info.
+     * @since v975
+     */
+    public List<EntityDiagnosticTimingInfo> entityDiagnostics = new ArrayList<>();
+    /**
+     * System diagnostic timing info.
+     * @since v975
+     */
+    public List<SystemDiagnosticTimingInfo> systemDiagnostics = new ArrayList<>();
 
     @Override
     public int packetId() {
@@ -63,6 +73,28 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
                 this.memoryCategoryValues.add(new MemoryCategoryCounter(category, currentBytes));
             }
         }
+
+        if (this.protocol >= 975) {
+            int entityCount = (int) this.getUnsignedVarInt();
+            this.entityDiagnostics = new ArrayList<>(entityCount);
+            for (int i = 0; i < entityCount; i++) {
+                String displayName = this.getString();
+                String entity = this.getString();
+                long timeInNs = this.getLLong();
+                int percentOfTotal = this.getByte();
+                this.entityDiagnostics.add(new EntityDiagnosticTimingInfo(displayName, entity, timeInNs, (byte) percentOfTotal));
+            }
+
+            int systemCount = (int) this.getUnsignedVarInt();
+            this.systemDiagnostics = new ArrayList<>(systemCount);
+            for (int i = 0; i < systemCount; i++) {
+                String displayName = this.getString();
+                long systemIndex = this.getLLong();
+                long timeInNs = this.getLLong();
+                int percentOfTotal = this.getByte();
+                this.systemDiagnostics.add(new SystemDiagnosticTimingInfo(displayName, systemIndex, timeInNs, (byte) percentOfTotal));
+            }
+        }
     }
 
     @Override
@@ -85,6 +117,24 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
                 this.putLLong(counter.currentBytes);
             }
         }
+
+        if (this.protocol >= 975) {
+            this.putUnsignedVarInt(this.entityDiagnostics.size());
+            for (EntityDiagnosticTimingInfo info : this.entityDiagnostics) {
+                this.putString(info.displayName);
+                this.putString(info.entity);
+                this.putLLong(info.timeInNs);
+                this.putByte(info.percentOfTotal);
+            }
+
+            this.putUnsignedVarInt(this.systemDiagnostics.size());
+            for (SystemDiagnosticTimingInfo info : this.systemDiagnostics) {
+                this.putString(info.displayName);
+                this.putLLong(info.systemIndex);
+                this.putLLong(info.timeInNs);
+                this.putByte(info.percentOfTotal);
+            }
+        }
     }
 
     /**
@@ -97,5 +147,33 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
     public static class MemoryCategoryCounter {
         public int category;
         public long currentBytes;
+    }
+
+    /**
+     * Entity diagnostic timing info.
+     * @since v975
+     */
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class EntityDiagnosticTimingInfo {
+        public String displayName;
+        public String entity;
+        public long timeInNs;
+        public byte percentOfTotal;
+    }
+
+    /**
+     * System diagnostic timing info.
+     * @since v975
+     */
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class SystemDiagnosticTimingInfo {
+        public String displayName;
+        public long systemIndex;
+        public long timeInNs;
+        public byte percentOfTotal;
     }
 }

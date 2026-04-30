@@ -3496,7 +3496,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
     @MethodSource("versionsFrom944")
     void partyChangedDecode(int protocol) {
         var cb = new org.cloudburstmc.protocol.bedrock.packet.PartyChangedPacket();
-        cb.setPartyId("test-party-456");
+        cb.setParty(new org.cloudburstmc.protocol.bedrock.packet.PartyChangedPacket.PartyInfo("test-party-456", false));
 
         PartyChangedPacket nk = crossEncode(cb, PartyChangedPacket::new, protocol);
 

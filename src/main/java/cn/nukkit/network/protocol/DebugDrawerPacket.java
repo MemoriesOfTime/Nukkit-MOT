@@ -176,6 +176,9 @@ public class DebugDrawerPacket extends DataPacket {
         this.putOptionalNull(shape.getScale(), this::putLFloat);
         this.putOptionalNull(shape.getRotation(), this::putVector3f);
         this.putOptionalNull(shape.getTotalTimeLeft(), this::putLFloat);
+        if (this.protocol >= ProtocolInfo.v1_26_20) {
+            this.putOptionalNull(shape.getMaximumRenderDistance(), this::putLFloat);
+        }
         this.putOptionalNull(shape.getColor(), color -> this.putLInt(color.getRGB()));
     }
 }

@@ -13,6 +13,7 @@ public class PartyChangedPacket extends DataPacket {
     public static final int NETWORK_ID = ProtocolInfo.PARTY_CHANGED_PACKET;
 
     public String partyId;
+    public boolean isPartyLeader;
 
     @Override
     @Deprecated
@@ -28,11 +29,17 @@ public class PartyChangedPacket extends DataPacket {
     @Override
     public void decode() {
         this.partyId = this.getString();
+        if (protocol >= 975) {
+            this.isPartyLeader = this.getBoolean();
+        }
     }
 
     @Override
     public void encode() {
         this.reset();
         this.putString(this.partyId);
+        if (protocol >= 975) {
+            this.putBoolean(this.isPartyLeader);
+        }
     }
 }

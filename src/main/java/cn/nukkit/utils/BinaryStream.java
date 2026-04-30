@@ -746,6 +746,12 @@ public class BinaryStream {
 
         int stackNetId = 0;
         if (this.getBoolean()) { // hasStackNetId
+            if (protocolId >= ProtocolInfo.v1_26_20) {
+                long stackNetIdVariant = this.getUnsignedVarInt();
+                if (stackNetIdVariant > 2) {
+                    throw new IllegalArgumentException("Not oneOf<ItemStackNetId, ItemStackRequestId, ItemStackLegacyRequestId>");
+                }
+            }
             stackNetId = this.getVarInt();
         }
 
@@ -1194,6 +1200,9 @@ public class BinaryStream {
         if (!instanceItem) {
             this.putBoolean(item.isUsingStackNetId());
             if (item.isUsingStackNetId()) {
+                if (gameVersion.getProtocol() >= ProtocolInfo.v1_26_20) {
+                    this.putUnsignedVarInt(0);
+                }
                 this.putVarInt(item.getStackNetId());
             }
         }
