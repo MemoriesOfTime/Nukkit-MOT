@@ -249,6 +249,9 @@ public final class NetworkMapping {
         if (inventory instanceof BundleInventory) {
             return ContainerSlotType.DYNAMIC_CONTAINER;
         }
+        if (inventory instanceof CrafterInventory) {
+            return ContainerSlotType.CRAFTER_BLOCK_CONTAINER;
+        }
         if (inventory instanceof HorseInventory) {
             return internalSlot <= HorseInventory.SLOT_ARMOR
                     ? ContainerSlotType.HORSE_EQUIP
