@@ -802,6 +802,13 @@ public class Blocks {
         list[TALL_DRY_GRASS] = BlockTallDryGrass.class; //1284
         list[CACTUS_FLOWER] = BlockCactusFlower.class; //1285
 
+        list[EXPOSED_LIGHTNING_ROD] = BlockLightningRodExposed.class; //1314
+        list[WEATHERED_LIGHTNING_ROD] = BlockLightningRodWeathered.class; //1315
+        list[OXIDIZED_LIGHTNING_ROD] = BlockLightningRodOxidized.class; //1316
+        list[WAXED_LIGHTNING_ROD] = BlockLightningRodWaxed.class; //1317
+        list[WAXED_EXPOSED_LIGHTNING_ROD] = BlockLightningRodExposedWaxed.class; //1318
+        list[WAXED_WEATHERED_LIGHTNING_ROD] = BlockLightningRodWeatheredWaxed.class; //1319
+        list[WAXED_OXIDIZED_LIGHTNING_ROD] = BlockLightningRodOxidizedWaxed.class; //1320
         list[COPPER_BARS] = BlockCopperBars.class; //1321
         list[EXPOSED_COPPER_BARS] = BlockCopperBarsExposed.class; //1322
         list[WEATHERED_COPPER_BARS] = BlockCopperBarsWeathered.class; //1323

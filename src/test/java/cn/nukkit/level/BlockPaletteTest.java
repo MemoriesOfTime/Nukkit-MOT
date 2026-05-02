@@ -3,6 +3,8 @@ package cn.nukkit.level;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockLightningRodBase;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -74,6 +76,15 @@ class BlockPaletteTest {
         assertCopperLanternStatesMapped(new BlockPalette(GameVersion.V1_26_10));
     }
 
+    @Test
+    /**
+     * Verifies lightning rod facing and powered states are mapped by the palettes that include them.
+     */
+    void lightningRodStatesHaveRuntimeMappings() {
+        assertLightningRodStatesMapped(new BlockPalette(GameVersion.V1_21_110));
+        assertLightningRodStatesMapped(new BlockPalette(GameVersion.V1_26_10));
+    }
+
     private static void assertCrafterTriggeredStateMapped(BlockPalette palette) {
         int defaultRuntimeId = palette.getRuntimeId(Block.CRAFTER, 0);
         int triggeredCraftingRuntimeId = palette.getRuntimeId(Block.CRAFTER, 0x37);
@@ -104,6 +115,37 @@ class BlockPaletteTest {
             Assertions.assertNotEquals(groundRuntimeId, hangingRuntimeId);
             Assertions.assertNotEquals(infoUpdateHashId, palette.getHashId(id, 0));
             Assertions.assertNotEquals(infoUpdateHashId, palette.getHashId(id, 1));
+        }
+    }
+
+    private static void assertLightningRodStatesMapped(BlockPalette palette) {
+        int infoUpdateRuntimeId = palette.getRuntimeId(Block.INFO_UPDATE, 0);
+        int infoUpdateHashId = palette.getHashId(Block.INFO_UPDATE, 0);
+        int[] ids = {
+                Block.LIGHTNING_ROD,
+                Block.EXPOSED_LIGHTNING_ROD,
+                Block.WEATHERED_LIGHTNING_ROD,
+                Block.OXIDIZED_LIGHTNING_ROD,
+                Block.WAXED_LIGHTNING_ROD,
+                Block.WAXED_EXPOSED_LIGHTNING_ROD,
+                Block.WAXED_WEATHERED_LIGHTNING_ROD,
+                Block.WAXED_OXIDIZED_LIGHTNING_ROD
+        };
+
+        for (int id : ids) {
+            for (BlockFace face : BlockFace.values()) {
+                int unpoweredMeta = face.getIndex();
+                int poweredMeta = face.getIndex() | BlockLightningRodBase.POWERED_BIT;
+                int unpoweredRuntimeId = palette.getRuntimeId(id, unpoweredMeta);
+                int poweredRuntimeId = palette.getRuntimeId(id, poweredMeta);
+
+                Assertions.assertNotEquals(infoUpdateRuntimeId, unpoweredRuntimeId);
+                Assertions.assertNotEquals(infoUpdateRuntimeId, poweredRuntimeId);
+                Assertions.assertNotEquals(unpoweredRuntimeId, poweredRuntimeId);
+                Assertions.assertNotEquals(infoUpdateHashId, palette.getHashId(id, unpoweredMeta));
+                Assertions.assertNotEquals(infoUpdateHashId, palette.getHashId(id, poweredMeta));
+                Assertions.assertNotEquals(palette.getHashId(id, unpoweredMeta), palette.getHashId(id, poweredMeta));
+            }
         }
     }
 }

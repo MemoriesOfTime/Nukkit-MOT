@@ -84,6 +84,14 @@ class RuntimeBlockStatesNewBlocksTest {
             expected.put("minecraft:waxed_exposed_copper_lantern", 2);
             expected.put("minecraft:waxed_weathered_copper_lantern", 2);
             expected.put("minecraft:waxed_oxidized_copper_lantern", 2);
+            expected.put("minecraft:lightning_rod", 12);
+            expected.put("minecraft:exposed_lightning_rod", 12);
+            expected.put("minecraft:weathered_lightning_rod", 12);
+            expected.put("minecraft:oxidized_lightning_rod", 12);
+            expected.put("minecraft:waxed_lightning_rod", 12);
+            expected.put("minecraft:waxed_exposed_lightning_rod", 12);
+            expected.put("minecraft:waxed_weathered_lightning_rod", 12);
+            expected.put("minecraft:waxed_oxidized_lightning_rod", 12);
         }
         return expected;
     }

@@ -6,28 +6,28 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Adapted from PowerNukkitX (<a href="https://github.com/PowerNukkitX/PowerNukkitX">PowerNukkitX</a>).
  */
-public class BlockLightningRod extends BlockLightningRodBase {
+public class BlockLightningRodOxidized extends BlockLightningRodBase {
 
-    public BlockLightningRod() {
+    public BlockLightningRodOxidized() {
         this(0);
     }
 
-    public BlockLightningRod(int meta) {
+    public BlockLightningRodOxidized(int meta) {
         super(meta);
     }
 
     @Override
     public String getName() {
-        return "Lightning Rod";
+        return "Oxidized Lightning Rod";
     }
 
     @Override
     public int getId() {
-        return LIGHTNING_ROD;
+        return OXIDIZED_LIGHTNING_ROD;
     }
 
     @Override
     public @NotNull OxidizationLevel getOxidizationLevel() {
-        return OxidizationLevel.UNAFFECTED;
+        return OxidizationLevel.OXIDIZED;
     }
 }
