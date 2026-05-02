@@ -126,7 +126,7 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         var enchantOption = new PlayerEnchantOptionsPacket.EnchantOptionData(
                 1, // minLevel
-                0, // primarySlot
+                3, // primarySlot
                 java.util.List.of(new PlayerEnchantOptionsPacket.EnchantData(0, 1)),
                 java.util.List.of(),
                 java.util.List.of(),
@@ -142,7 +142,7 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(1, cbPacket.getOptions().size());
         var option = cbPacket.getOptions().get(0);
         assertEquals(1, option.getCost());
-        assertEquals(0, option.getPrimarySlot());
+        assertEquals(3, option.getPrimarySlot());
         assertEquals("test_enchant", option.getEnchantName());
         assertEquals(1, option.getEnchantNetId());
     }

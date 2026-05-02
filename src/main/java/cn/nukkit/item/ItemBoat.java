@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockWater;
@@ -10,6 +11,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * Created by yescallop on 2016/2/13.
@@ -63,5 +65,16 @@ public class ItemBoat extends Item {
     @Override
     public int getMaxStackSize() {
         return 1;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return switch (this.getDamage()) {
+            case 6 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_0;
+            case 7 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_50;
+            case 8 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_80;
+            case 9 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_50;
+            default -> this.getDamage() >= 0 && this.getDamage() <= 5;
+        };
     }
 }

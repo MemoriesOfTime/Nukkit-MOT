@@ -13,7 +13,12 @@ import java.util.Map;
  * @author uriel
  *
  * @param <T>
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
+@Deprecated(forRemoval = true)
 public class MapperRemapped<T> extends JsonReaderI<T> {
 	private Map<String, String> rename;
 	private JsonReaderI<T> parent;

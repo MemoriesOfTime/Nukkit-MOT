@@ -36,7 +36,7 @@ public class InventorySlotPacket extends DataPacket {
     /**
      * @since v748
      */
-    private Item storageItem;
+    public Item storageItem = Item.AIR_ITEM.clone();
 
     @Override
     public void decode() {

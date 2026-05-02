@@ -2,6 +2,12 @@ package com.nimbusds.jose.shaded.asm;
 
 import com.nimbusds.jose.shaded.asm.ex.ConvertException;
 
+/**
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
+ */
+@Deprecated(forRemoval = true)
 public class DefaultConverter {
 	public static int convertToint(Object obj) {
 		if (obj == null)

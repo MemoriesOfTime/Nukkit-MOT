@@ -25,7 +25,13 @@ import java.lang.reflect.Type;
 import java.util.Date;
 import java.util.HashMap;
 
+/**
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
+ */
 @SuppressWarnings("unchecked")
+@Deprecated(forRemoval = true)
 public abstract class BeansMapper<T> extends JsonReaderI<T> {
 
 	public BeansMapper(JsonReader base) {

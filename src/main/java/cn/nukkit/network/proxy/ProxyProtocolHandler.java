@@ -112,9 +112,12 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
 
                 ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), realAddress));
             } catch (UnknownHostException e) {
-                log.warn("[ProxyProtocol] Failed to resolve source address: {}", message != null ? message.sourceAddress() : "unknown", e);
+                String sourceAddress = message != null ? message.sourceAddress() : "unknown";
+                log.warn("[ProxyProtocol] Failed to resolve source address {} from {}: {}", sourceAddress, sender, e.getMessage());
+                log.debug("[ProxyProtocol] Failed to resolve source address {} from {}", sourceAddress, sender, e);
             } catch (RuntimeException e) {
-                log.warn("[ProxyProtocol] Exception decoding PP v2 header from {}", sender, e);
+                log.warn("[ProxyProtocol] Dropping invalid PP v2 header from {}: {}: {}", sender, e.getClass().getSimpleName(), e.getMessage());
+                log.debug("[ProxyProtocol] Exception decoding PP v2 header from {}", sender, e);
             } finally {
                 if (message != null) {
                     message.release();

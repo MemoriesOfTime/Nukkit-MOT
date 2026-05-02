@@ -2,11 +2,15 @@ package cn.nukkit.utils;
 
 import cn.nukkit.utils.serverconfig.ConfigMigration;
 import cn.nukkit.utils.serverconfig.ServerConfig;
+import eu.okaeri.configs.ConfigManager;
+import eu.okaeri.configs.yaml.snakeyaml.YamlSnakeYamlConfigurer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -258,6 +262,37 @@ public class ConfigTest {
         // NetEase
         Assertions.assertFalse(config.neteaseSettings().clientSupport());
         Assertions.assertFalse(config.neteaseSettings().onlyAllowNeteaseClient());
+    }
+
+    @Test
+    public void testServerConfigRemovesUnknownYamlKeysOnUpdate() throws Exception {
+        Path configPath = tempDir.resolve("nukkit-mot.yml");
+        Files.writeString(configPath, """
+                unknown-top-level:
+                  enabled: true
+                performance-settings:
+                  async-workers: "2"
+                  unknown-performance-setting: true
+                network-settings:
+                  compression-level: 6
+                  unknown-network-setting: stale
+                """, StandardCharsets.UTF_8);
+
+        ServerConfig config = ConfigManager.create(ServerConfig.class, it -> {
+            it.configure(opt -> {
+                opt.configurer(new YamlSnakeYamlConfigurer());
+                opt.bindFile(configPath);
+                opt.removeOrphans(true);
+            });
+            it.load(true);
+        });
+
+        String saved = Files.readString(configPath, StandardCharsets.UTF_8);
+        Assertions.assertEquals("2", config.performanceSettings().asyncWorkers());
+        Assertions.assertEquals(6, config.networkSettings().compressionLevel());
+        Assertions.assertFalse(saved.contains("unknown-top-level"));
+        Assertions.assertFalse(saved.contains("unknown-performance-setting"));
+        Assertions.assertFalse(saved.contains("unknown-network-setting"));
     }
 
     @Test

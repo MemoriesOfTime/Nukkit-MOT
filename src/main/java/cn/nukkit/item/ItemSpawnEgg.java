@@ -149,17 +149,17 @@ public class ItemSpawnEgg extends Item {
     @Override
     public boolean isSupportedOn(GameVersion protocolId) {
         int meta = this.getDamage();
-        if (meta < 138) {
-            return true;
-        }
         return switch (meta) {
+            case 20, 21 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_60;
+            case 131 -> protocolId.getProtocol() >= ProtocolInfo.v1_18_30;
+            case 132, 133, 134 -> protocolId.getProtocol() >= ProtocolInfo.v1_18_10;
             case 138, 139 -> protocolId.getProtocol() >= ProtocolInfo.v1_20_0_23;
             case 142 -> protocolId.getProtocol() >= ProtocolInfo.v1_20_80;
             case 140, 144 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_0;
             case 141, 143, 145, 146 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_50;
             case 147 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_90;
             case 148 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_100;
-            default -> true;
+            default -> meta < 138;
         };
     }
 }

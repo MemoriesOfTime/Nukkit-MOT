@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol.regression.decode;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
@@ -9,6 +10,7 @@ import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.types.inventory.InventoryLayout;
 import cn.nukkit.network.protocol.types.inventory.InventoryTabLeft;
 import cn.nukkit.network.protocol.types.inventory.InventoryTabRight;
+import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.Unpooled;
 import org.cloudburstmc.math.vector.Vector3f;
 import org.cloudburstmc.math.vector.Vector3i;
@@ -19,6 +21,7 @@ import org.cloudburstmc.protocol.bedrock.data.LevelEvent;
 import org.cloudburstmc.protocol.bedrock.data.ResourcePackType;
 import org.cloudburstmc.protocol.bedrock.data.entity.EntityEventType;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -27,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -138,6 +142,29 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         return Stream.of(Arguments.of(ProtocolInfo.v1_17_40));
     }
 
+    static Stream<Arguments> versionsAt486And686() {
+        return Stream.of(
+                Arguments.of(ProtocolInfo.v1_18_10),
+                Arguments.of(ProtocolInfo.v1_21_2)
+        );
+    }
+
+    static Stream<Arguments> versionsAt557() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_19_40));
+    }
+
+    static Stream<Arguments> versionsAt575() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_19_70));
+    }
+
+    static Stream<Arguments> versionsAt712() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_21_20));
+    }
+
+    static Stream<Arguments> versionsAt729() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_21_30));
+    }
+
     static Stream<Arguments> versionsFrom818() {
         return filteredVersions(818);
     }
@@ -176,6 +203,46 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
 
     static Stream<Arguments> versionsAtV944() {
         return Stream.of(Arguments.of(ProtocolInfo.v1_26_10));
+    }
+
+    private PlayerAuthInputPacket decodeNetEasePlayerAuthInput(int protocol, GameVersion gameVersion, long inputFlags) {
+        BinaryStream stream = new BinaryStream();
+        stream.putLFloat(10.5f);
+        stream.putLFloat(20.5f);
+        stream.putVector3f(1.25f, 64.0f, -3.5f);
+        stream.putLFloat(0.25f);
+        stream.putLFloat(-0.5f);
+        stream.putLFloat(30.5f);
+        stream.putUnsignedVarLong(inputFlags);
+        stream.putUnsignedVarInt(cn.nukkit.network.protocol.types.InputMode.TOUCH.ordinal());
+        stream.putUnsignedVarInt(cn.nukkit.network.protocol.types.ClientPlayMode.NORMAL.ordinal());
+        if (protocol >= ProtocolInfo.v1_19_0_29) {
+            stream.putUnsignedVarInt(cn.nukkit.network.protocol.types.AuthInteractionModel.CROSSHAIR.ordinal());
+        }
+        if (protocol >= ProtocolInfo.v1_21_40) {
+            stream.putVector2f(5.0f, 6.0f);
+        }
+        stream.putUnsignedVarLong(123L);
+        stream.putVector3f(0.1f, 0.2f, 0.3f);
+        if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_16_200) {
+            stream.putBoolean(false);
+        }
+        if (protocol >= ProtocolInfo.v1_19_70_24) {
+            stream.putVector2f(0.6f, -0.4f);
+            if (protocol >= ProtocolInfo.v1_21_40) {
+                stream.putVector3f(0.0f, 1.0f, 0.0f);
+            }
+            if (protocol >= ProtocolInfo.v1_21_50) {
+                stream.putVector2f(-0.25f, 0.75f);
+            }
+        }
+
+        PlayerAuthInputPacket packet = new PlayerAuthInputPacket();
+        packet.protocol = protocol;
+        packet.gameVersion = gameVersion;
+        packet.setBuffer(stream.getBuffer());
+        packet.decode();
+        return packet;
     }
 
     // ==================== NetworkStackLatencyPacket ====================
@@ -394,7 +461,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(1, nk.options.size());
         PlayerEnchantOptionsPacket.EnchantOptionData option = nk.options.get(0);
         assertEquals(5, option.getMinLevel());
-        assertEquals(Integer.reverseBytes(2), option.getPrimarySlot());
+        assertEquals(2, option.getPrimarySlot());
         assertEquals(1, option.getEnchants0().size());
         assertEquals(1, option.getEnchants1().size());
         assertEquals("sharpness", option.getEnchantName());
@@ -2352,6 +2419,65 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
     }
 
+    @Test
+    void playerAuthInputNetEase12150UsesSingleFlagOffset() {
+        PlayerAuthInputPacket packet = decodeNetEasePlayerAuthInput(
+                ProtocolInfo.v1_21_50,
+                GameVersion.V1_21_50_NETEASE,
+                1L << 55
+        );
+
+        assertTrue(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.CAMERA_RELATIVE_MOVEMENT_ENABLED));
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.START_USING_ITEM));
+        assertNotNull(packet.getRawMoveVector());
+        assertEquals(-0.25f, packet.getRawMoveVector().x, 0.001f);
+        assertEquals(0.75f, packet.getRawMoveVector().y, 0.001f);
+        assertEquals(packet.getCount(), packet.getOffset(), "NetEase v766 PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    @Test
+    void playerAuthInputNetEase12150SkipsHiddenFlags() {
+        PlayerAuthInputPacket packet = decodeNetEasePlayerAuthInput(
+                ProtocolInfo.v1_21_50,
+                GameVersion.V1_21_50_NETEASE,
+                1L << 44
+        );
+
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.RECEIVED_SERVER_DATA));
+        assertTrue(packet.getInputData().isEmpty());
+        assertEquals(packet.getCount(), packet.getOffset(), "NetEase v766 hidden flags should be ignored during PlayerAuthInputPacket decode");
+    }
+
+    @Test
+    void playerAuthInputNetEase12193UsesDoubleFlagOffset() {
+        PlayerAuthInputPacket packet = decodeNetEasePlayerAuthInput(
+                ProtocolInfo.v1_21_93,
+                GameVersion.V1_21_93_NETEASE,
+                1L << 55
+        );
+
+        assertTrue(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.START_USING_ITEM));
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.CAMERA_RELATIVE_MOVEMENT_ENABLED));
+        assertNotNull(packet.getRawMoveVector());
+        assertEquals(-0.25f, packet.getRawMoveVector().x, 0.001f);
+        assertEquals(0.75f, packet.getRawMoveVector().y, 0.001f);
+        assertEquals(packet.getCount(), packet.getOffset(), "NetEase v819 PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    @Test
+    void playerAuthInputNetEase12193SkipsHiddenFlags() {
+        PlayerAuthInputPacket packet = decodeNetEasePlayerAuthInput(
+                ProtocolInfo.v1_21_93,
+                GameVersion.V1_21_93_NETEASE,
+                (1L << 44) | (1L << 45)
+        );
+
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.RECEIVED_SERVER_DATA));
+        assertFalse(packet.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE));
+        assertTrue(packet.getInputData().isEmpty());
+        assertEquals(packet.getCount(), packet.getOffset(), "NetEase v819 hidden flags should be ignored during PlayerAuthInputPacket decode");
+    }
+
     @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with embedded item interaction")
     @MethodSource("versionsAt471")
     void playerAuthInputWithEmbeddedItemInteraction(int protocol) {
@@ -2848,6 +2974,237 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
                 request.getTextProcessingEventOrigin());
     }
 
+    @ParameterizedTest(name = "ItemStackRequestPacket v{0} item-container action ids")
+    @MethodSource("versionsAt486And686")
+    void itemStackRequestItemContainerActionIds(int protocol) {
+        var gameVersion = GameVersion.byProtocol(protocol, false);
+        ItemStackRequestPacket nk = decodeRawItemStackRequestPacket(protocol, stream -> {
+            stream.putUnsignedVarInt(1);
+            stream.putVarInt(73);
+            stream.putUnsignedVarInt(2);
+
+            stream.putByte((byte) 7);
+            stream.putByte((byte) 3);
+            writeStackRequestSlotData(stream, gameVersion,
+                    cn.nukkit.network.protocol.types.inventory.ContainerSlotType.HOTBAR, null, 2, 777);
+            writeStackRequestSlotData(stream, gameVersion,
+                    cn.nukkit.network.protocol.types.inventory.ContainerSlotType.INVENTORY, null, 9, 888);
+
+            stream.putByte((byte) 8);
+            stream.putByte((byte) 1);
+            writeStackRequestSlotData(stream, gameVersion,
+                    cn.nukkit.network.protocol.types.inventory.ContainerSlotType.INVENTORY, null, 9, 888);
+            writeStackRequestSlotData(stream, gameVersion,
+                    cn.nukkit.network.protocol.types.inventory.ContainerSlotType.HOTBAR, null, 2, 777);
+
+            if (protocol >= ProtocolInfo.v1_16_200) {
+                stream.putUnsignedVarInt(0);
+            }
+            if (protocol >= ProtocolInfo.v1_19_30) {
+                stream.putLInt(-1);
+            }
+        });
+
+        assertEquals(1, nk.getRequests().size());
+        var request = nk.getRequests().get(0);
+        assertEquals(2, request.getActions().length);
+        assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.PlaceInItemContainerAction.class, request.getActions()[0]);
+        assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.TakeFromItemContainerAction.class, request.getActions()[1]);
+
+        var placeAction = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.PlaceInItemContainerAction) request.getActions()[0];
+        assertEquals(3, placeAction.getCount());
+        assertEquals(cn.nukkit.network.protocol.types.inventory.ContainerSlotType.HOTBAR, placeAction.getSource().getContainer());
+        assertEquals(777, placeAction.getSource().getStackNetworkId());
+        assertEquals(cn.nukkit.network.protocol.types.inventory.ContainerSlotType.INVENTORY, placeAction.getDestination().getContainer());
+        assertEquals(888, placeAction.getDestination().getStackNetworkId());
+
+        var takeAction = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.TakeFromItemContainerAction) request.getActions()[1];
+        assertEquals(1, takeAction.getCount());
+        assertEquals(888, takeAction.getSource().getStackNetworkId());
+        assertEquals(777, takeAction.getDestination().getStackNetworkId());
+        assertEquals(nk.getCount(), nk.getOffset(), "ItemStackRequestPacket decode should consume the full payload");
+    }
+
+    @ParameterizedTest(name = "ItemStackRequestPacket v{0} auto craft ingredients")
+    @MethodSource("versionsAt557")
+    void itemStackRequestV557AutoCraftIngredients(int protocol) {
+        var gameVersion = GameVersion.byProtocol(protocol, false);
+        int runtimeId = cn.nukkit.item.RuntimeItems.getMapping(gameVersion)
+                .toRuntime(cn.nukkit.item.Item.DIAMOND_SWORD, 0)
+                .getRuntimeId();
+
+        ItemStackRequestPacket nk = decodeRawItemStackRequestPacket(protocol, stream -> {
+            stream.putUnsignedVarInt(1);
+            stream.putVarInt(314);
+            stream.putUnsignedVarInt(1);
+
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType.CRAFT_RECIPE_AUTO.getId());
+            stream.putUnsignedVarInt(12);
+            stream.putByte((byte) 4);
+            stream.putByte((byte) 1);
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.descriptor.ItemDescriptorType.DEFAULT.ordinal());
+            stream.putLShort(runtimeId);
+            stream.putLShort(0);
+            stream.putVarInt(2);
+
+            stream.putUnsignedVarInt(1);
+            stream.putString("auto");
+            stream.putLInt(cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin.ANVIL_TEXT.getId());
+        });
+
+        var request = nk.getRequests().get(0);
+        assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.AutoCraftRecipeAction.class, request.getActions()[0]);
+        var action = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.AutoCraftRecipeAction) request.getActions()[0];
+        assertEquals(4, action.getTimesCrafted());
+        assertEquals(1, action.getIngredients().size());
+        var ingredient = action.getIngredients().get(0);
+        assertEquals(2, ingredient.getCount());
+        assertInstanceOf(cn.nukkit.network.protocol.types.inventory.descriptor.DefaultDescriptor.class, ingredient.getDescriptor());
+        var descriptor = (cn.nukkit.network.protocol.types.inventory.descriptor.DefaultDescriptor) ingredient.getDescriptor();
+        assertEquals(cn.nukkit.item.Item.DIAMOND_SWORD, descriptor.getItemId());
+        assertTrue(descriptor.match(cn.nukkit.item.Item.get(cn.nukkit.item.Item.DIAMOND_SWORD, 0, 1)));
+    }
+
+    @ParameterizedTest(name = "ItemStackRequestPacket v{0} complex alias descriptor")
+    @MethodSource("versionsAt575")
+    void itemStackRequestV575ComplexAliasDescriptor(int protocol) {
+        ItemStackRequestPacket nk = decodeRawItemStackRequestPacket(protocol, stream -> {
+            stream.putUnsignedVarInt(1);
+            stream.putVarInt(88);
+            stream.putUnsignedVarInt(1);
+
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType.CRAFT_RECIPE_AUTO.getId());
+            stream.putUnsignedVarInt(77);
+            stream.putByte((byte) 1);
+            stream.putByte((byte) 1);
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.descriptor.ItemDescriptorType.COMPLEX_ALIAS.ordinal());
+            stream.putString("minecraft:planks");
+            stream.putVarInt(3);
+
+            stream.putUnsignedVarInt(0);
+            stream.putLInt(cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin.ANVIL_TEXT.getId());
+        });
+
+        var request = nk.getRequests().get(0);
+        var action = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.AutoCraftRecipeAction) request.getActions()[0];
+        assertEquals(1, action.getIngredients().size());
+        var ingredient = action.getIngredients().get(0);
+        assertEquals(3, ingredient.getCount());
+        assertInstanceOf(cn.nukkit.network.protocol.types.inventory.descriptor.ComplexAliasDescriptor.class, ingredient.getDescriptor());
+        assertEquals("minecraft:planks",
+                ((cn.nukkit.network.protocol.types.inventory.descriptor.ComplexAliasDescriptor) ingredient.getDescriptor()).getName());
+    }
+
+    @ParameterizedTest(name = "ItemStackRequestPacket v{0} craft counts and required dynamic ids")
+    @MethodSource("versionsAt712")
+    void itemStackRequestV712CraftCountsAndDynamicIds(int protocol) {
+        var gameVersion = GameVersion.byProtocol(protocol, false);
+        int runtimeId = cn.nukkit.item.RuntimeItems.getMapping(gameVersion)
+                .toRuntime(cn.nukkit.item.Item.APPLE, 0)
+                .getRuntimeId();
+
+        ItemStackRequestPacket nk = decodeRawItemStackRequestPacket(protocol, stream -> {
+            stream.putUnsignedVarInt(1);
+            stream.putVarInt(101);
+            stream.putUnsignedVarInt(6);
+
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType.CRAFT_RECIPE.getId());
+            stream.putUnsignedVarInt(12);
+            stream.putByte((byte) 4);
+
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType.CRAFT_CREATIVE.getId());
+            stream.putUnsignedVarInt(9);
+            stream.putByte((byte) 2);
+
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType.CRAFT_REPAIR_AND_DISENCHANT.getId());
+            stream.putUnsignedVarInt(7);
+            stream.putByte((byte) 3);
+            stream.putVarInt(11);
+
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType.CRAFT_LOOM.getId());
+            stream.putString("minecraft:flower_banner_pattern");
+            stream.putByte((byte) 5);
+
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType.CRAFT_RECIPE_AUTO.getId());
+            stream.putUnsignedVarInt(21);
+            stream.putByte((byte) 7);
+            stream.putByte((byte) 6);
+            stream.putByte((byte) 1);
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.descriptor.ItemDescriptorType.DEFAULT.ordinal());
+            stream.putLShort(runtimeId);
+            stream.putLShort(0);
+            stream.putVarInt(1);
+
+            stream.putByte((byte) cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType.TAKE.getId());
+            stream.putByte((byte) 2);
+            writeStackRequestSlotData(stream, gameVersion,
+                    cn.nukkit.network.protocol.types.inventory.ContainerSlotType.DYNAMIC_CONTAINER, 88, 1, 300);
+            writeStackRequestSlotData(stream, gameVersion,
+                    cn.nukkit.network.protocol.types.inventory.ContainerSlotType.INVENTORY, 0, 5, 400);
+
+            stream.putUnsignedVarInt(1);
+            stream.putString("counts");
+            stream.putLInt(cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin.ANVIL_TEXT.getId());
+        });
+
+        var request = nk.getRequests().get(0);
+        assertEquals(6, request.getActions().length);
+        assertEquals(4, ((cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftRecipeAction) request.getActions()[0]).getNumberOfRequestedCrafts());
+        assertEquals(2, ((cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftCreativeAction) request.getActions()[1]).getNumberOfRequestedCrafts());
+        var grindstoneAction = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftGrindstoneAction) request.getActions()[2];
+        assertEquals(3, grindstoneAction.getNumberOfRequestedCrafts());
+        assertEquals(11, grindstoneAction.getRepairCost());
+        assertEquals(5, ((cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftLoomAction) request.getActions()[3]).getTimesCrafted());
+        var autoCraftAction = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.AutoCraftRecipeAction) request.getActions()[4];
+        assertEquals(7, autoCraftAction.getNumberOfRequestedCrafts());
+        assertEquals(6, autoCraftAction.getTimesCrafted());
+        assertEquals(1, autoCraftAction.getIngredients().size());
+        var takeAction = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.TakeAction) request.getActions()[5];
+        assertEquals(88, takeAction.getSource().getDynamicId());
+        assertEquals(0, takeAction.getDestination().getDynamicId());
+    }
+
+    @ParameterizedTest(name = "ItemStackRequestPacket v{0} optional dynamic ids")
+    @MethodSource("versionsAt729")
+    void itemStackRequestV729OptionalDynamicIds(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ItemStackRequestPacket();
+        cb.getRequests().add(new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequest(
+                202,
+                new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.ItemStackRequestAction[]{
+                        new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.TakeAction(
+                                1,
+                                new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequestSlotData(
+                                        org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                                        0,
+                                        500,
+                                        new org.cloudburstmc.protocol.bedrock.data.inventory.FullContainerName(
+                                                org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                                                null
+                                        )
+                                ),
+                                new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequestSlotData(
+                                        org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.INVENTORY,
+                                        1,
+                                        600,
+                                        new org.cloudburstmc.protocol.bedrock.data.inventory.FullContainerName(
+                                                org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.INVENTORY,
+                                                null
+                                        )
+                                )
+                        )
+                },
+                new String[]{"optional"},
+                org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.TextProcessingEventOrigin.ANVIL_TEXT
+        ));
+
+        ItemStackRequestPacket nk = crossEncode(cb, ItemStackRequestPacket::new, protocol);
+
+        var request = nk.getRequests().get(0);
+        var takeAction = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.TakeAction) request.getActions()[0];
+        assertNull(takeAction.getSource().getDynamicId());
+        assertNull(takeAction.getDestination().getDynamicId());
+    }
+
     // ==================== LoginPacket ====================
 
     @ParameterizedTest(name = "LoginPacket v{0}")
@@ -3074,6 +3431,39 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(2, nk.nameMap.size());
         assertEquals(1, nk.nameMap.get("minecraft:stone"));
         assertEquals(2, nk.nameMap.get("minecraft:dirt"));
+    }
+
+    private ItemStackRequestPacket decodeRawItemStackRequestPacket(int protocol, Consumer<BinaryStream> packetBodyWriter) {
+        var packet = new ItemStackRequestPacket();
+        packet.protocol = protocol;
+        packet.gameVersion = GameVersion.byProtocol(protocol, false);
+
+        var stream = new BinaryStream();
+        stream.putUnsignedVarInt(packet.packetId());
+        packetBodyWriter.accept(stream);
+
+        packet.setBuffer(stream.getBuffer());
+        packet.getUnsignedVarInt();
+        packet.decode();
+        assertEquals(packet.getCount(), packet.getOffset(), "ItemStackRequestPacket decode should consume the full payload");
+        return packet;
+    }
+
+    private void writeStackRequestSlotData(BinaryStream stream, GameVersion gameVersion,
+                                           cn.nukkit.network.protocol.types.inventory.ContainerSlotType container,
+                                           Integer dynamicId, int slot, int stackNetworkId) {
+        int protocol = gameVersion.getProtocol();
+        stream.putByte((byte) container.getId(gameVersion));
+        if (protocol >= ProtocolInfo.v1_21_30) {
+            stream.putBoolean(dynamicId != null);
+            if (dynamicId != null) {
+                stream.putLInt(dynamicId);
+            }
+        } else if (protocol >= ProtocolInfo.v1_21_20) {
+            stream.putLInt(dynamicId == null ? 0 : dynamicId);
+        }
+        stream.putByte((byte) slot);
+        stream.putVarInt(stackNetworkId);
     }
 
     private static <T> T readField(Object instance, String fieldName, Class<T> type) {

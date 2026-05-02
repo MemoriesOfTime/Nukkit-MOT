@@ -232,6 +232,11 @@ public final class DataPacketManager {
         );
 
         registerProcessor(
+                ProtocolInfo.v1_20_50,
+                ToggleCrafterSlotRequestProcessor.INSTANCE
+        );
+
+        registerProcessor(
                 ProtocolInfo.v1_21_130,
                 ServerboundDataStoreProcessor.INSTANCE
         );

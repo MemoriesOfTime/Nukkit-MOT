@@ -27,7 +27,12 @@ import static com.nimbusds.jose.shaded.json.parser.ParseException.ERROR_UNEXPECT
  * @author Uriel Chemouni &lt;uchemouni@gmail.com&gt;
  * @see JSONParserInputStream
  * @see JSONParserReader
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
+@Deprecated(forRemoval = true)
 abstract class JSONParserStream extends JSONParserBase {
 	// len
 	//

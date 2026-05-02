@@ -21,7 +21,7 @@
         <jline.version>3.30.6</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.10</leveldb-mcpe-jni.version>
-        <block-state-updater.version>1.21.60-20250619.144147-3</block-state-updater.version>
+        <block-state-updater.version>1.21.110-SNAPSHOT</block-state-updater.version>
         <netty.version>4.1.131.Final</netty.version>
         <caffeine.version>3.2.3</caffeine.version>
         <guava.version>33.1.0-jre</guava.version>
@@ -43,8 +43,8 @@
         <annotations.version>26.0.2</annotations.version>
         <jose4j.version>0.9.6</jose4j.version>
         <nukkitx-natives.version>1.0.3</nukkitx-natives.version>
-        <raknet.version>1.0.0.CR4-20260406.120344-3</raknet.version>
-        <cloudburst-common.version>3.0.0.Beta12-20260324.161234-12</cloudburst-common.version>
+        <raknet.version>1.0.0.CR4-20260426.145646-4</raknet.version>
+        <cloudburst-common.version>3.0.0.Beta12-20260420.182526-15</cloudburst-common.version>
         <jackson-dataformat-toml.version>2.20.1</jackson-dataformat-toml.version>
         <eu.okaeri.version>6.1.0-beta.1</eu.okaeri.version>
 
@@ -52,8 +52,8 @@
         <allaymc.version>0.1.6</allaymc.version>
         <cloudburstmc-math.version>2.0-SNAPSHOT</cloudburstmc-math.version>
         <junit.version>6.0.3</junit.version>
-        <mockito.version>5.17.0</mockito.version>
-        <bytebuddy.version>1.17.5</bytebuddy.version>
+        <mockito.version>5.23.0</mockito.version>
+        <bytebuddy.version>5.23.0</bytebuddy.version>
         <objenesis.version>3.4</objenesis.version>
 
         <error-prone.version>2.41.0</error-prone.version>
@@ -499,6 +499,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+            <version>1.10.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
             <version>${mockito.version}</version>
@@ -595,6 +601,23 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.7.0</version>
+                <executions>
+                    <execution>
+                        <id>test-dependency-properties</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

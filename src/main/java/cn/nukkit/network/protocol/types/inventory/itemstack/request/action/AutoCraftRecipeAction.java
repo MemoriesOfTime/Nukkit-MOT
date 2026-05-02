@@ -1,6 +1,6 @@
 package cn.nukkit.network.protocol.types.inventory.itemstack.request.action;
 
-import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.types.inventory.descriptor.ItemDescriptorWithCount;
 import lombok.Value;
 
 import java.util.List;
@@ -13,6 +13,10 @@ import java.util.List;
 public class AutoCraftRecipeAction implements RecipeItemStackRequestAction {
     int recipeNetworkId;
     /**
+     * @since v712
+     */
+    int numberOfRequestedCrafts;
+    /**
      * @since v448
      */
     int timesCrafted;
@@ -20,7 +24,7 @@ public class AutoCraftRecipeAction implements RecipeItemStackRequestAction {
     /**
      * @since v557
      */
-    List<Item> ingredients;
+    List<ItemDescriptorWithCount> ingredients;
 
     @Override
     public ItemStackRequestActionType getType() {

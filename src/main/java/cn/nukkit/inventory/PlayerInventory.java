@@ -606,7 +606,7 @@ public class PlayerInventory extends BaseInventory {
         } else {
             CreativeContentPacket pk = new CreativeContentPacket();
             if (!p.isSpectator()) {
-                pk.creativeItems = Item.getCreativeItemsAndGroups(p.getGameVersion());
+                pk.creativeItems = Item.getCreativeItemsAndGroups();
             }
             p.dataPacket(pk);
         }

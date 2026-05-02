@@ -292,7 +292,7 @@ public class BlockPalette {
             if (runtimeId == -1) {
                 Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyId);
                 if (cache == null) {
-                    log.info("({}) Missing block runtime id mappings for {}:{}", gameVersion, id, meta);
+                    logMissingRuntimeIdMapping("({}) Missing block runtime id mappings for {}:{}", gameVersion, id, meta);
                     runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
                     legacyToRuntimeIdCache.put(legacyId, runtimeId);
                 } else {
@@ -371,7 +371,7 @@ public class BlockPalette {
             if (runtimeId == -1) {
                 Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyFullId);
                 if (cache == null) {
-                    log.info("({}) Missing block runtime id mappings for fullId:{}", gameVersion, legacyFullId);
+                    logMissingRuntimeIdMapping("({}) Missing block runtime id mappings for fullId:{}", gameVersion, legacyFullId);
                     runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
                     legacyToRuntimeIdCache.put(legacyFullId, runtimeId);
                 } else {
@@ -396,6 +396,14 @@ public class BlockPalette {
             }
         }
         return hashId;
+    }
+
+    private void logMissingRuntimeIdMapping(String message, Object... args) {
+        if (this.gameVersion == GameVersion.getLastVersion() || this.gameVersion == GameVersion.V1_21_93_NETEASE) {
+            log.info(message, args);
+            return;
+        }
+        log.debug(message, args);
     }
 
 }

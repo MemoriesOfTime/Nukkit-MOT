@@ -3,109 +3,97 @@ package cn.nukkit.item;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.item.RuntimeItemMapping.LegacyEntry;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import cn.nukkit.potion.Potion;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Supplier;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 利用 runtime_item_states 文件测试所有物品的 isSupportedOn 方法。
+ * 验证 Item.isSupportedOn 在所有运行时版本上的一致性。
  * <p>
- * 通过解析每个版本的 runtime_item_states 文件，获取全部注册物品，
- * 调用 isSupportedOn 方法以验证其行为正确性和一致性。
+ * 该测试会自动从 RuntimeItems.VALUES 发现待测版本，
+ * 并从 NAMESPACED_ID_ITEM 与各版本 RuntimeItemMapping 中发现待测物品，
+ * 以便在新增协议版本或新增核心物品后，无需手动维护测试用例。
  */
 public class ItemSupportedOnTest {
 
     private static Field gameVersionField;
+    private static List<MappingContext> mappingContexts;
 
     @BeforeAll
     static void setup() throws Exception {
         MockServer.init();
         gameVersionField = RuntimeItemMapping.class.getDeclaredField("gameVersion");
         gameVersionField.setAccessible(true);
+        mappingContexts = collectMappingContexts();
     }
 
     /**
-     * 解析所有 runtime_item_states 文件，对所有能创建 Item 的物品调用 isSupportedOn，
-     * 验证方法不抛异常，并收集映射不一致项。
+     * 验证所有在各版本 RuntimeItemMapping 中注册的物品都能被测试覆盖到，
+     * 且在自己的注册版本上调用 isSupportedOn 不会抛异常。
      * <p>
-     * 某些物品（如 ItemSpawnEgg）会重写 isSupportedOn 进行版本限制，
-     * 导致 runtime_item_states 文件注册了该物品但 isSupportedOn 返回 false。
-     * 这是预期行为，不一致项仅作为信息报告。
+     * 如果该物品在自己的注册版本上返回 supported，则必须能被该版本实际编码。
+     * <p>
+     * 该测试同时覆盖两条创建链路：
+     * 1. Item.fromString(identifier) 用于覆盖 StringItem 及 namespaced 物品
+     * 2. Item.get(legacyId, damage) 用于覆盖 legacy/damage 变体
      */
     @Test
-    public void testIsSupportedOnForAllItems() throws Exception {
-        List<String> inconsistencies = new ArrayList<>();
-        int totalItems = 0;
+    public void testRuntimeMappedItemsSupportTheirOwnVersion() {
         int testedItems = 0;
 
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
-            GameVersion gameVersion = (GameVersion) gameVersionField.get(mapping);
-            int protocolId = mapping.getProtocolId();
+        for (MappingContext context : mappingContexts) {
+            RuntimeItemMapping mapping = context.mapping();
+            GameVersion gameVersion = context.gameVersion();
 
-            String filename = gameVersion.isNetEase()
-                    ? "runtime_item_states_netease_" + protocolId + ".json"
-                    : "runtime_item_states_" + protocolId + ".json";
+            for (String identifier : sortedIdentifiers(mapping.getName2RuntimeId().keySet())) {
+                Item namespacedItem = Item.fromString(identifier);
+                if (isConstructibleItem(identifier, namespacedItem)) {
+                    assertEncodableWhenSupported(new ItemCandidate(namespacedItem, "identifier " + identifier),
+                            context);
+                    testedItems++;
+                }
 
-            InputStream stream = getClass().getClassLoader().getResourceAsStream(filename);
-            assertNotNull(stream, "Missing resource: " + filename);
-
-            JsonArray items;
-            try (InputStreamReader reader = new InputStreamReader(stream)) {
-                items = JsonParser.parseReader(reader).getAsJsonArray();
-            }
-
-            for (JsonElement element : items) {
-                totalItems++;
-                String name = element.getAsJsonObject().get("name").getAsString();
-
-                // 通过 mapping 获取正确的 legacy ID 和 damage
-                LegacyEntry legacyEntry = mapping.fromIdentifier(name);
+                LegacyEntry legacyEntry = mapping.fromIdentifier(identifier);
                 if (legacyEntry == null) {
                     continue;
                 }
 
-                int legacyId = legacyEntry.getLegacyId();
-                int damage = legacyEntry.getDamage();
-
-                Item item = Item.get(legacyId, damage);
-                if (item.getId() == Item.AIR && legacyId != Item.AIR) {
-                    continue;
-                }
-
-                testedItems++;
-
-                // 调用 isSupportedOn 验证不抛异常
-                boolean supported = assertDoesNotThrow(() -> item.isSupportedOn(gameVersion),
-                        name + " isSupportedOn threw exception on " + gameVersion);
-
-                if (!supported) {
-                    inconsistencies.add(name + " (legacyId=" + legacyId + ", damage=" + damage
-                            + ") on " + gameVersion + " (protocol " + protocolId + ")");
+                Item legacyItem = Item.get(legacyEntry.getLegacyId(), legacyEntry.getDamage());
+                if (isConstructibleLegacyItem(legacyEntry, legacyItem)) {
+                    assertEncodableWhenSupported(new ItemCandidate(
+                            legacyItem,
+                            "legacy " + legacyEntry.getLegacyId() + ":" + legacyEntry.getDamage() + " <- " + identifier),
+                            context);
+                    testedItems++;
                 }
             }
         }
 
         assertTrue(testedItems > 0,
-                "Should have tested at least some items (tested " + testedItems + " of " + totalItems + ")");
+                "Should have verified at least one runtime-mapped item");
+    }
 
-        // 不一致项作为信息输出，不阻断测试
-        // 这些物品的 isSupportedOn 被子类重写（如 ItemSpawnEgg），添加了更严格的版本限制
-        if (!inconsistencies.isEmpty()) {
-            System.out.println("[INFO] " + inconsistencies.size()
-                    + " items registered in runtime_item_states but isSupportedOn returns false "
-                    + "(expected for items with version-specific overrides):");
-            inconsistencies.forEach(i -> System.out.println("[INFO]   " + i));
+    /**
+     * 验证所有自动发现到的物品，只要 isSupportedOn(version) 返回 true，
+     * 就必须能被该版本 RuntimeItemMapping 实际编码。
+     * <p>
+     * 这会自动抓出“忘记为新物品收紧旧版本 isSupportedOn”的问题，
+     * 也能在新增版本后自动把该版本纳入校验。
+     */
+    @Test
+    public void testSupportedItemsAreEncodableOnEveryRuntimeVersion() {
+        Map<String, ItemCandidate> candidates = collectItemCandidates();
+        assertFalse(candidates.isEmpty(), "Should have discovered item candidates automatically");
+
+        for (ItemCandidate candidate : candidates.values()) {
+            for (MappingContext context : mappingContexts) {
+                assertEncodableWhenSupported(candidate, context);
+            }
         }
     }
 
@@ -114,45 +102,62 @@ public class ItemSupportedOnTest {
      * isSupportedOnMapping 中对 AIR 有特殊处理，始终返回 true。
      */
     @Test
-    public void testAirAlwaysSupported() throws Exception {
+    public void testAirAlwaysSupported() {
         Item air = Item.get(Item.AIR);
         assertNotNull(air);
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
-            GameVersion gameVersion = (GameVersion) gameVersionField.get(mapping);
-            assertTrue(air.isSupportedOn(gameVersion),
-                    "AIR should be supported on " + gameVersion);
+        for (MappingContext context : mappingContexts) {
+            assertTrue(air.isSupportedOn(context.gameVersion()),
+                    "AIR should be supported on " + context.gameVersion());
         }
     }
 
+    @Test
+    public void testPotionMetaSupportBoundaries() {
+        assertEquals(42, Potion.SLOWNESS_IV);
+        assertEquals(43, Potion.WIND_CHARGED);
+        assertEquals(44, Potion.WEAVING);
+        assertEquals(45, Potion.OOZING);
+        assertEquals(46, Potion.INFESTED);
+
+        assertTrue(new ItemPotion(Potion.SLOWNESS_IV).isSupportedOn(GameVersion.V1_20_80));
+        assertTrue(new ItemPotionSplash(Potion.SLOWNESS_IV).isSupportedOn(GameVersion.V1_20_80));
+        assertTrue(new ItemPotionLingering(Potion.SLOWNESS_IV).isSupportedOn(GameVersion.V1_20_80));
+
+        assertFalse(new ItemPotion(Potion.WIND_CHARGED).isSupportedOn(GameVersion.V1_20_80));
+        assertFalse(new ItemPotionSplash(Potion.WEAVING).isSupportedOn(GameVersion.V1_20_80));
+        assertFalse(new ItemPotionLingering(Potion.INFESTED).isSupportedOn(GameVersion.V1_20_80));
+
+        assertTrue(new ItemPotion(Potion.WIND_CHARGED).isSupportedOn(GameVersion.V1_21_0));
+        assertTrue(new ItemPotionSplash(Potion.WEAVING).isSupportedOn(GameVersion.V1_21_0));
+        assertTrue(new ItemPotionLingering(Potion.INFESTED).isSupportedOn(GameVersion.V1_21_0));
+
+        assertFalse(new ItemPotion(Potion.INFESTED + 1).isSupportedOn(GameVersion.V1_21_0));
+    }
+
     /**
-     * 验证最新版本中所有通过 NAMESPACED_ID_ITEM 可获取的物品，
-     * 在最新版本上 isSupportedOn 返回 true。
-     * 同时验证在旧版本上调用不抛异常。
+     * 验证最新版本中所有可通过 NAMESPACED_ID_ITEM 自动发现的核心物品，
+     * 在最新版本上必须返回 supported 且能够被编码。
+     * <p>
+     * 新增核心物品只要注册到 NAMESPACED_ID_ITEM，就会被此测试自动纳入。
      */
     @Test
-    public void testLatestVersionItemsSupported() throws Exception {
+    public void testLatestVersionItemsSupported() {
         GameVersion latestVersion = GameVersion.getLastVersion();
+        RuntimeItemMapping latestMapping = RuntimeItems.getMapping(latestVersion);
         List<String> errors = new ArrayList<>();
         int verifiedCount = 0;
 
-        for (var entry : Item.NAMESPACED_ID_ITEM.entrySet()) {
-            String name = entry.getKey();
-            Supplier<Item> supplier = entry.getValue();
-            if (supplier == null) continue;
-
-            Item item = supplier.get();
-            if (item == null || item.getId() == Item.AIR) continue;
-
-            // 最新版本必须支持
-            if (!item.isSupportedOn(latestVersion)) {
-                errors.add(name + " should be supported on latest version " + latestVersion);
+        for (String identifier : new TreeSet<>(Item.NAMESPACED_ID_ITEM.keySet())) {
+            Item item = Item.fromString(identifier);
+            if (!isConstructibleItem(identifier, item)) {
+                continue;
             }
 
-            // 所有版本上调用不应抛异常
-            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
-                GameVersion gv = (GameVersion) gameVersionField.get(mapping);
-                assertDoesNotThrow(() -> item.isSupportedOn(gv),
-                        name + " isSupportedOn should not throw on " + gv);
+            if (!item.isSupportedOn(latestVersion)) {
+                errors.add(identifier + " should be supported on latest version " + latestVersion);
+            } else {
+                assertCanEncode(latestMapping, latestVersion, item,
+                        "latest namespaced item " + identifier);
             }
 
             verifiedCount++;
@@ -162,5 +167,97 @@ public class ItemSupportedOnTest {
                 "Items from NAMESPACED_ID_ITEM should be supported on latest version:\n"
                         + String.join("\n", errors));
         assertTrue(verifiedCount > 0, "Should have verified at least some items");
+    }
+
+    private static List<MappingContext> collectMappingContexts() throws IllegalAccessException {
+        List<MappingContext> contexts = new ArrayList<>(RuntimeItems.VALUES.length);
+        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+            contexts.add(new MappingContext(mapping, (GameVersion) gameVersionField.get(mapping)));
+        }
+        contexts.sort(Comparator.comparingInt(context -> context.gameVersion().getProtocol()));
+        return contexts;
+    }
+
+    private static Map<String, ItemCandidate> collectItemCandidates() {
+        Map<String, ItemCandidate> candidates = new LinkedHashMap<>();
+
+        for (String identifier : new TreeSet<>(Item.NAMESPACED_ID_ITEM.keySet())) {
+            addCandidate(candidates, "namespaced:" + identifier, Item.fromString(identifier), identifier);
+        }
+
+        for (MappingContext context : mappingContexts) {
+            RuntimeItemMapping mapping = context.mapping();
+            GameVersion gameVersion = context.gameVersion();
+
+            for (String identifier : sortedIdentifiers(mapping.getName2RuntimeId().keySet())) {
+                addCandidate(candidates,
+                        "runtime-name:" + identifier,
+                        Item.fromString(identifier),
+                        identifier + "@" + gameVersion);
+
+                LegacyEntry legacyEntry = mapping.fromIdentifier(identifier);
+                if (legacyEntry != null) {
+                    Item legacyItem = Item.get(legacyEntry.getLegacyId(), legacyEntry.getDamage());
+                    addCandidate(candidates,
+                            "legacy:" + legacyEntry.getLegacyId() + ":" + legacyEntry.getDamage(),
+                            legacyItem,
+                            identifier + "@" + gameVersion);
+                }
+            }
+        }
+
+        return candidates;
+    }
+
+    private static void addCandidate(Map<String, ItemCandidate> candidates, String uniqueKey, Item item, String source) {
+        if (item == null || item.getId() == Item.AIR) {
+            return;
+        }
+        candidates.putIfAbsent(uniqueKey, new ItemCandidate(item, source));
+    }
+
+    private static void assertEncodableWhenSupported(ItemCandidate candidate, MappingContext context) {
+        Item item = candidate.item();
+        GameVersion gameVersion = context.gameVersion();
+        boolean supported = assertDoesNotThrow(() -> item.isSupportedOn(gameVersion),
+                candidate.source() + " isSupportedOn should not throw on " + gameVersion);
+
+        if (supported) {
+            assertCanEncode(context.mapping(), gameVersion, item, candidate.source());
+        }
+    }
+
+    private static void assertCanEncode(RuntimeItemMapping mapping, GameVersion gameVersion, Item item, String source) {
+        if (item.getId() == Item.AIR) {
+            return;
+        }
+
+        if (item instanceof StringItem) {
+            assertTrue(mapping.getNetworkIdByNamespaceId(item.getNamespaceId()).isPresent(),
+                    source + " claims support on " + gameVersion
+                            + " but mapping does not contain namespace id " + item.getNamespaceId());
+            return;
+        }
+
+        assertDoesNotThrow(() -> mapping.getNetworkId(item),
+                source + " claims support on " + gameVersion + " but mapping can not encode item " + item);
+    }
+
+    private static boolean isConstructibleItem(String identifier, Item item) {
+        return item.getId() != Item.AIR || "minecraft:air".equals(identifier);
+    }
+
+    private static boolean isConstructibleLegacyItem(LegacyEntry legacyEntry, Item item) {
+        return item.getId() != Item.AIR || legacyEntry.getLegacyId() == Item.AIR;
+    }
+
+    private static Collection<String> sortedIdentifiers(Collection<String> identifiers) {
+        return new TreeSet<>(identifiers);
+    }
+
+    private record MappingContext(RuntimeItemMapping mapping, GameVersion gameVersion) {
+    }
+
+    private record ItemCandidate(Item item, String source) {
     }
 }

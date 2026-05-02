@@ -12,6 +12,8 @@ import io.netty.buffer.ByteBufAllocator;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 
+import static cn.nukkit.level.util.PalettedBlockStorage.COPY_LAST_MARKER;
+
 public class Data3dSerializer {
 
     public static void serialize(WriteBatch db, LevelDBChunk chunk) {
@@ -24,9 +26,15 @@ public class Data3dSerializer {
                 buffer.writeShortLE(height);
             }
 
-            for (int i = 0; i < dimensionData.getHeight() >> 4; i++) {
-                PalettedBlockStorage storage = chunk.getBiomeStorage(i);
-                storage.writeToStorage(buffer);
+            PalettedBlockStorage lastStorage = null;
+            for (int sectionY = dimensionData.getMinSectionY(); sectionY <= dimensionData.getMaxSectionY(); sectionY++) {
+                PalettedBlockStorage storage = chunk.getBiomeStorage(sectionY);
+                if (lastStorage != null && storage.contentEquals(lastStorage)) {
+                    buffer.writeByte(COPY_LAST_MARKER);
+                } else {
+                    storage.writeToStorage(buffer);
+                    lastStorage = storage;
+                }
             }
 
             db.put(LevelDBKey.DATA_3D.getKey(chunk.getX(), chunk.getZ(), chunk.getProvider().getLevel().getDimension()), Utils.convertByteBuf2Array(buffer));
@@ -43,8 +51,11 @@ public class Data3dSerializer {
             return;
         }
 
-        int[] heightMap = new int[512];
-        PalettedBlockStorage[] biomes = new PalettedBlockStorage[dimensionData.getHeight() >> 4];
+        int[] heightMap = new int[256];
+        int minSectionY = dimensionData.getMinSectionY();
+        int maxSectionY = dimensionData.getMaxSectionY();
+        int sectionCount = maxSectionY - minSectionY + 1;
+        PalettedBlockStorage[] biomes = new PalettedBlockStorage[sectionCount];
 
         ByteBuf buffer = ByteBufAllocator.DEFAULT.ioBuffer(data3d.length);
         try {
@@ -53,16 +64,21 @@ public class Data3dSerializer {
                 heightMap[i] = buffer.readUnsignedShortLE();
             }
 
-            for (int i = 0; i < biomes.length; i++) {
+            for (int sectionY = minSectionY, idx = 0; sectionY <= maxSectionY; sectionY++, idx++) {
+                if (!buffer.isReadable(1)) {
+                    biomes[idx] = idx > 0 ? biomes[idx - 1].copy() : PalettedBlockStorage.createWithDefaultState(BitArrayVersion.V0, 0);
+                    continue;
+                }
+
                 PalettedBlockStorage storage = readPalettedBiomes(buffer);
-                if (storage == null && i == 0) {
+                if (storage == null && idx == 0) {
                     throw new IllegalStateException("First biome palette can not point to previous!");
                 }
 
                 if (storage == null) {
-                    storage = biomes[i - 1].copy();
+                    storage = biomes[idx - 1].copy();
                 }
-                biomes[i] = storage;
+                biomes[idx] = storage;
             }
         } finally {
             buffer.release();

@@ -44,6 +44,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -80,6 +81,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
+    private static final AtomicInteger STACK_NETWORK_ID_COUNTER = new AtomicInteger(0);
     /**
      * 存储需要在 initCreativeItems 后重新添加的创造物品
      * Stores creative items that need to be re-added after initCreativeItems
@@ -96,6 +98,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private CompoundTag cachedNBT = null;
     public int count;
     protected String name;
+    /**
+     * Stack network id used by Server Authoritative Inventory (ItemStackRequest) to
+     * track a specific item instance across client-server round trips. Named
+     * {@code stackNetId} to avoid confusion with block/item runtime ids. 0 means the
+     * stack is not being tracked.
+     */
+    protected int stackNetId = 0;
 
     public Item(int id) {
         this(id, 0, 1, UNKNOWN_STR);
@@ -422,7 +431,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemEchoShard.class);
             registerNamespacedIdItem(ItemRecoveryCompass.class);
             registerNamespacedIdItem(ItemDoorMangrove.class);
+            registerNamespacedIdItem(ItemDoorBamboo.class);
             registerNamespacedIdItem(ItemDoorCherry.class);
+            registerNamespacedIdItem(ItemChiseledBookshelf.class);
+            registerNamespacedIdItem(ItemCrafter.class);
             //TODO 修改类名格式为ItemSmithingTemplateXXX
             registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
             registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
@@ -481,6 +493,28 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemOminousBottle.class);
             registerNamespacedIdItem(ItemBlueEgg.class);
             registerNamespacedIdItem(ItemBrownEgg.class);
+
+            registerNamespacedIdItem(ItemTorchflowerSeeds.class);
+            registerNamespacedIdItem(ItemPitcherPod.class);
+            registerNamespacedIdItem(ItemArmadilloScute.class);
+            registerNamespacedIdItem(ItemWolfArmor.class);
+            registerNamespacedIdItem(ItemResinBrick.class);
+            registerNamespacedIdItem(ItemHorseArmorCopper.class);
+            registerNamespacedIdItem(ItemHorseArmorNetherite.class);
+            registerNamespacedIdItem(ItemRecordTears.class);
+            registerNamespacedIdItem(ItemRecordLavaChicken.class);
+            registerNamespacedIdItem(ItemSpearWood.class);
+            registerNamespacedIdItem(ItemSpearStone.class);
+            registerNamespacedIdItem(ItemSpearIron.class);
+            registerNamespacedIdItem(ItemSpearGold.class);
+            registerNamespacedIdItem(ItemSpearDiamond.class);
+            registerNamespacedIdItem(ItemSpearCopper.class);
+            registerNamespacedIdItem(ItemSpearNetherite.class);
+            registerNamespacedIdItem(ItemNautilusArmorCopper.class);
+            registerNamespacedIdItem(ItemNautilusArmorIron.class);
+            registerNamespacedIdItem(ItemNautilusArmorGold.class);
+            registerNamespacedIdItem(ItemNautilusArmorDiamond.class);
+            registerNamespacedIdItem(ItemNautilusArmorNetherite.class);
 
             registerNamespacedIdItem(ItemSwordCopper.class);
             registerNamespacedIdItem(ItemAxeCopper.class);
@@ -659,7 +693,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static CreativeItems getCreativeItemsAndGroups(int protocol) {
-        return CREATIVE_ITEMS;
+        return getCreativeItemsAndGroups();
     }
 
     /**
@@ -667,7 +701,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static CreativeItems getCreativeItemsAndGroups(GameVersion protocol) {
-        return CREATIVE_ITEMS;
+        return getCreativeItemsAndGroups();
     }
 
     public static void addCreativeItem(Item item) {
@@ -743,14 +777,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
-    /**
-     * @deprecated Use {@link #isCreativeItem(Item)} instead, version parameter is no longer used
-     */
-    @Deprecated
-    public static boolean isCreativeItem(int protocol, Item item) {
-        return isCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
-    }
-
     public static boolean isCreativeItem(GameVersion gameVersion, Item item) {
         for (Item aCreative : Item.getCreativeItemsAndGroups().getItems(gameVersion)) {
             if (item.equals(aCreative, !item.isTool())) {
@@ -760,9 +786,16 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    /**
+     * @deprecated Use {@link #isCreativeItem(Item)} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static boolean isCreativeItem(int protocol, Item item) {
+        return isCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
+    }
+
     public static Item getCreativeItem(int index) {
-        ArrayList<Item> items = Item.getCreativeItems();
-        return (index >= 0 && index < items.size()) ? items.get(index) : null;
+        return getCreativeItem(Item.getCreativeItems(), index);
     }
 
     /**
@@ -770,7 +803,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static Item getCreativeItem(int protocol, int index) {
-        return getCreativeItem(index);
+        return getCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), index);
     }
 
     /**
@@ -778,17 +811,15 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static Item getCreativeItem(GameVersion gameVersion, int index) {
-        return getCreativeItem(index);
+        return getCreativeItem(Item.getCreativeItems(gameVersion), index);
     }
 
     public static int getCreativeItemIndex(Item item) {
-        ArrayList<Item> items = Item.getCreativeItems();
-        for (int i = 0; i < items.size(); i++) {
-            if (item.equals(items.get(i), !item.isTool())) {
-                return i;
-            }
-        }
-        return -1;
+        return getCreativeItemIndex(Item.getCreativeItems(), item);
+    }
+
+    public static int getCreativeItemIndex(GameVersion gameVersion, Item item) {
+        return getCreativeItemIndex(Item.getCreativeItems(gameVersion), item);
     }
 
     /**
@@ -796,15 +827,20 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     @Deprecated
     public static int getCreativeItemIndex(int protocol, Item item) {
-        return getCreativeItemIndex(item);
+        return getCreativeItemIndex(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
     }
 
-    /**
-     * @deprecated Use {@link #getCreativeItemIndex(Item)} instead, version parameter is no longer used
-     */
-    @Deprecated
-    public static int getCreativeItemIndex(GameVersion gameVersion, Item item) {
-        return getCreativeItemIndex(item);
+    private static Item getCreativeItem(ArrayList<Item> items, int index) {
+        return (index >= 0 && index < items.size()) ? items.get(index) : null;
+    }
+
+    private static int getCreativeItemIndex(ArrayList<Item> items, Item item) {
+        for (int i = 0; i < items.size(); i++) {
+            if (item.equals(items.get(i), !item.isTool())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     @SneakyThrows
@@ -1646,6 +1682,14 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    public boolean isSpear() {
+        return false;
+    }
+
+    public boolean isHorseArmor() {
+        return false;
+    }
+
     public int getEnchantAbility() {
         return 0;
     }
@@ -1859,6 +1903,58 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     /**
+     * Returns the stack network id assigned to this item instance. Stack network
+     * ids are allocated by Item's internal counter and used by the Server
+     * Authoritative Inventory (ItemStackRequest) flow to identify a specific
+     * stack across client-server round trips. Returns 0 when the stack is not
+     * being tracked (for example, items produced by legacy
+     * {@code InventoryTransactionPacket} paths).
+     *
+     * @return the stack network id, or 0 when unassigned
+     */
+    public int getStackNetId() {
+        return this.stackNetId;
+    }
+
+    /**
+     * Sets the stack network id for this item instance. Used by the
+     * ItemStackRequest handler to echo the client-supplied id back in the
+     * response, or by callers that want to reuse an existing id after cloning.
+     * Pass 0 to mark the stack as untracked.
+     *
+     * @param stackNetId the stack network id to assign (0 to clear)
+     * @return this item for chaining
+     */
+    public Item setStackNetId(int stackNetId) {
+        this.stackNetId = stackNetId;
+        return this;
+    }
+
+    /**
+     * Indicates whether this item instance carries a valid stack network id.
+     * Allocated ids are always positive; 0 means untracked.
+     *
+     * @return {@code true} when {@link #stackNetId} is greater than 0
+     */
+    public boolean isUsingStackNetId() {
+        return this.stackNetId > 0;
+    }
+
+    /**
+     * Allocates a fresh positive stack network id from Item's internal counter
+     * and assigns it to this item. Call this whenever a new, distinct stack is
+     * produced server-side (for example, the output of a crafting / enchanting
+     * / grindstone operation) so the client can reference it in subsequent
+     * {@code ItemStackRequest} actions.
+     *
+     * @return this item for chaining
+     */
+    public Item autoAssignStackNetworkId() {
+        this.stackNetId = STACK_NETWORK_ID_COUNTER.updateAndGet(current -> current == Integer.MAX_VALUE ? 1 : current + 1);
+        return this;
+    }
+
+    /**
      * @Deprecated Use {@link #getNetworkId} or {@link #getNamespaceId()} instead
      */
     @Deprecated
@@ -1931,6 +2027,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * @return 是否支持 whether supported
      */
     public boolean isSupportedOn(GameVersion protocolId) {
+        return this.isSupportedOnMapping(protocolId);
+    }
+
+    private boolean isSupportedOnMapping(GameVersion protocolId) {
         int itemId = this.getId();
         if (itemId == AIR) {
             return true;
@@ -2023,6 +2123,28 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
         public List<CreativeItemGroup> getGroups() {
             return groups;
+        }
+
+        /**
+         * Get creative groups referenced by items supported on the specified protocol version.
+         */
+        public List<CreativeItemGroup> getGroups(GameVersion protocol) {
+            if (protocol == GameVersion.getLastVersion()) {
+                return groups;
+            }
+            Set<CreativeItemGroup> referencedGroups = new HashSet<>();
+            for (CreativeItemGroup group : getContents(protocol).values()) {
+                if (group != null) {
+                    referencedGroups.add(group);
+                }
+            }
+            ArrayList<CreativeItemGroup> versionGroups = new ArrayList<>(referencedGroups.size());
+            for (CreativeItemGroup group : groups) {
+                if (referencedGroups.contains(group)) {
+                    versionGroups.add(group);
+                }
+            }
+            return versionGroups;
         }
 
         public Map<Item, CreativeItemGroup> getContents() {

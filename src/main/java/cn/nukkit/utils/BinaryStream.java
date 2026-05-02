@@ -26,6 +26,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.EntityLink;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
+import cn.nukkit.network.protocol.types.inventory.descriptor.*;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequestSlotData;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin;
@@ -743,8 +744,9 @@ public class BinaryStream {
             id = null;
         }
 
-        if (this.getBoolean()) { // hasNetId
-            this.getVarInt(); // netId
+        int stackNetId = 0;
+        if (this.getBoolean()) { // hasStackNetId
+            stackNetId = this.getVarInt();
         }
 
         int blockRuntimeId = this.getVarInt();// blockRuntimeId
@@ -838,6 +840,9 @@ public class BinaryStream {
                     if (compoundTag.contains(MV_ORIGIN_NBT)) {
                         item.setNamedTag(compoundTag.getCompound(MV_ORIGIN_NBT));
                     }
+                    if (stackNetId != 0) {
+                        item.setStackNetId(stackNetId);
+                    }
                     return item;
                 }
             }
@@ -882,6 +887,9 @@ public class BinaryStream {
             item.setNamedTag(namedTag);
         }
 
+        if (stackNetId != 0) {
+            item.setStackNetId(stackNetId);
+        }
         return item;
     }
 
@@ -1184,8 +1192,10 @@ public class BinaryStream {
         this.putUnsignedVarInt(damage);
 
         if (!instanceItem) {
-            this.putBoolean(true);
-            this.putVarInt(1); // Item is present
+            this.putBoolean(item.isUsingStackNetId());
+            if (item.isUsingStackNetId()) {
+                this.putVarInt(item.getStackNetId());
+            }
         }
 
         Block block = isBlock ? item.getBlockUnsafe() : null;
@@ -1795,25 +1805,56 @@ public class BinaryStream {
     }
 
     protected ItemStackRequestAction readRequestActionData(GameVersion gameVersion, ItemStackRequestActionType type) {
+        int protocol = gameVersion.getProtocol();
+        boolean hasNumberOfCrafts = protocol >= ProtocolInfo.v1_21_20;
         return switch (type) {
-            case CRAFT_REPAIR_AND_DISENCHANT -> new CraftGrindstoneAction((int) getUnsignedVarInt(), getVarInt());
-            case CRAFT_LOOM -> new CraftLoomAction(getString());
-            case CRAFT_RECIPE_AUTO -> new AutoCraftRecipeAction(
-                    (int) getUnsignedVarInt(), getByte(), Collections.emptyList()
-            );
+            case CRAFT_REPAIR_AND_DISENCHANT -> {
+                int recipeId = (int) getUnsignedVarInt();
+                int numberOfRequestedCrafts = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
+                int repairCost = getVarInt();
+                yield new CraftGrindstoneAction(recipeId, numberOfRequestedCrafts, repairCost);
+            }
+            case CRAFT_LOOM -> {
+                String patternId = getString();
+                int timesCrafted = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
+                yield new CraftLoomAction(patternId, timesCrafted);
+            }
+            case CRAFT_RECIPE_AUTO -> {
+                int recipeId = (int) getUnsignedVarInt();
+                int numberOfRequestedCrafts = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
+                int timesCrafted = protocol >= ProtocolInfo.v1_17_10 ? (getByte() & 0xFF) : 0;
+                List<ItemDescriptorWithCount> ingredients = new ArrayList<>();
+                if (protocol >= ProtocolInfo.v1_19_40) {
+                    int size = getByte() & 0xFF;
+                    for (int i = 0; i < size; i++) {
+                        ingredients.add(readIngredientDescriptor(gameVersion));
+                    }
+                }
+                yield new AutoCraftRecipeAction(recipeId, numberOfRequestedCrafts, timesCrafted, ingredients);
+            }
             case CRAFT_RESULTS_DEPRECATED -> new CraftResultsDeprecatedAction(
                     getArray(Item.class, (s) -> s.getSlot(gameVersion)),
-                    getByte()
+                    getByte() & 0xFF
             );
             case MINE_BLOCK -> new MineBlockAction(getVarInt(), getVarInt(), getVarInt());
             case CRAFT_RECIPE_OPTIONAL -> new CraftRecipeOptionalAction((int) getUnsignedVarInt(), getLInt());
             case TAKE -> new TakeAction(
-                    getByte(),
+                    getByte() & 0xFF,
+                    readStackRequestSlotInfo(gameVersion),
+                    readStackRequestSlotInfo(gameVersion)
+            );
+            case TAKE_FROM_ITEM_CONTAINER -> new TakeFromItemContainerAction(
+                    getByte() & 0xFF,
                     readStackRequestSlotInfo(gameVersion),
                     readStackRequestSlotInfo(gameVersion)
             );
             case PLACE -> new PlaceAction(
-                    getByte(),
+                    getByte() & 0xFF,
+                    readStackRequestSlotInfo(gameVersion),
+                    readStackRequestSlotInfo(gameVersion)
+            );
+            case PLACE_IN_ITEM_CONTAINER -> new PlaceInItemContainerAction(
+                    getByte() & 0xFF,
                     readStackRequestSlotInfo(gameVersion),
                     readStackRequestSlotInfo(gameVersion)
             );
@@ -1822,47 +1863,124 @@ public class BinaryStream {
                     readStackRequestSlotInfo(gameVersion)
             );
             case DROP -> new DropAction(
-                    getByte(),
+                    getByte() & 0xFF,
                     readStackRequestSlotInfo(gameVersion),
                     getBoolean()
             );
             case DESTROY -> new DestroyAction(
-                    getByte(),
+                    getByte() & 0xFF,
                     readStackRequestSlotInfo(gameVersion)
             );
             case CONSUME -> new ConsumeAction(
-                    getByte(),
+                    getByte() & 0xFF,
                     readStackRequestSlotInfo(gameVersion)
             );
             case CREATE -> new CreateAction(
-                    getByte()
+                    getByte() & 0xFF
             );
             case LAB_TABLE_COMBINE -> new LabTableCombineAction();
             case BEACON_PAYMENT -> new BeaconPaymentAction(
                     getVarInt(),
                     getVarInt()
             );
-            case CRAFT_RECIPE -> new CraftRecipeAction(
-                    (int) getUnsignedVarInt()
-            );
-            case CRAFT_CREATIVE -> new CraftCreativeAction(
-                    (int) getUnsignedVarInt()
-            );
+            case CRAFT_RECIPE -> {
+                int recipeId = (int) getUnsignedVarInt();
+                int numberOfRequestedCrafts = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
+                yield new CraftRecipeAction(recipeId, numberOfRequestedCrafts);
+            }
+            case CRAFT_CREATIVE -> {
+                int creativeItemId = (int) getUnsignedVarInt();
+                int numberOfRequestedCrafts = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
+                yield new CraftCreativeAction(creativeItemId, numberOfRequestedCrafts);
+            }
             case CRAFT_NON_IMPLEMENTED_DEPRECATED -> new CraftNonImplementedAction();
             default -> throw new UnsupportedOperationException("Unhandled stack request action type: " + type);
         };
     }
 
     private ItemStackRequestSlotData readStackRequestSlotInfo(GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
         ContainerSlotType containerSlotType = ContainerSlotType.fromId(getByte(), gameVersion);
         if (containerSlotType == null) {
             throw new UnsupportedOperationException("Unhandled container slot type id for protocol "
                     + gameVersion + " at offset " + (getOffset() - 1));
         }
+        Integer dynamicId;
+        if (protocol >= ProtocolInfo.v1_21_30) {
+            // FullContainerName dynamicId is optional
+            dynamicId = getBoolean() ? getLInt() : null;
+        } else if (protocol >= ProtocolInfo.v1_21_20) {
+            // FullContainerName dynamicId is always present
+            dynamicId = getLInt();
+        } else {
+            // No FullContainerName wrapper before v712
+            dynamicId = null;
+        }
+        int slot = getByte() & 0xFF;
+        int stackNetworkId = getVarInt();
         return new ItemStackRequestSlotData(
                 containerSlotType,
-                getByte(),
-                getVarInt()
+                slot,
+                stackNetworkId,
+                dynamicId
         );
+    }
+
+    private ItemDescriptorWithCount readIngredientDescriptor(GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
+        RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
+        if (protocol < ProtocolInfo.v1_19_30_23) {
+            // Legacy default descriptor: runtimeId(LShort) + auxValue(LShort) + count(VarInt)
+            int runtimeId = getLShort();
+            if (runtimeId == 0) {
+                return ItemDescriptorWithCount.empty();
+            }
+            int auxValue = getLShort();
+            int count = (int) getVarInt();
+            return new ItemDescriptorWithCount(new DefaultDescriptor(toLegacyItemId(mapping, runtimeId), auxValue), count);
+        }
+        int descriptorType = getByte() & 0xFF;
+        ItemDescriptor descriptor = switch (descriptorType) {
+            case 0 -> { // INVALID
+                yield InvalidDescriptor.INSTANCE;
+            }
+            case 1 -> { // DEFAULT
+                int runtimeId = getLShort();
+                if (runtimeId == 0) {
+                    yield InvalidDescriptor.INSTANCE;
+                }
+                int auxValue = getLShort();
+                yield new DefaultDescriptor(toLegacyItemId(mapping, runtimeId), auxValue);
+            }
+            case 2 -> { // MOLANG
+                String expression = getString();
+                int version = getByte() & 0xFF;
+                yield new MolangDescriptor(expression, version);
+            }
+            case 3 -> { // ITEM_TAG
+                String tag = getString();
+                yield new ItemTagDescriptor(tag);
+            }
+            case 4 -> { // DEFERRED
+                String name = getString();
+                int auxValue = getLShort();
+                yield new DeferredDescriptor(name, auxValue);
+            }
+            case 5 -> { // COMPLEX_ALIAS (since v582)
+                String name = getString();
+                yield new ComplexAliasDescriptor(name);
+            }
+            default -> throw new UnsupportedOperationException("Unhandled item descriptor type: " + descriptorType);
+        };
+        int count = (int) getVarInt();
+        return new ItemDescriptorWithCount(descriptor, count);
+    }
+
+    private int toLegacyItemId(RuntimeItemMapping mapping, int runtimeId) {
+        try {
+            return mapping.fromRuntime(runtimeId).getLegacyId();
+        } catch (IllegalArgumentException ignored) {
+            return runtimeId;
+        }
     }
 }
