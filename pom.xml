@@ -520,7 +520,7 @@
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy</artifactId>
-            <version>${mockito.version}</version>
+            <version>${bytebuddy.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
