@@ -53,7 +53,7 @@
         <cloudburstmc-math.version>2.0-SNAPSHOT</cloudburstmc-math.version>
         <junit.version>6.0.3</junit.version>
         <mockito.version>5.23.0</mockito.version>
-        <bytebuddy.version>5.23.0</bytebuddy.version>
+        <bytebuddy.version>1.17.5</bytebuddy.version>
         <objenesis.version>3.4</objenesis.version>
 
         <error-prone.version>2.41.0</error-prone.version>
@@ -520,7 +520,7 @@
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy</artifactId>
-            <version>${bytebuddy.version}</version>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
