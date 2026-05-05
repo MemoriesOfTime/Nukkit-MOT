@@ -848,6 +848,10 @@ public class LevelSoundEventPacket extends DataPacket {
     public boolean isBabyMob;
     public boolean isGlobal;
     public long entityUniqueId = -1;
+    /**
+     * @since v975
+     */
+    public Vector3f fireAtPosition;
 
     @Override
     public void decode() {
@@ -862,6 +866,9 @@ public class LevelSoundEventPacket extends DataPacket {
         this.isGlobal = this.getBoolean();
         if (this.protocol >= ProtocolInfo.v1_21_70_24) {
             this.entityUniqueId = this.getLLong();
+        }
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.fireAtPosition = this.getOptional(null, s -> s.getVector3f());
         }
     }
 
@@ -890,6 +897,9 @@ public class LevelSoundEventPacket extends DataPacket {
         this.putBoolean(this.isGlobal);
         if (this.protocol >= ProtocolInfo.v1_21_70_24) {
             this.putLLong(this.entityUniqueId);
+        }
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.putOptionalNull(this.fireAtPosition, this::putVector3f);
         }
     }
 

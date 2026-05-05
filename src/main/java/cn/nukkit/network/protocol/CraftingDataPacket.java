@@ -99,7 +99,11 @@ public class CraftingDataPacket extends DataPacket {
             }
         } else {
             for (Recipe recipe : entries) {
-                this.putVarInt(recipe.getType().getNetworkType(protocol));
+                RecipeType networkType = recipe.getType();
+                if ((networkType == RecipeType.FURNACE || networkType == RecipeType.FURNACE_DATA) && protocol >= ProtocolInfo.v1_26_20_26) {
+                    networkType = RecipeType.SHAPELESS;
+                }
+                this.putVarInt(networkType.getNetworkType(protocol));
                 switch (recipe.getType()) {
                     case SHAPELESS:
                         ShapelessRecipe shapeless = (ShapelessRecipe) recipe;
@@ -187,24 +191,43 @@ public class CraftingDataPacket extends DataPacket {
                     case FURNACE:
                     case FURNACE_DATA:
                         FurnaceRecipe furnace = (FurnaceRecipe) recipe;
-                        Item input = furnace.getInput();
-                        int runtimeId;
-                        int damage;
-                        if (!input.hasMeta()) {
-                            runtimeId = RuntimeItems.getMapping(gameVersion).toRuntime(input.getId(), 0).getRuntimeId();
-                            damage = 0x7fff;
+                        if (protocol >= ProtocolInfo.v1_26_20_26) {
+                            this.putString(furnace.getRecipeId());
+                            this.putUnsignedVarInt(1); // Ingredients length
+                            this.putRecipeIngredient(gameVersion, furnace.getInput());
+                            this.putUnsignedVarInt(1); // Results length
+                            this.putSlot(gameVersion, furnace.getResult(), true);
+                            this.putUUID(furnace.getId());
+                            String craftingTag;
+                            if (recipe instanceof BlastFurnaceRecipe) {
+                                craftingTag = CRAFTING_TAG_BLAST_FURNACE;
+                            } else {
+                                craftingTag = CRAFTING_TAG_FURNACE;
+                            }
+                            this.putString(craftingTag);
+                            this.putVarInt(0); // priority
+                            this.putByte((byte) RecipeUnlockingRequirement.UnlockingContext.ALWAYS_UNLOCKED.ordinal());
+                            this.putUnsignedVarInt(furnace.getNetworkId());
                         } else {
-                            RuntimeItemMapping.RuntimeEntry runtimeEntry = RuntimeItems.getMapping(gameVersion).toRuntime(input.getId(), input.getDamage());
-                            runtimeId = runtimeEntry.getRuntimeId();
-                            damage = runtimeEntry.isHasDamage() ? 0 : input.getDamage();
-                        }
-                        this.putVarInt(runtimeId);
-                        if (recipe.getType() == RecipeType.FURNACE_DATA) {
-                            this.putVarInt(damage);
-                        }
-                        this.putSlot(gameVersion, furnace.getResult(), protocol >= ProtocolInfo.v1_16_100);
-                        if (protocol >= 354) {
-                            this.putString(CRAFTING_TAG_FURNACE);
+                            Item input = furnace.getInput();
+                            int runtimeId;
+                            int damage;
+                            if (!input.hasMeta()) {
+                                runtimeId = RuntimeItems.getMapping(gameVersion).toRuntime(input.getId(), 0).getRuntimeId();
+                                damage = 0x7fff;
+                            } else {
+                                RuntimeItemMapping.RuntimeEntry runtimeEntry = RuntimeItems.getMapping(gameVersion).toRuntime(input.getId(), input.getDamage());
+                                runtimeId = runtimeEntry.getRuntimeId();
+                                damage = runtimeEntry.isHasDamage() ? 0 : input.getDamage();
+                            }
+                            this.putVarInt(runtimeId);
+                            if (recipe.getType() == RecipeType.FURNACE_DATA) {
+                                this.putVarInt(damage);
+                            }
+                            this.putSlot(gameVersion, furnace.getResult(), protocol >= ProtocolInfo.v1_16_100);
+                            if (protocol >= 354) {
+                                this.putString(CRAFTING_TAG_FURNACE);
+                            }
                         }
                         break;
                     case MULTI:

@@ -35,7 +35,7 @@ public class PlaySoundPacket extends DataPacket {
         this.putBlockVector3(this.x << 3, this.y << 3, this.z << 3);
         this.putLFloat(this.volume);
         this.putLFloat(this.pitch);
-        if (protocol >= 975) {
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.putOptionalNull(this.serverSoundHandle, this::putLLong);
         }
     }

@@ -29,7 +29,7 @@ public class PartyChangedPacket extends DataPacket {
     @Override
     public void decode() {
         this.partyId = this.getString();
-        if (protocol >= 975) {
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.isPartyLeader = this.getBoolean();
         }
     }
@@ -38,7 +38,7 @@ public class PartyChangedPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putString(this.partyId);
-        if (protocol >= 975) {
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.putBoolean(this.isPartyLeader);
         }
     }

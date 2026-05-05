@@ -48,7 +48,7 @@ public class MoveEntityAbsolutePacket extends DataPacket {
             onGround = (flags & FLAG_GROUND) != 0;
             teleport = (flags & FLAG_TELEPORT) != 0;
             forceMoveLocalEntity = (flags & FLAG_FORCE_MOVE_LOCAL_ENTITY) != 0;
-            if (protocol >= 975) {
+            if (protocol >= ProtocolInfo.v1_26_20_26) {
                 forceCompletion = (flags & FLAG_FORCE_COMPLETION) != 0;
             }
         }
@@ -76,7 +76,7 @@ public class MoveEntityAbsolutePacket extends DataPacket {
             if (forceMoveLocalEntity) {
                 flags |= FLAG_FORCE_MOVE_LOCAL_ENTITY;
             }
-            if (protocol >= 975 && forceCompletion) {
+            if (protocol >= ProtocolInfo.v1_26_20_26 && forceCompletion) {
                 flags |= FLAG_FORCE_COMPLETION;
             }
             this.putByte(flags);

@@ -74,7 +74,7 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
             }
         }
 
-        if (this.protocol >= 975) {
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
             int entityCount = (int) this.getUnsignedVarInt();
             this.entityDiagnostics = new ArrayList<>(entityCount);
             for (int i = 0; i < entityCount; i++) {
@@ -118,7 +118,7 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
             }
         }
 
-        if (this.protocol >= 975) {
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
             this.putUnsignedVarInt(this.entityDiagnostics.size());
             for (EntityDiagnosticTimingInfo info : this.entityDiagnostics) {
                 this.putString(info.displayName);

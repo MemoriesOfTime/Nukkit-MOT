@@ -101,7 +101,7 @@ public class EntityEventPacket extends DataPacket {
         this.eid = this.getEntityRuntimeId();
         this.event = this.getByte();
         this.data = this.getVarInt();
-        if (protocol >= 975) {
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.fireAtPosition = this.getOptional(null, s -> s.getVector3f());
         }
     }
@@ -139,7 +139,7 @@ public class EntityEventPacket extends DataPacket {
             }
         }
         this.putVarInt(this.data);
-        if (protocol >= 975) {
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.putOptionalNull(this.fireAtPosition, this::putVector3f);
         }
     }
