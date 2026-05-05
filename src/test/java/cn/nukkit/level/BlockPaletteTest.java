@@ -85,6 +85,15 @@ class BlockPaletteTest {
         assertLightningRodStatesMapped(new BlockPalette(GameVersion.V1_26_10));
     }
 
+    @Test
+    /**
+     * Verifies shelf wood variants and their 32 block states do not fall back to oak or info_update.
+     */
+    void shelfStatesHaveVariantSpecificRuntimeMappings() {
+        assertShelfStatesMapped(new BlockPalette(GameVersion.V1_21_110));
+        assertShelfStatesMapped(new BlockPalette(GameVersion.V1_26_10));
+    }
+
     private static void assertCrafterTriggeredStateMapped(BlockPalette palette) {
         int defaultRuntimeId = palette.getRuntimeId(Block.CRAFTER, 0);
         int triggeredCraftingRuntimeId = palette.getRuntimeId(Block.CRAFTER, 0x37);
@@ -145,6 +154,38 @@ class BlockPaletteTest {
                 Assertions.assertNotEquals(infoUpdateHashId, palette.getHashId(id, unpoweredMeta));
                 Assertions.assertNotEquals(infoUpdateHashId, palette.getHashId(id, poweredMeta));
                 Assertions.assertNotEquals(palette.getHashId(id, unpoweredMeta), palette.getHashId(id, poweredMeta));
+            }
+        }
+    }
+
+    private static void assertShelfStatesMapped(BlockPalette palette) {
+        int infoUpdateRuntimeId = palette.getRuntimeId(Block.INFO_UPDATE, 0);
+        int infoUpdateHashId = palette.getHashId(Block.INFO_UPDATE, 0);
+        int[] ids = {
+                Block.OAK_SHELF,
+                Block.SPRUCE_SHELF,
+                Block.BIRCH_SHELF,
+                Block.JUNGLE_SHELF,
+                Block.ACACIA_SHELF,
+                Block.DARK_OAK_SHELF,
+                Block.MANGROVE_SHELF,
+                Block.CHERRY_SHELF,
+                Block.PALE_OAK_SHELF,
+                Block.BAMBOO_SHELF,
+                Block.CRIMSON_SHELF,
+                Block.WARPED_SHELF
+        };
+
+        for (int id : ids) {
+            for (int meta = 0; meta < 32; meta++) {
+                int runtimeId = palette.getRuntimeId(id, meta);
+                int hashId = palette.getHashId(id, meta);
+                int legacyFullId = id << Block.DATA_BITS | meta;
+
+                Assertions.assertNotEquals(infoUpdateRuntimeId, runtimeId, "runtime fallback for " + id + ':' + meta);
+                Assertions.assertNotEquals(infoUpdateHashId, hashId, "hash fallback for " + id + ':' + meta);
+                Assertions.assertEquals(legacyFullId, palette.getLegacyFullId(runtimeId), "runtime reverse mapping for " + id + ':' + meta);
+                Assertions.assertEquals(legacyFullId, palette.getLegacyFullIdFromHashId(hashId), "hash reverse mapping for " + id + ':' + meta);
             }
         }
     }

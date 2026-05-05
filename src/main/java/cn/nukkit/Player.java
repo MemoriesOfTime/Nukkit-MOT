@@ -3752,6 +3752,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (ptse.isCancelled()) {
                         this.needSendData = true;
                     } else {
+                        this.setCrawling(false);
                         this.setSwimming(true);
                     }
                 }
@@ -3864,6 +3865,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (playerToggleCrawlEvent.isCancelled()) {
                             this.needSendData = true;
                         } else {
+                            this.setSwimming(false);
                             this.setCrawling(true);
                         }
                     }
@@ -4074,6 +4076,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (ptse.isCancelled()) {
                             this.needSendData = true;
                         } else {
+                            this.setCrawling(false);
                             this.setSwimming(true);
                         }
                         break;
@@ -4118,6 +4121,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (playerToggleCrawlEvent.isCancelled()) {
                             this.needSendData = true;
                         } else {
+                            this.setSwimming(false);
                             this.setCrawling(true);
                         }
                         break packetswitch;
@@ -6730,6 +6734,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.nextChunkOrderRun = 0;
             this.resetClientMovement();
 
+            this.setSwimming(false);
+            this.setCrawling(false);
+
             this.stopFishing(false);
             return true;
         }
@@ -6780,6 +6787,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.orderChunks();
             this.nextChunkOrderRun = 0;
             this.resetClientMovement();
+
+            this.setSwimming(false);
+            this.setCrawling(false);
 
             //DummyBossBar
             this.getDummyBossBars().values().forEach(DummyBossBar::reshow);
