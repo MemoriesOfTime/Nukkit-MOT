@@ -73,6 +73,7 @@ public class CraftingManager {
     private static BatchPacket packet898;
     private static BatchPacket packet924;
     private static BatchPacket packet944;
+    private static BatchPacket packet975;
 
     private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
@@ -821,6 +822,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet975 = null;
         packet944 = null;
         packet924 = null;
         packet898 = null;
@@ -919,7 +921,12 @@ public class CraftingManager {
             }
         }
 
-        if (protocol >= GameVersion.V1_26_10.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_20_26.getProtocol()) {
+            if (packet975 == null) {
+                packet975 = packetFor(GameVersion.V1_26_20);
+            }
+            return packet975;
+        } else if (protocol >= GameVersion.V1_26_10.getProtocol()) {
             if (packet944 == null) {
                 packet944 = packetFor(GameVersion.V1_26_10);
             }
@@ -1246,6 +1253,7 @@ public class CraftingManager {
             this.registerBlastFurnaceRecipe((BlastFurnaceRecipe) recipe);
             return;
         }
+        recipe.setId(UUID.randomUUID());
         this.furnaceRecipes.put(getItemHash(recipe.getInput()), recipe);
     }
 
@@ -1255,6 +1263,7 @@ public class CraftingManager {
     }
 
     public void registerBlastFurnaceRecipe(BlastFurnaceRecipe recipe) {
+        recipe.setId(UUID.randomUUID());
         this.blastFurnaceRecipes.put(getItemHash(recipe.getInput()), recipe);
     }
 

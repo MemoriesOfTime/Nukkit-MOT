@@ -34,7 +34,7 @@ public class AnimateEntityPacket extends DataPacket {
         this.nextState = this.getString();
         this.stopExpression = this.getString();
         if (this.protocol >= ProtocolInfo.v1_17_30) {
-            this.stopExpressionVersion = this.getInt();
+            this.stopExpressionVersion = this.getLInt();
         }
         this.controller = this.getString();
         this.blendOutTime = this.getLFloat();
@@ -50,7 +50,7 @@ public class AnimateEntityPacket extends DataPacket {
         this.putString(this.nextState);
         this.putString(this.stopExpression);
         if (this.protocol >= ProtocolInfo.v1_17_30) {
-            this.putInt(this.stopExpressionVersion);
+            this.putLInt(this.stopExpressionVersion);
         }
         this.putString(this.controller);
         this.putLFloat(this.blendOutTime);

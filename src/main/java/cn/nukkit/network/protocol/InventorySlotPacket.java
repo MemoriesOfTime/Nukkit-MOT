@@ -69,6 +69,6 @@ public class InventorySlotPacket extends DataPacket {
                 this.putVarInt(networkId);
             }
         }
-        this.putSlot(gameVersion, this.item);
+        this.putNetworkItemStackDescriptor(gameVersion, this.item);
     }
 }

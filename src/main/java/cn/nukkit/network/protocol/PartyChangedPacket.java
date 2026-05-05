@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
 /**
@@ -28,8 +29,8 @@ public class PartyChangedPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.partyId = this.getString();
-        if (protocol >= ProtocolInfo.v1_26_20_26) {
+        this.partyId = this.getOptional(null, BinaryStream::getString);
+        if (protocol >= ProtocolInfo.v1_26_20) {
             this.isPartyLeader = this.getBoolean();
         }
     }
@@ -37,8 +38,8 @@ public class PartyChangedPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putString(this.partyId);
-        if (protocol >= ProtocolInfo.v1_26_20_26) {
+        this.putOptionalNull(this.partyId, BinaryStream::putString);
+        if (protocol >= ProtocolInfo.v1_26_20) {
             this.putBoolean(this.isPartyLeader);
         }
     }
