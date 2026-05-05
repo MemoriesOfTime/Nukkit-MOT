@@ -34,25 +34,23 @@ public class LocatorBarPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.waypoints.clear();
-        int count = (int) this.getUnsignedVarInt();
-        for (int i = 0; i < count; i++) {
-            UUID groupHandle = this.getUUID();
-            LocatorBarWaypoint waypoint = readWaypoint();
-            int actionFlag = this.getByte();
-            this.waypoints.add(new Payload(Action.values()[actionFlag], groupHandle, waypoint));
-        }
+        this.waypoints = new ArrayList<>();
+        this.getArray(this.waypoints, bs -> {
+            UUID groupHandle = bs.getUUID();
+            LocatorBarWaypoint waypoint = this.readWaypoint();
+            int actionFlag = bs.getByte();
+            return new Payload(Action.values()[actionFlag], groupHandle, waypoint);
+        });
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(this.waypoints.size());
-        for (Payload payload : this.waypoints) {
+        this.putArray(this.waypoints, payload -> {
             this.putUUID(payload.groupHandle);
-            writeWaypoint(payload.waypoint);
+            this.writeWaypoint(payload.waypoint);
             this.putByte((byte) payload.actionFlag.ordinal());
-        }
+        });
     }
 
     private void writeWaypoint(LocatorBarWaypoint waypoint) {

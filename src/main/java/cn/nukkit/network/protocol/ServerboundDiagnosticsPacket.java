@@ -65,35 +65,16 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         this.avgUnaccountedTimePercent = this.getLFloat();
 
         if (this.protocol >= ProtocolInfo.v1_26_0) {
-            int count = (int) this.getUnsignedVarInt();
-            this.memoryCategoryValues = new ArrayList<>(count);
-            for (int i = 0; i < count; i++) {
-                int category = this.getByte();
-                long currentBytes = this.getLLong();
-                this.memoryCategoryValues.add(new MemoryCategoryCounter(category, currentBytes));
-            }
+            this.memoryCategoryValues = new ArrayList<>();
+            this.getArray(this.memoryCategoryValues, bs -> new MemoryCategoryCounter(bs.getByte(), bs.getLLong()));
         }
 
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
-            int entityCount = (int) this.getUnsignedVarInt();
-            this.entityDiagnostics = new ArrayList<>(entityCount);
-            for (int i = 0; i < entityCount; i++) {
-                String displayName = this.getString();
-                String entity = this.getString();
-                long timeInNs = this.getLLong();
-                int percentOfTotal = this.getByte();
-                this.entityDiagnostics.add(new EntityDiagnosticTimingInfo(displayName, entity, timeInNs, (byte) percentOfTotal));
-            }
+            this.entityDiagnostics = new ArrayList<>();
+            this.getArray(this.entityDiagnostics, bs -> new EntityDiagnosticTimingInfo(bs.getString(), bs.getString(), bs.getLLong(), (byte) bs.getByte()));
 
-            int systemCount = (int) this.getUnsignedVarInt();
-            this.systemDiagnostics = new ArrayList<>(systemCount);
-            for (int i = 0; i < systemCount; i++) {
-                String displayName = this.getString();
-                long systemIndex = this.getLLong();
-                long timeInNs = this.getLLong();
-                int percentOfTotal = this.getByte();
-                this.systemDiagnostics.add(new SystemDiagnosticTimingInfo(displayName, systemIndex, timeInNs, (byte) percentOfTotal));
-            }
+            this.systemDiagnostics = new ArrayList<>();
+            this.getArray(this.systemDiagnostics, bs -> new SystemDiagnosticTimingInfo(bs.getString(), bs.getLLong(), bs.getLLong(), (byte) bs.getByte()));
         }
     }
 
@@ -111,29 +92,26 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         this.putLFloat(this.avgUnaccountedTimePercent);
 
         if (this.protocol >= ProtocolInfo.v1_26_0) {
-            this.putUnsignedVarInt(this.memoryCategoryValues.size());
-            for (MemoryCategoryCounter counter : this.memoryCategoryValues) {
+            this.putArray(this.memoryCategoryValues, counter -> {
                 this.putByte((byte) counter.category);
                 this.putLLong(counter.currentBytes);
-            }
+            });
         }
 
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
-            this.putUnsignedVarInt(this.entityDiagnostics.size());
-            for (EntityDiagnosticTimingInfo info : this.entityDiagnostics) {
+            this.putArray(this.entityDiagnostics, info -> {
                 this.putString(info.displayName);
                 this.putString(info.entity);
                 this.putLLong(info.timeInNs);
                 this.putByte(info.percentOfTotal);
-            }
+            });
 
-            this.putUnsignedVarInt(this.systemDiagnostics.size());
-            for (SystemDiagnosticTimingInfo info : this.systemDiagnostics) {
+            this.putArray(this.systemDiagnostics, info -> {
                 this.putString(info.displayName);
                 this.putLLong(info.systemIndex);
                 this.putLLong(info.timeInNs);
                 this.putByte(info.percentOfTotal);
-            }
+            });
         }
     }
 
