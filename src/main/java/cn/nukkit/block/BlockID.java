@@ -906,5 +906,4 @@ public interface BlockID {
     int CINNABAR_BRICK_STAIRS = 1377;
     int CINNABAR_BRICK_WALL = 1378;
     int CHISELED_CINNABAR = 1379;
-    int SULFUR_SPIKE = 1380;
 }
