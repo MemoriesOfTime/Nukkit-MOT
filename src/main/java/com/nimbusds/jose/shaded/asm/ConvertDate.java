@@ -3,6 +3,12 @@ package com.nimbusds.jose.shaded.asm;
 import java.text.DateFormatSymbols;
 import java.util.*;
 
+/**
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
+ */
+@Deprecated(forRemoval = true)
 public class ConvertDate {
 	static TreeMap<String, Integer> monthsTable = new TreeMap<String, Integer>(new StringCmpNS()); // StringCmpNS.COMP
 	static TreeMap<String, Integer> daysTable = new TreeMap<String, Integer>(new StringCmpNS()); // StringCmpNS.COMP

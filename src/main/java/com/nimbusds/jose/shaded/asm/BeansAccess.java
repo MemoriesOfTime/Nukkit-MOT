@@ -27,7 +27,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * faster than java.lang.reflect.Method.invoke()
  * 
  * @author uriel Chemouni
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
+@Deprecated(forRemoval = true)
 public abstract class BeansAccess<T> {
 	private HashMap<String, Accessor> map;
 	private Accessor[] accs;

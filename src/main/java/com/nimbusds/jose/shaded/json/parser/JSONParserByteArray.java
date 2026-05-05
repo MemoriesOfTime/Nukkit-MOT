@@ -27,7 +27,12 @@ import static com.nimbusds.jose.shaded.json.parser.ParseException.ERROR_UNEXPECT
  * Parser for JSON text. Please note that JSONParser is NOT thread-safe.
  * 
  * @author Uriel Chemouni &lt;uchemouni@gmail.com&gt;
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
+@Deprecated(forRemoval = true)
 class JSONParserByteArray extends JSONParserMemory {
 	private byte[] in;
 

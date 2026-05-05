@@ -2,6 +2,7 @@ package cn.nukkit.blockentity;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockChestCopper;
 import cn.nukkit.inventory.BaseInventory;
 import cn.nukkit.inventory.ChestInventory;
 import cn.nukkit.inventory.DoubleChestInventory;
@@ -58,7 +59,11 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
     @Override
     public boolean isBlockEntityValid() {
         int blockID = this.getBlock().getId();
-        return blockID == Block.CHEST || blockID == Block.TRAPPED_CHEST;
+        return blockID == Block.CHEST || blockID == Block.TRAPPED_CHEST || blockID == Block.COPPER_CHEST
+                || blockID == Block.EXPOSED_COPPER_CHEST || blockID == Block.WEATHERED_COPPER_CHEST
+                || blockID == Block.OXIDIZED_COPPER_CHEST || blockID == Block.WAXED_COPPER_CHEST
+                || blockID == Block.WAXED_EXPOSED_COPPER_CHEST || blockID == Block.WAXED_WEATHERED_COPPER_CHEST
+                || blockID == Block.WAXED_OXIDIZED_COPPER_CHEST;
     }
 
     @Override
@@ -126,8 +131,17 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
     }
 
     public boolean pairWith(BlockEntityChest chest) {
-        if (this.isPaired() || chest.isPaired() || this.getBlock().getId() != chest.getBlock().getId()) {
+        if (this.isPaired() || chest.isPaired()) {
             return false;
+        }
+
+        Block thisBlock = this.getBlock();
+        Block chestBlock = chest.getBlock();
+        if (thisBlock.getId() != chestBlock.getId()) {
+            // 允许不同氧化等级/涂蜡状态的铜箱子互相配对（匹配原版行为）
+            if (!(thisBlock instanceof BlockChestCopper && chestBlock instanceof BlockChestCopper)) {
+                return false;
+            }
         }
 
         this.createPair(chest);

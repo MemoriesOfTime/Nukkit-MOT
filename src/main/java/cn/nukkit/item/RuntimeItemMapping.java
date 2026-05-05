@@ -57,6 +57,11 @@ public class RuntimeItemMapping {
 
     private byte[] itemPalette;
 
+    private static final ByteOrder[] BLOCK_STATE_BYTE_ORDERS = {
+            ByteOrder.LITTLE_ENDIAN,
+            ByteOrder.BIG_ENDIAN
+    };
+
     @Deprecated
     public RuntimeItemMapping(Map<String, MappingEntry> mappings, int protocolId) {
         this(mappings, GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
@@ -444,17 +449,30 @@ public class RuntimeItemMapping {
     }
 
     private int resolveLegacyFullIdFromBlockState(GameVersion gameVersion, String identifier, byte[] blockStateBytes, boolean ignoreUnknown) {
-        try {
-            CompoundTag blockState = NBTIO.read(blockStateBytes, ByteOrder.BIG_ENDIAN, false);
-            int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, blockState);
-            if (fullId != -1) {
-                return fullId;
+        Exception decodeFailure = null;
+        boolean decodedAny = false;
+        for (ByteOrder byteOrder : BLOCK_STATE_BYTE_ORDERS) {
+            try {
+                CompoundTag blockState = NBTIO.read(blockStateBytes, byteOrder, false);
+                decodedAny = true;
+                int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, blockState);
+                if (fullId != -1) {
+                    return fullId;
+                }
+            } catch (Exception e) {
+                if (decodeFailure == null) {
+                    decodeFailure = e;
+                } else {
+                    decodeFailure.addSuppressed(e);
+                }
             }
-        } catch (Exception e) {
+        }
+
+        if (decodeFailure != null && !decodedAny) {
             if (!ignoreUnknown) {
-                throw new IllegalStateException("Can not decode block_state_b64 for " + identifier, e);
+                throw new IllegalStateException("Can not decode block_state_b64 for " + identifier, decodeFailure);
             }
-            log.trace("Can not decode block_state_b64 for {}", identifier, e);
+            log.trace("Can not decode block_state_b64 for {}", identifier, decodeFailure);
             return -1;
         }
 
@@ -470,26 +488,28 @@ public class RuntimeItemMapping {
             return currentDamage;
         }
 
-        try {
-            CompoundTag blockState = NBTIO.read(blockStateBytes, ByteOrder.BIG_ENDIAN, false);
-            CompoundTag states = blockState.getCompound("states");
-            int facingDirection;
-            if (states.containsInt("facing_direction")) {
-                facingDirection = states.getInt("facing_direction");
-            } else if (states.containsByte("facing_direction")) {
-                facingDirection = states.getByte("facing_direction");
-            } else {
-                return currentDamage;
-            }
+        for (ByteOrder byteOrder : BLOCK_STATE_BYTE_ORDERS) {
+            try {
+                CompoundTag blockState = NBTIO.read(blockStateBytes, byteOrder, false);
+                CompoundTag states = blockState.getCompound("states");
+                int facingDirection;
+                if (states.containsInt("facing_direction")) {
+                    facingDirection = states.getInt("facing_direction");
+                } else if (states.containsByte("facing_direction")) {
+                    facingDirection = states.getByte("facing_direction");
+                } else {
+                    continue;
+                }
 
-            return switch (legacyId) {
-                case BlockID.DROPPER, BlockID.DISPENSER, BlockID.PISTON, BlockID.STICKY_PISTON -> facingDirection;
-                default -> currentDamage;
-            };
-        } catch (Exception e) {
-            log.trace("Can not derive legacy damage from block_state_b64 for legacy id {}", legacyId, e);
-            return currentDamage;
+                return switch (legacyId) {
+                    case BlockID.DROPPER, BlockID.DISPENSER, BlockID.PISTON, BlockID.STICKY_PISTON -> facingDirection;
+                    default -> currentDamage;
+                };
+            } catch (Exception e) {
+                log.trace("Can not derive legacy damage from block_state_b64 for legacy id {} using {} byte order", legacyId, byteOrder, e);
+            }
         }
+        return currentDamage;
     }
 
     private Item normalizeCreativeItemForTargetVersion(GameVersion gameVersion, Item item) {

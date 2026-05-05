@@ -19,7 +19,12 @@ package com.nimbusds.jose.shaded.json.parser;
  * ParseException explains why and where the error occurs in source JSON text.
  * 
  * @author Uriel Chemouni &lt;uchemouni@gmail.com&gt;
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
+@Deprecated(forRemoval = true)
 public class ParseException extends Exception {
 	private static final long serialVersionUID = 8879024178584091857L;
 

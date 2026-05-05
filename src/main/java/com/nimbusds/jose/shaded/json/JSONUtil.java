@@ -21,6 +21,12 @@ import java.lang.reflect.Method;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/**
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
+ */
+@Deprecated(forRemoval = true)
 public class JSONUtil {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static Object convertToStrict(Object obj, Class<?> dest) {

@@ -12,8 +12,10 @@ import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.camera.CameraFadeInstruction;
 import cn.nukkit.network.protocol.types.camera.CameraPreset;
+import org.cloudburstmc.protocol.bedrock.data.SoundEvent;
 import org.cloudburstmc.protocol.common.util.OptionalBoolean;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -307,6 +309,35 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(-1, cbPacket.getExtraData());
         assertFalse(cbPacket.isBabySound());
         assertFalse(cbPacket.isRelativeVolumeDisabled());
+    }
+
+    @Test
+    void testLavaChickenSoundEventUsesProtocolSpecificOrdinal() {
+        assertLevelSoundEventEncodesTo(ProtocolInfo.v1_21_93,
+                LevelSoundEventPacket.SOUND_RECORD_LAVA_CHICKEN, SoundEvent.RECORD_LAVA_CHICKEN);
+        assertLevelSoundEventEncodesTo(ProtocolInfo.v1_21_100,
+                LevelSoundEventPacket.SOUND_RECORD_LAVA_CHICKEN, SoundEvent.RECORD_LAVA_CHICKEN);
+    }
+
+    private void assertLevelSoundEventEncodesTo(int protocolVersion, int sound, SoundEvent expectedSound) {
+        var nukkitPacket = new LevelSoundEventPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.sound = sound;
+        nukkitPacket.x = 100.5f;
+        nukkitPacket.y = 64.0f;
+        nukkitPacket.z = 200.5f;
+        nukkitPacket.extraData = -1;
+        nukkitPacket.entityIdentifier = "";
+        nukkitPacket.isBabyMob = false;
+        nukkitPacket.isGlobal = false;
+        nukkitPacket.entityUniqueId = -1L;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.LevelSoundEventPacket.class);
+
+        assertEquals(expectedSound, cbPacket.getSound());
     }
 
     // ==================== SpawnParticleEffectPacket ====================

@@ -18,7 +18,7 @@
         <jline.version>3.30.6</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.10</leveldb-mcpe-jni.version>
-        <block-state-updater.version>1.21.60-20250619.144147-3</block-state-updater.version>
+        <block-state-updater.version>1.21.110-SNAPSHOT</block-state-updater.version>
         <netty.version>4.1.131.Final</netty.version>
     </properties>
 
