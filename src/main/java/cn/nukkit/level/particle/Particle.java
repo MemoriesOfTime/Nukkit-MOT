@@ -143,6 +143,10 @@ public abstract class Particle extends Vector3 {
      * @since v944
      */
     public static final int TYPE_RESET_MOB_GROWTH = dynamic(100);
+    /**
+     * @since v975
+     */
+    public static final int TYPE_SULFUR_CUBE = dynamic(101);
 
     public Particle() {
         super(0, 0, 0);

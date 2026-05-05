@@ -55,43 +55,16 @@ public class PlayerEnchantOptionsPacket extends DataPacket {
             throw new RuntimeException("EnchantOptions too big: " + size);
         }
         for (int i = 0; i < size; i++) {
-            int minLevel = (int) this.getUnsignedVarInt();
+            int minLevel = this.protocol >= ProtocolInfo.v1_26_20_26 ? this.getByte() : (int) this.getUnsignedVarInt();
             int slot = this.getLInt();
 
-            int eSize = (int) this.getUnsignedVarInt();
-            if (eSize > 1000) {
-                throw new RuntimeException("Enchantment list too big: " + eSize);
-            }
-            List<EnchantData> list1 = new ObjectArrayList<>();
-            for (int j = 0; j < eSize; j++) {
-                EnchantData data = new EnchantData(this.getByte(), this.getByte());
-                list1.add(data);
-            }
-
-            eSize = (int) this.getUnsignedVarInt();
-            if (eSize > 1000) {
-                throw new RuntimeException("Enchantment list too big: " + eSize);
-            }
-            List<EnchantData> list2 = new ObjectArrayList<>();
-            for (int j = 0; j < eSize; j++) {
-                EnchantData data = new EnchantData(this.getByte(), this.getByte());
-                list2.add(data);
-            }
-
-            eSize = (int) this.getUnsignedVarInt();
-            if (eSize > 1000) {
-                throw new RuntimeException("Enchantment list too big: " + eSize);
-            }
-            List<EnchantData> list3 = new ObjectArrayList<>();
-            for (int j = 0; j < eSize; j++) {
-                EnchantData data = new EnchantData(this.getByte(), this.getByte());
-                list3.add(data);
-            }
+            List<EnchantData> enchants0 = this.readEnchantDataList();
+            List<EnchantData> enchants1 = this.readEnchantDataList();
+            List<EnchantData> enchants2 = this.readEnchantDataList();
             String enchantName = this.getString();
             int eNetId = (int) this.getUnsignedVarInt();
-            this.options.add(new EnchantOptionData(minLevel, slot, list1, list2, list3, enchantName, eNetId));
+            this.options.add(new EnchantOptionData(minLevel, slot, enchants0, enchants1, enchants2, enchantName, eNetId));
         }
-
     }
 
     @Override
@@ -99,27 +72,51 @@ public class PlayerEnchantOptionsPacket extends DataPacket {
         this.reset();
         this.putUnsignedVarInt(this.options.size());
         for (EnchantOptionData option : this.options) {
-            this.putUnsignedVarInt(option.getMinLevel());
+            if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+                this.putByte((byte) option.getMinLevel());
+            } else {
+                this.putUnsignedVarInt(option.getMinLevel());
+            }
             this.putLInt(option.getPrimarySlot());
-            this.putUnsignedVarInt(option.getEnchants0().size());
-            for (EnchantData data : option.getEnchants0()) {
-                this.putByte((byte) data.getType());
-                this.putByte((byte) data.getLevel());
-            }
-            this.putUnsignedVarInt(option.getEnchants1().size());
-            for (EnchantData data : option.getEnchants1()) {
-                this.putByte((byte) data.getType());
-                this.putByte((byte) data.getLevel());
-            }
-            this.putUnsignedVarInt(option.getEnchants2().size());
-            for (EnchantData data : option.getEnchants2()) {
-                this.putByte((byte) data.getType());
-                this.putByte((byte) data.getLevel());
-            }
+            this.writeEnchantDataList(option.getEnchants0());
+            this.writeEnchantDataList(option.getEnchants1());
+            this.writeEnchantDataList(option.getEnchants2());
             this.putString(option.getEnchantName());
             this.putUnsignedVarInt(option.getEnchantNetId());
         }
+    }
 
+    private List<EnchantData> readEnchantDataList() {
+        int eSize = (int) this.getUnsignedVarInt();
+        if (eSize > 1000) {
+            throw new RuntimeException("Enchantment list too big: " + eSize);
+        }
+        List<EnchantData> list = new ObjectArrayList<>(eSize);
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            for (int j = 0; j < eSize; j++) {
+                list.add(new EnchantData((int) this.getUnsignedVarInt(), this.getByte()));
+            }
+        } else {
+            for (int j = 0; j < eSize; j++) {
+                list.add(new EnchantData(this.getByte(), this.getByte()));
+            }
+        }
+        return list;
+    }
+
+    private void writeEnchantDataList(List<EnchantData> list) {
+        this.putUnsignedVarInt(list.size());
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            for (EnchantData data : list) {
+                this.putUnsignedVarInt(data.getType());
+                this.putByte((byte) data.getLevel());
+            }
+        } else {
+            for (EnchantData data : list) {
+                this.putByte((byte) data.getType());
+                this.putByte((byte) data.getLevel());
+            }
+        }
     }
 
     @Value

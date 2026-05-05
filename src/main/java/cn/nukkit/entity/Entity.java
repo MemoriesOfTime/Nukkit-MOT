@@ -247,6 +247,14 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v924
      */
     public static final int DATA_AIM_ASSIST_PRIORITY_ACTOR_ID = 138; //int
+    /**
+     * @since v975
+     */
+    public static final int DATA_RESERVED_139 = 139; //long
+    /**
+     * @since v975
+     */
+    public static final int DATA_NAMEPLATE_RENDER_DISTANCE_MAX = 140; //float
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
