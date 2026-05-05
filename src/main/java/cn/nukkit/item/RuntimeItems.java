@@ -223,7 +223,7 @@ public class RuntimeItems {
         if (gameVersion.isNetEase()) {
             return getMappingNetEase(protocolId);
         }
-        if (protocolId >= ProtocolInfo.v1_26_20) {
+        if (protocolId >= ProtocolInfo.v1_26_20_26) {
             return mapping975;
         } else if (protocolId >= ProtocolInfo.v1_26_10) {
             return mapping944;
