@@ -60,7 +60,7 @@ public class LocatorBarPacket extends DataPacket {
             this.putVector3f(wp.position);
             this.putVarInt(wp.dimension);
         });
-        if (this.protocol >= ProtocolInfo.v1_26_20) {
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
             this.putOptionalNull(waypoint.texturePath, this::putString);
             this.putOptionalNull(waypoint.iconSize, (icon) -> {
                 this.putLFloat(icon.x);
@@ -83,7 +83,7 @@ public class LocatorBarPacket extends DataPacket {
             int dimension = s.getVarInt();
             return new LocatorBarWaypoint.WorldPosition(position, dimension);
         });
-        if (this.protocol >= ProtocolInfo.v1_26_20) {
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
             waypoint.texturePath = this.getOptional(null, BinaryStream::getString);
             waypoint.iconSize = this.getOptional(null, (s) -> new LocatorBarWaypoint.Vector2f(s.getLFloat(), s.getLFloat()));
         } else {

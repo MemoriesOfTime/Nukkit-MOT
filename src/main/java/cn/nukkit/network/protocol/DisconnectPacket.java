@@ -26,7 +26,7 @@ public class DisconnectPacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_20_40) {
             this.reason = DisconnectFailReason.values()[this.getVarInt()];
         }
-        if (protocol >= ProtocolInfo.v1_26_20) {
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.hideDisconnectionScreen = this.getUnsignedVarInt() != 0;
         } else {
             this.hideDisconnectionScreen = this.getBoolean();
@@ -45,7 +45,7 @@ public class DisconnectPacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_20_40) {
             this.putVarInt(this.reason.ordinal());
         }
-        if (protocol >= ProtocolInfo.v1_26_20) {
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.putUnsignedVarInt(this.hideDisconnectionScreen ? 1 : 0);
         } else {
             this.putBoolean(this.hideDisconnectionScreen);

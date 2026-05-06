@@ -30,7 +30,7 @@ public class PartyChangedPacket extends DataPacket {
     @Override
     public void decode() {
         this.partyId = this.getOptional(null, BinaryStream::getString);
-        if (protocol >= ProtocolInfo.v1_26_20) {
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.isPartyLeader = this.getBoolean();
         }
     }
@@ -39,7 +39,7 @@ public class PartyChangedPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putOptionalNull(this.partyId, BinaryStream::putString);
-        if (protocol >= ProtocolInfo.v1_26_20) {
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.putBoolean(this.isPartyLeader);
         }
     }
