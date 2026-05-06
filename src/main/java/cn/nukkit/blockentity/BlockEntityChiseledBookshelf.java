@@ -1,7 +1,7 @@
 package cn.nukkit.blockentity;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockChiseledBookshelf;
+import cn.nukkit.block.BlockBookshelfChiseled;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.inventory.ChiseledBookshelfInventory;
 import cn.nukkit.inventory.InventoryHolder;
@@ -179,7 +179,7 @@ public class BlockEntityChiseledBookshelf extends BlockEntitySpawnable implement
         }
 
         Block block = this.getLevelBlock();
-        if (block instanceof BlockChiseledBookshelf bookshelf) {
+        if (block instanceof BlockBookshelfChiseled bookshelf) {
             int booksStored = this.getBooksStoredBit();
             if (bookshelf.getBooksStoredBit() != booksStored) {
                 bookshelf.setBooksStoredBit(booksStored);

@@ -74,14 +74,14 @@ class BlockStateCacheTest {
      * Ensures copper lantern variants are registered and keep the hanging bit as block meta.
      */
     void copperLanternVariantsAreRegisteredAndPreserveHangingState() {
-        assertCopperLantern(Block.COPPER_LANTERN, BlockCopperLantern.class, "Copper Lantern", OxidizationLevel.UNAFFECTED, false);
-        assertCopperLantern(Block.EXPOSED_COPPER_LANTERN, BlockCopperLanternExposed.class, "Exposed Copper Lantern", OxidizationLevel.EXPOSED, false);
-        assertCopperLantern(Block.WEATHERED_COPPER_LANTERN, BlockCopperLanternWeathered.class, "Weathered Copper Lantern", OxidizationLevel.WEATHERED, false);
-        assertCopperLantern(Block.OXIDIZED_COPPER_LANTERN, BlockCopperLanternOxidized.class, "Oxidized Copper Lantern", OxidizationLevel.OXIDIZED, false);
-        assertCopperLantern(Block.WAXED_COPPER_LANTERN, BlockCopperLanternWaxed.class, "Waxed Copper Lantern", OxidizationLevel.UNAFFECTED, true);
-        assertCopperLantern(Block.WAXED_EXPOSED_COPPER_LANTERN, BlockCopperLanternExposedWaxed.class, "Waxed Exposed Copper Lantern", OxidizationLevel.EXPOSED, true);
-        assertCopperLantern(Block.WAXED_WEATHERED_COPPER_LANTERN, BlockCopperLanternWeatheredWaxed.class, "Waxed Weathered Copper Lantern", OxidizationLevel.WEATHERED, true);
-        assertCopperLantern(Block.WAXED_OXIDIZED_COPPER_LANTERN, BlockCopperLanternOxidizedWaxed.class, "Waxed Oxidized Copper Lantern", OxidizationLevel.OXIDIZED, true);
+        assertCopperLantern(Block.COPPER_LANTERN, BlockLanternCopper.class, "Copper Lantern", OxidizationLevel.UNAFFECTED, false);
+        assertCopperLantern(Block.EXPOSED_COPPER_LANTERN, BlockLanternCopperExposed.class, "Exposed Copper Lantern", OxidizationLevel.EXPOSED, false);
+        assertCopperLantern(Block.WEATHERED_COPPER_LANTERN, BlockLanternCopperWeathered.class, "Weathered Copper Lantern", OxidizationLevel.WEATHERED, false);
+        assertCopperLantern(Block.OXIDIZED_COPPER_LANTERN, BlockLanternCopperOxidized.class, "Oxidized Copper Lantern", OxidizationLevel.OXIDIZED, false);
+        assertCopperLantern(Block.WAXED_COPPER_LANTERN, BlockLanternCopperWaxed.class, "Waxed Copper Lantern", OxidizationLevel.UNAFFECTED, true);
+        assertCopperLantern(Block.WAXED_EXPOSED_COPPER_LANTERN, BlockLanternCopperExposedWaxed.class, "Waxed Exposed Copper Lantern", OxidizationLevel.EXPOSED, true);
+        assertCopperLantern(Block.WAXED_WEATHERED_COPPER_LANTERN, BlockLanternCopperWeatheredWaxed.class, "Waxed Weathered Copper Lantern", OxidizationLevel.WEATHERED, true);
+        assertCopperLantern(Block.WAXED_OXIDIZED_COPPER_LANTERN, BlockLanternCopperOxidizedWaxed.class, "Waxed Oxidized Copper Lantern", OxidizationLevel.OXIDIZED, true);
     }
 
     @Test
@@ -89,14 +89,14 @@ class BlockStateCacheTest {
      * Verifies oxidation state conversion preserves the copper lantern hanging state.
      */
     void copperLanternOxidationMappingPreservesHangingState() {
-        BlockCopperLanternBase copperLantern = (BlockCopperLanternBase) Block.get(Block.COPPER_LANTERN, BlockLantern.HANGING_BIT);
-        BlockCopperLanternBase waxedCopperLantern = (BlockCopperLanternBase) Block.get(Block.WAXED_COPPER_LANTERN, BlockLantern.HANGING_BIT);
+        BlockLanternCopperBase copperLantern = (BlockLanternCopperBase) Block.get(Block.COPPER_LANTERN, BlockLantern.HANGING_BIT);
+        BlockLanternCopperBase waxedCopperLantern = (BlockLanternCopperBase) Block.get(Block.WAXED_COPPER_LANTERN, BlockLantern.HANGING_BIT);
 
         Block exposed = copperLantern.getStateWithOxidizationLevel(OxidizationLevel.EXPOSED);
         Block waxedExposed = waxedCopperLantern.getStateWithOxidizationLevel(OxidizationLevel.EXPOSED);
 
-        Assertions.assertInstanceOf(BlockCopperLanternExposed.class, exposed);
-        Assertions.assertInstanceOf(BlockCopperLanternExposedWaxed.class, waxedExposed);
+        Assertions.assertInstanceOf(BlockLanternCopperExposed.class, exposed);
+        Assertions.assertInstanceOf(BlockLanternCopperExposedWaxed.class, waxedExposed);
         Assertions.assertEquals(BlockLantern.HANGING_BIT, exposed.getDamage());
         Assertions.assertEquals(BlockLantern.HANGING_BIT, waxedExposed.getDamage());
         Assertions.assertTrue(((BlockLantern) exposed).isHanging());
@@ -140,7 +140,7 @@ class BlockStateCacheTest {
         Assertions.assertTrue(((BlockLightningRodBase) waxedExposed).isPowered());
     }
 
-    private static void assertCopperLantern(int id, Class<? extends BlockCopperLanternBase> type, String name,
+    private static void assertCopperLantern(int id, Class<? extends BlockLanternCopperBase> type, String name,
                                            OxidizationLevel oxidizationLevel, boolean waxed) {
         Block ground = Block.get(id, 0);
         Block hanging = Block.get(id, BlockLantern.HANGING_BIT);
@@ -156,8 +156,8 @@ class BlockStateCacheTest {
         Assertions.assertEquals(BlockLantern.HANGING_BIT, hanging.getDamage());
         Assertions.assertFalse(((BlockLantern) ground).isHanging());
         Assertions.assertTrue(((BlockLantern) hanging).isHanging());
-        Assertions.assertEquals(oxidizationLevel, ((BlockCopperLanternBase) ground).getOxidizationLevel());
-        Assertions.assertEquals(waxed, ((BlockCopperLanternBase) ground).isWaxed());
+        Assertions.assertEquals(oxidizationLevel, ((BlockLanternCopperBase) ground).getOxidizationLevel());
+        Assertions.assertEquals(waxed, ((BlockLanternCopperBase) ground).isWaxed());
         Assertions.assertEquals(BlockColor.IRON_BLOCK_COLOR, ground.getColor());
         Assertions.assertEquals(BlockColor.IRON_BLOCK_COLOR, hanging.getColor());
     }

@@ -863,13 +863,11 @@ public interface BlockID {
     int CHISELED_RESIN_BRICKS = 1275;
     int RESIN_BLOCK = 1276;
     int RESIN_CLUMP = 1277;
-
     int BUSH = 1278;
     int WILDFLOWERS = 1279;
     int FIREFLY_BUSH = 1280;
     int LEAF_LITTER = 1281;
     int DRIED_GHAST = 1282;
-
     int SHORT_DRY_GRASS = 1283;
     int TALL_DRY_GRASS = 1284;
     int CACTUS_FLOWER = 1285;
