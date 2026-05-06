@@ -5319,7 +5319,7 @@ public class Level implements ChunkManager, Metadatable {
             }
             return GameVersion.V1_20_50_NETEASE;
         }
-        if (protocol >= GameVersion.V1_26_20.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_20_26.getProtocol()) {
             return GameVersion.V1_26_20;
         } else if (protocol >= GameVersion.V1_26_10.getProtocol()) {
             return GameVersion.V1_26_10;
