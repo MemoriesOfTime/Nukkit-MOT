@@ -100,6 +100,11 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
                 loadedArmor[slot] = NBTIO.getItemHelper(item);
                 count++;
             }
+            for (int i = 0; i < 4; i++) {
+                if (loadedArmor[i] == null) {
+                    loadedArmor[i] = Item.AIR_ITEM;
+                }
+            }
             this.armor = loadedArmor;
         } else {
             this.armor = getRandomArmor();
