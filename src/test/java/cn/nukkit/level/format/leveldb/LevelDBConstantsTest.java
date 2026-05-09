@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb;
 
+import cn.nukkit.MockServer;
 import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
 import cn.nukkit.level.format.leveldb.structure.ChunkState;
 import cn.nukkit.nbt.tag.IntTag;
@@ -7,6 +8,7 @@ import cn.nukkit.utils.Binary;
 import org.cloudburstmc.nbt.NbtMap;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
@@ -24,6 +26,13 @@ import static org.mockito.Mockito.when;
  * @author LT_Name
  */
 public class LevelDBConstantsTest {
+
+    @BeforeAll
+    static void initServer() {
+        MockServer.init();
+        MockServer.get().levelDbCache = 64;
+        MockServer.get().useNativeLevelDB = false;
+    }
 
     @Test
     public void testStateVersion() {
