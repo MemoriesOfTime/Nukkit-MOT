@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.LocatorBarWaypoint;
+import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
 import java.awt.*;
@@ -33,25 +34,23 @@ public class LocatorBarPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.waypoints.clear();
-        int count = (int) this.getUnsignedVarInt();
-        for (int i = 0; i < count; i++) {
-            UUID groupHandle = this.getUUID();
-            LocatorBarWaypoint waypoint = readWaypoint();
-            int actionFlag = this.getByte();
-            this.waypoints.add(new Payload(Action.values()[actionFlag], groupHandle, waypoint));
-        }
+        this.waypoints = new ArrayList<>();
+        this.getArray(this.waypoints, bs -> {
+            UUID groupHandle = bs.getUUID();
+            LocatorBarWaypoint waypoint = this.readWaypoint();
+            int actionFlag = bs.getByte();
+            return new Payload(Action.values()[actionFlag], groupHandle, waypoint);
+        });
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(this.waypoints.size());
-        for (Payload payload : this.waypoints) {
+        this.putArray(this.waypoints, payload -> {
             this.putUUID(payload.groupHandle);
-            writeWaypoint(payload.waypoint);
+            this.writeWaypoint(payload.waypoint);
             this.putByte((byte) payload.actionFlag.ordinal());
-        }
+        });
     }
 
     private void writeWaypoint(LocatorBarWaypoint waypoint) {
@@ -61,7 +60,15 @@ public class LocatorBarPacket extends DataPacket {
             this.putVector3f(wp.position);
             this.putVarInt(wp.dimension);
         });
-        this.putOptionalNull(waypoint.textureId, this::putLInt);
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.putOptionalNull(waypoint.texturePath, this::putString);
+            this.putOptionalNull(waypoint.iconSize, (icon) -> {
+                this.putLFloat(icon.x);
+                this.putLFloat(icon.y);
+            });
+        } else {
+            this.putOptionalNull(waypoint.textureId, this::putLInt);
+        }
         this.putOptionalNull(waypoint.color, (c) -> this.putLInt(c.getRGB()));
         this.putOptionalNull(waypoint.clientPositionAuthority, this::putBoolean);
         this.putOptionalNull(waypoint.entityUniqueId, this::putVarLong);
@@ -76,10 +83,14 @@ public class LocatorBarPacket extends DataPacket {
             int dimension = s.getVarInt();
             return new LocatorBarWaypoint.WorldPosition(position, dimension);
         });
-        Integer textureId = this.getOptional(null, (s) -> s.getLInt());
-        waypoint.textureId = textureId;
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            waypoint.texturePath = this.getOptional(null, BinaryStream::getString);
+            waypoint.iconSize = this.getOptional(null, (s) -> new LocatorBarWaypoint.Vector2f(s.getLFloat(), s.getLFloat()));
+        } else {
+            waypoint.textureId = this.getOptional(null, BinaryStream::getLInt);
+        }
         waypoint.color = this.getOptional(null, (s) -> new Color(s.getLInt(), true));
-        waypoint.clientPositionAuthority = this.getOptional(null, (s) -> s.getBoolean());
+        waypoint.clientPositionAuthority = this.getOptional(null, BinaryStream::getBoolean);
         waypoint.entityUniqueId = this.getOptional(null, (s) -> (long) s.getVarLong());
         return waypoint;
     }

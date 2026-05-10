@@ -15,6 +15,10 @@ public class MoveEntityAbsolutePacket extends DataPacket {
     public static final byte FLAG_GROUND = 0x01;
     public static final byte FLAG_TELEPORT = 0x02;
     public static final byte FLAG_FORCE_MOVE_LOCAL_ENTITY = 0x04;
+    /**
+     * @since v975
+     */
+    public static final byte FLAG_FORCE_COMPLETION = 0x08;
 
     public long eid;
     public double x;
@@ -26,6 +30,10 @@ public class MoveEntityAbsolutePacket extends DataPacket {
     public boolean onGround;
     public boolean teleport;
     public boolean forceMoveLocalEntity;
+    /**
+     * @since v975
+     */
+    public boolean forceCompletion;
 
     @Override
     public byte pid() {
@@ -40,6 +48,9 @@ public class MoveEntityAbsolutePacket extends DataPacket {
             onGround = (flags & FLAG_GROUND) != 0;
             teleport = (flags & FLAG_TELEPORT) != 0;
             forceMoveLocalEntity = (flags & FLAG_FORCE_MOVE_LOCAL_ENTITY) != 0;
+            if (protocol >= ProtocolInfo.v1_26_20_26) {
+                forceCompletion = (flags & FLAG_FORCE_COMPLETION) != 0;
+            }
         }
         Vector3f v = this.getVector3f();
         this.x = v.x;
@@ -64,6 +75,9 @@ public class MoveEntityAbsolutePacket extends DataPacket {
             }
             if (forceMoveLocalEntity) {
                 flags |= FLAG_FORCE_MOVE_LOCAL_ENTITY;
+            }
+            if (protocol >= ProtocolInfo.v1_26_20_26 && forceCompletion) {
+                flags |= FLAG_FORCE_COMPLETION;
             }
             this.putByte(flags);
         }

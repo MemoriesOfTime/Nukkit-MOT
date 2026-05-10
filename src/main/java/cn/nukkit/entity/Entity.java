@@ -247,6 +247,14 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v924
      */
     public static final int DATA_AIM_ASSIST_PRIORITY_ACTOR_ID = 138; //int
+    /**
+     * @since v975
+     */
+    public static final int DATA_RESERVED_139 = 139; //long
+    /**
+     * @since v975
+     */
+    public static final int DATA_NAMEPLATE_RENDER_DISTANCE_MAX = 140; //float
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
@@ -393,6 +401,26 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v818 1.21.90
      */
     public static final int DATA_FLAG_BODY_ROTATION_ALWAYS_FOLLOWS_HEAD = 124;
+    /**
+     * @since v843 1.21.110
+     */
+    public static final int DATA_FLAG_CAN_USE_VERTICAL_MOVEMENT_ACTION = 125;
+    /**
+     * @since v859 1.21.120
+     */
+    public static final int DATA_FLAG_BODY_ROTATION_LOCKED_TO_VEHICLE = 126;
+    /**
+     * @since v975 1.26.20
+     */
+    public static final int DATA_FLAG_USES_LEGACY_FRICTION = 127;
+    /**
+     * @since v975 1.26.20
+     */
+    public static final int DATA_FLAG_USES_UNIFORM_AIR_DRAG = 128;
+    /**
+     * @since v975 1.26.20
+     */
+    public static final int DATA_FLAG_NAMEPLATE_DEPTH_TESTED = 129;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;

@@ -25,6 +25,11 @@ public class DebugShape {
     private final Vector3f rotation;
     @Nullable
     private final Float totalTimeLeft;
+    /**
+     * @since v975
+     */
+    @Nullable
+    private final Float maximumRenderDistance;
     @Nullable
     private final Color color;
     /**
@@ -34,11 +39,15 @@ public class DebugShape {
     private final Long attachedToEntityId;
 
     public DebugShape(long id) {
-        this(id, 0, null, null, null, null, null, null);
+        this(id, 0, null, null, null, null, null, null, null);
     }
 
     public DebugShape(long id, int dimension) {
-        this(id, dimension, null, null, null, null, null, null);
+        this(id, dimension, null, null, null, null, null, null, null);
+    }
+
+    public DebugShape(long id, int dimension, @Nullable Vector3f position, @Nullable Float scale, @Nullable Vector3f rotation, @Nullable Float totalTimeLeft, @Nullable Color color, @Nullable Long attachedToEntityId) {
+        this(id, dimension, position, scale, rotation, totalTimeLeft, null, color, attachedToEntityId);
     }
 
     public Type getType() {

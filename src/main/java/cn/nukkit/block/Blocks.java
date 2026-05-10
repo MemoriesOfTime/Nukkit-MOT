@@ -873,6 +873,41 @@ public class Blocks {
         list[WAXED_EXPOSED_COPPER_LANTERN] = BlockLanternCopperExposedWaxed.class; //1343
         list[WAXED_WEATHERED_COPPER_LANTERN] = BlockLanternCopperWeatheredWaxed.class; //1344
         list[WAXED_OXIDIZED_COPPER_LANTERN] = BlockLanternCopperOxidizedWaxed.class; //1345
+
+        list[GOLDEN_DANDELION] = BlockDandelionGolden.class; //1346
+        list[SULFUR] = BlockSulfur.class; //1347
+        list[SULFUR_SLAB] = BlockSlabSulfur.class; //1348
+        list[SULFUR_DOUBLE_SLAB] = BlockDoubleSlabSulfur.class; //1349
+        list[SULFUR_STAIRS] = BlockStairsSulfur.class; //1350
+        list[SULFUR_WALL] = BlockWallSulfur.class; //1351
+        list[POLISHED_SULFUR] = BlockSulfurPolished.class; //1352
+        list[POLISHED_SULFUR_SLAB] = BlockSlabSulfurPolished.class; //1353
+        list[POLISHED_SULFUR_DOUBLE_SLAB] = BlockDoubleSlabSulfurPolished.class; //1354
+        list[POLISHED_SULFUR_STAIRS] = BlockStairsSulfurPolished.class; //1355
+        list[POLISHED_SULFUR_WALL] = BlockWallSulfurPolished.class; //1356
+        list[SULFUR_BRICKS] = BlockSulfurBricks.class; //1357
+        list[SULFUR_BRICK_SLAB] = BlockSlabSulfurBrick.class; //1358
+        list[SULFUR_BRICK_DOUBLE_SLAB] = BlockDoubleSlabSulfurBrick.class; //1359
+        list[SULFUR_BRICK_STAIRS] = BlockStairsSulfurBrick.class; //1360
+        list[SULFUR_BRICK_WALL] = BlockWallSulfurBrick.class; //1361
+        list[CHISELED_SULFUR] = BlockSulfurChiseled.class; //1362
+        list[POTENT_SULFUR] = BlockSulfurPotent.class; //1363
+        list[CINNABAR] = BlockCinnabar.class; //1364
+        list[CINNABAR_SLAB] = BlockSlabCinnabar.class; //1365
+        list[CINNABAR_DOUBLE_SLAB] = BlockDoubleSlabCinnabar.class; //1366
+        list[CINNABAR_STAIRS] = BlockStairsCinnabar.class; //1367
+        list[CINNABAR_WALL] = BlockWallCinnabar.class; //1368
+        list[POLISHED_CINNABAR] = BlockCinnabarPolished.class; //1369
+        list[POLISHED_CINNABAR_SLAB] = BlockSlabCinnabarPolished.class; //1370
+        list[POLISHED_CINNABAR_DOUBLE_SLAB] = BlockDoubleSlabCinnabarPolished.class; //1371
+        list[POLISHED_CINNABAR_STAIRS] = BlockStairsCinnabarPolished.class; //1372
+        list[POLISHED_CINNABAR_WALL] = BlockWallCinnabarPolished.class; //1373
+        list[CINNABAR_BRICKS] = BlockCinnabarBricks.class; //1374
+        list[CINNABAR_BRICK_SLAB] = BlockSlabCinnabarBrick.class; //1375
+        list[CINNABAR_BRICK_DOUBLE_SLAB] = BlockDoubleSlabCinnabarBrick.class; //1376
+        list[CINNABAR_BRICK_STAIRS] = BlockStairsCinnabarBrick.class; //1377
+        list[CINNABAR_BRICK_WALL] = BlockWallCinnabarBrick.class; //1378
+        list[CHISELED_CINNABAR] = BlockCinnabarChiseled.class; //1379
     }
 
     static void init() {

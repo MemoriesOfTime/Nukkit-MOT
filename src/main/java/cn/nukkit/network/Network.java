@@ -6,6 +6,8 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.ServerPresenceInfoPacket;
+import cn.nukkit.network.protocol.ServerStoreInfoPacket;
 import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.utils.BinaryStream;
@@ -654,6 +656,9 @@ public class Network {
                 .registerPacket(ProtocolInfo.SERVERBOUND_DATA_DRIVEN_SCREEN_CLOSED_PACKET, ServerboundDataDrivenScreenClosedPacket.class)
                 .registerPacket(ProtocolInfo.SYNC_WORLD_CLOCKS_PACKET, SyncWorldClocksPacket.class)
                 .registerPacket(ProtocolInfo.CLIENTBOUND_ATTRIBUTE_LAYER_SYNC_PACKET, ClientboundAttributeLayerSyncPacket.class)
+                // v975 packets
+                .registerPacket(ProtocolInfo.SERVER_STORE_INFO_PACKET, ServerStoreInfoPacket.class)
+                .registerPacket(ProtocolInfo.SERVER_PRESENCE_INFO_PACKET, ServerPresenceInfoPacket.class)
                 .build();
     }
 

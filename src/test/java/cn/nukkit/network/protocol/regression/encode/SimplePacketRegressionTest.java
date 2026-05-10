@@ -2121,7 +2121,7 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.PartyChangedPacket.class);
 
-        assertEquals("test-party-123", cbPacket.getPartyId());
+        assertEquals("test-party-123", cbPacket.getParty().getPartyId());
     }
 
     // ==================== ServerboundDataDrivenScreenClosedPacket ====================
