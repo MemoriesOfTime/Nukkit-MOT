@@ -9,7 +9,7 @@ import cn.nukkit.scheduler.AsyncTask;
  * @author MagicDroidX
  * Nukkit Project
  */
-public class LightPopulationTask extends AsyncTask<Void> {
+public class LightPopulationTask extends AsyncTask {
 
     public final int levelId;
     public BaseFullChunk chunk;

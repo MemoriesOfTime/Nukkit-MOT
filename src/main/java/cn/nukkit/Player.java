@@ -357,7 +357,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected Cache<String, FormWindowDialog> dialogWindows = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
-    protected AsyncTask<?> preLoginEventTask = null;
+    protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
 
     private int lastEmote;
@@ -1994,7 +1994,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (server.vanillaPortals) {
                     this.inPortalTicks = 81;
-                    this.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask<Void>() {
+                    this.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
                         @Override
                         public void onRun() {
                             Position foundPortal = BlockNetherPortal.findNearestPortal(portalPos);
@@ -7822,7 +7822,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.syncLoginPhase(SessionLoginPhase.PRE_LOGIN);
         final Player playerInstance = this;
 
-        this.preLoginEventTask = new AsyncTask<Void>() {
+        this.preLoginEventTask = new AsyncTask() {
             private PlayerAsyncPreLoginEvent event;
 
             @Override

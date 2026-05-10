@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
  * @author MagicDroidX
  * Nukkit Project
  */
-public class FileWriteTask extends AsyncTask<Void> {
+public class FileWriteTask extends AsyncTask {
 
     private final File file;
     private final InputStream contents;
