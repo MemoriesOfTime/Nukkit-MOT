@@ -9,11 +9,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * @author Nukkit Project Team
  */
-public abstract class AsyncTask<T> implements Runnable {
+public abstract class AsyncTask implements Runnable {
 
-    public static final Queue<AsyncTask<?>> FINISHED_LIST = new ConcurrentLinkedQueue<>();
+    public static final Queue<AsyncTask> FINISHED_LIST = new ConcurrentLinkedQueue<>();
 
-    private volatile T result;
+    private volatile Object result;
     private volatile int taskId;
     private volatile boolean finished = false;
 
@@ -29,7 +29,7 @@ public abstract class AsyncTask<T> implements Runnable {
         return this.finished;
     }
 
-    public T getResult() {
+    public Object getResult() {
         return this.result;
     }
 
@@ -37,7 +37,7 @@ public abstract class AsyncTask<T> implements Runnable {
         return this.result != null;
     }
 
-    public void setResult(T result) {
+    public void setResult(Object result) {
         this.result = result;
     }
 
@@ -57,12 +57,10 @@ public abstract class AsyncTask<T> implements Runnable {
         return false;
     }
 
-    @Deprecated
     public Object getFromThreadStore(String identifier) {
         return this.finished ? null : ThreadStore.store.get(identifier);
     }
 
-    @Deprecated
     public void saveToThreadStore(String identifier, Object value) {
         if (!this.finished) {
             if (value == null) {
@@ -86,14 +84,14 @@ public abstract class AsyncTask<T> implements Runnable {
     }
 
     public static void collectTask() {
-        AsyncTask<?> task;
+        AsyncTask task;
         while ((task = FINISHED_LIST.poll()) != null) {
             try {
                 task.onCompletion(Server.getInstance());
             } catch (Exception e) {
                 Server.getInstance().getLogger().critical("Exception while async task "
-                        + task.getTaskId()
-                        + " invoking onCompletion", e);
+                    + task.getTaskId()
+                    + " invoking onCompletion", e);
             }
         }
     }

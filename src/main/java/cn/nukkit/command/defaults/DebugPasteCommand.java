@@ -36,7 +36,7 @@ public class DebugPasteCommand extends VanillaCommand {
         return true;
     }
 
-    private static class DebugPasteTask extends AsyncTask<Void> {
+    private static class DebugPasteTask extends AsyncTask {
 
         private final Server server;
         private final CommandSender sender;

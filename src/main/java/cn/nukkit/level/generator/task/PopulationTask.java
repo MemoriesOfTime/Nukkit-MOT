@@ -11,7 +11,7 @@ import cn.nukkit.scheduler.AsyncTask;
  * @author MagicDroidX
  * Nukkit Project
  */
-public class PopulationTask extends AsyncTask<Void> {
+public class PopulationTask extends AsyncTask {
 
     private final long seed;
     private final Level level;

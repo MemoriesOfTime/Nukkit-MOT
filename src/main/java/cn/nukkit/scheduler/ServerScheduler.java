@@ -38,11 +38,11 @@ public class ServerScheduler {
         this.asyncPool = new AsyncPool(Server.getInstance(), WORKERS);
 
         ThreadFactory virtualFactory = Thread.ofVirtual()
-                .name("Nukkit Virtual Task #", 0)
-                .uncaughtExceptionHandler((t, e) -> Server.getInstance().getLogger()
-                        .critical("Exception in virtual task " + t.getName() + ": " + e.getMessage(),
-                                e instanceof Exception ? e : new RuntimeException(e)))
-                .factory();
+            .name("Nukkit Virtual Task #", 0)
+            .uncaughtExceptionHandler((t, e) -> Server.getInstance().getLogger()
+                .critical("Exception in virtual task " + t.getName() + ": " + e.getMessage(),
+                    e instanceof Exception ? e : new RuntimeException(e)))
+            .factory();
         this.virtualPool = Executors.newThreadPerTaskExecutor(virtualFactory);
     }
 
@@ -94,16 +94,16 @@ public class ServerScheduler {
     }
 
     @Deprecated
-    public TaskHandler scheduleAsyncTask(@NotNull AsyncTask<?> task) {
+    public TaskHandler scheduleAsyncTask(@NotNull AsyncTask task) {
         return addTask(null, task, 0, 0, true, task.isVirtual());
     }
 
-    public TaskHandler scheduleAsyncTask(@NotNull Plugin plugin, @NotNull AsyncTask<?> task) {
+    public TaskHandler scheduleAsyncTask(@NotNull Plugin plugin, @NotNull AsyncTask task) {
         return addTask(plugin, task, 0, 0, true, task.isVirtual());
     }
 
     @Deprecated
-    public void scheduleAsyncTaskToWorker(@NotNull AsyncTask<?> task, int worker) {
+    public void scheduleAsyncTaskToWorker(@NotNull AsyncTask task, int worker) {
         scheduleAsyncTask(task);
     }
 
@@ -330,7 +330,7 @@ public class ServerScheduler {
     }
 
     public void mainThreadHeartbeat(int currentTick) {
-         // Accepts pending.
+        // Accepts pending.
         TaskHandler task;
         while ((task = pending.poll()) != null) {
             int tick = Math.max(currentTick, task.getNextRunTick()); // Do not schedule in the past
@@ -371,7 +371,7 @@ public class ServerScheduler {
                         taskHandler.run(currentTick);
                     } catch (Throwable e) {
                         Server.getInstance().getLogger().critical("Could not execute taskHandler " + taskHandler.getTaskId() + ": " + e.getMessage(),
-                                e instanceof Exception ? e : new RuntimeException(e));
+                            e instanceof Exception ? e : new RuntimeException(e));
                     }
                 }
                 if (taskHandler.isRepeating()) {
