@@ -1274,15 +1274,22 @@ public class BinaryStream {
         int meta = item == null ? 0 : item.getDamage();
         boolean isBlock = item instanceof ItemBlock;
         boolean isDurable = item instanceof ItemDurable;
+        boolean isStringItem = item instanceof StringItem;
 
         RuntimeEntry runtimeEntry = null;
+        int runtimeId = 0;
+        int damage = 0;
         if (id != Item.AIR) {
             RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
-            runtimeEntry = mapping.toRuntime(id, meta);
+            if (isStringItem) {
+                runtimeId = mapping.getNetworkId(item);
+                damage = item.getDamage();
+            } else {
+                runtimeEntry = mapping.toRuntime(id, meta);
+                runtimeId = runtimeEntry.getRuntimeId();
+                damage = isBlock || isDurable || runtimeEntry.isHasDamage() ? 0 : meta;
+            }
         }
-
-        int runtimeId = runtimeEntry == null ? 0 : runtimeEntry.getRuntimeId();
-        int damage = isBlock || isDurable || runtimeEntry == null || runtimeEntry.isHasDamage() ? 0 : meta;
 
         this.putLShort(runtimeId);
         this.putLShort(item != null ? item.getCount() : 0);
@@ -1360,7 +1367,8 @@ public class BinaryStream {
             return this.getSlot(gameVersion);
         }
 
-        int id = 0;
+        Integer id = null;
+        String stringId = null;
         short runtimeId = (short) this.getLShort();
         int count = this.getLShort();
         int damage = (int) this.getUnsignedVarInt();
@@ -1369,11 +1377,25 @@ public class BinaryStream {
         LegacyEntry legacyEntry = null;
 
         if (runtimeId != 0) {
-            legacyEntry = mapping.fromRuntime(runtimeId);
-            id = legacyEntry.getLegacyId();
-            if (legacyEntry.isHasDamage()) {
-                damage = legacyEntry.getDamage();
+            try {
+                legacyEntry = mapping.fromRuntime(runtimeId);
+                id = legacyEntry.getLegacyId();
+                if (legacyEntry.isHasDamage()) {
+                    damage = legacyEntry.getDamage();
+                }
+            } catch (IllegalArgumentException e) {
+                // Custom items are not in runtime2Legacy map
             }
+
+            if (id == null || !Utils.hasItemOrBlock(id)) {
+                stringId = mapping.getNamespacedIdByNetworkId(runtimeId);
+                if (stringId == null) {
+                    throw new IllegalArgumentException("Unknown item: runtimeID=" + runtimeId + " protocol=" + gameVersion.getProtocol());
+                }
+                id = null;
+            }
+        } else {
+            id = 0;
         }
 
         if (this.getBoolean()) {
@@ -1438,7 +1460,7 @@ public class BinaryStream {
                     canBreak[i] = stream.readUTF();
                 }
 
-                if (id == ItemID.SHIELD) {
+                if (id != null && id == ItemID.SHIELD) {
                     stream.readLong();
                 }
 
@@ -1456,7 +1478,15 @@ public class BinaryStream {
             }
         }
 
-        Item item = Item.get(id, damage, count, nbt);
+        Item item;
+        if (stringId != null) {
+            item = Item.fromString(stringId);
+            item.setDamage(damage);
+            item.setCount(count);
+            item.setCompoundTag(nbt);
+        } else {
+            item = Item.get(id != null ? id : 0, damage, count, nbt);
+        }
 
         if ((canBreak != null && canBreak.length > 0) || (canPlace != null && canPlace.length > 0)) {
             CompoundTag namedTag = item.getNamedTag();

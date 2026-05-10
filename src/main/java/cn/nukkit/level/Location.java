@@ -112,6 +112,25 @@ public class Location extends Position {
         return this;
     }
 
+    public static double calculateYawFacing(double fromX, double fromZ, double toX, double toZ) {
+        double dx = toX - fromX;
+        double dz = toZ - fromZ;
+
+        return Math.toDegrees(Math.atan2(-dx, dz));
+    }
+
+    public static double calculateYawFacing(Vector3 from, Vector3 to) {
+        return calculateYawFacing(from.getX(), from.getZ(), to.getX(), to.getZ());
+    }
+
+    public Location setYawFacing(double x, double z) {
+        return this.setBothYaw(calculateYawFacing(this.x, this.z, x, z));
+    }
+
+    public Location setYawFacing(Vector3 target) {
+        return this.setYawFacing(target.getX(), target.getZ());
+    }
+
     @Override
     public String toString() {
         return "Location (level=" + (this.isValid() ? this.getLevel().getName() : "null") + ", x=" + this.x + ", y=" + this.y + ", z=" + this.z + ", yaw=" + this.yaw + ", pitch=" + this.pitch + ", headYaw=" + this.headYaw + ')';

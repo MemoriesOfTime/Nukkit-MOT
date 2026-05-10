@@ -545,13 +545,12 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         this.tiles.put(blockEntity.getId(), blockEntity);
         int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
         int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
-        if (this.tileList.containsKey(index) && !this.tileList.get(index).equals(blockEntity)) {
-            BlockEntity entity = this.tileList.get(index);
-            this.tiles.remove(entity.getId());
-            entity.onReplacedWith(blockEntity);
-            entity.close();
+        var existing = this.tileList.put(index, blockEntity);
+        if (existing != null && !existing.equals(blockEntity)) {
+            this.tiles.remove(existing.getId());
+            existing.onReplacedWith(blockEntity);
+            existing.close();
         }
-        this.tileList.put(index, blockEntity);
         if (this.isInit) {
             this.setChanged();
         }
@@ -563,7 +562,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             this.tiles.remove(blockEntity.getId());
             int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
             int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
-            this.tileList.remove(index);
+            this.tileList.remove(index, blockEntity);
 
             if (!(blockEntity instanceof PersistentDataContainerBlockEntity) && blockEntity.hasPersistentDataContainer()) {
                 this.createPersistentBlockContainer(blockEntity, blockEntity.getPersistentDataContainer().getStorage());
