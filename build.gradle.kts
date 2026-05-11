@@ -1,6 +1,6 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
 
-@Suppress("DSL_SCOPE_VIOLATION") // https://youtrack.jetbrains.com/issue/IDEA-262280
+@Suppress("DSL_SCOPE_VIOLATION")
 
 plugins {
     id("java-library")
@@ -137,7 +137,6 @@ publishing {
     }
 }
 
-
 tasks {
     compileJava {
         options.encoding = "UTF-8"
@@ -162,7 +161,6 @@ tasks {
 
         transform(Log4j2PluginsCacheFileTransformer())
 
-        // Backwards compatible jar directory
         destinationDirectory.set(file("$projectDir/target"))
         archiveClassifier.set("")
 

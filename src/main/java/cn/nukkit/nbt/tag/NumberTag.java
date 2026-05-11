@@ -6,7 +6,7 @@ import java.util.Objects;
  * @author MagicDroidX
  * Nukkit Project
  */
-public abstract class NumberTag<T extends Number> extends Tag {
+public sealed abstract class NumberTag<T extends Number> extends Tag permits ByteTag, ShortTag, IntTag, LongTag, FloatTag, DoubleTag {
 
     protected NumberTag(String name) {
         super(name);

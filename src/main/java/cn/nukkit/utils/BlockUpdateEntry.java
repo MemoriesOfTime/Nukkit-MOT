@@ -3,43 +3,34 @@ package cn.nukkit.utils;
 import cn.nukkit.block.Block;
 import cn.nukkit.math.Vector3;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 /**
  * Entry of a block update
  *
  * @author MagicDroidX
  * Nukkit Project
  */
-public class BlockUpdateEntry implements Comparable<BlockUpdateEntry> {
+public record BlockUpdateEntry(Vector3 pos, Block block, long delay, int priority) implements Comparable<BlockUpdateEntry> {
 
-    private static final AtomicLong entryID = new AtomicLong(0);
+    private static final java.util.concurrent.atomic.AtomicLong entryID = new java.util.concurrent.atomic.AtomicLong(0);
 
-    public int priority;
-    public long delay;
+    public static final long id = entryID.incrementAndGet();
 
-    public final Vector3 pos;
-    public final Block block;
-
-    public final long id;
-
-    public BlockUpdateEntry(Vector3 pos, Block block) {
-        this.pos = pos;
-        this.block = block;
-        this.id = entryID.incrementAndGet();
+    public BlockUpdateEntry {
+        if (pos == null || block == null) {
+            throw new IllegalArgumentException("Position and block cannot be null");
+        }
     }
 
-    public BlockUpdateEntry(Vector3 pos, Block block, long delay, int priority) {
-        this.id = entryID.incrementAndGet();
-        this.pos = pos;
-        this.priority = priority;
-        this.delay = delay;
-        this.block = block;
+    public BlockUpdateEntry(Vector3 pos, Block block) {
+        this(pos, block, 0, 0);
     }
 
     @Override
     public int compareTo(BlockUpdateEntry entry) {
-        return this.delay < entry.delay ? -1 : (this.delay > entry.delay ? 1 : (this.priority != entry.priority ? this.priority - entry.priority : Long.compare(this.id, entry.id)));
+        return this.delay < entry.delay ? -1 :
+            (this.delay > entry.delay ? 1 :
+             (this.priority != entry.priority ? this.priority - entry.priority :
+                 Long.compare(this.id, entry.id)));
     }
 
     @Override
@@ -49,9 +40,8 @@ public class BlockUpdateEntry implements Comparable<BlockUpdateEntry> {
                 return pos.equals(object);
             }
             return false;
-        } else {
-            return this.pos.equals(entry.pos) && Block.equals(this.block, entry.block, false);
         }
+        return this.pos.equals(entry.pos) && Block.equals(this.block, entry.block, false);
     }
 
     @Override

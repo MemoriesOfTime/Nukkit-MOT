@@ -1175,18 +1175,18 @@ public class LevelDBProvider implements LevelProvider {
     protected NbtMap saveBlockTickingQueue(Collection<BlockUpdateEntry> entries, long currentTick) {
         ArrayList<NbtMap> list = new ArrayList<>();
         for (BlockUpdateEntry entry : entries) {
-            Block block = entry.block;
+            Block block = entry.block();
 
             NbtMap blockTag = BlockStateMapping.get().getBlockStateFromFullId(block.getFullId()).getVanillaState();
-            Vector3 pos = entry.pos;
-            int priority = entry.priority;
+            Vector3 pos = entry.pos();
+            int priority = entry.priority();
 
             NbtMapBuilder tag = NbtMap.builder()
                     .putInt("x", pos.getFloorX())
                     .putInt("y", pos.getFloorY())
                     .putInt("z", pos.getFloorZ())
                     .putCompound("blockState", blockTag)
-                    .putLong("time", entry.delay - currentTick);
+                    .putLong("time", entry.delay() - currentTick);
 
             if (priority != 0) {
                 tag.putInt("p", priority); // Nukkit only

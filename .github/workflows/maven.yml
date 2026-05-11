@@ -24,7 +24,7 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2
     - name: Build projects
-      run: mvn -B package --file pom.xml
+      run: mvn -B package -T 1C --file pom.xml -Dmaven.javadoc.skip=true
     - run: mkdir staging && cp target/*.jar staging
     - uses: actions/upload-artifact@v6
       with:

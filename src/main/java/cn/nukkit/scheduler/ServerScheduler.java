@@ -4,6 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.PluginException;
 import cn.nukkit.utils.Utils;
+import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayDeque;
@@ -20,7 +21,9 @@ public class ServerScheduler {
 
     public static int WORKERS = 4;
 
+    @Getter
     private final AsyncPool asyncPool;
+    @Getter
     private final ExecutorService virtualPool;
 
     private final Queue<TaskHandler> pending;
@@ -35,7 +38,7 @@ public class ServerScheduler {
         this.currentTaskId = new AtomicInteger();
         this.queueMap = new ConcurrentHashMap<>();
         this.taskMap = new ConcurrentHashMap<>();
-        this.asyncPool = new AsyncPool(Server.getInstance(), WORKERS);
+        this.asyncPool = new AsyncPool(Server.getInstance());
 
         ThreadFactory virtualFactory = Thread.ofVirtual()
             .name("Nukkit Virtual Task #", 0)
@@ -44,10 +47,6 @@ public class ServerScheduler {
                     e instanceof Exception ? e : new RuntimeException(e)))
             .factory();
         this.virtualPool = Executors.newThreadPerTaskExecutor(virtualFactory);
-    }
-
-    public AsyncPool getAsyncPool() {
-        return asyncPool;
     }
 
     @Deprecated
@@ -105,10 +104,6 @@ public class ServerScheduler {
     @Deprecated
     public void scheduleAsyncTaskToWorker(@NotNull AsyncTask task, int worker) {
         scheduleAsyncTask(task);
-    }
-
-    public int getAsyncTaskPoolSize() {
-        return asyncPool.getCorePoolSize();
     }
 
     @Deprecated
@@ -346,10 +341,12 @@ public class ServerScheduler {
             }
         } else { // Normal server tick
             for (int i = this.currentTick + 1; i <= currentTick; i++) {
-                runTasks(currentTick);
+                runTasks(i);
             }
         }
         this.currentTick = currentTick;
+
+        // Collect completed async tasks using structured concurrency pattern
         AsyncTask.collectTask();
     }
 
