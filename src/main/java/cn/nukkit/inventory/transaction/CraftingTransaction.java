@@ -147,7 +147,6 @@ public class CraftingTransaction extends InventoryTransaction {
 
     @Override
     public boolean execute() {
-        normalizeCraftingResultSlots();
         if (super.execute()) {
             switch (this.primaryOutput.getId()) {
                 case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
@@ -166,99 +165,6 @@ public class CraftingTransaction extends InventoryTransaction {
         }
 
         return false;
-    }
-
-    /**
-     * Rewrites client-predicted crafting result slot changes to match the server inventory placement rules.
-     * Crafting output should merge into existing partial stacks before occupying empty slots.
-     */
-    void normalizeCraftingResultSlots() {
-        if (this.primaryOutput == null || this.primaryOutput.isNull()) {
-            return;
-        }
-
-        PlayerInventory inventory = this.source.getInventory();
-        if (inventory == null) {
-            return;
-        }
-
-        List<InventoryAction> normalized = new ArrayList<>(this.actions.size());
-        Item remaining = this.primaryOutput.clone();
-        boolean resultPlacementReplaced = false;
-
-        for (InventoryAction action : this.actions) {
-            if (action instanceof SlotChangeAction slotChangeAction && isPrimaryOutputPlacement(slotChangeAction, inventory)) {
-                if (!resultPlacementReplaced) {
-                    addNormalizedResultActions(normalized, inventory, remaining);
-                    resultPlacementReplaced = true;
-                }
-                continue;
-            }
-
-            normalized.add(action);
-        }
-
-        this.actions = normalized;
-        this.inventories.add(inventory);
-    }
-
-    /**
-     * Returns true when the slot change represents adding the primary crafting output to the player inventory.
-     */
-    private boolean isPrimaryOutputPlacement(SlotChangeAction action, PlayerInventory inventory) {
-        if (action.getInventory() != inventory) {
-            return false;
-        }
-
-        Item target = action.getTargetItem();
-        if (target.isNull() || !target.equals(this.primaryOutput, true, true)) {
-            return false;
-        }
-
-        Item source = action.getSourceItem();
-        return source.isNull() || source.equals(this.primaryOutput, true, true) && target.getCount() > source.getCount();
-    }
-
-    /**
-     * Adds replacement slot changes for the crafting result using the same order as {@link BaseInventory#addItem(Item...)}.
-     */
-    private void addNormalizedResultActions(List<InventoryAction> normalized, PlayerInventory inventory, Item remaining) {
-        if (remaining.getCount() <= 0) {
-            return;
-        }
-
-        // Mirror BaseInventory#addItem: fill partial stacks first, then use empty slots in slot order.
-        for (int slot = 0; slot < inventory.getSize() && remaining.getCount() > 0; slot++) {
-            Item current = inventory.getItem(slot);
-            if (current.isNull() || !current.equals(remaining, true, true)) {
-                continue;
-            }
-
-            int maxStackSize = Math.min(current.getMaxStackSize(), inventory.getMaxStackSize());
-            int space = maxStackSize - current.getCount();
-            if (space <= 0) {
-                continue;
-            }
-
-            int moved = Math.min(space, remaining.getCount());
-            Item target = current.clone();
-            target.setCount(current.getCount() + moved);
-            normalized.add(new SlotChangeAction(inventory, slot, current, target));
-            remaining.setCount(remaining.getCount() - moved);
-        }
-
-        for (int slot = 0; slot < inventory.getSize() && remaining.getCount() > 0; slot++) {
-            Item current = inventory.getItem(slot);
-            if (!current.isNull()) {
-                continue;
-            }
-
-            int moved = Math.min(Math.min(remaining.getMaxStackSize(), inventory.getMaxStackSize()), remaining.getCount());
-            Item target = remaining.clone();
-            target.setCount(moved);
-            normalized.add(new SlotChangeAction(inventory, slot, current, target));
-            remaining.setCount(remaining.getCount() - moved);
-        }
     }
 
     @Override
