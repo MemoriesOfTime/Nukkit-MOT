@@ -1204,7 +1204,7 @@ public class BinaryStream {
 
         ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
-            if (!instanceItem && (isDurable || block != null && block.getDamage() > 0)) {
+            if (!instanceItem && isDurable) {
                 byte[] nbt = item.getCompoundTag();
                 CompoundTag tag;
                 if (nbt == null || nbt.length == 0) {
@@ -1295,11 +1295,11 @@ public class BinaryStream {
         this.putLShort(item != null ? item.getCount() : 0);
         this.putUnsignedVarInt(damage);
 
-        boolean hasNetId = id != Item.AIR;
+        boolean hasNetId = item != null && item.isUsingStackNetId();
         this.putBoolean(hasNetId);
         if (hasNetId) {
             this.putUnsignedVarInt(0);
-            this.putVarInt(1);
+            this.putVarInt(item.getStackNetId());
         }
 
         Block block = isBlock && id != Item.AIR ? item.getBlockUnsafe() : null;
