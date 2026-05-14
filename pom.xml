@@ -17,8 +17,8 @@
         <argLine></argLine>
         <jline.version>3.30.6</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
-        <leveldb-mcpe-jni.version>0.0.10</leveldb-mcpe-jni.version>
-        <block-state-updater.version>1.21.60-20250619.144147-3</block-state-updater.version>
+        <leveldb-mcpe-jni.version>0.0.11</leveldb-mcpe-jni.version>
+        <block-state-updater.version>1.21.110-SNAPSHOT</block-state-updater.version>
         <netty.version>4.1.131.Final</netty.version>
     </properties>
 
@@ -61,6 +61,10 @@
         <repository>
             <id>okaeri-releases</id>
             <url>https://repo.okaeri.cloud/releases</url>
+        </repository>
+        <repository>
+            <id>porklib-maven</id>
+            <url>https://maven.daporkchop.net/</url>
         </repository>
     </repositories>
 
@@ -114,7 +118,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta12-20260420.182526-15</version>
+            <version>3.0.0.Beta12-20260428.175455-16</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -304,7 +308,7 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>cn.lanink.leveldb</groupId>
+            <groupId>dev.mot.leveldb</groupId>
             <artifactId>leveldb-mcpe-jni</artifactId>
             <version>${leveldb-mcpe-jni.version}</version>
             <scope>compile</scope>
@@ -338,7 +342,7 @@
         <dependency>
             <groupId>net.daporkchop.lib</groupId>
             <artifactId>natives</artifactId>
-            <version>0.5.8-20221202.164554-7</version>
+            <version>0.5.9-20250718.163325-7</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -441,7 +445,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>bedrock-codec</artifactId>
-            <version>3.0.0.Beta12-20260420.182526-15</version>
+            <version>3.0.0.Beta12-20260428.175455-16</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>

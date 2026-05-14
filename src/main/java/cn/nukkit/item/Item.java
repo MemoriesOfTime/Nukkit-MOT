@@ -1656,6 +1656,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    public boolean isShield() {
+        return false;
+    }
+
     public boolean isHelmet() {
         return false;
     }

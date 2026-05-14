@@ -42,6 +42,8 @@ public class LevelDBChunk extends BaseChunk {
 
     private final DimensionData dimensionData;
 
+    private List<PreservedEntityActor> preservedEntityActors = Collections.emptyList();
+
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ) {
         this(level, chunkX, chunkZ, new LevelDBChunkSection[0], new int[SUB_CHUNK_2D_SIZE], null, null, null, null, ChunkState.NEW);
     }
@@ -95,6 +97,49 @@ public class LevelDBChunk extends BaseChunk {
 
     public void setNbtEntities(List<CompoundTag> entities) {
         this.NBTentities = entities;
+    }
+
+    /**
+     * Returns Bedrock actor records that were read from modern LevelDB entity storage but were not converted into
+     * live Nukkit entities. These records are written back unchanged so unsupported addon/future entities are not
+     * silently removed during a normal chunk save.
+     *
+     * @return immutable list of preserved raw actor records
+     */
+    public List<PreservedEntityActor> getPreservedEntityActors() {
+        return this.preservedEntityActors;
+    }
+
+    /**
+     * Stores raw Bedrock actor records that should survive the chunk lifecycle even though Nukkit cannot load them
+     * as entities. The list is defensively copied to keep the chunk-owned preserve set stable until the next save.
+     *
+     * @param preservedEntityActors raw actor records to write back with the chunk, or {@code null} to clear them
+     */
+    public void setPreservedEntityActors(List<PreservedEntityActor> preservedEntityActors) {
+        this.preservedEntityActors = preservedEntityActors == null ? Collections.emptyList() : List.copyOf(preservedEntityActors);
+    }
+
+    /**
+     * Raw Bedrock actor payload that Nukkit cannot load yet but should not delete.
+     */
+    public static final class PreservedEntityActor {
+
+        private final byte[] storageKey;
+        private final byte[] rawNbt;
+
+        public PreservedEntityActor(byte[] storageKey, byte[] rawNbt) {
+            this.storageKey = Arrays.copyOf(storageKey, storageKey.length);
+            this.rawNbt = Arrays.copyOf(rawNbt, rawNbt.length);
+        }
+
+        public byte[] getStorageKey() {
+            return this.storageKey;
+        }
+
+        public byte[] getRawNbt() {
+            return this.rawNbt;
+        }
     }
 
     @Override

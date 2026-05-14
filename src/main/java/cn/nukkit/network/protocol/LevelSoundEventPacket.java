@@ -752,6 +752,18 @@ public class LevelSoundEventPacket extends DataPacket {
     public static final int SOUND_RECORD_LAVA_CHICKEN = 562;
     private static final int SOUND_RECORD_LAVA_CHICKEN_1_21_93 = 561;
     /**
+     * @since v844
+     */
+    public static final int SOUND_PLACE_ITEM = 563;
+    /**
+     * @since v844
+     */
+    public static final int SOUND_SINGLE_ITEM_SWAP = 564;
+    /**
+     * @since v844
+     */
+    public static final int SOUND_MULTI_ITEM_SWAP = 565;
+    /**
      * @since v898
      */
     public static final int SOUND_LUNGE_1 = 566;
@@ -884,9 +896,15 @@ public class LevelSoundEventPacket extends DataPacket {
      */
     public static final int SOUND_RESET_GROWTH = 598;
     /**
-     * @since v944
+     * @since v975
      */
-    public static final int SOUND_UNDEFINED = Utils.dynamic(599);
+    public static final int SOUND_PUSHED_BY_PLAYER = 599;
+    /**
+     * @since v975
+     */
+    public static final int SOUND_BOUNCE = 600;
+
+    public static final int SOUND_UNDEFINED = Utils.dynamic(601);
 
     public int sound;
     public float x;
@@ -897,6 +915,10 @@ public class LevelSoundEventPacket extends DataPacket {
     public boolean isBabyMob;
     public boolean isGlobal;
     public long entityUniqueId = -1;
+    /**
+     * @since v975
+     */
+    public Vector3f fireAtPosition;
 
     @Override
     public void decode() {
@@ -911,6 +933,9 @@ public class LevelSoundEventPacket extends DataPacket {
         this.isGlobal = this.getBoolean();
         if (this.protocol >= ProtocolInfo.v1_21_70_24) {
             this.entityUniqueId = this.getLLong();
+        }
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.fireAtPosition = this.getOptional(null, s -> s.getVector3f());
         }
     }
 
@@ -939,6 +964,9 @@ public class LevelSoundEventPacket extends DataPacket {
         this.putBoolean(this.isGlobal);
         if (this.protocol >= ProtocolInfo.v1_21_70_24) {
             this.putLLong(this.entityUniqueId);
+        }
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.putOptionalNull(this.fireAtPosition, this::putVector3f);
         }
     }
 

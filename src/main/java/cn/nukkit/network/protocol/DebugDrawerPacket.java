@@ -86,6 +86,13 @@ public class DebugDrawerPacket extends DataPacket {
                 case TEXT:
                     DebugText text = (DebugText) shape;
                     this.putString(text.getText());
+                    if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+                        this.putBoolean(text.isUseRotation());
+                        this.putOptionalNull(text.getBackgroundColor(), color -> this.putLInt(color.getRGB()));
+                        this.putBoolean(text.isDepthTest());
+                        this.putBoolean(text.isShowBackface());
+                        this.putBoolean(text.isShowTextBackface());
+                    }
                     break;
             }
         }
@@ -176,6 +183,9 @@ public class DebugDrawerPacket extends DataPacket {
         this.putOptionalNull(shape.getScale(), this::putLFloat);
         this.putOptionalNull(shape.getRotation(), this::putVector3f);
         this.putOptionalNull(shape.getTotalTimeLeft(), this::putLFloat);
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.putOptionalNull(shape.getMaximumRenderDistance(), this::putLFloat);
+        }
         this.putOptionalNull(shape.getColor(), color -> this.putLInt(color.getRGB()));
     }
 }

@@ -247,6 +247,14 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v924
      */
     public static final int DATA_AIM_ASSIST_PRIORITY_ACTOR_ID = 138; //int
+    /**
+     * @since v975
+     */
+    public static final int DATA_RESERVED_139 = 139; //long
+    /**
+     * @since v975
+     */
+    public static final int DATA_NAMEPLATE_RENDER_DISTANCE_MAX = 140; //float
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
@@ -393,6 +401,26 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v818 1.21.90
      */
     public static final int DATA_FLAG_BODY_ROTATION_ALWAYS_FOLLOWS_HEAD = 124;
+    /**
+     * @since v843 1.21.110
+     */
+    public static final int DATA_FLAG_CAN_USE_VERTICAL_MOVEMENT_ACTION = 125;
+    /**
+     * @since v859 1.21.120
+     */
+    public static final int DATA_FLAG_BODY_ROTATION_LOCKED_TO_VEHICLE = 126;
+    /**
+     * @since v975 1.26.20
+     */
+    public static final int DATA_FLAG_USES_LEGACY_FRICTION = 127;
+    /**
+     * @since v975 1.26.20
+     */
+    public static final int DATA_FLAG_USES_UNIFORM_AIR_DRAG = 128;
+    /**
+     * @since v975 1.26.20
+     */
+    public static final int DATA_FLAG_NAMEPLATE_DEPTH_TESTED = 129;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
@@ -1139,8 +1167,16 @@ public abstract class Entity extends Location implements Metadatable {
         return createEntity(name, pos.getChunk(), getDefaultNBT(pos), args);
     }
 
+    public static Entity createEntity(Identifier identifier, Position pos, Object... args) {
+        return createEntity(identifier, pos.getChunk(), getDefaultNBT(pos), args);
+    }
+
     public static Entity createEntity(int type, Position pos, Object... args) {
         return createEntity(String.valueOf(type), pos.getChunk(), getDefaultNBT(pos), args);
+    }
+
+    public static Entity createEntity(Identifier identifier, FullChunk chunk, CompoundTag nbt, Object... args) {
+        return identifier == null ? null : createEntity(identifier.toString(), chunk, nbt, args);
     }
 
     public static Entity createEntity(String name, FullChunk chunk, CompoundTag nbt, Object... args) {
@@ -1150,6 +1186,10 @@ public abstract class Entity extends Location implements Metadatable {
         EntityDefinition entityDefinition = EntityManager.get().getDefinition(name);
         if (entityDefinition != null) {
             return createEntity(entityDefinition.getImplementation(), chunk, nbt, args);
+        }
+        int runtimeId = getRuntimeIdByIdentifier(name);
+        if (runtimeId != 0) {
+            return createEntity(runtimeId, chunk, nbt, args);
         }
         return null;
     }
@@ -1164,6 +1204,88 @@ public abstract class Entity extends Location implements Metadatable {
             return createEntity(entityDefinition.getImplementation(), chunk, nbt, args);
         }
         return null;
+    }
+
+    /**
+     * Checks whether an entity can be created from the given save id, identifier, or numeric id string.
+     * 检查是否可以通过给定的保存 ID、命名空间标识符或数字 ID 字符串创建实体。
+     *
+     * @param name the entity save id, namespaced identifier, or numeric id string
+     *             实体保存 ID、命名空间标识符或数字 ID 字符串
+     * @return {@code true} if the entity is registered and its implementation exposes the default entity constructor
+     *         如果实体已注册且其实现类提供默认实体构造方法，则返回 {@code true}
+     */
+    public static boolean canCreateEntity(String name) {
+        Class<? extends Entity> clazz = knownEntities.get(name);
+        if (clazz != null) {
+            return hasMatchingConstructor(clazz, 0);
+        }
+        EntityDefinition entityDefinition = EntityManager.get().getDefinition(name);
+        if (entityDefinition != null) {
+            return hasMatchingConstructor(entityDefinition.getImplementation(), 0);
+        }
+        int runtimeId = getRuntimeIdByIdentifier(name);
+        return runtimeId != 0 && canCreateEntity(runtimeId);
+    }
+
+    /**
+     * Checks whether an entity can be created from the given namespaced identifier.
+     * 检查是否可以通过给定的命名空间标识符创建实体。
+     *
+     * @param identifier the namespaced entity identifier
+     *                   实体命名空间标识符
+     * @return {@code true} if the identifier is not {@code null} and resolves to a creatable entity
+     *         如果标识符非 {@code null} 且可解析为可创建的实体，则返回 {@code true}
+     */
+    public static boolean canCreateEntity(Identifier identifier) {
+        return identifier != null && canCreateEntity(identifier.toString());
+    }
+
+    /**
+     * Checks whether an entity can be created from the given legacy runtime type id.
+     * 检查是否可以通过给定的旧版运行时类型 ID 创建实体。
+     *
+     * @param type the legacy runtime type id
+     *             旧版运行时类型 ID
+     * @return {@code true} if the type id resolves to a registered entity with the default entity constructor
+     *         如果类型 ID 可解析为已注册实体且其实现类提供默认实体构造方法，则返回 {@code true}
+     */
+    public static boolean canCreateEntity(int type) {
+        String name = String.valueOf(type);
+        Class<? extends Entity> clazz = knownEntities.get(name);
+        if (clazz != null) {
+            return hasMatchingConstructor(clazz, 0);
+        }
+        EntityDefinition entityDefinition = EntityManager.get().getDefinition(type);
+        return entityDefinition != null && hasMatchingConstructor(entityDefinition.getImplementation(), 0);
+    }
+
+    private static boolean hasMatchingConstructor(Class<? extends Entity> clazz, int extraArgs) {
+        if (clazz == null) {
+            return false;
+        }
+        for (Constructor constructor : clazz.getConstructors()) {
+            if (constructor.getParameterCount() == extraArgs + 2) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean isKnown(String name) {
+        if (knownEntities.containsKey(name) || EntityManager.get().getDefinition(name) != null) {
+            return true;
+        }
+        int runtimeId = getRuntimeIdByIdentifier(name);
+        return runtimeId != 0 && isKnown(runtimeId);
+    }
+
+    public static boolean isKnown(int type) {
+        return knownEntities.containsKey(String.valueOf(type)) || EntityManager.get().getDefinition(type) != null;
+    }
+
+    private static int getRuntimeIdByIdentifier(String identifier) {
+        return identifier != null && identifier.indexOf(':') >= 0 ? EntityManager.get().getRuntimeId(identifier) : 0;
     }
 
     private static Entity createEntity(Class<? extends Entity> clazz, FullChunk chunk, CompoundTag nbt, Object... args) {

@@ -6,6 +6,8 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.ServerPresenceInfoPacket;
+import cn.nukkit.network.protocol.ServerStoreInfoPacket;
 import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.utils.BinaryStream;
@@ -561,6 +563,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.AVAILABLE_ENTITY_IDENTIFIERS_PACKET, AvailableEntityIdentifiersPacket.class)
                 .registerPacket(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V2, LevelSoundEventPacket.class)
                 .registerPacket(ProtocolInfo.SCRIPT_CUSTOM_EVENT_PACKET, ScriptCustomEventPacket.class)
+                .registerPacket(ProtocolInfo.SCRIPT_MESSAGE_PACKET, ScriptMessagePacket.class)
                 .registerPacket(ProtocolInfo.SPAWN_PARTICLE_EFFECT_PACKET, SpawnParticleEffectPacket.class)
                 .registerPacket(ProtocolInfo.BIOME_DEFINITION_LIST_PACKET, BiomeDefinitionListPacket.class)
                 .registerPacket(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET, LevelSoundEventPacket.class)
@@ -595,11 +598,14 @@ public class Network {
                 .registerPacket(ProtocolInfo.ITEM_STACK_REQUEST_PACKET, ItemStackRequestPacket.class)
                 .registerPacket(ProtocolInfo.ITEM_STACK_RESPONSE_PACKET, ItemStackResponsePacket.class)
                 .registerPacket(ProtocolInfo.SYNC_ENTITY_PROPERTY_PACKET, SyncEntityPropertyPacket.class)
+                .registerPacket(ProtocolInfo.NPC_REQUEST_PACKET, NPCRequestPacket.class)
                 .registerPacket(ProtocolInfo.NPC_DIALOGUE_PACKET, NPCDialoguePacket.class)
                 .registerPacket(ProtocolInfo.TOAST_REQUEST_PACKET, ToastRequestPacket.class)
                 .registerPacket(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET, RequestNetworkSettingsPacket.class)
                 .registerPacket(ProtocolInfo.UPDATE_CLIENT_INPUT_LOCKS, UpdateClientInputLocksPacket.class)
                 .registerPacket(ProtocolInfo.CAMERA_PRESETS_PACKET, CameraPresetsPacket.class)
+                .registerPacket(ProtocolInfo.SUB_CHUNK_PACKET, SubChunkPacket.class)
+                .registerPacket(ProtocolInfo.SUB_CHUNK_REQUEST_PACKET, SubChunkRequestPacket.class)
 
                 .registerPacket(ProtocolInfo.CAMERA_INSTRUCTION_PACKET, CameraInstructionPacket.class)
                 .registerPacket(ProtocolInfo.TRIM_DATA_PACKET, TrimDataPacket.class)
@@ -650,6 +656,9 @@ public class Network {
                 .registerPacket(ProtocolInfo.SERVERBOUND_DATA_DRIVEN_SCREEN_CLOSED_PACKET, ServerboundDataDrivenScreenClosedPacket.class)
                 .registerPacket(ProtocolInfo.SYNC_WORLD_CLOCKS_PACKET, SyncWorldClocksPacket.class)
                 .registerPacket(ProtocolInfo.CLIENTBOUND_ATTRIBUTE_LAYER_SYNC_PACKET, ClientboundAttributeLayerSyncPacket.class)
+                // v975 packets
+                .registerPacket(ProtocolInfo.SERVER_STORE_INFO_PACKET, ServerStoreInfoPacket.class)
+                .registerPacket(ProtocolInfo.SERVER_PRESENCE_INFO_PACKET, ServerPresenceInfoPacket.class)
                 .build();
     }
 

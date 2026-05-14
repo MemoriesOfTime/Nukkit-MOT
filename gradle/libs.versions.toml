@@ -2,8 +2,8 @@
 log4j = "2.25.4"
 jline = "3.30.6"
 leveldb_java = "1.1.0"
-leveldb_jni = "0.0.10"
-block_state_updater = "1.21.60-20250619.144147-3"
+leveldb_jni = "0.0.11"
+block_state_updater = "1.21.110-SNAPSHOT"
 netty_epoll = "4.1.131.Final"
 caffeine = "3.1.8"
 guava = "33.1.0-jre"
@@ -17,7 +17,7 @@ lombok = "1.18.36"
 terminalconsoleappender = "1.3.0"
 jsr305 = "3.0.2"
 snappy = "0.5"
-daporkchop_natives = "0.5.8-20221202.164554-7"
+daporkchop_natives = "0.5.9-20250718.163325-7"
 sentry = "6.25.0"
 commons_math3 = "3.6.1"
 snappy_java = "1.1.10.8"
@@ -29,7 +29,7 @@ junit_platform = "1.10.2"
 mockito = "5.23.0"
 nukkitx_natives = "1.0.3"
 raknet = "1.0.0.CR4-20260426.145646-4"
-cloudburst_common = "3.0.0.Beta12-20260420.182526-15"
+cloudburst_common = "3.0.0.Beta12-20260428.175455-16"
 jackson_dataformat_toml = "2.20.1"
 okaeri_configs = "6.1.0-beta.1"
 cloudburst_math = "2.0-SNAPSHOT"
@@ -73,7 +73,7 @@ block-state-updater = { module = "org.cloudburstmc:block-state-updater", version
 
 leveldb = { module = "com.hivemc.leveldb:leveldb", version.ref = "leveldb_java" }
 leveldb-api = { module = "com.hivemc.leveldb:leveldb-api", version.ref = "leveldb_java" }
-leveldb-jni = { module = "cn.lanink.leveldb:leveldb-mcpe-jni", version.ref = "leveldb_jni" }
+leveldb-jni = { module = "dev.mot.leveldb:leveldb-mcpe-jni", version.ref = "leveldb_jni" }
 
 log4j-api = { module = "org.apache.logging.log4j:log4j-api", version.ref = "log4j" }
 log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }

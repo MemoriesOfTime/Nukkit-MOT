@@ -196,11 +196,6 @@ public class Level implements ChunkManager, Metadatable {
         xrayableBlocks[Block.DEEPSLATE_EMERALD_ORE] = true;
         xrayableBlocks[Block.DEEPSLATE_COPPER_ORE] = true;
 
-        randomTickBlocks[Block.CAVE_VINES] = true;
-        randomTickBlocks[Block.CAVE_VINES_BODY_WITH_BERRIES] = true;
-        randomTickBlocks[Block.CAVE_VINES_HEAD_WITH_BERRIES] = true;
-        randomTickBlocks[Block.AZALEA_LEAVES] = true;
-        randomTickBlocks[Block.AZALEA_LEAVES_FLOWERED] = true;
         randomTickBlocks[Block.COPPER_BLOCK] = true;
         randomTickBlocks[Block.CUT_COPPER] = true;
         randomTickBlocks[Block.EXPOSED_COPPER] = true;
@@ -225,8 +220,54 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.EXPOSED_COPPER_BULB] = true;
         randomTickBlocks[Block.WEATHERED_COPPER_BULB] = true;
         randomTickBlocks[Block.OXIDIZED_COPPER_BULB] = true;
+        randomTickBlocks[Block.COPPER_LANTERN] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_LANTERN] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_LANTERN] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_LANTERN] = true;
+        randomTickBlocks[Block.LIGHTNING_ROD] = true;
+        randomTickBlocks[Block.EXPOSED_LIGHTNING_ROD] = true;
+        randomTickBlocks[Block.WEATHERED_LIGHTNING_ROD] = true;
+        randomTickBlocks[Block.OXIDIZED_LIGHTNING_ROD] = true;
+
+        randomTickBlocks[Block.COPPER_CHEST] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_CHEST] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_CHEST] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_CHEST] = true;
+
+        randomTickBlocks[Block.CHISELED_COPPER] = true;
+        randomTickBlocks[Block.EXPOSED_CHISELED_COPPER] = true;
+        randomTickBlocks[Block.WEATHERED_CHISELED_COPPER] = true;
+        randomTickBlocks[Block.OXIDIZED_CHISELED_COPPER] = true;
+        randomTickBlocks[Block.COPPER_GRATE] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_GRATE] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_GRATE] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_GRATE] = true;
+        randomTickBlocks[Block.COPPER_DOOR] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_DOOR] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_DOOR] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_DOOR] = true;
+        randomTickBlocks[Block.COPPER_TRAPDOOR] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_TRAPDOOR] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_TRAPDOOR] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_TRAPDOOR] = true;
+        randomTickBlocks[Block.COPPER_GOLEM_STATUE] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_GOLEM_STATUE] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_GOLEM_STATUE] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_GOLEM_STATUE] = true;
+        randomTickBlocks[Block.COPPER_BARS] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_BARS] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_BARS] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_BARS] = true;
+        randomTickBlocks[Block.COPPER_CHAIN] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_CHAIN] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_CHAIN] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_CHAIN] = true;
 
         randomTickBlocks[BlockID.BUDDING_AMETHYST] = true;
+
+        randomTickBlocks[Block.OPEN_EYEBLOSSOM] = true;
+        randomTickBlocks[Block.CLOSED_EYEBLOSSOM] = true;
+        randomTickBlocks[Block.CREAKING_HEART] = true;
     }
 
     @NonComputationAtomic
@@ -5278,7 +5319,9 @@ public class Level implements ChunkManager, Metadatable {
             }
             return GameVersion.V1_20_50_NETEASE;
         }
-        if (protocol >= GameVersion.V1_26_10.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_20_26.getProtocol()) {
+            return GameVersion.V1_26_20;
+        } else if (protocol >= GameVersion.V1_26_10.getProtocol()) {
             return GameVersion.V1_26_10;
         } else if (protocol >= GameVersion.V1_21_110_26.getProtocol()) {
             return GameVersion.V1_21_110;
@@ -5431,7 +5474,8 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == GameVersion.V1_21_100.getProtocol()) if (player == GameVersion.V1_21_100.getProtocol()) return true;
         if (chunk == GameVersion.V1_21_110.getProtocol())
             if (player >= GameVersion.V1_21_110_26.getProtocol()) if (player <= GameVersion.V1_26_0.getProtocol()) return true;
-        if (chunk == GameVersion.V1_26_10.getProtocol())  if (player >= GameVersion.V1_26_10.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_10.getProtocol())  if (player == GameVersion.V1_26_10.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_20.getProtocol())  if (player >= GameVersion.V1_26_20_26.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

@@ -31,6 +31,8 @@ public interface VanillaProperties {
 
     BooleanBlockProperty CRAFTING = new BooleanBlockProperty("crafting", false);
 
+    BooleanBlockProperty POWERED = new BooleanBlockProperty("powered_bit", false);
+
     BooleanBlockProperty TRIGGERED = new BooleanBlockProperty("triggered_bit", false);
 
     BlockProperty<BlockWall.WallConnectionType> WALL_CONNECTION_TYPE_EAST = new EnumBlockProperty<>("wall_connection_type_east",
