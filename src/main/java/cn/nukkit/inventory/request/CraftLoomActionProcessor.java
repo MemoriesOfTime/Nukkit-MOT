@@ -37,6 +37,19 @@ public class CraftLoomActionProcessor implements ItemStackRequestActionProcessor
     public static final String LOOM_PATTERN_KEY = "loomPatternId";
     public static final String LOOM_TIMES_KEY = "loomTimesCrafted";
 
+    /**
+     * Vanilla limit on stacked patterns per banner. The 7th visual layer is the
+     * banner's base colour, so {@code Patterns} list holds at most 6 entries
+     * before further additions are rejected.
+     */
+    private static final int MAX_BANNER_PATTERNS = 6;
+
+    /**
+     * Illager/ominous banner — {@code Type=1} on the banner NBT. Vanilla refuses
+     * to apply any further pattern to it so loom output is the original banner.
+     */
+    private static final int OMINOUS_BANNER_TYPE = 1;
+
     @Override
     public ItemStackRequestActionType getType() {
         return ItemStackRequestActionType.CRAFT_LOOM;
@@ -59,11 +72,36 @@ public class CraftLoomActionProcessor implements ItemStackRequestActionProcessor
             return context.error();
         }
 
+        // Vanilla: ominous banners (Type=1) reject all loom operations.
+        if (bannerItem.hasCompoundTag()
+                && bannerItem.getNamedTag().contains("Type")
+                && bannerItem.getNamedTag().getInt("Type") == OMINOUS_BANNER_TYPE) {
+            return context.error();
+        }
+
         BannerPattern.Type patternType = null;
         String patternId = action.getPatternId();
         if (patternId != null && !patternId.isBlank()) {
             patternType = BannerPattern.Type.getByName(patternId);
             if (patternType == null) {
+                return context.error();
+            }
+        }
+
+        // Vanilla: applying a new pattern requires the banner has < 6 patterns.
+        // Pure dye operations (no patternType) only repaint the base and are
+        // unaffected by the limit.
+        if (patternType != null && bannerItem.getPatternsSize() >= MAX_BANNER_PATTERNS) {
+            return context.error();
+        }
+
+        // Vanilla: "special" patterns (creeper/skull/flower/mojang/flow/guster)
+        // require a matching banner-pattern item in the material slot. The
+        // pattern item itself is NOT consumed (acts like a tool).
+        Item materialItem = loomInventory.getPattern();
+        if (patternType != null && requiresPatternItem(patternType)) {
+            if (materialItem == null || materialItem.isNull()
+                    || !isMatchingPatternItem(patternType, materialItem)) {
                 return context.error();
             }
         }
@@ -110,5 +148,29 @@ public class CraftLoomActionProcessor implements ItemStackRequestActionProcessor
                 List.of(responseSlot),
                 new FullContainerName(ContainerSlotType.CREATED_OUTPUT, null)
         )));
+    }
+
+    private static boolean requiresPatternItem(BannerPattern.Type type) {
+        return switch (type) {
+            case PATTERN_CREEPER, PATTERN_SKULL, PATTERN_FLOWER, PATTERN_MOJANG,
+                 PATTERN_FLOW, PATTERN_GUSTER,
+                 PATTERN_BRICK, PATTERN_CURLY_BORDER -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean isMatchingPatternItem(BannerPattern.Type type, Item material) {
+        return switch (type) {
+            case PATTERN_FLOW -> Item.FLOW_BANNER_PATTERN.equals(material.getNamespaceId());
+            case PATTERN_GUSTER -> Item.GUSTER_BANNER_PATTERN.equals(material.getNamespaceId());
+            // Legacy banner pattern item (id 434) uses meta to distinguish
+            // creeper/skull/flower/mojang/bricks/curly_border variants; client
+            // UI gates this by greying out incompatible patterns, so we accept
+            // any meta here.
+            case PATTERN_CREEPER, PATTERN_SKULL, PATTERN_FLOWER, PATTERN_MOJANG,
+                 PATTERN_BRICK, PATTERN_CURLY_BORDER ->
+                    material.getId() == Item.BANNER_PATTERN;
+            default -> true;
+        };
     }
 }

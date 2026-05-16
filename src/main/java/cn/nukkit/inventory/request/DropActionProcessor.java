@@ -2,6 +2,7 @@ package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
 import cn.nukkit.event.player.PlayerDropItemEvent;
+import cn.nukkit.event.player.PlayerTransferItemEvent;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
@@ -45,6 +46,11 @@ public class DropActionProcessor implements ItemStackRequestActionProcessor<Drop
 
         Item dropItem = item.clone();
         dropItem.setCount(count);
+
+        if (!TransferItemActionProcessor.fireTransferEvent(player, PlayerTransferItemEvent.Type.DROP,
+                inventory, slot, null, -1, item, null, count)) {
+            return context.error();
+        }
 
         PlayerDropItemEvent event = new PlayerDropItemEvent(player, dropItem);
         player.getServer().getPluginManager().callEvent(event);

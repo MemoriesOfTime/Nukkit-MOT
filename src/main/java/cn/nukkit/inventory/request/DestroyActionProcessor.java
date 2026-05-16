@@ -6,6 +6,7 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequestSlotData;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.DestroyAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType;
@@ -32,7 +33,13 @@ public class DestroyActionProcessor implements ItemStackRequestActionProcessor<D
         if (inventory == null) {
             return context.error();
         }
-        if (!player.isCreative() && !(inventory instanceof BeaconInventory)) {
+        // suppressResponse 表示当前 destroy 紧随 CraftResultsDeprecated —— 这是
+        // 协议要求的合成尾声清理，必须严格限定在 CREATED_OUTPUT 槽，否则恶意
+        // 客户端可借此绕过生存模式权限销毁背包物品。
+        // BeaconInventory 始终豁免（信标 payment 槽的标准消耗路径）。
+        boolean isCreatedOutputCleanup = suppressResponse
+                && src.getContainer() == ContainerSlotType.CREATED_OUTPUT;
+        if (!isCreatedOutputCleanup && !player.isCreative() && !(inventory instanceof BeaconInventory)) {
             return context.error();
         }
 

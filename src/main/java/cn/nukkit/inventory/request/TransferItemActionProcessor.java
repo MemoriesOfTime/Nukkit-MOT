@@ -300,14 +300,24 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
     static boolean fireTransferEvent(Player actor, Inventory sourceInventory, int sourceSlot,
                                      Inventory destinationInventory, int destinationSlot,
                                      Item sourceItem, Item destinationItem, int count) {
+        return fireTransferEvent(actor, PlayerTransferItemEvent.Type.TRANSFER,
+                sourceInventory, sourceSlot, destinationInventory, destinationSlot,
+                sourceItem, destinationItem, count);
+    }
+
+    static boolean fireTransferEvent(Player actor, PlayerTransferItemEvent.Type type,
+                                     Inventory sourceInventory, int sourceSlot,
+                                     Inventory destinationInventory, int destinationSlot,
+                                     Item sourceItem, Item destinationItem, int count) {
         PlayerTransferItemEvent event = new PlayerTransferItemEvent(
                 actor,
+                type,
                 sourceInventory,
                 sourceSlot,
                 destinationInventory,
                 destinationSlot,
                 sourceItem.clone(),
-                destinationItem.clone(),
+                destinationItem == null ? Item.get(Item.AIR) : destinationItem.clone(),
                 count
         );
         Server.getInstance().getPluginManager().callEvent(event);

@@ -1,6 +1,7 @@
 package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
+import cn.nukkit.event.player.PlayerTransferItemEvent;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
@@ -48,6 +49,16 @@ public class SwapActionProcessor implements ItemStackRequestActionProcessor<Swap
             return context.error();
         }
         if (!TransferItemActionProcessor.isSlotCompatible(dstInv, dstSlot, sourceItem)) {
+            return context.error();
+        }
+
+        // Swap is structurally a bi-directional transfer; emit one event with
+        // both sides populated so plugins can veto or observe it consistently
+        // with TAKE/PLACE and DROP. count uses the source stack size — there
+        // is no partial swap on the wire.
+        int count = sourceItem.isNull() ? destItem.getCount() : sourceItem.getCount();
+        if (!TransferItemActionProcessor.fireTransferEvent(player, PlayerTransferItemEvent.Type.SWAP,
+                srcInv, srcSlot, dstInv, dstSlot, sourceItem, destItem, count)) {
             return context.error();
         }
 
