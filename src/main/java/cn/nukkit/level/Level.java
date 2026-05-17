@@ -2646,7 +2646,8 @@ public class Level implements ChunkManager, Metadatable {
             }
 
             if (breakTime > 0) {
-                breakTime -= 0.15; // 保留 3 tick（150ms）宽限用于网络延迟补偿
+                // 保留 500ms 宽限用于网络延迟补偿与服务端/客户端公式差异。
+                breakTime -= 0.5;
             }
 
             Item[] eventDrops;
