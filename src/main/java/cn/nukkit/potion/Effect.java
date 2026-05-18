@@ -282,7 +282,7 @@ public class Effect implements Cloneable {
                 pk.amplifier = this.getAmplifier();
                 pk.particles = this.isVisible();
                 pk.duration = this.getDuration();
-                pk.tick = Server.getInstance().getTick();
+                pk.tick = player.getServer().getTick();
                 if (oldEffect != null) {
                     pk.eventId = MobEffectPacket.EVENT_MODIFY;
                 } else {
@@ -330,7 +330,7 @@ public class Effect implements Cloneable {
                 pk.eid = player.getId();
                 pk.effectId = this.getId();
                 pk.eventId = MobEffectPacket.EVENT_REMOVE;
-                pk.tick = Server.getInstance().getTick();
+                pk.tick = player.getServer().getTick();
 
                 player.dataPacket(pk);
 
