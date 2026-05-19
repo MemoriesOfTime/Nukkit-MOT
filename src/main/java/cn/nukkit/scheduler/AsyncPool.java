@@ -2,6 +2,7 @@ package cn.nukkit.scheduler;
 
 import cn.nukkit.Server;
 
+import java.util.List;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +28,26 @@ public class AsyncPool extends ThreadPoolExecutor {
         if (throwable != null) {
             server.getLogger().critical("Exception in asynchronous task", throwable);
         }
+    }
+
+    /**
+     * Stop accepting new tasks, wait up to {@code timeoutSeconds} for in-flight
+     * tasks to finish, then force-interrupt the rest.
+     *
+     * @return tasks that never started (drained by {@link #shutdownNow()} on timeout),
+     *         or an empty list if the pool terminated cleanly.
+     */
+    public List<Runnable> shutdownGracefully(long timeoutSeconds) {
+        this.shutdown();
+        try {
+            if (this.awaitTermination(timeoutSeconds, TimeUnit.SECONDS)) {
+                return List.of();
+            }
+            server.getLogger().warning("AsyncPool did not terminate within " + timeoutSeconds + "s, forcing shutdown");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return this.shutdownNow();
     }
 
     public Server getServer() {
