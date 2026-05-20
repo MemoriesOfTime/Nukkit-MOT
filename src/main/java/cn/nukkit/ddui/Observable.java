@@ -77,21 +77,19 @@ public class Observable<T> {
 
             Object actualValue = element.getValue();
 
-            DataStoreUpdate update = new DataStoreUpdate();
-            update.setDataStoreName(screen.getIdentifier().split(":")[0]);
-            update.setProperty(screen.getProperty());
-            update.setPath(element.getPath());
-            update.setType(element.getType());
-            update.setData(actualValue);
-            update.setPropertyUpdateCount(1);
-            update.setPathUpdateCount(1);
-
-            ClientboundDataStorePacket cbDataStore = new ClientboundDataStorePacket();
-            cbDataStore.setUpdates(List.of(update));
-
-            // todo: hack for unknown issue in v1_26_20
             for (Player viewer : screen.getAllViewers()) {
-                update.setProperty(update.getProperty() + (viewer.protocol >= ProtocolInfo.v1_26_20? "_": ""));
+                DataStoreUpdate update = new DataStoreUpdate();
+                update.setDataStoreName(screen.getIdentifier().split(":")[0]);
+                // todo: hack for unknown issue in v1_26_20
+                update.setProperty(screen.getProperty() + (viewer.protocol >= ProtocolInfo.v1_26_20 ? "_" : ""));
+                update.setPath(element.getPath());
+                update.setType(element.getType());
+                update.setData(actualValue);
+                update.setPropertyUpdateCount(1);
+                update.setPathUpdateCount(1);
+
+                ClientboundDataStorePacket cbDataStore = new ClientboundDataStorePacket();
+                cbDataStore.setUpdates(List.of(update));
                 viewer.dataPacket(cbDataStore);
             }
         }
