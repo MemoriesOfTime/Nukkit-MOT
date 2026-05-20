@@ -3,6 +3,7 @@ package cn.nukkit.ddui;
 import cn.nukkit.Player;
 import cn.nukkit.ddui.properties.DataDrivenProperty;
 import cn.nukkit.network.protocol.ClientboundDataStorePacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.datastore.DataStoreUpdate;
 import lombok.Getter;
 
@@ -88,7 +89,9 @@ public class Observable<T> {
             ClientboundDataStorePacket cbDataStore = new ClientboundDataStorePacket();
             cbDataStore.setUpdates(List.of(update));
 
+            // todo: hack for unknown issue in v1_26_20
             for (Player viewer : screen.getAllViewers()) {
+                update.setProperty(update.getProperty() + (viewer.protocol >= ProtocolInfo.v1_26_20? "_": ""));
                 viewer.dataPacket(cbDataStore);
             }
         }

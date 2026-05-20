@@ -8,6 +8,7 @@ import cn.nukkit.ddui.properties.ObjectProperty;
 import cn.nukkit.network.protocol.ClientboundDataDrivenUICloseScreenPacket;
 import cn.nukkit.network.protocol.ClientboundDataDrivenUIShowScreenPacket;
 import cn.nukkit.network.protocol.ClientboundDataStorePacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.datastore.DataStoreChange;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.TaskHandler;
@@ -92,7 +93,8 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
         String dataStore = getIdentifier().split(":")[0];
         DataStoreChange change = new DataStoreChange();
         change.setDataStoreName(dataStore);
-        change.setProperty(getProperty());
+        // todo: hack for unknown issue in v1_26_20
+        change.setProperty(getProperty() + (player.protocol >= ProtocolInfo.v1_26_20? "_": ""));
         change.setUpdateCount(1);
         change.setNewValue(toChangeValue());
 

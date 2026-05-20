@@ -31,7 +31,12 @@ public class ServerboundDataStoreProcessor extends DataPacketProcessor<Serverbou
 
             String dataStore = screen.getIdentifier().split(":")[0];
             if (!dataStore.equals(update.getDataStoreName())) return;
-            if (!screen.getProperty().equals(update.getProperty())) return;
+            // todo: hack for unknown issue in v1_26_20
+            String propertyId = screen.getProperty();
+            if (player.protocol >= ProtocolInfo.v1_26_20) {
+                propertyId += "_";
+            }
+            if (!propertyId.equals(update.getProperty())) return;
 
             DataDrivenProperty<?, ?> property = screen.resolvePath(update.getPath());
             if (property == null) return;
