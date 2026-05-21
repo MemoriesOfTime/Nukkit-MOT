@@ -39,6 +39,21 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
 
     public abstract String getProperty();
 
+    public String getClientProperty(Player player) {
+        Integer formId = playerFormIds.get(player);
+        if (formId == null) {
+            return getProperty();
+        }
+        return getClientProperty(player.protocol, formId);
+    }
+
+    String getClientProperty(int protocol, int formId) {
+        if (protocol >= ProtocolInfo.v1_26_20) {
+            return getProperty() + "_" + formId;
+        }
+        return getProperty();
+    }
+
     private final Set<Player> viewers = new CopyOnWriteArraySet<>();
 
     private final Map<Player, Integer> playerFormIds = new ConcurrentHashMap<>();
@@ -93,8 +108,7 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
         String dataStore = getIdentifier().split(":")[0];
         DataStoreChange change = new DataStoreChange();
         change.setDataStoreName(dataStore);
-        // todo: hack for unknown issue in v1_26_20
-        change.setProperty(getProperty() + (player.protocol >= ProtocolInfo.v1_26_20? "_": ""));
+        change.setProperty(getClientProperty(player.protocol, formId));
         change.setUpdateCount(1);
         change.setNewValue(toChangeValue());
 
@@ -104,6 +118,9 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
         ClientboundDataDrivenUIShowScreenPacket show = new ClientboundDataDrivenUIShowScreenPacket();
         show.screenId = getIdentifier();
         show.formId = formId;
+        if (player.protocol >= ProtocolInfo.v1_26_20) {
+            show.dataInstanceId = formId;
+        }
 
         // Send new screen packets
         player.dataPacket(data);

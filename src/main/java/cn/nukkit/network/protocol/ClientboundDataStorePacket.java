@@ -3,7 +3,6 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.network.protocol.types.datastore.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,16 +26,7 @@ public class ClientboundDataStorePacket extends DataPacket {
 
     @Override
     public void decode() {
-        long size = this.getUnsignedVarInt();
-        this.updates = new ArrayList<>();
-        for (int i = 0; i < size; i++) {
-            final DataStoreAction.Type action = DataStoreAction.Type.from((int) this.getUnsignedVarInt());
-            switch (action) {
-                case UPDATE -> this.updates.add(readDataStoreUpdate());
-                case CHANGE -> this.updates.add(readDataStoreChange());
-                case REMOVAL -> this.updates.add(readDataStoreRemoval());
-            }
-        }
+        this.decodeUnsupported();
     }
 
     @Override
@@ -66,76 +56,6 @@ public class ClientboundDataStorePacket extends DataPacket {
 
     public List<DataStoreAction> getUpdates() {
         return updates;
-    }
-
-    protected DataStoreRemoval readDataStoreRemoval() {
-        final DataStoreRemoval removal = new DataStoreRemoval();
-        removal.setDataStoreName(this.getString());
-        return removal;
-    }
-
-    public DataStoreUpdate readDataStoreUpdate() {
-        final DataStoreUpdate update = new DataStoreUpdate();
-        update.setDataStoreName(this.getString());
-        update.setProperty(this.getString());
-        update.setPath(this.getString());
-        int control = (int) this.getUnsignedVarInt();
-        switch (control) {
-            case 0:
-                long bits = this.getLLong();
-                update.setData(Double.longBitsToDouble(bits));
-                update.setType(DataStorePropertyType.INT64);
-                break;
-            case 1:
-                update.setData(this.getBoolean());
-                update.setType(DataStorePropertyType.BOOLEAN);
-                break;
-            case 2:
-                update.setData(this.getString());
-                update.setType(DataStorePropertyType.STRING);
-                break;
-            default:
-                throw new IllegalStateException("Invalid data store update control: " + control);
-        }
-        update.setPropertyUpdateCount(this.getLInt());
-        if (this.protocol >= ProtocolInfo.v1_26_0) {
-            update.setPathUpdateCount(this.getLInt());
-        } else {
-            update.setPathUpdateCount(0);
-        }
-        return update;
-    }
-
-    protected DataStoreChange readDataStoreChange() {
-        DataStoreChange change = new DataStoreChange();
-        change.setDataStoreName(this.getString());
-        change.setProperty(this.getString());
-        change.setUpdateCount(this.getLInt());
-        final DataStorePropertyType valueType = DataStorePropertyType.from(this.getLInt());
-        change.setNewValue(this.readTheNewPropertyValue(valueType));
-        return change;
-    }
-
-    protected Object readTheNewPropertyValue(DataStorePropertyType type) {
-        switch (type) {
-            case BOOLEAN:
-                return this.getBoolean();
-            case INT64:
-                return this.getLLong();
-            case STRING:
-                return this.getString();
-            case OBJECT:
-                final int length = (int) this.getUnsignedVarInt();
-                final Map<String, Object> map = new HashMap<>();
-                for (int i = 0; i < length; i++) {
-                    final String key = this.getString();
-                    final DataStorePropertyType valueType = DataStorePropertyType.from(this.getLInt());
-                    map.put(key, this.readTheNewPropertyValue(valueType));
-                }
-                return map;
-            default:
-                throw new IllegalStateException("Read invalid DataStorePropertyValueType");
-        }
     }
 
     public void setUpdates(List<DataStoreAction> updates) {
@@ -207,7 +127,7 @@ public class ClientboundDataStorePacket extends DataPacket {
 
     private void writeChangeValue(Object value) {
         if (value == null) {
-            // no-op
+            this.putLInt(TYPE_NONE);
         } else if (value instanceof Boolean b) {
             this.putLInt(TYPE_BOOL);
             this.putBoolean(b);
@@ -224,6 +144,8 @@ public class ClientboundDataStorePacket extends DataPacket {
                 this.putString((String) entry.getKey());
                 writeChangeValue(entry.getValue());
             }
+        } else {
+            this.putLInt(TYPE_NONE);
         }
     }
 
