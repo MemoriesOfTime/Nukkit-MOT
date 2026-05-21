@@ -14,10 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -1870,10 +1867,11 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         change.setDataStoreName("ui_state");
         change.setProperty("metadata");
         change.setUpdateCount(3);
-        change.setNewValue(Map.of(
-                "enabled", true,
-                "title", "main"
-        ));
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("enabled", true);
+        metadata.put("title", "main");
+        metadata.put("optional", null);
+        change.setNewValue(metadata);
 
         var removal = new cn.nukkit.network.protocol.types.datastore.DataStoreRemoval();
         removal.setDataStoreName("legacy_state");
@@ -1910,6 +1908,8 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         Map<?, ?> changeValue = (Map<?, ?>) cbChange.getNewValue();
         assertEquals(true, changeValue.get("enabled"));
         assertEquals("main", changeValue.get("title"));
+        assertTrue(changeValue.containsKey("optional"));
+        assertNull(changeValue.get("optional"));
 
         var cbRemoval = (org.cloudburstmc.protocol.bedrock.data.datastore.DataStoreRemoval) cbPacket.getUpdates().get(2);
         assertEquals("legacy_state", cbRemoval.getDataStoreName());
@@ -1977,12 +1977,23 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
         nukkitPacket.screenId = "test_screen";
+        if (protocolVersion >= ProtocolInfo.v1_26_10) {
+            nukkitPacket.formId = 21;
+            nukkitPacket.dataInstanceId = 21;
+        }
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.ClientboundDataDrivenUIShowScreenPacket.class);
 
         assertEquals("test_screen", cbPacket.getScreenId());
+        if (protocolVersion >= ProtocolInfo.v1_26_10) {
+            assertEquals(21, cbPacket.getFormId());
+            assertEquals(21, cbPacket.getDataInstanceId());
+        } else {
+            assertEquals(0, cbPacket.getFormId());
+            assertNull(cbPacket.getDataInstanceId());
+        }
     }
 
     // ==================== ClientboundTextureShiftPacket ====================
