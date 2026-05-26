@@ -1402,6 +1402,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return 0;
     }
 
+    public boolean isBrewingIngredient() {
+        return false;
+    }
+
     public boolean isNormalBlock() {
         return !isTransparent() && isSolid() && !isPowerSource();
     }

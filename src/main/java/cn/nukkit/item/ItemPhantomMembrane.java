@@ -24,4 +24,9 @@ public class ItemPhantomMembrane extends Item {
     public boolean isSupportedOn(GameVersion protocolId) {
         return protocolId.getProtocol() >= ProtocolInfo.v1_6_0;
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

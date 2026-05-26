@@ -1940,6 +1940,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      *
      * @return {@code true} when {@link #stackNetId} is greater than 0
      */
+    public boolean isBrewingIngredient() {
+        return false;
+    }
+
     public boolean isUsingStackNetId() {
         return this.stackNetId > 0;
     }

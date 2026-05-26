@@ -17,4 +17,9 @@ public class ItemSugar extends Item {
     public ItemSugar(Integer meta, int count) {
         super(SUGAR, meta, count, "Sugar");
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

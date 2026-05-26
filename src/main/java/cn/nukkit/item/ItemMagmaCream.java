@@ -13,4 +13,9 @@ public class ItemMagmaCream extends Item {
     public ItemMagmaCream(Integer meta, int count) {
         super(MAGMA_CREAM, 0, count, "Magma Cream");
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

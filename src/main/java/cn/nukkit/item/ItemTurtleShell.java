@@ -49,4 +49,9 @@ public class ItemTurtleShell extends ItemArmor {
     public boolean isSupportedOn(GameVersion protocolId) {
         return protocolId.getProtocol() >= ProtocolInfo.v1_5_0;
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

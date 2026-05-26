@@ -89,4 +89,9 @@ public class BlockStone extends BlockSolidMeta {
     public boolean canSilkTouch() {
         return true;
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

@@ -27,6 +27,7 @@ public class InventoryTransactionPacket extends DataPacket {
 
     public static final int USE_ITEM_ON_ENTITY_ACTION_INTERACT = 0;
     public static final int USE_ITEM_ON_ENTITY_ACTION_ATTACK = 1;
+    public static final int USE_ITEM_ON_ENTITY_ACTION_ITEM_INTERACT = 2;
 
 
     public static final int ACTION_MAGIC_SLOT_DROP_ITEM = 0;

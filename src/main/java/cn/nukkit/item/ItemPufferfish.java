@@ -17,4 +17,9 @@ public class ItemPufferfish extends ItemFish {
     public ItemPufferfish(Integer meta, int count) {
         super(PUFFERFISH, meta, count, "Pufferfish");
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

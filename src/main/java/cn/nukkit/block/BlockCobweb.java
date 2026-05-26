@@ -84,4 +84,9 @@ public class BlockCobweb extends BlockFlowable {
     public boolean diffusesSkyLight() {
         return true;
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

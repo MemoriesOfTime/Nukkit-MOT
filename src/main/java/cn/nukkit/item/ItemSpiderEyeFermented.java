@@ -13,4 +13,9 @@ public class ItemSpiderEyeFermented extends Item {
     public ItemSpiderEyeFermented(Integer meta, int count) {
         super(FERMENTED_SPIDER_EYE, 0, count, "Fermented Spider Eye");
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

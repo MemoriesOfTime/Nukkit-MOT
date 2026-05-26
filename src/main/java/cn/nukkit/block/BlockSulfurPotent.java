@@ -47,4 +47,9 @@ public class BlockSulfurPotent extends BlockSulfur implements BlockEntityHolder<
         createBlockEntity();
         return true;
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

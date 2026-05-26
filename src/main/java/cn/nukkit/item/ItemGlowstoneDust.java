@@ -17,4 +17,9 @@ public class ItemGlowstoneDust extends Item {
     public ItemGlowstoneDust(Integer meta, int count) {
         super(GLOWSTONE_DUST, meta, count, "Glowstone Dust");
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

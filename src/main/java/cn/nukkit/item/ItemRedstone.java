@@ -26,4 +26,9 @@ public class ItemRedstone extends Item implements ItemTrimMaterial {
     public ItemTrimMaterialType getMaterial() {
         return ItemTrimMaterialType.MATERIAL_REDSTONE;
     }
+
+    @Override
+    public boolean isBrewingIngredient() {
+        return true;
+    }
 }

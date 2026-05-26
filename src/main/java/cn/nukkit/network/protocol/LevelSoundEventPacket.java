@@ -903,8 +903,48 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v975
      */
     public static final int SOUND_BOUNCE = 600;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_SLIME_LANDING = 601;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_ABSORB_BLOCK = 602;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_EJECT_BLOCK = 603;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_GEYSER_ERUPTION_START = 604;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_GEYSER_ERUPTION_ACTIVE = 605;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_RECORD_BOUNCE = 606;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_BUCKET_FILL_LAND_ANIMAL = 607;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_BUCKET_EMPTY_LAND_ANIMAL = 608;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_GEYSER_CONTINUOUS_ERUPTION_START = 609;
+    /**
+     * @since v1001
+     */
+    public static final int SOUND_GEYSER_CONTINUOUS_ERUPTION_ACTIVE = 610;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(601);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(611);
 
     public int sound;
     public float x;
