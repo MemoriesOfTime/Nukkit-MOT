@@ -2138,39 +2138,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double dy = clientPos.y - this.y;
         double dz = clientPos.z - this.z;
 
-        // fastMove collision resolution + speed check on server correction amount (EC pattern)
-        if (!revert) {
-            this.fastMove(dx, dy, dz);
-
-            // Calculate server correction amount (how much fastMove deviated from client position)
-            double diffX = this.x - clientPos.x;
-            double diffY = this.y - clientPos.y;
-            double diffZ = this.z - clientPos.z;
-
-            if (diffX != 0 || diffY != 0 || diffZ != 0) {
-                // Check correction amount, not raw client movement delta
-                if (this.checkMovement && this.riptideTicks <= 0 && this.riding == null && !this.isGliding() && !this.getAllowFlight()) {
-                    double diffHorizontalSqr = (diffX * diffX + diffZ * diffZ) / tickDiffSq;
-                    if (diffHorizontalSqr > MAXIMUM_SPEED) {
-                        PlayerInvalidMoveEvent ev;
-                        this.getServer().getPluginManager().callEvent(ev = new PlayerInvalidMoveEvent(this, true));
-                        if (!ev.isCancelled()) {
-                            revert = ev.isRevert();
-                            if (revert) {
-                                server.getLogger().debug(username + ": diffHSpeed=" + diffHorizontalSqr + " > MAXIMUM_SPEED=" + MAXIMUM_SPEED);
-                            }
-                        }
+        // Anti-speed-hack: raw horizontal delta check, normalized by tickDiff to tolerate lag spikes.
+        // Exempt riptide, recent knockback, riding, gliding, and global allow-flight; otherwise reject and fire PlayerInvalidMoveEvent.
+        if (!revert && this.checkMovement && this.riptideTicks <= 0 && this.knockBackTime <= 0 && this.riding == null && !this.isGliding() && !this.getAllowFlight()) {
+            double hSpeedSqr = (dx * dx + dz * dz) / tickDiffSq;
+            if (hSpeedSqr > MAXIMUM_SPEED) {
+                PlayerInvalidMoveEvent ev;
+                this.getServer().getPluginManager().callEvent(ev = new PlayerInvalidMoveEvent(this, true));
+                if (!ev.isCancelled()) {
+                    revert = ev.isRevert();
+                    if (revert) {
+                        server.getLogger().debug(username + ": hSpeedSqr=" + hSpeedSqr + " > MAXIMUM_SPEED=" + MAXIMUM_SPEED);
                     }
                 }
+            }
+        }
 
-                // Accept client position (revert flag handles correction at end)
+        if (!revert) {
+            // Anti-noclip: keep a slight horizontal tolerance for stairs/slabs, but always validate the full destination height.
+            AxisAlignedBB destinationBox = this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, 0, 0.1);
+            if (this.isSpectator() || !this.level.hasCollision(this, destinationBox, false)) {
                 this.x = clientPos.x;
                 this.y = clientPos.y;
                 this.z = clientPos.z;
                 this.boundingBox.setBounds(this.x - 0.3, this.y, this.z - 0.3, this.x + 0.3, this.y + this.getHeight(), this.z + 0.3);
-
-                this.checkChunks();
+            } else {
+                revert = true;
             }
+
+            this.checkChunks();
 
             // Ground check
             if (!this.isSpectator() && (!this.onGround || dy != 0)) {
