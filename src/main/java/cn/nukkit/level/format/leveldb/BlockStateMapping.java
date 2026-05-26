@@ -5,7 +5,6 @@ import cn.nukkit.block.Block;
 import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterChunker;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterVanilla;
-import cn.nukkit.level.format.leveldb.updater.BlockStateUpdater_1_21_110_NoVersionBump;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -106,7 +105,7 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_21_30.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_40.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_60.INSTANCE);
-        blockStateUpdaters.add(BlockStateUpdater_1_21_110_NoVersionBump.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_110.INSTANCE);
 
         blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
 
