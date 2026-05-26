@@ -2155,37 +2155,37 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (!revert) {
-            // Anti-noclip: keep a slight horizontal tolerance for stairs/slabs, but always validate the full destination height.
-            AxisAlignedBB destinationBox = this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, 0, 0.1);
+            // Anti-noclip: horizontal tolerance + stepHeight Y shrink so stairs/slabs/walkable partial blocks
+            // within the player's step range do not falsely trigger a revert (aligned with upstream Nukkit).
+            AxisAlignedBB destinationBox = this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, this.getStepHeight(), 0.1);
             if (this.isSpectator() || !this.level.hasCollision(this, destinationBox, false)) {
                 this.x = clientPos.x;
                 this.y = clientPos.y;
                 this.z = clientPos.z;
                 this.boundingBox.setBounds(this.x - 0.3, this.y, this.z - 0.3, this.x + 0.3, this.y + this.getHeight(), this.z + 0.3);
+                this.checkChunks();
+
+                // Ground check
+                if (!this.isSpectator() && (!this.onGround || dy != 0)) {
+                    AxisAlignedBB bb = this.boundingBox.clone();
+                    bb.setMinY(bb.getMinY() - 0.75);
+
+                    // Hack: fix fall damage from walls while falling
+                    if (Math.abs(dy) > 0.01) {
+                        bb.setMinX(bb.getMinX() + 0.1);
+                        bb.setMaxX(bb.getMaxX() - 0.1);
+                        bb.setMinZ(bb.getMinZ() + 0.1);
+                        bb.setMaxZ(bb.getMaxZ() - 0.1);
+                    }
+
+                    this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+                }
+
+                this.isCollided = this.onGround;
+                this.updateFallState(this.onGround);
             } else {
                 revert = true;
             }
-
-            this.checkChunks();
-
-            // Ground check
-            if (!this.isSpectator() && (!this.onGround || dy != 0)) {
-                AxisAlignedBB bb = this.boundingBox.clone();
-                bb.setMinY(bb.getMinY() - 0.75);
-
-                // Hack: fix fall damage from walls while falling
-                if (Math.abs(dy) > 0.01) {
-                    bb.setMinX(bb.getMinX() + 0.1);
-                    bb.setMaxX(bb.getMaxX() - 0.1);
-                    bb.setMinZ(bb.getMinZ() + 0.1);
-                    bb.setMaxZ(bb.getMaxZ() - 0.1);
-                }
-
-                this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
-            }
-
-            this.isCollided = this.onGround;
-            this.updateFallState(this.onGround);
         }
 
         Location from = new Location(
