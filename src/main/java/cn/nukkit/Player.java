@@ -175,6 +175,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final float MAXIMUM_SPEED = 0.5f;
     public static final float DEFAULT_FLY_SPEED = 0.05f;
     public static final float DEFAULT_VERTICAL_FLY_SPEED = 1.0f;
+    private static final int SERVER_MOTION_ALLOWANCE_TICKS = 10;
+    private static final double SERVER_MOTION_EPSILON = 1.0E-6;
 
     public static final int PERMISSION_CUSTOM = 3;
     public static final int PERMISSION_OPERATOR = 2;
@@ -284,6 +286,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int inAirTicks = 0;
     protected int startAirTicks = 5;
     protected int lastInAirTick = 0;
+    private double serverMotionAllowanceX;
+    private double serverMotionAllowanceZ;
+    private int serverMotionAllowanceTicks;
 
     protected AdventureSettings adventureSettings;
     protected Color locatorBarColor;
@@ -1213,6 +1218,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.foodData.setLevel(20, 20);
             this.sendData(this);
         } else {
+            this.clearServerMotionAllowance();
             Position respawnPosition = respawnEvent.getRespawnPosition();
             this.setPosition(respawnPosition);
             this.sendPosition(respawnPosition, yaw, pitch, MovePlayerPacket.MODE_RESET);
@@ -2138,10 +2144,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double dy = clientPos.y - this.y;
         double dz = clientPos.z - this.z;
 
-        // Anti-speed-hack: raw horizontal delta check, normalized by tickDiff to tolerate lag spikes.
-        // Exempt riptide, recent knockback, riding, gliding, and global allow-flight; otherwise reject and fire PlayerInvalidMoveEvent.
-        if (!revert && this.checkMovement && this.riptideTicks <= 0 && this.knockBackTime <= 0 && this.riding == null && !this.isGliding() && !this.getAllowFlight()) {
-            double hSpeedSqr = (dx * dx + dz * dz) / tickDiffSq;
+        double expectedHorizontalSqr = 0;
+        if (this.serverMotionAllowanceTicks > 0) {
+            expectedHorizontalSqr = this.consumeServerMotionAllowance(tickDiff);
+        }
+
+        // Anti-speed-hack: compare client delta against server-authorized motion,
+        // matching vanilla's movedDist - expected velocity model instead of using knockback time as a blanket bypass.
+        if (!revert && this.checkMovement && this.riptideTicks <= 0 && this.riding == null && !this.isGliding() && !this.getAllowFlight()) {
+            double hSpeedSqr = Math.max(0, dx * dx + dz * dz - expectedHorizontalSqr) / tickDiffSq;
             if (hSpeedSqr > MAXIMUM_SPEED) {
                 PlayerInvalidMoveEvent ev;
                 this.getServer().getPluginManager().callEvent(ev = new PlayerInvalidMoveEvent(this, true));
@@ -2155,9 +2166,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (!revert) {
-            // Anti-noclip: horizontal tolerance + stepHeight Y shrink so stairs/slabs/walkable partial blocks
-            // within the player's step range do not falsely trigger a revert (aligned with upstream Nukkit).
-            AxisAlignedBB destinationBox = this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, this.getStepHeight(), 0.1);
+            // Anti-noclip: keep horizontal tolerance, but validate the full destination height.
+            AxisAlignedBB destinationBox = this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, 0, 0.1);
             if (this.isSpectator() || !this.level.hasCollision(this, destinationBox, false)) {
                 this.x = clientPos.x;
                 this.y = clientPos.y;
@@ -2244,6 +2254,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // Unified revert handling (EC pattern: MODE_NORMAL for softer correction)
         if (revert) {
+            this.clearServerMotionAllowance();
             this.x = from.x;
             this.y = from.y;
             this.z = from.z;
@@ -2375,6 +2386,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     @Override
     public boolean setMotion(Vector3 motion) {
         if (super.setMotion(motion)) {
+            boolean sentToClient = false;
             if (this.chunk != null && this.spawned) {
                 this.addMotion(this.motionX, this.motionY, this.motionZ); // Send to others
                 SetEntityMotionPacket pk = new SetEntityMotionPacket();
@@ -2382,7 +2394,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 pk.motionX = (float) motion.x;
                 pk.motionY = (float) motion.y;
                 pk.motionZ = (float) motion.z;
-                this.dataPacket(pk);
+                sentToClient = this.dataPacket(pk);
+            }
+
+            if (sentToClient) {
+                this.setServerMotionAllowance(motion);
+            } else {
+                this.clearServerMotionAllowance();
             }
 
             if (this.motionY > 0) {
@@ -2393,6 +2411,40 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return false;
+    }
+
+    private void setServerMotionAllowance(Vector3 motion) {
+        this.serverMotionAllowanceX = motion.x;
+        this.serverMotionAllowanceZ = motion.z;
+        this.serverMotionAllowanceTicks = SERVER_MOTION_ALLOWANCE_TICKS;
+        if (this.serverMotionAllowanceX * this.serverMotionAllowanceX + this.serverMotionAllowanceZ * this.serverMotionAllowanceZ <= SERVER_MOTION_EPSILON) {
+            this.clearServerMotionAllowance();
+        }
+    }
+
+    private double consumeServerMotionAllowance(int tickDiff) {
+        double expectedX = 0;
+        double expectedZ = 0;
+        double drag = 1 - this.getDrag();
+        for (int i = 0; i < tickDiff && this.serverMotionAllowanceTicks > 0; i++) {
+            expectedX += this.serverMotionAllowanceX;
+            expectedZ += this.serverMotionAllowanceZ;
+            this.serverMotionAllowanceX *= drag;
+            this.serverMotionAllowanceZ *= drag;
+            this.serverMotionAllowanceTicks--;
+        }
+
+        if (this.serverMotionAllowanceTicks <= 0
+                || this.serverMotionAllowanceX * this.serverMotionAllowanceX + this.serverMotionAllowanceZ * this.serverMotionAllowanceZ <= SERVER_MOTION_EPSILON) {
+            this.clearServerMotionAllowance();
+        }
+        return expectedX * expectedX + expectedZ * expectedZ;
+    }
+
+    private void clearServerMotionAllowance() {
+        this.serverMotionAllowanceX = 0;
+        this.serverMotionAllowanceZ = 0;
+        this.serverMotionAllowanceTicks = 0;
     }
 
     /**
@@ -5826,6 +5878,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void close(TextContainer message, String reason, boolean notify) {
         if (this.connected && !this.closed) {
+            this.clearServerMotionAllowance();
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
                 if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
@@ -6712,6 +6765,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.clearServerMotionAllowance();
             this.removeAllWindows();
             this.formOpen = false;
 
