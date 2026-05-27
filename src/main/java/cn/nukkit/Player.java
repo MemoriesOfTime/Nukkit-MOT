@@ -2193,6 +2193,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.isCollided = this.onGround;
                 this.updateFallState(this.onGround);
+                this.checkSwimmingState();
             } else {
                 revert = true;
             }
@@ -4136,7 +4137,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case PlayerActionPacket.ACTION_STOP_SWIMMING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput()) break;
                         ptse = new PlayerToggleSwimEvent(this, false);
-                        if (this.riding != null || this.sleeping != null || !this.isInsideOfWater()) {
+                        if (this.riding != null || this.sleeping != null) {
                             ptse.setCancelled(true);
                         }
                         this.server.getPluginManager().callEvent(ptse);
@@ -6801,6 +6802,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return false;
+    }
+
+    public void checkSwimmingState() {
+        if (this.isSwimming() && !this.isInsideOfWater()) {
+            this.setSwimming(false);
+        }
     }
 
     protected void forceSendEmptyChunks() {
