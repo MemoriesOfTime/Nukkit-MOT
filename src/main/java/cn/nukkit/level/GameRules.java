@@ -42,7 +42,7 @@ public class GameRules {
         gameRules.gameRules.put(FREEZE_DAMAGE, new Value<>(Type.BOOLEAN, true, 440));
         gameRules.gameRules.put(FUNCTION_COMMAND_LIMIT, new Value<>(Type.INTEGER, 10000, 332));
         gameRules.gameRules.put(KEEP_INVENTORY, new Value<>(Type.BOOLEAN, false));
-        gameRules.gameRules.put(LOCATOR_BAR, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_21_80));
+        gameRules.gameRules.put(LOCATOR_BAR, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_21_80, ProtocolInfo.v1_26_30));
         gameRules.gameRules.put(PLAYER_WAYPOINTS, new Value<>(Type.INTEGER, PlayerWaypointsMode.OFF.ordinal(), ProtocolInfo.v1_26_30));
         gameRules.gameRules.put(MAX_COMMAND_CHAIN_LENGTH, new Value<>(Type.INTEGER, 65536));
         gameRules.gameRules.put(MOB_GRIEFING, new Value<>(Type.BOOLEAN, true));
@@ -293,6 +293,7 @@ public class GameRules {
         private T value;
         private boolean canBeChanged;
         private int minProtocol;
+        private int maxProtocol = Integer.MAX_VALUE;
 
         public Value(Type type, T value) {
             this.type = type;
@@ -303,6 +304,13 @@ public class GameRules {
             this.type = type;
             this.value = value;
             this.minProtocol = minProtocol;
+        }
+
+        public Value(Type type, T value, int minProtocol, int maxProtocol) {
+            this.type = type;
+            this.value = value;
+            this.minProtocol = minProtocol;
+            this.maxProtocol = maxProtocol;
         }
 
         private void setValue(T value, Type type) {
@@ -326,6 +334,10 @@ public class GameRules {
 
         public int getMinProtocol() {
             return minProtocol;
+        }
+
+        public int getMaxProtocol() {
+            return maxProtocol;
         }
 
         private boolean getValueAsBoolean() {
