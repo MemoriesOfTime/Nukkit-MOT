@@ -105,5 +105,32 @@ public final class DispenseBehaviorRegister {
         registerBehavior(ItemID.MINECART_WITH_CHEST, new MinecartDispenseBehavior());
         registerBehavior(ItemID.MINECART_WITH_HOPPER, new MinecartDispenseBehavior());
         registerBehavior(ItemID.MINECART_WITH_TNT, new MinecartDispenseBehavior());
+
+        ArmorDispenseBehavior armorBehavior = new ArmorDispenseBehavior();
+        registerBehavior(ItemID.LEATHER_HELMET, armorBehavior);
+        registerBehavior(ItemID.LEATHER_CHESTPLATE, armorBehavior);
+        registerBehavior(ItemID.LEATHER_LEGGINGS, armorBehavior);
+        registerBehavior(ItemID.LEATHER_BOOTS, armorBehavior);
+        registerBehavior(ItemID.CHAIN_HELMET, armorBehavior);
+        registerBehavior(ItemID.CHAIN_CHESTPLATE, armorBehavior);
+        registerBehavior(ItemID.CHAIN_LEGGINGS, armorBehavior);
+        registerBehavior(ItemID.CHAIN_BOOTS, armorBehavior);
+        registerBehavior(ItemID.IRON_HELMET, armorBehavior);
+        registerBehavior(ItemID.IRON_CHESTPLATE, armorBehavior);
+        registerBehavior(ItemID.IRON_LEGGINGS, armorBehavior);
+        registerBehavior(ItemID.IRON_BOOTS, armorBehavior);
+        registerBehavior(ItemID.GOLD_HELMET, armorBehavior);
+        registerBehavior(ItemID.GOLD_CHESTPLATE, armorBehavior);
+        registerBehavior(ItemID.GOLD_LEGGINGS, armorBehavior);
+        registerBehavior(ItemID.GOLD_BOOTS, armorBehavior);
+        registerBehavior(ItemID.DIAMOND_HELMET, armorBehavior);
+        registerBehavior(ItemID.DIAMOND_CHESTPLATE, armorBehavior);
+        registerBehavior(ItemID.DIAMOND_LEGGINGS, armorBehavior);
+        registerBehavior(ItemID.DIAMOND_BOOTS, armorBehavior);
+        registerBehavior(ItemID.NETHERITE_HELMET, armorBehavior);
+        registerBehavior(ItemID.NETHERITE_CHESTPLATE, armorBehavior);
+        registerBehavior(ItemID.NETHERITE_LEGGINGS, armorBehavior);
+        registerBehavior(ItemID.NETHERITE_BOOTS, armorBehavior);
+        registerBehavior(ItemID.TURTLE_HELMET, armorBehavior);
     }
 }
