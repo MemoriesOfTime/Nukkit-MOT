@@ -5,14 +5,12 @@ import cn.nukkit.Server;
 import cn.nukkit.event.inventory.InventoryClickEvent;
 import cn.nukkit.event.inventory.InventoryTransactionEvent;
 import cn.nukkit.event.player.PlayerTransferItemEvent;
-import cn.nukkit.inventory.Inventory;
-import cn.nukkit.inventory.PlayerInventory;
-import cn.nukkit.inventory.PlayerUIComponent;
-import cn.nukkit.inventory.PlayerUIInventory;
+import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.InventoryTransaction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Sound;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequestSlotData;
@@ -47,6 +45,10 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         int count = action.getCount();
 
         if (srcInv == null || dstInv == null) {
+            return context.error();
+        }
+
+        if (sameInventorySlot(srcInv, srcSlot, dstInv, dstSlot)) {
             return context.error();
         }
 
@@ -155,6 +157,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         Item originalSourceItem = sourceItem.clone();
 
         if (!dstInv.setItem(dstSlot, newDest, sendDest)) {
+            playBundleSound(player, dstInv, Sound.BUNDLE_INSERT_FAIL);
             return context.error();
         }
 
@@ -175,6 +178,9 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         if (srcInv.getItem(srcSlot).isNull() && !fullTransfer) {
             srcInv.setItem(srcSlot, originalSourceItem, sendSource);
         }
+
+        playBundleSound(player, dstInv, Sound.BUNDLE_INSERT);
+        playBundleSound(player, srcInv, Sound.BUNDLE_REMOVE_ONE);
 
         List<ItemStackResponseContainer> containers = new ArrayList<>();
         containers.add(buildContainer(srcInv, srcSlot, src));
@@ -233,6 +239,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
 
         Item originalDestItem = destItem.clone();
         if (!dstInv.setItem(dstSlot, newDest, sendDest)) {
+            playBundleSound(player, dstInv, Sound.BUNDLE_INSERT_FAIL);
             return context.error();
         }
 
@@ -248,7 +255,17 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             return context.error();
         }
 
+        playBundleSound(player, dstInv, Sound.BUNDLE_INSERT);
+        playBundleSound(player, srcInv, Sound.BUNDLE_REMOVE_ONE);
+
         return context.success(List.of(buildContainer(dstInv, dstSlot, dst)));
+    }
+
+    private static void playBundleSound(Player player, Inventory inventory, Sound sound) {
+        if (!(inventory instanceof BundleInventory) || player.getLevel() == null) {
+            return;
+        }
+        player.getLevel().addSound(player, sound);
     }
 
     private static boolean isEquipmentSlot(ContainerSlotType type) {
@@ -261,6 +278,9 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
      * inventories accept any item.
      */
     static boolean isSlotCompatible(Inventory inventory, int slot, Item item) {
+        if (inventory instanceof PlayerOffhandInventory) {
+            return item == null || item.isNull() || item.canBePutInOffhandSlot();
+        }
         if (inventory instanceof PlayerInventory playerInv) {
             int size = playerInv.getSize();
             if (slot == size) {
@@ -330,6 +350,29 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
                 && Objects.equals(first.getDynamicId(), second.getDynamicId());
     }
 
+    private static boolean sameInventorySlot(Inventory first, int firstSlot, Inventory second, int secondSlot) {
+        Inventory firstCanonical = ItemStackRequestHandler.canonicalizeInventory(first);
+        Inventory secondCanonical = ItemStackRequestHandler.canonicalizeInventory(second);
+        int firstCanonicalSlot = canonicalSlot(first, firstSlot);
+        int secondCanonicalSlot = canonicalSlot(second, secondSlot);
+        return firstCanonical != null
+                && firstCanonical == secondCanonical
+                && firstCanonicalSlot == secondCanonicalSlot;
+    }
+
+    private static int canonicalSlot(Inventory inventory, int slot) {
+        if (inventory instanceof PlayerCursorInventory) {
+            return 0;
+        }
+        if (inventory instanceof BigCraftingGrid) {
+            return slot + 32;
+        }
+        if (inventory instanceof CraftingGrid) {
+            return slot + 28;
+        }
+        return slot;
+    }
+
     /**
      * InventoryTransaction subclass used solely to emit
      * {@link InventoryTransactionEvent} for server-authoritative item stack
@@ -368,28 +411,27 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
                 return false;
             }
 
-            // Snapshot affected slots before firing the event so we can tell
-            // whether a plugin actually mutated the inventory when cancelling.
+            // Snapshot complete affected inventories before firing the event so
+            // cancellation handlers can intentionally modify any slot without
+            // the outer ItemStackRequest rollback undoing those plugin changes.
             Map<Inventory, Map<Integer, Item>> preStates = new HashMap<>();
             for (InventoryAction action : this.actions) {
                 if (action instanceof SlotChangeAction slotChange) {
                     Inventory inv = slotChange.getInventory();
-                    int slot = slotChange.getSlot();
-                    preStates.computeIfAbsent(inv, k -> new HashMap<>()).put(slot, inv.getItem(slot).clone());
+                    Inventory canonical = ItemStackRequestHandler.canonicalizeInventory(inv);
+                    if (canonical != null && !preStates.containsKey(canonical)) {
+                        preStates.put(canonical, copyContents(canonical));
+                    }
                 }
             }
 
             if (!callExecuteEvent()) {
                 if (context != null) {
-                    for (InventoryAction action : this.actions) {
-                        if (action instanceof SlotChangeAction slotChange) {
-                            Inventory inv = slotChange.getInventory();
-                            int slot = slotChange.getSlot();
-                            Item before = preStates.getOrDefault(inv, Collections.emptyMap()).get(slot);
-                            Item after = inv.getItem(slot);
-                            if (before == null || after == null || !before.equals(after, true, true)) {
-                                context.addPluginModifiedInventory(inv);
-                            }
+                    for (Map.Entry<Inventory, Map<Integer, Item>> entry : preStates.entrySet()) {
+                        Inventory inv = entry.getKey();
+                        Map<Integer, Item> modifiedSlots = changedSlots(entry.getValue(), copyContents(inv));
+                        if (!modifiedSlots.isEmpty()) {
+                            context.addPluginModifiedSlots(inv, modifiedSlots);
                         }
                     }
                 }
@@ -397,6 +439,40 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             }
             this.hasExecuted = true;
             return true;
+        }
+
+        private static Map<Integer, Item> copyContents(Inventory inventory) {
+            LinkedHashMap<Integer, Item> snapshot = new LinkedHashMap<>();
+            for (var entry : inventory.getContents().entrySet()) {
+                Item item = entry.getValue();
+                if (item != null && !item.isNull() && item.getCount() > 0) {
+                    snapshot.put(entry.getKey(), item.clone());
+                }
+            }
+            return snapshot;
+        }
+
+        private static Map<Integer, Item> changedSlots(Map<Integer, Item> before, Map<Integer, Item> after) {
+            LinkedHashMap<Integer, Item> changed = new LinkedHashMap<>();
+            LinkedHashSet<Integer> slots = new LinkedHashSet<>(before.keySet());
+            slots.addAll(after.keySet());
+            for (int slot : slots) {
+                Item previous = before.get(slot);
+                Item current = after.get(slot);
+                if (!itemsEqual(previous, current)) {
+                    changed.put(slot, current == null ? Item.get(Item.AIR) : current.clone());
+                }
+            }
+            return changed;
+        }
+
+        private static boolean itemsEqual(Item first, Item second) {
+            boolean firstEmpty = first == null || first.isNull() || first.getCount() <= 0;
+            boolean secondEmpty = second == null || second.isNull() || second.getCount() <= 0;
+            if (firstEmpty || secondEmpty) {
+                return firstEmpty == secondEmpty;
+            }
+            return first.equalsExact(second);
         }
     }
 

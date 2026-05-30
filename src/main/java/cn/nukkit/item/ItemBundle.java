@@ -1,8 +1,11 @@
 package cn.nukkit.item;
 
 import cn.nukkit.GameVersion;
+import cn.nukkit.Player;
 import cn.nukkit.inventory.BundleInventory;
 import cn.nukkit.inventory.InventoryHolder;
+import cn.nukkit.level.Sound;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -20,6 +23,8 @@ public class ItemBundle extends StringItemBase implements InventoryHolder {
 
     private static final AtomicInteger NEXT_BUNDLE_ID = new AtomicInteger(1);
 
+    private int bundleId;
+    private int sourceBundleId;
     private BundleInventory inventory;
 
     public ItemBundle() {
@@ -42,6 +47,17 @@ public class ItemBundle extends StringItemBase implements InventoryHolder {
 
     public int getBundleId() {
         return ensureBundleTag().getInt(TAG_BUNDLE_ID);
+    }
+
+    public boolean matchesBundleIdentity(int bundleId) {
+        if (bundleId <= 0) {
+            return false;
+        }
+        if (this.bundleId == bundleId || this.sourceBundleId == bundleId) {
+            return true;
+        }
+        CompoundTag tag = this.hasCompoundTag() ? this.getNamedTag() : null;
+        return tag != null && tag.contains(TAG_BUNDLE_ID) && tag.getInt(TAG_BUNDLE_ID) == bundleId;
     }
 
     @Override
@@ -70,9 +86,38 @@ public class ItemBundle extends StringItemBase implements InventoryHolder {
     public Item setNamedTag(CompoundTag tag) {
         super.setNamedTag(tag);
         if (tag != null && tag.contains(TAG_BUNDLE_ID)) {
-            NEXT_BUNDLE_ID.updateAndGet(current -> Math.max(current, tag.getInt(TAG_BUNDLE_ID) + 1));
+            int tagBundleId = tag.getInt(TAG_BUNDLE_ID);
+            NEXT_BUNDLE_ID.updateAndGet(current -> Math.max(current, tagBundleId + 1));
+            if (this.bundleId <= 0) {
+                this.sourceBundleId = tagBundleId;
+                this.bundleId = NEXT_BUNDLE_ID.getAndIncrement();
+            }
         }
         return this;
+    }
+
+    @Override
+    public boolean onClickAir(Player player, Vector3 directionVector) {
+        Map.Entry<Integer, Item> entry = this.getInventory().getContents().entrySet().stream()
+                .filter(e -> e.getValue() != null && !e.getValue().isNull())
+                .min(Map.Entry.comparingByKey())
+                .orElse(null);
+        if (entry == null) {
+            return false;
+        }
+
+        Item item = entry.getValue().clone();
+        if (!this.getInventory().clear(entry.getKey(), false)) {
+            return false;
+        }
+        if (!player.dropItem(item)) {
+            this.getInventory().setItem(entry.getKey(), entry.getValue(), false);
+            return false;
+        }
+        if (player.getLevel() != null) {
+            player.getLevel().addSound(player, Sound.BUNDLE_DROP_CONTENTS);
+        }
+        return true;
     }
 
     @Override
@@ -82,12 +127,32 @@ public class ItemBundle extends StringItemBase implements InventoryHolder {
         return cloned;
     }
 
+    public void assignNewBundleId() {
+        CompoundTag tag = this.hasCompoundTag() ? this.getNamedTag() : new CompoundTag();
+        int oldBundleId = this.bundleId > 0 ? this.bundleId
+                : tag.contains(TAG_BUNDLE_ID) ? tag.getInt(TAG_BUNDLE_ID) : this.sourceBundleId;
+        this.sourceBundleId = oldBundleId;
+        this.bundleId = NEXT_BUNDLE_ID.getAndIncrement();
+        tag.putInt(TAG_BUNDLE_ID, this.bundleId);
+        if (!tag.containsList(TAG_STORAGE_ITEM_COMPONENT_CONTENT)) {
+            tag.putList(new ListTag<>(TAG_STORAGE_ITEM_COMPONENT_CONTENT));
+        }
+        this.setNamedTag(tag);
+    }
+
     private CompoundTag ensureBundleTag() {
         CompoundTag tag = this.hasCompoundTag() ? this.getNamedTag() : new CompoundTag();
         boolean dirty = !this.hasCompoundTag();
 
-        if (!tag.contains(TAG_BUNDLE_ID)) {
-            tag.putInt(TAG_BUNDLE_ID, NEXT_BUNDLE_ID.getAndIncrement());
+        if (this.bundleId <= 0) {
+            if (this.sourceBundleId <= 0 && tag.contains(TAG_BUNDLE_ID)) {
+                this.sourceBundleId = tag.getInt(TAG_BUNDLE_ID);
+            }
+            this.bundleId = NEXT_BUNDLE_ID.getAndIncrement();
+            tag.putInt(TAG_BUNDLE_ID, this.bundleId);
+            dirty = true;
+        } else if (!tag.contains(TAG_BUNDLE_ID) || tag.getInt(TAG_BUNDLE_ID) != this.bundleId) {
+            tag.putInt(TAG_BUNDLE_ID, this.bundleId);
             dirty = true;
         } else {
             NEXT_BUNDLE_ID.updateAndGet(current -> Math.max(current, tag.getInt(TAG_BUNDLE_ID) + 1));

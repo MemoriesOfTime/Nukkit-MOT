@@ -3,6 +3,7 @@ package cn.nukkit.inventory.request;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.inventory.*;
+import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBundle;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import org.junit.jupiter.api.BeforeAll;
@@ -91,5 +92,77 @@ class NetworkMappingTest {
 
         assertEquals(innerBundle.getBundleId(), bundleInventory.getHolder().getBundleId());
         assertEquals(innerBundle.getInventory().getContents(), bundleInventory.getContents());
+    }
+
+    @Test
+    void clonedBundlesReceiveDistinctDynamicContainerIdsInSameInventory() {
+        Player player = Mockito.mock(Player.class);
+        PlayerOffhandInventory offhand = Mockito.mock(PlayerOffhandInventory.class);
+        PlayerCursorInventory cursor = Mockito.mock(PlayerCursorInventory.class);
+        CraftingGrid craftingGrid = Mockito.mock(CraftingGrid.class);
+
+        Player holder = Mockito.mock(Player.class);
+        PlayerInventory realInventory = new PlayerInventory(holder);
+
+        ItemBundle firstBundle = new ItemBundle();
+        firstBundle.getInventory().setItem(0, Item.get(Item.STONE, 0, 1), false);
+        ItemBundle secondBundle = firstBundle.clone();
+        assertTrue(realInventory.setItem(0, firstBundle, false));
+        assertTrue(realInventory.setItem(1, secondBundle, false));
+        firstBundle = (ItemBundle) realInventory.getUnclonedItem(0);
+        secondBundle = (ItemBundle) realInventory.getUnclonedItem(1);
+
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getInventory()).thenReturn(realInventory);
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getCursorInventory()).thenReturn(cursor);
+        Mockito.when(player.getCraftingGrid()).thenReturn(craftingGrid);
+        Mockito.when(offhand.getContents()).thenReturn(Map.of());
+        Mockito.when(cursor.getContents()).thenReturn(Map.of());
+        Mockito.when(craftingGrid.getContents()).thenReturn(Map.of());
+
+        assertNotEquals(firstBundle.getBundleId(), secondBundle.getBundleId());
+
+        Inventory resolved = NetworkMapping.getInventory(player, ContainerSlotType.DYNAMIC_CONTAINER, secondBundle.getBundleId());
+        BundleInventory bundleInventory = assertInstanceOf(BundleInventory.class, resolved);
+
+        assertSame(secondBundle.getInventory(), bundleInventory);
+    }
+
+    @Test
+    void clonedBundleIdDoesNotCollideWithNestedBundleInSameAccessibleInventory() {
+        Player player = Mockito.mock(Player.class);
+        PlayerOffhandInventory offhand = Mockito.mock(PlayerOffhandInventory.class);
+        PlayerCursorInventory cursor = Mockito.mock(PlayerCursorInventory.class);
+        CraftingGrid craftingGrid = Mockito.mock(CraftingGrid.class);
+
+        Player holder = Mockito.mock(Player.class);
+        PlayerInventory realInventory = new PlayerInventory(holder);
+
+        ItemBundle nestedBundle = new ItemBundle();
+        ItemBundle outerBundle = new ItemBundle();
+        assertTrue(outerBundle.getInventory().setItem(0, nestedBundle, false));
+        ItemBundle looseBundle = nestedBundle.clone();
+        assertTrue(realInventory.setItem(0, outerBundle, false));
+        assertTrue(realInventory.setItem(1, looseBundle, false));
+        outerBundle = (ItemBundle) realInventory.getUnclonedItem(0);
+        looseBundle = (ItemBundle) realInventory.getUnclonedItem(1);
+        nestedBundle = (ItemBundle) outerBundle.getInventory().getUnclonedItem(0);
+
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getInventory()).thenReturn(realInventory);
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getCursorInventory()).thenReturn(cursor);
+        Mockito.when(player.getCraftingGrid()).thenReturn(craftingGrid);
+        Mockito.when(offhand.getContents()).thenReturn(Map.of());
+        Mockito.when(cursor.getContents()).thenReturn(Map.of());
+        Mockito.when(craftingGrid.getContents()).thenReturn(Map.of());
+
+        assertNotEquals(nestedBundle.getBundleId(), looseBundle.getBundleId());
+
+        Inventory resolved = NetworkMapping.getInventory(player, ContainerSlotType.DYNAMIC_CONTAINER, looseBundle.getBundleId());
+        BundleInventory bundleInventory = assertInstanceOf(BundleInventory.class, resolved);
+
+        assertSame(looseBundle.getInventory(), bundleInventory);
     }
 }

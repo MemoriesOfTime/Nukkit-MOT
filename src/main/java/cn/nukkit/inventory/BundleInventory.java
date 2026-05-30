@@ -1,6 +1,7 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBundle;
 import cn.nukkit.nbt.NBTIO;
@@ -33,6 +34,13 @@ public class BundleInventory extends BaseInventory {
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
+        if (!canStore(item)) {
+            return false;
+        }
+        if (wouldCreateBundleCycle(item)) {
+            return false;
+        }
+
         int newWeight = getWeight() - getWeight(this.getItemFast(index)) + getWeight(item);
         if (newWeight > MAX_FILL) {
             return false;
@@ -66,7 +74,7 @@ public class BundleInventory extends BaseInventory {
         pk.storageItem = getHolder().clone();
 
         for (Player player : players) {
-            if (!player.spawned || player.protocol < ProtocolInfo.v1_21_20) {
+            if (!player.spawned || player.protocol < ProtocolInfo.v1_21_40) {
                 continue;
             }
             pk.inventoryId = DYNAMIC_REGISTRY_WINDOW_ID;
@@ -84,7 +92,7 @@ public class BundleInventory extends BaseInventory {
         pk.storageItem = getHolder().clone();
 
         for (Player player : players) {
-            if (!player.spawned || player.protocol < ProtocolInfo.v1_21_20) {
+            if (!player.spawned || player.protocol < ProtocolInfo.v1_21_40) {
                 continue;
             }
             pk.inventoryId = DYNAMIC_REGISTRY_WINDOW_ID;
@@ -115,10 +123,20 @@ public class BundleInventory extends BaseInventory {
             }
 
             Item item = NBTIO.getItemHelper(itemTag);
-            if (!item.isNull()) {
-                this.slots.put(slot, item);
+            if (!item.isNull() && canStore(item) && !wouldCreateBundleCycle(item)) {
+                int newWeight = getWeight() + getWeight(item);
+                if (newWeight <= MAX_FILL) {
+                    this.slots.put(slot, item);
+                }
             }
         }
+    }
+
+    private boolean canStore(Item item) {
+        if (item == null || item.isNull()) {
+            return true;
+        }
+        return item.getId() != BlockID.SHULKER_BOX && item.getId() != BlockID.UNDYED_SHULKER_BOX;
     }
 
     private int getWeight(Set<Integer> visitedBundleIds) {
@@ -147,5 +165,30 @@ public class BundleInventory extends BaseInventory {
         }
 
         return Math.max(1, MAX_FILL / Math.max(1, item.getMaxStackSize())) * item.getCount();
+    }
+
+    private boolean wouldCreateBundleCycle(Item item) {
+        if (!(item instanceof ItemBundle bundle)) {
+            return false;
+        }
+        return containsBundleId(bundle, getHolder().getBundleId(), new HashSet<>());
+    }
+
+    private boolean containsBundleId(ItemBundle bundle, int targetBundleId, Set<Integer> visitedBundleIds) {
+        int bundleId = bundle.getBundleId();
+        if (!visitedBundleIds.add(bundleId)) {
+            return false;
+        }
+        if (bundle.matchesBundleIdentity(targetBundleId)) {
+            return true;
+        }
+
+        for (Item nested : bundle.getInventory().getContents().values()) {
+            if (nested instanceof ItemBundle nestedBundle
+                    && containsBundleId(nestedBundle, targetBundleId, visitedBundleIds)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

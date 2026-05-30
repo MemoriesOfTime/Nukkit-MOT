@@ -131,7 +131,7 @@ public final class ItemStackRequestHandler {
             }
 
             if (error) {
-                rollbackSnapshots(snapshots, context.getPluginModifiedInventories());
+                rollbackSnapshots(snapshots, context.getPluginModifiedSlots());
                 resyncActor(player, snapshots.keySet());
             }
 
@@ -197,7 +197,7 @@ public final class ItemStackRequestHandler {
                 || action instanceof CraftResultsDeprecatedAction;
     }
 
-    private static Inventory canonicalizeInventory(Inventory inventory) {
+    static Inventory canonicalizeInventory(Inventory inventory) {
         if (inventory instanceof PlayerUIComponent component && component.getHolder() instanceof Player player) {
             return player.getUIInventory();
         }
@@ -224,13 +224,11 @@ public final class ItemStackRequestHandler {
         return snapshot;
     }
 
-    private static void rollbackSnapshots(Map<Inventory, Map<Integer, Item>> snapshots, Set<Inventory> pluginModifiedInventories) {
+    private static void rollbackSnapshots(Map<Inventory, Map<Integer, Item>> snapshots,
+                                          Map<Inventory, Map<Integer, Item>> pluginModifiedSlots) {
         for (var entry : snapshots.entrySet()) {
-            Inventory canonical = canonicalizeInventory(entry.getKey());
-            if (canonical != null && pluginModifiedInventories.contains(canonical)) {
-                continue;
-            }
             restoreInventory(entry.getKey(), entry.getValue());
+            replayPluginModifiedSlots(entry.getKey(), pluginModifiedSlots);
         }
     }
 
@@ -260,6 +258,27 @@ public final class ItemStackRequestHandler {
                 canonical.setItem(entry.getKey(), item.clone(), false);
             } else {
                 canonical.clear(entry.getKey(), false);
+            }
+        }
+    }
+
+    private static void replayPluginModifiedSlots(Inventory inventory, Map<Inventory, Map<Integer, Item>> pluginModifiedSlots) {
+        Inventory canonical = canonicalizeInventory(inventory);
+        if (canonical == null || pluginModifiedSlots == null) {
+            return;
+        }
+
+        Map<Integer, Item> modifiedSlots = pluginModifiedSlots.get(canonical);
+        if (modifiedSlots == null || modifiedSlots.isEmpty()) {
+            return;
+        }
+
+        for (var entry : modifiedSlots.entrySet()) {
+            Item item = entry.getValue();
+            if (item == null || item.isNull() || item.getCount() <= 0) {
+                canonical.clear(entry.getKey(), false);
+            } else {
+                canonical.setItem(entry.getKey(), item.clone(), false);
             }
         }
     }

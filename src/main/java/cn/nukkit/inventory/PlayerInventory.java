@@ -301,6 +301,10 @@ public class PlayerInventory extends BaseInventory {
             item = ev.getNewItem();
         }
 
+        if (item instanceof cn.nukkit.item.ItemBundle bundle) {
+            ensureUniqueBundleId(index, bundle);
+        }
+
         Item old = this.getItem(index);
         this.slots.put(index, item.clone());
         this.onSlotChange(index, old, send);

@@ -22,8 +22,6 @@ public class PlayerOffhandInventory extends BaseInventory {
     /**
      * Items that can be put to offhand inventory on Bedrock Edition
      */
-    //private static final IntSet OFFHAND_ITEMS = new IntOpenHashSet(Arrays.asList(ItemID.SHIELD, ItemID.ARROW, ItemID.TOTEM, ItemID.MAP, ItemID.FIREWORKS, ItemID.NAUTILUS_SHELL, ItemID.SPARKLER));
-
     public PlayerOffhandInventory(EntityHumanType holder) {
         super(holder, InventoryType.OFFHAND);
     }
@@ -101,8 +99,7 @@ public class PlayerOffhandInventory extends BaseInventory {
 
     @Override
     public boolean allowedToAdd(Item item) {
-        //return OFFHAND_ITEMS.contains(item.getId());
-        return true;
+        return item == null || item.isNull() || item.canBePutInOffhandSlot();
     }
 
     @Override
@@ -135,6 +132,10 @@ public class PlayerOffhandInventory extends BaseInventory {
                 return false;
             }
             item = ev2.getNewItem();
+        }
+
+        if (item instanceof cn.nukkit.item.ItemBundle bundle) {
+            ensureUniqueBundleId(index, bundle);
         }
 
         this.slots.put(index, item.clone());

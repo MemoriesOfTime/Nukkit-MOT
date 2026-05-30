@@ -5,7 +5,9 @@ import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.entity.passive.EntityVillager;
+import cn.nukkit.event.Event;
 import cn.nukkit.event.inventory.InventoryEvent;
+import cn.nukkit.event.inventory.InventoryTransactionEvent;
 import cn.nukkit.event.inventory.ItemStackRequestActionEvent;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.special.FireworkRecipe;
@@ -14,10 +16,14 @@ import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBundle;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.Sound;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ItemStackResponsePacket;
 import cn.nukkit.network.protocol.PlayerEnchantOptionsPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
@@ -28,6 +34,8 @@ import cn.nukkit.network.protocol.types.inventory.descriptor.ItemTagDescriptor;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequestSlotData;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
+import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus;
+import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.TradeRecipeBuildUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,6 +133,73 @@ class ItemStackRequestProcessorTest {
         assertEquals(Item.DIAMOND, dest.getId());
         assertEquals(64, dest.getCount());
         assertTrue(ui.getItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT).isNull());
+    }
+
+    @Test
+    void offhandRejectsItemsThatBedrockCannotEquip() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+
+        Item stone = Item.get(Item.STONE, 0, 1);
+        stone.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, stone, false));
+        stone = inventory.getItem(0);
+
+        TakeAction action = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, stone.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.OFFHAND, 0, 0, null)
+        );
+
+        ActionResponse response = new TakeActionProcessor().handle(action, player, context());
+
+        assertNotNull(response);
+        assertFalse(response.success());
+        assertEquals(Item.STONE, inventory.getItem(0).getId());
+        assertTrue(offhand.getItem(0).isNull());
+    }
+
+    @Test
+    void offhandAcceptsShield() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+
+        Item shield = Item.get(Item.SHIELD, 0, 1);
+        shield.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, shield, false));
+        shield = inventory.getItem(0);
+
+        TakeAction action = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, shield.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.OFFHAND, 0, 0, null)
+        );
+
+        ActionResponse response = new TakeActionProcessor().handle(action, player, context());
+
+        assertNotNull(response);
+        assertTrue(response.success());
+        assertTrue(inventory.getItem(0).isNull());
+        assertEquals(Item.SHIELD, offhand.getItem(0).getId());
+    }
+
+    @Test
+    void offhandInventoryRejectsNonBedrockOffhandItemsDirectly() {
+        Player player = mockPlayer();
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+
+        assertFalse(offhand.setItem(0, Item.get(Item.STONE, 0, 1), false));
+        assertTrue(offhand.getItem(0).isNull());
+        assertTrue(offhand.setItem(0, Item.get(Item.SHIELD, 0, 1), false));
+        assertEquals(Item.SHIELD, offhand.getItem(0).getId());
     }
 
     @Test
@@ -357,6 +432,200 @@ class ItemStackRequestProcessorTest {
     }
 
     @Test
+    void cancelledTransactionKeepsPluginCountChange() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+        Mockito.when(player.getServer().getPluginManager()).thenReturn(pluginManager);
+        Mockito.doAnswer(invocation -> {
+            Event event = invocation.getArgument(0);
+            if (event instanceof InventoryTransactionEvent transactionEvent) {
+                inventory.setItem(0, Item.get(Item.STONE, 0, 3), false);
+                transactionEvent.setCancelled(true);
+            }
+            return null;
+        }).when(pluginManager).callEvent(any(Event.class));
+
+        Item source = Item.get(Item.STONE, 0, 5);
+        source.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, source, false));
+        source = inventory.getItem(0);
+
+        TakeAction action = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, source.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 1, 0, null)
+        );
+        ItemStackRequest request = new ItemStackRequest(7, new ItemStackRequestAction[]{action}, new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        assertEquals(Item.STONE, inventory.getItem(0).getId());
+        assertEquals(3, inventory.getItem(0).getCount(), "plugin count-only change must survive SAI error rollback");
+        assertTrue(inventory.getItem(1).isNull());
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.ERROR, response.entries.get(0).getResult());
+    }
+
+    @Test
+    void transferToSameSlotIsRejectedWithoutMutatingInventory() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+
+        Item source = Item.get(Item.STONE, 0, 5);
+        source.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, source, false));
+        source = inventory.getItem(0);
+
+        TakeAction action = new TakeAction(
+                5,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, source.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, source.getStackNetId(), null)
+        );
+        ItemStackRequest request = new ItemStackRequest(8, new ItemStackRequestAction[]{action}, new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        assertEquals(Item.STONE, inventory.getItem(0).getId());
+        assertEquals(5, inventory.getItem(0).getCount());
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.ERROR, response.entries.get(0).getResult());
+    }
+
+    @Test
+    void cancelledTransactionKeepsPluginChangesOutsideTransactionSlots() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+        Mockito.when(player.getServer().getPluginManager()).thenReturn(pluginManager);
+        Mockito.doAnswer(invocation -> {
+            Event event = invocation.getArgument(0);
+            if (event instanceof InventoryTransactionEvent transactionEvent) {
+                inventory.setItem(2, Item.get(Item.DIAMOND, 0, 4), false);
+                transactionEvent.setCancelled(true);
+            }
+            return null;
+        }).when(pluginManager).callEvent(any(Event.class));
+
+        Item source = Item.get(Item.STONE, 0, 5);
+        source.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, source, false));
+        source = inventory.getItem(0);
+
+        TakeAction action = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, source.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 1, 0, null)
+        );
+        ItemStackRequest request = new ItemStackRequest(9, new ItemStackRequestAction[]{action}, new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        assertEquals(Item.STONE, inventory.getItem(0).getId());
+        assertEquals(5, inventory.getItem(0).getCount());
+        assertTrue(inventory.getItem(1).isNull());
+        assertEquals(Item.DIAMOND, inventory.getItem(2).getId());
+        assertEquals(4, inventory.getItem(2).getCount(), "plugin changes in other slots must survive SAI error rollback");
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.ERROR, response.entries.get(0).getResult());
+    }
+
+    @Test
+    void cancelledLaterActionRollsBackEarlierActionButKeepsPluginSlotChanges() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+        Mockito.when(player.getServer().getPluginManager()).thenReturn(pluginManager);
+        Mockito.doAnswer(invocation -> {
+            Event event = invocation.getArgument(0);
+            if (event instanceof InventoryTransactionEvent transactionEvent
+                    && !inventory.getItem(1).isNull()) {
+                inventory.setItem(2, Item.get(Item.DIAMOND, 0, 4), false);
+                transactionEvent.setCancelled(true);
+            }
+            return null;
+        }).when(pluginManager).callEvent(any(Event.class));
+
+        Item source = Item.get(Item.STONE, 0, 5);
+        source.autoAssignStackNetworkId();
+        Item secondSource = Item.get(Item.DIRT, 0, 3);
+        secondSource.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, source, false));
+        assertTrue(inventory.setItem(3, secondSource, false));
+        source = inventory.getItem(0);
+        secondSource = inventory.getItem(3);
+
+        TakeAction firstAction = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, source.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 1, 0, null)
+        );
+        TakeAction secondAction = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 3, secondSource.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 4, 0, null)
+        );
+        ItemStackRequest request = new ItemStackRequest(10, new ItemStackRequestAction[]{firstAction, secondAction}, new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        assertEquals(Item.STONE, inventory.getItem(0).getId());
+        assertEquals(5, inventory.getItem(0).getCount());
+        assertTrue(inventory.getItem(1).isNull(), "earlier successful actions must roll back on request error");
+        assertEquals(Item.DIAMOND, inventory.getItem(2).getId());
+        assertEquals(4, inventory.getItem(2).getCount(), "plugin slot changes must survive rollback");
+        assertEquals(Item.DIRT, inventory.getItem(3).getId());
+        assertEquals(3, inventory.getItem(3).getCount());
+        assertTrue(inventory.getItem(4).isNull());
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.ERROR, response.entries.get(0).getResult());
+    }
+
+    @Test
     void dynamicContainerTransferRespondsForDifferentDynamicIdsWithSameSlot() {
         Player player = mockPlayer();
         PlayerInventory inventory = Mockito.mock(PlayerInventory.class);
@@ -384,6 +653,111 @@ class ItemStackRequestProcessorTest {
         assertEquals(2, response.containers().size(), "source and destination bundles need separate responses");
         assertEquals(sourceBundle.getBundleId(), response.containers().get(0).getContainerName().getDynamicId());
         assertEquals(destinationBundle.getBundleId(), response.containers().get(1).getContainerName().getDynamicId());
+    }
+
+    @Test
+    void placeInItemContainerStoresItemInBundleAndPersistsNbt() {
+        Player player = mockPlayer();
+        Level level = Mockito.mock(Level.class);
+        PlayerInventory inventory = new PlayerInventory(player);
+        ItemBundle bundle = new ItemBundle();
+        Mockito.when(player.getLevel()).thenReturn(level);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+
+        Item dirt = Item.get(Item.DIRT, 0, 32);
+        dirt.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, dirt, false));
+        assertTrue(inventory.setItem(1, bundle, false));
+        ItemBundle storedBundle = (ItemBundle) inventory.getUnclonedItem(1);
+        int bundleId = storedBundle.getBundleId();
+        dirt = inventory.getItem(0);
+
+        PlaceInItemContainerAction action = new PlaceInItemContainerAction(
+                16,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, dirt.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.DYNAMIC_CONTAINER, 0, 0, bundleId)
+        );
+
+        ActionResponse response = new PlaceInItemContainerActionProcessor().handle(action, player, context());
+
+        assertNotNull(response);
+        assertTrue(response.success());
+        assertEquals(16, inventory.getItem(0).getCount());
+        assertEquals(Item.DIRT, storedBundle.getInventory().getItem(0).getId());
+        assertEquals(16, storedBundle.getInventory().getItem(0).getCount());
+        assertEquals(1, storedBundle.getNamedTag()
+                .getList(ItemBundle.TAG_STORAGE_ITEM_COMPONENT_CONTENT, CompoundTag.class)
+                .size());
+        Mockito.verify(level).addSound(player, Sound.BUNDLE_INSERT);
+    }
+
+    @Test
+    void placeInItemContainerRejectsPuttingBundleInsideItself() {
+        Player player = mockPlayer();
+        Level level = Mockito.mock(Level.class);
+        PlayerInventory inventory = new PlayerInventory(player);
+        ItemBundle bundle = new ItemBundle();
+        Mockito.when(player.getLevel()).thenReturn(level);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+
+        assertTrue(inventory.setItem(0, bundle, false));
+        ItemBundle storedBundle = (ItemBundle) inventory.getUnclonedItem(0);
+        int bundleId = storedBundle.getBundleId();
+        int stackNetworkId = inventory.getItem(0).getStackNetId();
+
+        PlaceInItemContainerAction action = new PlaceInItemContainerAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, stackNetworkId, null),
+                new ItemStackRequestSlotData(ContainerSlotType.DYNAMIC_CONTAINER, 0, 0, bundleId)
+        );
+
+        ActionResponse response = new PlaceInItemContainerActionProcessor().handle(action, player, context());
+
+        assertNotNull(response);
+        assertFalse(response.success());
+        assertSame(storedBundle, inventory.getUnclonedItem(0));
+        assertTrue(storedBundle.getInventory().isEmpty());
+        Mockito.verify(level).addSound(player, Sound.BUNDLE_INSERT_FAIL);
+    }
+
+    @Test
+    void takeFromItemContainerMovesItemOutOfBundleAndPersistsNbt() {
+        Player player = mockPlayer();
+        Level level = Mockito.mock(Level.class);
+        PlayerInventory inventory = new PlayerInventory(player);
+        ItemBundle bundle = new ItemBundle();
+        Mockito.when(player.getLevel()).thenReturn(level);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+
+        assertTrue(inventory.setItem(1, bundle, false));
+        ItemBundle storedBundle = (ItemBundle) inventory.getUnclonedItem(1);
+        int bundleId = storedBundle.getBundleId();
+        Item dirt = Item.get(Item.DIRT, 0, 10);
+        dirt.autoAssignStackNetworkId();
+        assertTrue(storedBundle.getInventory().setItem(0, dirt, false));
+        dirt = storedBundle.getInventory().getItem(0);
+
+        TakeFromItemContainerAction action = new TakeFromItemContainerAction(
+                6,
+                new ItemStackRequestSlotData(ContainerSlotType.DYNAMIC_CONTAINER, 0, dirt.getStackNetId(), bundleId),
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, 0, null)
+        );
+
+        ActionResponse response = new TakeFromItemContainerActionProcessor().handle(action, player, context());
+
+        assertNotNull(response);
+        assertTrue(response.success());
+        assertEquals(Item.DIRT, inventory.getItem(0).getId());
+        assertEquals(6, inventory.getItem(0).getCount());
+        assertEquals(4, storedBundle.getInventory().getItem(0).getCount());
+        ListTag<CompoundTag> storedItems = storedBundle.getNamedTag()
+                .getList(ItemBundle.TAG_STORAGE_ITEM_COMPONENT_CONTENT, CompoundTag.class);
+        assertEquals(1, storedItems.size());
+        assertEquals(4, storedItems.get(0).getByte("Count"));
+        Mockito.verify(level).addSound(player, Sound.BUNDLE_REMOVE_ONE);
     }
 
     @Test
@@ -524,6 +898,18 @@ class ItemStackRequestProcessorTest {
                 actions,
                 new String[0]
         ));
+    }
+
+    private static <T extends DataPacket> T capturePacket(Player player, Class<T> type) {
+        ArgumentCaptor<DataPacket> captor = ArgumentCaptor.forClass(DataPacket.class);
+        Mockito.verify(player, atLeastOnce()).dataPacket(captor.capture());
+        for (DataPacket packet : captor.getAllValues()) {
+            if (type.isInstance(packet)) {
+                return type.cast(packet);
+            }
+        }
+        fail("Expected packet " + type.getSimpleName());
+        return null;
     }
 
     private static List<Item> cloneItems(List<Item> items) {

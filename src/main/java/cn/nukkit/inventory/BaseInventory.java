@@ -10,6 +10,7 @@ import cn.nukkit.event.entity.EntityInventoryChangeEvent;
 import cn.nukkit.event.inventory.InventoryOpenEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.ItemBundle;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -208,6 +209,10 @@ public abstract class BaseInventory implements Inventory {
         // "empty slot" in ItemStackResponse packets and causes cursor/inventory desync.
         if (!item.isNull() && item.getStackNetId() == 0) {
             item.autoAssignStackNetworkId();
+        }
+
+        if (item instanceof ItemBundle bundle) {
+            ensureUniqueBundleId(index, bundle);
         }
 
         Item old = this.getItem(index);
@@ -464,6 +469,32 @@ public abstract class BaseInventory implements Inventory {
     @Override
     public InventoryHolder getHolder() {
         return holder;
+    }
+
+    protected void ensureUniqueBundleId(int targetSlot, ItemBundle bundle) {
+        HashSet<Integer> existingBundleIds = new HashSet<>();
+        for (var entry : this.slots.entrySet()) {
+            if (entry.getKey() != targetSlot) {
+                collectBundleIds(entry.getValue(), existingBundleIds, new HashSet<>());
+            }
+        }
+        while (existingBundleIds.contains(bundle.getBundleId())) {
+            bundle.assignNewBundleId();
+        }
+    }
+
+    private void collectBundleIds(Item item, Set<Integer> bundleIds, Set<Integer> visitedBundleIds) {
+        if (!(item instanceof ItemBundle bundle)) {
+            return;
+        }
+        int currentId = bundle.getBundleId();
+        if (!visitedBundleIds.add(currentId)) {
+            return;
+        }
+        bundleIds.add(currentId);
+        for (Item nested : bundle.getInventory().getContents().values()) {
+            collectBundleIds(nested, bundleIds, visitedBundleIds);
+        }
     }
 
     @Override

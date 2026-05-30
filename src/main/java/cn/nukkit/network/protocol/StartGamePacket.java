@@ -401,7 +401,7 @@ public class StartGamePacket extends DataPacket {
             if (protocol == 354 && version != null && version.startsWith("1.11.4")) {
                 this.putBoolean(this.isOnlySpawningV1Villagers);
             } else if (protocol >= ProtocolInfo.v1_16_0) {
-                this.putBoolean(this.isInventoryServerAuthoritative);
+                this.putBoolean(protocol >= ProtocolInfo.v1_16_100 && this.isInventoryServerAuthoritative);
                 if (protocol >= ProtocolInfo.v1_16_230_50) {
                     this.putString(""); // serverEngine
                     if (protocol >= ProtocolInfo.v1_18_0) {

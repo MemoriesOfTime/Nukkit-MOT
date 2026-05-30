@@ -1,6 +1,7 @@
 package cn.nukkit.inventory.request;
 
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
 import lombok.Getter;
@@ -23,7 +24,7 @@ public class ItemStackRequestContext {
     private int currentActionIndex;
     private final Map<String, Object> extraData = new HashMap<>();
     private final List<Runnable> commitActions = new ArrayList<>();
-    private final Set<Inventory> pluginModifiedInventories = new LinkedHashSet<>();
+    private final Map<Inventory, Map<Integer, Item>> pluginModifiedSlots = new LinkedHashMap<>();
 
     public ItemStackRequestContext(ItemStackRequest itemStackRequest) {
         this.itemStackRequest = itemStackRequest;
@@ -61,14 +62,20 @@ public class ItemStackRequestContext {
         }
     }
 
-    public void addPluginModifiedInventory(Inventory inventory) {
-        if (inventory != null) {
-            this.pluginModifiedInventories.add(inventory);
+    public void addPluginModifiedSlots(Inventory inventory, Map<Integer, Item> slots) {
+        Inventory canonical = ItemStackRequestHandler.canonicalizeInventory(inventory);
+        if (canonical != null && slots != null && !slots.isEmpty()) {
+            Map<Integer, Item> modifiedSlots = this.pluginModifiedSlots
+                    .computeIfAbsent(canonical, ignored -> new LinkedHashMap<>());
+            for (var entry : slots.entrySet()) {
+                Item item = entry.getValue();
+                modifiedSlots.put(entry.getKey(), item == null ? Item.get(Item.AIR) : item.clone());
+            }
         }
     }
 
-    public Set<Inventory> getPluginModifiedInventories() {
-        return this.pluginModifiedInventories;
+    public Map<Inventory, Map<Integer, Item>> getPluginModifiedSlots() {
+        return this.pluginModifiedSlots;
     }
 
     public ActionResponse error() {
