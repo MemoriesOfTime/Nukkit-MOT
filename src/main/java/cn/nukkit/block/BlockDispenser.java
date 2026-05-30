@@ -215,7 +215,7 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
         Item origin = original;
         original = original.clone();
 
-        DispenseBehavior behavior = DispenseBehaviorRegister.getBehavior(original.getId());
+        DispenseBehavior behavior = DispenseBehaviorRegister.getBehavior(original);
         Item result = behavior.dispense(this, facing, original);
 
         pk.evid = LevelEventPacket.EVENT_SOUND_CLICK;
