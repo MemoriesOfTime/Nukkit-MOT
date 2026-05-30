@@ -33,7 +33,9 @@ public class PlayerListPacket extends DataPacket {
         switch (type) {
             case TYPE_ADD:
                 for (Entry entry : this.entries) {
-                    this.putUUID(entry.uuid);
+                    if (protocol >= ProtocolInfo.v1_2_13) {
+                        this.putUUID(entry.uuid);
+                    }
                     this.putVarLong(entry.entityId);
                     this.putString(entry.name);
                     if (protocol >= ProtocolInfo.v1_2_13 && protocol <= ProtocolInfo.v1_6_0) {
@@ -71,7 +73,9 @@ public class PlayerListPacket extends DataPacket {
                 break;
             case TYPE_REMOVE:
                 for (Entry entry : this.entries) {
-                    this.putUUID(entry.uuid);
+                    if (protocol >= ProtocolInfo.v1_2_13) {
+                        this.putUUID(entry.uuid);
+                    }
                 }
         }
     }
