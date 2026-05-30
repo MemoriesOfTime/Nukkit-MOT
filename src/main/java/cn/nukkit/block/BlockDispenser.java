@@ -152,7 +152,7 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
             return type;
         }
 
-        if (type == Level.BLOCK_UPDATE_REDSTONE) {
+        if (type == Level.BLOCK_UPDATE_NORMAL || type == Level.BLOCK_UPDATE_REDSTONE) {
             if ((level.isBlockPowered(this) || level.isBlockPowered(this.up())) && !isTriggered()) {
                 this.setTriggered(true);
                 this.level.setBlock(this, this, false, false);
