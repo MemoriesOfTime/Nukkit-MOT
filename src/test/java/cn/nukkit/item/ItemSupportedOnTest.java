@@ -134,6 +134,14 @@ public class ItemSupportedOnTest {
         assertFalse(new ItemPotion(Potion.INFESTED + 1).isSupportedOn(GameVersion.V1_21_0));
     }
 
+    @Test
+    public void testCopperArmorItemsUseArmorBase() {
+        assertCopperArmorItem(new ItemHelmetCopper(), Item.COPPER_HELMET);
+        assertCopperArmorItem(new ItemChestplateCopper(), Item.COPPER_CHESTPLATE);
+        assertCopperArmorItem(new ItemLeggingsCopper(), Item.COPPER_LEGGINGS);
+        assertCopperArmorItem(new ItemBootsCopper(), Item.COPPER_BOOTS);
+    }
+
     /**
      * 验证最新版本中所有可通过 NAMESPACED_ID_ITEM 自动发现的核心物品，
      * 在最新版本上必须返回 supported 且能够被编码。
@@ -167,6 +175,15 @@ public class ItemSupportedOnTest {
                 "Items from NAMESPACED_ID_ITEM should be supported on latest version:\n"
                         + String.join("\n", errors));
         assertTrue(verifiedCount > 0, "Should have verified at least some items");
+    }
+
+    private static void assertCopperArmorItem(Item item, String namespaceId) {
+        assertInstanceOf(ItemArmor.class, item);
+        assertInstanceOf(StringItem.class, item);
+        assertEquals(Item.STRING_IDENTIFIED_ITEM, item.getId());
+        assertEquals(namespaceId, item.getNamespaceId());
+        assertTrue(item.isArmor());
+        assertEquals(1, item.getMaxStackSize());
     }
 
     private static List<MappingContext> collectMappingContexts() throws IllegalAccessException {
