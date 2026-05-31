@@ -99,7 +99,7 @@ public class PlayerOffhandInventory extends BaseInventory {
 
     @Override
     public boolean allowedToAdd(Item item) {
-        return item == null || item.isNull() || item.canBePutInOffhandSlot();
+        return true;
     }
 
     @Override

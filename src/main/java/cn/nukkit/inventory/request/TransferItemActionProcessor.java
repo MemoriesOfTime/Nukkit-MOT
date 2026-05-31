@@ -2,8 +2,6 @@ package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.event.inventory.InventoryClickEvent;
-import cn.nukkit.event.inventory.InventoryTransactionEvent;
 import cn.nukkit.event.player.PlayerTransferItemEvent;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.InventoryTransaction;
@@ -128,18 +126,8 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             return context.error();
         }
 
-        // Fire InventoryClickEvent for each affected slot (matches legacy
-        // InventoryTransaction.java:260). Only holder-is-Player inventories
-        // trigger the event, as in the legacy path.
-        if (!fireClickEvent(player, srcInv, srcSlot, sourceItem, newSrc)) {
-            return context.error();
-        }
-        if (!fireClickEvent(player, dstInv, dstSlot, destItem, newDest)) {
-            return context.error();
-        }
-
-        // 向后兼容：旧路径中每次库存交互都会触发 InventoryTransactionEvent，
-        // 但 SAI 路径默认不触发。为保持与旧插件的兼容性，在此处补发事件。
+        // 向后兼容：复用 legacy InventoryTransaction 的事件语义，按相同顺序
+        // 触发 InventoryTransactionEvent，并在适用时最多触发一次 InventoryClickEvent。
         List<InventoryAction> transactionActions = new ArrayList<>();
         transactionActions.add(new SlotChangeAction(srcInv, srcSlot, sourceItem, newSrc));
         if (srcInv != dstInv || srcSlot != dstSlot) {
@@ -222,12 +210,6 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         if (!fireTransferEvent(player, srcInv, srcSlot, dstInv, dstSlot, sourceItem, destItem, count)) {
             return context.error();
         }
-        if (!fireClickEvent(player, srcInv, srcSlot, sourceItem, newSrc)) {
-            return context.error();
-        }
-        if (!fireClickEvent(player, dstInv, dstSlot, destItem, newDest)) {
-            return context.error();
-        }
 
         List<InventoryAction> transactionActions = new ArrayList<>();
         transactionActions.add(new SlotChangeAction(srcInv, srcSlot, sourceItem, newSrc));
@@ -300,23 +282,6 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         return inventory instanceof PlayerUIInventory && slot == PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT;
     }
 
-    /**
-     * Fire {@link InventoryClickEvent} for a slot that is about to change. Only
-     * inventories whose holder is a {@link Player} emit the event, mirroring the
-     * legacy {@code InventoryTransaction.callExecuteEvent} check. Returns
-     * {@code false} when a plugin cancelled the event — callers should abort
-     * and return an error response.
-     */
-    static boolean fireClickEvent(Player actor, Inventory inventory, int slot, Item sourceItem, Item heldItem) {
-        if (!(inventory.getHolder() instanceof Player)) {
-            return true;
-        }
-        InventoryClickEvent event = new InventoryClickEvent(
-                actor, inventory, slot, sourceItem.clone(), heldItem.clone());
-        Server.getInstance().getPluginManager().callEvent(event);
-        return !event.isCancelled();
-    }
-
     static boolean fireTransferEvent(Player actor, Inventory sourceInventory, int sourceSlot,
                                      Inventory destinationInventory, int destinationSlot,
                                      Item sourceItem, Item destinationItem, int count) {
@@ -375,11 +340,10 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
 
     /**
      * InventoryTransaction subclass used solely to emit
-     * {@link InventoryTransactionEvent} for server-authoritative item stack
-     * requests that involve block-entity containers (e.g. chests).  It does
+     * legacy inventory events for server-authoritative item stack requests. It does
      * <b>not</b> execute any actions – the real mutation is already performed
      * by {@link #doTransfer} – so calling {@link #execute} only fires the
-     * event and returns whether a plugin cancelled it.
+     * events and returns whether a plugin cancelled them.
      */
     static class EventOnlyInventoryTransaction extends InventoryTransaction {
         private final ItemStackRequestContext context;
@@ -400,9 +364,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
 
         @Override
         protected boolean callExecuteEvent() {
-            InventoryTransactionEvent ev = new InventoryTransactionEvent(this);
-            this.source.getServer().getPluginManager().callEvent(ev);
-            return !ev.isCancelled();
+            return InventoryTransaction.callExecuteEvents(this);
         }
 
         @Override

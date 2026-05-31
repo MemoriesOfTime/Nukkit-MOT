@@ -6,6 +6,7 @@ import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.event.Event;
+import cn.nukkit.event.inventory.InventoryClickEvent;
 import cn.nukkit.event.inventory.InventoryEvent;
 import cn.nukkit.event.inventory.InventoryTransactionEvent;
 import cn.nukkit.event.inventory.ItemStackRequestActionEvent;
@@ -192,14 +193,59 @@ class ItemStackRequestProcessorTest {
     }
 
     @Test
-    void offhandInventoryRejectsNonBedrockOffhandItemsDirectly() {
+    void offhandInventoryAllowsDirectApiForCompatibility() {
         Player player = mockPlayer();
         PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
 
-        assertFalse(offhand.setItem(0, Item.get(Item.STONE, 0, 1), false));
-        assertTrue(offhand.getItem(0).isNull());
+        assertTrue(offhand.setItem(0, Item.get(Item.STONE, 0, 1), false));
+        assertEquals(Item.STONE, offhand.getItem(0).getId());
         assertTrue(offhand.setItem(0, Item.get(Item.SHIELD, 0, 1), false));
         assertEquals(Item.SHIELD, offhand.getItem(0).getId());
+    }
+
+    @Test
+    void transferFiresLegacyTransactionThenSingleClickEvent() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(MockServer.get().getPluginManager()).thenReturn(pluginManager);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+
+        List<Class<? extends Event>> legacyEvents = new ArrayList<>();
+        Mockito.doAnswer(invocation -> {
+            Event event = invocation.getArgument(0);
+            if (event instanceof InventoryTransactionEvent || event instanceof InventoryClickEvent) {
+                legacyEvents.add(event.getClass());
+            }
+            return null;
+        }).when(pluginManager).callEvent(any(Event.class));
+
+        Item source = Item.get(Item.STONE, 0, 5);
+        source.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, source, false));
+        source = inventory.getItem(0);
+
+        TakeAction action = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, source.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 1, 0, null)
+        );
+
+        ActionResponse response = new TakeActionProcessor().handle(action, player, context());
+
+        assertNotNull(response);
+        assertTrue(response.success());
+        assertEquals(List.of(InventoryTransactionEvent.class, InventoryClickEvent.class), legacyEvents);
     }
 
     @Test

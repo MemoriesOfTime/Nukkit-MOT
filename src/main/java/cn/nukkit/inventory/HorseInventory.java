@@ -28,6 +28,7 @@ public class HorseInventory extends BaseInventory {
 
     private int chestSize;
     private boolean suppressSaddleSync;
+    private boolean suppressArmorVisual;
 
     public HorseInventory(EntityHorseBase holder, int chestSize) {
         super(holder, InventoryType.HORSE, Map.of(), SLOT_CHEST_BASE + Math.max(0, chestSize), "Horse");
@@ -82,14 +83,10 @@ public class HorseInventory extends BaseInventory {
             return item.getId() == Item.SADDLE;
         }
         if (slot == SLOT_ARMOR) {
-            if (getHolder() instanceof EntityLlama) {
-                return false;
-            }
-            int id = item.getId();
-            return id == Item.LEATHER_HORSE_ARMOR
-                    || id == Item.IRON_HORSE_ARMOR
-                    || id == Item.GOLD_HORSE_ARMOR
-                    || id == Item.DIAMOND_HORSE_ARMOR;
+            EntityHorseBase holder = getHolder();
+            return !(holder instanceof EntityLlama)
+                    && holder.canWearHorseArmor()
+                    && item.isHorseArmor();
         }
         return isChestSlot(slot);
     }
@@ -109,7 +106,7 @@ public class HorseInventory extends BaseInventory {
         Item now = this.getItem(index);
         if (index == SLOT_SADDLE) {
             syncSaddle(!now.isNull());
-        } else if (index == SLOT_ARMOR) {
+        } else if (index == SLOT_ARMOR && !suppressArmorVisual) {
             broadcastArmorVisual(now);
         }
     }
@@ -137,6 +134,7 @@ public class HorseInventory extends BaseInventory {
         pk.eid = holder.getId();
         Item air = Item.get(Item.AIR);
         pk.slots = new Item[]{air, body, air, air};
+        pk.body = body;
 
         Collection<Player> viewers = holder.getViewers().values();
         for (Player viewer : viewers) {
@@ -159,6 +157,16 @@ public class HorseInventory extends BaseInventory {
         }
     }
 
+    public boolean applyArmorWithoutVisual(Item armorItem) {
+        boolean previous = suppressArmorVisual;
+        suppressArmorVisual = true;
+        try {
+            return this.setItem(SLOT_ARMOR, armorItem == null ? Item.get(Item.AIR) : armorItem, false);
+        } finally {
+            suppressArmorVisual = previous;
+        }
+    }
+
     public ListTag<CompoundTag> saveToNBT() {
         ListTag<CompoundTag> list = new ListTag<>();
         for (int slot = 0; slot < this.getSize(); slot++) {
@@ -175,8 +183,10 @@ public class HorseInventory extends BaseInventory {
         if (list == null) {
             return;
         }
-        boolean previous = suppressSaddleSync;
+        boolean previousSaddle = suppressSaddleSync;
+        boolean previousArmor = suppressArmorVisual;
         suppressSaddleSync = true;
+        suppressArmorVisual = true;
         try {
             for (CompoundTag tag : list.getAll()) {
                 int slot = tag.contains("Slot") ? (tag.getByte("Slot") & 0xFF) : -1;
@@ -193,7 +203,8 @@ public class HorseInventory extends BaseInventory {
                 super.setItem(slot, item, false);
             }
         } finally {
-            suppressSaddleSync = previous;
+            suppressSaddleSync = previousSaddle;
+            suppressArmorVisual = previousArmor;
         }
     }
 }

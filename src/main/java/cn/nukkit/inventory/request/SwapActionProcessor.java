@@ -62,17 +62,7 @@ public class SwapActionProcessor implements ItemStackRequestActionProcessor<Swap
             return context.error();
         }
 
-        // Fire InventoryClickEvent for both slots before mutation, matching the
-        // legacy InventoryTransaction path (one event per swapped slot).
-        if (!TransferItemActionProcessor.fireClickEvent(player, srcInv, srcSlot, sourceItem, destItem)) {
-            return context.error();
-        }
-        if (!TransferItemActionProcessor.fireClickEvent(player, dstInv, dstSlot, destItem, sourceItem)) {
-            return context.error();
-        }
-
-        // 向后兼容：旧路径中每次库存交互都会触发 InventoryTransactionEvent，
-        // 但 SAI 路径默认不触发。
+        // 向后兼容：复用 legacy InventoryTransaction 的事件语义。
         List<InventoryAction> transactionActions = new ArrayList<>();
         transactionActions.add(new SlotChangeAction(srcInv, srcSlot, sourceItem, destItem));
         transactionActions.add(new SlotChangeAction(dstInv, dstSlot, destItem, sourceItem));
