@@ -109,7 +109,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
-import java.net.URL;
+import java.net.URI;
 import java.net.URLConnection;
 import java.nio.ByteOrder;
 import java.util.*;
@@ -1266,7 +1266,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
                 try {
-                    URLConnection request = new URL(Nukkit.BRANCH).openConnection();
+                    URLConnection request = URI.create(Nukkit.BRANCH).toURL().openConnection();
                     request.connect();
                     InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
                     String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
@@ -2190,6 +2190,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.isCollided = this.onGround;
             this.updateFallState(this.onGround);
+            this.checkSwimmingState();
         }
 
         Location from = new Location(
@@ -3282,6 +3283,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     // 低版本仅兼容国际版，高于554的版本在RequestNetworkSettingsProcessor_v554中处理
                     this.gameVersion = GameVersion.byProtocol(this.protocol, false);
                     this.syncGameVersion(this.gameVersion);
+                } else if (this.protocol != this.gameVersion.getProtocol()) {
+                    // LoginPacket.decode() 可能修改协议号（如将1.19.62的567修正为1.19.63的568），
+                    // 需要重新同步gameVersion以保持protocol和gameVersion一致，
+                    this.gameVersion = GameVersion.byProtocol(this.protocol, this.gameVersion.isNetEase());
+                    this.syncGameVersion(this.gameVersion);
                 }
 
                 switch (this.server.spaceMode) {
@@ -4083,7 +4089,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case PlayerActionPacket.ACTION_STOP_SWIMMING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput()) break;
                         ptse = new PlayerToggleSwimEvent(this, false);
-                        if (this.riding != null || this.sleeping != null || !this.isInsideOfWater()) {
+                        if (this.riding != null || this.sleeping != null) {
                             ptse.setCancelled(true);
                         }
                         this.server.getPluginManager().callEvent(ptse);
@@ -5827,7 +5833,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.connected && !this.closed) {
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
-                pk.message = reason;
+                if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
+                    pk.message = TextFormat.clean(reason);
+                } else {
+                    pk.message = reason;
+                }
                 this.forceDataPacket(pk, null);
             }
 
@@ -6742,6 +6752,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return false;
+    }
+
+    public void checkSwimmingState() {
+        if (this.isSwimming() && !this.isInsideOfWater()) {
+            this.setSwimming(false);
+        }
     }
 
     protected void forceSendEmptyChunks() {

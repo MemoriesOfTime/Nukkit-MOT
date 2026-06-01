@@ -75,8 +75,8 @@ public final class LevelDBConstants {
     public static final int PALETTE_VERSION = GameVersion.getFeatureVersion().getProtocol();
 
     public static final int STATE_MAYOR_VERSION = 1;
-    public static final int STATE_MINOR_VERSION = 21;
-    public static final int STATE_PATCH_VERSION = 60;
+    public static final int STATE_MINOR_VERSION = 26;
+    public static final int STATE_PATCH_VERSION = 10;
 
     /**
      * Block state schema version written inside block state NBT and consumed by
@@ -85,7 +85,7 @@ public final class LevelDBConstants {
      * version stored in leveldb_palette.nbt; LevelDBConstantsTest verifies that
      * contract.
      */
-    public static final int STATE_VERSION = makeVersion(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION) + 33; //33 update
+    public static final int STATE_VERSION = makeVersion(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION);
 
     /**
      * Game/client version written to level.dat fields such as
