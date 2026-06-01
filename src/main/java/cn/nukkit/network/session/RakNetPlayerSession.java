@@ -545,10 +545,19 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         return protocol != Integer.MAX_VALUE && protocol >= ProtocolInfo.v1_20_60;
     }
 
+    private String playerLabel() {
+        return this.player == null ? String.valueOf(this.channel.remoteAddress()) : this.player.getName();
+    }
+
     private boolean processInboundBatch(byte[] packetBuffer, boolean ci) {
         try {
             if (!ci) {
-                return this.server.getNetwork().processBatch(packetBuffer, this.inbound, this.compressionIn, this.channel.config().getProtocolVersion(), this.player);
+                if (!this.server.getNetwork().processBatchQuietly(packetBuffer, this.inbound, this.compressionIn, this.channel.config().getProtocolVersion(), this.player)) {
+                    log.warn("[{}] Failed to decode batch packet ({} bytes, non-prefixed, compression={})",
+                            this.playerLabel(), packetBuffer.length, this.compressionIn);
+                    return false;
+                }
+                return true;
             }
 
             InboundBatchDecodeResult result = decodeInboundPrefixedBatch(
@@ -560,6 +569,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     this.player
             );
             if (!result.success()) {
+                log.warn("[{}] Failed to decode batch packet ({} bytes, prefixed, raknetProtocol={}, legacyFallback={})",
+                        this.playerLabel(), packetBuffer.length, this.channel.config().getProtocolVersion(),
+                        this.state.getSecurity().isLegacyInboundGraceWindow());
                 return false;
             }
 
@@ -571,7 +583,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             this.inbound.addAll(result.packets());
             return true;
         } catch (Exception e) {
-            log.error("[{}] Unable to process batch packet", (this.player == null ? this.channel.remoteAddress() : this.player.getName()), e);
+            log.error("[{}] Unable to process batch packet", this.playerLabel(), e);
             return false;
         }
     }
@@ -579,6 +591,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     static InboundBatchDecodeResult decodeInboundPrefixedBatch(Network network, byte[] packetBuffer, CompressionProvider legacyCompression,
                                                                boolean allowLegacyFallback, int raknetProtocol, Player player) {
         if (packetBuffer.length == 0) {
+            log.debug("Prefixed batch decode failed: empty packet buffer");
             return InboundBatchDecodeResult.failed();
         }
 
@@ -587,16 +600,24 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             List<DataPacket> prefixedPackets = new ObjectArrayList<>();
             // Skip the 1-byte compression prefix; copy cost is negligible vs decompression
             byte[] prefixedPayload = Arrays.copyOfRange(packetBuffer, 1, packetBuffer.length);
-            if (network.processBatch(prefixedPayload, prefixedPackets, prefixedCompression, raknetProtocol, player)) {
+            if (network.processBatchQuietly(prefixedPayload, prefixedPackets, prefixedCompression, raknetProtocol, player)) {
                 return InboundBatchDecodeResult.prefixed(prefixedCompression, prefixedPackets);
             }
+            log.debug("Prefixed batch decode failed: processBatch returned false (compression={}, {} bytes, raknetProtocol={})",
+                    prefixedCompression, prefixedPayload.length, raknetProtocol);
+        } else if (prefixedCompression == null) {
+            log.debug("Prefixed batch decode: unknown compression prefix 0x{} (raknetProtocol={})",
+                    Integer.toHexString(packetBuffer[0] & 0xFF), raknetProtocol);
+        } else {
+            log.debug("Prefixed batch decode: buffer too short after prefix ({} bytes)", packetBuffer.length);
         }
 
         if (allowLegacyFallback && legacyCompression != null) {
             List<DataPacket> legacyPackets = new ObjectArrayList<>();
-            if (network.processBatch(packetBuffer, legacyPackets, legacyCompression, raknetProtocol, player)) {
+            if (network.processBatchQuietly(packetBuffer, legacyPackets, legacyCompression, raknetProtocol, player)) {
                 return InboundBatchDecodeResult.legacy(legacyCompression, legacyPackets);
             }
+            log.debug("Prefixed batch decode: legacy fallback also failed (compression={})", legacyCompression);
         }
         return InboundBatchDecodeResult.failed();
     }

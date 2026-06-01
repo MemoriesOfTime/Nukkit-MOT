@@ -6,8 +6,6 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
-import cn.nukkit.network.protocol.ServerPresenceInfoPacket;
-import cn.nukkit.network.protocol.ServerStoreInfoPacket;
 import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.utils.BinaryStream;
@@ -36,6 +34,8 @@ import java.util.*;
  */
 @Log4j2
 public class Network {
+
+    private static final int MAX_BATCH_PACKET_COUNT = 1300;
 
     public static final byte CHANNEL_NONE = 0;
     public static final byte CHANNEL_PRIORITY = 1; //Priority channel, only to be used when it matters
@@ -220,6 +220,14 @@ public class Network {
     }
 
     public boolean processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
+        return this.processBatch(payload, packets, compression, raknetProtocol, player, true);
+    }
+
+    public boolean processBatchQuietly(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
+        return this.processBatch(payload, packets, compression, raknetProtocol, player, false);
+    }
+
+    private boolean processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player, boolean warnOnFailure) {
         int maxSize = 3145728; // 3 * 1024 * 1024
         if (player != null && player.getSkin() == null) {
             maxSize = 6291456; // 6 * 1024 * 1024
@@ -228,7 +236,11 @@ public class Network {
         try {
             data = compression.decompress(payload, maxSize);
         } catch (Exception e) {
-            log.debug("Exception while inflating batch packet", e);
+            if (warnOnFailure) {
+                log.warn("Exception while decompressing batch packet (compression={}, {} bytes): {}", compression, payload.length, e.toString());
+            } else if (log.isDebugEnabled()) {
+                log.debug("Exception while decompressing batch packet (compression={}, {} bytes)", compression, payload.length, e);
+            }
             return false;
         }
 
@@ -237,8 +249,8 @@ public class Network {
         try {
             while (!stream.feof()) {
                 count++;
-                if (count >= 1000) {
-                    throw new ProtocolException("Illegal batch with " + count + " packets");
+                if (count > MAX_BATCH_PACKET_COUNT) {
+                    throw new ProtocolException("Illegal batch with " + count + " packets (decompressed " + data.length + " bytes, first 32: " + ByteBufUtil.hexDump(Arrays.copyOf(data, Math.min(32, data.length))) + ")");
                 }
                 byte[] buf = stream.getByteArray();
 
@@ -287,8 +299,7 @@ public class Network {
                         if (log.isTraceEnabled()) {
                             log.trace("Dumping Packet\n{}", ByteBufUtil.prettyHexDump(Unpooled.wrappedBuffer(buf)));
                         }
-                        log.error("Unable to decode packet", e);
-                        throw new IllegalStateException("Unable to decode " + pk.getClass().getSimpleName());
+                        throw new IllegalStateException("Unable to decode " + pk.getClass().getSimpleName(), e);
                     }
 
                     packets.add(pk);
@@ -297,8 +308,12 @@ public class Network {
                 }
             }
         } catch (Exception e) {
-            if (log.isDebugEnabled()) {
-                log.debug("Error whilst decoding batch packet", e);
+            if (warnOnFailure) {
+                log.warn("Error whilst decoding batch packet (decoded {} packets, compression={}, decompressed={} bytes): {}",
+                        count, compression, data.length, e.toString());
+            } else if (log.isDebugEnabled()) {
+                log.debug("Error whilst decoding batch packet (decoded {} packets, compression={}, decompressed={} bytes)",
+                        count, compression, data.length, e);
             }
             return false;
         }
