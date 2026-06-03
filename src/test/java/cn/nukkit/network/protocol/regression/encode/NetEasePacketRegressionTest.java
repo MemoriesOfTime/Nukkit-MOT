@@ -20,6 +20,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -93,13 +94,82 @@ public class NetEasePacketRegressionTest {
     void testConfirmSkinPacketEmpty(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.netease.ConfirmSkinPacket();
         prepareNetEasePacket(nukkitPacket, protocolVersion);
-        // Empty UUID list - no trailing uidStr/geoStr loops needed
+        // Empty entry list - no trailing uidStr/geoStr loops needed
         nukkitPacket.encode();
 
         var cbPacket = crossDecodeNetEase(nukkitPacket,
                 org.allaymc.protocol.extension.packet.ConfirmSkinPacket.class);
 
         assertTrue(cbPacket.getEntries().isEmpty());
+    }
+
+    @ParameterizedTest(name = "ConfirmSkinPacket entry v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testConfirmSkinPacketEntry(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.ConfirmSkinPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+
+        var uuid = UUID.fromString("12345678-1234-5678-9abc-def012345678");
+        byte[] skinBytes = new byte[]{1, 2, 3, 4};
+        nukkitPacket.addEntry(new cn.nukkit.network.protocol.netease.ConfirmSkinPacket.SkinEntry(
+                true, uuid, skinBytes, "uid-123", "geo-456"));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                org.allaymc.protocol.extension.packet.ConfirmSkinPacket.class);
+
+        assertEquals(1, cbPacket.getEntries().size());
+        var entry = cbPacket.getEntries().get(0);
+        assertTrue(entry.isValid());
+        assertEquals(uuid, entry.getUuid());
+        assertArrayEquals(skinBytes, entry.getSkinBytes());
+        assertEquals("uid-123", entry.getUidStr());
+        assertEquals("geo-456", entry.getGeoStr());
+    }
+
+    @SuppressWarnings("deprecation")
+    @ParameterizedTest(name = "ConfirmSkinPacket legacy UUID list v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testConfirmSkinPacketLegacyUuidList(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.ConfirmSkinPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+
+        var uuid = UUID.fromString("87654321-4321-8765-9abc-def012345678");
+        nukkitPacket.uuids.add(uuid);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                org.allaymc.protocol.extension.packet.ConfirmSkinPacket.class);
+
+        assertEquals(1, cbPacket.getEntries().size());
+        var entry = cbPacket.getEntries().get(0);
+        assertTrue(entry.isValid());
+        assertEquals(uuid, entry.getUuid());
+        assertArrayEquals(new byte[0], entry.getSkinBytes());
+        assertEquals("", entry.getUidStr());
+        assertEquals("", entry.getGeoStr());
+    }
+
+    @ParameterizedTest(name = "ConfirmSkinPacket null optional fields v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testConfirmSkinPacketNullOptionalFields(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.ConfirmSkinPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        var uuid = UUID.fromString("11111111-2222-3333-4444-555555555555");
+        nukkitPacket.addEntry(new cn.nukkit.network.protocol.netease.ConfirmSkinPacket.SkinEntry(
+                false, uuid, null, null, null));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                org.allaymc.protocol.extension.packet.ConfirmSkinPacket.class);
+
+        assertEquals(1, cbPacket.getEntries().size());
+        var entry = cbPacket.getEntries().get(0);
+        assertFalse(entry.isValid());
+        assertEquals(uuid, entry.getUuid());
+        assertArrayEquals(new byte[0], entry.getSkinBytes());
+        assertEquals("", entry.getUidStr());
+        assertEquals("", entry.getGeoStr());
     }
 
     // ==================== TextPacket NetEase CHAT ====================
