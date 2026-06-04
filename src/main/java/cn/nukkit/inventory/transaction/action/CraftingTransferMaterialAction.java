@@ -22,7 +22,14 @@ public class CraftingTransferMaterialAction extends InventoryAction {
             } else if (this.targetItem.isNull()) {
                 ((CraftingTransaction) transaction).setExtraOutput(this.sourceItem);
             } else {
-                throw new RuntimeException("Invalid " + getClass().getName() + ", either source or target item must be air, got source: " + this.sourceItem + ", target: " + this.targetItem);
+                if (!this.sourceItem.equals(this.targetItem, true, true)
+                        || this.sourceItem.getCount() <= this.targetItem.getCount()) {
+                    throw new RuntimeException("Invalid " + getClass().getName() + ", expected a partial consume of the same item, got source: " + this.sourceItem + ", target: " + this.targetItem);
+                }
+                int consumed = this.sourceItem.getCount() - this.targetItem.getCount();
+                Item consumedItem = this.sourceItem.clone();
+                consumedItem.setCount(consumed);
+                ((CraftingTransaction) transaction).setInput(consumedItem);
             }
         } else {
             throw new RuntimeException(getClass().getName() + " can only be added to CraftingTransactions");
