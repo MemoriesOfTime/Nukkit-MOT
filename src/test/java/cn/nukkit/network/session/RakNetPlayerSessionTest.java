@@ -8,7 +8,9 @@ import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
 import cn.nukkit.network.session.login.SessionLoginPhase;
+import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -75,7 +77,7 @@ class RakNetPlayerSessionTest {
     @Test
     void decodeInboundPrefixedBatchKeepsPrefixedSnappyPackets() throws Exception {
         byte[] legacyPacketBuffer = createLegacyHandshakeBatch();
-        byte[] compressed = CompressionProvider.SNAPPY.compress(new cn.nukkit.utils.BinaryStream(legacyPacketBuffer), 7);
+        byte[] compressed = CompressionProvider.SNAPPY.compress(new BinaryStream(legacyPacketBuffer), 7);
         byte[] prefixedPacketBuffer = new byte[compressed.length + 1];
         prefixedPacketBuffer[0] = CompressionProvider.SNAPPY.getPrefix();
         System.arraycopy(compressed, 0, prefixedPacketBuffer, 1, compressed.length);
@@ -94,6 +96,27 @@ class RakNetPlayerSessionTest {
         assertSame(CompressionProvider.SNAPPY, result.compression());
         assertEquals(1, result.packets().size());
         assertInstanceOf(ClientToServerHandshakePacket.class, result.packets().get(0));
+    }
+
+    @Test
+    void decodeInboundPrefixedBatchAcceptsResourcePackRequestBurst() throws Exception {
+        Player player = mock(Player.class);
+        player.protocol = GameVersion.V1_21_130.getProtocol();
+        when(player.getGameVersion()).thenReturn(GameVersion.V1_21_130);
+
+        RakNetPlayerSession.InboundBatchDecodeResult result = RakNetPlayerSession.decodeInboundPrefixedBatch(
+                network,
+                createPrefixedResourcePackRequestBatch(1300),
+                CompressionProvider.NONE,
+                true,
+                RAKNET_PROTOCOL,
+                player
+        );
+
+        assertTrue(result.success());
+        assertTrue(result.prefixed());
+        assertEquals(1300, result.packets().size());
+        assertTrue(result.packets().stream().allMatch(ResourcePackChunkRequestPacket.class::isInstance));
     }
 
     @Test
@@ -294,6 +317,26 @@ class RakNetPlayerSessionTest {
                 0x01,
                 ClientToServerHandshakePacket.NETWORK_ID
         };
+    }
+
+    private static byte[] createPrefixedResourcePackRequestBatch(int packetCount) throws Exception {
+        UUID packId = UUID.fromString("07f9efc2-1a83-4084-88b1-bb20af4a6eb4");
+        BinaryStream batch = new BinaryStream();
+        for (int i = 0; i < packetCount; i++) {
+            ResourcePackChunkRequestPacket request = new ResourcePackChunkRequestPacket();
+            request.protocol = GameVersion.V1_21_130.getProtocol();
+            request.gameVersion = GameVersion.V1_21_130;
+            request.packId = packId;
+            request.chunkIndex = i;
+            request.encode();
+            batch.putByteArray(request.getBuffer());
+        }
+
+        byte[] compressed = CompressionProvider.ZLIB_RAW.compress(batch, 7);
+        byte[] prefixed = new byte[compressed.length + 1];
+        prefixed[0] = CompressionProvider.ZLIB_RAW.getPrefix();
+        System.arraycopy(compressed, 0, prefixed, 1, compressed.length);
+        return prefixed;
     }
 
     private record SessionFixture(RakNetPlayerSession session, RakChildChannel channel, EventLoop eventLoop,

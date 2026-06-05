@@ -13,11 +13,17 @@ public class FireworksDispenseBehavior extends DefaultDispenseBehavior {
 
     @Override
     public Item dispense(BlockDispenser block, BlockFace face, Item item) {
-        BlockFace opposite = face.getOpposite();
-        Vector3 pos = block.getSide(face).add(0.5 + opposite.getXOffset() * 0.2, 0.5 + opposite.getYOffset() * 0.2, 0.5 + opposite.getZOffset() * 0.2);
-        CompoundTag nbt = Entity.getDefaultNBT(pos);
-        nbt.putCompound("FireworkItem", NBTIO.putItemHelper(item));
-        new EntityFirework(block.level.getChunk(pos.getChunkX(), pos.getChunkZ()), nbt).spawnToAll();
+        Vector3 pos = block.getDispensePosition();
+        Vector3 motion = new Vector3(face.getXOffset(), face.getYOffset(), face.getZOffset());
+
+        CompoundTag nbt = Entity.getDefaultNBT(pos, motion,
+                        (float) motion.yRotFromDirection(),
+                        (float) motion.xRotFromDirection())
+                .putCompound("FireworkItem", NBTIO.putItemHelper(item));
+
+        EntityFirework firework = new EntityFirework(
+                block.level.getChunk(pos.getChunkX(), pos.getChunkZ()), nbt, true, null);
+        firework.spawnToAll();
         return null;
     }
 }
