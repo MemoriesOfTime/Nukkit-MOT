@@ -4,6 +4,7 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.*;
+import cn.nukkit.level.particle.Particle;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.nbt.NBTIO;
@@ -123,6 +124,7 @@ public class Binary {
         for (Map.Entry<Integer, EntityData> entry : map.entrySet()) {
             EntityData d = entry.getValue();
             int id = entry.getKey();
+            int originalId = id;
             int type = d.getType();
             boolean forceEmptyData = false;
 
@@ -167,6 +169,8 @@ public class Binary {
                 case Entity.DATA_TYPE_INT:
                     if (forceEmptyData) {
                         stream.putVarInt(0);
+                    } else if (originalId == Entity.DATA_AREA_EFFECT_CLOUD_PARTICLE_ID) {
+                        stream.putVarInt(Particle.getMultiversionId(gameVersion, ((IntEntityData) d).getData()));
                     } else {
                         stream.putVarInt(((IntEntityData) d).getData());
                     }
