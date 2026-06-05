@@ -59,9 +59,10 @@ public class FireworkRecipe extends MultiRecipe {
         ListTag<CompoundTag> explosionList = tag.getCompound("Fireworks").getList("Explosions", CompoundTag.class);
 
         for (Item star : ingredients.starGroups()) {
-            CompoundTag starTag = star.getNamedTag();
-            CompoundTag fireworksItem = starTag.contains("FireworksItem")
-                    ? starTag.getCompound("FireworksItem") : starTag;
+            CompoundTag fireworksItem = getExplosionComponent(star);
+            if (fireworksItem == null) {
+                continue;
+            }
             int explosionsPerBatch = star.getCount() / ingredients.batchCount();
             for (int i = 0; i < explosionsPerBatch; i++) {
                 explosionList.add(createExplosion(fireworksItem));
@@ -73,6 +74,27 @@ public class FireworkRecipe extends MultiRecipe {
         }
 
         return firework;
+    }
+
+    private static CompoundTag getExplosionComponent(Item star) {
+        if (!star.hasCompoundTag()) {
+            return null;
+        }
+
+        CompoundTag starTag = star.getNamedTag();
+        if (starTag.contains("FireworksItem")) {
+            return starTag.getCompound("FireworksItem");
+        }
+
+        return hasExplosionData(starTag) ? starTag : null;
+    }
+
+    private static boolean hasExplosionData(CompoundTag tag) {
+        return tag.exist("FireworkColor")
+                || tag.exist("FireworkFade")
+                || tag.exist("FireworkFlicker")
+                || tag.exist("FireworkTrail")
+                || tag.exist("FireworkType");
     }
 
     private static CompoundTag createExplosion(CompoundTag fireworksItem) {
@@ -108,9 +130,6 @@ public class FireworkRecipe extends MultiRecipe {
                 case ItemID.PAPER -> paper += input.getCount();
                 case ItemID.GUNPOWDER -> gunpowder += input.getCount();
                 case ItemID.FIREWORKSCHARGE -> {
-                    if (!input.hasCompoundTag()) {
-                        return null;
-                    }
                     addStar(starGroups, input);
                     stars += input.getCount();
                 }

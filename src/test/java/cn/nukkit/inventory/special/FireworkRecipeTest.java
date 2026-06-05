@@ -104,6 +104,27 @@ class FireworkRecipeTest {
     }
 
     @Test
+    void acceptsFireworkStarWithoutExplosionComponent() {
+        List<Item> inputs = List.of(
+                Item.get(ItemID.PAPER),
+                Item.get(ItemID.GUNPOWDER),
+                Item.get(ItemID.FIREWORKSCHARGE)
+        );
+        ItemFirework output = new ItemFirework(0, 3);
+        output.setFlight(1);
+
+        assertTrue(recipe.canExecute(null, output, inputs));
+
+        Recipe craftedRecipe = recipe.toRecipe(output, inputs);
+        assertInstanceOf(ItemFirework.class, craftedRecipe.getResult());
+        ItemFirework firework = (ItemFirework) craftedRecipe.getResult();
+        ListTag<CompoundTag> explosions = firework.getNamedTag()
+                .getCompound("Fireworks")
+                .getList("Explosions", CompoundTag.class);
+        assertTrue(explosions.isEmpty());
+    }
+
+    @Test
     void rejectsSmallGridRecipeThatRequiresCraftingTable() {
         Player player = Mockito.mock(Player.class);
         player.craftingType = Player.CRAFTING_SMALL;
