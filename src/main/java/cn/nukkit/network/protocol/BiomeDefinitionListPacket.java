@@ -43,6 +43,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
     private static final BatchPacket CACHED_PACKET;
 
     private static final BatchPacket CACHED_PACKET_819_NETEASE;
+    private static final BatchPacket CACHED_PACKET_844_NETEASE;
 
     private static final byte[] TAG_361;
     private static final byte[] TAG_419;
@@ -170,8 +171,14 @@ public class BiomeDefinitionListPacket extends DataPacket {
             );
             pk.protocol = ProtocolInfo.v1_21_110;
             pk.gameVersion = GameVersion.V1_21_110;
+            DataPacket pkNetEase = pk.clone();
             pk.tryEncode();
             CACHED_PACKET = pk.compress(Deflater.BEST_COMPRESSION);
+
+            pkNetEase.protocol = ProtocolInfo.v1_21_111;
+            pkNetEase.gameVersion = GameVersion.V1_21_111_NETEASE;
+            pkNetEase.tryEncode();
+            CACHED_PACKET_844_NETEASE = pkNetEase.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
             throw new AssertionError("Error whilst loading biome definitions 844", e);
         }
@@ -189,7 +196,9 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
 
         if (gameVersion.isNetEase()) {
-            if (protocol >= ProtocolInfo.v1_21_93) {
+            if (protocol >= ProtocolInfo.v1_21_111) {
+                return CACHED_PACKET_844_NETEASE;
+            } else if (protocol >= ProtocolInfo.v1_21_93) {
                 return CACHED_PACKET_819_NETEASE;
             }
         }

@@ -91,8 +91,13 @@ public class BlockPalette {
 
             if (useNetEaseConversion) {
                 ListTag<CompoundTag> fullPalette = loadFullBlockPalette(protocol);
-                log.info("Using full block_palette_{}.nbt for NetEase conversion ({} blocks)", protocol, fullPalette.size());
-                tag = NetEaseConverter.convertBlockStates(fullPalette, true);
+                if (fullPalette != null) {
+                    log.info("Using full block_palette_{}.nbt for NetEase conversion ({} blocks)", protocol, fullPalette.size());
+                    tag = NetEaseConverter.convertBlockStates(fullPalette, true);
+                } else {
+                    log.info("Full block_palette_{}.nbt not found; converting runtime_block_states_{}.dat for NetEase", protocol, protocol);
+                    tag = NetEaseConverter.convertBlockStates(tag, true);
+                }
             }
         } catch (IOException | NullPointerException e) {
             throw new AssertionError("Unable to load block palette " + protocol, e);
@@ -369,7 +374,9 @@ public class BlockPalette {
     }
 
     private void logMissingRuntimeIdMapping(String message, Object... args) {
-        if (this.gameVersion == GameVersion.getLastVersion() || this.gameVersion == GameVersion.V1_21_93_NETEASE) {
+        if (this.gameVersion == GameVersion.getLastVersion()
+                || this.gameVersion == GameVersion.V1_21_93_NETEASE
+                || this.gameVersion == GameVersion.V1_21_111_NETEASE) {
             log.info(message, args);
             return;
         }

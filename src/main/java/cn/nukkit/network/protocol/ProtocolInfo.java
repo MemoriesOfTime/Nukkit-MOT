@@ -101,6 +101,7 @@ public interface ProtocolInfo {
     int v1_21_100 = 827;
     int v1_21_110_26 = 843;
     int v1_21_110 = 844;
+    int v1_21_111 = v1_21_110;
     int v1_21_120 = 859;
     int v1_21_124 = 860;
     int v1_21_130_28 = 897;

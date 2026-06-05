@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 class BlockPaletteTest {
 
+    private static final int NETEASE_MICRO_BLOCK_ID = 9990;
+
     @BeforeAll
     /**
      * Boots the shared mock server once so palette construction uses initialized registries.
@@ -92,6 +94,21 @@ class BlockPaletteTest {
     void shelfStatesHaveVariantSpecificRuntimeMappings() {
         assertShelfStatesMapped(new BlockPalette(GameVersion.V1_21_110));
         assertShelfStatesMapped(new BlockPalette(GameVersion.V1_26_10));
+    }
+
+    @Test
+    /**
+     * Verifies NetEase 1.21.111 can build a converted palette even without a dedicated resource file.
+     */
+    void netEase121111PaletteLoadsConvertedStates() {
+        BlockPalette palette = new BlockPalette(GameVersion.V1_21_111_NETEASE);
+
+        assertCopperLanternStatesMapped(palette);
+        assertLightningRodStatesMapped(palette);
+        assertShelfStatesMapped(palette);
+        Assertions.assertNotEquals(
+                palette.getRuntimeId(Block.INFO_UPDATE, 0),
+                palette.getRuntimeId(NETEASE_MICRO_BLOCK_ID, 0));
     }
 
     private static void assertCrafterTriggeredStateMapped(BlockPalette palette) {

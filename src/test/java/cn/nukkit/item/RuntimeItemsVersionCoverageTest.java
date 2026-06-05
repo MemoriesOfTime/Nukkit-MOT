@@ -2,6 +2,7 @@ package cn.nukkit.item;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -9,7 +10,9 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -71,6 +74,18 @@ public class RuntimeItemsVersionCoverageTest {
         RuntimeItemMapping mapping = RuntimeItems.getMapping(lastVersion);
         assertNotNull(mapping,
                 "RuntimeItems.getMapping() 应该为最新版本 " + lastVersion + " 返回有效映射");
+    }
+
+    /**
+     * 验证网易 1.21.111 协议能解析为独立 GameVersion，并能拿到运行时物品映射。
+     */
+    @Test
+    public void testNetEase121111VersionMappingExists() {
+        GameVersion netEase121111 = GameVersion.byProtocol(ProtocolInfo.v1_21_110, true);
+
+        assertSame(GameVersion.V1_21_111_NETEASE, netEase121111);
+        assertEquals("1.21.111_NetEase", netEase121111.toString());
+        assertNotNull(RuntimeItems.getMapping(netEase121111));
     }
 
     /**
