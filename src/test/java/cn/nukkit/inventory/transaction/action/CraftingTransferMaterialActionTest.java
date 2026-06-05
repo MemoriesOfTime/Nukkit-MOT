@@ -36,6 +36,19 @@ class CraftingTransferMaterialActionTest {
     }
 
     @Test
+    void partialConsumptionExposesConsumedDeltaForBalanceCheck() {
+        Item source = Item.get(BlockID.LOG, 0, 64);
+        Item target = Item.get(BlockID.LOG, 0, 63);
+        Item consumedFromInventory = Item.get(BlockID.LOG);
+        TestCraftingTransaction transaction = new TestCraftingTransaction(List.of(
+                new CraftingTransferMaterialAction(source, target, 0),
+                new BalanceAction(consumedFromInventory, Item.get(Item.AIR))
+        ));
+
+        assertTrue(transaction.matchesBalance());
+    }
+
+    @Test
     void partialConsumptionRejectsDifferentTargetItem() {
         TestCraftingTransaction transaction = new TestCraftingTransaction();
         Item source = Item.get(BlockID.LOG, 0, 64);
@@ -48,11 +61,44 @@ class CraftingTransferMaterialActionTest {
     private static final class TestCraftingTransaction extends CraftingTransaction {
 
         private TestCraftingTransaction() {
-            super(mockPlayer(), List.of());
+            this(List.of());
+        }
+
+        private TestCraftingTransaction(List<InventoryAction> actions) {
+            super(mockPlayer(), actions);
         }
 
         private List<Item> getExtraOutputList() {
             return this.secondaryOutputs;
+        }
+
+        private boolean matchesBalance() {
+            return matchItems(false, false);
+        }
+    }
+
+    private static final class BalanceAction extends InventoryAction {
+
+        private BalanceAction(Item sourceItem, Item targetItem) {
+            super(sourceItem, targetItem);
+        }
+
+        @Override
+        public boolean isValid(Player source) {
+            return true;
+        }
+
+        @Override
+        public boolean execute(Player source) {
+            return true;
+        }
+
+        @Override
+        public void onExecuteSuccess(Player source) {
+        }
+
+        @Override
+        public void onExecuteFail(Player source) {
         }
     }
 

@@ -29,6 +29,8 @@ public class CraftingTransferMaterialAction extends InventoryAction {
                 int consumed = this.sourceItem.getCount() - this.targetItem.getCount();
                 Item consumedItem = this.sourceItem.clone();
                 consumedItem.setCount(consumed);
+                this.sourceItem = Item.get(Item.AIR);
+                this.targetItem = consumedItem;
                 ((CraftingTransaction) transaction).setInput(consumedItem);
             }
         } else {
