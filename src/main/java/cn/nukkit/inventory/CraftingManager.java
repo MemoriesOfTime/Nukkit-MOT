@@ -875,9 +875,7 @@ public class CraftingManager {
         packet_netease_844 = null;
 
         this.getCachedPacket(GameVersion.getLastVersion()); // 缓存当前协议版本的数据包
-        this.getCachedPacket(GameVersion.V1_21_50_NETEASE);
-        this.getCachedPacket(GameVersion.V1_21_93_NETEASE);
-        this.getCachedPacket(GameVersion.V1_21_111_NETEASE);
+        this.getCachedPacket(GameVersion.getLastNetEaseVersion());
     }
 
     @Deprecated

@@ -531,7 +531,6 @@ public class Utils {
             case ProtocolInfo.v1_21_93 -> "1.21.93";
             case ProtocolInfo.v1_21_100 -> "1.21.100";
             case ProtocolInfo.v1_21_110_26 -> "1.21.110";
-            case ProtocolInfo.v1_21_111 -> "1.21.111";
             case ProtocolInfo.v1_21_120 -> "1.21.120";
             case ProtocolInfo.v1_21_124 -> "1.21.124";
             case ProtocolInfo.v1_21_130_28, ProtocolInfo.v1_21_130 -> "1.21.130";

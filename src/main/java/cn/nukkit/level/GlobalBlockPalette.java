@@ -135,8 +135,7 @@ public class GlobalBlockPalette {
         // cache current block palette
         getPaletteByProtocol(GameVersion.getLastVersion());
         if (Server.getInstance().netEaseMode) {
-            getPaletteByProtocol(GameVersion.V1_21_50_NETEASE);
-            getPaletteByProtocol(GameVersion.V1_21_111_NETEASE);
+            getPaletteByProtocol(GameVersion.getLastNetEaseVersion());
         }
     }
 
