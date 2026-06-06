@@ -3,7 +3,9 @@ package cn.nukkit.network.protocol.regression.encode;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.entity.Attribute;
+import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.regression.PacketBridgeUtil;
 import io.netty.buffer.ByteBuf;
 import org.allaymc.protocol.extension.codec.v630.Bedrock_v630_NetEase;
@@ -14,10 +16,13 @@ import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockPacketDefinition;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -33,6 +38,8 @@ public class NetEasePacketRegressionTest {
 
     private static final Map<Integer, BedrockCodec> NETEASE_CODECS;
     private static final Map<Integer, GameVersion> NETEASE_GAME_VERSIONS;
+    private static final int CUSTOM_PACKET_NEW_ID = 399;
+    private static final byte CUSTOM_PACKET_LEGACY_ID = (byte) 0xfe;
 
     static {
         NETEASE_CODECS = new LinkedHashMap<>();
@@ -54,6 +61,25 @@ public class NetEasePacketRegressionTest {
 
     static Stream<Arguments> allNetEaseVersions() {
         return NETEASE_CODECS.keySet().stream().map(Arguments::of);
+    }
+
+    static Stream<Arguments> netEasePacketPoolVersions() {
+        return Stream.of(
+                GameVersion.V1_20_50_NETEASE,
+                GameVersion.V1_21_2_NETEASE,
+                GameVersion.V1_21_50_NETEASE,
+                GameVersion.V1_21_93_NETEASE
+        ).map(Arguments::of);
+    }
+
+    static Stream<Arguments> internationalPacketPoolVersions() {
+        return Stream.of(
+                GameVersion.V1_20_50,
+                GameVersion.V1_21_2,
+                GameVersion.V1_21_50,
+                GameVersion.V1_21_93,
+                GameVersion.getLastVersion()
+        ).map(Arguments::of);
     }
 
     @SuppressWarnings("unchecked")
@@ -85,6 +111,60 @@ public class NetEasePacketRegressionTest {
         packet.protocol = protocolVersion;
         packet.gameVersion = NETEASE_GAME_VERSIONS.get(protocolVersion);
         return packet;
+    }
+
+    private cn.nukkit.network.protocol.netease.PyRpcPacket decodePyRpcPacket(byte[] data, long msgId, int protocolVersion) {
+        var cbPacket = new org.allaymc.protocol.extension.packet.PyRpcPacket();
+        cbPacket.setData(data);
+        cbPacket.setMsgId(msgId);
+
+        BedrockCodec codec = NETEASE_CODECS.get(protocolVersion);
+        byte[] buffer = PacketBridgeUtil.cbPacketToNukkitBuffer(
+                cbPacket, codec, codec.createHelper(), ProtocolInfo.PY_RPC_PACKET, protocolVersion);
+
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.PyRpcPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.setBuffer(buffer);
+        nukkitPacket.getUnsignedVarInt();
+        nukkitPacket.decode();
+        return nukkitPacket;
+    }
+
+    private static byte[] msgpackArray(byte[]... elements) {
+        assertTrue(elements.length < 16, "test helper only supports fixarray");
+        return concat(new byte[]{(byte) (0x90 | elements.length)}, concat(elements));
+    }
+
+    private static byte[] msgpackMap(String key, byte[] value) {
+        return concat(new byte[]{(byte) 0x81}, msgpackString(key), value);
+    }
+
+    private static byte[] msgpackMap(byte[] key, byte[] value) {
+        return concat(new byte[]{(byte) 0x81}, key, value);
+    }
+
+    private static byte[] msgpackString(String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        assertTrue(bytes.length < 32, "test helper only supports fixstr");
+        return concat(new byte[]{(byte) (0xa0 | bytes.length)}, bytes);
+    }
+
+    private static byte[] msgpackBinary(String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        assertTrue(bytes.length < 256, "test helper only supports bin8");
+        return concat(new byte[]{(byte) 0xc4, (byte) bytes.length}, bytes);
+    }
+
+    private static byte[] msgpackNil() {
+        return new byte[]{(byte) 0xc0};
+    }
+
+    private static byte[] concat(byte[]... parts) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (byte[] part : parts) {
+            out.writeBytes(part);
+        }
+        return out.toByteArray();
     }
 
     // ==================== ConfirmSkinPacket ====================
@@ -170,6 +250,272 @@ public class NetEasePacketRegressionTest {
         assertArrayEquals(new byte[0], entry.getSkinBytes());
         assertEquals("", entry.getUidStr());
         assertEquals("", entry.getGeoStr());
+    }
+
+    // ==================== PyRpcPacket ====================
+
+    @ParameterizedTest(name = "PyRpcPacket v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.PyRpcPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        byte[] data = new byte[]{(byte) 0x93, (byte) 0xa3, 'm', 's', 'g', 1, 2, 3};
+        nukkitPacket.setData(data);
+        nukkitPacket.setMsgId(0xfedcba98L);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                org.allaymc.protocol.extension.packet.PyRpcPacket.class);
+
+        assertArrayEquals(data, cbPacket.getData());
+        assertEquals(0xfedcba98L, cbPacket.getMsgId());
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket ModEventS2C create v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacketCreatesModEventS2CPacket(int protocolVersion) {
+        Map<String, Object> eventData = new LinkedHashMap<>();
+        eventData.put("animName", "wave");
+
+        var nukkitPacket = cn.nukkit.network.protocol.netease.PyRpcPacket.createModEventPacket(
+                "Minecraft", "emote", "PlayEmoteEvent", eventData);
+
+        byte[] expected = msgpackArray(
+                msgpackBinary("ModEventS2C"),
+                msgpackArray(
+                        msgpackBinary("Minecraft"),
+                        msgpackBinary("emote"),
+                        msgpackBinary("PlayEmoteEvent"),
+                        msgpackMap(msgpackBinary("animName"), msgpackBinary("wave"))),
+                msgpackNil());
+        assertArrayEquals(expected, nukkitPacket.getData());
+        assertEquals(cn.nukkit.network.protocol.netease.PyRpcPacket.DEFAULT_MSG_ID, nukkitPacket.getMsgId());
+
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                org.allaymc.protocol.extension.packet.PyRpcPacket.class);
+
+        assertArrayEquals(expected, cbPacket.getData());
+        assertEquals(cn.nukkit.network.protocol.netease.PyRpcPacket.DEFAULT_MSG_ID, cbPacket.getMsgId());
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket encrypted ModEventS2C create v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacketCreatesEncryptedModEventS2CPacket(int protocolVersion) {
+        var nukkitPacket = cn.nukkit.network.protocol.netease.PyRpcPacket.createEncryptedModEventPacket(
+                "Minecraft", "secure", "EncryptedEvent", "payload", value -> "enc:" + value);
+
+        byte[] expected = msgpackArray(
+                msgpackBinary("ModEventS2C"),
+                msgpackArray(
+                        msgpackBinary("Minecraft"),
+                        msgpackBinary("secure"),
+                        msgpackBinary("EncryptedEvent"),
+                        msgpackMap(msgpackBinary("data"), msgpackBinary("enc:payload"))),
+                msgpackNil());
+        assertArrayEquals(expected, nukkitPacket.getData());
+        assertEquals(cn.nukkit.network.protocol.netease.PyRpcPacket.DEFAULT_MSG_ID, nukkitPacket.getMsgId());
+
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                org.allaymc.protocol.extension.packet.PyRpcPacket.class);
+
+        assertArrayEquals(expected, cbPacket.getData());
+        assertEquals(cn.nukkit.network.protocol.netease.PyRpcPacket.DEFAULT_MSG_ID, cbPacket.getMsgId());
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket decode v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacketDecode(int protocolVersion) {
+        byte[] data = new byte[]{(byte) 0x92, (byte) 0xa4, 't', 'e', 's', 't', 42};
+        var cbPacket = new org.allaymc.protocol.extension.packet.PyRpcPacket();
+        cbPacket.setData(data);
+        cbPacket.setMsgId(0x87654321L);
+
+        BedrockCodec codec = NETEASE_CODECS.get(protocolVersion);
+        byte[] buffer = PacketBridgeUtil.cbPacketToNukkitBuffer(
+                cbPacket, codec, codec.createHelper(), ProtocolInfo.PY_RPC_PACKET, protocolVersion);
+
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.PyRpcPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.setBuffer(buffer);
+        nukkitPacket.getUnsignedVarInt();
+        nukkitPacket.decode();
+
+        assertArrayEquals(data, nukkitPacket.getData());
+        assertEquals(0x87654321L, nukkitPacket.getMsgId());
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket registered NetEase v{0}")
+    @MethodSource("netEasePacketPoolVersions")
+    void testPyRpcPacketRegistered(GameVersion gameVersion) {
+        Network network = new Network(MockServer.get());
+
+        assertTrue(network.getPacketPool(gameVersion).isNetEase());
+        DataPacket packet = network.getPacket(ProtocolInfo.PY_RPC_PACKET, gameVersion);
+
+        assertInstanceOf(cn.nukkit.network.protocol.netease.PyRpcPacket.class, packet);
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket not registered international v{0}")
+    @MethodSource("internationalPacketPoolVersions")
+    void testPyRpcPacketNotRegisteredForInternationalPacketPool(GameVersion gameVersion) {
+        Network network = new Network(MockServer.get());
+
+        assertFalse(network.getPacketPool(gameVersion).isNetEase());
+        assertNull(network.getPacket(ProtocolInfo.PY_RPC_PACKET, gameVersion.getProtocol()));
+        assertNull(network.getPacket(ProtocolInfo.PY_RPC_PACKET, gameVersion));
+    }
+
+    @ParameterizedTest(name = "PacketPool branch flag v{0}")
+    @MethodSource("netEasePacketPoolVersions")
+    void testPacketPoolNetEaseFlagDistinguishesSameProtocolBranches(GameVersion gameVersion) {
+        Network network = new Network(MockServer.get());
+
+        assertFalse(network.getPacketPool(gameVersion.getProtocol()).isNetEase());
+        assertTrue(network.getPacketPool(gameVersion).isNetEase());
+    }
+
+    @ParameterizedTest(name = "setPacketPool rejects mismatched branch v{0}")
+    @MethodSource("netEasePacketPoolVersions")
+    void testSetPacketPoolRejectsMismatchedNetEaseFlag(GameVersion gameVersion) {
+        Network network = new Network(MockServer.get());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> network.setPacketPool(gameVersion, network.getPacketPool(gameVersion.getProtocol())));
+    }
+
+    @Test
+    void testProtocolRegisterPacketNewAlsoUpdatesCurrentNetEasePacketPool() {
+        Network network = new Network(MockServer.get());
+
+        network.registerPacketNew(ProtocolInfo.v1_21_80, CUSTOM_PACKET_NEW_ID, CustomNewProtocolPacket.class);
+
+        assertInstanceOf(CustomNewProtocolPacket.class,
+                network.getPacket(CUSTOM_PACKET_NEW_ID, GameVersion.V1_21_80));
+        assertInstanceOf(CustomNewProtocolPacket.class,
+                network.getPacket(CUSTOM_PACKET_NEW_ID, GameVersion.V1_21_93_NETEASE));
+    }
+
+    @Test
+    void testProtocolRegisterPacketAlsoUpdatesBaseNetEasePacketPool() {
+        Network network = new Network(MockServer.get());
+        int packetId = ProtocolInfo.toNewProtocolID(CUSTOM_PACKET_LEGACY_ID);
+
+        network.registerPacket(ProtocolInfo.v1_2_0, CUSTOM_PACKET_LEGACY_ID, CustomLegacyProtocolPacket.class);
+
+        assertInstanceOf(CustomLegacyProtocolPacket.class,
+                network.getPacket(packetId, GameVersion.V1_2_0));
+        assertInstanceOf(CustomLegacyProtocolPacket.class,
+                network.getPacket(packetId, GameVersion.V1_20_50_NETEASE));
+    }
+
+    @Test
+    void testExplicitInternationalGameVersionRegistrationDoesNotUpdateNetEasePacketPool() {
+        Network network = new Network(MockServer.get());
+
+        network.registerPacketNew(GameVersion.V1_21_93, CUSTOM_PACKET_NEW_ID, CustomExplicitProtocolPacket.class);
+
+        assertInstanceOf(CustomExplicitProtocolPacket.class,
+                network.getPacket(CUSTOM_PACKET_NEW_ID, GameVersion.V1_21_93));
+        assertNull(network.getPacket(CUSTOM_PACKET_NEW_ID, GameVersion.V1_21_93_NETEASE));
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket ModEventC2S sub-packet v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacketDecodesModEventSubPacket(int protocolVersion) {
+        byte[] data = msgpackArray(
+                msgpackString("ModEventC2S"),
+                msgpackArray(
+                        msgpackString("Minecraft"),
+                        msgpackString("emote"),
+                        msgpackString("PlayEmoteEvent"),
+                        msgpackMap("animName", msgpackString("wave"))));
+
+        var nukkitPacket = decodePyRpcPacket(data, 0x12345678L, protocolVersion);
+
+        assertEquals(1, nukkitPacket.getSubPackets().size());
+        var subPacket = assertInstanceOf(
+                cn.nukkit.network.protocol.netease.PyRpcPacket.ModEventSubPacket.class,
+                nukkitPacket.getSubPackets().get(0));
+        assertEquals("Minecraft", subPacket.getModName());
+        assertEquals("emote", subPacket.getSystemName());
+        assertEquals("PlayEmoteEvent", subPacket.getEventName());
+        assertEquals("wave", subPacket.getEventData().get("animName"));
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket wrapped ModEventC2S sub-packet v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacketDecodesWrappedModEventSubPacket(int protocolVersion) {
+        byte[] data = msgpackMap("value", msgpackArray(
+                msgpackString("ModEventC2S"),
+                msgpackMap("value", msgpackArray(
+                        msgpackString("Minecraft"),
+                        msgpackString("emote"),
+                        msgpackString("PlayEmoteEvent"),
+                        msgpackMap("animName", msgpackString("wave"))))));
+
+        var nukkitPacket = decodePyRpcPacket(data, 0x12345678L, protocolVersion);
+
+        assertEquals(1, nukkitPacket.getSubPackets().size());
+        var subPacket = assertInstanceOf(
+                cn.nukkit.network.protocol.netease.PyRpcPacket.ModEventSubPacket.class,
+                nukkitPacket.getSubPackets().get(0));
+        assertEquals("Minecraft", subPacket.getModName());
+        assertEquals("emote", subPacket.getSystemName());
+        assertEquals("PlayEmoteEvent", subPacket.getEventName());
+        assertEquals("wave", subPacket.getEventData().get("animName"));
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket binary ModEventC2S sub-packet v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacketDecodesBinaryModEventSubPacket(int protocolVersion) {
+        byte[] data = msgpackMap(msgpackBinary("value"), msgpackArray(
+                msgpackBinary("ModEventC2S"),
+                msgpackMap(msgpackBinary("value"), msgpackArray(
+                        msgpackBinary("Minecraft"),
+                        msgpackBinary("emote"),
+                        msgpackBinary("PlayEmoteEvent"),
+                        msgpackMap(msgpackBinary("animName"), msgpackBinary("wave"))))));
+
+        var nukkitPacket = decodePyRpcPacket(data, 0x12345678L, protocolVersion);
+
+        assertEquals(1, nukkitPacket.getSubPackets().size());
+        var subPacket = assertInstanceOf(
+                cn.nukkit.network.protocol.netease.PyRpcPacket.ModEventSubPacket.class,
+                nukkitPacket.getSubPackets().get(0));
+        assertEquals("Minecraft", subPacket.getModName());
+        assertEquals("emote", subPacket.getSystemName());
+        assertEquals("PlayEmoteEvent", subPacket.getEventName());
+        assertEquals("wave", subPacket.getEventData().get("animName"));
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket StoreBuySuccServerEvent sub-packet v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacketDecodesStoreBuySuccessSubPacket(int protocolVersion) {
+        byte[] data = msgpackArray(msgpackString("StoreBuySuccServerEvent"));
+
+        var nukkitPacket = decodePyRpcPacket(data, 0x12345678L, protocolVersion);
+
+        assertEquals(1, nukkitPacket.getSubPackets().size());
+        assertInstanceOf(cn.nukkit.network.protocol.netease.PyRpcPacket.StoreBuySuccessSubPacket.class,
+                nukkitPacket.getSubPackets().get(0));
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket wrapped StoreBuySuccServerEvent sub-packet v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacketDecodesWrappedStoreBuySuccessSubPacket(int protocolVersion) {
+        byte[] data = msgpackMap("value", msgpackArray(msgpackString("StoreBuySuccServerEvent")));
+
+        var nukkitPacket = decodePyRpcPacket(data, 0x12345678L, protocolVersion);
+
+        assertEquals(1, nukkitPacket.getSubPackets().size());
+        assertInstanceOf(cn.nukkit.network.protocol.netease.PyRpcPacket.StoreBuySuccessSubPacket.class,
+                nukkitPacket.getSubPackets().get(0));
     }
 
     // ==================== TextPacket NetEase CHAT ====================
@@ -348,5 +694,50 @@ public class NetEasePacketRegressionTest {
         assertEquals(200.5f, cbPacket.getPosition().getZ(), 0.001f);
         assertEquals(0, cbPacket.getMode().ordinal());
         assertTrue(cbPacket.isOnGround());
+    }
+
+    public static final class CustomNewProtocolPacket extends DataPacket {
+        @Override
+        public byte pid() {
+            return 0;
+        }
+
+        @Override
+        public void decode() {
+        }
+
+        @Override
+        public void encode() {
+        }
+    }
+
+    public static final class CustomLegacyProtocolPacket extends DataPacket {
+        @Override
+        public byte pid() {
+            return CUSTOM_PACKET_LEGACY_ID;
+        }
+
+        @Override
+        public void decode() {
+        }
+
+        @Override
+        public void encode() {
+        }
+    }
+
+    public static final class CustomExplicitProtocolPacket extends DataPacket {
+        @Override
+        public byte pid() {
+            return 0;
+        }
+
+        @Override
+        public void decode() {
+        }
+
+        @Override
+        public void encode() {
+        }
     }
 }

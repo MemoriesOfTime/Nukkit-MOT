@@ -8,6 +8,7 @@ import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
 import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.utils.BinaryStream;
@@ -117,6 +118,55 @@ class RakNetPlayerSessionTest {
         assertTrue(result.prefixed());
         assertEquals(1300, result.packets().size());
         assertTrue(result.packets().stream().allMatch(ResourcePackChunkRequestPacket.class::isInstance));
+    }
+
+    @Test
+    void firstLoginBatchUsesPlayerProtocolWhenGameVersionIsNotNegotiated() {
+        Player player = mock(Player.class, CALLS_REAL_METHODS);
+        player.protocol = GameVersion.V1_21_130.getProtocol();
+        assertNull(player.getGameVersion());
+
+        List<DataPacket> packets = new ArrayList<>();
+        boolean success = network.processBatchQuietly(
+                createRequestNetworkSettingsBatch(GameVersion.V1_21_130.getProtocol()),
+                packets,
+                CompressionProvider.NONE,
+                RAKNET_PROTOCOL,
+                player
+        );
+
+        assertTrue(success);
+        assertEquals(1, packets.size());
+        RequestNetworkSettingsPacket packet = assertInstanceOf(RequestNetworkSettingsPacket.class, packets.get(0));
+        assertEquals(GameVersion.V1_21_130.getProtocol(), packet.protocol);
+        assertEquals(GameVersion.V1_21_130, packet.gameVersion);
+        assertEquals(GameVersion.V1_21_130.getProtocol(), packet.protocolVersion);
+        assertEquals(GameVersion.V1_21_130, player.getGameVersion());
+    }
+
+    @Test
+    void firstLoginBatchUsesLastVersionWhenPlayerProtocolIsNotNegotiated() {
+        Player player = mock(Player.class, CALLS_REAL_METHODS);
+        player.protocol = Integer.MAX_VALUE;
+        assertEquals(Integer.MAX_VALUE, player.protocol);
+        assertNull(player.getGameVersion());
+
+        List<DataPacket> packets = new ArrayList<>();
+        boolean success = network.processBatchQuietly(
+                createRequestNetworkSettingsBatch(GameVersion.V1_21_130.getProtocol()),
+                packets,
+                CompressionProvider.NONE,
+                RAKNET_PROTOCOL,
+                player
+        );
+
+        assertTrue(success);
+        assertEquals(1, packets.size());
+        RequestNetworkSettingsPacket packet = assertInstanceOf(RequestNetworkSettingsPacket.class, packets.get(0));
+        assertEquals(GameVersion.getLastVersion().getProtocol(), packet.protocol);
+        assertEquals(GameVersion.getLastVersion(), packet.gameVersion);
+        assertEquals(GameVersion.V1_21_130.getProtocol(), packet.protocolVersion);
+        assertEquals(GameVersion.getLastVersion(), player.getGameVersion());
     }
 
     @Test
@@ -317,6 +367,16 @@ class RakNetPlayerSessionTest {
                 0x01,
                 ClientToServerHandshakePacket.NETWORK_ID
         };
+    }
+
+    private static byte[] createRequestNetworkSettingsBatch(int protocol) {
+        BinaryStream packet = new BinaryStream();
+        packet.putUnsignedVarInt(RequestNetworkSettingsPacket.NETWORK_ID & 0xff);
+        packet.putInt(protocol);
+
+        BinaryStream batch = new BinaryStream();
+        batch.putByteArray(packet.getBuffer());
+        return batch.getBuffer();
     }
 
     private static byte[] createPrefixedResourcePackRequestBatch(int packetCount) throws Exception {
