@@ -323,10 +323,6 @@ public interface ProtocolInfo {
     @OnlyNetEase
     int PY_RPC_PACKET = 200;
     @OnlyNetEase
-    int STORE_BUY_SUCCESS_PACKET = 202;
-    @OnlyNetEase
-    int NETEASE_JSON_PACKET = 203;
-    @OnlyNetEase
     int PACKET_CONFIRM_SKIN = 228;
 
     int CAMERA_INSTRUCTION_PACKET = 300;
