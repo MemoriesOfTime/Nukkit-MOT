@@ -97,6 +97,9 @@ public class RuntimeItemsVersionCoverageTest {
      */
     @Test
     public void testNetEase121111ItemPaletteConversion() {
+        assertNotNull(RuntimeItemsVersionCoverageTest.class.getClassLoader()
+                .getResource("runtime_item_states_netease_844.json"));
+
         RuntimeItemMapping mapping = RuntimeItems.getMapping(GameVersion.V1_21_111_NETEASE);
 
         assertAbsent(mapping, "minecraft:board");

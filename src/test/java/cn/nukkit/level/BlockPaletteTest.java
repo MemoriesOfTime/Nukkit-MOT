@@ -98,9 +98,12 @@ class BlockPaletteTest {
 
     @Test
     /**
-     * Verifies NetEase 1.21.111 can build a converted palette even without a dedicated resource file.
+     * Verifies NetEase 1.21.111 loads the dedicated palette exported from SynapseAPI/DataConvert.
      */
-    void netEase121111PaletteLoadsConvertedStates() {
+    void netEase121111PaletteLoadsDedicatedStates() {
+        Assertions.assertNotNull(BlockPaletteTest.class.getClassLoader()
+                .getResource("runtime_block_states_netease_844.dat"));
+
         BlockPalette palette = new BlockPalette(GameVersion.V1_21_111_NETEASE);
 
         assertCopperLanternStatesMapped(palette);
