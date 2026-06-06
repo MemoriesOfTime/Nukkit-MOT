@@ -8,6 +8,7 @@ import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.mapping.LevelSoundEventMap;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.camera.CameraFadeInstruction;
@@ -319,6 +320,47 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
                 LevelSoundEventPacket.SOUND_RECORD_LAVA_CHICKEN, SoundEvent.RECORD_LAVA_CHICKEN);
     }
 
+    @Test
+    void testLevelSoundEventV1001EncodesSoundNames() {
+        assertLevelSoundEventEncodesTo(ProtocolInfo.v1_26_30,
+                LevelSoundEventPacket.SOUND_ATTACK, SoundEvent.ATTACK);
+        assertLevelSoundEventEncodesTo(ProtocolInfo.v1_26_30,
+                LevelSoundEventPacket.SOUND_SMITHING_TABLE_USE, SoundEvent.USE_SMITHING_TABLE);
+    }
+
+    @Test
+    void testLevelSoundEventMapPublicApi() {
+        assertEquals("attack", LevelSoundEventMap.getName(LevelSoundEventPacket.SOUND_ATTACK));
+        assertEquals(LevelSoundEventPacket.SOUND_ATTACK, LevelSoundEventMap.getId("attack"));
+        assertTrue(LevelSoundEventMap.isKnownName("smithing_table.use"));
+        assertEquals(LevelSoundEventPacket.SOUND_UNDEFINED, LevelSoundEventMap.getId("unknown.sound"));
+        assertEquals(LevelSoundEventMap.UNDEFINED_NAME, LevelSoundEventMap.getName(LevelSoundEventPacket.SOUND_UNDEFINED));
+        assertTrue(LevelSoundEventMap.getNames().contains("record.lava_chicken"));
+    }
+
+    @Test
+    void testLevelSoundEventV1001EncodesCompleteCloudburstSoundNameSet() {
+        java.util.List<String> nukkitNames = new java.util.ArrayList<>();
+        for (int sound = LevelSoundEventPacket.SOUND_ITEM_USE_ON; sound < LevelSoundEventPacket.SOUND_UNDEFINED; sound++) {
+            String name = encodeLevelSoundEventName(ProtocolInfo.v1_26_30, sound);
+            if (!"undefined".equals(name)) {
+                nukkitNames.add(name);
+            }
+        }
+
+        java.util.Set<String> duplicateNames = nukkitNames.stream()
+                .filter(name -> java.util.Collections.frequency(nukkitNames, name) > 1)
+                .collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new));
+        assertTrue(duplicateNames.isEmpty(), "Duplicate LevelSoundEventPacket v1001 sound names: " + duplicateNames);
+
+        java.util.Set<String> nukkitNameSet = new java.util.TreeSet<>(nukkitNames);
+        java.util.Set<String> cloudburstNameSet = java.util.Arrays.stream(SoundEvent.values())
+                .map(SoundEvent::getSerializeName)
+                .filter(name -> !"undefined".equals(name))
+                .collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new));
+        assertEquals(cloudburstNameSet, nukkitNameSet);
+    }
+
     private void assertLevelSoundEventEncodesTo(int protocolVersion, int sound, SoundEvent expectedSound) {
         var nukkitPacket = new LevelSoundEventPacket();
         nukkitPacket.protocol = protocolVersion;
@@ -338,6 +380,28 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
                 org.cloudburstmc.protocol.bedrock.packet.LevelSoundEventPacket.class);
 
         assertEquals(expectedSound, cbPacket.getSound());
+    }
+
+    private String encodeLevelSoundEventName(int protocolVersion, int sound) {
+        var nukkitPacket = new LevelSoundEventPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.sound = sound;
+        nukkitPacket.x = 100.5f;
+        nukkitPacket.y = 64.0f;
+        nukkitPacket.z = 200.5f;
+        nukkitPacket.extraData = -1;
+        nukkitPacket.entityIdentifier = "";
+        nukkitPacket.isBabyMob = false;
+        nukkitPacket.isGlobal = false;
+        nukkitPacket.entityUniqueId = -1L;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.LevelSoundEventPacket.class);
+
+        assertNotNull(cbPacket.getSound(), "Unknown Cloudburst sound name encoded for Nukkit sound id " + sound);
+        return cbPacket.getSound().getSerializeName();
     }
 
     // ==================== SpawnParticleEffectPacket ====================

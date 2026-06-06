@@ -674,6 +674,10 @@ public class Network {
                 // v975 packets
                 .registerPacket(ProtocolInfo.SERVER_STORE_INFO_PACKET, ServerStoreInfoPacket.class)
                 .registerPacket(ProtocolInfo.SERVER_PRESENCE_INFO_PACKET, ServerPresenceInfoPacket.class)
+                // v1001 packets
+                .registerPacket(ProtocolInfo.CLIENTBOUND_UPDATE_SOUND_DATA_PACKET, ClientboundUpdateSoundDataPacket.class)
+                .registerPacket(ProtocolInfo.SEND_PARTY_DESTINATION_COOKIE_PACKET, SendPartyDestinationCookiePacket.class)
+                .registerPacket(ProtocolInfo.PARTY_DESTINATION_COOKIE_RESPONSE_PACKET, PartyDestinationCookieResponsePacket.class)
                 .build();
     }
 

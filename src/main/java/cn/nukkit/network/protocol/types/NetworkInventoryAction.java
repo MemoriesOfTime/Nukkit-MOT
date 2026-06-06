@@ -69,49 +69,46 @@ public class NetworkInventoryAction {
     public int stackNetworkId;
 
     public NetworkInventoryAction read(InventoryTransactionPacket packet) {
+        return this.read(packet, packet.protocol >= ProtocolInfo.v1_26_30);
+    }
+
+    public NetworkInventoryAction read(InventoryTransactionPacket packet, boolean useV1001InventoryTransactionShape) {
         this.sourceType = (int) packet.getUnsignedVarInt();
 
-        switch (this.sourceType) {
-            case SOURCE_CONTAINER:
-                this.windowId = packet.getVarInt();
-                break;
-            case SOURCE_WORLD:
+        if (useV1001InventoryTransactionShape) {
+            if (packet.getBoolean() && packet.getBoolean()) {
+                this.windowId = packet.getSingedByte();
+            }
+            if (packet.getBoolean() && packet.getBoolean()) {
                 this.flags = packet.getUnsignedVarInt();
-                break;
-            case SOURCE_CREATIVE:
-                break;
-            case SOURCE_CRAFT_SLOT:
-            case SOURCE_TODO:
-                this.windowId = packet.getVarInt();
-
-                switch (this.windowId) {
-                    case SOURCE_TYPE_CRAFTING_RESULT:
-                    case SOURCE_TYPE_CRAFTING_USE_INGREDIENT:
-                        packet.isCraftingPart = true;
-                        break;
-                    case SOURCE_TYPE_ENCHANT_INPUT:
-                    case SOURCE_TYPE_ENCHANT_OUTPUT:
-                    case SOURCE_TYPE_ENCHANT_MATERIAL:
-                        packet.isEnchantingPart = true;
-                        break;
-                    case SOURCE_TYPE_ANVIL_INPUT:
-                    case SOURCE_TYPE_ANVIL_MATERIAL:
-                    case SOURCE_TYPE_ANVIL_RESULT:
-                        packet.isRepairItemPart = true;
-                        break;
-                    case SOURCE_TYPE_TRADING_INPUT_1:
-                    case SOURCE_TYPE_TRADING_INPUT_2:
-                    case SOURCE_TYPE_TRADING_USE_INPUTS:
-                    case SOURCE_TYPE_TRADING_OUTPUT:
-                        packet.isTradeItemPart = true;
-                        break;
-                }
-                break;
+            }
+            updateTransactionPartFlags(packet);
+        } else {
+            switch (this.sourceType) {
+                case SOURCE_CONTAINER:
+                    this.windowId = packet.getVarInt();
+                    break;
+                case SOURCE_WORLD:
+                    this.flags = packet.getUnsignedVarInt();
+                    break;
+                case SOURCE_CREATIVE:
+                    break;
+                case SOURCE_CRAFT_SLOT:
+                case SOURCE_TODO:
+                    this.windowId = packet.getVarInt();
+                    updateTransactionPartFlags(packet);
+                    break;
+            }
         }
 
         this.inventorySlot = (int) packet.getUnsignedVarInt();
-        this.oldItem = packet.getSlot(packet.gameVersion);
-        this.newItem = packet.getSlot(packet.gameVersion);
+        if (useV1001InventoryTransactionShape) {
+            this.oldItem = packet.getNetworkItemStackDescriptor(packet.gameVersion);
+            this.newItem = packet.getNetworkItemStackDescriptor(packet.gameVersion);
+        } else {
+            this.oldItem = packet.getSlot(packet.gameVersion);
+            this.newItem = packet.getSlot(packet.gameVersion);
+        }
 
         if (packet.hasNetworkIds && packet.protocol >= 407 && packet.protocol < ProtocolInfo.v1_16_220) {
             this.stackNetworkId = packet.getVarInt();
@@ -123,27 +120,79 @@ public class NetworkInventoryAction {
     public void write(InventoryTransactionPacket packet) {
         packet.putUnsignedVarInt(this.sourceType);
 
-        switch (this.sourceType) {
-            case SOURCE_CONTAINER:
-                packet.putVarInt(this.windowId);
-                break;
-            case SOURCE_WORLD:
+        if (packet.protocol >= ProtocolInfo.v1_26_30) {
+            packet.putBoolean(true);
+            switch (this.sourceType) {
+                case SOURCE_CONTAINER:
+                case SOURCE_TODO:
+                    packet.putBoolean(true);
+                    packet.putByte((byte) this.windowId);
+                    break;
+                default:
+                    packet.putBoolean(false);
+                    break;
+            }
+
+            packet.putBoolean(true);
+            if (this.sourceType == SOURCE_WORLD) {
+                packet.putBoolean(true);
                 packet.putUnsignedVarInt(this.flags);
-                break;
-            case SOURCE_CREATIVE:
-                break;
-            case SOURCE_CRAFT_SLOT:
-            case SOURCE_TODO:
-                packet.putVarInt(this.windowId);
-                break;
+            } else {
+                packet.putBoolean(false);
+            }
+        } else {
+            switch (this.sourceType) {
+                case SOURCE_CONTAINER:
+                    packet.putVarInt(this.windowId);
+                    break;
+                case SOURCE_WORLD:
+                    packet.putUnsignedVarInt(this.flags);
+                    break;
+                case SOURCE_CREATIVE:
+                    break;
+                case SOURCE_CRAFT_SLOT:
+                case SOURCE_TODO:
+                    packet.putVarInt(this.windowId);
+                    break;
+            }
         }
 
         packet.putUnsignedVarInt(this.inventorySlot);
-        packet.putSlot(packet.gameVersion, this.oldItem);
-        packet.putSlot(packet.gameVersion, this.newItem);
+        if (packet.protocol >= ProtocolInfo.v1_26_30) {
+            packet.putNetworkItemStackDescriptor(packet.gameVersion, this.oldItem);
+            packet.putNetworkItemStackDescriptor(packet.gameVersion, this.newItem);
+        } else {
+            packet.putSlot(packet.gameVersion, this.oldItem);
+            packet.putSlot(packet.gameVersion, this.newItem);
+        }
 
         if (packet.hasNetworkIds && packet.protocol >= 407 && packet.protocol < ProtocolInfo.v1_16_220) {
             packet.putVarInt(this.stackNetworkId);
+        }
+    }
+
+    private void updateTransactionPartFlags(InventoryTransactionPacket packet) {
+        switch (this.windowId) {
+            case SOURCE_TYPE_CRAFTING_RESULT:
+            case SOURCE_TYPE_CRAFTING_USE_INGREDIENT:
+                packet.isCraftingPart = true;
+                break;
+            case SOURCE_TYPE_ENCHANT_INPUT:
+            case SOURCE_TYPE_ENCHANT_OUTPUT:
+            case SOURCE_TYPE_ENCHANT_MATERIAL:
+                packet.isEnchantingPart = true;
+                break;
+            case SOURCE_TYPE_ANVIL_INPUT:
+            case SOURCE_TYPE_ANVIL_MATERIAL:
+            case SOURCE_TYPE_ANVIL_RESULT:
+                packet.isRepairItemPart = true;
+                break;
+            case SOURCE_TYPE_TRADING_INPUT_1:
+            case SOURCE_TYPE_TRADING_INPUT_2:
+            case SOURCE_TYPE_TRADING_USE_INPUTS:
+            case SOURCE_TYPE_TRADING_OUTPUT:
+                packet.isTradeItemPart = true;
+                break;
         }
     }
 

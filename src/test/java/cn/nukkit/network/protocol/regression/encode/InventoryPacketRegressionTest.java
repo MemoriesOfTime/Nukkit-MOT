@@ -79,6 +79,12 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
         );
     }
 
+    static Stream<Arguments> versionsAt1001() {
+        return Stream.of(
+                Arguments.of(ProtocolInfo.v1_26_30)
+        );
+    }
+
     @ParameterizedTest(name = "MobEquipmentPacket v{0}")
     @MethodSource("versionsAll")
     void testMobEquipmentPacket(int protocolVersion) {
@@ -374,6 +380,127 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
         assertEquals(-2.5f, cbPacket.getHeadPosition().getZ(), 0.001f);
     }
 
+    @ParameterizedTest(name = "InventoryTransactionPacket v1001 item use signed fields v{0}")
+    @MethodSource("versionsAt1001")
+    void testInventoryTransactionPacketV1001ItemUseSignedFields(int protocolVersion) {
+        var nukkitPacket = new InventoryTransactionPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.transactionType = InventoryTransactionPacket.TYPE_USE_ITEM;
+        nukkitPacket.legacyRequestId = 0;
+
+        var action = new cn.nukkit.network.protocol.types.NetworkInventoryAction();
+        action.sourceType = cn.nukkit.network.protocol.types.NetworkInventoryAction.SOURCE_CONTAINER;
+        action.windowId = 0;
+        action.inventorySlot = 4;
+        action.oldItem = Item.AIR_ITEM;
+        action.newItem = Item.AIR_ITEM;
+        nukkitPacket.actions = new cn.nukkit.network.protocol.types.NetworkInventoryAction[]{action};
+
+        var useItemData = new cn.nukkit.inventory.transaction.data.UseItemData();
+        useItemData.actionType = InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR;
+        useItemData.triggerType = 1;
+        useItemData.blockPos = new cn.nukkit.math.BlockVector3(5, 60, -10);
+        useItemData.face = cn.nukkit.math.BlockFace.UP;
+        useItemData.hotbarSlot = 3;
+        useItemData.itemInHand = Item.AIR_ITEM;
+        useItemData.playerPos = new cn.nukkit.math.Vector3(1.25f, 64.0f, -3.5f);
+        useItemData.clickPos = new cn.nukkit.math.Vector3f(0.5f, 0.5f, 0.5f);
+        useItemData.blockRuntimeId = 42;
+        useItemData.clientInteractPrediction = 1;
+        useItemData.clientCooldownState = 7;
+        nukkitPacket.transactionData = useItemData;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket.class,
+                withBlockDefinition(42));
+
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType.ITEM_USE,
+                cbPacket.getTransactionType());
+        assertEquals(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR, cbPacket.getActionType());
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.TriggerType.PLAYER_INPUT,
+                cbPacket.getTriggerType());
+        assertEquals(5, cbPacket.getBlockPosition().getX());
+        assertEquals(60, cbPacket.getBlockPosition().getY());
+        assertEquals(-10, cbPacket.getBlockPosition().getZ());
+        assertEquals(1, cbPacket.getBlockFace());
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.PredictedResult.SUCCESS,
+                cbPacket.getClientInteractPrediction());
+        assertEquals(7, cbPacket.getClientCooldownState());
+    }
+
+    @ParameterizedTest(name = "InventoryTransactionPacket v1001 release consume action v{0}")
+    @MethodSource("versionsAt1001")
+    void testInventoryTransactionPacketV1001ReleaseConsumeAction(int protocolVersion) {
+        var nukkitPacket = new InventoryTransactionPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.transactionType = InventoryTransactionPacket.TYPE_RELEASE_ITEM;
+        nukkitPacket.legacyRequestId = 0;
+
+        var action = new cn.nukkit.network.protocol.types.NetworkInventoryAction();
+        action.sourceType = cn.nukkit.network.protocol.types.NetworkInventoryAction.SOURCE_CONTAINER;
+        action.windowId = 0;
+        action.inventorySlot = 4;
+        action.oldItem = Item.AIR_ITEM;
+        action.newItem = Item.AIR_ITEM;
+        nukkitPacket.actions = new cn.nukkit.network.protocol.types.NetworkInventoryAction[]{action};
+
+        var releaseItemData = new cn.nukkit.inventory.transaction.data.ReleaseItemData();
+        releaseItemData.actionType = InventoryTransactionPacket.RELEASE_ITEM_ACTION_CONSUME;
+        releaseItemData.hotbarSlot = 2;
+        releaseItemData.itemInHand = Item.AIR_ITEM;
+        releaseItemData.headRot = new cn.nukkit.math.Vector3(1.5f, 64.0f, -2.5f);
+        nukkitPacket.transactionData = releaseItemData;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket.class);
+
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType.ITEM_RELEASE,
+                cbPacket.getTransactionType());
+        assertEquals(InventoryTransactionPacket.RELEASE_ITEM_ACTION_CONSUME, cbPacket.getActionType());
+    }
+
+    @ParameterizedTest(name = "InventoryTransactionPacket v1001 should preserve legacy slots v{0}")
+    @MethodSource("versionsAt1001")
+    void testInventoryTransactionPacketV1001LegacySlots(int protocolVersion) {
+        var nukkitPacket = new InventoryTransactionPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.transactionType = InventoryTransactionPacket.TYPE_RELEASE_ITEM;
+        nukkitPacket.legacyRequestId = -4;
+        nukkitPacket.legacySlots.add(new InventoryTransactionPacket.LegacySetItemSlotData(
+                7,
+                new byte[]{1, 3, 5}
+        ));
+
+        var action = new cn.nukkit.network.protocol.types.NetworkInventoryAction();
+        action.sourceType = cn.nukkit.network.protocol.types.NetworkInventoryAction.SOURCE_CONTAINER;
+        action.windowId = 0;
+        action.inventorySlot = 4;
+        action.oldItem = Item.AIR_ITEM;
+        action.newItem = Item.AIR_ITEM;
+        nukkitPacket.actions = new cn.nukkit.network.protocol.types.NetworkInventoryAction[]{action};
+
+        var releaseItemData = new cn.nukkit.inventory.transaction.data.ReleaseItemData();
+        releaseItemData.actionType = InventoryTransactionPacket.RELEASE_ITEM_ACTION_RELEASE;
+        releaseItemData.hotbarSlot = 2;
+        releaseItemData.itemInHand = Item.AIR_ITEM;
+        releaseItemData.headRot = new cn.nukkit.math.Vector3(1.5f, 64.0f, -2.5f);
+        nukkitPacket.transactionData = releaseItemData;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket.class);
+
+        assertEquals(-4, cbPacket.getLegacyRequestId());
+        assertEquals(1, cbPacket.getLegacySlots().size());
+        assertEquals(7, cbPacket.getLegacySlots().get(0).getContainerId());
+        assertArrayEquals(new byte[]{1, 3, 5}, cbPacket.getLegacySlots().get(0).getSlots());
+    }
+
     @ParameterizedTest(name = "InventoryTransactionPacket v{0} with network ids")
     @MethodSource("versions407To428")
     void testInventoryTransactionPacketWithNetworkIds(int protocolVersion) {
@@ -559,6 +686,17 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
                 }
             }
         }
+    }
+
+    private static Consumer<BedrockCodecHelper> withBlockDefinition(int runtimeId) {
+        return helper -> helper.setBlockDefinitions(SimpleDefinitionRegistry
+                .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder()
+                .add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                        "test:block_" + runtimeId,
+                        runtimeId,
+                        org.cloudburstmc.nbt.NbtMap.EMPTY
+                ))
+                .build());
     }
 
     private static Consumer<BedrockCodecHelper> withCreativeContentDefinitions(cn.nukkit.GameVersion gameVersion) {

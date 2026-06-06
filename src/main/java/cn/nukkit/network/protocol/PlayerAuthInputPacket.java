@@ -209,7 +209,7 @@ public class PlayerAuthInputPacket extends DataPacket {
         int actionCount = Math.min((int) packet.getUnsignedVarInt(), 4096);
         packet.actions = new NetworkInventoryAction[actionCount];
         for (int i = 0; i < packet.actions.length; i++) {
-            packet.actions[i] = new NetworkInventoryAction().read(packet);
+            packet.actions[i] = new NetworkInventoryAction().read(packet, false);
         }
 
         UseItemData itemData = new UseItemData();
