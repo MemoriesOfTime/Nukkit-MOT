@@ -43,6 +43,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
     private static final BatchPacket CACHED_PACKET;
 
     private static final BatchPacket CACHED_PACKET_819_NETEASE;
+    private static final BatchPacket CACHED_PACKET_844_NETEASE;
 
     private static final byte[] TAG_361;
     private static final byte[] TAG_419;
@@ -168,10 +169,16 @@ public class BiomeDefinitionListPacket extends DataPacket {
                     Utils.loadJsonResource("biome/stripped_biome_definitions_844.json"),
                     new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
             );
-            pk.protocol = ProtocolInfo.v1_21_110;
-            pk.gameVersion = GameVersion.V1_21_110;
+            pk.protocol = ProtocolInfo.v1_21_111;
+            pk.gameVersion = GameVersion.V1_21_111;
+            DataPacket pkNetEase = pk.clone();
             pk.tryEncode();
             CACHED_PACKET = pk.compress(Deflater.BEST_COMPRESSION);
+
+            pkNetEase.protocol = ProtocolInfo.v1_21_111;
+            pkNetEase.gameVersion = GameVersion.V1_21_111_NETEASE;
+            pkNetEase.tryEncode();
+            CACHED_PACKET_844_NETEASE = pkNetEase.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
             throw new AssertionError("Error whilst loading biome definitions 844", e);
         }
@@ -189,7 +196,9 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
 
         if (gameVersion.isNetEase()) {
-            if (protocol >= ProtocolInfo.v1_21_93) {
+            if (protocol >= ProtocolInfo.v1_21_111) {
+                return CACHED_PACKET_844_NETEASE;
+            } else if (protocol >= ProtocolInfo.v1_21_93) {
                 return CACHED_PACKET_819_NETEASE;
             }
         }
@@ -275,7 +284,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
         this.putLFloat(definition.getTemperature());
         this.putLFloat(definition.getDownfall());
-        if (protocol >= GameVersion.V1_21_110.getProtocol()) {
+        if (protocol >= GameVersion.V1_21_111.getProtocol()) {
             this.putLFloat(definition.getFoliageSnow());
         } else {
             this.putLFloat(definition.getRedSporeDensity());
@@ -307,7 +316,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
         this.putOptionalNull(definitionChunkGen.getSurfaceMaterialAdjustment(),
                 (surfaceMaterialAdjustment) -> this.putSurfaceMaterialAdjustment(surfaceMaterialAdjustment, strings));
         this.putOptionalNull(definitionChunkGen.getSurfaceMaterial(), this::putSurfaceMaterial);
-        if (protocol >= ProtocolInfo.v1_21_110) {
+        if (protocol >= ProtocolInfo.v1_21_111) {
             this.putBoolean(definitionChunkGen.isHasDefaultOverworldSurface());
         }
         this.putBoolean(definitionChunkGen.isHasSwampSurface());

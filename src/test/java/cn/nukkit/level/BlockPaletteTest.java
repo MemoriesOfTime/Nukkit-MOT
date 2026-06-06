@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 class BlockPaletteTest {
 
+    private static final int NETEASE_MICRO_BLOCK_ID = 9990;
+
     @BeforeAll
     /**
      * Boots the shared mock server once so palette construction uses initialized registries.
@@ -72,7 +74,7 @@ class BlockPaletteTest {
      * Verifies copper lantern ground and hanging states are mapped by the palettes that include them.
      */
     void copperLanternStatesHaveRuntimeMappings() {
-        assertCopperLanternStatesMapped(new BlockPalette(GameVersion.V1_21_110));
+        assertCopperLanternStatesMapped(new BlockPalette(GameVersion.V1_21_111));
         assertCopperLanternStatesMapped(new BlockPalette(GameVersion.V1_26_10));
     }
 
@@ -81,7 +83,7 @@ class BlockPaletteTest {
      * Verifies lightning rod facing and powered states are mapped by the palettes that include them.
      */
     void lightningRodStatesHaveRuntimeMappings() {
-        assertLightningRodStatesMapped(new BlockPalette(GameVersion.V1_21_110));
+        assertLightningRodStatesMapped(new BlockPalette(GameVersion.V1_21_111));
         assertLightningRodStatesMapped(new BlockPalette(GameVersion.V1_26_10));
     }
 
@@ -90,8 +92,26 @@ class BlockPaletteTest {
      * Verifies shelf wood variants and their 32 block states do not fall back to oak or info_update.
      */
     void shelfStatesHaveVariantSpecificRuntimeMappings() {
-        assertShelfStatesMapped(new BlockPalette(GameVersion.V1_21_110));
+        assertShelfStatesMapped(new BlockPalette(GameVersion.V1_21_111));
         assertShelfStatesMapped(new BlockPalette(GameVersion.V1_26_10));
+    }
+
+    @Test
+    /**
+     * Verifies NetEase 1.21.111 loads the dedicated palette exported from SynapseAPI/DataConvert.
+     */
+    void netEase121111PaletteLoadsDedicatedStates() {
+        Assertions.assertNotNull(BlockPaletteTest.class.getClassLoader()
+                .getResource("runtime_block_states_netease_844.dat"));
+
+        BlockPalette palette = new BlockPalette(GameVersion.V1_21_111_NETEASE);
+
+        assertCopperLanternStatesMapped(palette);
+        assertLightningRodStatesMapped(palette);
+        assertShelfStatesMapped(palette);
+        Assertions.assertNotEquals(
+                palette.getRuntimeId(Block.INFO_UPDATE, 0),
+                palette.getRuntimeId(NETEASE_MICRO_BLOCK_ID, 0));
     }
 
     private static void assertCrafterTriggeredStateMapped(BlockPalette palette) {

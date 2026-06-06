@@ -2,15 +2,17 @@ package cn.nukkit.item;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
+import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.utils.Utils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 验证 RuntimeItems 的版本覆盖完整性。
@@ -74,6 +76,46 @@ public class RuntimeItemsVersionCoverageTest {
     }
 
     /**
+     * 验证网易 1.21.111 协议能解析为独立 GameVersion，并能拿到运行时物品映射。
+     */
+    @Test
+    public void testNetEase121111VersionMappingExists() {
+        GameVersion standard121111 = GameVersion.byProtocol(ProtocolInfo.v1_21_111, false);
+        GameVersion netEase121111 = GameVersion.byProtocol(ProtocolInfo.v1_21_111, true);
+
+        assertSame(GameVersion.V1_21_111, standard121111);
+        assertEquals("1.21.111", standard121111.toString());
+        assertEquals("1.21.111", Utils.getVersionByProtocol(ProtocolInfo.v1_21_111));
+        assertSame(GameVersion.V1_21_111_NETEASE, netEase121111);
+        assertNotSame(standard121111, netEase121111);
+        assertEquals("1.21.111_NetEase", netEase121111.toString());
+        assertNotNull(RuntimeItems.getMapping(netEase121111));
+    }
+
+    /**
+     * 验证网易 1.21.111 运行时物品表按 SynapseAPI/ECNK 的 121111NE 数据修正。
+     */
+    @Test
+    public void testNetEase121111ItemPaletteConversion() {
+        assertNotNull(RuntimeItemsVersionCoverageTest.class.getClassLoader()
+                .getResource("runtime_item_states_netease_844.json"));
+
+        RuntimeItemMapping mapping = RuntimeItems.getMapping(GameVersion.V1_21_111_NETEASE);
+
+        assertAbsent(mapping, "minecraft:board");
+        assertAbsent(mapping, "minecraft:chalkboard");
+        assertAbsent(mapping, "minecraft:mod_ore");
+        assertAbsent(mapping, "minecraft:mod_armor");
+
+        assertNetworkId(mapping, "minecraft:micro_block", -9735);
+        assertNetworkId(mapping, "minecraft:mod", 1997);
+        assertNetworkId(mapping, "minecraft:mod_ex", 1998);
+        assertNetworkId(mapping, "minecraft:debug_stick", 1999);
+        assertNetworkId(mapping, "minecraft:command_block_minecart", 594);
+        assertNetworkId(mapping, "minecraft:splash_potion", 596);
+    }
+
+    /**
      * 验证所有需要独立 RuntimeItemMapping 的 GameVersion 都能获取到映射。
      */
     @Test
@@ -102,5 +144,16 @@ public class RuntimeItemsVersionCoverageTest {
         for (int i = 0; i < values.length; i++) {
             assertNotNull(values[i], "RuntimeItems.VALUES[" + i + "] should not be null");
         }
+    }
+
+    private static void assertAbsent(RuntimeItemMapping mapping, String namespaceId) {
+        assertFalse(mapping.getNetworkIdByNamespaceId(namespaceId).isPresent(),
+                namespaceId + " should not exist in NetEase 1.21.111 runtime item mapping");
+    }
+
+    private static void assertNetworkId(RuntimeItemMapping mapping, String namespaceId, int expectedNetworkId) {
+        OptionalInt actual = mapping.getNetworkIdByNamespaceId(namespaceId);
+        assertTrue(actual.isPresent(), namespaceId + " should exist in NetEase 1.21.111 runtime item mapping");
+        assertEquals(expectedNetworkId, actual.getAsInt(), namespaceId + " runtime id mismatch");
     }
 }
