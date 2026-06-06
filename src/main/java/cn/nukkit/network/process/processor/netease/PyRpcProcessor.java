@@ -5,11 +5,16 @@ import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.event.player.PlayerNetEaseModEventC2SEvent;
+import cn.nukkit.event.player.PlayerNetEasePyRpcReceivedEvent;
 import cn.nukkit.event.player.PlayerNetEaseStoreBuySuccessEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.netease.PyRpcPacket;
+import cn.nukkit.network.protocol.netease.pyrpc.PyRpcMessage;
+import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
+import cn.nukkit.network.protocol.netease.pyrpc.subpacket.ModEventPyRpcSubPacket;
+import cn.nukkit.network.protocol.netease.pyrpc.subpacket.StoreBuySuccessPyRpcSubPacket;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -33,18 +38,37 @@ public class PyRpcProcessor extends DataPacketProcessor<PyRpcPacket> {
         }
 
         Player player = playerHandle.player;
-        for (PyRpcPacket.SubPacket subPacket : pk.getSubPackets()) {
-            if (subPacket instanceof PyRpcPacket.ModEventSubPacket modEvent) {
-                new PlayerNetEaseModEventC2SEvent(
-                        player,
-                        modEvent.getModName(),
-                        modEvent.getSystemName(),
-                        modEvent.getEventName(),
-                        modEvent.getEventData()
-                ).call();
-            } else if (subPacket instanceof PyRpcPacket.StoreBuySuccessSubPacket) {
-                new PlayerNetEaseStoreBuySuccessEvent(player).call();
-            }
+        PyRpcMessage message = pk.getMessage();
+        PyRpcSubPacket subPacket = pk.getSubPacket();
+        if (subPacket == null) {
+            return;
+        }
+
+        PlayerNetEasePyRpcReceivedEvent pyRpcEvent = new PlayerNetEasePyRpcReceivedEvent(
+                player,
+                pk.getMsgId(),
+                message,
+                subPacket
+        );
+        pyRpcEvent.call();
+        if (pyRpcEvent.isCancelled()) {
+            return;
+        }
+
+        if (subPacket instanceof ModEventPyRpcSubPacket modEvent) {
+            new PlayerNetEaseModEventC2SEvent(
+                    player,
+                    pk.getMsgId(),
+                    message,
+                    modEvent
+            ).call();
+        } else if (subPacket instanceof StoreBuySuccessPyRpcSubPacket storeBuySuccess) {
+            new PlayerNetEaseStoreBuySuccessEvent(
+                    player,
+                    pk.getMsgId(),
+                    message,
+                    storeBuySuccess
+            ).call();
         }
     }
 

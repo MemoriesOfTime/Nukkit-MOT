@@ -2,54 +2,44 @@ package cn.nukkit.event.player;
 
 import cn.nukkit.Player;
 import cn.nukkit.api.OnlyNetEase;
+import cn.nukkit.event.Cancellable;
 import cn.nukkit.event.HandlerList;
+import cn.nukkit.network.protocol.netease.pyrpc.PyRpcMessage;
+import cn.nukkit.network.protocol.netease.pyrpc.subpacket.ModEventPyRpcSubPacket;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * NetEase client-to-server mod event carried by PyRpcPacket.
  */
 @OnlyNetEase
-public class PlayerNetEaseModEventC2SEvent extends PlayerEvent {
+public class PlayerNetEaseModEventC2SEvent extends PlayerNetEasePyRpcEvent<ModEventPyRpcSubPacket> implements Cancellable {
 
     private static final HandlerList handlers = new HandlerList();
 
-    private final String modName;
-    private final String systemName;
-    private final String customEventName;
-    private final Map<String, Object> eventData;
-
-    public PlayerNetEaseModEventC2SEvent(Player player, String modName, String systemName,
-                                         String customEventName, Map<String, Object> eventData) {
-        this.player = player;
-        this.modName = modName;
-        this.systemName = systemName;
-        this.customEventName = customEventName;
-        this.eventData = eventData != null
-                ? Collections.unmodifiableMap(new LinkedHashMap<>(eventData))
-                : Collections.emptyMap();
+    public PlayerNetEaseModEventC2SEvent(Player player, long msgId, PyRpcMessage message,
+                                         ModEventPyRpcSubPacket subPacket) {
+        super(player, msgId, message, subPacket);
     }
 
     public String getModName() {
-        return modName;
+        return getSubPacket().getModName();
     }
 
     public String getSystemName() {
-        return systemName;
+        return getSubPacket().getSystemName();
     }
 
     public String getCustomEventName() {
-        return customEventName;
+        return getSubPacket().getEventName();
     }
 
     public Map<String, Object> getEventData() {
-        return eventData;
+        return getSubPacket().getEventData();
     }
 
     public Map<String, Object> getArgs() {
-        return eventData;
+        return getEventData();
     }
 
     public static HandlerList getHandlers() {

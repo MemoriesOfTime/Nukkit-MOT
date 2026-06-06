@@ -68,6 +68,7 @@ import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.netease.PyRpcPacket;
+import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.session.NetworkPlayerSession;
@@ -1461,6 +1462,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         packet.setData(data);
         packet.setMsgId(msgId);
         return this.dataPacket(packet);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket) {
+        return this.sendPyRpc(subPacket, PyRpcPacket.DEFAULT_MSG_ID);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket, long msgId) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createSubPacket(subPacket, msgId));
     }
 
     @OnlyNetEase
