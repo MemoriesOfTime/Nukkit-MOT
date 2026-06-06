@@ -320,6 +320,15 @@ public interface ProtocolInfo {
     byte CAMERA_PRESETS_PACKET = (byte) 0xc6;
     byte UNLOCKED_RECIPES_PACKET = (byte) 0xc7;
 
+    @OnlyNetEase
+    int PY_RPC_PACKET = 200;
+    @OnlyNetEase
+    int STORE_BUY_SUCCESS_PACKET = 202;
+    @OnlyNetEase
+    int NETEASE_JSON_PACKET = 203;
+    @OnlyNetEase
+    int PACKET_CONFIRM_SKIN = 228;
+
     int CAMERA_INSTRUCTION_PACKET = 300;
     int COMPRESSED_BIOME_DEFINITIONS_LIST_PACKET = 301;
     int TRIM_DATA_PACKET = 302;
@@ -482,9 +491,6 @@ public interface ProtocolInfo {
      * @since v975
      */
     int SERVER_PRESENCE_INFO_PACKET = 347;
-
-    @OnlyNetEase
-    int PACKET_CONFIRM_SKIN = 0xe4;
 
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;

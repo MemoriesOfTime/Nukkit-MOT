@@ -7,6 +7,9 @@ import cn.nukkit.Server;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
+import cn.nukkit.network.protocol.netease.NetEaseJsonPacket;
+import cn.nukkit.network.protocol.netease.PyRpcPacket;
+import cn.nukkit.network.protocol.netease.StoreBuySuccessPacket;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -645,6 +648,9 @@ public class Network {
                 .registerPacket(ProtocolInfo.DEBUG_DRAWER_PACKET, DebugDrawerPacket.class)
 
                 // NetEase
+                .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
+                .registerPacket(ProtocolInfo.STORE_BUY_SUCCESS_PACKET, StoreBuySuccessPacket.class)
+                .registerPacket(ProtocolInfo.NETEASE_JSON_PACKET, NetEaseJsonPacket.class)
                 .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
                 .build();
 

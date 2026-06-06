@@ -3,7 +3,9 @@ package cn.nukkit.network.protocol.regression.encode;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.entity.Attribute;
+import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.regression.PacketBridgeUtil;
 import io.netty.buffer.ByteBuf;
 import org.allaymc.protocol.extension.codec.v630.Bedrock_v630_NetEase;
@@ -54,6 +56,10 @@ public class NetEasePacketRegressionTest {
 
     static Stream<Arguments> allNetEaseVersions() {
         return NETEASE_CODECS.keySet().stream().map(Arguments::of);
+    }
+
+    static Stream<Arguments> netEasePacketPoolVersions() {
+        return Stream.of(630, 686, 766, 819, ProtocolInfo.CURRENT_PROTOCOL).map(Arguments::of);
     }
 
     @SuppressWarnings("unchecked")
@@ -170,6 +176,144 @@ public class NetEasePacketRegressionTest {
         assertArrayEquals(new byte[0], entry.getSkinBytes());
         assertEquals("", entry.getUidStr());
         assertEquals("", entry.getGeoStr());
+    }
+
+    // ==================== PyRpcPacket ====================
+
+    @ParameterizedTest(name = "PyRpcPacket v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.PyRpcPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        byte[] data = new byte[]{(byte) 0x93, (byte) 0xa3, 'm', 's', 'g', 1, 2, 3};
+        nukkitPacket.setData(data);
+        nukkitPacket.setMsgId(0xfedcba98L);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                org.allaymc.protocol.extension.packet.PyRpcPacket.class);
+
+        assertArrayEquals(data, cbPacket.getData());
+        assertEquals(0xfedcba98L, cbPacket.getMsgId());
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket decode v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testPyRpcPacketDecode(int protocolVersion) {
+        byte[] data = new byte[]{(byte) 0x92, (byte) 0xa4, 't', 'e', 's', 't', 42};
+        var cbPacket = new org.allaymc.protocol.extension.packet.PyRpcPacket();
+        cbPacket.setData(data);
+        cbPacket.setMsgId(0x87654321L);
+
+        BedrockCodec codec = NETEASE_CODECS.get(protocolVersion);
+        byte[] buffer = PacketBridgeUtil.cbPacketToNukkitBuffer(
+                cbPacket, codec, codec.createHelper(), ProtocolInfo.PY_RPC_PACKET, protocolVersion);
+
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.PyRpcPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.setBuffer(buffer);
+        nukkitPacket.getUnsignedVarInt();
+        nukkitPacket.decode();
+
+        assertArrayEquals(data, nukkitPacket.getData());
+        assertEquals(0x87654321L, nukkitPacket.getMsgId());
+    }
+
+    @ParameterizedTest(name = "PyRpcPacket registered v{0}")
+    @MethodSource("netEasePacketPoolVersions")
+    void testPyRpcPacketRegistered(int protocolVersion) {
+        Network network = new Network(MockServer.get());
+
+        DataPacket packet = network.getPacket(ProtocolInfo.PY_RPC_PACKET, protocolVersion);
+
+        assertInstanceOf(cn.nukkit.network.protocol.netease.PyRpcPacket.class, packet);
+    }
+
+    // ==================== StoreBuySuccessPacket ====================
+
+    @ParameterizedTest(name = "StoreBuySuccessPacket v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testStoreBuySuccessPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.StoreBuySuccessPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                org.allaymc.protocol.extension.packet.StoreBuySuccessPacket.class);
+
+        assertNotNull(cbPacket);
+    }
+
+    @ParameterizedTest(name = "StoreBuySuccessPacket decode v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testStoreBuySuccessPacketDecode(int protocolVersion) {
+        var cbPacket = new org.allaymc.protocol.extension.packet.StoreBuySuccessPacket();
+        BedrockCodec codec = NETEASE_CODECS.get(protocolVersion);
+        byte[] buffer = PacketBridgeUtil.cbPacketToNukkitBuffer(
+                cbPacket, codec, codec.createHelper(), ProtocolInfo.STORE_BUY_SUCCESS_PACKET, protocolVersion);
+
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.StoreBuySuccessPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.setBuffer(buffer);
+        nukkitPacket.getUnsignedVarInt();
+        nukkitPacket.decode();
+
+        assertEquals(nukkitPacket.getCount(), nukkitPacket.getOffset());
+    }
+
+    @ParameterizedTest(name = "StoreBuySuccessPacket registered v{0}")
+    @MethodSource("netEasePacketPoolVersions")
+    void testStoreBuySuccessPacketRegistered(int protocolVersion) {
+        Network network = new Network(MockServer.get());
+
+        DataPacket packet = network.getPacket(ProtocolInfo.STORE_BUY_SUCCESS_PACKET, protocolVersion);
+
+        assertInstanceOf(cn.nukkit.network.protocol.netease.StoreBuySuccessPacket.class, packet);
+    }
+
+    // ==================== NetEaseJsonPacket ====================
+
+    @ParameterizedTest(name = "NetEaseJsonPacket v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testNetEaseJsonPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.NetEaseJsonPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.setJson("{\"event\":\"store\",\"success\":true}");
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                org.allaymc.protocol.extension.packet.NetEaseJsonPacket.class);
+
+        assertEquals("{\"event\":\"store\",\"success\":true}", cbPacket.getJson());
+    }
+
+    @ParameterizedTest(name = "NetEaseJsonPacket decode v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testNetEaseJsonPacketDecode(int protocolVersion) {
+        var cbPacket = new org.allaymc.protocol.extension.packet.NetEaseJsonPacket();
+        cbPacket.setJson("{\"from\":\"client\",\"value\":123}");
+
+        BedrockCodec codec = NETEASE_CODECS.get(protocolVersion);
+        byte[] buffer = PacketBridgeUtil.cbPacketToNukkitBuffer(
+                cbPacket, codec, codec.createHelper(), ProtocolInfo.NETEASE_JSON_PACKET, protocolVersion);
+
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.NetEaseJsonPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.setBuffer(buffer);
+        nukkitPacket.getUnsignedVarInt();
+        nukkitPacket.decode();
+
+        assertEquals("{\"from\":\"client\",\"value\":123}", nukkitPacket.getJson());
+    }
+
+    @ParameterizedTest(name = "NetEaseJsonPacket registered v{0}")
+    @MethodSource("netEasePacketPoolVersions")
+    void testNetEaseJsonPacketRegistered(int protocolVersion) {
+        Network network = new Network(MockServer.get());
+
+        DataPacket packet = network.getPacket(ProtocolInfo.NETEASE_JSON_PACKET, protocolVersion);
+
+        assertInstanceOf(cn.nukkit.network.protocol.netease.NetEaseJsonPacket.class, packet);
     }
 
     // ==================== TextPacket NetEase CHAT ====================
