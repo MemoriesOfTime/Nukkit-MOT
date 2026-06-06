@@ -87,6 +87,17 @@ class BlockPaletteTest {
 
     @Test
     /**
+     * Verifies item frame vertical states use dedicated legacy data so wall map states remain separate.
+     */
+    void itemFrameVerticalStatesHaveRuntimeMappings() {
+        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.getLastVersion()), Block.ITEM_FRAME_BLOCK);
+        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.getLastVersion()), Block.GLOW_FRAME);
+        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_21_50_NETEASE), Block.ITEM_FRAME_BLOCK);
+        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_21_50_NETEASE), Block.GLOW_FRAME);
+    }
+
+    @Test
+    /**
      * Verifies shelf wood variants and their 32 block states do not fall back to oak or info_update.
      */
     void shelfStatesHaveVariantSpecificRuntimeMappings() {
@@ -156,6 +167,20 @@ class BlockPaletteTest {
                 Assertions.assertNotEquals(palette.getHashId(id, unpoweredMeta), palette.getHashId(id, poweredMeta));
             }
         }
+    }
+
+    private static void assertItemFrameVerticalStatesMapped(BlockPalette palette, int id) {
+        int downMeta = 8;
+        int upMeta = 9;
+        int downFullId = id << Block.DATA_BITS | downMeta;
+        int upFullId = id << Block.DATA_BITS | upMeta;
+
+        Assertions.assertEquals(downFullId, palette.getLegacyFullId(palette.getRuntimeId(id, downMeta)));
+        Assertions.assertEquals(upFullId, palette.getLegacyFullId(palette.getRuntimeId(id, upMeta)));
+        Assertions.assertEquals(downFullId, palette.getLegacyFullIdFromHashId(palette.getHashId(id, downMeta)));
+        Assertions.assertEquals(upFullId, palette.getLegacyFullIdFromHashId(palette.getHashId(id, upMeta)));
+        Assertions.assertNotEquals(palette.getRuntimeId(id, 4), palette.getRuntimeId(id, downMeta));
+        Assertions.assertNotEquals(palette.getRuntimeId(id, 5), palette.getRuntimeId(id, upMeta));
     }
 
     private static void assertShelfStatesMapped(BlockPalette palette) {
