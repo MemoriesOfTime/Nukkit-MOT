@@ -1,5 +1,6 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.custom.comparator.HashedPaletteComparator;
 import cn.nukkit.level.BlockPalette;
@@ -36,10 +37,16 @@ public class NetEaseConverter {
 
     // NetEase特有物品
     // 数据格式：{ {String namespaceId, int id}, ... }
-    private static final Object[][] ITEMS = {
+    private static final Object[][] DEFAULT_ITEMS = {
             {"minecraft:mod_ore", 230},
             {"minecraft:micro_block", -9735},
             {"minecraft:mod_armor", 1996},
+            {"minecraft:mod", 1997},
+            {"minecraft:mod_ex", 1998},
+            {"minecraft:debug_stick", 1999},
+    };
+    private static final Object[][] ITEMS_121111 = {
+            {"minecraft:micro_block", -9735},
             {"minecraft:mod", 1997},
             {"minecraft:mod_ex", 1998},
             {"minecraft:debug_stick", 1999},
@@ -106,6 +113,16 @@ public class NetEaseConverter {
      * @return 转换后的网易版本物品状态JSON数组
      */
     public static JsonArray convertItemStates(JsonArray itemStates) {
+        return convertItemStates(itemStates, null);
+    }
+
+    /**
+     * 转换物品状态JSON为网易版本
+     * @param itemStates 标准版本的物品状态JSON数组
+     * @param gameVersion 目标网易版本
+     * @return 转换后的网易版本物品状态JSON数组
+     */
+    public static JsonArray convertItemStates(JsonArray itemStates, GameVersion gameVersion) {
         JsonArray result = new JsonArray();
 
         for (JsonElement element : itemStates) {
@@ -117,8 +134,16 @@ public class NetEaseConverter {
             JsonObject item = element.getAsJsonObject();
             String name = item.has("name") ? item.get("name").getAsString() : "";
 
-            if (shouldRemoveBlock(name)) {
+            if (shouldRemoveItem(name, gameVersion)) {
                 log.debug("Removing item for NetEase: {}", name);
+                continue;
+            }
+
+            Integer runtimeIdOverride = getRuntimeIdOverride(name, gameVersion);
+            if (runtimeIdOverride != null) {
+                JsonObject converted = item.deepCopy();
+                converted.addProperty("id", runtimeIdOverride);
+                result.add(converted);
                 continue;
             }
 
@@ -126,7 +151,7 @@ public class NetEaseConverter {
         }
 
         // 添加NetEase特有物品
-        for (Object[] item : ITEMS) {
+        for (Object[] item : getAdditionalItems(gameVersion)) {
             JsonObject itemObj = new JsonObject();
             itemObj.addProperty("name", (String) item[0]);
             itemObj.addProperty("id", (int) item[1]);
@@ -208,6 +233,32 @@ public class NetEaseConverter {
             }
         }
         return false;
+    }
+
+    private static boolean shouldRemoveItem(String itemName, GameVersion gameVersion) {
+        if (shouldRemoveBlock(itemName)) {
+            return true;
+        }
+        return isNetEase121111(gameVersion) && "minecraft:board".equals(itemName);
+    }
+
+    private static Integer getRuntimeIdOverride(String itemName, GameVersion gameVersion) {
+        if (!isNetEase121111(gameVersion)) {
+            return null;
+        }
+        return switch (itemName) {
+            case "minecraft:command_block_minecart" -> 594;
+            case "minecraft:splash_potion" -> 596;
+            default -> null;
+        };
+    }
+
+    private static Object[][] getAdditionalItems(GameVersion gameVersion) {
+        return isNetEase121111(gameVersion) ? ITEMS_121111 : DEFAULT_ITEMS;
+    }
+
+    private static boolean isNetEase121111(GameVersion gameVersion) {
+        return gameVersion == GameVersion.V1_21_111_NETEASE;
     }
 
     /**

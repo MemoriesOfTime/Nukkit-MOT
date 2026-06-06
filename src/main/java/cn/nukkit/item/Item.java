@@ -594,7 +594,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
 
         // Only load the latest version; runtime filtering via isSupportedOn per protocol
-        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_110, CREATIVE_ITEMS);
+        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_111, CREATIVE_ITEMS);
 
         isInitializingCreativeItems = false;
         creativeItemsInitialized = true;

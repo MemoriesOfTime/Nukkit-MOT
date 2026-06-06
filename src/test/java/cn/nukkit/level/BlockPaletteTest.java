@@ -74,7 +74,7 @@ class BlockPaletteTest {
      * Verifies copper lantern ground and hanging states are mapped by the palettes that include them.
      */
     void copperLanternStatesHaveRuntimeMappings() {
-        assertCopperLanternStatesMapped(new BlockPalette(GameVersion.V1_21_110));
+        assertCopperLanternStatesMapped(new BlockPalette(GameVersion.V1_21_111));
         assertCopperLanternStatesMapped(new BlockPalette(GameVersion.V1_26_10));
     }
 
@@ -83,7 +83,7 @@ class BlockPaletteTest {
      * Verifies lightning rod facing and powered states are mapped by the palettes that include them.
      */
     void lightningRodStatesHaveRuntimeMappings() {
-        assertLightningRodStatesMapped(new BlockPalette(GameVersion.V1_21_110));
+        assertLightningRodStatesMapped(new BlockPalette(GameVersion.V1_21_111));
         assertLightningRodStatesMapped(new BlockPalette(GameVersion.V1_26_10));
     }
 
@@ -92,7 +92,7 @@ class BlockPaletteTest {
      * Verifies shelf wood variants and their 32 block states do not fall back to oak or info_update.
      */
     void shelfStatesHaveVariantSpecificRuntimeMappings() {
-        assertShelfStatesMapped(new BlockPalette(GameVersion.V1_21_110));
+        assertShelfStatesMapped(new BlockPalette(GameVersion.V1_21_111));
         assertShelfStatesMapped(new BlockPalette(GameVersion.V1_26_10));
     }
 

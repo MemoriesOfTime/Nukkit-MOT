@@ -95,7 +95,7 @@ public class RuntimeItemMapping {
         JsonArray json = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray();
 
         if (useNetEaseConversion) {
-            json = NetEaseConverter.convertItemStates(json);
+            json = NetEaseConverter.convertItemStates(json, gameVersion);
             log.info("Converted {} item states to NetEase version", json.size());
         }
 

@@ -643,6 +643,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PRESETS_PACKET, CameraAimAssistPresetsPacket.class)
                 .registerPacket(ProtocolInfo.CLIENT_CAMERA_AIM_ASSIST_PACKET, ClientCameraAimAssistPacket.class)
                 .registerPacket(ProtocolInfo.DEBUG_DRAWER_PACKET, DebugDrawerPacket.class)
+                .registerPacket(ProtocolInfo.SERVERBOUND_PACK_SETTING_CHANGE_PACKET, ServerboundPackSettingChangePacket.class)
 
                 // NetEase
                 .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)

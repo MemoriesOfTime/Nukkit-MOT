@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol.regression.decode;
 
 import cn.nukkit.MockServer;
+import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.PlayerAbility;
@@ -59,6 +60,10 @@ public class ClientActionDecodeRegressionTest extends AbstractPacketRegressionTe
 
     static Stream<Arguments> versionsFrom712() {
         return filteredVersions(712);
+    }
+
+    static Stream<Arguments> versionsFrom844() {
+        return filteredVersions(ProtocolInfo.v1_21_111);
     }
 
     // ==================== ItemFrameDropItemPacket ====================
@@ -136,6 +141,69 @@ public class ClientActionDecodeRegressionTest extends AbstractPacketRegressionTe
         // START_LOADING_SCREEN has ordinal 1 in the CB enum, which is the raw wire value NK stores
         assertEquals(ServerboundLoadingScreenPacketType.START_LOADING_SCREEN.ordinal(), nk.loadingScreenType);
         assertEquals(42, nk.loadingScreenId);
+    }
+
+    // ==================== ServerboundPackSettingChangePacket ====================
+
+    @ParameterizedTest(name = "ServerboundPackSettingChangePacket v{0} string")
+    @MethodSource("versionsFrom844")
+    void serverboundPackSettingChangeString(int protocol) {
+        UUID packId = UUID.fromString("12345678-1234-5678-1234-567812345678");
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerboundPackSettingChangePacket();
+        cb.setPackId(packId);
+        cb.setPackSettingName("difficulty");
+        cb.setPackSettingValue("hard");
+
+        ServerboundPackSettingChangePacket nk = crossEncode(cb, ServerboundPackSettingChangePacket::new, protocol);
+
+        assertEquals(packId, nk.packId);
+        assertEquals("difficulty", nk.packSettingName);
+        assertEquals(ServerboundPackSettingChangePacket.TYPE_STRING, nk.valueType);
+        assertEquals("hard", nk.stringValue);
+    }
+
+    @ParameterizedTest(name = "ServerboundPackSettingChangePacket v{0} bool")
+    @MethodSource("versionsFrom844")
+    void serverboundPackSettingChangeBoolean(int protocol) {
+        UUID packId = UUID.fromString("87654321-4321-8765-4321-876543218765");
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerboundPackSettingChangePacket();
+        cb.setPackId(packId);
+        cb.setPackSettingName("enabled");
+        cb.setPackSettingValue(Boolean.TRUE);
+
+        ServerboundPackSettingChangePacket nk = crossEncode(cb, ServerboundPackSettingChangePacket::new, protocol);
+
+        assertEquals(packId, nk.packId);
+        assertEquals("enabled", nk.packSettingName);
+        assertEquals(ServerboundPackSettingChangePacket.TYPE_BOOL, nk.valueType);
+        assertTrue(nk.boolValue);
+    }
+
+    @ParameterizedTest(name = "ServerboundPackSettingChangePacket v{0} float")
+    @MethodSource("versionsFrom844")
+    void serverboundPackSettingChangeFloat(int protocol) {
+        UUID packId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerboundPackSettingChangePacket();
+        cb.setPackId(packId);
+        cb.setPackSettingName("scale");
+        cb.setPackSettingValue(0.75f);
+
+        ServerboundPackSettingChangePacket nk = crossEncode(cb, ServerboundPackSettingChangePacket::new, protocol);
+
+        assertEquals(packId, nk.packId);
+        assertEquals("scale", nk.packSettingName);
+        assertEquals(ServerboundPackSettingChangePacket.TYPE_FLOAT, nk.valueType);
+        assertEquals(0.75f, nk.floatValue, 0.0001f);
+    }
+
+    @ParameterizedTest(name = "ServerboundPackSettingChangePacket registered v{0}")
+    @MethodSource("versionsFrom844")
+    void serverboundPackSettingChangeRegistered(int protocol) {
+        Network network = new Network(MockServer.get());
+
+        DataPacket packet = network.getPacket(ProtocolInfo.SERVERBOUND_PACK_SETTING_CHANGE_PACKET, protocol);
+
+        assertInstanceOf(ServerboundPackSettingChangePacket.class, packet);
     }
 
     // ==================== LecternUpdatePacket ====================
