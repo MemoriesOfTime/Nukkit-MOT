@@ -605,7 +605,8 @@ public class Server {
      */
     public boolean enableProxyProtocol;
     /**
-     * Whitelist of proxy IPs/CIDRs allowed to send Proxy Protocol headers (e.g. "127.0.0.1", "10.0.0.0/8")
+     * Whitelist of proxy IPv4/IPv6 CIDRs allowed to send Proxy Protocol headers
+     * (e.g. "127.0.0.1", "10.0.0.0/8", "2001:db8::/32")
      */
     public List<String> proxyProtocolWhitelist;
     /**

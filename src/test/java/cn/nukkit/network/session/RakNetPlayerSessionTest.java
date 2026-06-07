@@ -6,6 +6,7 @@ import cn.nukkit.Player;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
+import cn.nukkit.network.proxy.ProxyProtocolHandler;
 import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
@@ -13,8 +14,10 @@ import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
@@ -227,6 +230,33 @@ class RakNetPlayerSessionTest {
     }
 
     @Test
+    void expireLoginSessionsClearsProxyProtocolMappingForTimedOutPendingSession() throws Exception {
+        MockServer.get().networkLoginTimeoutMilliseconds = 100;
+
+        Queue<RakNetPlayerSession> sessionCreationQueue = new ArrayDeque<>();
+        Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        RakNetInterface interfaceUnderTest = createRakNetInterface(MockServer.get(), sessionCreationQueue, pendingSessions);
+
+        Channel parentChannel = mock(Channel.class);
+        ChannelPipeline pipeline = mock(ChannelPipeline.class);
+        ProxyProtocolHandler proxyProtocolHandler = mock(ProxyProtocolHandler.class);
+        when(parentChannel.pipeline()).thenReturn(pipeline);
+        when(pipeline.get(ProxyProtocolHandler.class)).thenReturn(proxyProtocolHandler);
+        setField(interfaceUnderTest, "channel", parentChannel);
+
+        InetSocketAddress realAddress = new InetSocketAddress("127.0.0.1", 19132);
+        SessionFixture fixture = createSession(interfaceUnderTest, false, false, false);
+        fixture.session.getState().getConnection()
+                .setChildChannelAcceptedNanos(System.nanoTime() - TimeUnit.MILLISECONDS.toNanos(200));
+        pendingSessions.add(fixture.session);
+
+        invokeExpireLoginSessions(interfaceUnderTest);
+
+        assertFalse(pendingSessions.contains(fixture.session));
+        verify(proxyProtocolHandler).clearMappingByRealAddress(realAddress);
+    }
+
+    @Test
     void channelActiveQueuesPlayerCreationOnlyOnce() throws Exception {
         Queue<RakNetPlayerSession> sessionCreationQueue = new ArrayDeque<>();
         Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -245,6 +275,31 @@ class RakNetPlayerSessionTest {
         assertEquals(1, sessionCreationQueue.size());
         assertSame(fixture.session, sessionCreationQueue.peek());
         assertEquals(1, pendingSessions.size());
+    }
+
+    @Test
+    void processClearsProxyProtocolMappingWhenDisconnectedSessionIsRemoved() throws Exception {
+        Queue<RakNetPlayerSession> sessionCreationQueue = new ArrayDeque<>();
+        Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
+        RakNetInterface interfaceUnderTest = createRakNetInterface(MockServer.get(), sessionCreationQueue, pendingSessions, sessions);
+
+        Channel parentChannel = mock(Channel.class);
+        ChannelPipeline pipeline = mock(ChannelPipeline.class);
+        ProxyProtocolHandler proxyProtocolHandler = mock(ProxyProtocolHandler.class);
+        when(parentChannel.pipeline()).thenReturn(pipeline);
+        when(pipeline.get(ProxyProtocolHandler.class)).thenReturn(proxyProtocolHandler);
+        setField(interfaceUnderTest, "channel", parentChannel);
+
+        InetSocketAddress realAddress = new InetSocketAddress("127.0.0.1", 19132);
+        SessionFixture fixture = createSession(interfaceUnderTest, false, true, true);
+        sessions.put(realAddress, fixture.session);
+        fixture.session.disconnect("Closed");
+
+        interfaceUnderTest.process();
+
+        assertTrue(sessions.isEmpty());
+        verify(proxyProtocolHandler).clearMappingByRealAddress(realAddress);
     }
 
     @Test
@@ -342,11 +397,17 @@ class RakNetPlayerSessionTest {
 
     private static RakNetInterface createRakNetInterface(cn.nukkit.Server server, Queue<RakNetPlayerSession> sessionCreationQueue,
                                                          Set<RakNetPlayerSession> pendingSessions) throws Exception {
+        return createRakNetInterface(server, sessionCreationQueue, pendingSessions, new HashMap<InetSocketAddress, RakNetPlayerSession>());
+    }
+
+    private static RakNetInterface createRakNetInterface(cn.nukkit.Server server, Queue<RakNetPlayerSession> sessionCreationQueue,
+                                                         Set<RakNetPlayerSession> pendingSessions,
+                                                         Map<InetSocketAddress, RakNetPlayerSession> sessions) throws Exception {
         RakNetInterface interfaceUnderTest = mock(RakNetInterface.class, CALLS_REAL_METHODS);
         setField(interfaceUnderTest, "server", server);
         setField(interfaceUnderTest, "sessionCreationQueue", sessionCreationQueue);
         setField(interfaceUnderTest, "pendingSessions", pendingSessions);
-        setField(interfaceUnderTest, "sessions", new HashMap<InetSocketAddress, RakNetPlayerSession>());
+        setField(interfaceUnderTest, "sessions", sessions);
         return interfaceUnderTest;
     }
 
