@@ -5,10 +5,20 @@ import cn.nukkit.MockServer;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockLightningRodBase;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteOrder;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 class BlockPaletteTest {
 
@@ -92,8 +102,25 @@ class BlockPaletteTest {
     void itemFrameVerticalStatesHaveRuntimeMappings() {
         assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.getLastVersion()), Block.ITEM_FRAME_BLOCK);
         assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.getLastVersion()), Block.GLOW_FRAME);
+        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_20_50_NETEASE), Block.ITEM_FRAME_BLOCK);
+        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_21_2_NETEASE), Block.ITEM_FRAME_BLOCK);
         assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_21_50_NETEASE), Block.ITEM_FRAME_BLOCK);
         assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_21_50_NETEASE), Block.GLOW_FRAME);
+        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_21_93_NETEASE), Block.ITEM_FRAME_BLOCK);
+        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_21_93_NETEASE), Block.GLOW_FRAME);
+    }
+
+    @Test
+    /**
+     * Verifies item frame vertical compatibility mappings do not overwrite real runtime reverse mappings.
+     */
+    void itemFrameVerticalStatesDoNotOverwriteRealRuntimeMappings() throws IOException {
+        BlockPalette palette = new BlockPalette(GameVersion.V1_16_100);
+        Map<Integer, CompoundTag> rawStates = loadRawRuntimeStates(GameVersion.V1_16_100);
+        CompoundTag mapNorthFrame = rawState(rawStates, Block.ITEM_FRAME_BLOCK, 7);
+
+        assertRealRuntimeReverseMappingPreserved(palette, rawStates, mapNorthFrame.getInt("runtimeId") + 5);
+        assertRealRuntimeReverseMappingPreserved(palette, rawStates, mapNorthFrame.getInt("runtimeId") + 10);
     }
 
     @Test
@@ -181,6 +208,64 @@ class BlockPaletteTest {
         Assertions.assertEquals(upFullId, palette.getLegacyFullIdFromHashId(palette.getHashId(id, upMeta)));
         Assertions.assertNotEquals(palette.getRuntimeId(id, 4), palette.getRuntimeId(id, downMeta));
         Assertions.assertNotEquals(palette.getRuntimeId(id, 5), palette.getRuntimeId(id, upMeta));
+        assertRuntimeMatchesRawItemFrameState(palette, id, downMeta, 0);
+        assertRuntimeMatchesRawItemFrameState(palette, id, upMeta, 1);
+    }
+
+    private static void assertRuntimeMatchesRawItemFrameState(BlockPalette palette, int id, int meta, int facingDirection) {
+        try {
+            Map<Integer, CompoundTag> rawStates = loadRawRuntimeStates(palette.getGameVersion());
+            int runtimeId = palette.getRuntimeId(id, meta);
+            CompoundTag rawState = rawStates.get(runtimeId);
+
+            Assertions.assertNotNull(rawState, "missing raw runtime state for " + palette.getGameVersion() + ' ' + id + ':' + meta + " runtimeId=" + runtimeId);
+            Assertions.assertEquals(id, rawState.getInt("id"), "raw id for runtimeId " + runtimeId);
+            Assertions.assertEquals(meta, rawState.getShort("data"), "raw data for runtimeId " + runtimeId);
+            CompoundTag states = rawState.getCompound("states");
+            Assertions.assertEquals(facingDirection, states.getInt("facing_direction"), "facing_direction for " + id + ':' + meta);
+            Assertions.assertEquals(0, states.getByte("item_frame_map_bit"), "item_frame_map_bit for " + id + ':' + meta);
+            if (states.contains("item_frame_photo_bit")) {
+                Assertions.assertEquals(0, states.getByte("item_frame_photo_bit"), "item_frame_photo_bit for " + id + ':' + meta);
+            }
+        } catch (IOException e) {
+            throw new AssertionError("Unable to load raw runtime states for " + palette.getGameVersion(), e);
+        }
+    }
+
+    private static void assertRealRuntimeReverseMappingPreserved(BlockPalette palette,
+                                                                Map<Integer, CompoundTag> rawStates,
+                                                                int runtimeId) {
+        CompoundTag rawState = rawStates.get(runtimeId);
+
+        Assertions.assertNotNull(rawState, "expected real raw state for runtimeId " + runtimeId);
+        int expectedFullId = rawState.getInt("id") << Block.DATA_BITS | rawState.getShort("data");
+        Assertions.assertEquals(expectedFullId, palette.getLegacyFullId(runtimeId), "real runtime reverse mapping for runtimeId " + runtimeId);
+    }
+
+    private static CompoundTag rawState(Map<Integer, CompoundTag> rawStates, int id, int data) {
+        for (CompoundTag rawState : rawStates.values()) {
+            if (rawState.getInt("id") == id && rawState.getShort("data") == data) {
+                return rawState;
+            }
+        }
+        throw new AssertionError("Missing raw state for " + id + ':' + data);
+    }
+
+    private static Map<Integer, CompoundTag> loadRawRuntimeStates(GameVersion gameVersion) throws IOException {
+        String name = (gameVersion.isNetEase() ? "runtime_block_states_netease_" : "runtime_block_states_")
+                + gameVersion.getProtocol() + ".dat";
+        try (InputStream stream = BlockPaletteTest.class.getClassLoader().getResourceAsStream(name)) {
+            Assertions.assertNotNull(stream, "missing runtime state resource " + name);
+            @SuppressWarnings("unchecked")
+            ListTag<CompoundTag> states = (ListTag<CompoundTag>) NBTIO.readTag(
+                    new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
+
+            Map<Integer, CompoundTag> byRuntimeId = new HashMap<>();
+            for (CompoundTag state : states.getAll()) {
+                byRuntimeId.put(state.getInt("runtimeId"), state);
+            }
+            return byRuntimeId;
+        }
     }
 
     private static void assertShelfStatesMapped(BlockPalette palette) {

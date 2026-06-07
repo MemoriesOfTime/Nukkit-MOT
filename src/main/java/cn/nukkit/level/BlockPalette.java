@@ -29,10 +29,6 @@ import java.util.zip.GZIPInputStream;
 public class BlockPalette {
 
     private static final int MISSING_LEGACY_MAPPING_CACHE_SIZE = 1024;
-    private static final int ITEM_FRAME_DOWN_FACE_META = 8;
-    private static final int ITEM_FRAME_UP_FACE_META = 9;
-    private static final int ITEM_FRAME_FACING_DIRECTION_DOWN = 0;
-    private static final int ITEM_FRAME_FACING_DIRECTION_UP = 1;
 
     private final int protocol;
     private final GameVersion gameVersion;
@@ -215,36 +211,6 @@ public class BlockPalette {
         this.legacyToRuntimeId.put(legacyId, runtimeId);
         this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
         int stateHash = Hash.hashBlock(blockState);
-        this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
-        this.legacyToHashId.putIfAbsent(legacyId, stateHash);
-
-        // The shipped runtime states only carry wall-mounted item frame data. Keep wall map states at 4..7
-        // and synthesize separate legacy data for vertical placement.
-        if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
-            if (data == 7) {
-                registerSyntheticItemFrameState(blockId, ITEM_FRAME_UP_FACE_META, runtimeId + 5,
-                        blockState, ITEM_FRAME_FACING_DIRECTION_UP);
-                registerSyntheticItemFrameState(blockId, ITEM_FRAME_DOWN_FACE_META, runtimeId + 10,
-                        blockState, ITEM_FRAME_FACING_DIRECTION_DOWN);
-            }
-        }
-    }
-
-    private void registerSyntheticItemFrameState(int blockId, int data, int runtimeId,
-                                                 CompoundTag sourceState, int facingDirection) {
-        Block.registerKnownState(blockId, data);
-
-        int legacyId = blockId << Block.DATA_BITS | data;
-        this.legacyToRuntimeId.put(legacyId, runtimeId);
-        this.runtimeIdToLegacy.put(runtimeId, legacyId);
-
-        CompoundTag syntheticState = sourceState.copy();
-        CompoundTag states = syntheticState.getCompound("states");
-        states.putInt("facing_direction", facingDirection);
-        states.putByte("item_frame_map_bit", 0);
-        states.putByte("item_frame_photo_bit", 0);
-
-        int stateHash = Hash.hashBlock(syntheticState);
         this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
     }
