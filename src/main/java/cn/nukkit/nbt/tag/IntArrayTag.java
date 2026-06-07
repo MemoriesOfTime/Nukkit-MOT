@@ -2,11 +2,13 @@ package cn.nukkit.nbt.tag;
 
 import cn.nukkit.nbt.stream.NBTInputStream;
 import cn.nukkit.nbt.stream.NBTOutputStream;
+import lombok.Getter;
 
 import java.io.IOException;
 import java.util.Arrays;
 
-public class IntArrayTag extends Tag {
+@Getter
+public final class IntArrayTag extends Tag {
 
     public int[] data;
 
@@ -38,10 +40,6 @@ public class IntArrayTag extends Tag {
         for (int i = 0; i < length; i++) {
             data[i] = dis.readInt();
         }
-    }
-
-    public int[] getData() {
-        return data;
     }
 
     @Override

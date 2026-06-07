@@ -5,7 +5,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 
 import java.io.IOException;
 
-public class DoubleTag extends NumberTag<Double> {
+public final class DoubleTag extends NumberTag<Double> {
 
     public double data;
 

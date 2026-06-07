@@ -1,6 +1,6 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
 
-@Suppress("DSL_SCOPE_VIOLATION") // https://youtrack.jetbrains.com/issue/IDEA-262280
+@Suppress("DSL_SCOPE_VIOLATION")
 
 plugins {
     id("java-library")
@@ -20,11 +20,11 @@ abstract class JavaAgentArgumentProvider : CommandLineArgumentProvider {
 }
 
 group = "cn.nukkit"
-version = "MOT-SNAPSHOT"
+version = "SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
     withSourcesJar()
     withJavadocJar()
@@ -137,7 +137,6 @@ publishing {
     }
 }
 
-
 tasks {
     compileJava {
         options.encoding = "UTF-8"
@@ -158,10 +157,10 @@ tasks {
 
     shadowJar {
         manifest.attributes["Multi-Release"] = "true"
+        manifest.attributes["Main-Class"] = "cn.nukkit.Nukkit"
 
         transform(Log4j2PluginsCacheFileTransformer())
 
-        // Backwards compatible jar directory
         destinationDirectory.set(file("$projectDir/target"))
         archiveClassifier.set("")
 

@@ -349,12 +349,12 @@ public class Chunk extends BaseChunk {
 
             for (BlockUpdateEntry entry : entries) {
                 CompoundTag entryNBT = new CompoundTag()
-                        .putString("i", entry.block.getSaveId())
-                        .putInt("x", entry.pos.getFloorX())
-                        .putInt("y", entry.pos.getFloorY())
-                        .putInt("z", entry.pos.getFloorZ())
-                        .putInt("t", (int) (entry.delay - totalTime))
-                        .putInt("p", entry.priority);
+                        .putString("i", entry.block().getSaveId())
+                        .putInt("x", entry.pos().getFloorX())
+                        .putInt("y", entry.pos().getFloorY())
+                        .putInt("z", entry.pos().getFloorZ())
+                        .putInt("t", (int) (entry.delay() - totalTime))
+                        .putInt("p", entry.priority());
                 tileTickTag.add(entryNBT);
             }
 
@@ -437,12 +437,12 @@ public class Chunk extends BaseChunk {
 
             for (BlockUpdateEntry entry : entries) {
                 CompoundTag entryNBT = new CompoundTag()
-                        .putString("i", entry.block.getSaveId())
-                        .putInt("x", entry.pos.getFloorX())
-                        .putInt("y", entry.pos.getFloorY())
-                        .putInt("z", entry.pos.getFloorZ())
-                        .putInt("t", (int) (entry.delay - totalTime))
-                        .putInt("p", entry.priority);
+                        .putString("i", entry.block().getSaveId())
+                        .putInt("x", entry.pos().getFloorX())
+                        .putInt("y", entry.pos().getFloorY())
+                        .putInt("z", entry.pos().getFloorZ())
+                        .putInt("t", (int) (entry.delay() - totalTime))
+                        .putInt("p", entry.priority());
                 tileTickTag.add(entryNBT);
             }
 

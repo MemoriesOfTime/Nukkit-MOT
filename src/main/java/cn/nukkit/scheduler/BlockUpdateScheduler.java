@@ -9,10 +9,7 @@ import cn.nukkit.utils.BlockUpdateEntry;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BlockUpdateScheduler {
@@ -57,14 +54,14 @@ public class BlockUpdateScheduler {
             if (updates != null) {
                 globalIndex.removeAll(updates);
                 for (BlockUpdateEntry entry : updates) {
-                    if (level.isAreaLoaded(new SimpleAxisAlignedBB(entry.pos, entry.pos))) {
-                        Block block = level.getBlock(entry.pos, entry.block.layer);
+                    if (level.isAreaLoaded(new SimpleAxisAlignedBB(entry.pos(), entry.pos()))) {
+                        Block block = level.getBlock(entry.pos(), entry.block().layer);
 
-                        if (Block.equals(block, entry.block, false)) {
+                        if (Block.equals(block, entry.block(), false)) {
                             block.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
                         }
                     } else {
-                        level.scheduleUpdate(entry.block, entry.pos, 0);
+                        level.scheduleUpdate(entry.block(), entry.pos(), 0);
                     }
                 }
             }
@@ -78,7 +75,7 @@ public class BlockUpdateScheduler {
 
         for (Set<BlockUpdateEntry> tickSet : this.queuedUpdates.values()) {
             for (BlockUpdateEntry update : tickSet) {
-                Vector3 pos = update.pos;
+                Vector3 pos = update.pos();
 
                 if (pos.getX() >= boundingBox.getMinX() && pos.getX() < boundingBox.getMaxX() &&
                         pos.getZ() >= boundingBox.getMinZ() && pos.getZ() < boundingBox.getMaxZ()) {
@@ -97,7 +94,7 @@ public class BlockUpdateScheduler {
     }
 
     private long getMinTime(BlockUpdateEntry entry) {
-        return Math.max(entry.delay, lastTick + 1);
+        return Math.max(entry.delay(), lastTick + 1);
     }
 
     public void add(BlockUpdateEntry entry) {
@@ -128,7 +125,7 @@ public class BlockUpdateScheduler {
     @Deprecated
     @SuppressWarnings("SuspiciousMethodCalls")
     public boolean remove(Vector3 pos) {
-        globalIndex.removeIf(e -> e.pos.equals(pos));
+        globalIndex.removeIf(e -> e.pos().equals(pos));
         for (Set<BlockUpdateEntry> tickUpdateSet : queuedUpdates.values()) {
             if (tickUpdateSet.remove(pos)) {
                 return true;

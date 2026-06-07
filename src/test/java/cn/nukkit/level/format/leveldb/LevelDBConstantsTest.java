@@ -51,17 +51,17 @@ public class LevelDBConstantsTest {
         int version1_21_0 = (0 << 8) | (21 << 16) | (1 << 24);
 
         NbtMap oldSandRed = NbtMap.builder()
-                .putString("name", "minecraft:sand")
-                .putCompound("states", NbtMap.builder()
-                        .putString("sand_type", "red")
-                        .build())
-                .putInt("version", version1_21_0)
-                .build();
+            .putString("name", "minecraft:sand")
+            .putCompound("states", NbtMap.builder()
+                .putString("sand_type", "red")
+                .build())
+            .putInt("version", version1_21_0)
+            .build();
 
         NbtMap updated = BlockStateMapping.get().updateVanillaState(oldSandRed);
 
         assertEquals(LevelDBConstants.STATE_VERSION, updated.getInt("version"),
-                "Updater output version must match palette STATE_VERSION");
+            "Updater output version must match palette STATE_VERSION");
         assertEquals("minecraft:red_sand", updated.getString("name"));
         assertFalse(updated.containsKey("sand_type") || updated.getCompound("states").containsKey("sand_type"));
     }
@@ -71,12 +71,12 @@ public class LevelDBConstantsTest {
         int version1_21_0 = (0 << 8) | (21 << 16) | (1 << 24);
 
         NbtMap oldDirtCoarse = NbtMap.builder()
-                .putString("name", "minecraft:dirt")
-                .putCompound("states", NbtMap.builder()
-                        .putString("dirt_type", "coarse")
-                        .build())
-                .putInt("version", version1_21_0)
-                .build();
+            .putString("name", "minecraft:dirt")
+            .putCompound("states", NbtMap.builder()
+                .putString("dirt_type", "coarse")
+                .build())
+            .putInt("version", version1_21_0)
+            .build();
 
         NbtMap updated = BlockStateMapping.get().updateVanillaState(oldDirtCoarse);
         BlockStateSnapshot snapshot = BlockStateMapping.get().getStateUnsafe(updated);
@@ -89,10 +89,10 @@ public class LevelDBConstantsTest {
     @Test
     public void testKnownStatePassthroughUnchanged() {
         NbtMap stone = NbtMap.builder()
-                .putString("name", "minecraft:stone")
-                .putCompound("states", NbtMap.builder().build())
-                .putInt("version", LevelDBConstants.STATE_VERSION)
-                .build();
+            .putString("name", "minecraft:stone")
+            .putCompound("states", NbtMap.builder().build())
+            .putInt("version", LevelDBConstants.STATE_VERSION)
+            .build();
 
         BlockStateSnapshot direct = BlockStateMapping.get().getStateUnsafe(stone);
         assertNotNull(direct, "minecraft:stone must be in palette");
@@ -114,19 +114,19 @@ public class LevelDBConstantsTest {
     public void testChunkerStyleSubChunkKeyLayout() {
         byte[] overworldKey = LevelDBKey.SUB_CHUNK_PREFIX.getKey(1, -2, -4, 0);
         assertArrayEquals(new byte[]{
-                1, 0, 0, 0,
-                (byte) 0xfe, (byte) 0xff, (byte) 0xff, (byte) 0xff,
-                '/',
-                (byte) 0xfc
+            1, 0, 0, 0,
+            (byte) 0xfe, (byte) 0xff, (byte) 0xff, (byte) 0xff,
+            '/',
+            (byte) 0xfc
         }, overworldKey);
 
         byte[] netherKey = LevelDBKey.SUB_CHUNK_PREFIX.getKey(1, -2, -1, 1);
         assertArrayEquals(new byte[]{
-                1, 0, 0, 0,
-                (byte) 0xfe, (byte) 0xff, (byte) 0xff, (byte) 0xff,
-                1, 0, 0, 0,
-                '/',
-                (byte) 0xff
+            1, 0, 0, 0,
+            (byte) 0xfe, (byte) 0xff, (byte) 0xff, (byte) 0xff,
+            1, 0, 0, 0,
+            '/',
+            (byte) 0xff
         }, netherKey);
     }
 
@@ -134,9 +134,9 @@ public class LevelDBConstantsTest {
     public void testPrefixedChunkKeyLayout() {
         byte[] key = LevelDBKey.getKey(LevelDBKey.DIGP_PREFIX, 1, -2, 0);
         assertArrayEquals(new byte[]{
-                'd', 'i', 'g', 'p',
-                1, 0, 0, 0,
-                (byte) 0xfe, (byte) 0xff, (byte) 0xff, (byte) 0xff
+            'd', 'i', 'g', 'p',
+            1, 0, 0, 0,
+            (byte) 0xfe, (byte) 0xff, (byte) 0xff, (byte) 0xff
         }, key);
     }
 
@@ -212,9 +212,9 @@ public class LevelDBConstantsTest {
         Set<ByteBuffer> nukkitChunks = Set.of(ByteBuffer.wrap(markedFinalization));
 
         assertTrue(LevelDBProvider.isLegacyNukkitFinalizationState(
-                markedFinalization, ChunkState.POPULATED.ordinal(), nukkitChunks));
+            markedFinalization, ChunkState.POPULATED.ordinal(), nukkitChunks));
         assertFalse(LevelDBProvider.isLegacyNukkitFinalizationState(
-                unmarkedFinalization, ChunkState.POPULATED.ordinal(), nukkitChunks));
+            unmarkedFinalization, ChunkState.POPULATED.ordinal(), nukkitChunks));
     }
 
     @SafeVarargs

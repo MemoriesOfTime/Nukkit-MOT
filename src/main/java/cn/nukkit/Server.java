@@ -162,7 +162,7 @@ public class Server {
     private float maxUse = 0;
 
     private final NukkitConsole console;
-    private final ConsoleThread consoleThread;
+    private final Thread consoleThread;
 
     private final SimpleCommandMap commandMap;
     private final CraftingManager craftingManager;
@@ -651,7 +651,9 @@ public class Server {
         this.playerDataSerializer = new DefaultPlayerDataSerializer(this);
 
         this.console = new NukkitConsole();
-        this.consoleThread = new ConsoleThread();
+        this.consoleThread = Thread.ofVirtual()
+                .name("Console Thread")
+                .unstarted(console::start);
         this.consoleThread.start();
         this.console.setExecutingCommands(true);
 
@@ -3280,6 +3282,15 @@ public class Server {
     }
 
     /**
+     * Get the console thread
+     *
+     * @return console thread
+     */
+    Thread getConsoleThread() {
+        return consoleThread;
+    }
+
+    /**
      * Get the mob spawner task
      *
      * @return spawner task
@@ -3456,13 +3467,6 @@ public class Server {
             } else {
                 getInstance().getLogger().warning("Default " + action + " used by a plugin. This can cause instability with the multiversion.");
             }
-        }
-    }
-
-    private class ConsoleThread extends Thread implements InterruptibleThread {
-        @Override
-        public void run() {
-            console.start();
         }
     }
 
