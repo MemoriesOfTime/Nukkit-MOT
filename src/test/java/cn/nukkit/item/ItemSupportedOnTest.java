@@ -3,6 +3,9 @@ package cn.nukkit.item;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.item.RuntimeItemMapping.LegacyEntry;
+import cn.nukkit.item.trim.ItemTrimMaterialType;
+import cn.nukkit.item.trim.ItemTrimPatternType;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.potion.Potion;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -134,6 +137,14 @@ public class ItemSupportedOnTest {
         assertFalse(new ItemPotion(Potion.INFESTED + 1).isSupportedOn(GameVersion.V1_21_0));
     }
 
+    @Test
+    public void testCopperArmorItemsUseArmorBase() {
+        assertCopperArmorItem(new ItemHelmetCopper(), Item.COPPER_HELMET, ArmorSlot.HELMET, 2, 122);
+        assertCopperArmorItem(new ItemChestplateCopper(), Item.COPPER_CHESTPLATE, ArmorSlot.CHESTPLATE, 4, 177);
+        assertCopperArmorItem(new ItemLeggingsCopper(), Item.COPPER_LEGGINGS, ArmorSlot.LEGGINGS, 3, 166);
+        assertCopperArmorItem(new ItemBootsCopper(), Item.COPPER_BOOTS, ArmorSlot.BOOTS, 1, 144);
+    }
+
     /**
      * 验证最新版本中所有可通过 NAMESPACED_ID_ITEM 自动发现的核心物品，
      * 在最新版本上必须返回 supported 且能够被编码。
@@ -167,6 +178,40 @@ public class ItemSupportedOnTest {
                 "Items from NAMESPACED_ID_ITEM should be supported on latest version:\n"
                         + String.join("\n", errors));
         assertTrue(verifiedCount > 0, "Should have verified at least some items");
+    }
+
+    private static void assertCopperArmorItem(Item item, String namespaceId, ArmorSlot slot, int armorPoints, int maxDurability) {
+        ItemArmor armor = assertInstanceOf(ItemArmor.class, item);
+        assertInstanceOf(StringItem.class, item);
+        assertInstanceOf(ItemDurable.class, item);
+        assertEquals(Item.STRING_IDENTIFIED_ITEM, item.getId());
+        assertEquals(namespaceId, item.getNamespaceId());
+        assertTrue(item.isArmor());
+        assertEquals(1, item.getMaxStackSize());
+        assertEquals(ItemArmor.TIER_COPPER, item.getTier());
+        assertEquals(armorPoints, item.getArmorPoints());
+        assertEquals(maxDurability, item.getMaxDurability());
+        assertEquals(12, item.getEnchantAbility());
+        assertEquals(slot == ArmorSlot.HELMET, item.isHelmet());
+        assertEquals(slot == ArmorSlot.CHESTPLATE, item.isChestplate());
+        assertEquals(slot == ArmorSlot.LEGGINGS, item.isLeggings());
+        assertEquals(slot == ArmorSlot.BOOTS, item.isBoots());
+        assertEquals(slot == ArmorSlot.HELMET, item.canBePutInHelmetSlot());
+        assertCopperArmorTrim(armor);
+    }
+
+    private static void assertCopperArmorTrim(ItemArmor armor) {
+        assertSame(armor, armor.setArmorTrim(ItemTrimPatternType.COAST_ARMOR_TRIM, ItemTrimMaterialType.MATERIAL_COPPER));
+        CompoundTag trim = armor.getNamedTag().getCompound("Trim");
+        assertEquals("coast", trim.getString("Pattern"));
+        assertEquals("copper", trim.getString("Material"));
+    }
+
+    private enum ArmorSlot {
+        HELMET,
+        CHESTPLATE,
+        LEGGINGS,
+        BOOTS
     }
 
     private static List<MappingContext> collectMappingContexts() throws IllegalAccessException {

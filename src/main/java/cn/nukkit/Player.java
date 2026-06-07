@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.AdventureSettings.Type;
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCampfire;
@@ -66,6 +67,8 @@ import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.netease.PyRpcPacket;
+import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.session.NetworkPlayerSession;
@@ -109,7 +112,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
-import java.net.URL;
+import java.net.URI;
 import java.net.URLConnection;
 import java.nio.ByteOrder;
 import java.util.*;
@@ -120,6 +123,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -248,7 +252,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Client game version
      */
     @Getter
-    protected GameVersion gameVersion;
+    protected GameVersion gameVersion = GameVersion.getLastVersion();
     /**
      * Client RakNet protocol version
      */
@@ -1266,7 +1270,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
                 try {
-                    URLConnection request = new URL(Nukkit.BRANCH).openConnection();
+                    URLConnection request = URI.create(Nukkit.BRANCH).toURL().openConnection();
                     request.connect();
                     InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
                     String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
@@ -1442,6 +1446,58 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
         } : callback), mode);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpcData(byte[] data) {
+        return this.sendPyRpcData(data, PyRpcPacket.DEFAULT_MSG_ID);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpcData(byte[] data, long msgId) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        PyRpcPacket packet = new PyRpcPacket();
+        packet.setData(data);
+        packet.setMsgId(msgId);
+        return this.dataPacket(packet);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket) {
+        return this.sendPyRpc(subPacket, PyRpcPacket.DEFAULT_MSG_ID);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket, long msgId) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createSubPacket(subPacket, msgId));
+    }
+
+    @OnlyNetEase
+    public boolean modNotifyToClient(String modName, String systemName, String eventName, Map<String, ?> eventData) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createModEventPacket(modName, systemName, eventName, eventData));
+    }
+
+    @OnlyNetEase
+    public boolean modNotifyToClientEncrypted(String modName, String systemName, String eventName,
+                                              String data, Function<String, String> encMethod) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createEncryptedModEventPacket(
+            modName, systemName, eventName, data, encMethod
+        ));
+    }
+
+    private boolean canUseNetEaseModApi() {
+        return this.gameVersion != null && this.gameVersion.isNetEase();
     }
 
     /**

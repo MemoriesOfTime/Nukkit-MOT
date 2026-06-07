@@ -29,6 +29,8 @@ public class PacketPool {
     private final int protocolVersion;
     @Getter
     private final String minecraftVersion;
+    @Getter
+    private final boolean netEase;
     private final Int2ObjectOpenHashMap<Class<? extends DataPacket>> packets;
     private final Class<? extends DataPacket>[] packetsById;
     private final Map<Class<? extends DataPacket>, Integer> packetsByClass;
@@ -69,6 +71,7 @@ public class PacketPool {
         builder.packetsByClass.putAll(this.packetsByClass);
         builder.protocolVersion = this.protocolVersion;
         builder.minecraftVersion = this.minecraftVersion;
+        builder.netEase = this.netEase;
 
         return builder;
     }
@@ -80,6 +83,7 @@ public class PacketPool {
         private final Map<Class<? extends DataPacket>, Integer> packetsByClass = new IdentityHashMap<>();
         private int protocolVersion = -1;
         private String minecraftVersion = null;
+        private boolean netEase;
 
         public <T extends DataPacket> Builder registerPacket(byte id, @NonNull Class<T> packetClass) {
             return this.registerPacket(ProtocolInfo.toNewProtocolID(id), packetClass);
@@ -116,6 +120,11 @@ public class PacketPool {
             return this;
         }
 
+        public Builder netEase(boolean netEase) {
+            this.netEase = netEase;
+            return this;
+        }
+
         public PacketPool build() {
             checkArgument(protocolVersion >= 0, "No protocol version defined");
             checkNotNull(minecraftVersion, "No Minecraft version defined");
@@ -131,7 +140,7 @@ public class PacketPool {
             for (Int2ObjectMap.Entry<Class<? extends DataPacket>> entry : packets.int2ObjectEntrySet()) {
                 packetsById[entry.getIntKey()] = entry.getValue();
             }
-            return new PacketPool(protocolVersion, minecraftVersion, packets, packetsById, packetsByClass);
+            return new PacketPool(protocolVersion, minecraftVersion, netEase, packets, packetsById, packetsByClass);
         }
     }
 }
