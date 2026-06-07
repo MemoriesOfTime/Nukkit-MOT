@@ -77,6 +77,8 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)
                 .option(RakChannelOption.RAK_SERVER_COOKIE_MODE, this.server.rakCookieMode)
                 .option(RakChannelOption.RAK_PACKET_LIMIT, this.server.rakPacketLimit)
+                // Nukkit validates, strips, and remaps Proxy Protocol datagrams in ProxyProtocolHandler.
+                // Keep RakNet's built-in handler disabled to avoid decoding the same header twice.
                 .option(RakChannelOption.RAK_PROXY_PROTOCOL, false)
                 .handler(new ChannelInitializer<>() {
                     @Override
