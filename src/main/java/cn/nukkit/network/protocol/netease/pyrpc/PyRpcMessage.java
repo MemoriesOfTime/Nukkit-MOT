@@ -1,5 +1,7 @@
 package cn.nukkit.network.protocol.netease.pyrpc;
 
+import cn.nukkit.api.OnlyNetEase;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -7,6 +9,7 @@ import java.util.List;
 /**
  * Decoded method/argument envelope for a NetEase PyRpc payload.
  */
+@OnlyNetEase
 public final class PyRpcMessage {
 
     private final String method;

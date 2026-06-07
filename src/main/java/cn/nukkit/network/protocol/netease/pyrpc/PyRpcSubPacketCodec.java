@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol.netease.pyrpc;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.protocol.netease.pyrpc.io.PyRpcWriter;
 
 /**
@@ -7,6 +8,7 @@ import cn.nukkit.network.protocol.netease.pyrpc.io.PyRpcWriter;
  *
  * @param <T> sub-packet type handled by this codec
  */
+@OnlyNetEase
 public interface PyRpcSubPacketCodec<T extends PyRpcSubPacket> {
 
     String getMethod();

@@ -1,5 +1,7 @@
 package cn.nukkit.network.protocol.netease.pyrpc.io;
 
+import cn.nukkit.api.OnlyNetEase;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -9,6 +11,7 @@ import java.util.Map;
 /**
  * Bounded MessagePack reader for NetEase PyRpc payloads.
  */
+@OnlyNetEase
 public final class PyRpcReader {
 
     private static final int MAX_MESSAGE_PACK_CONTAINER_SIZE = 1024;

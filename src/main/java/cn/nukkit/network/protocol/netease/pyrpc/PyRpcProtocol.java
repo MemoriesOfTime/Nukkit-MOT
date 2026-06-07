@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol.netease.pyrpc;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.protocol.netease.pyrpc.codec.ModEventPyRpcSubPacketCodec;
 import cn.nukkit.network.protocol.netease.pyrpc.codec.StoreBuySuccessPyRpcSubPacketCodec;
 import cn.nukkit.network.protocol.netease.pyrpc.io.PyRpcReader;
@@ -12,6 +13,7 @@ import java.util.*;
 /**
  * NetEase PyRpc message envelope codec.
  */
+@OnlyNetEase
 public final class PyRpcProtocol {
 
     public static final PyRpcProtocol DEFAULT = createDefault();

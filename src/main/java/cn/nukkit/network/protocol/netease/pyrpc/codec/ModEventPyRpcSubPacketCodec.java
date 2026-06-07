@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol.netease.pyrpc.codec;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcMessage;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcProtocol;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacketCodec;
@@ -11,6 +12,7 @@ import java.util.List;
 /**
  * Codec for NetEase ModEventC2S/ModEventS2C PyRpc payloads.
  */
+@OnlyNetEase
 public final class ModEventPyRpcSubPacketCodec implements PyRpcSubPacketCodec<ModEventPyRpcSubPacket> {
 
     @Override

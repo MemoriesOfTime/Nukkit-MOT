@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol.netease.pyrpc.codec;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcMessage;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacketCodec;
 import cn.nukkit.network.protocol.netease.pyrpc.io.PyRpcWriter;
@@ -8,6 +9,7 @@ import cn.nukkit.network.protocol.netease.pyrpc.subpacket.StoreBuySuccessPyRpcSu
 /**
  * Codec for NetEase store purchase success PyRpc payloads.
  */
+@OnlyNetEase
 public final class StoreBuySuccessPyRpcSubPacketCodec implements PyRpcSubPacketCodec<StoreBuySuccessPyRpcSubPacket> {
 
     @Override

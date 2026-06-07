@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol.netease.pyrpc.subpacket;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 
 import java.util.Collections;
@@ -9,6 +10,7 @@ import java.util.Map;
 /**
  * NetEase PyRpc mod event payload.
  */
+@OnlyNetEase
 public final class ModEventPyRpcSubPacket implements PyRpcSubPacket {
 
     public static final String CLIENT_TO_SERVER_METHOD = "ModEventC2S";

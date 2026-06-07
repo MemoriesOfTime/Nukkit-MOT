@@ -1,5 +1,7 @@
 package cn.nukkit.network.protocol.netease.pyrpc.io;
 
+import cn.nukkit.api.OnlyNetEase;
+
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
@@ -12,6 +14,7 @@ import java.util.Map;
 /**
  * MessagePack writer for NetEase PyRpc payloads.
  */
+@OnlyNetEase
 public final class PyRpcWriter {
 
     private final ByteArrayOutputStream out = new ByteArrayOutputStream();

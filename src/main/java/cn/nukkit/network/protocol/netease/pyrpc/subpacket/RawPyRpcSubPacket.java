@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol.netease.pyrpc.subpacket;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 
 import java.util.ArrayList;
@@ -10,6 +11,7 @@ import java.util.Objects;
 /**
  * Fallback sub-packet for PyRpc methods that do not have a registered codec.
  */
+@OnlyNetEase
 public final class RawPyRpcSubPacket implements PyRpcSubPacket {
 
     private final String method;

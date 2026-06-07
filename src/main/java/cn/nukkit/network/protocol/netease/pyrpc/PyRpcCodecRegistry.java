@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol.netease.pyrpc;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.protocol.netease.pyrpc.io.PyRpcWriter;
 import cn.nukkit.network.protocol.netease.pyrpc.subpacket.RawPyRpcSubPacket;
 
@@ -10,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Registry for typed NetEase PyRpc sub-packet codecs.
  */
+@OnlyNetEase
 public final class PyRpcCodecRegistry {
 
     private final Map<String, PyRpcSubPacketCodec<? extends PyRpcSubPacket>> codecsByMethod = new ConcurrentHashMap<>();
