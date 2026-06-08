@@ -29,6 +29,7 @@ import java.util.Map;
 public class BlockChest extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityChest> {
 
     private static final int[] faces = {2, 5, 3, 4};
+    private static final BlockFace[] PAIR_SCAN_ORDER = {BlockFace.EAST, BlockFace.NORTH, BlockFace.WEST, BlockFace.SOUTH};
 
     public BlockChest() {
         this(0);
@@ -92,7 +93,6 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
 
     @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
-        BlockEntityChest chest = null;
         this.setDamage(faces[player != null ? player.getDirection().getHorizontalIndex() : 0]);
 
         this.getLevel().setBlock(block, this, true, true);
@@ -122,36 +122,50 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
     }
 
     public boolean tryPair() {
-        BlockEntityChest chest = null;
-
         if (!(this.getLevel().getBlockEntity(this) instanceof BlockEntityChest blockEntity)) {
             return false;
         }
 
-        for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
-            if ((this.getDamage() == 4 || this.getDamage() == 5) && (side == BlockFace.WEST || side == BlockFace.EAST)) {
-                continue;
-            } else if ((this.getDamage() == 3 || this.getDamage() == 2) && (side == BlockFace.NORTH || side == BlockFace.SOUTH)) {
-                continue;
-            }
+        BlockEntityChest pair = this.findPair();
+        if (pair == null || !pair.pairWith(blockEntity)) {
+            return false;
+        }
+
+        this.onPaired(blockEntity, pair);
+
+        return true;
+    }
+
+    protected void onPaired(BlockEntityChest blockEntity, BlockEntityChest pair) {
+    }
+
+    protected BlockEntityChest findPair() {
+        for (BlockFace side : PAIR_SCAN_ORDER) {
             Block c = this.getSide(side);
-            if (c instanceof BlockChest && c.getDamage() == this.getDamage()) {
-                BlockEntity entity = this.getLevel().getBlockEntity(c);
-                if (entity instanceof BlockEntityChest && !((BlockEntityChest) entity).isPaired()) {
-                    chest = (BlockEntityChest) entity;
-                    break;
-                }
+            if (!this.canPairWithSide(c, side)) {
+                continue;
+            }
+
+            BlockEntity entity = this.getLevel().getBlockEntity(c);
+            if (entity instanceof BlockEntityChest chest && !chest.isPaired()) {
+                return chest;
             }
         }
 
-        if (chest != null) {
-            chest.pairWith(blockEntity);
-            blockEntity.pairWith(chest);
+        return null;
+    }
 
-            return true;
+    protected boolean canPairWithSide(Block block, BlockFace side) {
+        if (!(block instanceof BlockChest chest) || !this.canPairWith(chest)) {
+            return false;
         }
 
-        return false;
+        BlockFace facing = this.getBlockFace();
+        return side.getAxis() != facing.getAxis() && chest.getBlockFace() == facing;
+    }
+
+    protected boolean canPairWith(BlockChest chest) {
+        return chest.getId() == this.getId();
     }
 
     @Override
@@ -235,7 +249,12 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
 
     @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
+        return switch (this.getDamage() & 0x7) {
+            case 3 -> BlockFace.SOUTH;
+            case 4 -> BlockFace.WEST;
+            case 5 -> BlockFace.EAST;
+            default -> BlockFace.NORTH;
+        };
     }
 
     @Override
