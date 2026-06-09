@@ -46,7 +46,14 @@ val mockitoAgent by configurations.creating {
 }
 
 dependencies {
-    api(libs.raknet)
+    api(libs.raknet) {
+        exclude("io.netty", "netty-common")
+        exclude("io.netty", "netty-codec")
+        exclude("io.netty", "netty-buffer")
+        exclude("io.netty", "netty-transport")
+        exclude("io.netty", "netty-transport-native-unix-common")
+        exclude("io.netty", "netty-codec-haproxy")
+    }
     api(libs.netty.epoll)
     api(libs.netty.codec.haproxy)
     api(libs.nukkitx.natives)
