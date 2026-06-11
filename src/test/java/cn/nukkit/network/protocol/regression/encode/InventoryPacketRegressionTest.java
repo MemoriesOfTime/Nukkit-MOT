@@ -61,6 +61,24 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
         );
     }
 
+    static Stream<Arguments> versionsAt712() {
+        return Stream.of(
+                Arguments.of(ProtocolInfo.v1_21_20)
+        );
+    }
+
+    static Stream<Arguments> versionsAt729() {
+        return Stream.of(
+                Arguments.of(ProtocolInfo.v1_21_30)
+        );
+    }
+
+    static Stream<Arguments> versionsAt748() {
+        return Stream.of(
+                Arguments.of(ProtocolInfo.v1_21_40)
+        );
+    }
+
     @ParameterizedTest(name = "MobEquipmentPacket v{0}")
     @MethodSource("versionsAll")
     void testMobEquipmentPacket(int protocolVersion) {
@@ -135,6 +153,164 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
 
         assertEquals(1, cbPacket.getContainerId());
         assertEquals(5, cbPacket.getSlot());
+    }
+
+    @ParameterizedTest(name = "InventoryContentPacket v{0} should preserve required dynamic id")
+    @MethodSource("versionsAt712")
+    void testInventoryContentPacketV712DynamicId(int protocolVersion) {
+        var nukkitPacket = new InventoryContentPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.inventoryId = 2;
+        nukkitPacket.slots = new Item[]{Item.AIR_ITEM};
+        nukkitPacket.containerNameData = new cn.nukkit.network.protocol.types.inventory.FullContainerName(
+                cn.nukkit.network.protocol.types.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                33
+        );
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventoryContentPacket.class);
+
+        assertEquals(2, cbPacket.getContainerId());
+        assertEquals(1, cbPacket.getContents().size());
+        assertEquals(33, cbPacket.getContainerNameData().getDynamicId());
+    }
+
+    @ParameterizedTest(name = "InventorySlotPacket v{0} should preserve required dynamic id")
+    @MethodSource("versionsAt712")
+    void testInventorySlotPacketV712DynamicId(int protocolVersion) {
+        var nukkitPacket = new InventorySlotPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.inventoryId = 2;
+        nukkitPacket.slot = 1;
+        nukkitPacket.item = Item.AIR_ITEM;
+        nukkitPacket.containerNameData = new cn.nukkit.network.protocol.types.inventory.FullContainerName(
+                cn.nukkit.network.protocol.types.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                44
+        );
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventorySlotPacket.class);
+
+        assertEquals(2, cbPacket.getContainerId());
+        assertEquals(1, cbPacket.getSlot());
+        assertEquals(44, cbPacket.getContainerNameData().getDynamicId());
+    }
+
+    @ParameterizedTest(name = "InventoryContentPacket v{0} should preserve container name and dynamic size")
+    @MethodSource("versionsAt729")
+    void testInventoryContentPacketV729ContainerNameAndDynamicSize(int protocolVersion) {
+        var nukkitPacket = new InventoryContentPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.inventoryId = 3;
+        nukkitPacket.slots = new Item[]{Item.AIR_ITEM};
+        nukkitPacket.containerNameData = new cn.nukkit.network.protocol.types.inventory.FullContainerName(
+                cn.nukkit.network.protocol.types.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                45
+        );
+        nukkitPacket.dynamicContainerSize = 6;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventoryContentPacket.class);
+
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                cbPacket.getContainerNameData().getContainer());
+        assertEquals(45, cbPacket.getContainerNameData().getDynamicId());
+        assertEquals(6, cbPacket.getDynamicContainerSize());
+    }
+
+    @ParameterizedTest(name = "InventorySlotPacket v{0} should preserve container name and dynamic size")
+    @MethodSource("versionsAt729")
+    void testInventorySlotPacketV729ContainerNameAndDynamicSize(int protocolVersion) {
+        var nukkitPacket = new InventorySlotPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.inventoryId = 4;
+        nukkitPacket.slot = 2;
+        nukkitPacket.item = Item.AIR_ITEM;
+        nukkitPacket.containerNameData = new cn.nukkit.network.protocol.types.inventory.FullContainerName(
+                cn.nukkit.network.protocol.types.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                46
+        );
+        nukkitPacket.dynamicContainerSize = 7;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventorySlotPacket.class);
+
+        assertEquals(2, cbPacket.getSlot());
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.DYNAMIC_CONTAINER,
+                cbPacket.getContainerNameData().getContainer());
+        assertEquals(46, cbPacket.getContainerNameData().getDynamicId());
+        assertEquals(7, cbPacket.getDynamicContainerSize());
+    }
+
+    @ParameterizedTest(name = "InventoryContentPacket v{0} should preserve tracked stack network ids")
+    @MethodSource("versionsAt748")
+    void testInventoryContentPacketTrackedStackNetworkIds(int protocolVersion) {
+        var gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        var trackedItem = Item.get(Item.DIAMOND_SWORD, 0, 1).setStackNetId(1234);
+        var storageItem = Item.get(Item.APPLE, 0, 1);
+
+        var nukkitPacket = new InventoryContentPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = gameVersion;
+        nukkitPacket.inventoryId = 3;
+        nukkitPacket.slots = new Item[]{trackedItem};
+        nukkitPacket.containerNameData = new cn.nukkit.network.protocol.types.inventory.FullContainerName(
+                cn.nukkit.network.protocol.types.inventory.ContainerSlotType.INVENTORY,
+                11
+        );
+        nukkitPacket.storageItem = storageItem;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventoryContentPacket.class,
+                withCreativeContentDefinitions(gameVersion));
+
+        assertEquals(1, cbPacket.getContents().size());
+        assertTrue(cbPacket.getContents().get(0).isUsingNetId());
+        assertEquals(1234, cbPacket.getContents().get(0).getNetId());
+        assertEquals(11, cbPacket.getContainerNameData().getDynamicId());
+        assertFalse(cbPacket.getStorageItem().isUsingNetId());
+        assertEquals(1, cbPacket.getStorageItem().getCount());
+    }
+
+    @ParameterizedTest(name = "InventorySlotPacket v{0} should preserve tracked stack network ids")
+    @MethodSource("versionsAt748")
+    void testInventorySlotPacketTrackedStackNetworkIds(int protocolVersion) {
+        var gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        var trackedItem = Item.get(Item.DIAMOND_SWORD, 0, 1).setStackNetId(5678);
+        var storageItem = Item.get(Item.APPLE, 0, 1);
+
+        var nukkitPacket = new InventorySlotPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = gameVersion;
+        nukkitPacket.inventoryId = 4;
+        nukkitPacket.slot = 6;
+        nukkitPacket.item = trackedItem;
+        nukkitPacket.containerNameData = new cn.nukkit.network.protocol.types.inventory.FullContainerName(
+                cn.nukkit.network.protocol.types.inventory.ContainerSlotType.INVENTORY,
+                7
+        );
+        nukkitPacket.storageItem = storageItem;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventorySlotPacket.class,
+                withCreativeContentDefinitions(gameVersion));
+
+        assertEquals(6, cbPacket.getSlot());
+        assertTrue(cbPacket.getItem().isUsingNetId());
+        assertEquals(5678, cbPacket.getItem().getNetId());
+        assertEquals(7, cbPacket.getContainerNameData().getDynamicId());
+        assertFalse(cbPacket.getStorageItem().isUsingNetId());
+        assertEquals(1, cbPacket.getStorageItem().getCount());
     }
 
     @ParameterizedTest(name = "ContainerClosePacket v{0}")

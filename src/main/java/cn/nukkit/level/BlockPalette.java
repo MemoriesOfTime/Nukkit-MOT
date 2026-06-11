@@ -7,10 +7,8 @@ import cn.nukkit.block.BlockID;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.utils.Config;
 import cn.nukkit.utils.Hash;
 import cn.nukkit.utils.NetEaseConverter;
-import cn.nukkit.utils.Utils;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
@@ -24,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 
@@ -62,7 +59,6 @@ public class BlockPalette {
         legacyToHashId.defaultReturnValue(-1);
 
         loadBlockStates(paletteFor(protocol));
-        loadBlockStatesExtras();
         this.lock();
     }
 
@@ -183,32 +179,6 @@ public class BlockPalette {
         return true;
     }
 
-    /**
-     * 加载扩展数据，用于在不修改runtime_block_states.dat文件的情况下额外增加一些内容
-     */
-    private void loadBlockStatesExtras() {
-        try (InputStream resourceAsStream = Server.class.getClassLoader().getResourceAsStream("RuntimeBlockStatesExtras/" + protocol + ".json")) {
-            if (resourceAsStream == null) {
-                return;
-            }
-            List<Map> extras = new Config().loadFromStream(resourceAsStream).getMapList("extras");
-            //noinspection unchecked
-            for (Map<String, Object> map : extras) {
-                int id = Utils.toInt(map.get("id"));
-                int data = Utils.toInt(map.getOrDefault("data", 0));
-                int runtimeId = Utils.toInt(map.get("runtimeId"));
-                Block.registerKnownState(id, data);
-                int legacyId = id << Block.DATA_BITS | data;
-                legacyToRuntimeId.put(legacyId, runtimeId);
-                if (!runtimeIdToLegacy.containsKey(runtimeId)) {
-                    runtimeIdToLegacy.put(runtimeId, legacyId);
-                }
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public int getProtocol() {
         return this.protocol;
     }
@@ -243,25 +213,6 @@ public class BlockPalette {
         int stateHash = Hash.hashBlock(blockState);
         this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
-
-        // Hack: Map IDs for item frame up & down states
-        if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
-            if (data == 7) {
-                int offset = 5;
-
-                runtimeId = runtimeId + offset;
-                legacyId = blockId << Block.DATA_BITS | 5; // Up
-                this.legacyToRuntimeId.put(legacyId, runtimeId);
-                this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-
-                int offset2 = 0;
-
-                runtimeId = runtimeId + offset + offset2;
-                legacyId = blockId << Block.DATA_BITS | 4; // Down
-                this.legacyToRuntimeId.put(legacyId, runtimeId);
-                this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-            }
-        }
     }
 
     public void lock() {
@@ -292,7 +243,7 @@ public class BlockPalette {
             if (runtimeId == -1) {
                 Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyId);
                 if (cache == null) {
-                    log.info("({}) Missing block runtime id mappings for {}:{}", gameVersion, id, meta);
+                    logMissingRuntimeIdMapping("({}) Missing block runtime id mappings for {}:{}", gameVersion, id, meta);
                     runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
                     legacyToRuntimeIdCache.put(legacyId, runtimeId);
                 } else {
@@ -371,7 +322,7 @@ public class BlockPalette {
             if (runtimeId == -1) {
                 Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyFullId);
                 if (cache == null) {
-                    log.info("({}) Missing block runtime id mappings for fullId:{}", gameVersion, legacyFullId);
+                    logMissingRuntimeIdMapping("({}) Missing block runtime id mappings for fullId:{}", gameVersion, legacyFullId);
                     runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
                     legacyToRuntimeIdCache.put(legacyFullId, runtimeId);
                 } else {
@@ -396,6 +347,14 @@ public class BlockPalette {
             }
         }
         return hashId;
+    }
+
+    private void logMissingRuntimeIdMapping(String message, Object... args) {
+        if (this.gameVersion == GameVersion.getLastVersion() || this.gameVersion == GameVersion.V1_21_93_NETEASE) {
+            log.info(message, args);
+            return;
+        }
+        log.debug(message, args);
     }
 
 }

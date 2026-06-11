@@ -14,11 +14,12 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
+        <argLine></argLine>
         <jline.version>3.30.6</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
-        <leveldb-mcpe-jni.version>0.0.10</leveldb-mcpe-jni.version>
-        <block-state-updater.version>1.21.60-20250619.144147-3</block-state-updater.version>
-        <netty.version>4.1.131.Final</netty.version>
+        <leveldb-mcpe-jni.version>0.0.11</leveldb-mcpe-jni.version>
+        <block-state-updater.version>1.21.110-SNAPSHOT</block-state-updater.version>
+        <netty.version>4.1.135.Final</netty.version>
     </properties>
 
     <distributionManagement>
@@ -61,13 +62,17 @@
             <id>okaeri-releases</id>
             <url>https://repo.okaeri.cloud/releases</url>
         </repository>
+        <repository>
+            <id>porklib-maven</id>
+            <url>https://maven.daporkchop.net/</url>
+        </repository>
     </repositories>
 
     <dependencies>
         <dependency>
             <groupId>dev.mot.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.0.0.CR4-20260406.120344-3</version>
+            <version>1.1.0.CR1-20260606.034627-2</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -89,6 +94,10 @@
                 <exclusion>
                     <groupId>io.netty</groupId>
                     <artifactId>netty-transport-native-unix-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-codec-haproxy</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -113,7 +122,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta12-20260324.161234-12</version>
+            <version>3.0.0.Beta12-20260428.175455-16</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -303,7 +312,7 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>cn.lanink.leveldb</groupId>
+            <groupId>dev.mot.leveldb</groupId>
             <artifactId>leveldb-mcpe-jni</artifactId>
             <version>${leveldb-mcpe-jni.version}</version>
             <scope>compile</scope>
@@ -337,7 +346,7 @@
         <dependency>
             <groupId>net.daporkchop.lib</groupId>
             <artifactId>natives</artifactId>
-            <version>0.5.8-20221202.164554-7</version>
+            <version>0.5.9-20250718.163325-7</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -420,21 +429,27 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+            <version>1.10.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>5.11.0</version>
+            <version>5.23.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
-            <version>5.11.0</version>
+            <version>5.23.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>bedrock-codec</artifactId>
-            <version>3.0.0.Beta12-20260324.161234-12</version>
+            <version>3.0.0.Beta12-20260428.175455-16</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -485,6 +500,23 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.7.0</version>
+                <executions>
+                    <execution>
+                        <id>test-dependency-properties</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

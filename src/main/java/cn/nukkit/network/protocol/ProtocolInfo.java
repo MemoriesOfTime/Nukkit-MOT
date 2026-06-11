@@ -107,8 +107,10 @@ public interface ProtocolInfo {
     int v1_21_130 = 898;
     int v1_26_0 = 924;
     int v1_26_10 = 944;
+    int v1_26_20_26 = 974;
+    int v1_26_20 = 975;
 
-    int CURRENT_PROTOCOL = Utils.dynamic(v1_26_10);
+    int CURRENT_PROTOCOL = Utils.dynamic(v1_26_20);
 
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
             v1_1_0, v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
@@ -118,7 +120,7 @@ public interface ProtocolInfo {
             v1_19_10, v1_19_20, v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50_20, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70,
             v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40, v1_20_50, v1_20_60, v1_20_70, v1_20_80,
             v1_21_0, v1_21_2, v1_21_20, v1_21_30, v1_21_40, v1_21_50_26, v1_21_50, v1_21_60, v1_21_70_24, v1_21_70, v1_21_80, v1_21_90, v1_21_93,
-            v1_21_100, v1_21_110_26, v1_21_110, v1_21_120, v1_21_124, v1_21_130_28, v1_21_130, v1_26_0, v1_26_10
+            v1_21_100, v1_21_110_26, v1_21_110, v1_21_120, v1_21_124, v1_21_130_28, v1_21_130, v1_26_0, v1_26_10, v1_26_20_26, v1_26_20
     );
 
     String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);
@@ -318,6 +320,11 @@ public interface ProtocolInfo {
     byte CAMERA_PRESETS_PACKET = (byte) 0xc6;
     byte UNLOCKED_RECIPES_PACKET = (byte) 0xc7;
 
+    @OnlyNetEase
+    int PY_RPC_PACKET = 200;
+    @OnlyNetEase
+    int PACKET_CONFIRM_SKIN = 228;
+
     int CAMERA_INSTRUCTION_PACKET = 300;
     int COMPRESSED_BIOME_DEFINITIONS_LIST_PACKET = 301;
     int TRIM_DATA_PACKET = 302;
@@ -472,9 +479,14 @@ public interface ProtocolInfo {
      * @since v944
      */
     int CLIENTBOUND_ATTRIBUTE_LAYER_SYNC_PACKET = 345;
-
-    @OnlyNetEase
-    int PACKET_CONFIRM_SKIN = 0xe4;
+    /**
+     * @since v975
+     */
+    int SERVER_STORE_INFO_PACKET = 346;
+    /**
+     * @since v975
+     */
+    int SERVER_PRESENCE_INFO_PACKET = 347;
 
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;

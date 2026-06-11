@@ -525,6 +525,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return 0;
     }
 
+    public int onTouch(@NotNull Vector3 vector, @NotNull Item item, @NotNull BlockFace face, float fx, float fy, float fz,
+                       @Nullable Player player, PlayerInteractEvent.Action action) {
+        return this.onTouch(player, action);
+    }
+
     public boolean onActivate(Item item) {
         return this.onActivate(item, null);
     }
@@ -945,12 +950,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             if (canHarvest && efficiencyLevel > 0) {
                 speedMultiplier += efficiencyLevel * efficiencyLevel + 1;
             }
+        }
 
-            if (hasConduitPower) hasteEffectLevel = Integer.max(hasteEffectLevel, 2);
+        if (hasConduitPower) hasteEffectLevel = Integer.max(hasteEffectLevel, 2);
 
-            if (hasteEffectLevel > 0) {
-                speedMultiplier *= 1 + (0.2 * hasteEffectLevel);
-            }
+        if (hasteEffectLevel > 0) {
+            speedMultiplier *= 1 + (0.2 * hasteEffectLevel);
         }
 
         if (miningFatigueLevel > 0) {

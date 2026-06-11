@@ -605,7 +605,8 @@ public class Server {
      */
     public boolean enableProxyProtocol;
     /**
-     * Whitelist of proxy IPs/CIDRs allowed to send Proxy Protocol headers (e.g. "127.0.0.1", "10.0.0.0/8")
+     * Whitelist of proxy IPv4/IPv6 CIDRs allowed to send Proxy Protocol headers
+     * (e.g. "127.0.0.1", "10.0.0.0/8", "2001:db8::/32")
      */
     public List<String> proxyProtocolWhitelist;
     /**
@@ -972,7 +973,7 @@ public class Server {
         // Check for updates
         CompletableFuture.runAsync(() -> {
             try {
-                URLConnection request = new URL(Nukkit.BRANCH).openConnection();
+                URLConnection request = URI.create(Nukkit.BRANCH).toURL().openConnection();
                 request.connect();
                 InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
                 String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
@@ -1230,6 +1231,7 @@ public class Server {
             this.getLogger().debug("Stopping all tasks...");
             this.scheduler.cancelAllTasks();
             this.scheduler.mainThreadHeartbeat(Integer.MAX_VALUE);
+            this.scheduler.shutdown();
 
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
@@ -2619,6 +2621,7 @@ public class Server {
                 it.configure(opt -> {
                     opt.configurer(new YamlSnakeYamlConfigurer());
                     opt.bindFile(configFile);
+                    opt.removeOrphans(true);
                 });
                 if (firstLoad) {
                     it.saveDefaults();
@@ -3203,6 +3206,12 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.TARGET, BlockEntityTarget.class);
         BlockEntity.registerBlockEntity(BlockEntity.BRUSHABLE_BLOCK, BlockEntityBrushableBlock.class);
         BlockEntity.registerBlockEntity(BlockEntity.CONDUIT, BlockEntityConduit.class);
+        BlockEntity.registerBlockEntity(BlockEntity.POTENT_SULFUR, BlockEntityPotentSulfur.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CHISELED_BOOKSHELF, BlockEntityChiseledBookshelf.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CRAFTER, BlockEntityCrafter.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SHELF, BlockEntityShelf.class);
+        BlockEntity.registerBlockEntity(BlockEntity.COPPER_GOLEM_STATUE, BlockEntityCopperGolemStatue.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CREAKING_HEART, BlockEntityCreakingHeart.class);
 
         // Persistent container, not on vanilla
         BlockEntity.registerBlockEntity(BlockEntity.PERSISTENT_CONTAINER, PersistentDataContainerBlockEntity.class);

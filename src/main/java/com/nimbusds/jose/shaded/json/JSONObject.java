@@ -28,7 +28,12 @@ import java.util.Map;
  * 
  * @author FangYidong &lt;fangyidong@yahoo.com.cn&gt;
  * @author Uriel Chemouni &lt;uchemouni@gmail.com&gt;
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
+@Deprecated(forRemoval = true)
 public class JSONObject extends HashMap<String, Object> implements JSONAwareEx, JSONStreamAwareEx {
 	private static final long serialVersionUID = -503443796854799292L;
 

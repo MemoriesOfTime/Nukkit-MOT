@@ -153,18 +153,29 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
     }
 
     private void writeWeight(AttributeLayerSettings.Weight w) {
-        if (w instanceof AttributeLayerSettings.FloatWeight) {
-            this.putUnsignedVarInt(0);
-            this.putLFloat(((AttributeLayerSettings.FloatWeight) w).value);
-        } else if (w instanceof AttributeLayerSettings.StringWeight) {
-            this.putUnsignedVarInt(1);
-            this.putString(((AttributeLayerSettings.StringWeight) w).value);
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            if (w instanceof AttributeLayerSettings.FloatWeight) {
+                this.putLFloat(((AttributeLayerSettings.FloatWeight) w).value);
+            } else {
+                throw new IllegalArgumentException("Unknown Weight: " + w);
+            }
         } else {
-            throw new IllegalArgumentException("Unknown Weight: " + w);
+            if (w instanceof AttributeLayerSettings.FloatWeight) {
+                this.putUnsignedVarInt(0);
+                this.putLFloat(((AttributeLayerSettings.FloatWeight) w).value);
+            } else if (w instanceof AttributeLayerSettings.StringWeight) {
+                this.putUnsignedVarInt(1);
+                this.putString(((AttributeLayerSettings.StringWeight) w).value);
+            } else {
+                throw new IllegalArgumentException("Unknown Weight: " + w);
+            }
         }
     }
 
     private AttributeLayerSettings.Weight readWeight() {
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            return new AttributeLayerSettings.FloatWeight(this.getLFloat());
+        }
         int type = (int) this.getUnsignedVarInt();
         switch (type) {
             case 0:

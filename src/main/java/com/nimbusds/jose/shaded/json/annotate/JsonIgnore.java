@@ -22,10 +22,15 @@ import java.lang.annotation.Target;
  * 
  * @author uriel
  * 
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
 @Target({ ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.FIELD })
 @Retention(RetentionPolicy.RUNTIME)
 @JsonSmartAnnotation
+@Deprecated(forRemoval = true)
 public @interface JsonIgnore {
 	boolean value() default true;
 }

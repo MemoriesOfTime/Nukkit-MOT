@@ -145,6 +145,8 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.WHEAT_BLOCK] = true;
         randomTickBlocks[Block.SUGARCANE_BLOCK] = true;
         randomTickBlocks[Block.NETHER_WART_BLOCK] = true;
+        randomTickBlocks[Block.TORCHFLOWER_CROP] = true;
+        randomTickBlocks[Block.PITCHER_CROP] = true;
         randomTickBlocks[Block.FIRE] = true;
         randomTickBlocks[Block.GLOWING_REDSTONE_ORE] = true;
         randomTickBlocks[Block.COCOA_BLOCK] = true;
@@ -194,11 +196,6 @@ public class Level implements ChunkManager, Metadatable {
         xrayableBlocks[Block.DEEPSLATE_EMERALD_ORE] = true;
         xrayableBlocks[Block.DEEPSLATE_COPPER_ORE] = true;
 
-        randomTickBlocks[Block.CAVE_VINES] = true;
-        randomTickBlocks[Block.CAVE_VINES_BODY_WITH_BERRIES] = true;
-        randomTickBlocks[Block.CAVE_VINES_HEAD_WITH_BERRIES] = true;
-        randomTickBlocks[Block.AZALEA_LEAVES] = true;
-        randomTickBlocks[Block.AZALEA_LEAVES_FLOWERED] = true;
         randomTickBlocks[Block.COPPER_BLOCK] = true;
         randomTickBlocks[Block.CUT_COPPER] = true;
         randomTickBlocks[Block.EXPOSED_COPPER] = true;
@@ -223,8 +220,54 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.EXPOSED_COPPER_BULB] = true;
         randomTickBlocks[Block.WEATHERED_COPPER_BULB] = true;
         randomTickBlocks[Block.OXIDIZED_COPPER_BULB] = true;
+        randomTickBlocks[Block.COPPER_LANTERN] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_LANTERN] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_LANTERN] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_LANTERN] = true;
+        randomTickBlocks[Block.LIGHTNING_ROD] = true;
+        randomTickBlocks[Block.EXPOSED_LIGHTNING_ROD] = true;
+        randomTickBlocks[Block.WEATHERED_LIGHTNING_ROD] = true;
+        randomTickBlocks[Block.OXIDIZED_LIGHTNING_ROD] = true;
+
+        randomTickBlocks[Block.COPPER_CHEST] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_CHEST] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_CHEST] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_CHEST] = true;
+
+        randomTickBlocks[Block.CHISELED_COPPER] = true;
+        randomTickBlocks[Block.EXPOSED_CHISELED_COPPER] = true;
+        randomTickBlocks[Block.WEATHERED_CHISELED_COPPER] = true;
+        randomTickBlocks[Block.OXIDIZED_CHISELED_COPPER] = true;
+        randomTickBlocks[Block.COPPER_GRATE] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_GRATE] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_GRATE] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_GRATE] = true;
+        randomTickBlocks[Block.COPPER_DOOR] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_DOOR] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_DOOR] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_DOOR] = true;
+        randomTickBlocks[Block.COPPER_TRAPDOOR] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_TRAPDOOR] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_TRAPDOOR] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_TRAPDOOR] = true;
+        randomTickBlocks[Block.COPPER_GOLEM_STATUE] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_GOLEM_STATUE] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_GOLEM_STATUE] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_GOLEM_STATUE] = true;
+        randomTickBlocks[Block.COPPER_BARS] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_BARS] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_BARS] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_BARS] = true;
+        randomTickBlocks[Block.COPPER_CHAIN] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_CHAIN] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_CHAIN] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_CHAIN] = true;
 
         randomTickBlocks[BlockID.BUDDING_AMETHYST] = true;
+
+        randomTickBlocks[Block.OPEN_EYEBLOSSOM] = true;
+        randomTickBlocks[Block.CLOSED_EYEBLOSSOM] = true;
+        randomTickBlocks[Block.CREAKING_HEART] = true;
     }
 
     @NonComputationAtomic
@@ -1153,8 +1196,10 @@ public class Level implements ChunkManager, Metadatable {
                         int chunkZ = Level.getHashZ(index);
                         if (blocks == null || blocks.size() > MAX_BLOCK_CACHE) {
                             FullChunk chunk = this.getChunk(chunkX, chunkZ);
-                            for (Player p : this.getChunkPlayers(chunkX, chunkZ).values()) {
-                                p.onChunkChanged(chunk);
+                            if (chunk != null) {
+                                for (Player p : this.getChunkPlayers(chunkX, chunkZ).values()) {
+                                    p.onChunkChanged(chunk);
+                                }
                             }
                         } else {
                             Player[] playerArray = this.getChunkPlayers(chunkX, chunkZ).values().toArray(Player.EMPTY_ARRAY);
@@ -2745,7 +2790,9 @@ public class Level implements ChunkManager, Metadatable {
             this.server.getPluginManager().callEvent(ev);
 
             if (!ev.isCancelled()) {
-                target.onTouch(player, ev.getAction());
+                if (target.onTouch(vector, item, face, fx, fy, fz, player, ev.getAction()) != 0) {
+                    return item;
+                }
 
                 if ((!player.isSneaking() || player.getInventory().getItemInHand().isNull()) && target.canBeActivated() && target.onActivate(item, player)) {
                     if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
@@ -4143,14 +4190,18 @@ public class Level implements ChunkManager, Metadatable {
         int x = (int) pos.x & 0x0f;
         int z = (int) pos.z & 0x0f;
         if (chunk != null && chunk.isGenerated()) {
-            int y = NukkitMath.clamp((int) pos.y, this.getMinBlockY() + 1, this.getMaxBlockY() - 1);
+            int minY = this.getMinBlockY();
+            int maxY = this.getMaxBlockY();
+            int y = NukkitMath.clamp((int) pos.y, minY + 1, maxY - 1);
+            boolean foundGround = false;
             boolean wasAir = chunk.getBlockId(x, y - 1, z) == 0;
-            for (; y > 0; --y) {
+            for (; y > minY; --y) {
                 int[] b = chunk.getBlockState(x, y, z);
                 Block block = Block.get(b[0], b[1]);
                 if (this.isFullBlock(block)) {
                     if (wasAir) {
                         y++;
+                        foundGround = true;
                         break;
                     }
                 } else {
@@ -4158,21 +4209,32 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
 
-            for (; y >= 0 && y < this.getMaxBlockY(); y++) {
-                int[] b = chunk.getBlockState(x, y + 1, z);
+            if (!foundGround && y == minY) {
+                int[] b = chunk.getBlockState(x, y, z);
                 Block block = Block.get(b[0], b[1]);
-                if (!this.isFullBlock(block)) {
-                    b = chunk.getBlockState(x, y, z);
-                    block = Block.get(b[0], b[1]);
-                    if (!this.isFullBlock(block)) {
-                        return new Position(pos.x + 0.5, pos.y + 0.1, pos.z + 0.5, this);
-                    }
-                } else {
-                    ++y;
+                if (this.isFullBlock(block)) {
+                    y++;
+                    foundGround = true;
                 }
             }
 
-            pos.y = y;
+            if (foundGround) {
+                for (; y >= minY && y < maxY; y++) {
+                    int[] b = chunk.getBlockState(x, y + 1, z);
+                    Block block = Block.get(b[0], b[1]);
+                    if (!this.isFullBlock(block)) {
+                        b = chunk.getBlockState(x, y, z);
+                        block = Block.get(b[0], b[1]);
+                        if (!this.isFullBlock(block)) {
+                            return new Position(pos.x + 0.5, y + 0.51, pos.z + 0.5, this);
+                        }
+                    } else {
+                        ++y;
+                    }
+                }
+
+                pos.y = y;
+            }
         }
 
         return new Position(pos.x + 0.5, pos.y + 0.1, pos.z + 0.5, this);
@@ -5257,7 +5319,9 @@ public class Level implements ChunkManager, Metadatable {
             }
             return GameVersion.V1_20_50_NETEASE;
         }
-        if (protocol >= GameVersion.V1_26_10.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_20_26.getProtocol()) {
+            return GameVersion.V1_26_20;
+        } else if (protocol >= GameVersion.V1_26_10.getProtocol()) {
             return GameVersion.V1_26_10;
         } else if (protocol >= GameVersion.V1_21_110_26.getProtocol()) {
             return GameVersion.V1_21_110;
@@ -5410,7 +5474,8 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == GameVersion.V1_21_100.getProtocol()) if (player == GameVersion.V1_21_100.getProtocol()) return true;
         if (chunk == GameVersion.V1_21_110.getProtocol())
             if (player >= GameVersion.V1_21_110_26.getProtocol()) if (player <= GameVersion.V1_26_0.getProtocol()) return true;
-        if (chunk == GameVersion.V1_26_10.getProtocol())  if (player >= GameVersion.V1_26_10.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_10.getProtocol())  if (player == GameVersion.V1_26_10.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_20.getProtocol())  if (player >= GameVersion.V1_26_20_26.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

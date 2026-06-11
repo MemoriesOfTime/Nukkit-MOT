@@ -750,6 +750,67 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v819
      */
     public static final int SOUND_RECORD_LAVA_CHICKEN = 562;
+    private static final int SOUND_RECORD_LAVA_CHICKEN_1_21_93 = 561;
+    /**
+     * @since v844
+     */
+    public static final int SOUND_PLACE_ITEM = 563;
+    /**
+     * @since v844
+     */
+    public static final int SOUND_SINGLE_ITEM_SWAP = 564;
+    /**
+     * @since v844
+     */
+    public static final int SOUND_MULTI_ITEM_SWAP = 565;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_LUNGE_1 = 566;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_LUNGE_2 = 567;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_LUNGE_3 = 568;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_ATTACK_CRITICAL = 569;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_SPEAR_ATTACK_HIT = 570;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_SPEAR_ATTACK_MISS = 571;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_WOODEN_SPEAR_ATTACK_HIT = 572;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_WOODEN_SPEAR_ATTACK_MISS = 573;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_IMITATE_PARCHED = 574;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_IMITATE_CAMEL_HUSK = 575;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_SPEAR_USE = 576;
+    /**
+     * @since v898
+     */
+    public static final int SOUND_WOODEN_SPEAR_USE = 577;
     /**
      * @since v924
      */
@@ -835,9 +896,15 @@ public class LevelSoundEventPacket extends DataPacket {
      */
     public static final int SOUND_RESET_GROWTH = 598;
     /**
-     * @since v944
+     * @since v975
      */
-    public static final int SOUND_UNDEFINED = Utils.dynamic(599);
+    public static final int SOUND_PUSHED_BY_PLAYER = 599;
+    /**
+     * @since v975
+     */
+    public static final int SOUND_BOUNCE = 600;
+
+    public static final int SOUND_UNDEFINED = Utils.dynamic(601);
 
     public int sound;
     public float x;
@@ -848,10 +915,14 @@ public class LevelSoundEventPacket extends DataPacket {
     public boolean isBabyMob;
     public boolean isGlobal;
     public long entityUniqueId = -1;
+    /**
+     * @since v975
+     */
+    public Vector3f fireAtPosition;
 
     @Override
     public void decode() {
-        this.sound = (int) this.getUnsignedVarInt();
+        this.sound = getCanonicalSound((int) this.getUnsignedVarInt(), this.protocol);
         Vector3f v = this.getVector3f();
         this.x = v.x;
         this.y = v.y;
@@ -863,12 +934,15 @@ public class LevelSoundEventPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_70_24) {
             this.entityUniqueId = this.getLLong();
         }
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.fireAtPosition = this.getOptional(null, s -> s.getVector3f());
+        }
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(this.sound);
+        this.putUnsignedVarInt(getProtocolSound(this.sound, this.protocol));
         this.putVector3f(this.x, this.y, this.z);
         if (this.sound == SOUND_NOTE && this.protocol < ProtocolInfo.v1_21_50) {
             // Pre-1.21.50 instrument ID order differs: swap 5↔6 (flute↔glockenspiel), 7↔8 (guitar↔chime)
@@ -891,6 +965,25 @@ public class LevelSoundEventPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_70_24) {
             this.putLLong(this.entityUniqueId);
         }
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.putOptionalNull(this.fireAtPosition, this::putVector3f);
+        }
+    }
+
+    private static int getCanonicalSound(int sound, int protocol) {
+        if (protocol >= ProtocolInfo.v1_21_93 && protocol < ProtocolInfo.v1_21_100
+                && sound == SOUND_RECORD_LAVA_CHICKEN_1_21_93) {
+            return SOUND_RECORD_LAVA_CHICKEN;
+        }
+        return sound;
+    }
+
+    private static int getProtocolSound(int sound, int protocol) {
+        if (protocol >= ProtocolInfo.v1_21_93 && protocol < ProtocolInfo.v1_21_100
+                && sound == SOUND_RECORD_LAVA_CHICKEN) {
+            return SOUND_RECORD_LAVA_CHICKEN_1_21_93;
+        }
+        return sound;
     }
 
     @Override

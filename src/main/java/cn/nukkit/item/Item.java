@@ -44,6 +44,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,9 +79,12 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     public static final String UNKNOWN_STR = "Unknown";
     public static Class<?>[] list = null;
     public static final Map<String, Supplier<Item>> NAMESPACED_ID_ITEM = new HashMap<>();
+    private static final Set<String> REGISTERED_STRING_ITEM_IDENTIFIERS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> REGISTERED_NON_STRING_ITEM_IDENTIFIERS = ConcurrentHashMap.newKeySet();
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
+    private static final AtomicInteger STACK_NETWORK_ID_COUNTER = new AtomicInteger(0);
     /**
      * 存储需要在 initCreativeItems 后重新添加的创造物品
      * Stores creative items that need to be re-added after initCreativeItems
@@ -96,6 +101,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private CompoundTag cachedNBT = null;
     public int count;
     protected String name;
+    /**
+     * Stack network id used by Server Authoritative Inventory (ItemStackRequest) to
+     * track a specific item instance across client-server round trips. Named
+     * {@code stackNetId} to avoid confusion with block/item runtime ids. 0 means the
+     * stack is not being tracked.
+     */
+    protected int stackNetId = 0;
 
     public Item(int id) {
         this(id, 0, 1, UNKNOWN_STR);
@@ -422,7 +434,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemEchoShard.class);
             registerNamespacedIdItem(ItemRecoveryCompass.class);
             registerNamespacedIdItem(ItemDoorMangrove.class);
+            registerNamespacedIdItem(ItemDoorBamboo.class);
             registerNamespacedIdItem(ItemDoorCherry.class);
+            registerNamespacedIdItem(ItemChiseledBookshelf.class);
+            registerNamespacedIdItem(ItemCrafter.class);
             //TODO 修改类名格式为ItemSmithingTemplateXXX
             registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
             registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
@@ -481,6 +496,28 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemOminousBottle.class);
             registerNamespacedIdItem(ItemBlueEgg.class);
             registerNamespacedIdItem(ItemBrownEgg.class);
+
+            registerNamespacedIdItem(ItemTorchflowerSeeds.class);
+            registerNamespacedIdItem(ItemPitcherPod.class);
+            registerNamespacedIdItem(ItemArmadilloScute.class);
+            registerNamespacedIdItem(ItemWolfArmor.class);
+            registerNamespacedIdItem(ItemResinBrick.class);
+            registerNamespacedIdItem(ItemHorseArmorCopper.class);
+            registerNamespacedIdItem(ItemHorseArmorNetherite.class);
+            registerNamespacedIdItem(ItemRecordTears.class);
+            registerNamespacedIdItem(ItemRecordLavaChicken.class);
+            registerNamespacedIdItem(ItemSpearWood.class);
+            registerNamespacedIdItem(ItemSpearStone.class);
+            registerNamespacedIdItem(ItemSpearIron.class);
+            registerNamespacedIdItem(ItemSpearGold.class);
+            registerNamespacedIdItem(ItemSpearDiamond.class);
+            registerNamespacedIdItem(ItemSpearCopper.class);
+            registerNamespacedIdItem(ItemSpearNetherite.class);
+            registerNamespacedIdItem(ItemNautilusArmorCopper.class);
+            registerNamespacedIdItem(ItemNautilusArmorIron.class);
+            registerNamespacedIdItem(ItemNautilusArmorGold.class);
+            registerNamespacedIdItem(ItemNautilusArmorDiamond.class);
+            registerNamespacedIdItem(ItemNautilusArmorNetherite.class);
 
             registerNamespacedIdItem(ItemSwordCopper.class);
             registerNamespacedIdItem(ItemAxeCopper.class);
@@ -542,6 +579,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                     Item item = Item.get(id, damage);
                     if (item.getId() != 0 && !NAMESPACED_ID_ITEM.containsKey(entity.getKey())) {
                         NAMESPACED_ID_ITEM.put(entity.getKey(), () -> item);
+                        markRegisteredStringItemIdentifier(entity.getKey(), false);
                     }
                 } catch (Exception ignored) {
 
@@ -814,18 +852,69 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Constructor<? extends StringItem> declaredConstructor = item.getDeclaredConstructor();
         var Item = declaredConstructor.newInstance();
         registerNamespacedIdItem(Item.getNamespaceId(), stringItemSupplier(declaredConstructor));
+        markRegisteredStringItemIdentifier(Item.getNamespaceId(), true);
     }
 
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Constructor<? extends Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
         NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ROOT), itemSupplier(constructor));
+        markRegisteredStringItemIdentifier(namespacedId, StringItem.class.isAssignableFrom(constructor.getDeclaringClass()));
     }
 
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Supplier<Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
-        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ROOT), constructor);
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        NAMESPACED_ID_ITEM.put(normalizedNamespacedId, constructor);
+        clearRegisteredStringItemIdentifierCache(normalizedNamespacedId);
+    }
+
+    public static boolean isRegisteredStringItemIdentifier(@NotNull String namespacedId) {
+        Preconditions.checkNotNull(namespacedId, "namespacedId is null");
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        if (REGISTERED_STRING_ITEM_IDENTIFIERS.contains(normalizedNamespacedId)) {
+            return true;
+        }
+        if (REGISTERED_NON_STRING_ITEM_IDENTIFIERS.contains(normalizedNamespacedId)) {
+            return false;
+        }
+
+        Supplier<Item> constructor = NAMESPACED_ID_ITEM.get(normalizedNamespacedId);
+        if (constructor == null) {
+            return false;
+        }
+
+        try {
+            boolean isStringItem = constructor.get() instanceof StringItem;
+            markRegisteredStringItemIdentifier(normalizedNamespacedId, isStringItem);
+            return isStringItem;
+        } catch (Exception e) {
+            log.warn("Could not determine whether {} is a StringItem", normalizedNamespacedId, e);
+            markRegisteredStringItemIdentifier(normalizedNamespacedId, false);
+            return false;
+        }
+    }
+
+    private static String normalizeNamespacedItemIdentifier(@NotNull String namespacedId) {
+        return namespacedId.toLowerCase(Locale.ROOT);
+    }
+
+    private static void markRegisteredStringItemIdentifier(@NotNull String namespacedId, boolean stringItem) {
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        if (stringItem) {
+            REGISTERED_NON_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+            REGISTERED_STRING_ITEM_IDENTIFIERS.add(normalizedNamespacedId);
+        } else {
+            REGISTERED_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+            REGISTERED_NON_STRING_ITEM_IDENTIFIERS.add(normalizedNamespacedId);
+        }
+    }
+
+    private static void clearRegisteredStringItemIdentifierCache(@NotNull String namespacedId) {
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        REGISTERED_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+        REGISTERED_NON_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
     }
 
     @NotNull
@@ -896,6 +985,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CustomItemDefinition customDef = customItem.getDefinition();
         CUSTOM_ITEM_DEFINITIONS.put(customItem.getNamespaceId(), customDef);
         registerNamespacedIdItem(customItem.getNamespaceId(), supplier);
+        markRegisteredStringItemIdentifier(customItem.getNamespaceId(), true);
 
         // 在服务端注册自定义物品的tag
         if (customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components") instanceof CompoundTag componentTag) {
@@ -1624,6 +1714,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    public boolean isShield() {
+        return false;
+    }
+
     public boolean isHelmet() {
         return false;
     }
@@ -1645,6 +1739,14 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public boolean isMace() {
+        return false;
+    }
+
+    public boolean isSpear() {
+        return false;
+    }
+
+    public boolean isHorseArmor() {
         return false;
     }
 
@@ -1858,6 +1960,58 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         } catch (CloneNotSupportedException e) {
             return null;
         }
+    }
+
+    /**
+     * Returns the stack network id assigned to this item instance. Stack network
+     * ids are allocated by Item's internal counter and used by the Server
+     * Authoritative Inventory (ItemStackRequest) flow to identify a specific
+     * stack across client-server round trips. Returns 0 when the stack is not
+     * being tracked (for example, items produced by legacy
+     * {@code InventoryTransactionPacket} paths).
+     *
+     * @return the stack network id, or 0 when unassigned
+     */
+    public int getStackNetId() {
+        return this.stackNetId;
+    }
+
+    /**
+     * Sets the stack network id for this item instance. Used by the
+     * ItemStackRequest handler to echo the client-supplied id back in the
+     * response, or by callers that want to reuse an existing id after cloning.
+     * Pass 0 to mark the stack as untracked.
+     *
+     * @param stackNetId the stack network id to assign (0 to clear)
+     * @return this item for chaining
+     */
+    public Item setStackNetId(int stackNetId) {
+        this.stackNetId = stackNetId;
+        return this;
+    }
+
+    /**
+     * Indicates whether this item instance carries a valid stack network id.
+     * Allocated ids are always positive; 0 means untracked.
+     *
+     * @return {@code true} when {@link #stackNetId} is greater than 0
+     */
+    public boolean isUsingStackNetId() {
+        return this.stackNetId > 0;
+    }
+
+    /**
+     * Allocates a fresh positive stack network id from Item's internal counter
+     * and assigns it to this item. Call this whenever a new, distinct stack is
+     * produced server-side (for example, the output of a crafting / enchanting
+     * / grindstone operation) so the client can reference it in subsequent
+     * {@code ItemStackRequest} actions.
+     *
+     * @return this item for chaining
+     */
+    public Item autoAssignStackNetworkId() {
+        this.stackNetId = STACK_NETWORK_ID_COUNTER.updateAndGet(current -> current == Integer.MAX_VALUE ? 1 : current + 1);
+        return this;
     }
 
     /**

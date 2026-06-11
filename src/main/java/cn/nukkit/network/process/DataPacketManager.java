@@ -4,6 +4,7 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.processor.ServerboundDataDrivenScreenClosedProcessor;
 import cn.nukkit.network.process.processor.ServerboundDataStoreProcessor;
 import cn.nukkit.network.process.processor.common.*;
+import cn.nukkit.network.process.processor.netease.PyRpcProcessor;
 import cn.nukkit.network.process.processor.v113.*;
 import cn.nukkit.network.process.processor.v137.CommandRequestProcessor_v137;
 import cn.nukkit.network.process.processor.v282.SetLocalPlayerAsInitializedProcessor_v282;
@@ -182,6 +183,7 @@ public final class DataPacketManager {
                 PlayerHotbarProcessor.INSTANCE,
                 PlayerInputProcessor.INSTANCE,
                 PlayerSkinProcessor.INSTANCE,
+                PyRpcProcessor.INSTANCE,
                 RequestChunkRadiusProcessor.INSTANCE,
                 ResourcePackChunkRequestProcessor.INSTANCE,
                 RespawnProcessor.INSTANCE,
@@ -231,6 +233,11 @@ public final class DataPacketManager {
         registerProcessor(
                 ProtocolInfo.v1_19_30,
                 RequestNetworkSettingsProcessor_v554.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_20_50,
+                ToggleCrafterSlotRequestProcessor.INSTANCE
         );
 
         registerProcessor(

@@ -26,11 +26,12 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class BlockItemFrame extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityItemFrame> {
 
-    protected final static int[] FACING = new int[]{4, 5, 3, 2, 1, 0}; // TODO when 1.13 support arrives, add UP/DOWN facings
+    protected final static int[] FACING = new int[]{8, 9, 3, 2, 1, 0};
 
-    //TODO fix runtime_block_states
-    private final static int FACING_BITMASK = 0x3; //11
+    private final static int WALL_FACING_BITMASK = 0x3; //11
     private final static int HAS_MAP_BIT = 0x4; //100
+    private final static int DOWN_FACE_META = 0x8;
+    private final static int UP_FACE_META = 0x9;
     //private final static int HAS_PHOTO_BIT = 0x10; //10000
 
     public BlockItemFrame() {
@@ -147,7 +148,7 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable, Bl
 
     @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
-        if (face.getIndex() > 1 && target.isSolid() && (!block.isSolid() || block.canBeReplaced())) {
+        if (target.isSolid() && (!block.isSolid() || block.canBeReplaced())) {
             this.setBlockFace(face);
             this.getLevel().setBlock(block, this, true, true);
             CompoundTag nbt = new CompoundTag()
@@ -218,28 +219,44 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable, Bl
     }
 
     public BlockFace getFacing() {
-        return switch (this.getDamage() & FACING_BITMASK) {
+        return switch (this.getFacingMeta()) {
             case 0 -> BlockFace.WEST;
             case 1 -> BlockFace.EAST;
             case 2 -> BlockFace.NORTH;
             case 3 -> BlockFace.SOUTH;
+            case DOWN_FACE_META -> BlockFace.UP;
+            case UP_FACE_META -> BlockFace.DOWN;
             default -> null;
         };
     }
 
     @Override
     public void setBlockFace(@NotNull BlockFace face) {
-        if (face.getIndex() > 1) {
-            this.setDamage(FACING[face.getIndex()]);
-        }
+        this.setDamage(FACING[face.getIndex()]);
     }
 
     public boolean isStoringMap() {
-        return (this.getDamage() & HAS_MAP_BIT) != 0;
+        return this.getFacingMeta() <= 3 && (this.getDamage() & HAS_MAP_BIT) != 0;
     }
 
     public void setStoringMap(boolean map) {
-        this.setDamage((this.getDamage() & FACING_BITMASK) | (map ? HAS_MAP_BIT : 0x0));
+        int facingMeta = this.getFacingMeta();
+        if (facingMeta > 3) {
+            this.setDamage(facingMeta);
+            return;
+        }
+        this.setDamage(facingMeta | (map ? HAS_MAP_BIT : 0x0));
+    }
+
+    private int getFacingMeta() {
+        int damage = this.getDamage();
+        if (damage == DOWN_FACE_META || damage == (DOWN_FACE_META | HAS_MAP_BIT)) {
+            return DOWN_FACE_META;
+        }
+        if (damage == UP_FACE_META || damage == (UP_FACE_META | HAS_MAP_BIT)) {
+            return UP_FACE_META;
+        }
+        return damage & WALL_FACING_BITMASK;
     }
 
     @Override

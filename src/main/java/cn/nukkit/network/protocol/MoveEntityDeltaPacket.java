@@ -16,6 +16,7 @@ public class MoveEntityDeltaPacket extends DataPacket {
     public static final int FLAG_ON_GROUND = 0B1000000;
     public static final int FLAG_TELEPORTING = 0B10000000;
     public static final int FLAG_FORCE_MOVE_LOCAL_ENTITY = 0B100000000;
+    public static final int FLAG_FORCE_COMPLETION = 0B1000000000;
 
     public long eid;
     public int flags = 0;

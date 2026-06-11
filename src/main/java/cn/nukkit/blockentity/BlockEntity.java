@@ -60,6 +60,12 @@ public abstract class BlockEntity extends Position {
     public static final String BRUSHABLE_BLOCK = "BrushableBlock";
     public static final String CONDUIT = "Conduit";
     public static final String HANGING_SIGN = "HangingSign";
+    public static final String POTENT_SULFUR = "PotentSulfur";
+    public static final String CHISELED_BOOKSHELF = "ChiseledBookshelf";
+    public static final String CRAFTER = "Crafter";
+    public static final String SHELF = "Shelf";
+    public static final String CREAKING_HEART = "CreakingHeart";
+    public static final String COPPER_GOLEM_STATUE = "CopperGolemStatue";
 
     // Not a vanilla block entity
     public static final String PERSISTENT_CONTAINER = "PersistentContainer";

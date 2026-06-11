@@ -2,10 +2,13 @@ package cn.nukkit;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.custom.CustomBlockManager;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.level.Level;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.MainLogger;
 import org.mockito.Mockito;
@@ -169,6 +172,44 @@ public final class MockServer {
         Mockito.lenient().when(mock.getOnlinePlayers()).thenReturn(Collections.emptyMap());
         Mockito.lenient().when(mock.getGamemode()).thenReturn(0);
         Mockito.lenient().when(mock.getDataPath()).thenReturn(System.getProperty("java.io.tmpdir"));
+
+        Level mockLevel = Mockito.mock(Level.class);
+        setupLevelBlockStub(mockLevel);
+        Mockito.lenient().when(mock.getDefaultLevel()).thenReturn(mockLevel);
+    }
+
+    /**
+     * Setup getBlock() stub for mock Level to return a simple Block for any position.
+     * This is needed for BlockIterator and other ray tracing tests.
+     */
+    private static void setupLevelBlockStub(Level mockLevel) {
+        Mockito.lenient().when(mockLevel.getBlock(Mockito.any(Vector3.class)))
+            .thenAnswer(invocation -> {
+                Vector3 pos = invocation.getArgument(0);
+                return createSimpleBlock(pos);
+            });
+    }
+
+    /**
+     * Create a simple Block instance for testing purposes.
+     * Returns a minimal Block that reports its position correctly.
+     */
+    private static Block createSimpleBlock(Vector3 pos) {
+        Block block = new Block() {
+            @Override
+            public String getName() {
+                return "Air";
+            }
+
+            @Override
+            public int getId() {
+                return BlockID.AIR;
+            }
+        };
+        block.x = pos.x;
+        block.y = pos.y;
+        block.z = pos.z;
+        return block;
     }
 
     private MockServer() {}

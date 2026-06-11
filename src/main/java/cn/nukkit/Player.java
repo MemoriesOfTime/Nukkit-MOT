@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.AdventureSettings.Type;
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCampfire;
@@ -66,6 +67,8 @@ import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.netease.PyRpcPacket;
+import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.session.NetworkPlayerSession;
@@ -109,7 +112,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
-import java.net.URL;
+import java.net.URI;
 import java.net.URLConnection;
 import java.nio.ByteOrder;
 import java.util.*;
@@ -120,6 +123,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -248,7 +252,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Client game version
      */
     @Getter
-    protected GameVersion gameVersion;
+    protected GameVersion gameVersion = GameVersion.getLastVersion();
     /**
      * Client RakNet protocol version
      */
@@ -343,6 +347,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private PlayerBlockActionData lastBlockAction;
 
     private static final int NO_SHIELD_DELAY = 10;
+    private static final int TELEPORT_CHUNK_READY_OFFSET = 1;
     private int noShieldTicks;
 
     public int pickedXPOrb = 0;
@@ -1225,14 +1230,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.foodData.setLevel(20, 20);
             this.sendData(this);
         } else {
-            this.setPosition(respawnEvent.getRespawnPosition());
-            this.sendPosition(respawnEvent.getRespawnPosition(), yaw, pitch, MovePlayerPacket.MODE_RESET);
+            Position respawnPosition = respawnEvent.getRespawnPosition();
+            this.setPosition(respawnPosition);
+            this.sendPosition(respawnPosition, yaw, pitch, MovePlayerPacket.MODE_RESET);
+            this.forceMovement = this.teleportPosition = Location.fromObject(respawnPosition, respawnPosition.level, yaw, pitch, headYaw);
+            this.nextChunkOrderRun = 0;
 
             if (this.protocol < ProtocolInfo.v1_5_0) {
                 RespawnPacket respawnPacket = new RespawnPacket();
-                respawnPacket.x = (float) respawnEvent.getRespawnPosition().x;
-                respawnPacket.y = (float) respawnEvent.getRespawnPosition().y;
-                respawnPacket.z = (float) respawnEvent.getRespawnPosition().z;
+                respawnPacket.x = (float) respawnPosition.x;
+                respawnPacket.y = (float) respawnPosition.y;
+                respawnPacket.z = (float) respawnPosition.z;
                 this.dataPacket(respawnPacket);
             }
 
@@ -1275,7 +1283,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
                 try {
-                    URLConnection request = new URL(Nukkit.BRANCH).openConnection();
+                    URLConnection request = URI.create(Nukkit.BRANCH).toURL().openConnection();
                     request.connect();
                     InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
                     String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
@@ -1451,6 +1459,58 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
         } : callback), mode);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpcData(byte[] data) {
+        return this.sendPyRpcData(data, PyRpcPacket.DEFAULT_MSG_ID);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpcData(byte[] data, long msgId) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        PyRpcPacket packet = new PyRpcPacket();
+        packet.setData(data);
+        packet.setMsgId(msgId);
+        return this.dataPacket(packet);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket) {
+        return this.sendPyRpc(subPacket, PyRpcPacket.DEFAULT_MSG_ID);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket, long msgId) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createSubPacket(subPacket, msgId));
+    }
+
+    @OnlyNetEase
+    public boolean modNotifyToClient(String modName, String systemName, String eventName, Map<String, ?> eventData) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createModEventPacket(modName, systemName, eventName, eventData));
+    }
+
+    @OnlyNetEase
+    public boolean modNotifyToClientEncrypted(String modName, String systemName, String eventName,
+                                              String data, Function<String, String> encMethod) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createEncryptedModEventPacket(
+            modName, systemName, eventName, data, encMethod
+        ));
+    }
+
+    private boolean canUseNetEaseModApi() {
+        return this.gameVersion != null && this.gameVersion.isNetEase();
     }
 
     /**
@@ -2199,6 +2259,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.isCollided = this.onGround;
             this.updateFallState(this.onGround);
+            this.checkSwimmingState();
         }
 
         Location from = new Location(
@@ -3367,6 +3428,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     // 低版本仅兼容国际版，高于554的版本在RequestNetworkSettingsProcessor_v554中处理
                     this.gameVersion = GameVersion.byProtocol(this.protocol, false);
                     this.syncGameVersion(this.gameVersion);
+                } else if (this.protocol != this.gameVersion.getProtocol()) {
+                    // LoginPacket.decode() 可能修改协议号（如将1.19.62的567修正为1.19.63的568），
+                    // 需要重新同步gameVersion以保持protocol和gameVersion一致，
+                    this.gameVersion = GameVersion.byProtocol(this.protocol, this.gameVersion.isNetEase());
+                    this.syncGameVersion(this.gameVersion);
                 }
 
                 switch (this.server.spaceMode) {
@@ -3658,6 +3724,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (!authPacket.getBlockActionData().isEmpty()) {
                     for (PlayerBlockActionData action : authPacket.getBlockActionData().values()) {
                         BlockVector3 blockPos = action.getPosition();
+                        if (blockPos == null) {
+                            continue;
+                        }
                         BlockFace blockFace = BlockFace.fromIndex(action.getFacing());
                         if (this.lastBlockAction != null && this.lastBlockAction.getAction() == PlayerActionType.PREDICT_DESTROY_BLOCK &&
                                 action.getAction() == PlayerActionType.CONTINUE_DESTROY_BLOCK) {
@@ -3844,6 +3913,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (ptse.isCancelled()) {
                         this.needSendData = true;
                     } else {
+                        this.setCrawling(false);
                         this.setSwimming(true);
                     }
                 }
@@ -3956,6 +4026,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (playerToggleCrawlEvent.isCancelled()) {
                             this.needSendData = true;
                         } else {
+                            this.setSwimming(false);
                             this.setCrawling(true);
                         }
                     }
@@ -4166,13 +4237,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (ptse.isCancelled()) {
                             this.needSendData = true;
                         } else {
+                            this.setCrawling(false);
                             this.setSwimming(true);
                         }
                         break;
                     case PlayerActionPacket.ACTION_STOP_SWIMMING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput()) break;
                         ptse = new PlayerToggleSwimEvent(this, false);
-                        if (this.riding != null || this.sleeping != null || !this.isInsideOfWater()) {
+                        if (this.riding != null || this.sleeping != null) {
                             ptse.setCancelled(true);
                         }
                         this.server.getPluginManager().callEvent(ptse);
@@ -4210,6 +4282,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (playerToggleCrawlEvent.isCancelled()) {
                             this.needSendData = true;
                         } else {
+                            this.setSwimming(false);
                             this.setCrawling(true);
                         }
                         break packetswitch;
@@ -5915,43 +5988,69 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.connected && !this.closed) {
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
-                pk.message = reason;
+                if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
+                    pk.message = TextFormat.clean(reason);
+                } else {
+                    pk.message = reason;
+                }
                 this.forceDataPacket(pk, null);
             }
 
             this.connected = false;
             PlayerQuitEvent ev = null;
-            if (this.username != null && !this.username.isEmpty()) {
-                this.server.getPluginManager().callEvent(ev = new PlayerQuitEvent(this, message, true, reason));
-                if (this.loggedIn && ev.getAutoSave()) {
-                    this.save();
+            try {
+                if (this.username != null && !this.username.isEmpty()) {
+                    try {
+                        this.server.getPluginManager().callEvent(ev = new PlayerQuitEvent(this, message, true, reason));
+                    } catch (Throwable t) {
+                        this.server.getLogger().logException(t);
+                    }
+                    if (this.loggedIn && (ev == null || ev.getAutoSave())) {
+                        try {
+                            this.save();
+                        } catch (Throwable t) {
+                            this.server.getLogger().logException(t);
+                        }
+                    }
+                    if (this.fishing != null) {
+                        try {
+                            this.stopFishing(false);
+                        } catch (Throwable t) {
+                            this.server.getLogger().logException(t);
+                        }
+                    }
                 }
-                if (this.fishing != null) {
-                    this.stopFishing(false);
+
+                for (Player player : new ArrayList<>(this.server.playerList.values())) {
+                    if (!player.canSee(this)) {
+                        player.showPlayer(this);
+                    }
                 }
-            }
 
-            for (Player player : new ArrayList<>(this.server.playerList.values())) {
-                if (!player.canSee(this)) {
-                    player.showPlayer(this);
+                this.hiddenPlayers.clear();
+
+                try {
+                    this.removeAllWindows(true);
+                } catch (Throwable t) {
+                    this.server.getLogger().logException(t);
                 }
-            }
 
-            this.hiddenPlayers.clear();
+                DataDrivenScreen.removeActiveScreen(this);
 
-            this.removeAllWindows(true);
+                this.unloadChunks(false);
 
-            DataDrivenScreen.removeActiveScreen(this);
+                try {
+                    super.close();
+                } catch (Throwable t) {
+                    this.server.getLogger().logException(t);
+                }
+            } finally {
+                this.interfaz.close(this, notify ? reason : "");
 
-            this.unloadChunks(false);
-
-            super.close();
-
-            this.interfaz.close(this, notify ? reason : "");
-
-            if (this.loggedIn) {
-                this.server.removeOnlinePlayer(this);
-                this.loggedIn = false;
+                if (this.loggedIn) {
+                    this.server.removeOnlinePlayer(this);
+                    this.loggedIn = false;
+                }
             }
 
             if (ev != null && !Objects.equals(this.username, "") && this.spawned && !Objects.equals(ev.getQuitMessage().toString(), "")) {
@@ -6717,8 +6816,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkX = (int) this.teleportPosition.x >> 4;
             int chunkZ = (int) this.teleportPosition.z >> 4;
 
-            for (int X = -1; X <= 1; ++X) {
-                for (int Z = -1; Z <= 1; ++Z) {
+            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : this.server.c_s_spawnThreshold);
+            int maxChunkOffset = Math.min(TELEPORT_CHUNK_READY_OFFSET, chunkSendRadius);
+            long chunkSendRadiusSqr = (long) chunkSendRadius * chunkSendRadius;
+            for (int X = -maxChunkOffset; X <= maxChunkOffset; ++X) {
+                for (int Z = -maxChunkOffset; Z <= maxChunkOffset; ++Z) {
+                    if ((long) X * X + (long) Z * Z > chunkSendRadiusSqr) {
+                        continue;
+                    }
                     long index = Level.chunkHash(chunkX + X, chunkZ + Z);
                     if (!this.usedChunks.containsKey(index) || !this.usedChunks.get(index)) {
                         return false;
@@ -6794,11 +6899,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.nextChunkOrderRun = 0;
             this.resetClientMovement();
 
+            this.setSwimming(false);
+            this.setCrawling(false);
+
             this.stopFishing(false);
             return true;
         }
 
         return false;
+    }
+
+    public void checkSwimmingState() {
+        if (this.isSwimming() && !this.isInsideOfWater()) {
+            this.setSwimming(false);
+        }
     }
 
     protected void forceSendEmptyChunks() {
@@ -6844,6 +6958,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.orderChunks();
             this.nextChunkOrderRun = 0;
             this.resetClientMovement();
+
+            this.setSwimming(false);
+            this.setCrawling(false);
 
             //DummyBossBar
             this.getDummyBossBars().values().forEach(DummyBossBar::reshow);
@@ -7507,10 +7624,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param port     target server port
      */
     public void transfer(String hostName, int port) {
+        if (!this.connected || this.closed) {
+            return;
+        }
         TransferPacket pk = new TransferPacket();
         pk.address = hostName;
         pk.port = port;
-        this.dataPacket(pk);
+        if (!this.dataPacket(pk)) {
+            return;
+        }
+
+        this.server.getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
+            if (this.connected && !this.closed) {
+                this.close("", "transferred", false);
+            }
+        }, 100);
     }
 
     /**
@@ -7921,11 +8049,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return switch (phase) {
-            case RESOURCE_PACK, READY_TO_LOGIN -> packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET)
+            case PRE_LOGIN, RESOURCE_PACK, READY_TO_LOGIN -> packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.CLIENT_CACHE_STATUS_PACKET)
+                    || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET)
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET)
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
             case CONNECTED, NETWORK_SETTINGS_NEGOTIATED, LOGIN_RECEIVED, ENCRYPTION_REQUEST_SENT,
-                    AWAITING_ENCRYPTION_RESPONSE, ENCRYPTION_RESPONSE_RECEIVED, PRE_LOGIN,
+                    AWAITING_ENCRYPTION_RESPONSE, ENCRYPTION_RESPONSE_RECEIVED,
                     LOGGED_IN, DISCONNECTED -> false;
         };
     }

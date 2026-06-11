@@ -26,7 +26,12 @@ import static com.nimbusds.jose.shaded.json.parser.ParseException.*;
  * @author Uriel Chemouni &lt;uchemouni@gmail.com&gt;
  * @see JSONParserString
  * @see JSONParserByteArray
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
+@Deprecated(forRemoval = true)
 abstract class JSONParserMemory extends JSONParserBase {
 	protected int len;
 

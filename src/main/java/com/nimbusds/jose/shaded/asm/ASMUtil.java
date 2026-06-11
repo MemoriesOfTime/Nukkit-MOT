@@ -29,7 +29,12 @@ import static org.objectweb.asm.Opcodes.*;
  * ASM Utils used to simplify class generation
  * 
  * @author uriel Chemouni
+ *
+ * @deprecated This compatibility type exists only for legacy plugins that referenced
+ * Nimbus' former shaded json-smart classes and may be removed in a future release.
+ * Plugins should bundle their own JSON library or migrate to a supported JSON API.
  */
+@Deprecated(forRemoval = true)
 public class ASMUtil {
 	/**
 	 * Append the call of proper autoboxing method for the given primitive type.
