@@ -261,16 +261,13 @@ public class CraftingManager {
         }
 
         Map shapelessOutput = (Map) ((List) recipe.get("output")).get(0);
-        RuntimeItemMapping.LegacyEntry shapelessOutputEntry = itemMapping.fromRuntime((int) shapelessOutput.get("legacyId"));
         top:
-        if (shapelessOutputEntry != null && shapelessOutputEntry.getLegacyId() != 0) {
-            int outputDamage = (int) shapelessOutput.getOrDefault("damage", 0);
-            if (outputDamage == 0) {
-                outputDamage = shapelessOutputEntry.getDamage();
+        {
+            Item outputItem = loadRecipeOutputItem(itemMapping, shapelessOutput);
+            if (outputItem == null || outputItem.isNull()) {
+                log.trace("Unknown shapeless output: {}", recipe);
+                break top;
             }
-            String nbt = (String) shapelessOutput.get("nbt_b64");
-            byte[] nbtBytes = nbt != null ? Base64.getDecoder().decode(nbt) : new byte[0];
-            Item outputItem = Item.get(shapelessOutputEntry.getLegacyId(), outputDamage, (Integer) shapelessOutput.getOrDefault("count", 1), nbtBytes);
             List<Map> input = (List<Map>) recipe.get("input");
             List<Item> sorted = new ArrayList<>();
 
@@ -284,22 +281,12 @@ public class CraftingManager {
                     }
                     break top;
                 }
-                RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromRuntime((int) ingredient.get("itemId"));
-                if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+                Item inputItem = loadRecipeIngredientItem(itemMapping, ingredient);
+                if (inputItem == null || inputItem.isNull()) {
                     log.trace("Unknown shapeless input: {}", recipe);
                     break top;
                 }
-                int aux = (int) ingredient.getOrDefault("auxValue", 0);
-                if (aux == 32767) {
-                    if (legacyEntry.isHasDamage()) {
-                        aux = legacyEntry.getDamage();
-                    } else {
-                        aux = -1;
-                    }
-                } else if (aux == 0) {
-                    aux = legacyEntry.getDamage();
-                }
-                sorted.add(Item.get(legacyEntry.getLegacyId(), aux, (Integer) ingredient.getOrDefault("count", 1)));
+                sorted.add(inputItem);
             }
 
             sorted.sort(recipeComparator);
@@ -319,27 +306,17 @@ public class CraftingManager {
                 ((ItemFirework) outputItem).setFlight(3);
                 this.registerRecipe(new ShapelessRecipe(null, 0, outputItem, sorted));
             }
-        } else {
-            log.trace("Unknown shapeless output: {}", recipe);
         }
     }
 
     @SuppressWarnings("unchecked")
     private void loadStonecutterRecipe(RuntimeItemMapping itemMapping, Map recipe) {
         Map outputMap = (Map) ((List) recipe.get("output")).get(0);
-        RuntimeItemMapping.LegacyEntry outputEntry = itemMapping.fromRuntime((int) outputMap.get("legacyId"));
-        if (outputEntry == null || outputEntry.getLegacyId() == 0) {
+        Item outputItem = loadRecipeOutputItem(itemMapping, outputMap);
+        if (outputItem == null || outputItem.isNull()) {
             log.trace("Unknown stonecutter output: {}", recipe);
             return;
         }
-
-        int outputDamage = (int) outputMap.getOrDefault("damage", 0);
-        if (outputDamage == 0) {
-            outputDamage = outputEntry.getDamage();
-        }
-        String nbt = (String) outputMap.get("nbt_b64");
-        byte[] nbtBytes = nbt != null ? Base64.getDecoder().decode(nbt) : new byte[0];
-        Item outputItem = Item.get(outputEntry.getLegacyId(), outputDamage, (Integer) outputMap.getOrDefault("count", 1), nbtBytes);
 
         List<Map> input = (List<Map>) recipe.get("input");
         if (input.isEmpty()) {
@@ -350,27 +327,10 @@ public class CraftingManager {
             log.trace("Unknown stonecutter ingredient type: {}", recipe);
             return;
         }
-        RuntimeItemMapping.LegacyEntry inputEntry = itemMapping.fromRuntime((int) ingredientMap.get("itemId"));
-        if (inputEntry == null || inputEntry.getLegacyId() == 0) {
+        Item inputItem = loadRecipeIngredientItem(itemMapping, ingredientMap, true);
+        if (inputItem == null || inputItem.isNull()) {
             log.trace("Unknown stonecutter input: {}", recipe);
             return;
-        }
-        int inputAux = (int) ingredientMap.getOrDefault("auxValue", 0);
-        int count = (Integer) ingredientMap.getOrDefault("count", 1);
-        Item inputItem;
-        if (inputAux == 32767) {
-            if (inputEntry.isHasDamage()) {
-                // 运行时物品映射到带 damage 的 legacy ID（如花岗岩→stone:1），使用具体 damage 值
-                inputItem = Item.get(inputEntry.getLegacyId(), inputEntry.getDamage(), count);
-            } else {
-                // 真正的通配符：meta 传 null 使 hasMeta=false，编码时 damage=Short.MAX_VALUE(32767)，客户端按 runtimeId 过滤
-                inputItem = Item.get(inputEntry.getLegacyId(), null, count);
-            }
-        } else {
-            if (inputAux == 0) {
-                inputAux = inputEntry.getDamage();
-            }
-            inputItem = Item.get(inputEntry.getLegacyId(), inputAux, count);
         }
 
         String recipeId = (String) recipe.get("id");
@@ -386,29 +346,20 @@ public class CraftingManager {
 
         List<Map> outputList = (List<Map>) recipe.get("output");
         Map shapedOutput = outputList.get(0);
-        RuntimeItemMapping.LegacyEntry shapedOutputEntry = itemMapping.fromRuntime((int) shapedOutput.get("legacyId"));
         top:
-        if (shapedOutputEntry != null && shapedOutputEntry.getLegacyId() != 0) {
-            int outputDamage = (int) shapedOutput.getOrDefault("damage", 0);
-            if (outputDamage == 0) {
-                outputDamage = shapedOutputEntry.getDamage();
+        {
+            Item outputItem = loadRecipeOutputItem(itemMapping, shapedOutput);
+            if (outputItem == null || outputItem.isNull()) {
+                log.trace("Unknown shaped output: {}", recipe);
+                break top;
             }
-            String nbt = (String) shapedOutput.get("nbt_b64");
-            byte[] nbtBytes = nbt != null ? Base64.getDecoder().decode(nbt) : new byte[0];
-            Item outputItem = Item.get(shapedOutputEntry.getLegacyId(), outputDamage, (Integer) shapedOutput.getOrDefault("count", 1), nbtBytes);
 
             List<Item> extraOutputs = new ArrayList<>();
             for (int i = 1; i < outputList.size(); i++) {
                 Map extraOutput = outputList.get(i);
-                RuntimeItemMapping.LegacyEntry extraEntry = itemMapping.fromRuntime((int) extraOutput.get("legacyId"));
-                if (extraEntry != null && extraEntry.getLegacyId() != 0) {
-                    int extraDamage = (int) extraOutput.getOrDefault("damage", 0);
-                    if (extraDamage == 0) {
-                        extraDamage = extraEntry.getDamage();
-                    }
-                    String extraNbt = (String) extraOutput.get("nbt_b64");
-                    byte[] extraNbtBytes = extraNbt != null ? Base64.getDecoder().decode(extraNbt) : new byte[0];
-                    extraOutputs.add(Item.get(extraEntry.getLegacyId(), extraDamage, (Integer) extraOutput.getOrDefault("count", 1), extraNbtBytes));
+                Item extraItem = loadRecipeOutputItem(itemMapping, extraOutput);
+                if (extraItem != null && !extraItem.isNull()) {
+                    extraOutputs.add(extraItem);
                 }
             }
             String[] shape = ((List<String>) recipe.get("shape")).toArray(new String[0]);
@@ -420,7 +371,7 @@ public class CraftingManager {
                 String type = (String) ingredientEntry.getValue().get("type");
                 if (!"default".equals(type)) {
                     if ("item_tag".equals(type)) {
-                        buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, (String) ingredientEntry.getValue().get("itemTag"), null, null);
+                        buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs, (String) ingredientEntry.getValue().get("itemTag"), null, null);
                     } else if ("complex_alias".equals(type)) {
                         switch ((String) recipe.get("id")) {
                             case "minecraft:painting":
@@ -457,31 +408,124 @@ public class CraftingManager {
                     }
                 }
                 if (inputItem == null) {
-                    RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromRuntime((int) ingredientEntry.getValue().get("itemId"));
-                    if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+                    inputItem = loadRecipeIngredientItem(itemMapping, ingredientEntry.getValue());
+                    if (inputItem == null || inputItem.isNull()) {
                         log.trace("Unknown shaped input: {}", recipe);
                         break top;
                     }
-                    int aux = (int) ingredientEntry.getValue().getOrDefault("auxValue", 0);
-                    if (aux == 32767) {
-                        if (legacyEntry.isHasDamage()) {
-                            aux = legacyEntry.getDamage();
-                        } else {
-                            aux = -1;
-                        }
-                    } else if (aux == 0) {
-                        aux = legacyEntry.getDamage();
-                    }
-                    inputItem = Item.get(legacyEntry.getLegacyId(), aux, (Integer) ingredientEntry.getValue().getOrDefault("count", 1));
                 }
                 ingredients.put(ingredientEntry.getKey().charAt(0), inputItem);
             }
 
             int priority = (int) recipe.getOrDefault("priority", 0);
             this.registerRecipe(new ShapedRecipe((String) recipe.get("id"), priority, outputItem, shape, ingredients, extraOutputs));
-        } else {
-            log.trace("Unknown shaped output: {}", recipe);
         }
+    }
+
+    private Item loadRecipeOutputItem(RuntimeItemMapping itemMapping, Map<String, Object> itemData) {
+        int count = (Integer) itemData.getOrDefault("count", 1);
+        String nbt = (String) itemData.get("nbt_b64");
+        byte[] nbtBytes = nbt != null ? Base64.getDecoder().decode(nbt) : new byte[0];
+        int damage = (int) itemData.getOrDefault("damage", 0);
+
+        Item stringItem = loadStringRecipeItem(itemMapping, itemData, "legacyId", damage, itemData.containsKey("damage"), count, nbtBytes);
+        if (stringItem != null) {
+            return stringItem;
+        }
+
+        RuntimeItemMapping.LegacyEntry legacyEntry = getLegacyEntry(itemMapping, itemData, "legacyId");
+        if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+            return null;
+        }
+        if (damage == 0) {
+            damage = legacyEntry.getDamage();
+        }
+        return Item.get(legacyEntry.getLegacyId(), damage, count, nbtBytes);
+    }
+
+    private Item loadRecipeIngredientItem(RuntimeItemMapping itemMapping, Map<String, Object> itemData) {
+        return loadRecipeIngredientItem(itemMapping, itemData, false);
+    }
+
+    private Item loadRecipeIngredientItem(RuntimeItemMapping itemMapping, Map<String, Object> itemData, boolean wildcardMetaAsNull) {
+        int count = (Integer) itemData.getOrDefault("count", 1);
+        int aux = (int) itemData.getOrDefault("auxValue", 0);
+
+        Item stringItem = loadStringRecipeItem(itemMapping, itemData, "itemId", aux, aux != 32767, count, null);
+        if (stringItem != null) {
+            if (aux == 32767 && stringItem.getId() == Item.STRING_IDENTIFIED_ITEM) {
+                stringItem.setDamage(null);
+            }
+            return stringItem;
+        }
+
+        RuntimeItemMapping.LegacyEntry legacyEntry = getLegacyEntry(itemMapping, itemData, "itemId");
+        if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+            return null;
+        }
+        if (aux == 32767) {
+            if (legacyEntry.isHasDamage()) {
+                aux = legacyEntry.getDamage();
+            } else if (wildcardMetaAsNull) {
+                return Item.get(legacyEntry.getLegacyId(), null, count);
+            } else {
+                aux = -1;
+            }
+        } else if (aux == 0) {
+            aux = legacyEntry.getDamage();
+        }
+        return Item.get(legacyEntry.getLegacyId(), aux, count);
+    }
+
+    private Item loadStringRecipeItem(RuntimeItemMapping itemMapping, Map<String, Object> itemData, String runtimeIdKey, int damage, boolean hasExplicitDamage, int count, byte[] nbtBytes) {
+        String identifier = (String) itemData.get("id");
+        boolean explicitIdentifier = identifier != null;
+        if (identifier == null && itemData.get(runtimeIdKey) instanceof Number runtimeId) {
+            identifier = itemMapping.getNamespacedIdByNetworkId(runtimeId.intValue());
+        }
+        if (identifier == null) {
+            return null;
+        }
+
+        Item item = Item.fromString(identifier);
+        if (item.getId() != Item.STRING_IDENTIFIED_ITEM && (!explicitIdentifier || item.isNull())) {
+            return null;
+        }
+        if (hasExplicitDamage) {
+            item.setDamage(damage);
+        }
+        item.setCount(count);
+        if (nbtBytes != null) {
+            item.setCompoundTag(nbtBytes);
+        }
+        return item;
+    }
+
+    private RuntimeItemMapping.LegacyEntry getLegacyEntry(RuntimeItemMapping itemMapping, Map<String, Object> itemData, String runtimeIdKey) {
+        try {
+            return itemMapping.fromRuntime((int) itemData.get(runtimeIdKey));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private Item loadRecipeTagItem(RuntimeItemMapping itemMapping, String identifier, int count) {
+        Item stringItem = Item.fromString(identifier);
+        if (stringItem.getId() == Item.STRING_IDENTIFIED_ITEM) {
+            stringItem.setCount(count);
+            return stringItem;
+        }
+
+        RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromIdentifier(identifier);
+        if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+            return null;
+        }
+        return Item.get(legacyEntry.getLegacyId(), legacyEntry.getDamage(), count);
+    }
+
+    private static int getExpandableLegacyId(Item item) {
+        int id = item.getId();
+        return needExpandLegacy(id) ? id : 0;
     }
 
     @SuppressWarnings("unchecked")
@@ -571,28 +615,28 @@ public class CraftingManager {
                         String itemTag = (String) ingredient.get("itemTag");
                         if (!itemTag.equals(toReplaceTag)) {
                             if (itemTag.equals(replaceOtherTagKey)) {
-                                RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromIdentifier(replaceOtherTagValue);
-                                if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+                                inputItem = loadRecipeTagItem(itemMapping, replaceOtherTagValue, (Integer) ingredient.getOrDefault("count", 1));
+                                if (inputItem == null || inputItem.isNull()) {
                                     log.trace("Unknown multi item tag input: {}", replaceOtherTagValue);
                                     continue top;
                                 }
-                                inputItem = Item.get(legacyEntry.getLegacyId(), legacyEntry.getDamage(), (Integer) ingredient.getOrDefault("count", 1));
-                                if (needExpandLegacy(legacyEntry.getLegacyId())) {
-                                    expandLegacy = legacyEntry.getLegacyId();
+                                int expandableLegacyId = getExpandableLegacyId(inputItem);
+                                if (expandableLegacyId != 0) {
+                                    expandLegacy = expandableLegacyId;
                                 }
                             } else {
                                 buildShapelessRecipeItemTagOverrides(itemMapping, input, outputItem, itemTag, toReplaceTag, material);
                                 continue top;
                             }
                         } else {
-                            RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromIdentifier(material);
-                            if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+                            inputItem = loadRecipeTagItem(itemMapping, material, (Integer) ingredient.getOrDefault("count", 1));
+                            if (inputItem == null || inputItem.isNull()) {
                                 log.trace("Unknown item tag input: {}", material);
                                 continue top;
                             }
-                            inputItem = Item.get(legacyEntry.getLegacyId(), legacyEntry.getDamage(), (Integer) ingredient.getOrDefault("count", 1));
-                            if (needExpandLegacy(legacyEntry.getLegacyId())) {
-                                expandLegacy = legacyEntry.getLegacyId();
+                            int expandableLegacyId = getExpandableLegacyId(inputItem);
+                            if (expandableLegacyId != 0) {
+                                expandLegacy = expandableLegacyId;
                             }
                         }
                     } else {
@@ -600,22 +644,11 @@ public class CraftingManager {
                         continue top;
                     }
                 } else {
-                    RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromRuntime((int) ingredient.get("itemId"));
-                    if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+                    inputItem = loadRecipeIngredientItem(itemMapping, ingredient);
+                    if (inputItem == null || inputItem.isNull()) {
                         log.trace("Unknown shapeless input: {}", input);
                         continue top;
                     }
-                    int aux = (int) ingredient.getOrDefault("auxValue", 0);
-                    if (aux == 32767) {
-                        if (legacyEntry.isHasDamage()) {
-                            aux = legacyEntry.getDamage();
-                        } else {
-                            aux = -1;
-                        }
-                    } else if (aux == 0) {
-                        aux = legacyEntry.getDamage();
-                    }
-                    inputItem = Item.get(legacyEntry.getLegacyId(), aux, (Integer) ingredient.getOrDefault("count", 1));
                 }
 
                 sorted.add(inputItem);
@@ -640,7 +673,7 @@ public class CraftingManager {
     }
 
     @SuppressWarnings("unchecked")
-    private void buildShapedRecipeItemTagOverrides(RuntimeItemMapping itemMapping, Map<String, Map<String, Object>> input, String[] shape, Item outputItem, String toReplaceTag, String replaceOtherTagKey, String replaceOtherTagValue) {
+    private void buildShapedRecipeItemTagOverrides(RuntimeItemMapping itemMapping, Map<String, Map<String, Object>> input, String[] shape, Item outputItem, List<Item> extraOutputs, String toReplaceTag, String replaceOtherTagKey, String replaceOtherTagValue) {
         Set<String> tags = ItemTag.getItemSet(toReplaceTag);
         if (tags.isEmpty()) {
             log.trace("Unknown item tag: {}", toReplaceTag);
@@ -661,28 +694,28 @@ public class CraftingManager {
                         String itemTag = (String) ingredientEntry.getValue().get("itemTag");
                         if (!itemTag.equals(toReplaceTag)) {
                             if (itemTag.equals(replaceOtherTagKey)) {
-                                RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromIdentifier(replaceOtherTagValue);
-                                if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+                                inputItem = loadRecipeTagItem(itemMapping, replaceOtherTagValue, (Integer) ingredientEntry.getValue().getOrDefault("count", 1));
+                                if (inputItem == null || inputItem.isNull()) {
                                     log.trace("Unknown multi item tag input: {}", replaceOtherTagValue);
                                     continue top;
                                 }
-                                inputItem = Item.get(legacyEntry.getLegacyId(), legacyEntry.getDamage(), (Integer) ingredientEntry.getValue().getOrDefault("count", 1));
-                                if (needExpandLegacy(legacyEntry.getLegacyId())) {
-                                    expandLegacy = legacyEntry.getLegacyId();
+                                int expandableLegacyId = getExpandableLegacyId(inputItem);
+                                if (expandableLegacyId != 0) {
+                                    expandLegacy = expandableLegacyId;
                                 }
                             } else {
-                                buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, itemTag, toReplaceTag, material);
+                                buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs, itemTag, toReplaceTag, material);
                                 continue top;
                             }
                         } else {
-                            RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromIdentifier(material);
-                            if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+                            inputItem = loadRecipeTagItem(itemMapping, material, (Integer) ingredientEntry.getValue().getOrDefault("count", 1));
+                            if (inputItem == null || inputItem.isNull()) {
                                 log.trace("Unknown item tag input: {}", material);
                                 continue top;
                             }
-                            inputItem = Item.get(legacyEntry.getLegacyId(), legacyEntry.getDamage(), (Integer) ingredientEntry.getValue().getOrDefault("count", 1));
-                            if (needExpandLegacy(legacyEntry.getLegacyId())) {
-                                expandLegacy = legacyEntry.getLegacyId();
+                            int expandableLegacyId = getExpandableLegacyId(inputItem);
+                            if (expandableLegacyId != 0) {
+                                expandLegacy = expandableLegacyId;
                             }
                         }
                     } else {
@@ -690,22 +723,11 @@ public class CraftingManager {
                         continue top;
                     }
                 } else {
-                    RuntimeItemMapping.LegacyEntry legacyEntry = itemMapping.fromRuntime((int) ingredientEntry.getValue().get("itemId"));
-                    if (legacyEntry == null || legacyEntry.getLegacyId() == 0) {
+                    inputItem = loadRecipeIngredientItem(itemMapping, ingredientEntry.getValue());
+                    if (inputItem == null || inputItem.isNull()) {
                         log.trace("Unknown shaped input: {}", input);
                         continue top;
                     }
-                    int aux = (int) ingredientEntry.getValue().getOrDefault("auxValue", 0);
-                    if (aux == 32767) {
-                        if (legacyEntry.isHasDamage()) {
-                            aux = legacyEntry.getDamage();
-                        } else {
-                            aux = -1;
-                        }
-                    } else if (aux == 0) {
-                        aux = legacyEntry.getDamage();
-                    }
-                    inputItem = Item.get(legacyEntry.getLegacyId(), aux, (Integer) ingredientEntry.getValue().getOrDefault("count", 1));
                 }
 
                 ingredients.put(ingredientEntry.getKey().charAt(0), inputItem);
@@ -719,10 +741,10 @@ public class CraftingManager {
                             item.setDamage(meta);
                         }
                     }
-                    this.registerRecipe(new ShapedRecipe(null, 0, outputItem, shape, ingredients, Collections.emptyList()));
+                    this.registerRecipe(new ShapedRecipe(null, 0, outputItem, shape, ingredients, extraOutputs));
                 }
             } else {
-                this.registerRecipe(new ShapedRecipe(null, 0, outputItem, shape, ingredients, Collections.emptyList()));
+                this.registerRecipe(new ShapedRecipe(null, 0, outputItem, shape, ingredients, extraOutputs));
             }
         }
     }
