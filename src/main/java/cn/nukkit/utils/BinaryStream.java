@@ -334,18 +334,18 @@ public class BinaryStream {
         this.putString(skin.getSkinId());
 
         if (protocol < ProtocolInfo.v1_13_0) {
-            if (skin.isPersona()) { // Hack: Replace persona skins with steve skins for < 1.13 players to avoid invisible skins
+            boolean useSteve = skin.isPersona();
+            if (!useSteve && protocol < ProtocolInfo.v1_2_13) {
+                useSteve = skin.getSkinData().data.length != Skin.SINGLE_SKIN_SIZE;
+            }
+            if (useSteve) {
                 this.putByteArray(steveSkinDecoded != null ? steveSkinDecoded : (steveSkinDecoded = Base64.getDecoder().decode(Skin.STEVE_SKIN)));
-                if (protocol >= ProtocolInfo.v1_2_13) {
-                    this.putByteArray(skin.getCapeData().data);
-                }
+                this.putByteArray(skin.getCapeData().data);
                 this.putString("geometry.humanoid.custom");
                 this.putString(Skin.STEVE_GEOMETRY_OLD);
             } else {
                 this.putByteArray(skin.getSkinData().data);
-                if (protocol >= ProtocolInfo.v1_2_13) {
-                    this.putByteArray(skin.getCapeData().data);
-                }
+                this.putByteArray(skin.getCapeData().data);
                 this.putString(skin.isLegacySlim ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom");
                 this.putString(skin.getGeometryData());
             }

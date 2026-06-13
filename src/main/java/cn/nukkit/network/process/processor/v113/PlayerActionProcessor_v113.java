@@ -4,23 +4,16 @@ import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockAir;
-import cn.nukkit.block.BlockFire;
 import cn.nukkit.block.BlockID;
-import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.event.entity.EntityShootBowEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
-import cn.nukkit.event.player.PlayerRespawnEvent;
 import cn.nukkit.event.player.PlayerToggleSneakEvent;
 import cn.nukkit.event.player.PlayerToggleSprintEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemArrow;
 import cn.nukkit.item.enchantment.Enchantment;
-import cn.nukkit.level.Position;
-import cn.nukkit.level.Sound;
-import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -28,13 +21,7 @@ import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.process.DataPacketProcessor;
-import cn.nukkit.network.protocol.DataPacket;
-import cn.nukkit.network.protocol.LevelEventPacket;
-import cn.nukkit.network.protocol.LevelSoundEventPacket;
-import cn.nukkit.network.protocol.PlayerActionPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.RespawnPacket;
-import cn.nukkit.network.protocol.UpdateBlockPacket;
+import cn.nukkit.network.protocol.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Random;
@@ -60,7 +47,7 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull PlayerActionPacket pk) {
         Player player = playerHandle.player;
-        if (!player.spawned || (!player.isAlive() && pk.action != PlayerActionPacket.ACTION_RESPAWN && pk.action != PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS)) {
+        if (!player.spawned || (!player.isAlive() && pk.action != ACTION_RESPAWN_V113 && pk.action != PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS)) {
             return;
         }
 
@@ -153,13 +140,13 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
                         double p = (double) diff / 20;
 
                         double f = Math.min((p * p + p * 2) / 3, 1) * 2;
-                        
+
                         Entity projectile = Entity.createEntity("Arrow", player.level.getChunk(player.getChunkX(), player.getChunkZ()), nbt, player, f == 2);
                         if (projectile == null) {
                             player.getInventory().sendContents(player);
                             break;
                         }
-                        
+
                         EntityShootBowEvent entityShootBowEvent = new EntityShootBowEvent(player, bow, (cn.nukkit.entity.projectile.EntityProjectile) projectile, f);
 
                         if (f < 0.1 || diff < 5) {
@@ -204,57 +191,12 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
                 playerHandle.setStartAction(-1);
                 break;
 
-            case PlayerActionPacket.ACTION_STOP_SLEEPING:
+            case ACTION_STOP_SLEEPING_V113:
                 player.stopSleep();
                 break;
 
-            case PlayerActionPacket.ACTION_RESPAWN:
-                if (!player.spawned || player.isAlive() || !player.isOnline()) {
-                    break;
-                }
-
-                if (player.getServer().isHardcore()) {
-                    player.setBanned(true);
-                    break;
-                }
-
-                player.craftingType = Player.CRAFTING_SMALL;
-
-                PlayerRespawnEvent playerRespawnEvent = new PlayerRespawnEvent(player, player.getSpawn());
-                player.getServer().getPluginManager().callEvent(playerRespawnEvent);
-
-                Position respawnPos = playerRespawnEvent.getRespawnPosition();
-
-                player.teleport(respawnPos, null);
-
-                RespawnPacket respawnPacket = new RespawnPacket();
-                respawnPacket.x = (float) respawnPos.x;
-                respawnPacket.y = (float) respawnPos.y;
-                respawnPacket.z = (float) respawnPos.z;
-                player.dataPacket(respawnPacket);
-
-                player.setSprinting(false, true);
-                player.setSneaking(false);
-
-                player.extinguish();
-                player.setDataProperty(new cn.nukkit.entity.data.ShortEntityData(Player.DATA_AIR, 400), false);
-                player.deadTicks = 0;
-                player.noDamageTicks = 60;
-
-                player.removeAllEffects();
-                player.setHealth(player.getMaxHealth());
-                player.getFoodData().setLevel(20, 20);
-
-                player.sendData(player);
-
-                player.setMovementSpeed(Player.DEFAULT_SPEED);
-
-                player.getAdventureSettings().update();
-                player.getInventory().sendContents(player);
-                player.getInventory().sendArmorContents(player);
-
-                player.spawnToAll();
-                player.scheduleUpdate();
+            case ACTION_RESPAWN_V113:
+                playerHandle.handleRespawnRequest();
                 break;
 
             case PlayerActionPacket.ACTION_JUMP:

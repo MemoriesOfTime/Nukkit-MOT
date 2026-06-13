@@ -21,6 +21,8 @@ import org.jetbrains.annotations.NotNull;
  */
 public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPacketV113> {
 
+    private static final Gson GSON = new Gson();
+
     public static final CommandStepProcessor_v113 INSTANCE = new CommandStepProcessor_v113();
 
     @Override
@@ -43,20 +45,20 @@ public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPa
                             try {
                                 switch (par.type) {
                                     case TARGET:
-                                        CommandArg rules = new Gson().fromJson(arg, CommandArg.class);
+                                        CommandArg rules = GSON.fromJson(arg, CommandArg.class);
                                         if (rules != null && rules.getRules() != null && rules.getRules().length > 0) {
                                             commandText.append(" ").append(rules.getRules()[0].getValue());
                                         }
                                         break;
                                     case BLOCK_POSITION:
-                                        CommandArgBlockVector bv = new Gson().fromJson(arg, CommandArgBlockVector.class);
+                                        CommandArgBlockVector bv = GSON.fromJson(arg, CommandArgBlockVector.class);
                                         if (bv != null) {
                                             commandText.append(" ").append(bv.getX()).append(" ").append(bv.getY()).append(" ").append(bv.getZ());
                                         }
                                         break;
                                     case STRING:
                                     case RAWTEXT:
-                                        String string = new Gson().fromJson(arg, String.class);
+                                        String string = GSON.fromJson(arg, String.class);
                                         if (string != null) {
                                             commandText.append(" ").append(string);
                                         }

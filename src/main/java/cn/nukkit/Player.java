@@ -1250,6 +1250,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.spawned = true;
 
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.sendAllInventories();
+            this.inventory.sendHeldItemIfNotAir(this);
+        }
+
         PlayerJoinEvent playerJoinEvent = new PlayerJoinEvent(this,
                 new TranslationContainer(TextFormat.YELLOW + "%multiplayer.player.joined", new String[]{this.displayName})
         );
@@ -4145,11 +4150,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.stopSleep();
                         break;
                     case PlayerActionPacket.ACTION_RESPAWN:
-                        if (!this.spawned || this.isAlive() || !this.isOnline()) {
-                            break;
-                        }
-
-                        this.respawn();
+                        this.handleRespawnRequest();
                         break;
                     case PlayerActionPacket.ACTION_JUMP:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput()) break;
@@ -6435,6 +6436,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.dataPacket(healthPk);
             }
         }
+    }
+
+    protected boolean handleRespawnRequest() {
+        if (!this.spawned || this.isAlive() || !this.isOnline()) {
+            return false;
+        }
+
+        this.respawn();
+        return true;
     }
 
     protected void respawn() {
