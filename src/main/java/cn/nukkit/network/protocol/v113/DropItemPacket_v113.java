@@ -5,9 +5,9 @@ import cn.nukkit.item.Item;
 /**
  * @author Nukkit Project Team
  */
-public class DropItemPacketV113 extends DataPacket_v113 {
+public class DropItemPacket_v113 extends DataPacket_v113 {
 
-    public static final byte NETWORK_ID = ProtocolInfoV113.DROP_ITEM_PACKET;
+    public static final byte NETWORK_ID = ProtocolInfo_v113.DROP_ITEM_PACKET;
 
     public int type;
     public Item item;

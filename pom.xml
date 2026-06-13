@@ -19,7 +19,7 @@
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.11</leveldb-mcpe-jni.version>
         <block-state-updater.version>1.21.110-SNAPSHOT</block-state-updater.version>
-        <netty.version>4.1.131.Final</netty.version>
+        <netty.version>4.1.135.Final</netty.version>
     </properties>
 
     <distributionManagement>
@@ -72,7 +72,7 @@
         <dependency>
             <groupId>dev.mot.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.0.0.CR4-20260426.145646-4</version>
+            <version>1.1.0.CR1-20260606.034627-2</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -94,6 +94,10 @@
                 <exclusion>
                     <groupId>io.netty</groupId>
                     <artifactId>netty-transport-native-unix-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-codec-haproxy</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>

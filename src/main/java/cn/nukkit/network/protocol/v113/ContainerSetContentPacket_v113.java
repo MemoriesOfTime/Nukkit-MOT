@@ -7,8 +7,8 @@ import cn.nukkit.network.protocol.DataPacket;
  * author: MagicDroidX
  * Nukkit Project
  */
-public class ContainerSetContentPacketV113 extends DataPacket_v113 {
-    public static final byte NETWORK_ID = ProtocolInfoV113.CONTAINER_SET_CONTENT_PACKET;
+public class ContainerSetContentPacket_v113 extends DataPacket_v113 {
+    public static final byte NETWORK_ID = ProtocolInfo_v113.CONTAINER_SET_CONTENT_PACKET;
 
     @Override
     public byte pid() {
@@ -36,7 +36,7 @@ public class ContainerSetContentPacketV113 extends DataPacket_v113 {
     @Override
     public void decode() {
         this.windowid = (int) this.getUnsignedVarInt();
-        this.eid = this.getVarLong();
+        this.eid = this.getEntityUniqueId();
         int count = (int) this.getUnsignedVarInt();
         this.slots = new Item[count];
 
@@ -55,7 +55,7 @@ public class ContainerSetContentPacketV113 extends DataPacket_v113 {
     public void encode() {
         this.reset();
         this.putUnsignedVarInt(this.windowid);
-        this.putVarLong(this.eid);
+        this.putEntityUniqueId(this.eid);
         this.putUnsignedVarInt(this.slots.length);
         for (Item slot : this.slots) {
             this.putSlot(gameVersion, slot);
@@ -72,8 +72,8 @@ public class ContainerSetContentPacketV113 extends DataPacket_v113 {
     }
 
     @Override
-    public ContainerSetContentPacketV113 clone() {
-        ContainerSetContentPacketV113 pk = (ContainerSetContentPacketV113) super.clone();
+    public ContainerSetContentPacket_v113 clone() {
+        ContainerSetContentPacket_v113 pk = (ContainerSetContentPacket_v113) super.clone();
         pk.slots = this.slots.clone();
         return pk;
     }

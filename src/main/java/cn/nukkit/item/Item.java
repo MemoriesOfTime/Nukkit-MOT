@@ -44,6 +44,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,6 +79,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     public static final String UNKNOWN_STR = "Unknown";
     public static Class<?>[] list = null;
     public static final Map<String, Supplier<Item>> NAMESPACED_ID_ITEM = new HashMap<>();
+    private static final Set<String> REGISTERED_STRING_ITEM_IDENTIFIERS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> REGISTERED_NON_STRING_ITEM_IDENTIFIERS = ConcurrentHashMap.newKeySet();
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
@@ -574,6 +578,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                     Item item = Item.get(id, damage);
                     if (item.getId() != 0 && !NAMESPACED_ID_ITEM.containsKey(entity.getKey())) {
                         NAMESPACED_ID_ITEM.put(entity.getKey(), () -> item);
+                        markRegisteredStringItemIdentifier(entity.getKey(), false);
                     }
                 } catch (Exception ignored) {
 
@@ -846,18 +851,69 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Constructor<? extends StringItem> declaredConstructor = item.getDeclaredConstructor();
         var Item = declaredConstructor.newInstance();
         registerNamespacedIdItem(Item.getNamespaceId(), stringItemSupplier(declaredConstructor));
+        markRegisteredStringItemIdentifier(Item.getNamespaceId(), true);
     }
 
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Constructor<? extends Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
         NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ROOT), itemSupplier(constructor));
+        markRegisteredStringItemIdentifier(namespacedId, StringItem.class.isAssignableFrom(constructor.getDeclaringClass()));
     }
 
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Supplier<Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
-        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ROOT), constructor);
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        NAMESPACED_ID_ITEM.put(normalizedNamespacedId, constructor);
+        clearRegisteredStringItemIdentifierCache(normalizedNamespacedId);
+    }
+
+    public static boolean isRegisteredStringItemIdentifier(@NotNull String namespacedId) {
+        Preconditions.checkNotNull(namespacedId, "namespacedId is null");
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        if (REGISTERED_STRING_ITEM_IDENTIFIERS.contains(normalizedNamespacedId)) {
+            return true;
+        }
+        if (REGISTERED_NON_STRING_ITEM_IDENTIFIERS.contains(normalizedNamespacedId)) {
+            return false;
+        }
+
+        Supplier<Item> constructor = NAMESPACED_ID_ITEM.get(normalizedNamespacedId);
+        if (constructor == null) {
+            return false;
+        }
+
+        try {
+            boolean isStringItem = constructor.get() instanceof StringItem;
+            markRegisteredStringItemIdentifier(normalizedNamespacedId, isStringItem);
+            return isStringItem;
+        } catch (Exception e) {
+            log.warn("Could not determine whether {} is a StringItem", normalizedNamespacedId, e);
+            markRegisteredStringItemIdentifier(normalizedNamespacedId, false);
+            return false;
+        }
+    }
+
+    private static String normalizeNamespacedItemIdentifier(@NotNull String namespacedId) {
+        return namespacedId.toLowerCase(Locale.ROOT);
+    }
+
+    private static void markRegisteredStringItemIdentifier(@NotNull String namespacedId, boolean stringItem) {
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        if (stringItem) {
+            REGISTERED_NON_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+            REGISTERED_STRING_ITEM_IDENTIFIERS.add(normalizedNamespacedId);
+        } else {
+            REGISTERED_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+            REGISTERED_NON_STRING_ITEM_IDENTIFIERS.add(normalizedNamespacedId);
+        }
+    }
+
+    private static void clearRegisteredStringItemIdentifierCache(@NotNull String namespacedId) {
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        REGISTERED_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+        REGISTERED_NON_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
     }
 
     @NotNull
@@ -928,6 +984,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CustomItemDefinition customDef = customItem.getDefinition();
         CUSTOM_ITEM_DEFINITIONS.put(customItem.getNamespaceId(), customDef);
         registerNamespacedIdItem(customItem.getNamespaceId(), supplier);
+        markRegisteredStringItemIdentifier(customItem.getNamespaceId(), true);
 
         // 在服务端注册自定义物品的tag
         if (customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components") instanceof CompoundTag componentTag) {

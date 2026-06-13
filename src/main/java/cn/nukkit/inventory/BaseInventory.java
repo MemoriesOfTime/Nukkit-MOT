@@ -16,8 +16,8 @@ import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
-import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
-import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
+import cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import org.jetbrains.annotations.ApiStatus;
@@ -550,7 +550,7 @@ public abstract class BaseInventory implements Inventory {
         }
 
         if (Server.getInstance().minimumProtocol <= ProtocolInfo.v1_1_0) {
-            ContainerSetContentPacketV113 pk2 = new ContainerSetContentPacketV113();
+            ContainerSetContentPacket_v113 pk2 = new ContainerSetContentPacket_v113();
             pk2.slots = pk.slots.clone();
             for (Player player : players) {
                 if (player.protocol > ProtocolInfo.v1_1_0) {
@@ -654,7 +654,7 @@ public abstract class BaseInventory implements Inventory {
             pk.containerNameData = this.resolveFullContainerName(index, id);
             player.dataPacket(pk);
         } else {
-            ContainerSetSlotPacketV113 pk = new ContainerSetSlotPacketV113();
+            ContainerSetSlotPacket_v113 pk = new ContainerSetSlotPacket_v113();
             pk.slot = index;
             pk.item = this.getItem(index).clone();
             int id = player.getWindowId(this);
@@ -673,7 +673,7 @@ public abstract class BaseInventory implements Inventory {
         pk.slot = index;
         pk.item = this.getItem(index).clone();
 
-        ContainerSetSlotPacketV113 pk2 = new ContainerSetSlotPacketV113();
+        ContainerSetSlotPacket_v113 pk2 = new ContainerSetSlotPacket_v113();
         pk2.slot = index;
         pk2.item = pk.item.clone();
 

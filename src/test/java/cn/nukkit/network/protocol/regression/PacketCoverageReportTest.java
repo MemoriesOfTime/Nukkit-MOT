@@ -61,7 +61,7 @@ public class PacketCoverageReportTest {
             if (EXCLUDED_PACKETS.contains(name)) {
                 continue;
             }
-            if (name.endsWith("V113")) {
+            if (name.endsWith("_v113")) {
                 legacyV113Packets.add(name);
             } else {
                 standardPacketNames.add(name);
