@@ -3508,7 +3508,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                if (!loginChainData.isXboxAuthed() && server.xboxAuth && this.protocol >= ProtocolInfo.v1_2_0) {
+                if (!loginChainData.isXboxAuthed() && server.xboxAuth) {
                     this.close("", "disconnectionScreen.notAuthenticated");
                     if (server.banXBAuthFailed) {
                         this.server.getNetwork().blockAddress(this.socketAddress.getAddress(), 5);
@@ -3521,19 +3521,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.socketAddress = new InetSocketAddress(this.loginChainData.getWaterdogIP(), this.getRawPort());
                 }
 
-                this.version = Optional.ofNullable(loginChainData.getGameVersion())
-                        .filter(s -> !s.isBlank())
-                        .orElseGet(() -> Utils.getVersionByProtocol(this.protocol));
+                this.version = loginChainData.getGameVersion();
 
-                // Older login chains may not satisfy the modern validator; fall back to LoginPacket when needed.
-                String rawVerifiedName = Optional.ofNullable(loginChainData.getUsername())
-                        .filter(s -> !s.isBlank())
-                        .orElse(loginPacket.username);
-                if (rawVerifiedName == null || rawVerifiedName.isBlank()) {
-                    this.close("", "disconnectionScreen.invalidName");
-                    break;
-                }
-                String verifiedName = TextFormat.clean(rawVerifiedName);
+                // Use verified identity data from ClientChainData (signature-validated) as the source of truth
+                String verifiedName = TextFormat.clean(loginChainData.getUsername());
                 if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
                     verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
                 }
@@ -3549,15 +3540,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
 
-                this.randomClientId = loginChainData.getClientId() != 0L ? loginChainData.getClientId() : loginPacket.clientId;
+                this.randomClientId = loginChainData.getClientId();
 
-                this.uuid = Optional.ofNullable(loginChainData.getClientUUID())
-                        .orElseGet(() -> Optional.ofNullable(loginPacket.clientUUID)
-                                .orElseGet(() -> UUID.nameUUIDFromBytes(rawVerifiedName.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+                this.uuid = loginChainData.getClientUUID();
                 this.rawUUID = Binary.writeUUID(this.uuid);
-                this.minecraftId = Optional.ofNullable(loginChainData.getMinecraftId()).orElse(loginPacket.minecraftId);
+                this.minecraftId = loginChainData.getMinecraftId();
 
                 boolean valid = true;
+                String rawVerifiedName = loginChainData.getUsername();
                 int len = rawVerifiedName.length();
                 if (((len > 16 || len < 3) && !gameVersion.isNetEase())
                         || rawVerifiedName.trim().isEmpty()) {
