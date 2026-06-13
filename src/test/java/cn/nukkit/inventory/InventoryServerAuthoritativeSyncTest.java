@@ -5,6 +5,7 @@ import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Position;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
@@ -157,6 +158,27 @@ class InventoryServerAuthoritativeSyncTest {
         InventoryContentPacket packet = capturePacket(player, InventoryContentPacket.class);
         assertEquals(ContainerSlotType.OFFHAND, packet.containerNameData.getContainer());
         assertEquals(0, packet.containerNameData.getDynamicId());
+    }
+
+    @Test
+    void playerUIComponentForceWriteUsesBackingUIInventory() {
+        Player player = Mockito.mock(Player.class);
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+
+        ui.getCursorInventory().setItemForce(0, Item.get(Item.DIAMOND, 0, 1));
+        assertEquals(Item.DIAMOND, ui.getItem(0).getId());
+
+        ui.getCraftingGrid().setItemForce(1, Item.get(Item.STONE, 0, 2));
+        assertEquals(Item.STONE, ui.getItem(29).getId());
+        assertEquals(2, ui.getItem(29).getCount());
+
+        AnvilInventory anvil = new AnvilInventory(ui, new Position());
+        anvil.setItemForce(0, Item.get(Item.IRON_INGOT, 0, 3));
+        assertEquals(Item.IRON_INGOT, ui.getItem(1).getId());
+        assertEquals(3, ui.getItem(1).getCount());
+
+        anvil.setItemForce(0, Item.get(Item.AIR));
+        assertTrue(ui.getItem(1).isNull());
     }
 
     private static <T extends DataPacket> T capturePacket(Player player, Class<T> type) {

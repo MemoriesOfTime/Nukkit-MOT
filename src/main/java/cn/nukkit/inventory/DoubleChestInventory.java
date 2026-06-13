@@ -79,6 +79,16 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
     }
 
     @Override
+    @ApiStatus.Internal
+    public void setItemForce(int index, Item item) {
+        if (index < this.left.getSize()) {
+            this.left.setItemForce(index, item);
+        } else {
+            this.right.setItemForce(index - this.left.getSize(), item);
+        }
+    }
+
+    @Override
     public boolean clear(int index) {
         return this.clear(index, true);
     }

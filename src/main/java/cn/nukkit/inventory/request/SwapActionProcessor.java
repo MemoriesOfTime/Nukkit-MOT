@@ -78,7 +78,7 @@ public class SwapActionProcessor implements ItemStackRequestActionProcessor<Swap
             return context.error();
         }
         if (!dstInv.setItem(dstSlot, sourceItem.clone(), false)) {
-            srcInv.setItem(srcSlot, originalSource, false);
+            srcInv.setItemForce(srcSlot, originalSource);
             return context.error();
         }
 

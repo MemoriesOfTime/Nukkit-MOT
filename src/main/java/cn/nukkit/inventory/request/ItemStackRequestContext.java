@@ -6,6 +6,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackReq
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 
 import java.util.*;
 
@@ -15,6 +16,7 @@ import java.util.*;
  * opaque scratchpad for cross-action state (e.g. the recipe resolved by
  * CraftRecipeAction that CreateAction / CraftResultsDeprecated will consume).
  */
+@Log4j2
 public class ItemStackRequestContext {
 
     @Getter
@@ -49,17 +51,26 @@ public class ItemStackRequestContext {
         }
     }
 
+    /**
+     * Execute all registered commit actions. Each action is wrapped in its own
+     * try-catch so that a single failure does not skip subsequent actions —
+     * commit side-effects (exp changes, entity spawns, NBT updates) are often
+     * independent and should not be abandoned just because one of them threw.
+     *
+     * @return {@code true} only if every action completed without throwing
+     */
     public boolean commit() {
-        try {
-            for (Runnable action : commitActions) {
+        boolean allOk = true;
+        for (Runnable action : commitActions) {
+            try {
                 action.run();
+            } catch (Throwable t) {
+                log.error("Failed to execute item stack request commit action", t);
+                allOk = false;
             }
-            commitActions.clear();
-            return true;
-        } catch (Throwable t) {
-            commitActions.clear();
-            return false;
         }
+        commitActions.clear();
+        return allOk;
     }
 
     public void addPluginModifiedSlots(Inventory inventory, Map<Integer, Item> slots) {

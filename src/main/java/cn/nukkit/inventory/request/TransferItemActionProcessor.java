@@ -153,18 +153,14 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
                 ? srcInv.clear(srcSlot, sendSource)
                 : srcInv.setItem(srcSlot, newSrc, sendSource);
         if (!srcOk) {
-            if (originalDestItem.isNull()) {
-                dstInv.clear(dstSlot, sendDest);
-            } else {
-                dstInv.setItem(dstSlot, originalDestItem, sendDest);
-            }
+            dstInv.setItemForce(dstSlot, originalDestItem);
             return context.error();
         }
 
         // 防御：如果 src 的底层 setItem 不知为何把原物品写没了（如插件篡改为 AIR），
         // 也要把 src 恢复，避免客户端回滚看到不一致状态。
         if (srcInv.getItem(srcSlot).isNull() && !fullTransfer) {
-            srcInv.setItem(srcSlot, originalSourceItem, sendSource);
+            srcInv.setItemForce(srcSlot, originalSourceItem);
         }
 
         playBundleSound(player, dstInv, Sound.BUNDLE_INSERT);
@@ -229,11 +225,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
                 ? srcInv.clear(srcSlot, sendSource)
                 : srcInv.setItem(srcSlot, newSrc, sendSource);
         if (!srcOk) {
-            if (originalDestItem.isNull()) {
-                dstInv.clear(dstSlot, sendDest);
-            } else {
-                dstInv.setItem(dstSlot, originalDestItem, sendDest);
-            }
+            dstInv.setItemForce(dstSlot, originalDestItem);
             return context.error();
         }
 

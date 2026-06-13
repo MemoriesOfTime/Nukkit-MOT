@@ -70,6 +70,17 @@ public class PlayerUIComponent extends BaseInventory {
     }
 
     @Override
+    @ApiStatus.Internal
+    public void setItemForce(int index, Item item) {
+        if (index < 0 || index >= this.size) {
+            return;
+        }
+        Item before = this.playerUI.getItem(index + this.offset);
+        this.playerUI.setItemForce(index + this.offset, item);
+        onSlotChange(index, before, false);
+    }
+
+    @Override
     public boolean clear(int index, boolean send) {
         Item before = playerUI.getItem(index + this.offset);
         if (this.playerUI.clear(index + this.offset, send)) {

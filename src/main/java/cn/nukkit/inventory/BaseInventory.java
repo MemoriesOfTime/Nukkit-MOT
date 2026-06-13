@@ -202,7 +202,6 @@ public abstract class BaseInventory implements Inventory {
         if (holder instanceof BlockEntity) {
             ((BlockEntity) holder).setDirty();
         }
-
         // Server-Authoritative Inventory requires every non-empty stack to carry a
         // positive stackNetworkId. Items created before SAI (e.g. loaded from NBT or
         // spawned by plugins) may still have id==0, which Bedrock clients interpret as
@@ -219,6 +218,31 @@ public abstract class BaseInventory implements Inventory {
         this.slots.put(index, item.clone());
         this.onSlotChange(index, old, send);
         return true;
+    }
+
+    @Override
+    @ApiStatus.Internal
+    public void setItemForce(int index, Item item) {
+        if (index < 0 || index >= this.size) {
+            return;
+        }
+        Item old = this.getItem(index);
+        if (item == null || item.isNull() || item.getCount() <= 0) {
+            this.slots.remove(index);
+        } else {
+            if (item.getStackNetId() == 0) {
+                item.autoAssignStackNetworkId();
+            }
+            if (item instanceof ItemBundle bundle) {
+                ensureUniqueBundleId(index, bundle);
+            }
+            this.slots.put(index, item.clone());
+        }
+        InventoryHolder holder = this.getHolder();
+        if (holder instanceof BlockEntity) {
+            ((BlockEntity) holder).setDirty();
+        }
+        this.onSlotChange(index, old, false);
     }
 
     @Override

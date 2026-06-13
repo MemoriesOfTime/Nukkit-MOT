@@ -127,8 +127,14 @@ public final class ItemStackRequestHandler {
                 }
             }
 
-            if (!error && !context.commit()) {
-                error = true;
+            if (!error) {
+                // commit 副作用（经验扣除、实体生成、NBT 更新等）是不可逆的。
+                // 如果 commit 部分失败，回滚库存只会制造新的不一致
+                // （如经验已扣但物品也恢复），因此 commit 失败时不回滚，
+                // 仅记录日志并同步当前真实状态给客户端。
+                if (!context.commit()) {
+                    log.warn("{}: item stack request {} commit partially failed", player.getName(), request.getRequestId());
+                }
             }
 
             if (error) {
@@ -244,11 +250,15 @@ public final class ItemStackRequestHandler {
             currentSlots.add(slot);
         }
 
+        // Use setItemForce to bypass EntityInventoryChangeEvent / EntityArmorChangeEvent
+        // — rollback is a server-authoritative restore and must not be vetoed by
+        // plugin event handlers, otherwise the slot stays in its post-action state
+        // and the client receives an inconsistent inventory.
         for (int slot : currentSlots) {
             if (!snapshot.containsKey(slot)) {
                 Item current = canonical.getItem(slot);
                 if (current != null && !current.isNull()) {
-                    canonical.clear(slot, false);
+                    canonical.setItemForce(slot, Item.get(Item.AIR));
                 }
             }
         }
@@ -256,9 +266,9 @@ public final class ItemStackRequestHandler {
         for (var entry : snapshot.entrySet()) {
             Item item = entry.getValue();
             if (item != null && !item.isNull() && item.getCount() > 0) {
-                canonical.setItem(entry.getKey(), item.clone(), false);
+                canonical.setItemForce(entry.getKey(), item.clone());
             } else {
-                canonical.clear(entry.getKey(), false);
+                canonical.setItemForce(entry.getKey(), Item.get(Item.AIR));
             }
         }
     }
@@ -277,9 +287,9 @@ public final class ItemStackRequestHandler {
         for (var entry : modifiedSlots.entrySet()) {
             Item item = entry.getValue();
             if (item == null || item.isNull() || item.getCount() <= 0) {
-                canonical.clear(entry.getKey(), false);
+                canonical.setItemForce(entry.getKey(), Item.get(Item.AIR));
             } else {
-                canonical.setItem(entry.getKey(), item.clone(), false);
+                canonical.setItemForce(entry.getKey(), item.clone());
             }
         }
     }

@@ -950,6 +950,36 @@ class ItemStackRequestProcessorTest {
         assertFalse(response.success());
     }
 
+    @Test
+    void commitExecutesAllActionsEvenWhenSomeFail() {
+        ItemStackRequestContext ctx = context();
+        boolean[] executed = new boolean[3];
+        ctx.onCommit(() -> executed[0] = true);
+        ctx.onCommit(() -> { executed[1] = true; throw new RuntimeException("boom"); });
+        ctx.onCommit(() -> executed[2] = true);
+
+        boolean result = ctx.commit();
+
+        assertFalse(result, "commit should return false when any action fails");
+        assertTrue(executed[0], "first action should have executed");
+        assertTrue(executed[1], "second action should have executed (before throwing)");
+        assertTrue(executed[2], "third action should still execute after second threw");
+    }
+
+    @Test
+    void setItemForceWritesDirectlyWithoutEvents() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+
+        Item diamond = Item.get(Item.DIAMOND, 0, 32);
+        inventory.setItemForce(0, diamond);
+        assertEquals(Item.DIAMOND, inventory.getItem(0).getId());
+        assertEquals(32, inventory.getItem(0).getCount());
+
+        inventory.setItemForce(0, Item.get(Item.AIR));
+        assertTrue(inventory.getItem(0).isNull());
+    }
+
     private static Player mockPlayer() {
         Player player = Mockito.mock(Player.class);
         player.protocol = ProtocolInfo.v1_21_30;
