@@ -6,6 +6,8 @@ import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 
 import java.util.HashMap;
 
@@ -60,6 +62,10 @@ public class PlayerUIInventory extends BaseInventory {
         pk.slot = index;
         pk.item = this.getItem(index);
 
+        // v1.21.30+ requires the correct container type in InventorySlotPacket,
+        // otherwise the client ignores the update (default is ANVIL_INPUT).
+        pk.containerNameData = new FullContainerName(resolveUISlotType(index), null);
+
         for (Player p : target) {
             if (p == this.getHolder()) {
                 pk.inventoryId = ContainerIds.UI;
@@ -93,6 +99,7 @@ public class PlayerUIInventory extends BaseInventory {
         for (int i = 0; i < this.getSize(); ++i) {
             pk.slots[i] = this.getItem(i);
         }
+        pk.containerNameData = new FullContainerName(ContainerSlotType.CRAFTING_INPUT, null);
 
         for (Player p : target) {
             if (p == this.getHolder()) {
@@ -112,11 +119,39 @@ public class PlayerUIInventory extends BaseInventory {
                     p.dataPacket(pk);
                 }
             }
-            /*if (p.protocol >= ProtocolInfo.v1_16_0) {
+            if (p.protocol >= ProtocolInfo.v1_16_0) {
                 p.dataPacket(pk);
-            }*/
+            }
             //https://github.com/CloudburstMC/Nukkit/commit/f96ce6eb90d47ab99ced368dd7129601f14c0b2b
         }
+    }
+
+    private static ContainerSlotType resolveUISlotType(int slot) {
+        if (slot == 0) {
+            return ContainerSlotType.CURSOR;
+        }
+        if (slot == PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT) {
+            return ContainerSlotType.CREATED_OUTPUT;
+        }
+        return switch (slot) {
+            case 1 -> ContainerSlotType.ANVIL_INPUT;
+            case 2 -> ContainerSlotType.ANVIL_MATERIAL;
+            case 3 -> ContainerSlotType.STONECUTTER_INPUT;
+            case 9 -> ContainerSlotType.LOOM_INPUT;
+            case 10 -> ContainerSlotType.LOOM_DYE;
+            case 11 -> ContainerSlotType.LOOM_MATERIAL;
+            case 12 -> ContainerSlotType.CARTOGRAPHY_INPUT;
+            case 13 -> ContainerSlotType.CARTOGRAPHY_ADDITIONAL;
+            case 14 -> ContainerSlotType.ENCHANTING_INPUT;
+            case 15 -> ContainerSlotType.ENCHANTING_MATERIAL;
+            case 16 -> ContainerSlotType.GRINDSTONE_INPUT;
+            case 17 -> ContainerSlotType.GRINDSTONE_ADDITIONAL;
+            case 27 -> ContainerSlotType.BEACON_PAYMENT;
+            case 51 -> ContainerSlotType.SMITHING_TABLE_INPUT;
+            case 52 -> ContainerSlotType.SMITHING_TABLE_MATERIAL;
+            case 53 -> ContainerSlotType.SMITHING_TABLE_TEMPLATE;
+            default -> ContainerSlotType.CRAFTING_INPUT;
+        };
     }
 
     @Override

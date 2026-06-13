@@ -531,6 +531,12 @@ public class Server {
      */
     public boolean serverAuthoritativeBlockBreaking;
     /**
+     * Server authoritative inventory mode
+     * When enabled, server has final authority over inventory changes
+     * @since v1.16.100 (protocol 407+)
+     */
+    public boolean serverAuthoritativeInventory;
+    /**
      * Network encryption
      */
     public boolean encryptionEnabled;
@@ -3327,6 +3333,7 @@ public class Server {
             default -> this.serverAuthoritativeMovementMode = 1; // server-auth
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
+        this.serverAuthoritativeInventory = this.getPropertyBoolean("server-authoritative-inventory", true);
 
         // === Advanced MOT settings from nukkit-mot.yml ===
         ServerConfig config = this.serverConfig;
@@ -3546,6 +3553,7 @@ public class Server {
 
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
+            put("server-authoritative-inventory", true);
         }
     }
 

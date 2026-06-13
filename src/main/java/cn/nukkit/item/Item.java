@@ -84,7 +84,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
-    private static final AtomicInteger STACK_NETWORK_ID_COUNTER = new AtomicInteger(0);
     /**
      * 存储需要在 initCreativeItems 后重新添加的创造物品
      * Stores creative items that need to be re-added after initCreativeItems
@@ -1718,6 +1717,17 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    public boolean canBePutInOffhandSlot() {
+        return this.isShield()
+                || this.id == ARROW
+                || this.id == TOTEM
+                || this.id == MAP
+                || this.id == EMPTY_MAP
+                || this.id == FIREWORKS
+                || this.id == NAUTILUS_SHELL
+                || this.id == SPARKLER;
+    }
+
     public boolean isHelmet() {
         return false;
     }
@@ -2001,7 +2011,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     /**
-     * Allocates a fresh positive stack network id from Item's internal counter
+     * Allocates a fresh positive stack network id from ItemStackNetManager
      * and assigns it to this item. Call this whenever a new, distinct stack is
      * produced server-side (for example, the output of a crafting / enchanting
      * / grindstone operation) so the client can reference it in subsequent
@@ -2010,7 +2020,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * @return this item for chaining
      */
     public Item autoAssignStackNetworkId() {
-        this.stackNetId = STACK_NETWORK_ID_COUNTER.updateAndGet(current -> current == Integer.MAX_VALUE ? 1 : current + 1);
+        this.stackNetId = ItemStackNetManager.allocate();
         return this;
     }
 

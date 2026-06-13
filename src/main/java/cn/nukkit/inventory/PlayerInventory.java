@@ -15,7 +15,9 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.ContainerType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113;
 
@@ -299,6 +301,10 @@ public class PlayerInventory extends BaseInventory {
             item = ev.getNewItem();
         }
 
+        if (item instanceof cn.nukkit.item.ItemBundle bundle) {
+            ensureUniqueBundleId(index, bundle);
+        }
+
         Item old = this.getItem(index);
         this.slots.put(index, item.clone());
         this.onSlotChange(index, old, send);
@@ -381,8 +387,10 @@ public class PlayerInventory extends BaseInventory {
             if (player.equals(this.getHolder())) {
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     InventoryContentPacket pk2 = new InventoryContentPacket();
-                    pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
+                    int id = InventoryContentPacket.SPECIAL_ARMOR;
+                    pk2.inventoryId = id;
                     pk2.slots = armor;
+                    pk2.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, id);
                     player.dataPacket(pk2);
                 } else {
                     ContainerSetContentPacket_v113 pk2 = new ContainerSetContentPacket_v113();
@@ -446,9 +454,11 @@ public class PlayerInventory extends BaseInventory {
             if (player.equals(this.getHolder())) {
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     InventorySlotPacket pk2 = new InventorySlotPacket();
-                    pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
+                    int id = InventoryContentPacket.SPECIAL_ARMOR;
+                    pk2.inventoryId = id;
                     pk2.slot = index - this.getSize();
                     pk2.item = this.getItem(index);
+                    pk2.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, id);
                     player.dataPacket(pk2);
                 } else {
                     ContainerSetSlotPacket_v113 pk3 = new ContainerSetSlotPacket_v113();
@@ -523,6 +533,7 @@ public class PlayerInventory extends BaseInventory {
                 continue;
             }
             pk.inventoryId = id;
+            pk.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR_AND_INVENTORY, id);
             player.dataPacket(pk.clone());
         }
     }
@@ -557,6 +568,7 @@ public class PlayerInventory extends BaseInventory {
         for (Player player : players) {
             if (player.equals(this.getHolder())) {
                 pk.inventoryId = ContainerIds.INVENTORY;
+                pk.containerNameData = resolvePlayerSlotContainerName(index, ContainerIds.INVENTORY);
                 pk2.windowid = 0;
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     player.dataPacket(pk);
@@ -570,6 +582,7 @@ public class PlayerInventory extends BaseInventory {
                     continue;
                 }
                 pk.inventoryId = id;
+                pk.containerNameData = resolvePlayerSlotContainerName(index, id);
                 pk2.windowid = id;
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     player.dataPacket(pk.clone());
@@ -578,6 +591,16 @@ public class PlayerInventory extends BaseInventory {
                 }
             }
         }
+    }
+
+    private FullContainerName resolvePlayerSlotContainerName(int index, int dynamicId) {
+        if (index < 9) {
+            return new FullContainerName(ContainerSlotType.HOTBAR, dynamicId);
+        }
+        if (index < 36) {
+            return new FullContainerName(ContainerSlotType.INVENTORY, dynamicId);
+        }
+        return new FullContainerName(ContainerSlotType.ARMOR, dynamicId);
     }
 
     public void sendCreativeContents() {

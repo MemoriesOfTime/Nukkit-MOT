@@ -724,6 +724,10 @@ public class BinaryStream {
     }
 
     private Item getSlotNew(GameVersion gameVersion) {
+        return this.getSlotNew(gameVersion, false);
+    }
+
+    private Item getSlotNew(GameVersion gameVersion, boolean instanceItem) {
         int protocolId = gameVersion.getProtocol();
         int runtimeId = this.getVarInt();
         if (runtimeId == 0) {
@@ -762,7 +766,7 @@ public class BinaryStream {
         }
 
         int stackNetId = 0;
-        if (this.getBoolean()) { // hasStackNetId
+        if (!instanceItem && this.getBoolean()) { // hasStackNetId
             stackNetId = this.getVarInt();
         }
 
@@ -857,7 +861,7 @@ public class BinaryStream {
                     if (compoundTag.contains(MV_ORIGIN_NBT)) {
                         item.setNamedTag(compoundTag.getCompound(MV_ORIGIN_NBT));
                     }
-                    if (stackNetId != 0) {
+                    if (!instanceItem && stackNetId != 0) {
                         item.setStackNetId(stackNetId);
                     }
                     return item;
@@ -904,7 +908,7 @@ public class BinaryStream {
             item.setNamedTag(namedTag);
         }
 
-        if (stackNetId != 0) {
+        if (!instanceItem && stackNetId != 0) {
             item.setStackNetId(stackNetId);
         }
         return item;
@@ -2126,7 +2130,12 @@ public class BinaryStream {
                 yield new AutoCraftRecipeAction(recipeId, numberOfRequestedCrafts, timesCrafted, ingredients);
             }
             case CRAFT_RESULTS_DEPRECATED -> new CraftResultsDeprecatedAction(
-                    getArray(Item.class, (s) -> s.getSlot(gameVersion)),
+                    getArray(Item.class, (s) -> {
+                        if (gameVersion.getProtocol() >= ProtocolInfo.v1_16_220) {
+                            return this.getSlotNew(gameVersion, true);
+                        }
+                        return this.getSlot(gameVersion);
+                    }),
                     getByte() & 0xFF
             );
             case MINE_BLOCK -> new MineBlockAction(getVarInt(), getVarInt(), getVarInt());

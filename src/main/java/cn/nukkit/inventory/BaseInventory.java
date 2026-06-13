@@ -10,13 +10,17 @@ import cn.nukkit.event.entity.EntityInventoryChangeEvent;
 import cn.nukkit.event.inventory.InventoryOpenEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.ItemBundle;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.util.*;
 
@@ -106,12 +110,37 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public Item getItem(int index) {
-        return this.slots.containsKey(index) ? this.slots.get(index).clone() : new ItemBlock(Block.get(BlockID.AIR), null, 0);
+        Item original = this.slots.get(index);
+        if (original != null) {
+            // Ensure every non-empty stack carries a valid stackNetworkId for SAI.
+            if (!original.isNull() && original.getStackNetId() == 0) {
+                original.autoAssignStackNetworkId();
+            }
+            return original.clone();
+        }
+        return new ItemBlock(Block.get(BlockID.AIR), null, 0);
+    }
+
+    @Override
+    @ApiStatus.Internal
+    public Item getUnclonedItem(int index) {
+        Item item = this.slots.get(index);
+        if (item != null) {
+            if (!item.isNull() && item.getStackNetId() == 0) {
+                item.autoAssignStackNetworkId();
+            }
+            return item;
+        }
+        return new ItemBlock(Block.get(BlockID.AIR), null, 0);
     }
 
     @Override
     public Item getItemFast(int index) {
-        return this.slots.getOrDefault(index, air);
+        Item item = this.slots.getOrDefault(index, air);
+        if (item != air && !item.isNull() && item.getStackNetId() == 0) {
+            item.autoAssignStackNetworkId();
+        }
+        return item;
     }
 
     @Override
@@ -173,11 +202,47 @@ public abstract class BaseInventory implements Inventory {
         if (holder instanceof BlockEntity) {
             ((BlockEntity) holder).setDirty();
         }
+        // Server-Authoritative Inventory requires every non-empty stack to carry a
+        // positive stackNetworkId. Items created before SAI (e.g. loaded from NBT or
+        // spawned by plugins) may still have id==0, which Bedrock clients interpret as
+        // "empty slot" in ItemStackResponse packets and causes cursor/inventory desync.
+        if (!item.isNull() && item.getStackNetId() == 0) {
+            item.autoAssignStackNetworkId();
+        }
+
+        if (item instanceof ItemBundle bundle) {
+            ensureUniqueBundleId(index, bundle);
+        }
 
         Item old = this.getItem(index);
         this.slots.put(index, item.clone());
         this.onSlotChange(index, old, send);
         return true;
+    }
+
+    @Override
+    @ApiStatus.Internal
+    public void setItemForce(int index, Item item) {
+        if (index < 0 || index >= this.size) {
+            return;
+        }
+        Item old = this.getItem(index);
+        if (item == null || item.isNull() || item.getCount() <= 0) {
+            this.slots.remove(index);
+        } else {
+            if (item.getStackNetId() == 0) {
+                item.autoAssignStackNetworkId();
+            }
+            if (item instanceof ItemBundle bundle) {
+                ensureUniqueBundleId(index, bundle);
+            }
+            this.slots.put(index, item.clone());
+        }
+        InventoryHolder holder = this.getHolder();
+        if (holder instanceof BlockEntity) {
+            ((BlockEntity) holder).setDirty();
+        }
+        this.onSlotChange(index, old, false);
     }
 
     @Override
@@ -430,6 +495,32 @@ public abstract class BaseInventory implements Inventory {
         return holder;
     }
 
+    protected void ensureUniqueBundleId(int targetSlot, ItemBundle bundle) {
+        HashSet<Integer> existingBundleIds = new HashSet<>();
+        for (var entry : this.slots.entrySet()) {
+            if (entry.getKey() != targetSlot) {
+                collectBundleIds(entry.getValue(), existingBundleIds, new HashSet<>());
+            }
+        }
+        while (existingBundleIds.contains(bundle.getBundleId())) {
+            bundle.assignNewBundleId();
+        }
+    }
+
+    private void collectBundleIds(Item item, Set<Integer> bundleIds, Set<Integer> visitedBundleIds) {
+        if (!(item instanceof ItemBundle bundle)) {
+            return;
+        }
+        int currentId = bundle.getBundleId();
+        if (!visitedBundleIds.add(currentId)) {
+            return;
+        }
+        bundleIds.add(currentId);
+        for (Item nested : bundle.getInventory().getContents().values()) {
+            collectBundleIds(nested, bundleIds, visitedBundleIds);
+        }
+    }
+
     @Override
     public void setMaxStackSize(int maxStackSize) {
         this.maxStackSize = maxStackSize;
@@ -510,6 +601,7 @@ public abstract class BaseInventory implements Inventory {
                 continue;
             }
             pk.inventoryId = id;
+            pk.containerNameData = this.resolveFullContainerName(0, id);
             player.dataPacket(pk);
         }
     }
@@ -583,6 +675,7 @@ public abstract class BaseInventory implements Inventory {
                 return;
             }
             pk.inventoryId = id;
+            pk.containerNameData = this.resolveFullContainerName(index, id);
             player.dataPacket(pk);
         } else {
             ContainerSetSlotPacket_v113 pk = new ContainerSetSlotPacket_v113();
@@ -617,6 +710,7 @@ public abstract class BaseInventory implements Inventory {
             pk.inventoryId = id;
             pk2.windowid = id;
             if (player.protocol >= ProtocolInfo.v1_2_0) {
+                pk.containerNameData = this.resolveFullContainerName(index, id);
                 player.dataPacket(pk);
             } else {
                 player.dataPacket(pk2);
@@ -632,5 +726,64 @@ public abstract class BaseInventory implements Inventory {
     @Override
     public InventoryType getType() {
         return type;
+    }
+
+    protected FullContainerName resolveFullContainerName(int index) {
+        return new FullContainerName(resolveContainerSlotType(index), null);
+    }
+
+    protected FullContainerName resolveFullContainerName(int index, int dynamicId) {
+        return new FullContainerName(resolveContainerSlotType(index), dynamicId);
+    }
+
+    protected ContainerSlotType resolveContainerSlotType(int index) {
+        return switch (this.type) {
+            case PLAYER -> {
+                if (index < 9) {
+                    yield ContainerSlotType.HOTBAR;
+                }
+                if (index < 36) {
+                    yield ContainerSlotType.INVENTORY;
+                }
+                yield ContainerSlotType.ARMOR;
+            }
+            case OFFHAND -> ContainerSlotType.OFFHAND;
+            case ENTITY_ARMOR -> ContainerSlotType.ARMOR;
+            case BARREL -> ContainerSlotType.BARREL;
+            case SHULKER_BOX -> ContainerSlotType.SHULKER_BOX;
+            case FURNACE -> switch (index) {
+                case 0 -> ContainerSlotType.FURNACE_INGREDIENT;
+                case 1 -> ContainerSlotType.FURNACE_FUEL;
+                default -> ContainerSlotType.FURNACE_RESULT;
+            };
+            case BLAST_FURNACE -> switch (index) {
+                case 0 -> ContainerSlotType.BLAST_FURNACE_INGREDIENT;
+                case 1 -> ContainerSlotType.FURNACE_FUEL;
+                default -> ContainerSlotType.FURNACE_RESULT;
+            };
+            case SMOKER -> switch (index) {
+                case 0 -> ContainerSlotType.SMOKER_INGREDIENT;
+                case 1 -> ContainerSlotType.FURNACE_FUEL;
+                default -> ContainerSlotType.FURNACE_RESULT;
+            };
+            case BREWING_STAND -> {
+                if (index == 0) {
+                    yield ContainerSlotType.BREWING_INPUT;
+                }
+                if (index == 4) {
+                    yield ContainerSlotType.BREWING_FUEL;
+                }
+                yield ContainerSlotType.BREWING_RESULT;
+            }
+            case BEACON -> ContainerSlotType.BEACON_PAYMENT;
+            case TRADING -> switch (index) {
+                case 0 -> ContainerSlotType.TRADE2_INGREDIENT_1;
+                case 1 -> ContainerSlotType.TRADE2_INGREDIENT_2;
+                default -> ContainerSlotType.TRADE2_RESULT;
+            };
+            case HORSE -> index <= HorseInventory.SLOT_ARMOR ? ContainerSlotType.HORSE_EQUIP : ContainerSlotType.LEVEL_ENTITY;
+            case UI -> ContainerSlotType.CRAFTING_INPUT;
+            default -> ContainerSlotType.LEVEL_ENTITY;
+        };
     }
 }
