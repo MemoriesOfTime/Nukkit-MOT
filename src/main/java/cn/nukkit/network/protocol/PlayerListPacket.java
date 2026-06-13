@@ -33,7 +33,7 @@ public class PlayerListPacket extends DataPacket {
         switch (type) {
             case TYPE_ADD:
                 for (Entry entry : this.entries) {
-if (protocol >= ProtocolInfo.v1_2_13) {
+                    if (protocol >= ProtocolInfo.v1_2_13) {
                         this.putUUID(entry.uuid);
                     }
                     this.putVarLong(entry.entityId);
