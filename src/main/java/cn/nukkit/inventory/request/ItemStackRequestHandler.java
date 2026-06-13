@@ -89,9 +89,10 @@ public final class ItemStackRequestHandler {
                         (ItemStackRequestActionProcessor<ItemStackRequestAction>) PROCESSORS.get(action.getType());
 
                 if (processor == null) {
+                    // 未注册/未实现的 action 类型静默跳过，继续处理同一请求内的后续 action，
+                    // 单条 action 不应令整条 request 失败。
                     log.warn("{}: unhandled item stack request action {}", player.getName(), action.getType());
-                    error = true;
-                    break;
+                    continue;
                 }
 
                 try {

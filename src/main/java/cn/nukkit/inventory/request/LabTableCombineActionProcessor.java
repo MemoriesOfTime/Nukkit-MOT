@@ -13,6 +13,8 @@ public class LabTableCombineActionProcessor implements ItemStackRequestActionPro
 
     @Override
     public ActionResponse handle(LabTableCombineAction action, Player player, ItemStackRequestContext context) {
-        return context.error();
+        // 实验台（教育版）合成 action，服务端未实现。返回 null 表示静默跳过：
+        // 不产出响应、不判定为错误，避免中断整条 request，
+        return null;
     }
 }

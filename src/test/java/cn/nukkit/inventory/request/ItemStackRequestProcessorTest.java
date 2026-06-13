@@ -815,6 +815,28 @@ class ItemStackRequestProcessorTest {
     }
 
     @Test
+    void unimplementedActionsAreSkippedInsteadOfFailingRequest() {
+        Player player = mockPlayer();
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(player.getServer().getPluginManager()).thenReturn(pluginManager);
+
+        // CraftNonImplemented / LabTableCombine 是占位/未实现的 action 类型，
+        // 必须被静默跳过而非令整条 request 失败。
+        // 仅含这类 action 的请求应返回 OK。
+        ItemStackRequest request = new ItemStackRequest(
+                11,
+                new ItemStackRequestAction[]{new CraftNonImplementedAction(), new LabTableCombineAction()},
+                new String[0]
+        );
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.OK, response.entries.get(0).getResult(),
+                "deprecated/unimplemented actions must be skipped, not treated as request errors");
+    }
+
+    @Test
     void tagDescriptorsMatchRegisteredItemTags() {
         Item planks = Mockito.mock(Item.class);
         Mockito.when(planks.isNull()).thenReturn(false);

@@ -13,6 +13,8 @@ public class CraftNonImplementedActionProcessor implements ItemStackRequestActio
 
     @Override
     public ActionResponse handle(CraftNonImplementedAction action, Player player, ItemStackRequestContext context) {
-        return context.error();
+        // 协议占位/no-op action（老协议下还会承接映射歧义的若干真实 action）。
+        // 返回 null 表示静默跳过：不产出响应、不判定为错误，避免中断整条 request，
+        return null;
     }
 }
