@@ -12,9 +12,9 @@ import cn.nukkit.item.Item;
 import java.util.ArrayList;
 import java.util.List;
 
-final class CraftingEventV113Adapter {
+final class CraftingEvent_v113Adapter {
 
-    private CraftingEventV113Adapter() {
+    private CraftingEvent_v113Adapter() {
     }
 
     static boolean execute(Player player, CraftingRecipe recipe, Item requestedOutput) {

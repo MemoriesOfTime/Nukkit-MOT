@@ -26,7 +26,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 
-class CraftingEventV113AdapterTest {
+class CraftingEvent_v113AdapterTest {
 
     private CraftingManager craftingManager;
 
@@ -50,7 +50,7 @@ class CraftingEventV113AdapterTest {
 
         Mockito.lenient().when(craftingManager.matchRecipe(any(), any(), any())).thenReturn(recipe);
 
-        assertFalse(CraftingEventV113Adapter.execute(player, recipe, recipe.getResult()));
+        assertFalse(CraftingEvent_v113Adapter.execute(player, recipe, recipe.getResult()));
         assertTrue(player.getInventory().contains(Item.get(BlockID.LOG)));
         assertFalse(player.getInventory().contains(Item.get(BlockID.PLANKS, 0, 4)));
     }
@@ -87,7 +87,7 @@ class CraftingEventV113AdapterTest {
 
         Mockito.lenient().when(craftingManager.matchRecipe(any(), any(), any())).thenReturn(recipe);
 
-        assertFalse(CraftingEventV113Adapter.execute(player, recipe, recipe.getResult()));
+        assertFalse(CraftingEvent_v113Adapter.execute(player, recipe, recipe.getResult()));
         assertFalse(player.getInventory().contains(Item.get(ItemID.DIAMOND)));
     }
 
@@ -99,7 +99,7 @@ class CraftingEventV113AdapterTest {
 
         Mockito.lenient().when(craftingManager.matchRecipe(any(), any(), any())).thenReturn(recipe);
 
-        assertTrue(CraftingEventV113Adapter.execute(player, recipe, recipe.getResult()));
+        assertTrue(CraftingEvent_v113Adapter.execute(player, recipe, recipe.getResult()));
         assertEquals(Item.AIR, player.getCraftingGrid().getItem(0).getId());
         assertTrue(player.getInventory().contains(Item.get(BlockID.PLANKS, 0, 4)));
     }

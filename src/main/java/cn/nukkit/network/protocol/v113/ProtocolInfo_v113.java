@@ -4,7 +4,7 @@ package cn.nukkit.network.protocol.v113;
  * author: MagicDroidX & iNevet
  * Nukkit Project
  */
-public interface ProtocolInfoV113 {
+public interface ProtocolInfo_v113 {
 
     byte LOGIN_PACKET = 0x01;
     byte PLAY_STATUS_PACKET = 0x02;

@@ -4,13 +4,13 @@ import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.data.CommandParameter;
-import cn.nukkit.command.data.v113.CommandArg;
-import cn.nukkit.command.data.v113.CommandArgBlockVector;
+import cn.nukkit.command.data.v113.CommandArgBlockVector_v113;
+import cn.nukkit.command.data.v113.CommandArg_v113;
 import cn.nukkit.event.player.PlayerCommandPreprocessEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.v113.CommandStepPacketV113;
+import cn.nukkit.network.protocol.v113.CommandStepPacket_v113;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonSyntaxException;
@@ -19,14 +19,14 @@ import org.jetbrains.annotations.NotNull;
 /**
  * @author LT_Name
  */
-public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPacketV113> {
+public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPacket_v113> {
 
     private static final Gson GSON = new Gson();
 
     public static final CommandStepProcessor_v113 INSTANCE = new CommandStepProcessor_v113();
 
     @Override
-    public void handle(@NotNull PlayerHandle playerHandle, @NotNull CommandStepPacketV113 pk) {
+    public void handle(@NotNull PlayerHandle playerHandle, @NotNull CommandStepPacket_v113 pk) {
         Player player = playerHandle.player;
         if (!player.spawned || !player.isAlive()) {
             return;
@@ -45,13 +45,13 @@ public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPa
                             try {
                                 switch (par.type) {
                                     case TARGET:
-                                        CommandArg rules = GSON.fromJson(arg, CommandArg.class);
+                                        CommandArg_v113 rules = GSON.fromJson(arg, CommandArg_v113.class);
                                         if (rules != null && rules.getRules() != null && rules.getRules().length > 0) {
                                             commandText.append(" ").append(rules.getRules()[0].getValue());
                                         }
                                         break;
                                     case BLOCK_POSITION:
-                                        CommandArgBlockVector bv = GSON.fromJson(arg, CommandArgBlockVector.class);
+                                        CommandArgBlockVector_v113 bv = GSON.fromJson(arg, CommandArgBlockVector_v113.class);
                                         if (bv != null) {
                                             commandText.append(" ").append(bv.getX()).append(" ").append(bv.getY()).append(" ").append(bv.getZ());
                                         }
@@ -90,12 +90,12 @@ public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPa
 
     @Override
     public int getPacketId() {
-        return ProtocolInfo.toNewProtocolID(CommandStepPacketV113.NETWORK_ID);
+        return ProtocolInfo.toNewProtocolID(CommandStepPacket_v113.NETWORK_ID);
     }
 
     @Override
     public Class<? extends DataPacket> getPacketClass() {
-        return CommandStepPacketV113.class;
+        return CommandStepPacket_v113.class;
     }
 
     @Override

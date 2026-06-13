@@ -1,6 +1,6 @@
 package cn.nukkit.command.data.v113;
 
-public class CommandArgBlockVector {
+public class CommandArgBlockVector_v113 {
 
     private int x;
     private int y;

@@ -7,8 +7,8 @@ import cn.nukkit.network.protocol.DataPacket;
  * author: MagicDroidX
  * Nukkit Project
  */
-public class ContainerSetContentPacketV113 extends DataPacket_v113 {
-    public static final byte NETWORK_ID = ProtocolInfoV113.CONTAINER_SET_CONTENT_PACKET;
+public class ContainerSetContentPacket_v113 extends DataPacket_v113 {
+    public static final byte NETWORK_ID = ProtocolInfo_v113.CONTAINER_SET_CONTENT_PACKET;
 
     @Override
     public byte pid() {
@@ -72,8 +72,8 @@ public class ContainerSetContentPacketV113 extends DataPacket_v113 {
     }
 
     @Override
-    public ContainerSetContentPacketV113 clone() {
-        ContainerSetContentPacketV113 pk = (ContainerSetContentPacketV113) super.clone();
+    public ContainerSetContentPacket_v113 clone() {
+        ContainerSetContentPacket_v113 pk = (ContainerSetContentPacket_v113) super.clone();
         pk.slots = this.slots.clone();
         return pk;
     }

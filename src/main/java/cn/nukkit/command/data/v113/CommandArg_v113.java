@@ -1,11 +1,11 @@
 package cn.nukkit.command.data.v113;
 
-public class CommandArg {
+public class CommandArg_v113 {
 
-    private CommandArgRules[] rules;
+    private CommandArgRules_v113[] rules;
     private String selector;
 
-    public CommandArgRules[] getRules() {
+    public CommandArgRules_v113[] getRules() {
         return rules;
     }
 

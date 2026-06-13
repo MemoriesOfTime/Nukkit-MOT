@@ -1,6 +1,6 @@
 package cn.nukkit.command.data.v113;
 
-public class CommandArgRules {
+public class CommandArgRules_v113 {
 
     private boolean inverted;
     private String name;

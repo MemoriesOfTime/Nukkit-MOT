@@ -94,7 +94,7 @@ public class CraftingEventProcessor_v113 extends DataPacketProcessor<CraftingEve
         }
 
         Item requestedOutput = pk.output != null && pk.output.length > 0 ? pk.output[0] : null;
-        if (!CraftingEventV113Adapter.execute(player, recipe, requestedOutput)) {
+        if (!CraftingEvent_v113Adapter.execute(player, recipe, requestedOutput)) {
             Server.getInstance().getLogger().debug("Invalid crafting event " + pk.id + " from player " + player.getName());
             player.getInventory().sendContents(player);
             if (player.getCraftingGrid() != null) {

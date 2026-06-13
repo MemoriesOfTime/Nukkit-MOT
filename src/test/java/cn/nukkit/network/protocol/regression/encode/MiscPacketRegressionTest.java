@@ -11,7 +11,7 @@ import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.MovementEffectType;
 import cn.nukkit.network.protocol.types.ServerAuthMovementMode;
-import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import org.junit.jupiter.api.BeforeAll;
@@ -291,10 +291,10 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
 
     @Test
     void testContainerSetContentPacketLegacy113MatchesGenisysProEntityIdEncoding() {
-        var nukkitPacket = new ContainerSetContentPacketV113();
+        var nukkitPacket = new ContainerSetContentPacket_v113();
         nukkitPacket.protocol = LEGACY_PROTOCOL_113;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
-        nukkitPacket.windowid = ContainerSetContentPacketV113.SPECIAL_INVENTORY;
+        nukkitPacket.windowid = ContainerSetContentPacket_v113.SPECIAL_INVENTORY;
         nukkitPacket.eid = 11;
         nukkitPacket.slots = cn.nukkit.item.Item.EMPTY_ARRAY;
         nukkitPacket.hotbar = new int[0];
@@ -304,13 +304,13 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
 
     @Test
     void testContainerSetContentPacketLegacy113DecodesLegacyEntityIdEncoding() {
-        var nukkitPacket = new ContainerSetContentPacketV113();
+        var nukkitPacket = new ContainerSetContentPacket_v113();
         nukkitPacket.protocol = LEGACY_PROTOCOL_113;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
         nukkitPacket.setBuffer(Binary.hexStringToBytes(LEGACY_113_CONTAINER_SET_CONTENT_HEX));
         nukkitPacket.decode();
 
-        assertEquals(ContainerSetContentPacketV113.SPECIAL_INVENTORY, nukkitPacket.windowid);
+        assertEquals(ContainerSetContentPacket_v113.SPECIAL_INVENTORY, nukkitPacket.windowid);
         assertEquals(11, nukkitPacket.eid);
         assertEquals(0, nukkitPacket.slots.length);
         assertEquals(0, nukkitPacket.hotbar.length);

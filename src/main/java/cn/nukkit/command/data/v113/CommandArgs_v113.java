@@ -4,5 +4,5 @@ import com.google.gson.JsonElement;
 
 import java.util.HashMap;
 
-public class CommandArgsV113 extends HashMap<String, JsonElement> {
+public class CommandArgs_v113 extends HashMap<String, JsonElement> {
 }

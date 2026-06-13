@@ -11,7 +11,7 @@ import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -37,12 +37,12 @@ class PlayerLegacyLoginInventoryTest {
         player.runFirstSpawn();
 
         int inventoryWindowId = player.getWindowId(inventory);
-        ContainerSetContentPacketV113 inventoryPacket = player.findContentPacket(inventoryWindowId);
+        ContainerSetContentPacket_v113 inventoryPacket = player.findContentPacket(inventoryWindowId);
         assertNotNull(inventoryPacket);
         assertEquals(ItemID.DIAMOND, inventoryPacket.slots[0].getId());
         assertEquals(3, inventoryPacket.slots[0].getCount());
 
-        ContainerSetContentPacketV113 armorPacket = player.findContentPacket(ContainerSetContentPacketV113.SPECIAL_ARMOR);
+        ContainerSetContentPacket_v113 armorPacket = player.findContentPacket(ContainerSetContentPacket_v113.SPECIAL_ARMOR);
         assertNotNull(armorPacket);
         assertEquals(ItemID.IRON_HELMET, armorPacket.slots[0].getId());
 
@@ -93,10 +93,10 @@ class PlayerLegacyLoginInventoryTest {
             this.doFirstSpawn();
         }
 
-        private ContainerSetContentPacketV113 findContentPacket(int windowId) {
+        private ContainerSetContentPacket_v113 findContentPacket(int windowId) {
             return this.sentPackets.stream()
-                    .filter(ContainerSetContentPacketV113.class::isInstance)
-                    .map(ContainerSetContentPacketV113.class::cast)
+                    .filter(ContainerSetContentPacket_v113.class::isInstance)
+                    .map(ContainerSetContentPacket_v113.class::cast)
                     .filter(packet -> packet.windowid == windowId)
                     .findFirst()
                     .orElse(null);
