@@ -218,7 +218,13 @@ public class AddEntityPacket extends DataPacket {
             this.putVector3f(this.speedX, this.speedY, this.speedZ);
             this.putLFloat(this.pitch * (256f / 360f));
             this.putLFloat(this.yaw * (256f / 360f));
-            this.putLegacyAttributeList();
+            this.putUnsignedVarInt(this.attributes.length);
+            for (Attribute attribute : this.attributes) {
+                this.putString(attribute.getName());
+                this.putLFloat(attribute.getMinValue());
+                this.putLFloat(attribute.getValue());
+                this.putLFloat(attribute.getMaxValue());
+            }
             this.put(Binary.writeMetadata(gameVersion, this.metadata));
             this.putUnsignedVarInt(this.links.length);
             for (EntityLink link : links) {
@@ -265,16 +271,6 @@ public class AddEntityPacket extends DataPacket {
         this.putUnsignedVarInt(this.links.length);
         for (EntityLink link : links) {
             putEntityLink(protocol, link);
-        }
-    }
-
-    private void putLegacyAttributeList() {
-        this.putUnsignedVarInt(this.attributes.length);
-        for (Attribute attribute : this.attributes) {
-            this.putString(attribute.getName());
-            this.putLFloat(attribute.getMinValue());
-            this.putLFloat(attribute.getValue());
-            this.putLFloat(attribute.getMaxValue());
         }
     }
 
