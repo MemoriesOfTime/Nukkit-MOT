@@ -29,14 +29,103 @@ class NetworkMappingTest {
     }
 
     @Test
-    void levelEntityAndCrafterContainerResolveToTopWindow() {
+    void levelEntityResolvesToTopWindow() {
         Player player = Mockito.mock(Player.class);
         Inventory topWindow = Mockito.mock(Inventory.class);
 
         Mockito.when(player.getTopWindow()).thenReturn(Optional.of(topWindow));
 
+        // LEVEL_ENTITY is a catch-all (chest/hopper/dispenser/...) and intentionally
+        // returns the open window without a type check.
         assertSame(topWindow, NetworkMapping.getInventory(player, ContainerSlotType.LEVEL_ENTITY, null));
-        assertSame(topWindow, NetworkMapping.getInventory(player, ContainerSlotType.CRAFTER_BLOCK_CONTAINER, null));
+    }
+
+    @Test
+    void typedContainerSlotsRejectMismatchedTopWindow() {
+        Player player = Mockito.mock(Player.class);
+        // topWindow is a barrel, but the client claims furnace/brewing/shulker/crafter/trade slots.
+        Inventory barrel = Mockito.mock(BarrelInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(barrel));
+
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.FURNACE_INGREDIENT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.FURNACE_FUEL, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.BLAST_FURNACE_INGREDIENT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.SMOKER_INGREDIENT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.BREWING_INPUT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.BREWING_FUEL, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.SHULKER_BOX, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.CRAFTER_BLOCK_CONTAINER, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.TRADE_INGREDIENT_1, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.TRADE2_RESULT, null));
+    }
+
+    @Test
+    void typedContainerSlotsResolveWhenTopWindowMatches() {
+        Player player = Mockito.mock(Player.class);
+
+        FurnaceInventory furnace = Mockito.mock(FurnaceInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(furnace));
+        assertSame(furnace, NetworkMapping.getInventory(player, ContainerSlotType.FURNACE_INGREDIENT, null));
+        assertSame(furnace, NetworkMapping.getInventory(player, ContainerSlotType.FURNACE_FUEL, null));
+        assertSame(furnace, NetworkMapping.getInventory(player, ContainerSlotType.FURNACE_RESULT, null));
+
+        // BlastFurnaceInventory / SmokerInventory extend FurnaceInventory, so a single
+        // instanceof check covers all three furnace variants.
+        BlastFurnaceInventory blast = Mockito.mock(BlastFurnaceInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(blast));
+        assertSame(blast, NetworkMapping.getInventory(player, ContainerSlotType.BLAST_FURNACE_INGREDIENT, null));
+
+        SmokerInventory smoker = Mockito.mock(SmokerInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(smoker));
+        assertSame(smoker, NetworkMapping.getInventory(player, ContainerSlotType.SMOKER_INGREDIENT, null));
+
+        BrewingInventory brewing = Mockito.mock(BrewingInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(brewing));
+        assertSame(brewing, NetworkMapping.getInventory(player, ContainerSlotType.BREWING_INPUT, null));
+
+        ShulkerBoxInventory shulker = Mockito.mock(ShulkerBoxInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(shulker));
+        assertSame(shulker, NetworkMapping.getInventory(player, ContainerSlotType.SHULKER_BOX, null));
+
+        BarrelInventory barrel = Mockito.mock(BarrelInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(barrel));
+        assertSame(barrel, NetworkMapping.getInventory(player, ContainerSlotType.BARREL, null));
+
+        CrafterInventory crafter = Mockito.mock(CrafterInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(crafter));
+        assertSame(crafter, NetworkMapping.getInventory(player, ContainerSlotType.CRAFTER_BLOCK_CONTAINER, null));
+
+        TradeInventory trade = Mockito.mock(TradeInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(trade));
+        assertSame(trade, NetworkMapping.getInventory(player, ContainerSlotType.TRADE_INGREDIENT_1, null));
+        assertSame(trade, NetworkMapping.getInventory(player, ContainerSlotType.TRADE2_RESULT, null));
+    }
+
+    @Test
+    void typedContainerSlotsRejectNullTopWindow() {
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.FURNACE_INGREDIENT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.BARREL, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.SHULKER_BOX, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.CRAFTER_BLOCK_CONTAINER, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.TRADE_INGREDIENT_1, null));
+    }
+
+    @Test
+    void educationEditionSlotsReturnNullRegardlessOfTopWindow() {
+        Player player = Mockito.mock(Player.class);
+        Inventory topWindow = Mockito.mock(Inventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(topWindow));
+
+        // MOT does not implement education-edition chemistry containers.
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.COMPOUND_CREATOR_INPUT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.COMPOUND_CREATOR_OUTPUT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.MATERIAL_REDUCER_INPUT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.MATERIAL_REDUCER_OUTPUT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.LAB_TABLE_INPUT, null));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.ELEMENT_CONSTRUCTOR_OUTPUT, null));
     }
 
     @Test

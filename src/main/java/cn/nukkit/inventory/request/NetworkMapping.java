@@ -60,21 +60,41 @@ public final class NetworkMapping {
             case CARTOGRAPHY_INPUT, CARTOGRAPHY_ADDITIONAL, CARTOGRAPHY_RESULT ->
                     topWindow instanceof CartographyTableInventory ? topWindow : null;
             case BEACON_PAYMENT -> player.getWindowById(Player.BEACON_WINDOW_ID);
+            // 教育版化学桌容器在 MOT 中未实现（无对应 Inventory 子类，
+            // LabTableCombine 处理器为空壳），返回 null 拒绝任何针对这些槽类型的操作。
             case COMPOUND_CREATOR_INPUT, COMPOUND_CREATOR_OUTPUT,
                  ELEMENT_CONSTRUCTOR_OUTPUT,
                  MATERIAL_REDUCER_INPUT, MATERIAL_REDUCER_OUTPUT,
-                 LAB_TABLE_INPUT -> topWindow;
+                 LAB_TABLE_INPUT -> null;
             case TRADE_INGREDIENT_1, TRADE_INGREDIENT_2, TRADE_RESULT,
                  TRADE2_INGREDIENT_1, TRADE2_INGREDIENT_2, TRADE2_RESULT ->
-                    topWindow;
+                    typedContainer(topWindow, TradeInventory.class);
             case FURNACE_FUEL, FURNACE_INGREDIENT, FURNACE_RESULT,
-                 BLAST_FURNACE_INGREDIENT, SMOKER_INGREDIENT,
-                 BREWING_INPUT, BREWING_RESULT, BREWING_FUEL,
-                 SHULKER_BOX, BARREL,
-                 LEVEL_ENTITY, CRAFTER_BLOCK_CONTAINER -> topWindow;
+                 BLAST_FURNACE_INGREDIENT, SMOKER_INGREDIENT ->
+                    typedContainer(topWindow, FurnaceInventory.class);
+            case BREWING_INPUT, BREWING_RESULT, BREWING_FUEL ->
+                    typedContainer(topWindow, BrewingInventory.class);
+            case SHULKER_BOX -> typedContainer(topWindow, ShulkerBoxInventory.class);
+            case BARREL -> typedContainer(topWindow, BarrelInventory.class);
+            case CRAFTER_BLOCK_CONTAINER -> typedContainer(topWindow, CrafterInventory.class);
+            // LEVEL_ENTITY 是 chest/hopper/dispenser/dropper/ender chest 等多种
+            // 方块实体容器的共用泛化槽类型，无法精确校验窗口类型，保留返回 topWindow。
+            case LEVEL_ENTITY -> topWindow;
             case DYNAMIC_CONTAINER -> resolveDynamicContainer(player, dynamicId);
             default -> null;
         };
+    }
+
+    /**
+     * Return {@code topWindow} only when it is an instance of the expected inventory
+     * class. A null return (no window open, or a window of an unrelated type) lets
+     * callers translate the result into an error response, so a client-reported
+     * {@link ContainerSlotType} cannot operate on a mismatched inventory. Mirrors the
+     * inline defensive check used for the cartography-table branch.
+     */
+    @Nullable
+    private static Inventory typedContainer(@Nullable Inventory topWindow, Class<? extends Inventory> expected) {
+        return expected.isInstance(topWindow) ? topWindow : null;
     }
 
     private static boolean isSlotTypeCompatibleWithFakeUI(FakeBlockUIComponent fakeUI, ContainerSlotType type) {
