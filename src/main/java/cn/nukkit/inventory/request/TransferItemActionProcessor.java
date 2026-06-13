@@ -58,7 +58,21 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         if (sourceItem.isNull() || sourceItem.getCount() < count) {
             return context.error();
         }
-        if (validateStackNetworkId(sourceItem.getStackNetId(), src.getStackNetworkId())) {
+
+        boolean fullTransfer = sourceItem.getCount() == count;
+        boolean srcIsCreatedOutput = isCreatedOutput(srcInv, srcSlot);
+        boolean creativeCreatedOutputTransfer = player.isCreative()
+                && srcIsCreatedOutput
+                && Boolean.TRUE.equals(context.get(CraftCreativeActionProcessor.CRAFT_CREATIVE_KEY));
+
+        // Creative item creation writes a server-allocated stackNetworkId into CREATED_OUTPUT
+        // (CraftCreativeActionProcessor returns no response), so the client's source-slot
+        // stackNetworkId for the follow-up PLACE/TAKE is its own prediction and will not match
+        // the server's id. Validating it here would reject every creative take — the items would
+        // appear then vanish as the request is rolled back. Skip the source-id check on the
+        // creative CREATED_OUTPUT transfer path and rely on the count/item checks above.
+        if (!creativeCreatedOutputTransfer
+                && validateStackNetworkId(sourceItem.getStackNetId(), src.getStackNetworkId())) {
             return context.error();
         }
 
@@ -67,11 +81,6 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             return context.error();
         }
 
-        boolean fullTransfer = sourceItem.getCount() == count;
-        boolean srcIsCreatedOutput = isCreatedOutput(srcInv, srcSlot);
-        boolean creativeCreatedOutputTransfer = player.isCreative()
-                && srcIsCreatedOutput
-                && Boolean.TRUE.equals(context.get(CraftCreativeActionProcessor.CRAFT_CREATIVE_KEY));
         if (creativeCreatedOutputTransfer) {
             return transferCreativeCreatedOutput(action, player, context, srcInv, srcSlot, dstInv, dstSlot,
                     sourceItem, destItem, fullTransfer);

@@ -68,6 +68,227 @@ class ItemStackRequestProcessorTest {
     }
 
     @Test
+    void creativeTakeThroughFullHandlerEndsUpInPlayerInventory() {
+        Player player = mockPlayer();
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getGameVersion()).thenReturn(GameVersion.V1_21_130);
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+        Mockito.when(MockServer.get().getPluginManager()).thenReturn(pluginManager);
+
+        List<Item> creativeItems = Item.getCreativeItems(GameVersion.V1_21_130);
+        int creativeIndex = -1;
+        for (int i = 0; i < creativeItems.size(); i++) {
+            if (creativeItems.get(i).getMaxStackSize() > 1) {
+                creativeIndex = i;
+                break;
+            }
+        }
+        assertTrue(creativeIndex >= 0, "creative catalog should contain stackable items");
+        Item expected = creativeItems.get(creativeIndex);
+
+        // 模拟真实创造拿物品流程: CraftCreative (写 CREATED_OUTPUT) -> Place (移到 hotbar 0)
+        CraftCreativeAction craft = new CraftCreativeAction(creativeIndex + 1, 0);
+        PlaceAction place = new PlaceAction(
+                expected.getMaxStackSize(),
+                new ItemStackRequestSlotData(ContainerSlotType.CREATED_OUTPUT,
+                        PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, 0, null),
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, 0, null)
+        );
+        ItemStackRequest request = new ItemStackRequest(
+                12, new ItemStackRequestAction[]{craft, place}, new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        assertEquals(expected.getId(), inventory.getItem(0).getId(), "creative item should reach hotbar slot 0");
+        assertEquals(expected.getMaxStackSize(), inventory.getItem(0).getCount(),
+                "creative item should keep its full stack count");
+        assertTrue(ui.getItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT).isNull(),
+                "CREATED_OUTPUT should be cleared after the transfer");
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.OK, response.entries.get(0).getResult(),
+                "creative take request should succeed");
+    }
+
+    @Test
+    void creativeTakeToOccupiedDifferentItemSlotFails() {
+        Player player = mockPlayer();
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getGameVersion()).thenReturn(GameVersion.V1_21_130);
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+        Mockito.when(MockServer.get().getPluginManager()).thenReturn(pluginManager);
+
+        // hotbar 0 已被不同物品(泥土)占据
+        Item occupied = Item.get(Item.DIRT, 0, 5);
+        occupied.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, occupied, false));
+
+        List<Item> creativeItems = Item.getCreativeItems(GameVersion.V1_21_130);
+        int creativeIndex = -1;
+        for (int i = 0; i < creativeItems.size(); i++) {
+            if (creativeItems.get(i).getMaxStackSize() > 1) {
+                creativeIndex = i;
+                break;
+            }
+        }
+        assertTrue(creativeIndex >= 0);
+        Item expected = creativeItems.get(creativeIndex);
+
+        CraftCreativeAction craft = new CraftCreativeAction(creativeIndex + 1, 0);
+        PlaceAction place = new PlaceAction(
+                expected.getMaxStackSize(),
+                new ItemStackRequestSlotData(ContainerSlotType.CREATED_OUTPUT,
+                        PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, 0, null),
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, occupied.getStackNetId(), null)
+        );
+        ItemStackRequest request = new ItemStackRequest(
+                13, new ItemStackRequestAction[]{craft, place}, new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        assertEquals(expected.getId(), inventory.getItem(0).getId(),
+                "creative item should overwrite the occupied slot (creative uses transferCreativeCreatedOutput)");
+        assertEquals(expected.getMaxStackSize(), inventory.getItem(0).getCount());
+        assertTrue(ui.getItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT).isNull());
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.OK, response.entries.get(0).getResult());
+    }
+
+    @Test
+    void creativeTakeWithClientPredictedSourceNetIdStillSucceeds() {
+        // 真实 Bedrock 客户端在 CraftCreative 后,PlaceAction 的 source(CREATED_OUTPUT)
+        // 携带的 stackNetworkId 是客户端预测值,与服务端 autoAssignStackNetworkId 分配的不一致。
+        // 如果 validateStackNetworkId 因此拒绝,就会 error -> 回滚 -> 物品闪现后消失。
+        Player player = mockPlayer();
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getGameVersion()).thenReturn(GameVersion.V1_21_130);
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+        Mockito.when(MockServer.get().getPluginManager()).thenReturn(pluginManager);
+
+        List<Item> creativeItems = Item.getCreativeItems(GameVersion.V1_21_130);
+        int creativeIndex = -1;
+        for (int i = 0; i < creativeItems.size(); i++) {
+            if (creativeItems.get(i).getMaxStackSize() > 1) {
+                creativeIndex = i;
+                break;
+            }
+        }
+        assertTrue(creativeIndex >= 0);
+        Item expected = creativeItems.get(creativeIndex);
+
+        CraftCreativeAction craft = new CraftCreativeAction(creativeIndex + 1, 0);
+        // 客户端 source stackNetworkId = 客户端预测值(非零,与服务端分配的不同)
+        PlaceAction place = new PlaceAction(
+                expected.getMaxStackSize(),
+                new ItemStackRequestSlotData(ContainerSlotType.CREATED_OUTPUT,
+                        PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, 123456, null),
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, 0, null)
+        );
+        ItemStackRequest request = new ItemStackRequest(
+                14, new ItemStackRequestAction[]{craft, place}, new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        assertEquals(expected.getId(), inventory.getItem(0).getId(),
+                "creative item should reach hotbar even when client source netId differs from server");
+        assertEquals(expected.getMaxStackSize(), inventory.getItem(0).getCount());
+        assertTrue(ui.getItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT).isNull());
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.OK, response.entries.get(0).getResult(),
+                "creative take with client-predicted source netId should not be rejected");
+    }
+
+    @Test
+    void creativeTakeToCursorSurvivesSnapshotRollback() {
+        // 复现用户报告的核心症状:开启 SAI 后点击创造背包物品,光标短暂持有后被清空。
+        // 根因: CraftCreative 写入 CREATED_OUTPUT 的服务端 stackNetId 不回传客户端,
+        // 后续 PLACE 到 CURSOR 的源 stackNetId 失配 -> validateStackNetworkId 拒绝 ->
+        // 回滚把光标清空。目标为 CURSOR 时 dstInv 经 canonicalizeInventory 归并到 UI 库存,
+        // 也会被纳入快照回滚,故必须用真实光标验证。
+        Player player = mockPlayer();
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getGameVersion()).thenReturn(GameVersion.V1_21_130);
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+        Mockito.when(MockServer.get().getPluginManager()).thenReturn(pluginManager);
+
+        List<Item> creativeItems = Item.getCreativeItems(GameVersion.V1_21_130);
+        int creativeIndex = -1;
+        for (int i = 0; i < creativeItems.size(); i++) {
+            if (creativeItems.get(i).getMaxStackSize() > 1) {
+                creativeIndex = i;
+                break;
+            }
+        }
+        assertTrue(creativeIndex >= 0);
+        Item expected = creativeItems.get(creativeIndex);
+
+        CraftCreativeAction craft = new CraftCreativeAction(creativeIndex + 1, 0);
+        // 目标为 CURSOR(客户端真实点击创造物品后的拾取动作);source stackNetworkId 为客户端预测值
+        PlaceAction place = new PlaceAction(
+                expected.getMaxStackSize(),
+                new ItemStackRequestSlotData(ContainerSlotType.CREATED_OUTPUT,
+                        PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, 123456, null),
+                new ItemStackRequestSlotData(ContainerSlotType.CURSOR, 0, 0, null)
+        );
+        ItemStackRequest request = new ItemStackRequest(
+                15, new ItemStackRequestAction[]{craft, place}, new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        Item cursor = player.getCursorInventory().getItem(0);
+        assertEquals(expected.getId(), cursor.getId(),
+                "creative item should be held by cursor, not cleared by rollback");
+        assertEquals(expected.getMaxStackSize(), cursor.getCount());
+        assertTrue(ui.getItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT).isNull());
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.OK, response.entries.get(0).getResult(),
+                "creative take to cursor should succeed");
+    }
+
+    @Test
     void creativeCraftWithZeroRequestedCountCreatesFullStack() {
         Player player = mockPlayer();
         PlayerUIInventory ui = new PlayerUIInventory(player);
@@ -95,6 +316,63 @@ class ItemStackRequestProcessorTest {
         assertEquals(expected.getId(), created.getId());
         assertEquals(expected.getMaxStackSize(), created.getCount());
         assertTrue(created.getStackNetId() > 0);
+    }
+
+    @Test
+    void creativeCreatedOutputUsesMaxStackRegardlessOfRequestedCrafts() {
+        // 回归测试：真实客户端从创造背包拿可堆叠物品时,CraftCreative 的 numberOfRequestedCrafts
+        // 可能是任意值（部分客户端传 1），但客户端随后的 PLACE/DROP 请求会带整堆数量(maxStackSize)。
+        // 若 CraftCreative 按 numberOfRequestedCrafts 写入更小数量,doTransfer 的 count 校验就会失败
+        // -> 请求 error -> 回滚清空光标（"光标短暂持有后被清"）。
+        // 因此 CREATED_OUTPUT 必须始终写入 maxStackSize。
+        Player player = mockPlayer();
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getGameVersion()).thenReturn(GameVersion.V1_21_130);
+        Mockito.when(player.getWindowId(inventory)).thenReturn(0);
+        Mockito.when(player.getWindowId(ui)).thenReturn(0);
+        Mockito.when(player.getWindowId(offhand)).thenReturn(0);
+        Mockito.when(MockServer.get().getPluginManager()).thenReturn(pluginManager);
+
+        List<Item> creativeItems = Item.getCreativeItems(GameVersion.V1_21_130);
+        int creativeIndex = -1;
+        for (int i = 0; i < creativeItems.size(); i++) {
+            if (creativeItems.get(i).getMaxStackSize() > 1) {
+                creativeIndex = i;
+                break;
+            }
+        }
+        assertTrue(creativeIndex >= 0);
+        Item expected = creativeItems.get(creativeIndex);
+        int maxStack = expected.getMaxStackSize();
+
+        // numberOfRequestedCrafts=1（模拟真实客户端），但 PLACE 请求整堆 maxStack
+        CraftCreativeAction craft = new CraftCreativeAction(creativeIndex + 1, 1);
+        PlaceAction place = new PlaceAction(
+                maxStack,
+                new ItemStackRequestSlotData(ContainerSlotType.CREATED_OUTPUT,
+                        PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, 0, null),
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, 0, null)
+        );
+        ItemStackRequest request = new ItemStackRequest(
+                16, new ItemStackRequestAction[]{craft, place}, new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        assertEquals(expected.getId(), inventory.getItem(0).getId(),
+                "creative item should reach hotbar even when numberOfRequestedCrafts is smaller than maxStack");
+        assertEquals(maxStack, inventory.getItem(0).getCount());
+        assertTrue(ui.getItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT).isNull());
+        ItemStackResponsePacket response = capturePacket(player, ItemStackResponsePacket.class);
+        assertEquals(ItemStackResponseStatus.OK, response.entries.get(0).getResult());
     }
 
     @Test
