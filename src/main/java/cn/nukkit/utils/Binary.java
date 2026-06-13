@@ -120,13 +120,23 @@ public class Binary {
         int protocol = gameVersion.getProtocol();
         BinaryStream stream = new BinaryStream();
         Map<Integer, EntityData> map = metadata.getMap();
-        stream.putUnsignedVarInt(map.size());
+
+        boolean skipVector3f = protocol < ProtocolInfo.v1_8_0;
+
+        int writtenCount = 0;
+        BinaryStream entryStream = new BinaryStream();
+        java.util.Set<Integer> writtenKeys = new java.util.HashSet<>();
+
         for (Map.Entry<Integer, EntityData> entry : map.entrySet()) {
             EntityData d = entry.getValue();
             int id = entry.getKey();
             int originalId = id;
             int type = d.getType();
             boolean forceEmptyData = false;
+
+            if (skipVector3f && type == Entity.DATA_TYPE_VECTOR3F) {
+                continue;
+            }
 
             // HACK: Multiversion entity data
             if (protocol < ProtocolInfo.v1_19_40) {
@@ -156,40 +166,51 @@ public class Binary {
                 }
             }
 
-            stream.putUnsignedVarInt(id);
-            stream.putUnsignedVarInt(type);
+            if (!writtenKeys.add(id)) {
+                continue;
+            }
+
+            writtenCount++;
+
+            entryStream.putUnsignedVarInt(id);
+            entryStream.putUnsignedVarInt(type);
+
+            if (forceEmptyData) {
+                // forceEmptyData requires type to be DATA_TYPE_INT so that putVarInt(0) matches the declared type
+                assert type == Entity.DATA_TYPE_INT : "forceEmptyData used without setting type to DATA_TYPE_INT (actual type=" + type + ")";
+                entryStream.putVarInt(0);
+                continue;
+            }
 
             switch (d.getType()) {
                 case Entity.DATA_TYPE_BYTE:
-                    stream.putByte(((ByteEntityData) d).getData().byteValue());
+                    entryStream.putByte(((ByteEntityData) d).getData().byteValue());
                     break;
                 case Entity.DATA_TYPE_SHORT:
-                    stream.putLShort(((ShortEntityData) d).getData());
+                    entryStream.putLShort(((ShortEntityData) d).getData());
                     break;
                 case Entity.DATA_TYPE_INT:
-                    if (forceEmptyData) {
-                        stream.putVarInt(0);
-                    } else if (originalId == Entity.DATA_AREA_EFFECT_CLOUD_PARTICLE_ID) {
-                        stream.putVarInt(Particle.getMultiversionId(gameVersion, ((IntEntityData) d).getData()));
+                    if (originalId == Entity.DATA_AREA_EFFECT_CLOUD_PARTICLE_ID) {
+                        entryStream.putVarInt(Particle.getMultiversionId(gameVersion, ((IntEntityData) d).getData()));
                     } else {
-                        stream.putVarInt(((IntEntityData) d).getData());
+                        entryStream.putVarInt(((IntEntityData) d).getData());
                     }
                     break;
                 case Entity.DATA_TYPE_FLOAT:
-                    stream.putLFloat(((FloatEntityData) d).getData());
+                    entryStream.putLFloat(((FloatEntityData) d).getData());
                     break;
                 case Entity.DATA_TYPE_STRING:
                     String s = ((StringEntityData) d).getData();
-                    stream.putUnsignedVarInt(s.getBytes(StandardCharsets.UTF_8).length);
-                    stream.put(s.getBytes(StandardCharsets.UTF_8));
+                    entryStream.putUnsignedVarInt(s.getBytes(StandardCharsets.UTF_8).length);
+                    entryStream.put(s.getBytes(StandardCharsets.UTF_8));
                     break;
                 case Entity.DATA_TYPE_NBT:
                     NBTEntityData slot = (NBTEntityData) d;
                     if (protocol < ProtocolInfo.v1_12_0) {
-                        stream.putSlot(gameVersion, slot.item);
+                        entryStream.putSlot(gameVersion, slot.item);
                     } else {
                         try {
-                            stream.put(NBTIO.write(slot.getData(), ByteOrder.LITTLE_ENDIAN, true));
+                            entryStream.put(NBTIO.write(slot.getData(), ByteOrder.LITTLE_ENDIAN, true));
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
@@ -197,9 +218,9 @@ public class Binary {
                     break;
                 case Entity.DATA_TYPE_POS:
                     IntPositionEntityData pos = (IntPositionEntityData) d;
-                    stream.putVarInt(pos.x);
-                    stream.putVarInt(pos.y);
-                    stream.putVarInt(pos.z);
+                    entryStream.putVarInt(pos.x);
+                    entryStream.putVarInt(pos.y);
+                    entryStream.putVarInt(pos.z);
                     break;
                 case Entity.DATA_TYPE_LONG:
                     if (protocol < ProtocolInfo.v1_19_50_20) {
@@ -208,11 +229,11 @@ public class Binary {
                             dataVersions = ((LongEntityData) d).dataVersions;
                             if (dataVersions != null && dataVersions.length == 3) {
                                 if (protocol < ProtocolInfo.v1_2_13) {
-                                    stream.putVarLong(dataVersions[0]);
+                                    entryStream.putVarLong(dataVersions[0]);
                                 }else if (protocol < ProtocolInfo.v1_7_0) {
-                                    stream.putVarLong(dataVersions[1]);
+                                    entryStream.putVarLong(dataVersions[1]);
                                 }else {
-                                    stream.putVarLong(dataVersions[2]);
+                                    entryStream.putVarLong(dataVersions[2]);
                                 }
                                 break;
                             }
@@ -222,7 +243,7 @@ public class Binary {
                         } else if (id == Entity.DATA_FLAGS_EXTENDED) {
                             dataVersions = ((LongEntityData) d).dataVersions;
                             if (dataVersions != null && dataVersions.length == 1) {
-                                stream.putVarLong(dataVersions[0]);
+                                entryStream.putVarLong(dataVersions[0]);
                                 break;
                             }
                             if (Server.getInstance().minimumProtocol != ProtocolInfo.CURRENT_PROTOCOL) {
@@ -230,16 +251,18 @@ public class Binary {
                             }
                         }
                     }
-                    stream.putVarLong(((LongEntityData) d).getData());
+                    entryStream.putVarLong(((LongEntityData) d).getData());
                     break;
                 case Entity.DATA_TYPE_VECTOR3F:
                     Vector3fEntityData v3data = (Vector3fEntityData) d;
-                    stream.putLFloat(v3data.x);
-                    stream.putLFloat(v3data.y);
-                    stream.putLFloat(v3data.z);
+                    entryStream.putLFloat(v3data.x);
+                    entryStream.putLFloat(v3data.y);
+                    entryStream.putLFloat(v3data.z);
                     break;
             }
         }
+        stream.putUnsignedVarInt(writtenCount);
+        stream.put(entryStream.getBuffer());
         return stream.getBuffer();
     }
 

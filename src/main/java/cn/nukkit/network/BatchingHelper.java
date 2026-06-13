@@ -55,20 +55,34 @@ public class BatchingHelper {
     }
 
     private void batchAndSendPackets(Player[] players, DataPacket[] packets) {
+        Network network = Server.getInstance().getNetwork();
+
         //只有一个玩家时直接发送
         //未知原因 注释掉会导致客户端容易闪退
         if (players.length == 1) {
+            Player player = players[0];
+            GameVersion gameVersion = player.getGameVersion();
+            PacketPool pool = gameVersion != null ? network.getPacketPool(gameVersion) : null;
             for (DataPacket packet : packets) {
-                packet.protocol = players[0].protocol;
-                packet.gameVersion = players[0].getGameVersion();
-                players[0].getNetworkSession().sendPacket(packet);
-           }
-           return;
+                if (pool != null && !pool.containsPacket(packet.getClass())) {
+                    continue;
+                }
+                packet.protocol = player.protocol;
+                packet.gameVersion = gameVersion;
+                player.getNetworkSession().sendPacket(packet);
+            }
+            return;
         }
 
         Object2ObjectMap<GameVersion, ObjectList<Player>> targets = new Object2ObjectOpenHashMap<>();
         for (Player player : players) {
             targets.computeIfAbsent(player.getGameVersion(), i -> new ObjectArrayList<>()).add(player);
+        }
+
+        // 预先缓存各版本的 PacketPool，用于过滤不支持的数据包
+        Object2ObjectMap<GameVersion, PacketPool> pools = new Object2ObjectOpenHashMap<>();
+        for (GameVersion gameVersion : targets.keySet()) {
+            pools.put(gameVersion, network.getPacketPool(gameVersion));
         }
 
         // Encoded packets by encoding protocol
@@ -77,9 +91,18 @@ public class BatchingHelper {
         for (DataPacket packet : packets) {
             Object2ObjectMap<GameVersion, GameVersion> encodingProtocols = new Object2ObjectOpenHashMap<>();
             for (GameVersion gameVersion : targets.keySet()) {
+                // 过滤该版本不支持的数据包
+                if (!pools.get(gameVersion).containsPacket(packet.getClass())) {
+                    continue;
+                }
                 // TODO: encode only by encoding protocols
                 // No need to have all versions here
                 encodingProtocols.put(gameVersion, gameVersion);
+            }
+
+            // 如果所有版本都不支持该包，跳过编码
+            if (encodingProtocols.isEmpty()) {
+                continue;
             }
 
             Object2ObjectMap<GameVersion, DataPacket> encodedPacket = new Object2ObjectOpenHashMap<>();
@@ -101,6 +124,9 @@ public class BatchingHelper {
 
         for (GameVersion gameVersion : targets.keySet()) {
             ObjectList<DataPacket> packetList = encodedPackets.get(gameVersion);
+            if (packetList == null || packetList.isEmpty()) {
+                continue;
+            }
             ObjectList<Player> finalTargets = targets.get(gameVersion);
 
             BinaryStream batched = new BinaryStream();

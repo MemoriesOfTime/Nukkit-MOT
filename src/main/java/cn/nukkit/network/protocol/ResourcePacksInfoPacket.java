@@ -99,10 +99,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
             this.putString(entry.getPackId().toString());
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
+            this.putString(entry.getEncryptionKey());
             if (this.protocol < ProtocolInfo.v1_2_0) {
                 continue;
             }
-            this.putString(entry.getEncryptionKey());
             this.putString(entry.getSubPackName());
             this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
             this.putBoolean(entry.usesScripting());
@@ -119,13 +119,11 @@ public class ResourcePacksInfoPacket extends DataPacket {
             }
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
+            this.putString(entry.getEncryptionKey());
             if (this.protocol < ProtocolInfo.v1_2_0) {
                 continue;
             }
-            this.putString(entry.getEncryptionKey()); // encryption key
-            if (protocol >= ProtocolInfo.v1_2_0) {
-                this.putString(entry.getSubPackName()); // sub-pack name
-            }
+            this.putString(entry.getSubPackName());
             if (protocol > ProtocolInfo.v1_5_0) {
                 this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
                 if (protocol >= ProtocolInfo.v1_9_0) {

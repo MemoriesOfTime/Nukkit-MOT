@@ -318,7 +318,9 @@ public class Network {
                         break;
                 }
 
-GameVersion packetGameVersion = this.resolveBatchGameVersion(player, netEaseRaknet);
+                // Save the player's original protocol before resolveBatchGameVersion mutates it
+                int originalPlayerProtocol = player != null ? player.protocol : 0;
+                GameVersion packetGameVersion = this.resolveBatchGameVersion(player, netEaseRaknet);
                 DataPacket pk = this.getPacket(packetId, packetGameVersion);
 
                 if (pk != null) {
@@ -330,7 +332,7 @@ GameVersion packetGameVersion = this.resolveBatchGameVersion(player, netEaseRakn
                             pk.decode();
                         } else { // version < 1.6
                             int headerLength;
-                            if (player != null && player.protocol == Integer.MAX_VALUE) {
+                            if (player != null && originalPlayerProtocol == Integer.MAX_VALUE) {
                                 // Pre-login legacy clients have not negotiated a concrete MCPE protocol yet.
                                 // Infer the packet header width from the RakNet protocol to avoid misaligned LoginPacket decoding.
                                 headerLength = raknetProtocol == 7 ? 1 : 3;

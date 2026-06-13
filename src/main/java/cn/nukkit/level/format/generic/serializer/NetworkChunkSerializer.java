@@ -78,14 +78,17 @@ public class NetworkChunkSerializer {
             } else if (protocolId >= ProtocolInfo.v1_18_0) {
                 serialize1_18_0(stream, chunk, sections, networkChunkData);
             } else {
-                subChunkCount = Math.max(1, subChunkCount - chunk.getSectionOffset());
+                int offset = chunk.getSectionOffset();
+                subChunkCount = Math.max(1, subChunkCount - offset);
+                // Pre-1.18 clients only support 256-block height (16 sub-chunks)
+                int maxSubChunkCount = 16;
+                subChunkCount = Math.min(maxSubChunkCount, subChunkCount);
                 networkChunkData.setChunkSections(subChunkCount);
 
                 if (protocolId < ProtocolInfo.v1_12_0) {
                     stream.putByte((byte) subChunkCount);
                 }
 
-                int offset = chunk.getSectionOffset();
                 for (int i = offset; i < subChunkCount + offset; i++) {
                     if (protocolId < ProtocolInfo.v1_13_0) {
                         stream.putByte((byte) 0);
@@ -96,8 +99,13 @@ public class NetworkChunkSerializer {
                 }
 
                 if (protocolId < ProtocolInfo.v1_12_0) {
+                    // heightMap is stored relative to minBlockY (offset << 4); convert back to absolute Y and clamp to 0-255
+                    int heightOffset = offset << 4;
                     for (short height : chunk.getHeightMapArray()) {
-                        stream.putByte(height & 0xFF);
+                        int clamped = height - heightOffset;
+                        if (clamped < 0) clamped = 0;
+                        if (clamped > 255) clamped = 255;
+                        stream.putByte((byte) clamped);
                     }
                     stream.put(PAD_256);
                 }

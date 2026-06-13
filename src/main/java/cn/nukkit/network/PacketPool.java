@@ -64,6 +64,10 @@ public class PacketPool {
         return id;
     }
 
+    public boolean containsPacket(@NonNull Class<? extends DataPacket> clazz) {
+        return packetsByClass.containsKey(clazz);
+    }
+
     public Builder toBuilder() {
         Builder builder = new Builder();
 
