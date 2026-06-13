@@ -16,6 +16,7 @@ import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBundle;
+import cn.nukkit.item.ItemFirework;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
@@ -344,6 +345,8 @@ class ItemStackRequestProcessorTest {
 
         MultiRecipe recipe = new FireworkRecipe();
         Item output = Item.get(Item.FIREWORKS, 0, 3);
+        // 1 份火药 -> flight 1；canExecute 要求客户端 output 与服务端按材料计算的结果精确匹配（含 Flight NBT）
+        ((ItemFirework) output).setFlight(1);
 
         ItemStackRequestContext missingConsumes = context(
                 new CraftRecipeAction(recipe.getNetworkId(), 1),
