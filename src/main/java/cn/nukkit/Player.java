@@ -1407,10 +1407,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
-        if (!this.isPacketSupported(packet)) {
-            return false;
-        }
-
         packet = packet.clone();
         packet.protocol = this.protocol;
         packet.gameVersion = this.gameVersion;
@@ -1461,11 +1457,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         packet.protocol = this.protocol;
         packet.gameVersion = this.gameVersion;
 
-        if (!this.isPacketSupported(packet)) {
-            if (callback != null) callback.run();
-            return;
-        }
-
         if (server.callDataPkSendEv) {
             new DataPacketSendEvent(this, packet).call();
             // forceDataPacket不允许取消事件
@@ -1473,16 +1464,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
         } : callback), mode);
-    }
-
-    private boolean isPacketSupported(DataPacket packet) {
-        if (packet instanceof BatchPacket) {
-            return true;
-        }
-        if (this.gameVersion == null) {
-            return true;
-        }
-        return this.server.getNetwork().getPacketPool(this.gameVersion).containsPacket(packet.getClass());
     }
 
     @OnlyNetEase
