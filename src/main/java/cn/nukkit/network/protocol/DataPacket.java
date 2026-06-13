@@ -147,6 +147,40 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     }
 
     @Override
+    public long getEntityUniqueId() {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            return this.getUnsignedVarInt();
+        }
+        return super.getEntityUniqueId();
+    }
+
+    @Override
+    public void putEntityUniqueId(long eid) {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.putUnsignedVarInt(eid);
+            return;
+        }
+        super.putEntityUniqueId(eid);
+    }
+
+    @Override
+    public long getEntityRuntimeId() {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            return this.getUnsignedVarInt();
+        }
+        return super.getEntityRuntimeId();
+    }
+
+    @Override
+    public void putEntityRuntimeId(long eid) {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.putUnsignedVarInt(eid);
+            return;
+        }
+        super.putEntityRuntimeId(eid);
+    }
+
+    @Override
     public BlockVector3 getBlockVector3() {
         return super.getBlockVector3(this.gameVersion);
     }

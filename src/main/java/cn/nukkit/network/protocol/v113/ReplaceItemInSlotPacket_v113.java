@@ -5,9 +5,9 @@ import cn.nukkit.item.Item;
 /**
  * Created by Pub4Game on 29.04.2016.
  */
-public class ReplaceItemInSlotPacketV113 extends DataPacket_v113 {
+public class ReplaceItemInSlotPacket_v113 extends DataPacket_v113 {
 
-    public static final byte NETWORK_ID = ProtocolInfoV113.REPLACE_ITEM_IN_SLOT_PACKET;
+    public static final byte NETWORK_ID = ProtocolInfo_v113.REPLACE_ITEM_IN_SLOT_PACKET;
 
     public Item item;
 

@@ -7,9 +7,9 @@ import cn.nukkit.math.Vector3f;
 /**
  * @author Nukkit Project Team
  */
-public class UseItemPacketV113 extends DataPacket_v113 {
+public class UseItemPacket_v113 extends DataPacket_v113 {
 
-    public static final byte NETWORK_ID = ProtocolInfoV113.USE_ITEM_PACKET;
+    public static final byte NETWORK_ID = ProtocolInfo_v113.USE_ITEM_PACKET;
 
     public int x;
     public int y;

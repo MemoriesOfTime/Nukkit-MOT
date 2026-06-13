@@ -28,6 +28,23 @@ public class UpdateAttributesPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.entityId);
+
+            if (this.entries == null) {
+                this.putUnsignedVarInt(0);
+            } else {
+                this.putUnsignedVarInt(this.entries.length);
+                for (Attribute entry : this.entries) {
+                    this.putLFloat(entry.getMinValue());
+                    this.putLFloat(entry.getMaxValue());
+                    this.putLFloat(entry.getValue());
+                    this.putLFloat(entry.getDefaultValue());
+                    this.putString(entry.getName());
+                }
+            }
+            return;
+        }
 
         this.putEntityRuntimeId(this.entityId);
 
