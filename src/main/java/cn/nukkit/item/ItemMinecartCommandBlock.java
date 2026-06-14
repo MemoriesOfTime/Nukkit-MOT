@@ -15,17 +15,17 @@ import cn.nukkit.utils.Rail;
 /**
  * Spawn item for the command block minecart.
  */
-public class ItemCommandBlockMinecart extends Item {
+public class ItemMinecartCommandBlock extends Item {
 
-    public ItemCommandBlockMinecart() {
+    public ItemMinecartCommandBlock() {
         this(0, 1);
     }
 
-    public ItemCommandBlockMinecart(Integer meta) {
+    public ItemMinecartCommandBlock(Integer meta) {
         this(meta, 1);
     }
 
-    public ItemCommandBlockMinecart(Integer meta, int count) {
+    public ItemMinecartCommandBlock(Integer meta, int count) {
         super(COMMAND_BLOCK_MINECART, meta, count, "Minecart with Command Block");
     }
 

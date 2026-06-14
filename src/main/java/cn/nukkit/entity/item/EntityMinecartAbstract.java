@@ -742,6 +742,12 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, offSet));
             }
         } else {
+            if (blockInside == null) {
+                Block defaultBlock = getDefaultDisplayBlock();
+                if (defaultBlock != null && defaultBlock.isNormalBlock()) {
+                    blockInside = defaultBlock;
+                }
+            }
             int display = blockInside == null ? 0
                     : blockInside.getId()
                     | blockInside.getDamage() << 16;
@@ -753,6 +759,20 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             setDataProperty(new IntEntityData(DATA_DISPLAY_ITEM, display));
             setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, 6));
         }
+    }
+
+    /**
+     * The block this minecart type shows by default when freshly spawned (no
+     * persisted {@code CustomDisplayTile} NBT and no plugin override). Returns
+     * {@code null} for plain minecarts. Called from {@link #prepareDataProperty()},
+     * which runs during {@link #initEntity()} — before the subclass constructor
+     * body — so this hook is the only chance to set the default display block
+     * before the spawn metadata is computed.
+     *
+     * @return the default display block, or {@code null} for none
+     */
+    protected Block getDefaultDisplayBlock() {
+        return null;
     }
 
     private void saveEntityData() {

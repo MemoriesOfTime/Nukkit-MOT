@@ -4,6 +4,7 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.*;
+import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.particle.Particle;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.NukkitMath;
@@ -192,6 +193,20 @@ public class Binary {
                 case Entity.DATA_TYPE_INT:
                     if (originalId == Entity.DATA_AREA_EFFECT_CLOUD_PARTICLE_ID) {
                         entryStream.putVarInt(Particle.getMultiversionId(gameVersion, ((IntEntityData) d).getData()));
+                    } else if (originalId == Entity.DATA_DISPLAY_ITEM) {
+                        // Minecart display block: stored as legacy id | (meta << 16), but the
+                        // client resolves this field against the per-protocol block palette
+                        // (runtime/hashed block state id), so it must be converted here.
+                        // See CloudburstMC BlockDefinitionTransformer (key 16) and PowerNukkitX
+                        // which stores blockInside.getRuntimeId() directly.
+                        int display = ((IntEntityData) d).getData();
+                        if (display == 0) {
+                            entryStream.putVarInt(0);
+                        } else {
+                            int legacyId = display & 0xFFFF;
+                            int meta = (display >> 16) & 0xFFFF;
+                            entryStream.putVarInt(GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, legacyId, meta));
+                        }
                     } else {
                         entryStream.putVarInt(((IntEntityData) d).getData());
                     }
@@ -201,6 +216,9 @@ public class Binary {
                     break;
                 case Entity.DATA_TYPE_STRING:
                     String s = ((StringEntityData) d).getData();
+                    if (s == null) {
+                        s = "";
+                    }
                     entryStream.putUnsignedVarInt(s.getBytes(StandardCharsets.UTF_8).length);
                     entryStream.put(s.getBytes(StandardCharsets.UTF_8));
                     break;

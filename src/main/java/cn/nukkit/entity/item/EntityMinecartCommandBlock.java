@@ -71,8 +71,12 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
 
     public EntityMinecartCommandBlock(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
-        setDisplayBlock(Block.get(Block.COMMAND_BLOCK), false);
         setName("Minecart with Command Block");
+    }
+
+    @Override
+    protected Block getDefaultDisplayBlock() {
+        return Block.get(Block.COMMAND_BLOCK);
     }
 
     @Override
@@ -174,7 +178,7 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
     public void initEntity() {
         super.initEntity();
 
-        if (this.namedTag.contains(ICommandBlock.TAG_COMMAND)) {
+        if (this.namedTag.containsString(ICommandBlock.TAG_COMMAND)) {
             this.command = this.namedTag.getString(ICommandBlock.TAG_COMMAND);
         }
         if (this.namedTag.contains(ICommandBlock.TAG_SUCCESS_COUNT)) {
@@ -183,10 +187,10 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
         if (this.namedTag.contains(ICommandBlock.TAG_TRACK_OUTPUT)) {
             this.trackOutput = this.namedTag.getBoolean(ICommandBlock.TAG_TRACK_OUTPUT);
         }
-        if (this.namedTag.contains(ICommandBlock.TAG_LAST_OUTPUT)) {
+        if (this.namedTag.containsString(ICommandBlock.TAG_LAST_OUTPUT)) {
             this.lastOutput = this.namedTag.getString(ICommandBlock.TAG_LAST_OUTPUT);
         }
-        if (this.namedTag.contains(ICommandBlock.TAG_CUSTOM_NAME)) {
+        if (this.namedTag.containsString(ICommandBlock.TAG_CUSTOM_NAME)) {
             this.customName = this.namedTag.getString(ICommandBlock.TAG_CUSTOM_NAME);
         }
 
@@ -194,7 +198,7 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
 
         // Sync command block entity data so the client renders the block and shows the latest output.
         this.setDataProperty(new ByteEntityData(Entity.DATA_COMMAND_BLOCK_TRACK_OUTPUT, this.trackOutput ? 1 : 0));
-        this.setDataProperty(new StringEntityData(Entity.DATA_COMMAND_BLOCK_COMMAND, this.command));
+        this.setDataProperty(new StringEntityData(Entity.DATA_COMMAND_BLOCK_COMMAND, this.command == null ? "" : this.command));
         this.setDataProperty(new StringEntityData(Entity.DATA_COMMAND_BLOCK_LAST_OUTPUT, this.lastOutput == null ? "" : this.lastOutput));
         this.setDataProperty(new IntEntityData(Entity.DATA_COMMAND_BLOCK_TICK_DELAY, 0));
         this.setDataProperty(new ByteEntityData(Entity.DATA_COMMAND_BLOCK_EXECUTE_ON_FIRST_TICK, 0));
@@ -362,7 +366,13 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
     @NotNull
     @Override
     public Position getPosition() {
-        return this;
+        // Must return a defensive copy, not `this`. Entity extends Location/Position, so
+        // returning `this` would let callers mutate the entity real coordinates via
+        // setComponents(). In particular, Entity.move() onGround check calls
+        // getPosition().setComponents(down()), which silently subtracted 1 from this.y
+        // every tick the minecart stood still, causing it to bounce (sink then recover)
+        // on the Y axis. Entity.getPosition() also returns a fresh Position for this reason.
+        return new Position(this.x, this.y, this.z, this.level);
     }
 
     @NotNull
