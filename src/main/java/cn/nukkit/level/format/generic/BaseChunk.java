@@ -58,6 +58,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         if (entity != null && !entity.isBlockEntityValid()) {
             removeBlockEntity(entity);
         }
+        // A retained unknown/modded tile NBT must also be dropped once the block here can no
+        // longer host a block entity, otherwise it would be re-written (resurrected) on save.
+        removeInvalidUnknownTile(x, y, z);
     }
 
     @Override
