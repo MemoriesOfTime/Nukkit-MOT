@@ -38,7 +38,7 @@ public enum InventoryType {
     GRINDSTONE(3, "Grindstone", 26),
     STONECUTTER(2, "Stonecutter", 29),
     CRAFTER(9, "Crafter", 36),
-    COMMAND_BLOCK(0, "Command Block", 39);
+    COMMAND_BLOCK(0, "Command Block", 16);
 
     private final int size;
     private final String title;

@@ -147,6 +147,11 @@ public class BlockCommandBlock extends BlockSolidMeta
     }
 
     @Override
+    public boolean canBeActivated() {
+        return true;
+    }
+
+    @Override
     public boolean onActivate(@NotNull Item item, @Nullable Player player) {
         if (player == null || !player.isCreative()) {
             return false;
