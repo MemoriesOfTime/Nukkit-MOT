@@ -48,6 +48,15 @@ public class BlockEntityCommandBlock extends BlockEntitySpawnable
     protected boolean executingOnFirstTick;
     protected int currentTick;
     protected boolean wasActiveLastTick;
+    /**
+     * Tracks whether the current command execution already received a precise
+     * success count via {@link #sendCommandOutput}. Commands that report their
+     * result through {@link cn.nukkit.command.utils.CommandLogger} (e.g. give,
+     * kill, effect) call sendCommandOutput during dispatchCommand with the exact
+     * number of affected targets. When set, {@link #execute(int)} keeps that
+     * value instead of falling back to the 0/1 boolean dispatch result.
+     */
+    protected boolean receivedOutputSuccessCount;
 
     protected final PermissibleBase perm = new PermissibleBase(this);
     protected CommandBlockInventory inventory;
@@ -217,12 +226,13 @@ public class BlockEntityCommandBlock extends BlockEntitySpawnable
         if (!this.level.getGameRules().getBoolean(GameRule.COMMAND_BLOCKS_ENABLED)) {
             return false;
         }
+        // Wiki (Trigger and chaining): a block already executed this game tick
+        // "does nothing" — it neither runs its command nor updates its success
+        // count, and the chain is not propagated further. This mirrors JE's
+        // BaseCommandBlock.performCommand early return on equal lastExecution.
         if (this.getLastExecution() == this.level.getCurrentTick()) {
-            this.successCount = 0;
             return false;
         }
-
-        this.setConditionMet();
 
         Block levelBlock = this.getLevelBlock();
         BlockFace facing = BlockFace.DOWN;
@@ -230,7 +240,17 @@ public class BlockEntityCommandBlock extends BlockEntitySpawnable
             facing = faceable.getBlockFace();
         }
 
-        if (this.isConditionMet() && (this.isAuto() || this.isPowered())) {
+        // Wiki distinguishes three cases when a block is triggered:
+        //  - Not activated: propagate the chain only; success count untouched.
+        //  - Activated + conditional + predecessor failed: success count 0, no command.
+        //  - Activated + condition met (or unconditional): run the command.
+        boolean activated = this.isAuto() || this.isPowered();
+        if (activated) {
+            this.setConditionMet();
+        }
+        boolean runCommand = activated && (!this.conditionalMode || this.conditionMet);
+
+        if (runCommand) {
             String cmd = this.getCommand();
             if (cmd != null && !cmd.trim().isEmpty()) {
                 if ("Searge".equalsIgnoreCase(cmd)) {
@@ -246,19 +266,30 @@ public class BlockEntityCommandBlock extends BlockEntitySpawnable
                         return false;
                     }
                     try {
+                        // Reset before dispatch: sendCommandOutput (called inside
+                        // dispatchCommand for ParamTree commands) may capture the
+                        // precise number of affected targets.
+                        this.receivedOutputSuccessCount = false;
                         boolean result = this.server.dispatchCommand(this, event.getCommand());
-                        this.successCount = result ? 1 : 0;
+                        if (!this.receivedOutputSuccessCount) {
+                            // Legacy command or one that didn't report output:
+                            // fall back to the boolean dispatch result (0/1).
+                            this.successCount = result ? 1 : 0;
+                        }
                     } catch (Exception e) {
                         this.successCount = 0;
                         this.server.getLogger().warning("Command block error at " + this.getLocation(), e);
                     }
                 }
             }
-            this.propagateChain(facing, chain);
-        } else {
+        } else if (activated && this.conditionalMode && !this.conditionMet) {
+            // Wiki: a conditional block whose predecessor didn't succeed sets its
+            // success count to 0 and still triggers the next chain block, but runs
+            // no command.
             this.successCount = 0;
-            this.propagateChain(facing, chain);
         }
+
+        this.propagateChain(facing, chain);
 
         this.lastExecution = this.level.getCurrentTick();
         this.lastOutputCommandMode = this.getMode();
@@ -367,6 +398,15 @@ public class BlockEntityCommandBlock extends BlockEntitySpawnable
 
     @Override
     public void sendCommandOutput(CommandOutputContainer container) {
+        // Capture the precise success count reported by the command (e.g. number
+        // of affected targets) so it can drive comparator output and conditional
+        // chain blocks, matching Bedrock's success count semantics. dispatchCommand
+        // only exposes a boolean, so this is the only channel to obtain the value.
+        int reported = container.getSuccessCount();
+        if (reported > 0) {
+            this.successCount = reported;
+            this.receivedOutputSuccessCount = true;
+        }
         for (cn.nukkit.network.protocol.types.CommandOutputMessage msg : container.getMessages()) {
             String text = this.server.getLanguage().translateString(
                     msg.getMessageId(), msg.getParameters());

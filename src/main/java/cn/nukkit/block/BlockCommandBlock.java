@@ -173,7 +173,15 @@ public class BlockCommandBlock extends BlockSolidMeta
             if (this.level.isBlockPowered(this)) {
                 if (!tile.isPowered()) {
                     tile.setPowered(true);
-                    if (this.getId() != REPEATING_COMMAND_BLOCK) {
+                    // JE (CommandBlock.setPoweredAndUpdate): a redstone rising edge
+                    // only schedules a tick for impulse blocks in redstone mode.
+                    // Repeating blocks are polled by their own onUpdate; chain blocks
+                    // are only triggered by their predecessor's executeChain; and
+                    // impulse blocks in "Always Active" mode are triggered once via
+                    // the setAutomatic side effect when set in the GUI.
+                    if (this.getId() != REPEATING_COMMAND_BLOCK
+                            && this.getId() != CHAIN_COMMAND_BLOCK
+                            && !tile.isAuto()) {
                         tile.trigger();
                     }
                 }

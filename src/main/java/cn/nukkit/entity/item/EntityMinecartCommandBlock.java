@@ -57,6 +57,13 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
     protected long lastExecution;
     /** Custom name used as the CommandSender name (separate from the entity display name). */
     protected String customName = "";
+    /**
+     * Tracks whether the current command execution already received a precise
+     * success count via {@link #sendCommandOutput}. See
+     * {@link cn.nukkit.blockentity.BlockEntityCommandBlock#receivedOutputSuccessCount}
+     * for the rationale.
+     */
+    protected boolean receivedOutputSuccessCount;
 
     private int lastActivated = Integer.MIN_VALUE;
     protected CommandBlockMinecartInventory inventory;
@@ -236,8 +243,14 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
                     return;
                 }
                 try {
+                    // Reset before dispatch: sendCommandOutput (called inside
+                    // dispatchCommand for ParamTree commands) may capture the
+                    // precise number of affected targets.
+                    this.receivedOutputSuccessCount = false;
                     boolean result = this.server.dispatchCommand(this, event.getCommand());
-                    this.successCount = result ? 1 : 0;
+                    if (!this.receivedOutputSuccessCount) {
+                        this.successCount = result ? 1 : 0;
+                    }
                 } catch (Exception e) {
                     this.successCount = 0;
                     this.server.getLogger().warning("Command block minecart error at " + this.getLocation(), e);
@@ -381,6 +394,13 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
 
     @Override
     public void sendCommandOutput(CommandOutputContainer container) {
+        // Capture the precise success count reported by the command, matching
+        // Bedrock success count semantics. See BlockEntityCommandBlock for details.
+        int reported = container.getSuccessCount();
+        if (reported > 0) {
+            this.successCount = reported;
+            this.receivedOutputSuccessCount = true;
+        }
         for (cn.nukkit.network.protocol.types.CommandOutputMessage msg : container.getMessages()) {
             String text = this.server.getLanguage().translateString(
                     msg.getMessageId(), msg.getParameters());
