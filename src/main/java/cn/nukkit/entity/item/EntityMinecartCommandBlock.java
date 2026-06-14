@@ -4,17 +4,18 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.ICommandBlock;
-import cn.nukkit.command.CommandSender;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.entity.data.StringEntityData;
 import cn.nukkit.event.command.CommandBlockExecuteEvent;
+import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.inventory.CommandBlockMinecartInventory;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.lang.CommandOutputContainer;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.GameRule;
@@ -50,13 +51,13 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
     /** Cooldown (in server ticks) between activations on a powered activator rail (JE: 4). */
     private static final int ACTIVATION_DELAY = 4;
 
-    protected String command = "";
+    protected String command;
     protected int successCount;
-    protected boolean trackOutput = true;
-    protected String lastOutput = "";
+    protected boolean trackOutput;
+    protected String lastOutput;
     protected long lastExecution;
     /** Custom name used as the CommandSender name (separate from the entity display name). */
-    protected String customName = "";
+    protected String customName;
     /**
      * Tracks whether the current command execution already received a precise
      * success count via {@link #sendCommandOutput}. See
@@ -65,7 +66,7 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
      */
     protected boolean receivedOutputSuccessCount;
 
-    private int lastActivated = Integer.MIN_VALUE;
+    private int lastActivated;
     protected CommandBlockMinecartInventory inventory;
     protected final PermissibleBase perm = new PermissibleBase(this);
 
@@ -96,7 +97,7 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
 
     @Override
     public String getInteractButtonText() {
-        return "";
+        return "action.interact.opencontainer";
     }
 
     @Override
@@ -151,6 +152,13 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
         return successCount;
     }
 
+    /**
+     * @return the last command output text, or an empty string if none.
+     */
+    public String getLastOutput() {
+        return lastOutput == null ? "" : lastOutput;
+    }
+
     public void setCommand(String command) {
         this.command = command == null ? "" : command;
         this.successCount = 0;
@@ -172,11 +180,19 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
      */
     public void setCustomName(String name) {
         this.customName = name == null ? "" : name;
+        this.namedTag.putString(ICommandBlock.TAG_CUSTOM_NAME, this.customName);
     }
 
     @Override
     public void initEntity() {
         super.initEntity();
+
+        this.command = "";
+        this.successCount = 0;
+        this.trackOutput = true;
+        this.lastOutput = "";
+        this.customName = "";
+        this.lastExecution = -1L;
 
         if (this.namedTag.containsString(ICommandBlock.TAG_COMMAND)) {
             this.command = this.namedTag.getString(ICommandBlock.TAG_COMMAND);
@@ -193,10 +209,18 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
         if (this.namedTag.containsString(ICommandBlock.TAG_CUSTOM_NAME)) {
             this.customName = this.namedTag.getString(ICommandBlock.TAG_CUSTOM_NAME);
         }
+        if (this.namedTag.contains(ICommandBlock.TAG_LAST_EXECUTION)) {
+            this.lastExecution = this.namedTag.getLong(ICommandBlock.TAG_LAST_EXECUTION);
+        }
 
         this.inventory = new CommandBlockMinecartInventory(this);
 
-        // Sync command block entity data so the client renders the block and shows the latest output.
+        this.dataProperties
+                .putByte(Entity.DATA_CONTAINER_TYPE, ContainerType.COMMAND_BLOCK.getId())
+                .putInt(Entity.DATA_CONTAINER_BASE_SIZE, 1)
+                .putInt(Entity.DATA_CONTAINER_EXTRA_SLOTS_PER_STRENGTH, 0);
+        this.setDataProperty(new ByteEntityData(Entity.DATA_HAS_COMMAND_BLOCK, 1));
+
         this.setDataProperty(new ByteEntityData(Entity.DATA_COMMAND_BLOCK_TRACK_OUTPUT, this.trackOutput ? 1 : 0));
         this.setDataProperty(new StringEntityData(Entity.DATA_COMMAND_BLOCK_COMMAND, this.command == null ? "" : this.command));
         this.setDataProperty(new StringEntityData(Entity.DATA_COMMAND_BLOCK_LAST_OUTPUT, this.lastOutput == null ? "" : this.lastOutput));
@@ -211,7 +235,7 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
      */
     @Override
     public void activate(int x, int y, int z, boolean flag) {
-        if (this.server.getTick() - this.lastActivated >= ACTIVATION_DELAY) {
+        if (flag && this.server.getTick() - this.lastActivated >= ACTIVATION_DELAY) {
             this.performCommand();
             this.lastActivated = this.server.getTick();
         }
@@ -227,7 +251,6 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
         }
         long serverTick = this.level.getCurrentTick();
         if (this.lastExecution == serverTick) {
-            // JE: a command block only executes once per game tick.
             return;
         }
 
@@ -247,9 +270,6 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
                     return;
                 }
                 try {
-                    // Reset before dispatch: sendCommandOutput (called inside
-                    // dispatchCommand for ParamTree commands) may capture the
-                    // precise number of affected targets.
                     this.receivedOutputSuccessCount = false;
                     boolean result = this.server.dispatchCommand(this, event.getCommand());
                     if (!this.receivedOutputSuccessCount) {
@@ -278,7 +298,13 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
         if (player.isCreative() && this.level.getGameRules().getBoolean(GameRule.COMMAND_BLOCKS_ENABLED)) {
-            player.addWindow(this.getInventory());
+            this.sendData(player);
+
+            CommandBlockMinecartInventory inventory = this.inventory;
+            if (player.getWindowId(inventory) != -1) {
+                player.removeWindow(inventory);
+            }
+            player.addWindow(inventory);
             return true;
         }
         return false;
@@ -291,7 +317,7 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
 
     @Override
     public void dropItem() {
-        if (this.lastDamageCause instanceof cn.nukkit.event.entity.EntityDamageByEntityEvent damageEvent) {
+        if (this.lastDamageCause instanceof EntityDamageByEntityEvent damageEvent) {
             Entity damager = damageEvent.getDamager();
             if (damager instanceof Player && ((Player) damager).isCreative()) {
                 return;
@@ -366,12 +392,6 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
     @NotNull
     @Override
     public Position getPosition() {
-        // Must return a defensive copy, not `this`. Entity extends Location/Position, so
-        // returning `this` would let callers mutate the entity real coordinates via
-        // setComponents(). In particular, Entity.move() onGround check calls
-        // getPosition().setComponents(down()), which silently subtracted 1 from this.y
-        // every tick the minecart stood still, causing it to bounce (sink then recover)
-        // on the Y axis. Entity.getPosition() also returns a fresh Position for this reason.
         return new Position(this.x, this.y, this.z, this.level);
     }
 
@@ -404,8 +424,6 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
 
     @Override
     public void sendCommandOutput(CommandOutputContainer container) {
-        // Capture the precise success count reported by the command, matching
-        // Bedrock success count semantics. See BlockEntityCommandBlock for details.
         int reported = container.getSuccessCount();
         if (reported > 0) {
             this.successCount = reported;

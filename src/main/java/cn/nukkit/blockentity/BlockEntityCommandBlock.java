@@ -33,11 +33,14 @@ public class BlockEntityCommandBlock extends BlockEntitySpawnable
 
     protected boolean conditionalMode;
     protected boolean auto;
-    protected String command = "";
+    // NOTE: no inline initializers here. BlockEntity's super() chain calls
+    // initBlockEntity() before subclass field init runs, so an inline `= ""`
+    // would clobber values just loaded from NBT. Defaults are set in initBlockEntity().
+    protected String command;
     protected long lastExecution;
-    protected boolean trackOutput = true;
-    protected String lastOutput = "";
-    protected ListTag<StringTag> lastOutputParams = new ListTag<>();
+    protected boolean trackOutput;
+    protected String lastOutput;
+    protected ListTag<StringTag> lastOutputParams;
     protected int lastOutputCommandMode;
     protected boolean lastOutputCondionalMode;
     protected boolean lastOutputRedstoneMode;
@@ -69,6 +72,15 @@ public class BlockEntityCommandBlock extends BlockEntitySpawnable
     protected void initBlockEntity() {
         super.initBlockEntity();
         this.inventory = new CommandBlockInventory(this);
+
+        // Defaults for a freshly-created command block (no persisted NBT yet). See the
+        // field-initializer note above: defaults must be applied here, not inline, so
+        // that loading from NBT below is not clobbered by subclass field init.
+        this.command = "";
+        this.lastExecution = 0;
+        this.trackOutput = true;
+        this.lastOutput = "";
+        this.lastOutputParams = new ListTag<>();
 
         if (this.namedTag.containsString(ICommandBlock.TAG_COMMAND)) {
             this.command = this.namedTag.getString(ICommandBlock.TAG_COMMAND);

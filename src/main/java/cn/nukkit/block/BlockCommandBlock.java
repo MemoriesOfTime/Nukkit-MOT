@@ -6,6 +6,7 @@ import cn.nukkit.block.properties.BlockPropertiesHelper;
 import cn.nukkit.block.properties.VanillaProperties;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCommandBlock;
+import cn.nukkit.inventory.CommandBlockInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.GameRule;
@@ -23,8 +24,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>
  * Adapted from Lumi (<a href="https://github.com/KoshakMineDEV/Lumi">Lumi</a>)
  */
-public class BlockCommandBlock extends BlockSolidMeta
-        implements Faceable, BlockEntityHolder<BlockEntityCommandBlock>, BlockPropertiesHelper {
+public class BlockCommandBlock extends BlockSolidMeta implements Faceable, BlockEntityHolder<BlockEntityCommandBlock>, BlockPropertiesHelper {
 
     private static final BlockProperties PROPERTIES = new BlockProperties(
             VanillaProperties.FACING_DIRECTION,
@@ -102,12 +102,12 @@ public class BlockCommandBlock extends BlockSolidMeta
     }
 
     @Override
-    public Class<? extends BlockEntityCommandBlock> getBlockEntityClass() {
+    public @NotNull Class<? extends BlockEntityCommandBlock> getBlockEntityClass() {
         return BlockEntityCommandBlock.class;
     }
 
     @Override
-    public String getBlockEntityType() {
+    public @NotNull String getBlockEntityType() {
         return BlockEntity.COMMAND_BLOCK;
     }
 
@@ -160,12 +160,13 @@ public class BlockCommandBlock extends BlockSolidMeta
             return false;
         }
         BlockEntityCommandBlock tile = this.getOrCreateBlockEntity();
-        if (tile != null) {
-            tile.spawnTo(player);
-            player.addWindow(tile.getInventory());
-            return true;
+        tile.spawnTo(player);
+        CommandBlockInventory inventory = tile.getInventory();
+        if (player.getWindowId(inventory) != -1) {
+            player.removeWindow(inventory);
         }
-        return false;
+        player.addWindow(inventory);
+        return true;
     }
 
     @Override

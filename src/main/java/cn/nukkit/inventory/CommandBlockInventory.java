@@ -48,15 +48,12 @@ public class CommandBlockInventory extends BaseInventory {
      * resend the {@code ContainerOpenPacket} — meaning the UI can only be opened
      * once per command block.
      * <p>
-     * To work around this, if the player still has this inventory tracked we
-     * remove the stale window first so {@code addWindow} performs a fresh open
-     * and re-sends the packet.
+     * Callers must remove a stale tracked window before invoking
+     * {@link Player#addWindow}; by the time this method runs, {@code addWindow}
+     * has already assigned the fresh window id used by {@link #onOpen(Player)}.
      */
     @Override
     public boolean open(Player who) {
-        if (who.getWindowId(this) != -1) {
-            who.removeWindow(this);
-        }
         InventoryOpenEvent ev = new InventoryOpenEvent(this, who);
         who.getServer().getPluginManager().callEvent(ev);
         if (ev.isCancelled()) {

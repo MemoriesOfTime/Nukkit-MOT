@@ -314,8 +314,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 motiveZ *= 1 + entityCollisionReduction;
                 motiveX *= 0.5D;
                 motiveZ *= 0.5D;
-                if (entity instanceof EntityMinecartAbstract) {
-                    EntityMinecartAbstract mine = (EntityMinecartAbstract) entity;
+                if (entity instanceof EntityMinecartAbstract mine) {
                     double desinityX = mine.x - x;
                     double desinityZ = mine.z - z;
                     Vector3 vector = new Vector3(desinityX, 0, desinityZ).normalize();
@@ -737,6 +736,9 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             if (namedTag.getBoolean("CustomDisplayTile")) {
                 int display = namedTag.getInt("DisplayTile");
                 int offSet = namedTag.getInt("DisplayOffset");
+                if (blockInside == null && display != 0) {
+                    blockInside = Block.get(display & 0xFFFF, (display >> 16) & 0xFFFF);
+                }
                 setDataProperty(new ByteEntityData(DATA_HAS_DISPLAY, 1));
                 setDataProperty(new IntEntityData(DATA_DISPLAY_ITEM, display));
                 setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, offSet));
@@ -776,13 +778,20 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
     }
 
     private void saveEntityData() {
+        if (blockInside == null && super.getDataPropertyByte(DATA_HAS_DISPLAY) == 1) {
+            int display = getDataPropertyInt(DATA_DISPLAY_ITEM);
+            if (display != 0) {
+                blockInside = Block.get(display & 0xFFFF, (display >> 16) & 0xFFFF);
+            }
+        }
         boolean hasDisplay = super.getDataPropertyByte(DATA_HAS_DISPLAY) == 1
                 || blockInside != null;
         int display;
         int offSet;
         namedTag.putBoolean("CustomDisplayTile", hasDisplay);
         if (hasDisplay) {
-            display = blockInside.getId()
+            display = blockInside == null ? 0
+                    : blockInside.getId()
                     | blockInside.getDamage() << 16;
             offSet = getDataPropertyInt(DATA_DISPLAY_OFFSET);
             namedTag.putInt("DisplayTile", display);
