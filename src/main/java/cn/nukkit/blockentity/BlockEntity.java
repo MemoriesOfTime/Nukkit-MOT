@@ -42,6 +42,7 @@ public abstract class BlockEntity extends Position {
     public static final String PISTON_ARM = "PistonArm";
     public static final String MOVING_BLOCK = "MovingBlock";
     public static final String COMPARATOR = "Comparator";
+    public static final String COMMAND_BLOCK = "CommandBlock";
     public static final String HOPPER = "Hopper";
     public static final String BED = "Bed";
     public static final String JUKEBOX = "Jukebox";

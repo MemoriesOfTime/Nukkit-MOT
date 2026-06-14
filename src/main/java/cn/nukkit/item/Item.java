@@ -297,6 +297,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[QUARTZ] = ItemQuartz.class; //406
             list[MINECART_WITH_TNT] = ItemMinecartTNT.class; //407
             list[MINECART_WITH_HOPPER] = ItemMinecartHopper.class; //408
+            list[COMMAND_BLOCK_MINECART] = ItemCommandBlockMinecart.class; //443
             list[PRISMARINE_SHARD] = ItemPrismarineShard.class; //409
             list[HOPPER] = ItemHopper.class;
             list[RAW_RABBIT] = ItemRabbitRaw.class; //411
