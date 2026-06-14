@@ -26,8 +26,12 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
 
     public EntityMinecartChest(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
-        setDisplayBlock(Block.get(Block.CHEST), false);
         setName("Minecart with Chest");
+    }
+
+    @Override
+    protected Block getDefaultDisplayBlock() {
+        return Block.get(Block.CHEST);
     }
 
     @Override

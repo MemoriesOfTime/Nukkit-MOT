@@ -190,7 +190,8 @@ public final class DataPacketManager {
                 ServerSettingsRequestProcessor.INSTANCE,
                 SetDifficultyProcessor.INSTANCE,
                 SetPlayerGameTypeProcessor.INSTANCE,
-                TextProcessor.INSTANCE
+                TextProcessor.INSTANCE,
+                CommandBlockUpdateProcessor.INSTANCE
         );
 
         registerProcessor(

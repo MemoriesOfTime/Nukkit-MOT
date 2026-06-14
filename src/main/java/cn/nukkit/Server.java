@@ -3154,6 +3154,7 @@ public class Server {
         Entity.registerEntity("MinecartChest", EntityMinecartChest.class);
         Entity.registerEntity("MinecartHopper", EntityMinecartHopper.class);
         Entity.registerEntity("MinecartTnt", EntityMinecartTNT.class);
+        Entity.registerEntity("MinecartCommandBlock", EntityMinecartCommandBlock.class);
         Entity.registerEntity("Boat", EntityBoat.class);
         Entity.registerEntity("ChestBoat", EntityChestBoat.class);
         //Others
@@ -3212,6 +3213,7 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.SHELF, BlockEntityShelf.class);
         BlockEntity.registerBlockEntity(BlockEntity.COPPER_GOLEM_STATUE, BlockEntityCopperGolemStatue.class);
         BlockEntity.registerBlockEntity(BlockEntity.CREAKING_HEART, BlockEntityCreakingHeart.class);
+        BlockEntity.registerBlockEntity(BlockEntity.COMMAND_BLOCK, BlockEntityCommandBlock.class);
 
         // Persistent container, not on vanilla
         BlockEntity.registerBlockEntity(BlockEntity.PERSISTENT_CONTAINER, PersistentDataContainerBlockEntity.class);

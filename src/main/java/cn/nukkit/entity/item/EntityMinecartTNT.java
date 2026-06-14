@@ -33,8 +33,12 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
 
     public EntityMinecartTNT(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
-        super.setDisplayBlock(Block.get(BlockID.TNT), false);
         setName("Minecart with TNT");
+    }
+
+    @Override
+    protected Block getDefaultDisplayBlock() {
+        return Block.get(BlockID.TNT);
     }
 
     @Override
