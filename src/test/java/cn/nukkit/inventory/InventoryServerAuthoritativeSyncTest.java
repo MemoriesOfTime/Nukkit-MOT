@@ -4,18 +4,23 @@ import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.blockentity.BlockEntityFurnace;
+import cn.nukkit.entity.item.EntityMinecartHopper;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Position;
-import cn.nukkit.network.protocol.DataPacket;
-import cn.nukkit.network.protocol.InventoryContentPacket;
-import cn.nukkit.network.protocol.InventorySlotPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.SourceInterface;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
+import cn.nukkit.network.session.NetworkPlayerSession;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -163,6 +168,61 @@ class InventoryServerAuthoritativeSyncTest {
     }
 
     @Test
+    void failedDynamicWindowOpenDoesNotSendClosePacket() {
+        TestPlayer player = createWindowTestPlayer();
+        FailingContainerInventory inventory = new FailingContainerInventory(Mockito.mock(BlockEntityChest.class));
+
+        int result = player.addWindow(inventory);
+
+        assertEquals(-1, result);
+        assertEquals(-1, player.getWindowId(inventory));
+        assertFalse(player.sentPackets.stream().anyMatch(ContainerClosePacket.class::isInstance));
+    }
+
+    @Test
+    void failedPermanentWindowOpenKeepsWindowMappingWithoutClosePacket() {
+        TestPlayer player = createWindowTestPlayer();
+        player.spawned = false;
+        FailingContainerInventory inventory = new FailingContainerInventory(Mockito.mock(BlockEntityChest.class));
+
+        int result = player.addWindow(inventory, 42, true);
+
+        assertEquals(-1, result);
+        assertEquals(42, player.getWindowId(inventory));
+        assertFalse(player.sentPackets.stream().anyMatch(ContainerClosePacket.class::isInstance));
+    }
+
+    @Test
+    void minecartHopperUsesHopperUiTypeWhileCartographyUsesProtocolContainerId() {
+        assertEquals(InventoryType.HOPPER.getNetworkType(), InventoryType.MINECART_HOPPER.getNetworkType());
+        assertEquals(ContainerType.CARTOGRAPHY.getId(), InventoryType.CARTOGRAPHY.getNetworkType());
+    }
+
+    @Test
+    void minecartHopperWindowOpensWithHopperUiTypeAndEntityId() {
+        TestPlayer player = createWindowTestPlayer();
+        EntityMinecartHopper minecart = Mockito.mock(EntityMinecartHopper.class);
+        Mockito.when(minecart.getId()).thenReturn(1234L);
+        MinecartHopperInventory inventory = new MinecartHopperInventory(minecart);
+
+        int windowId = player.addWindow(inventory);
+
+        assertTrue(windowId >= Player.MINIMUM_OTHER_WINDOW_ID);
+        ContainerOpenPacket openPacket = findPacket(player, ContainerOpenPacket.class);
+        assertNotNull(openPacket);
+        assertEquals(windowId, openPacket.windowId);
+        assertEquals(InventoryType.HOPPER.getNetworkType(), openPacket.type);
+        assertEquals(1234L, openPacket.entityId);
+
+        InventoryContentPacket contentPacket = findPacket(player, InventoryContentPacket.class);
+        assertNotNull(contentPacket);
+        assertTrue(player.sentPackets.indexOf(openPacket) < player.sentPackets.indexOf(contentPacket));
+        assertEquals(windowId, contentPacket.inventoryId);
+        assertEquals(ContainerSlotType.LEVEL_ENTITY, contentPacket.containerNameData.getContainer());
+        assertNull(contentPacket.containerNameData.getDynamicId());
+    }
+
+    @Test
     void playerUIComponentForceWriteUsesBackingUIInventory() {
         Player player = Mockito.mock(Player.class);
         PlayerUIInventory ui = new PlayerUIInventory(player);
@@ -187,5 +247,51 @@ class InventoryServerAuthoritativeSyncTest {
         ArgumentCaptor<DataPacket> captor = ArgumentCaptor.forClass(DataPacket.class);
         Mockito.verify(player).dataPacket(captor.capture());
         return assertInstanceOf(type, captor.getValue());
+    }
+
+    private static <T extends DataPacket> T findPacket(TestPlayer player, Class<T> type) {
+        return player.sentPackets.stream()
+                .filter(type::isInstance)
+                .map(type::cast)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static TestPlayer createWindowTestPlayer() {
+        SourceInterface sourceInterface = Mockito.mock(SourceInterface.class);
+        Mockito.when(sourceInterface.getSession(Mockito.any(InetSocketAddress.class)))
+                .thenReturn(Mockito.mock(NetworkPlayerSession.class));
+
+        TestPlayer player = new TestPlayer(sourceInterface);
+        player.protocol = ProtocolInfo.v1_21_30;
+        player.spawned = true;
+        return player;
+    }
+
+    private static final class TestPlayer extends Player {
+
+        private final List<DataPacket> sentPackets = new ArrayList<>();
+
+        private TestPlayer(SourceInterface sourceInterface) {
+            super(sourceInterface, 1L, new InetSocketAddress("127.0.0.1", 19132));
+        }
+
+        @Override
+        public boolean dataPacket(DataPacket packet) {
+            this.sentPackets.add(packet);
+            return true;
+        }
+    }
+
+    private static final class FailingContainerInventory extends ContainerInventory {
+
+        private FailingContainerInventory(InventoryHolder holder) {
+            super(holder, InventoryType.HOPPER);
+        }
+
+        @Override
+        public boolean open(Player who) {
+            return false;
+        }
     }
 }

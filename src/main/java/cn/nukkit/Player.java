@@ -7298,7 +7298,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.spawned && !this.inventoryOpen && inventory.open(this)) {
             return cnt;
         } else if (!alwaysOpen) {
-            this.removeWindow(inventory);
+            if (!this.permanentWindows.contains(cnt)) {
+                this.windows.remove(inventory);
+            }
 
             return -1;
         } else {
