@@ -18,7 +18,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class BlockDropper extends BlockSolidMeta implements Faceable {
+public class BlockDropper extends BlockSolidMeta implements Faceable, BlockEntityHolder<BlockEntityDropper> {
 
     protected boolean triggered = false;
 
@@ -38,6 +38,18 @@ public class BlockDropper extends BlockSolidMeta implements Faceable {
     @Override
     public String getName() {
         return "Dropper";
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityDropper> getBlockEntityClass() {
+        return BlockEntityDropper.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.DROPPER;
     }
 
     @Override

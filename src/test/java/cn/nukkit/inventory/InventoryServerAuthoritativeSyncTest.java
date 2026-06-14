@@ -42,7 +42,9 @@ class InventoryServerAuthoritativeSyncTest {
         chest.sendSlot(3, player);
         InventorySlotPacket slotPacket = capturePacket(player, InventorySlotPacket.class);
         assertEquals(ContainerSlotType.LEVEL_ENTITY, slotPacket.containerNameData.getContainer());
-        assertEquals(7, slotPacket.containerNameData.getDynamicId());
+        // Dynamic containers are never registered server-side, so a non-null dynamicId
+        // makes the client reject the packet (e.g. hopper/chest GUI closes immediately).
+        assertNull(slotPacket.containerNameData.getDynamicId());
 
         Mockito.reset(player);
         player.protocol = ProtocolInfo.v1_21_30;
@@ -50,7 +52,7 @@ class InventoryServerAuthoritativeSyncTest {
         chest.sendContents(player);
         InventoryContentPacket contentPacket = capturePacket(player, InventoryContentPacket.class);
         assertEquals(ContainerSlotType.LEVEL_ENTITY, contentPacket.containerNameData.getContainer());
-        assertEquals(7, contentPacket.containerNameData.getDynamicId());
+        assertNull(contentPacket.containerNameData.getDynamicId());
     }
 
     @Test
@@ -64,7 +66,7 @@ class InventoryServerAuthoritativeSyncTest {
         furnace.sendSlot(0, player);
         InventorySlotPacket ingredientPacket = capturePacket(player, InventorySlotPacket.class);
         assertEquals(ContainerSlotType.FURNACE_INGREDIENT, ingredientPacket.containerNameData.getContainer());
-        assertEquals(8, ingredientPacket.containerNameData.getDynamicId());
+        assertNull(ingredientPacket.containerNameData.getDynamicId());
 
         Mockito.reset(player);
         player.protocol = ProtocolInfo.v1_21_30;
@@ -72,7 +74,7 @@ class InventoryServerAuthoritativeSyncTest {
         furnace.sendSlot(2, player);
         InventorySlotPacket resultPacket = capturePacket(player, InventorySlotPacket.class);
         assertEquals(ContainerSlotType.FURNACE_RESULT, resultPacket.containerNameData.getContainer());
-        assertEquals(8, resultPacket.containerNameData.getDynamicId());
+        assertNull(resultPacket.containerNameData.getDynamicId());
     }
 
     @Test
@@ -115,7 +117,7 @@ class InventoryServerAuthoritativeSyncTest {
         InventorySlotPacket packet = capturePacket(player, InventorySlotPacket.class);
         assertEquals(27, packet.slot);
         assertEquals(ContainerSlotType.LEVEL_ENTITY, packet.containerNameData.getContainer());
-        assertEquals(9, packet.containerNameData.getDynamicId());
+        assertNull(packet.containerNameData.getDynamicId());
     }
 
     @Test

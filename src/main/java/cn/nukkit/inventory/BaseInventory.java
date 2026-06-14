@@ -601,7 +601,7 @@ public abstract class BaseInventory implements Inventory {
                 continue;
             }
             pk.inventoryId = id;
-            pk.containerNameData = this.resolveFullContainerName(0, id);
+            pk.containerNameData = this.resolveFullContainerName(0);
             player.dataPacket(pk);
         }
     }
@@ -675,7 +675,7 @@ public abstract class BaseInventory implements Inventory {
                 return;
             }
             pk.inventoryId = id;
-            pk.containerNameData = this.resolveFullContainerName(index, id);
+            pk.containerNameData = this.resolveFullContainerName(index);
             player.dataPacket(pk);
         } else {
             ContainerSetSlotPacket_v113 pk = new ContainerSetSlotPacket_v113();
@@ -710,7 +710,7 @@ public abstract class BaseInventory implements Inventory {
             pk.inventoryId = id;
             pk2.windowid = id;
             if (player.protocol >= ProtocolInfo.v1_2_0) {
-                pk.containerNameData = this.resolveFullContainerName(index, id);
+                pk.containerNameData = this.resolveFullContainerName(index);
                 player.dataPacket(pk);
             } else {
                 player.dataPacket(pk2);
@@ -730,10 +730,6 @@ public abstract class BaseInventory implements Inventory {
 
     protected FullContainerName resolveFullContainerName(int index) {
         return new FullContainerName(resolveContainerSlotType(index), null);
-    }
-
-    protected FullContainerName resolveFullContainerName(int index, int dynamicId) {
-        return new FullContainerName(resolveContainerSlotType(index), dynamicId);
     }
 
     protected ContainerSlotType resolveContainerSlotType(int index) {

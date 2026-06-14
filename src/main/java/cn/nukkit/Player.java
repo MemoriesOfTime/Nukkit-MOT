@@ -164,6 +164,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public static final int LECTERN_WINDOW_ID = 7;
     public static final int STONECUTTER_WINDOW_ID = 8;
+    public static final int CARTOGRAPHY_WINDOW_ID = 9;
 
     // 后续创建的窗口应该从此数值开始
     public static final int MINIMUM_OTHER_WINDOW_ID = Utils.dynamic(10);
@@ -7400,8 +7401,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.moveBlockUIContents(Player.ANVIL_WINDOW_ID); // LOOM_WINDOW_ID is the same as ANVIL_WINDOW_ID?
             this.moveBlockUIContents(Player.ENCHANT_WINDOW_ID);
             this.moveBlockUIContents(Player.BEACON_WINDOW_ID);
+            this.moveBlockUIContents(Player.GRINDSTONE_WINDOW_ID);
             this.moveBlockUIContents(Player.SMITHING_WINDOW_ID);
             this.moveBlockUIContents(Player.STONECUTTER_WINDOW_ID);
+            this.moveBlockUIContents(Player.CARTOGRAPHY_WINDOW_ID);
 
             this.playerUIInventory.clearAll();
 

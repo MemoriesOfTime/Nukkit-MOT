@@ -54,7 +54,7 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
     public Class<? extends BlockEntityChest> getBlockEntityClass() {
         return BlockEntityChest.class;
     }
-    
+
     @NotNull
     @Override
     public String getBlockEntityType() {

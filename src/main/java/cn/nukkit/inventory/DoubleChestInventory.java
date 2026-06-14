@@ -214,7 +214,7 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
                 continue;
             }
             pk.inventoryId = id;
-            pk.containerNameData = new FullContainerName(ContainerSlotType.LEVEL_ENTITY, id);
+            pk.containerNameData = new FullContainerName(ContainerSlotType.LEVEL_ENTITY, null);
             player.dataPacket(pk);
         }
     }
