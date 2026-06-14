@@ -40,6 +40,21 @@ public abstract class ItemCustom extends StringItemBase implements CustomItem {
     @Override
     public abstract CustomItemDefinition getDefinition();
 
+    /**
+     * 当{@link CustomItemDefinition.SimpleBuilder#allowOffHand(boolean)}设置为{@code true}时，
+     * 允许该自定义物品放入副手槽。
+     * <p>
+     * Allows this custom item to be put into the off-hand slot when
+     * {@link CustomItemDefinition.SimpleBuilder#allowOffHand(boolean)} is set to {@code true}.
+     */
+    @Override
+    public boolean canBePutInOffhandSlot() {
+        return this.getDefinition().getNbt()
+                .getCompound("components")
+                .getCompound("item_properties")
+                .getBoolean("allow_off_hand");
+    }
+
     @Override
     public ItemCustom clone() {
         return (ItemCustom) super.clone();
