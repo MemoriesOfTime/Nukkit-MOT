@@ -39,7 +39,8 @@ public enum InventoryType {
     STONECUTTER(2, "Stonecutter", 29),
     CARTOGRAPHY(2, "Cartography Table", 30),
     HORSE(17, "Horse", 12), //1 SADDLE, 1 ARMOR, up to 15 CHEST
-    CRAFTER(9, "Crafter", 36);
+    CRAFTER(9, "Crafter", 36),
+    COMMAND_BLOCK(0, "Command Block", 16);
 
     private final int size;
     private final String title;
