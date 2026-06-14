@@ -5981,7 +5981,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
                 if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
-                    pk.message = TextFormat.clean(reason);
+                    pk.message = TextFormat.clean(TextFormat.colorize(reason));
                 } else {
                     pk.message = reason;
                 }
