@@ -601,10 +601,10 @@ public class CustomItemDefinition {
 
         /**
          * 设置攻击伤害。服务端的 {@link Item#getAttackDamage()} 会读取此值。
-         * 未设置时，使用物品实例的 {@code getAttackDamage()}（通常为基类默认 1）。
+         * 未设置时默认为 1。
          * <p>
          * Sets the attack damage. Server-side {@link Item#getAttackDamage()} reads this value.
-         * When unset, the item instance's {@code getAttackDamage()} is used.
+         * Defaults to 1 when unset.
          */
         public ToolBuilder attackDamage(int attackDamage) {
             this.attackDamage = attackDamage;
@@ -613,10 +613,10 @@ public class CustomItemDefinition {
 
         /**
          * 设置最大耐久。服务端的 {@link Item#getMaxDurability()} 会读取此值。
-         * 未设置时，使用物品实例的 {@code getMaxDurability()}。
+         * 未设置时默认为 {@link ItemTool#DURABILITY_WOODEN}。
          * <p>
          * Sets the max durability. Server-side {@link Item#getMaxDurability()} reads this value.
-         * When unset, the item instance's {@code getMaxDurability()} is used.
+         * Defaults to {@link ItemTool#DURABILITY_WOODEN} when unset.
          */
         public ToolBuilder maxDurability(int maxDurability) {
             this.maxDurability = maxDurability;
@@ -934,11 +934,13 @@ public class CustomItemDefinition {
         /**
          * 指定盔甲装备槽位。决定 {@code wearable.slot}、{@code enchantable_slot}，
          * 并使服务端的 {@code isHelmet()/isChestplate()/isLeggings()/isBoots()} 返回 {@code true}。
-         * 未设置时回退到基于 item 实例方法的判定。
+         * <p>
+         * <b>重要：未设置时不会写入槽位，自定义盔甲将无法装备。</b>
          * <p>
          * Specifies the armor equipment slot. Determines {@code wearable.slot}, {@code enchantable_slot},
          * and makes server-side {@code isHelmet()/isChestplate()/isLeggings()/isBoots()} return {@code true}.
-         * Falls back to item instance methods when unset.
+         * <p>
+         * <b>Important: when unset, no slot is written and the custom armor cannot be equipped.</b>
          */
         public ArmorBuilder slot(@NotNull ArmorSlot slot) {
             this.slot = slot;
@@ -947,10 +949,10 @@ public class CustomItemDefinition {
 
         /**
          * 设置护甲值。服务端的 {@link Item#getArmorPoints()} 会读取此值。
-         * 未设置时，使用物品实例的 {@code getArmorPoints()}。
+         * 未设置时默认为 0。
          * <p>
          * Sets the armor points. Server-side {@link Item#getArmorPoints()} reads this value.
-         * When unset, the item instance's {@code getArmorPoints()} is used.
+         * Defaults to 0 when unset.
          */
         public ArmorBuilder armorPoints(int armorPoints) {
             this.armorPoints = armorPoints;
