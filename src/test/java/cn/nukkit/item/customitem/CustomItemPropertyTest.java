@@ -156,6 +156,49 @@ class CustomItemPropertyTest {
         assertTrue(found, "minecraft:is_pickaxe tag should be written");
     }
 
+    @Test
+    void customArmorHasConfiguredMaxDurability() {
+        assertEquals(165, helmet.getMaxDurability());
+    }
+
+    // ===== 最小配置（防递归）测试 =====
+
+    @Test
+    void minimalArmorDoesNotRecurseAndReturnsDefaults() {
+        MinimalArmor chest = new MinimalArmor("test:min_armor", "Min Armor");
+        //getDefinition() 内部调 build()，若递归会 StackOverflowError
+        assertDoesNotThrow(chest::getDefinition);
+        //未设置的属性返回安全默认值
+        assertTrue(chest.isChestplate());
+        assertEquals(0, chest.getArmorPoints());
+        assertEquals(0, chest.getToughness());
+        assertEquals(0, chest.getTier());
+        assertEquals(0, chest.getMaxDurability());
+    }
+
+    @Test
+    void minimalToolDoesNotRecurseAndReturnsDefaults() {
+        MinimalTool axe = new MinimalTool("test:min_tool", "Min Tool");
+        //getDefinition() 内部调 build()，若递归会 StackOverflowError
+        assertDoesNotThrow(axe::getDefinition);
+        //未设置的属性返回安全默认值
+        assertTrue(axe.isAxe());
+        //attackDamage 未设 → 默认 1（Item 基类默认）
+        assertEquals(1, axe.getAttackDamage());
+        //tier 未设 → 默认 0
+        assertEquals(0, axe.getTier());
+        //maxDurability 未设 → 默认 WOODEN(60)
+        assertEquals(ItemTool.DURABILITY_WOODEN, axe.getMaxDurability());
+    }
+
+    @Test
+    void speedWithoutToolTypeDoesNotRecurse() {
+        //speed() 不再调 item.isPickaxe() 等，不会递归
+        MinimalTool axe = new MinimalTool("test:min_tool2", "Min Tool 2");
+        assertDoesNotThrow(axe::getDefinition);
+        assertTrue(axe.isAxe());
+    }
+
     // ===== 测试用自定义物品 =====
 
     private static final class CustomArmor extends ItemCustomArmor {
@@ -171,6 +214,7 @@ class CustomItemPropertyTest {
                     .armorPoints(5)
                     .toughness(2)
                     .tier(ItemArmor.TIER_IRON)
+                    .maxDurability(165)
                     .build();
         }
     }
@@ -193,6 +237,44 @@ class CustomItemPropertyTest {
                 builder.toolType(ToolType.SWORD);
             }
             return builder.build();
+        }
+    }
+
+    /**
+     * 最小配置的自定义盔甲：只设 slot，不设 armorPoints/toughness/tier/maxDurability。
+     * 用于验证 build() 不会递归，且未设置属性返回安全默认值。
+     */
+    private static final class MinimalArmor extends ItemCustomArmor {
+        MinimalArmor(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            return CustomItemDefinition
+                    .armorBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .slot(ArmorSlot.CHEST)
+                    .build();
+        }
+    }
+
+    /**
+     * 最小配置的自定义工具：只设 toolType，不设 attackDamage/maxDurability/tier，且调 speed() 不设 toolType 路径。
+     * 用于验证 build() 不会递归（StackOverflow），且未设置属性返回安全默认值。
+     */
+    private static final class MinimalTool extends ItemCustomTool {
+        MinimalTool(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            //只设 toolType + speed，不设 attackDamage/maxDurability/tier
+            return CustomItemDefinition
+                    .toolBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .toolType(ToolType.AXE)
+                    .speed(6)
+                    .build();
         }
     }
 }

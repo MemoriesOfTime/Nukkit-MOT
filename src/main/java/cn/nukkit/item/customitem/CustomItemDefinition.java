@@ -645,11 +645,9 @@ public class CustomItemDefinition {
                 log.warn("speed has an invalid value!");
                 return this;
             }
-            if (this.toolType != null) {
-                this.speed = speed;
-            } else if (item.isPickaxe() || item.isShovel() || item.isHoe() || item.isAxe() || item.isShears()) {
-                this.speed = speed;
-            }
+            //不调用 item.isPickaxe() 等实例方法，因为它们会通过 getDefinitionNbt() 递归。
+            //直接接受 speed 值；若 toolType 未设置，build() 也不会应用工具类型方块挖掘速度。
+            this.speed = speed;
             return this;
         }
 
@@ -760,10 +758,12 @@ public class CustomItemDefinition {
 
         @Override
         public CustomItemDefinition build() {
-            //附加耐久 攻击伤害 tier 信息
-            int resolvedDurability = this.maxDurability != null ? this.maxDurability : item.getMaxDurability();
-            int resolvedDamage = this.attackDamage != null ? this.attackDamage : item.getAttackDamage();
-            int resolvedTier = this.tier != null ? this.tier : item.getTier();
+            //附加耐久 攻击伤害 tier 信息。
+            //注意：不能用 item.getXxx() 作为 fallback，因为 ItemCustomTool 的覆写会调用 getDefinitionNbt()
+            //→ getDefinition() → build()，造成无限递归。未设置时使用基类默认值。
+            int resolvedDurability = this.maxDurability != null ? this.maxDurability : ItemTool.DURABILITY_WOODEN;
+            int resolvedDamage = this.attackDamage != null ? this.attackDamage : 1;
+            int resolvedTier = this.tier != null ? this.tier : 0;
             this.nbt.getCompound("components")
                     .putCompound("minecraft:durability", new CompoundTag().putInt("max_durability", resolvedDurability))
                     .getCompound("item_properties")
@@ -901,6 +901,7 @@ public class CustomItemDefinition {
         private @Nullable Integer armorPoints = null;
         private @Nullable Integer toughness = null;
         private @Nullable Integer tier = null;
+        private @Nullable Integer maxDurability = null;
 
         private ArmorBuilder(ItemCustomArmor item, CreativeItemCategory creativeCategory) {
             super(item, creativeCategory);
@@ -980,14 +981,29 @@ public class CustomItemDefinition {
             return this;
         }
 
+        /**
+         * 设置最大耐久。服务端的 {@link Item#getMaxDurability()} 会读取此值。
+         * 未设置时默认为 0。
+         * <p>
+         * Sets the max durability. Server-side {@link Item#getMaxDurability()} reads this value.
+         * Defaults to 0 when unset.
+         */
+        public ArmorBuilder maxDurability(int maxDurability) {
+            this.maxDurability = maxDurability;
+            return this;
+        }
+
         @Override
         public CustomItemDefinition build() {
-            int resolvedProtection = this.armorPoints != null ? this.armorPoints : item.getArmorPoints();
-            int resolvedToughness = this.toughness != null ? this.toughness : item.getToughness();
-            int resolvedTier = this.tier != null ? this.tier : item.getTier();
+            //注意：不能用 item.getXxx() 作为 fallback，因为 ItemCustomArmor 的覆写会调用 getDefinitionNbt()
+            //→ getDefinition() → build()，造成无限递归。未设置时使用默认值。
+            int resolvedProtection = this.armorPoints != null ? this.armorPoints : 0;
+            int resolvedToughness = this.toughness != null ? this.toughness : 0;
+            int resolvedTier = this.tier != null ? this.tier : 0;
+            int resolvedDurability = this.maxDurability != null ? this.maxDurability : 0;
             this.nbt.getCompound("components")
                     .putCompound("minecraft:durability", new CompoundTag()
-                            .putInt("max_durability", item.getMaxDurability()))
+                            .putInt("max_durability", resolvedDurability))
                     .putCompound("minecraft:wearable", new CompoundTag()
                     .putInt("protection", resolvedProtection)
                     .putInt("toughness", resolvedToughness))

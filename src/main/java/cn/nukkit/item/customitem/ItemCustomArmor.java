@@ -106,6 +106,14 @@ public abstract class ItemCustomArmor extends ItemArmor implements CustomItem {
     }
 
     @Override
+    public int getMaxDurability() {
+        return this.getDefinitionNbt()
+                .getCompound("components")
+                .getCompound("minecraft:durability")
+                .getInt("max_durability");
+    }
+
+    @Override
     public ItemCustomArmor clone() {
         return (ItemCustomArmor) super.clone();
     }
