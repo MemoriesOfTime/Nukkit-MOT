@@ -866,14 +866,20 @@ public class CustomItemDefinition {
                         )
                         .putInt("speed", speed);
                 this.diggerRoot.getList("destroy_speeds", CompoundTag.class).add(cmp);
+            }
+
+            //toolType 导出方块 + addExtraBlock 方块
+            for (var k : this.blocks) {
+                this.diggerRoot.getList("destroy_speeds", CompoundTag.class).add(k);
+            }
+
+            //有 destroy_speeds 条目才写回 digger：避免无 blockTags（SWORD/HOE/孤立 addExtraBlock）
+            //时 digger 缺失导致 getSpeed() 返回 null。putCompound 按引用存储，前面追加的条目一并生效。
+            if (!this.diggerRoot.getList("destroy_speeds", CompoundTag.class).isEmpty()) {
                 this.nbt.getCompound("components")
                         .putCompound("minecraft:digger", this.diggerRoot);
             }
 
-            //添加可挖掘的方块
-            for (var k : this.blocks) {
-                this.diggerRoot.getList("destroy_speeds", CompoundTag.class).add(k);
-            }
             return calculateID();
         }
 
@@ -896,6 +902,14 @@ public class CustomItemDefinition {
     }
 
     public static class ArmorBuilder extends SimpleBuilder {
+        /**
+         * 自定义盔甲未显式调用 {@link #maxDurability(int)} 时的默认耐久。
+         * 取原版最低值（皮革头盔 = 56）作安全下限，避免 {@code max_durability=0} 在
+         * {@link cn.nukkit.entity.EntityHumanType#damageArmor} 中首次受击即摧毁护甲。
+         * 需不可损坏的盔甲应显式设置较大耐久或用 {@link cn.nukkit.item.Item#setUnbreakable()}。
+         */
+        public static final int DURABILITY_DEFAULT = 56;
+
         private final ItemCustomArmor item;
         private @Nullable ArmorSlot slot = null;
         private @Nullable Integer armorPoints = null;
@@ -985,10 +999,7 @@ public class CustomItemDefinition {
 
         /**
          * 设置最大耐久。服务端的 {@link Item#getMaxDurability()} 会读取此值。
-         * 未设置时默认为 0。
-         * <p>
-         * Sets the max durability. Server-side {@link Item#getMaxDurability()} reads this value.
-         * Defaults to 0 when unset.
+         * 未设置时默认为 {@link #DURABILITY_DEFAULT}（正数安全值），避免护甲受击时被摧毁。
          */
         public ArmorBuilder maxDurability(int maxDurability) {
             this.maxDurability = maxDurability;
@@ -1002,7 +1013,7 @@ public class CustomItemDefinition {
             int resolvedProtection = this.armorPoints != null ? this.armorPoints : 0;
             int resolvedToughness = this.toughness != null ? this.toughness : 0;
             int resolvedTier = this.tier != null ? this.tier : 0;
-            int resolvedDurability = this.maxDurability != null ? this.maxDurability : 0;
+            int resolvedDurability = this.maxDurability != null ? this.maxDurability : DURABILITY_DEFAULT;
             this.nbt.getCompound("components")
                     .putCompound("minecraft:durability", new CompoundTag()
                             .putInt("max_durability", resolvedDurability))

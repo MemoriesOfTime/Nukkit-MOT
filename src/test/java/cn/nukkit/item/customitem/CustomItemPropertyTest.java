@@ -173,7 +173,8 @@ class CustomItemPropertyTest {
         assertEquals(0, chest.getArmorPoints());
         assertEquals(0, chest.getToughness());
         assertEquals(0, chest.getTier());
-        assertEquals(0, chest.getMaxDurability());
+        //maxDurability 未设 → 默认 DURABILITY_DEFAULT(56)，避免首次受击即摧毁护甲。
+        assertEquals(CustomItemDefinition.ArmorBuilder.DURABILITY_DEFAULT, chest.getMaxDurability());
     }
 
     @Test
@@ -197,6 +198,86 @@ class CustomItemPropertyTest {
         MinimalTool axe = new MinimalTool("test:min_tool2", "Min Tool 2");
         assertDoesNotThrow(axe::getDefinition);
         assertTrue(axe.isAxe());
+    }
+
+    // ===== digger 组件写回回归测试 =====
+    // 回归：toolType(SWORD/HOE) 无 blockTags，或仅调 addExtraBlock，build() 仍应写回
+    // minecraft:digger，否则服务端 getSpeed() 返回 null、客户端收不到挖掘速度。
+
+    @Test
+    void customSwordWritesDiggerComponent() {
+        CompoundTag nbt = sword.getDefinition().getNbt();
+        assertTrue(nbt.getCompound("components").contains("minecraft:digger"),
+                "SWORD should have minecraft:digger even without blockTags");
+        var speeds = nbt.getCompound("components")
+                .getCompound("minecraft:digger")
+                .getList("destroy_speeds", CompoundTag.class).getAll();
+        assertFalse(speeds.isEmpty(), "destroy_speeds must not be empty for sword");
+
+        //SWORD 的 toolBlocks 应含 web 和 bamboo
+        boolean hasWeb = false, hasBamboo = false;
+        for (var entry : speeds) {
+            String name = entry.getCompound("block").getString("name");
+            if ("minecraft:web".equals(name)) hasWeb = true;
+            if ("minecraft:bamboo".equals(name)) hasBamboo = true;
+        }
+        assertTrue(hasWeb, "sword digger should include minecraft:web");
+        assertTrue(hasBamboo, "sword digger should include minecraft:bamboo");
+    }
+
+    @Test
+    void customSwordGetSpeedNotNull() {
+        //CustomTool tier=IRON(5) → 默认 speed=6
+        Integer s = sword.getSpeed();
+        assertNotNull(s, "getSpeed() must not be null when digger is written");
+        assertEquals(6, s);
+    }
+
+    @Test
+    void customHoeWritesDiggerComponent() {
+        CustomHoe hoe = new CustomHoe("test:hoe", "Test Hoe");
+        CompoundTag nbt = hoe.getDefinition().getNbt();
+        assertTrue(nbt.getCompound("components").contains("minecraft:digger"),
+                "HOE should have minecraft:digger even without blockTags");
+        var speeds = nbt.getCompound("components")
+                .getCompound("minecraft:digger")
+                .getList("destroy_speeds", CompoundTag.class).getAll();
+        assertFalse(speeds.isEmpty(), "destroy_speeds must not be empty for hoe");
+
+        //HOE 的 toolBlocks 应含 leaves
+        boolean hasLeaves = false;
+        for (var entry : speeds) {
+            if ("minecraft:leaves".equals(entry.getCompound("block").getString("name"))) {
+                hasLeaves = true;
+                break;
+            }
+        }
+        assertTrue(hasLeaves, "hoe digger should include minecraft:leaves");
+        assertNotNull(hoe.getSpeed(), "hoe getSpeed() must not be null");
+    }
+
+    @Test
+    void addExtraBlockOnlyWritesDiggerWithoutToolType() {
+        //不设 toolType、仅调 addExtraBlock：此前 digger 不被写回。
+        ExtraBlockTool tool = new ExtraBlockTool("test:extra_block", "Extra Block Tool");
+        CompoundTag nbt = tool.getDefinition().getNbt();
+        assertTrue(nbt.getCompound("components").contains("minecraft:digger"),
+                "addExtraBlock without addExtraBlockTags should still write minecraft:digger");
+        var speeds = nbt.getCompound("components")
+                .getCompound("minecraft:digger")
+                .getList("destroy_speeds", CompoundTag.class).getAll();
+        assertEquals(1, speeds.size());
+        assertEquals("minecraft:stone", speeds.get(0).getCompound("block").getString("name"));
+        assertEquals(5, speeds.get(0).getInt("speed"));
+    }
+
+    @Test
+    void shearsWithoutBlocksWritesNoDigger() {
+        //SHEARS 无 type 方块也无 blockTags：digger 不应被写入。
+        ShearsTool shears = new ShearsTool("test:shears", "Test Shears");
+        CompoundTag nbt = shears.getDefinition().getNbt();
+        assertFalse(nbt.getCompound("components").contains("minecraft:digger"),
+                "shears with no blocks should not write minecraft:digger");
     }
 
     // ===== 测试用自定义物品 =====
@@ -274,6 +355,48 @@ class CustomItemPropertyTest {
                     .toolBuilder(this, CreativeItemCategory.EQUIPMENT)
                     .toolType(ToolType.AXE)
                     .speed(6)
+                    .build();
+        }
+    }
+
+    private static final class CustomHoe extends ItemCustomTool {
+        CustomHoe(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            return CustomItemDefinition
+                    .toolBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .toolType(ToolType.HOE)
+                    .build();
+        }
+    }
+
+    private static final class ExtraBlockTool extends ItemCustomTool {
+        ExtraBlockTool(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            return CustomItemDefinition
+                    .toolBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .addExtraBlock("minecraft:stone", 5)
+                    .build();
+        }
+    }
+
+    private static final class ShearsTool extends ItemCustomTool {
+        ShearsTool(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            return CustomItemDefinition
+                    .toolBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .toolType(ToolType.SHEARS)
                     .build();
         }
     }
