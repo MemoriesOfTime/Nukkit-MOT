@@ -29,24 +29,32 @@ public interface CustomItem extends StringItem {
     CustomItemDefinition getDefinition();
 
     /**
-     * 从注册表读取当前物品定义的 NBT。注册表保存的是注册时的快照，
+     * 从注册表读取当前物品的定义。注册表保存的是注册时的快照，
      * 比 {@link #getDefinition()}（每次调用都重建）更可靠、更高效。
      * 若物品未注册（如测试或注册前访问），回退到 {@link #getDefinition()}。
      * <p>
-     * Reads this item definition's NBT from the registry. The registry holds the
+     * Reads this item's definition from the registry. The registry holds the
      * snapshot taken at registration time, which is more reliable and efficient
      * than {@link #getDefinition()} (rebuilt on every call). Falls back to
      * {@link #getDefinition()} when the item is not registered (e.g. in tests).
      *
+     * @return 物品定义
+     */
+    default CustomItemDefinition resolveDefinition() {
+        var definition = Item.getCustomItemDefinition().get(this.getNamespaceId());
+        return definition != null ? definition : this.getDefinition();
+    }
+
+    /**
+     * 从注册表读取当前物品定义的 NBT。等价于
+     * {@code resolveDefinition().getNbt()}。
+     * <p>
+     * Reads this item definition's NBT from the registry. Equivalent to
+     * {@code resolveDefinition().getNbt()}.
+     *
      * @return 定义 NBT
      */
     default CompoundTag getDefinitionNbt() {
-        var definitions = Item.getCustomItemDefinition();
-        var definition = definitions.get(this.getNamespaceId());
-        if (definition == null) {
-            // 未注册时回退到实时定义，保证测试和边界场景可用
-            definition = this.getDefinition();
-        }
-        return definition.getNbt();
+        return this.resolveDefinition().getNbt();
     }
 }

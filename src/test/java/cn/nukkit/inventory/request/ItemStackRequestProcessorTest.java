@@ -538,6 +538,35 @@ class ItemStackRequestProcessorTest {
         assertTrue(offhand.getItem(0).isNull());
     }
 
+    @Test
+    void offhandAcceptsLegacyCustomItem() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+
+        Item custom = new TestLegacyCustomItem("test:offhand_legacy", "Offhand Legacy");
+        custom.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, custom, false));
+        custom = inventory.getItem(0);
+
+        TakeAction action = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, custom.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.OFFHAND, 0, 0, null)
+        );
+
+        ActionResponse response = new TakeActionProcessor().handle(action, player, context());
+
+        // Legacy 模式物品定义在 behavior pack，服务端无 allow_off_hand 信息，应信任客户端放行
+        assertNotNull(response);
+        assertTrue(response.success());
+        assertTrue(inventory.getItem(0).isNull());
+        assertEquals(custom.getNamespaceId(), offhand.getItem(0).getNamespaceId());
+    }
+
     /**
      * Minimal {@link cn.nukkit.item.customitem.ItemCustom} used by the off-hand tests.
      * Its {@link cn.nukkit.item.customitem.CustomItemDefinition} is built with the
@@ -556,6 +585,25 @@ class ItemStackRequestProcessorTest {
             return cn.nukkit.item.customitem.CustomItemDefinition
                     .customBuilder(this, cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory.ITEMS)
                     .allowOffHand(this.allowOffHand)
+                    .build();
+        }
+    }
+
+    /**
+     * Minimal legacy-mode {@link cn.nukkit.item.customitem.ItemCustom}. Its definition
+     * is built with {@link cn.nukkit.item.customitem.CustomItemDefinition.LegacyItemBuilder},
+     * so it has no {@code components.item_properties}; its off-hand eligibility must defer
+     * to the client behavior pack (server returns {@code true}).
+     */
+    private static final class TestLegacyCustomItem extends cn.nukkit.item.customitem.ItemCustom {
+        TestLegacyCustomItem(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public cn.nukkit.item.customitem.CustomItemDefinition getDefinition() {
+            return cn.nukkit.item.customitem.CustomItemDefinition
+                    .legacyBuilder(this)
                     .build();
         }
     }
