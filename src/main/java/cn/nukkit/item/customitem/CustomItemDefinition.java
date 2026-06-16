@@ -552,9 +552,9 @@ public class CustomItemDefinition {
             }
             toolBlocks.put(ItemTag.IS_HOE, hoeBlocks);
 
-            for (var name : List.of("minecraft:web", "minecraft:bamboo")) {
-                swordBlocks.put(name, new DigProperty());
-            }
+            //web 须显式写入原版 cobweb 速度 15，否则被 tier 默认值覆盖致回归；bamboo 瞬间破坏，不经 toolBreakTimeBonus0。
+            swordBlocks.put("minecraft:web", new DigProperty(new CompoundTag(), 15));
+            swordBlocks.put("minecraft:bamboo", new DigProperty());
             toolBlocks.put(ItemTag.IS_SWORD, swordBlocks);
         }
 
@@ -772,14 +772,15 @@ public class CustomItemDefinition {
                     .putInt("enchantable_value", tierToToolEnchantAbility(resolvedTier));
 
             if (speed == null) {
+                //对齐 Block.toolBreakTimeBonus0 的 tier→speed 查表（WOODEN=1,GOLD=2,STONE=3,COPPER=4,IRON=5,DIAMOND=6,NETHERITE=7）；COPPER 等无对应原版工具，回退 1。
                 speed = switch (resolvedTier) {
-                    case 6 -> 7;
-                    case 5 -> 6;
-                    case 4 -> 5;
-                    case 3 -> 4;
-                    case 2 -> 3;
-                    case 1 -> 2;
-                    default -> 1;
+                    case 1 -> 2;   // TIER_WOODEN
+                    case 2 -> 12;  // TIER_GOLD
+                    case 3 -> 4;   // TIER_STONE
+                    case 5 -> 6;   // TIER_IRON
+                    case 6 -> 8;   // TIER_DIAMOND
+                    case 7 -> 9;   // TIER_NETHERITE
+                    default -> 1;  // TIER_COPPER(4) 等
                 };
             }
             //确定工具类型：仅使用显式设置的 toolType。避免调用 item.isPickaxe() 等实例方法，
@@ -845,14 +846,15 @@ public class CustomItemDefinition {
             if (type != null) {
                 toolBlocks.get(type).forEach(
                         (k, v) -> {
-                            if (v.getSpeed() == null) v.setSpeed(speed);
+                            //不修改共享 DigProperty（static toolBlocks），否则首次 build 会污染后续不同 tier 的 build。
+                            int blockSpeed = v.getSpeed() != null ? v.getSpeed() : speed;
                             blocks.add(new CompoundTag()
                                     .putCompound("block", new CompoundTag()
                                             .putString("name", k)
                                             .putCompound("states", v.getStates())
                                             .putString("tags", "")
                                     )
-                                    .putInt("speed", v.getSpeed()));
+                                    .putInt("speed", blockSpeed));
                         }
                 );
             }

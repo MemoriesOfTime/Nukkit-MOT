@@ -1,6 +1,7 @@
 package cn.nukkit.item.customitem;
 
 import cn.nukkit.MockServer;
+import cn.nukkit.block.Block;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemArmor;
 import cn.nukkit.item.ItemTool;
@@ -200,9 +201,45 @@ class CustomItemPropertyTest {
         assertTrue(axe.isAxe());
     }
 
-    // ===== digger 组件写回回归测试 =====
-    // 回归：toolType(SWORD/HOE) 无 blockTags，或仅调 addExtraBlock，build() 仍应写回
-    // minecraft:digger，否则服务端 getSpeed() 返回 null、客户端收不到挖掘速度。
+    // ===== digger 写回 + 逐方块速度回归测试（方案 B：getSpeedFor 按 blockId 查 destroy_speeds）=====
+
+    @Test
+    void customPickaxeBreakTimeMatchesVanilla() {
+        //自定义铁镐挖石头须与原版一致（base=1.5*1.5=2.25, bonus=6 → 0.375）
+        Block stone = Block.get(Block.STONE);
+        double customTime = stone.calculateBreakTimeNotInAir(pickaxe, null);
+        double vanillaTime = stone.calculateBreakTimeNotInAir(Item.get(Item.IRON_PICKAXE), null);
+        assertEquals(vanillaTime, customTime, 0.001, "custom iron pickaxe must match vanilla");
+        assertEquals(0.375, customTime, 0.001);
+    }
+
+    @Test
+    void customHoeLeavesBreakTimeMatchesVanilla() {
+        //原版锄头挖树叶本就慢（BlockLeaves.getToolType=HOE，correctTool0 line850 要求 ==SHEARS 故 false）。自定义锄头虽因 correctTool 扩展 correctTool=true，但 bonus 仍取 tier=1，保持一致。
+        CustomHoe hoe = new CustomHoe("test:hoe_leaves", "Test Hoe Leaves");
+        Block leaves = Block.get(Block.LEAVES);
+        double customTime = leaves.calculateBreakTimeNotInAir(hoe, null);
+        double vanillaTime = leaves.calculateBreakTimeNotInAir(Item.get(Item.IRON_HOE), null);
+        assertEquals(vanillaTime, customTime, 0.001, "custom hoe leaves must match vanilla hoe");
+    }
+
+    @Test
+    void customSwordCobwebBreakTimeMatchesVanilla() {
+        //BlockCobweb.getToolType=SWORD，correctTool0 line854 true → bonus=15（base=6 → 0.4）
+        Block cobweb = Block.get(Block.COBWEB);
+        double customTime = cobweb.calculateBreakTimeNotInAir(sword, null);
+        double vanillaTime = cobweb.calculateBreakTimeNotInAir(Item.get(Item.IRON_SWORD), null);
+        assertEquals(vanillaTime, customTime, 0.001, "custom sword cobweb must match vanilla sword");
+        assertEquals(0.4, customTime, 0.001);
+    }
+
+    @Test
+    void clonedToolSpeedCacheConsistent() {
+        Integer original = pickaxe.getSpeedFor(Block.get(Block.STONE));
+        ItemCustomTool cloned = pickaxe.clone();
+        assertEquals(original, cloned.getSpeedFor(Block.get(Block.STONE)));
+        assertNotNull(cloned.getSpeedFor(Block.get(Block.STONE)));
+    }
 
     @Test
     void customSwordWritesDiggerComponent() {
@@ -226,11 +263,67 @@ class CustomItemPropertyTest {
     }
 
     @Test
-    void customSwordGetSpeedNotNull() {
-        //CustomTool tier=IRON(5) → 默认 speed=6
-        Integer s = sword.getSpeed();
-        assertNotNull(s, "getSpeed() must not be null when digger is written");
-        assertEquals(6, s);
+    void customSwordCobwebUsesVanillaSpeed() {
+        //cobweb 回归修复：剑挖蜘蛛网须用原版 15，而非 tier 默认值（此前 getSpeed()[0] 误判为 6）
+        Block cobweb = Block.get(Block.COBWEB);
+        assertEquals(15, sword.getSpeedFor(cobweb),
+                "sword dig speed for cobweb must be the vanilla value 15");
+    }
+
+    @Test
+    void customSwordNonListedBlockReturnsNull() {
+        //石头不在 sword digger 列表 → null（Block 回退 tier 查表）
+        assertNull(sword.getSpeedFor(Block.get(Block.STONE)),
+                "sword getSpeedFor must be null for non-digger blocks");
+    }
+
+    @Test
+    void customPickaxeToolBlockSpeedMatchesTier() {
+        //PICKAXE toolBlocks 方块 speed = tier 查表值（IRON=6）
+        Integer speed = pickaxe.getSpeedFor(Block.get(Block.STONE));
+        assertNotNull(speed);
+        assertEquals(6, speed, "iron pickaxe dig speed for stone must be 6");
+    }
+
+    @Test
+    void addExtraBlockSpeedHonoredPerBlock() {
+        //方案 B 核心：addExtraBlock 逐方块自定义速度，而非取 destroy_speeds[0]
+        ExtraBlockTool tool = new ExtraBlockTool("test:extra_block", "Extra Block Tool");
+        Integer speed = tool.getSpeedFor(Block.get(Block.STONE));
+        assertNotNull(speed);
+        assertEquals(5, speed, "addExtraBlock speed must apply to the specific block");
+    }
+
+    @Test
+    void addExtraBlockEnablesCorrectToolBreakSpeed() {
+        //correctTool 扩展：ExtraBlockTool 非 toolType 但 digger 含 stone → correctTool=true → bonus=5
+        //（base=1.5*5=7.5 / 5 = 1.5；无扩展则 7.5）
+        ExtraBlockTool tool = new ExtraBlockTool("test:extra_block", "Extra Block Tool");
+        Block stone = Block.get(Block.STONE);
+        double breakTime = stone.calculateBreakTimeNotInAir(tool, null);
+        assertEquals(1.5, breakTime, 0.01,
+                "digger-listed block must use digger speed (correctTool extension)");
+    }
+
+    @Test
+    void goldTierPickaxeSpeedMatchesVanilla() {
+        //tier 修正：GOLD 须为 12（此前误算 3）
+        var gold = new CustomTierTool("test:gold_pickaxe", "Gold Pickaxe", ItemTool.TIER_GOLD, ToolType.PICKAXE);
+        assertEquals(12, gold.getSpeedFor(Block.get(Block.STONE)));
+    }
+
+    @Test
+    void diamondTierPickaxeSpeedMatchesVanilla() {
+        //tier 修正：DIAMOND 须为 8（此前误算 7）
+        var diamond = new CustomTierTool("test:diamond_pickaxe", "Diamond Pickaxe", ItemTool.TIER_DIAMOND, ToolType.PICKAXE);
+        assertEquals(8, diamond.getSpeedFor(Block.get(Block.STONE)));
+    }
+
+    @Test
+    void netheriteTierPickaxeSpeedMatchesVanilla() {
+        //tier 修正：NETHERITE 须为 9（此前误算 1）
+        var netherite = new CustomTierTool("test:netherite_pickaxe", "Netherite Pickaxe", ItemTool.TIER_NETHERITE, ToolType.PICKAXE);
+        assertEquals(9, netherite.getSpeedFor(Block.get(Block.STONE)));
     }
 
     @Test
@@ -253,12 +346,13 @@ class CustomItemPropertyTest {
             }
         }
         assertTrue(hasLeaves, "hoe digger should include minecraft:leaves");
-        assertNotNull(hoe.getSpeed(), "hoe getSpeed() must not be null");
+        //hoe leaves 走 tier 默认值（tier=0 → 1）；原版锄头挖树叶本就慢，保持一致
+        assertEquals(1, hoe.getSpeedFor(Block.get(Block.LEAVES)));
     }
 
     @Test
     void addExtraBlockOnlyWritesDiggerWithoutToolType() {
-        //不设 toolType、仅调 addExtraBlock：此前 digger 不被写回。
+        //不设 toolType 仅调 addExtraBlock：digger 仍应写回
         ExtraBlockTool tool = new ExtraBlockTool("test:extra_block", "Extra Block Tool");
         CompoundTag nbt = tool.getDefinition().getNbt();
         assertTrue(nbt.getCompound("components").contains("minecraft:digger"),
@@ -397,6 +491,27 @@ class CustomItemPropertyTest {
             return CustomItemDefinition
                     .toolBuilder(this, CreativeItemCategory.EQUIPMENT)
                     .toolType(ToolType.SHEARS)
+                    .build();
+        }
+    }
+
+    /** 可配置 tier + toolType 的自定义工具，验证不同 tier 的 toolBlocks speed 是否与原版 tier 查表一致。 */
+    private static final class CustomTierTool extends ItemCustomTool {
+        private final int tier;
+        private final ToolType toolType;
+
+        CustomTierTool(String id, String name, int tier, ToolType toolType) {
+            super(id, name);
+            this.tier = tier;
+            this.toolType = toolType;
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            return CustomItemDefinition
+                    .toolBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .toolType(toolType)
+                    .tier(tier)
                     .build();
         }
     }
