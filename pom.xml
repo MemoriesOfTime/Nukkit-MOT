@@ -498,6 +498,28 @@
                 </configuration>
             </plugin>
             <plugin>
+                <!-- Register src/build-tools/java as an additional source root so the build-time
+                     helper (MinifyJsonResources) is compiled and available on the classpath during
+                     process-classes. Bound before the compile phase. -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>add-build-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/src/build-tools/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
                 <configuration>
@@ -515,6 +537,31 @@
                         <goals>
                             <goal>properties</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- Minify every .json resource in the build output to shrink the JAR.
+                     Source files stay readable; only the copied artifacts under target/classes are minified.
+                     Runs in process-classes (after compile, before package) so the helper class is compiled,
+                     and after the default process-resources copy. Idempotent: already-minified files are unchanged.
+                     Uses Gson (compile classpath) to parse and re-serialize without whitespace. -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>minify-json-resources</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>cn.nukkit.buildtools.MinifyJsonResources</mainClass>
+                            <arguments>
+                                <argument>${project.build.outputDirectory}</argument>
+                            </arguments>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -561,6 +608,14 @@
                             <artifact>*:*</artifact>
                             <excludes>
                                 <exclude>META-INF/versions/</exclude>
+                            </excludes>
+                        </filter>
+                        <!-- Exclude build-time helper classes from the shaded JAR.
+                             MinifyJsonResources only runs during process-classes. -->
+                        <filter>
+                            <artifact>${project.groupId}:${project.artifactId}</artifact>
+                            <excludes>
+                                <exclude>cn/nukkit/buildtools/**</exclude>
                             </excludes>
                         </filter>
                     </filters>
