@@ -231,6 +231,10 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
         nukkitPacket.avgEndFrameTimeMS = 0.5f;
         nukkitPacket.avgRemainderTimePercent = 2.0f;
         nukkitPacket.avgUnaccountedTimePercent = 1.0f;
+        if (protocolVersion >= ProtocolInfo.v1_26_30) {
+            nukkitPacket.whiskerScopes.add(new cn.nukkit.network.protocol.ServerboundDiagnosticsPacket.WhiskerScopeDataSummary(
+                    "scope", "  ", 10L, 20L, 30L));
+        }
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -239,6 +243,15 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
         assertEquals(60.0f, cbPacket.getAvgFps(), 0.001f);
         assertEquals(5.0f, cbPacket.getAvgServerSimTickTimeMS(), 0.001f);
         assertEquals(8.0f, cbPacket.getAvgRenderTimeMS(), 0.001f);
+        if (protocolVersion >= ProtocolInfo.v1_26_30) {
+            assertEquals(1, cbPacket.getWhiskerScopes().size());
+            var scope = cbPacket.getWhiskerScopes().get(0);
+            assertEquals("scope", scope.getLabel());
+            assertEquals("  ", scope.getIndentation());
+            assertEquals(10L, scope.getTotalHighCostNS());
+            assertEquals(20L, scope.getTotalMidCostNS());
+            assertEquals(30L, scope.getTotalLowCostNS());
+        }
     }
 
     // ==================== ScriptCustomEventPacket ====================

@@ -41,6 +41,11 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
      * @since v975
      */
     public List<SystemDiagnosticTimingInfo> systemDiagnostics = new ArrayList<>();
+    /**
+     * Whisker scope diagnostic timing info.
+     * @since v1001
+     */
+    public List<WhiskerScopeDataSummary> whiskerScopes = new ArrayList<>();
 
     @Override
     public int packetId() {
@@ -75,6 +80,12 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
 
             this.systemDiagnostics = new ArrayList<>();
             this.getArray(this.systemDiagnostics, bs -> new SystemDiagnosticTimingInfo(bs.getString(), bs.getLLong(), bs.getLLong(), (byte) bs.getByte()));
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_26_30) {
+            this.whiskerScopes = new ArrayList<>();
+            this.getArray(this.whiskerScopes, bs -> new WhiskerScopeDataSummary(
+                    bs.getString(), bs.getString(), bs.getLLong(), bs.getLLong(), bs.getLLong()));
         }
     }
 
@@ -111,6 +122,16 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
                 this.putLLong(info.systemIndex);
                 this.putLLong(info.timeInNs);
                 this.putByte(info.percentOfTotal);
+            });
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_26_30) {
+            this.putArray(this.whiskerScopes, info -> {
+                this.putString(info.label);
+                this.putString(info.indentation);
+                this.putLLong(info.totalHighCostNS);
+                this.putLLong(info.totalMidCostNS);
+                this.putLLong(info.totalLowCostNS);
             });
         }
     }
@@ -153,5 +174,20 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         public long systemIndex;
         public long timeInNs;
         public byte percentOfTotal;
+    }
+
+    /**
+     * Whisker scope diagnostic timing info.
+     * @since v1001
+     */
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class WhiskerScopeDataSummary {
+        public String label;
+        public String indentation;
+        public long totalHighCostNS;
+        public long totalMidCostNS;
+        public long totalLowCostNS;
     }
 }

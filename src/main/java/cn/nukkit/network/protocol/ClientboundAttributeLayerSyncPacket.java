@@ -77,6 +77,9 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
     private void writeUpdateAttributeLayers(UpdateAttributeLayersData data) {
         this.putArray(data.attributeLayers, (layer) -> {
             this.putString(layer.layerName);
+            if (this.protocol >= ProtocolInfo.v1_26_30) {
+                this.putOptionalNull(layer.noiseName, this::putString);
+            }
             this.putVarInt(layer.dimension);
             writeAttributeLayerSettings(layer.settings);
             this.putArray(layer.attributes, this::writeEnvironmentAttribute);
@@ -87,11 +90,12 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
         List<AttributeLayerData> layers = new ArrayList<>();
         this.getArray(layers, (s) -> {
             String name = s.getString();
+            String noiseName = this.protocol >= ProtocolInfo.v1_26_30 ? s.getOptional(null, (s2) -> s2.getString()) : null;
             int dim = s.getVarInt();
             AttributeLayerSettings settings = readAttributeLayerSettings();
             List<EnvironmentAttributeData> attrs = new ArrayList<>();
             s.getArray(attrs, (s2) -> readEnvironmentAttribute());
-            return new AttributeLayerData(name, dim, settings, attrs);
+            return new AttributeLayerData(name, noiseName, dim, settings, attrs);
         });
         return new UpdateAttributeLayersData(layers);
     }
@@ -194,6 +198,10 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
         this.putLInt(e.currentTransitionTicks);
         this.putLInt(e.totalTransitionTicks);
         this.putString(e.easing.getSerializeName());
+        if (this.protocol >= ProtocolInfo.v1_26_30) {
+            this.putLInt(e.localTransitionTicks);
+            this.putBoolean(e.noiseTransition);
+        }
     }
 
     private EnvironmentAttributeData readEnvironmentAttribute() {
@@ -204,6 +212,11 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
         int currentTicks = this.getLInt();
         int totalTicks = this.getLInt();
         EnvironmentAttributeData.CameraEase easing = EnvironmentAttributeData.CameraEase.fromName(this.getString());
+        if (this.protocol >= ProtocolInfo.v1_26_30) {
+            int localTransitionTicks = this.getLInt();
+            boolean noiseTransition = this.getBoolean();
+            return new EnvironmentAttributeData(name, from, attribute, to, currentTicks, totalTicks, easing, localTransitionTicks, noiseTransition);
+        }
         return new EnvironmentAttributeData(name, from, attribute, to, currentTicks, totalTicks, easing);
     }
 

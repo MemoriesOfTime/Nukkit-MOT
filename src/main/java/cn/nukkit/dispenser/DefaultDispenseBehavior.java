@@ -33,9 +33,9 @@ public class DefaultDispenseBehavior implements DispenseBehavior {
         motion.y += rand.nextGaussian() * 0.007499999832361937 * 6;
         motion.z += rand.nextGaussian() * 0.007499999832361937 * 6;
 
-        Item i = item.clone();
-        i.setCount(1);
-        block.level.dropItem(dispensePos, i, motion);
+        Item clone = item.clone();
+        clone.setCount(1);
+        block.level.dropItem(dispensePos, clone, motion);
         return null;
     }
 }
