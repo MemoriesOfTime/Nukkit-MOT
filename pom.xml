@@ -449,7 +449,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>bedrock-codec</artifactId>
-            <version>3.0.0.Beta12-20260602.165120-25</version>
+            <version>3.0.0.Beta12-20260609.111529-26</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
