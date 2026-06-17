@@ -16,6 +16,7 @@ import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.data.property.EntityProperty;
+import cn.nukkit.entity.data.warden.WardenWarningData;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
@@ -59,6 +60,8 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.PunchBlockParticle;
 import cn.nukkit.level.sound.ExperienceOrbSound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.nbt.NBTIO;
@@ -200,6 +203,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public int gamemode;
     public long lastBreak = -1;
     private BlockVector3 lastBreakPosition = new BlockVector3();
+
+    protected final WardenWarningData wardenWarningData = new WardenWarningData();
 
     protected int windowCnt = MINIMUM_OTHER_WINDOW_ID;
 
@@ -2297,6 +2302,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.blocksAround = null;
                 this.collisionBlocks = null;
 
+                if (this.isGliding()) {
+                    this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), VibrationType.ELYTRA_GLIDE));
+                } else if (this.isSwimming() || this.isInsideOfWater()) {
+                    if (!this.isSneaking()) {
+                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), VibrationType.SWIM));
+                    }
+                } else if (this.isOnGround()) {
+                    if (!this.isSneaking()) {
+                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), VibrationType.STEP));
+                    }
+                }
+
                 if (!to.equals(moveEvent.getTo())) { // If plugins modify the destination
                     this.teleport(moveEvent.getTo(), null);
                 } else {
@@ -3066,6 +3083,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.foodData = new PlayerFood(this, this.namedTag.getInt("foodLevel"), this.namedTag.getFloat("foodSaturationLevel"));
+
+        // Restore warden warning state (per-player, persists across reconnect/restart)
+        this.wardenWarningData.warningLevel = this.namedTag.getInt("wardenWarningLevel");
+        this.wardenWarningData.lastWarningTick = this.namedTag.getLong("wardenLastWarningTick");
 
         if (this.isSpectator()) {
             this.keepMovement = true;
@@ -5368,6 +5389,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                             this.inventory.addItem(new ItemGlassBottle());
                                         }
 
+                                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0, this.getEyeHeight()), VibrationType.DRINK));
+
                                         if (potion != null) {
                                             potion.applyPotion(this);
                                         }
@@ -5381,6 +5404,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         Food food = Food.getByRelative(itemInHand);
                                         if (food != null && food.eatenBy(this)) {
                                             this.getInventory().decreaseCount(this.getInventory().getHeldItemIndex());
+                                            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0, this.getEyeHeight()), VibrationType.EAT));
                                         }
                                     }
                                     return;
@@ -6152,6 +6176,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.namedTag.putList(fogIdentifiers);
             this.namedTag.putList(userProvidedFogIds);
 
+            this.namedTag.putInt("wardenWarningLevel", this.wardenWarningData.warningLevel);
+            this.namedTag.putLong("wardenLastWarningTick", this.wardenWarningData.lastWarningTick);
+
             if (!this.username.isEmpty() && this.namedTag != null) {
                 if (this.server.savePlayerDataByUuid) {
                     this.server.saveOfflinePlayerData(this.uuid, this.namedTag, async);
@@ -6902,6 +6929,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.setSwimming(false);
             this.setCrawling(false);
+
+            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, from.clone(), VibrationType.TELEPORT));
 
             this.stopFishing(false);
             return true;
@@ -8540,5 +8569,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         DebugDrawerPacket packet = new DebugDrawerPacket();
         packet.shapes.addAll(entries);
         this.dataPacket(packet);
+    }
+
+    /**
+     * Returns the warden-related warning data for this player.
+     *
+     * @return the warden warning data
+     */
+    public WardenWarningData getWardenWarningData() {
+        return this.wardenWarningData;
     }
 }

@@ -18,6 +18,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.particle.HugeExplodeSeedParticle;
 import cn.nukkit.level.util.ExplosionSource;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Hash;
@@ -331,6 +333,14 @@ public class Explosion {
 
         this.level.addParticle(new HugeExplodeSeedParticle(this.source));
         this.level.addSound(this.source, Sound.RANDOM_EXPLODE);
+
+        Object initiator = null;
+        if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
+            initiator = entitySource.entity();
+        } else if (this.sourceObject instanceof ExplosionSource.BlockSource blockSource) {
+            initiator = blockSource.block();
+        }
+        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(initiator, this.source.clone(), VibrationType.EXPLODE));
 
         return true;
     }

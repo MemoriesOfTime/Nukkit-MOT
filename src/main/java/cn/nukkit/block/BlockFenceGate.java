@@ -7,6 +7,8 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.sound.DoorSound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
@@ -161,6 +163,7 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
         } else {
             this.level.addSound(this, Sound.RANDOM_DOOR_CLOSE);
         }
+        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player != null ? player : this, this.add(0.5, 0.5, 0.5), this.isOpen() ? VibrationType.BLOCK_OPEN : VibrationType.BLOCK_CLOSE));
         return true;
     }
 
@@ -179,7 +182,7 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
 
         return 0;
     }
-    
+
     @Override
     public Item toItem() {
         return Item.get(Item.FENCE_GATE, 0, 1);
