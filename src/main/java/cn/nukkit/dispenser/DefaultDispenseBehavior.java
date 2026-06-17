@@ -35,7 +35,6 @@ public class DefaultDispenseBehavior implements DispenseBehavior {
 
         Item clone = item.clone();
         clone.setCount(1);
-        item.setCount(item.getCount() - 1);
         block.level.dropItem(dispensePos, clone, motion);
         return null;
     }

@@ -5,6 +5,7 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDropper;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
@@ -163,11 +164,35 @@ public class BlockDropper extends BlockSolidMeta implements Faceable {
 
         if (target != null) {
             target = target.clone();
-            drop(target);
+
+            // 优先推入相邻容器；失败则弹入世界（原版 dropper 行为）
+            if (!this.dispenseToContainer(target)) {
+                this.drop(target);
+            }
 
             target.count--;
             inv.setItem(slot, target);
         }
+    }
+
+    /**
+     * 尝试将 1 个单位的物品插入朝向相邻的容器。不修改源物品数量。
+     *
+     * @return true 表示已插入容器；false 表示相邻方块非容器或已拒收
+     */
+    private boolean dispenseToContainer(Item item) {
+        BlockEntity be = this.level.getBlockEntityIfLoaded(this.getSide(this.getBlockFace()));
+        if (!(be instanceof InventoryHolder)) {
+            return false;
+        }
+        Inventory inventory = ((InventoryHolder) be).getInventory();
+        Item one = item.clone();
+        one.setCount(1);
+        if (!inventory.canAddItem(one)) {
+            return false;
+        }
+        inventory.addItem(one);
+        return true;
     }
 
     public void drop(Item item) {
@@ -182,7 +207,7 @@ public class BlockDropper extends BlockSolidMeta implements Faceable {
 
         ThreadLocalRandom rand = ThreadLocalRandom.current();
         double offset = rand.nextDouble() * 0.1 + 0.2;
-        Vector3 motion = new Vector3(face.getXOffset() * offset, 0.1, face.getZOffset() * offset);
+        Vector3 motion = new Vector3(face.getXOffset() * offset, 0.20000000298023224, face.getZOffset() * offset);
 
         motion.x += rand.nextGaussian() * 0.007499999832361937 * 6;
         motion.y += rand.nextGaussian() * 0.007499999832361937 * 6;
