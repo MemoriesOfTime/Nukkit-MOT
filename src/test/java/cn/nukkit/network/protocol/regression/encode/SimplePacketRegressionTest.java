@@ -91,6 +91,10 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersions(ProtocolInfo.v1_21_130_28);
     }
 
+    static Stream<Arguments> versionsAt1001() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_26_30));
+    }
+
     // ==================== RemoveEntityPacket ====================
 
     @ParameterizedTest(name = "RemoveEntityPacket v{0}")
@@ -175,6 +179,47 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
                 org.cloudburstmc.protocol.bedrock.packet.SetCommandsEnabledPacket.class);
 
         assertTrue(cbPacket.isCommandsEnabled());
+    }
+
+    // ==================== ClientboundUpdateSoundDataPacket ====================
+
+    @ParameterizedTest(name = "ClientboundUpdateSoundDataPacket v{0}")
+    @MethodSource("versionsAt1001")
+    void testClientboundUpdateSoundDataPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ClientboundUpdateSoundDataPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.serverSoundHandle = 0x0102030405060708L;
+        nukkitPacket.type = "music";
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ClientboundUpdateSoundDataPacket.class);
+
+        assertEquals(0x0102030405060708L, cbPacket.getServerSoundHandle());
+        assertEquals("music", cbPacket.getType());
+    }
+
+    // ==================== SendPartyDestinationCookiePacket ====================
+
+    @ParameterizedTest(name = "SendPartyDestinationCookiePacket v{0}")
+    @MethodSource("versionsAt1001")
+    void testSendPartyDestinationCookiePacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.SendPartyDestinationCookiePacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.cookie = "cookie-1";
+        nukkitPacket.intent = cn.nukkit.network.protocol.SendPartyDestinationCookiePacket.Intent.OPT_IN;
+        nukkitPacket.destinationName = "destination";
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.SendPartyDestinationCookiePacket.class);
+
+        assertEquals("cookie-1", cbPacket.getCookie());
+        assertEquals(org.cloudburstmc.protocol.bedrock.packet.SendPartyDestinationCookiePacket.Intent.OPT_IN,
+                cbPacket.getIntent());
+        assertEquals("destination", cbPacket.getDestinationName());
     }
 
     // ==================== ModalFormRequestPacket ====================

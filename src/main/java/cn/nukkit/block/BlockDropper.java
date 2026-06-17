@@ -3,8 +3,10 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDropper;
+import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
@@ -175,11 +177,47 @@ public class BlockDropper extends BlockSolidMeta implements Faceable, BlockEntit
 
         if (target != null) {
             target = target.clone();
-            drop(target);
+
+            // 优先推入相邻容器；失败则弹入世界（原版 dropper 行为）
+            if (!this.dispenseToContainer((BlockEntityDropper) blockEntity, target)) {
+                this.drop(target);
+            }
 
             target.count--;
             inv.setItem(slot, target);
         }
+    }
+
+    /**
+     * 尝试将 1 个单位的物品插入朝向相邻的容器。不修改源物品数量。
+     *
+     * @return true 表示已插入容器；false 表示相邻方块非容器或已拒收
+     */
+    private boolean dispenseToContainer(BlockEntityDropper dropper, Item item) {
+        BlockEntity be = this.level.getBlockEntityIfLoaded(this.getSide(this.getBlockFace()));
+        if (!(be instanceof InventoryHolder)) {
+            return false;
+        }
+        Inventory target = ((InventoryHolder) be).getInventory();
+        Item one = item.clone();
+        one.setCount(1);
+        if (!target.canAddItem(one)) {
+            return false;
+        }
+        // 与 BlockHopper 一致：插入前触发 InventoryMoveItemEvent，允许插件拦截/修改 dropper→container 自动传输
+        InventoryMoveItemEvent ev = new InventoryMoveItemEvent(
+                dropper.getInventory(),
+                target,
+                dropper,
+                one,
+                InventoryMoveItemEvent.Action.SLOT_CHANGE
+        );
+        ev.call();
+        if (ev.isCancelled()) {
+            return false;
+        }
+        target.addItem(one);
+        return true;
     }
 
     public void drop(Item item) {
@@ -194,7 +232,7 @@ public class BlockDropper extends BlockSolidMeta implements Faceable, BlockEntit
 
         ThreadLocalRandom rand = ThreadLocalRandom.current();
         double offset = rand.nextDouble() * 0.1 + 0.2;
-        Vector3 motion = new Vector3(face.getXOffset() * offset, 0.1, face.getZOffset() * offset);
+        Vector3 motion = new Vector3(face.getXOffset() * offset, 0.20000000298023224, face.getZOffset() * offset);
 
         motion.x += rand.nextGaussian() * 0.007499999832361937 * 6;
         motion.y += rand.nextGaussian() * 0.007499999832361937 * 6;

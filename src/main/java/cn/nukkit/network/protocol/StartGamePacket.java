@@ -193,6 +193,18 @@ public class StartGamePacket extends DataPacket {
      */
     @SuppressWarnings("dep-ann")
     public boolean tickDeathSystemsEnabled;
+    /**
+     * @since v1001
+     */
+    public int serverEditorConnectionPolicy;
+    /**
+     * @since v1001
+     */
+    public boolean allowAnonymousBlockDropsInEditorWorlds;
+    /**
+     * @since v1001
+     */
+    public boolean loggingChat;
 
     @Override
     public void decode() {
@@ -355,6 +367,10 @@ public class StartGamePacket extends DataPacket {
                 }
             }
         }
+        if (protocol >= ProtocolInfo.v1_26_30) {
+            this.putVarInt(this.serverEditorConnectionPolicy);
+            this.putBoolean(this.allowAnonymousBlockDropsInEditorWorlds);
+        }
         /* Level settings end */
 
         this.putString(this.levelId);
@@ -430,6 +446,9 @@ public class StartGamePacket extends DataPacket {
                                             this.putBoolean(this.tickDeathSystemsEnabled);
                                         }
                                         this.putBoolean(this.networkPermissions.isServerAuthSounds());
+                                        if (protocol >= ProtocolInfo.v1_26_30) {
+                                            this.putBoolean(this.loggingChat);
+                                        }
                                         if (protocol >= ProtocolInfo.v1_26_0) {
                                             // v924: Server telemetry data
                                             this.putBoolean(false); // containServerJoinInformation
