@@ -59,6 +59,10 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersions(ProtocolInfo.v1_20_50);
     }
 
+    static Stream<Arguments> versionsFrom622() {
+        return filteredVersions(ProtocolInfo.v1_20_40);
+    }
+
     static Stream<Arguments> versionsFrom313() {
         return filteredVersions(313);
     }
@@ -1044,6 +1048,34 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         }
         if (protocol >= ProtocolInfo.v1_21_20) { // v712
             assertEquals("You have been disconnected.", nk.filteredMessage);
+        }
+    }
+
+    /**
+     * Verifies that v1001 (1.26.30) DisconnectFailReason ordinals map correctly
+     * between Nukkit-MOT and CloudburstMC. The enum is used as a wire varint
+     * (ordinal), so any missing/duplicated entry would corrupt the reason.
+     */
+    @ParameterizedTest(name = "DisconnectPacket v{0} v1001 reasons round-trip")
+    @MethodSource("versionsFrom622")
+    void disconnectV1001Reasons(int protocol) {
+        for (var cbReason : new org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason[]{
+                org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason.HOST_DISCONNECTED,
+                org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason.EDITOR_JOIN_INTENT_POLICY_FAILURE,
+                org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason.NONCE_NOT_VALID,
+                org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason.SCRIPT_WATCHDOG_EXCEPTION
+        }) {
+            var cb = new org.cloudburstmc.protocol.bedrock.packet.DisconnectPacket();
+            cb.setReason(cbReason);
+            cb.setMessageSkipped(true);
+
+            DisconnectPacket nk = crossEncode(cb, DisconnectPacket::new, protocol);
+
+            // Ordinal is the wire value, so it must match for both the id and the constant name.
+            assertEquals(cbReason.ordinal(), nk.reason.ordinal(),
+                    "ordinal mismatch for " + cbReason + " at v" + protocol);
+            assertEquals(cbReason.name(), nk.reason.name(),
+                    "name mismatch for " + cbReason + " at v" + protocol);
         }
     }
 

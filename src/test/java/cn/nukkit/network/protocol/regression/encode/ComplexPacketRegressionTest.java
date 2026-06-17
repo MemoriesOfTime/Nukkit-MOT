@@ -1064,6 +1064,153 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals("hello", ((org.cloudburstmc.protocol.bedrock.data.debugshape.DebugText) cbShape).getText());
     }
 
+    /**
+     * v1001 (1.26.30) introduced four new debug shape types. The CB DebugDrawerSerializer_v1001
+     * only writes these shapes for v1001+, so restrict tests to that version.
+     */
+    static Stream<Arguments> versionsAtV1_26_30() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_26_30));
+    }
+
+    @ParameterizedTest(name = "DebugDrawerPacket v{0} (cylinder shape)")
+    @MethodSource("versionsAtV1_26_30")
+    void testDebugDrawerPacketCylinderShape(int protocolVersion) {
+        var nukkitPacket = new DebugDrawerPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.shapes.add(new cn.nukkit.network.protocol.types.debugshape.DebugCylinder(
+                1L, 0,
+                new Vector3f(10.0f, 20.0f, 30.0f),
+                1.0f, null, null,
+                new Color(255, 0, 0),
+                new Vector2f(2.0f, 3.0f),
+                new Vector2f(4.0f, 5.0f),
+                6.0f, 16
+        ));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket, org.cloudburstmc.protocol.bedrock.packet.DebugDrawerPacket.class);
+
+        assertEquals(1, cbPacket.getShapes().size());
+        var cbShape = cbPacket.getShapes().get(0);
+        assertInstanceOf(org.cloudburstmc.protocol.bedrock.data.debugshape.DebugCylinder.class, cbShape);
+        var cylinder = (org.cloudburstmc.protocol.bedrock.data.debugshape.DebugCylinder) cbShape;
+        assertEquals(2.0f, cylinder.getRadiusX().getX(), 0.001f);
+        assertEquals(3.0f, cylinder.getRadiusX().getY(), 0.001f);
+        assertEquals(4.0f, cylinder.getRadiusZ().getX(), 0.001f);
+        assertEquals(5.0f, cylinder.getRadiusZ().getY(), 0.001f);
+        assertEquals(6.0f, cylinder.getHeight(), 0.001f);
+        assertEquals(16, cylinder.getSegments());
+    }
+
+    @ParameterizedTest(name = "DebugDrawerPacket v{0} (pyramid shape with depth)")
+    @MethodSource("versionsAtV1_26_30")
+    void testDebugDrawerPacketPyramidShapeWithDepth(int protocolVersion) {
+        var nukkitPacket = new DebugDrawerPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.shapes.add(new cn.nukkit.network.protocol.types.debugshape.DebugPyramid(
+                1L, 0,
+                new Vector3f(10.0f, 20.0f, 30.0f),
+                1.0f, null, null,
+                new Color(0, 255, 0),
+                2.0f, 3.0f, 4.0f
+        ));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket, org.cloudburstmc.protocol.bedrock.packet.DebugDrawerPacket.class);
+
+        assertEquals(1, cbPacket.getShapes().size());
+        var cbShape = cbPacket.getShapes().get(0);
+        assertInstanceOf(org.cloudburstmc.protocol.bedrock.data.debugshape.DebugPyramid.class, cbShape);
+        var pyramid = (org.cloudburstmc.protocol.bedrock.data.debugshape.DebugPyramid) cbShape;
+        assertEquals(2.0f, pyramid.getWidth(), 0.001f);
+        assertEquals(3.0f, pyramid.getDepth(), 0.001f);
+        assertEquals(4.0f, pyramid.getHeight(), 0.001f);
+    }
+
+    @ParameterizedTest(name = "DebugDrawerPacket v{0} (pyramid shape without depth)")
+    @MethodSource("versionsAtV1_26_30")
+    void testDebugDrawerPacketPyramidShapeWithoutDepth(int protocolVersion) {
+        var nukkitPacket = new DebugDrawerPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.shapes.add(new cn.nukkit.network.protocol.types.debugshape.DebugPyramid(
+                1L, 0,
+                new Vector3f(10.0f, 20.0f, 30.0f),
+                1.0f, null, null,
+                new Color(0, 255, 0),
+                2.0f, null, 4.0f
+        ));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket, org.cloudburstmc.protocol.bedrock.packet.DebugDrawerPacket.class);
+
+        assertEquals(1, cbPacket.getShapes().size());
+        var cbShape = cbPacket.getShapes().get(0);
+        assertInstanceOf(org.cloudburstmc.protocol.bedrock.data.debugshape.DebugPyramid.class, cbShape);
+        var pyramid = (org.cloudburstmc.protocol.bedrock.data.debugshape.DebugPyramid) cbShape;
+        assertEquals(2.0f, pyramid.getWidth(), 0.001f);
+        assertNull(pyramid.getDepth(), "depth should be absent on the wire when null");
+        assertEquals(4.0f, pyramid.getHeight(), 0.001f);
+    }
+
+    @ParameterizedTest(name = "DebugDrawerPacket v{0} (ellipsoid shape)")
+    @MethodSource("versionsAtV1_26_30")
+    void testDebugDrawerPacketEllipsoidShape(int protocolVersion) {
+        var nukkitPacket = new DebugDrawerPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.shapes.add(new cn.nukkit.network.protocol.types.debugshape.DebugEllipsoid(
+                1L, 0,
+                new Vector3f(10.0f, 20.0f, 30.0f),
+                1.0f, null, null,
+                new Color(0, 0, 255),
+                new Vector3f(1.0f, 2.0f, 3.0f),
+                24
+        ));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket, org.cloudburstmc.protocol.bedrock.packet.DebugDrawerPacket.class);
+
+        assertEquals(1, cbPacket.getShapes().size());
+        var cbShape = cbPacket.getShapes().get(0);
+        assertInstanceOf(org.cloudburstmc.protocol.bedrock.data.debugshape.DebugEllipsoid.class, cbShape);
+        var ellipsoid = (org.cloudburstmc.protocol.bedrock.data.debugshape.DebugEllipsoid) cbShape;
+        assertEquals(1.0f, ellipsoid.getRadii().getX(), 0.001f);
+        assertEquals(2.0f, ellipsoid.getRadii().getY(), 0.001f);
+        assertEquals(3.0f, ellipsoid.getRadii().getZ(), 0.001f);
+        assertEquals(24, ellipsoid.getSegments());
+    }
+
+    @ParameterizedTest(name = "DebugDrawerPacket v{0} (cone shape)")
+    @MethodSource("versionsAtV1_26_30")
+    void testDebugDrawerPacketConeShape(int protocolVersion) {
+        var nukkitPacket = new DebugDrawerPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.shapes.add(new cn.nukkit.network.protocol.types.debugshape.DebugCone(
+                1L, 0,
+                new Vector3f(10.0f, 20.0f, 30.0f),
+                1.0f, null, null,
+                new Color(255, 255, 0),
+                new Vector2f(2.0f, 3.0f),
+                4.0f, 12
+        ));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket, org.cloudburstmc.protocol.bedrock.packet.DebugDrawerPacket.class);
+
+        assertEquals(1, cbPacket.getShapes().size());
+        var cbShape = cbPacket.getShapes().get(0);
+        assertInstanceOf(org.cloudburstmc.protocol.bedrock.data.debugshape.DebugCone.class, cbShape);
+        var cone = (org.cloudburstmc.protocol.bedrock.data.debugshape.DebugCone) cbShape;
+        assertEquals(2.0f, cone.getRadii().getX(), 0.001f);
+        assertEquals(3.0f, cone.getRadii().getY(), 0.001f);
+        assertEquals(4.0f, cone.getHeight(), 0.001f);
+        assertEquals(12, cone.getSegments());
+    }
+
     // ==================== AvailableCommandsPacket ====================
 
     static Stream<Arguments> versionsFrom313() {
