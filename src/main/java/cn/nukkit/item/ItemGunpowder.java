@@ -17,9 +17,4 @@ public class ItemGunpowder extends Item {
     public ItemGunpowder(Integer meta, int count) {
         super(GUNPOWDER, meta, count, "Gunpowder");
     }
-
-    @Override
-    public boolean isBrewingIngredient() {
-        return true;
-    }
 }

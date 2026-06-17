@@ -17,9 +17,4 @@ public class ItemSpiderEye extends ItemEdible {
     public ItemSpiderEye(Integer meta, int count) {
         super(SPIDER_EYE, meta, count, "Spider Eye");
     }
-
-    @Override
-    public boolean isBrewingIngredient() {
-        return true;
-    }
 }

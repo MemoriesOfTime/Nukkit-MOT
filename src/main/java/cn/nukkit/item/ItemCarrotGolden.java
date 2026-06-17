@@ -13,9 +13,4 @@ public class ItemCarrotGolden extends ItemEdible {
     public ItemCarrotGolden(Integer meta, int count) {
         super(GOLDEN_CARROT, 0, count, "Golden Carrot");
     }
-
-    @Override
-    public boolean isBrewingIngredient() {
-        return true;
-    }
 }

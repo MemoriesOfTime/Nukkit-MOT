@@ -13,9 +13,4 @@ public class ItemDragonBreath extends Item {
     public ItemDragonBreath(Integer meta, int count) {
         super(DRAGON_BREATH, 0, count, "Dragon Breath");
     }
-
-    @Override
-    public boolean isBrewingIngredient() {
-        return true;
-    }
 }

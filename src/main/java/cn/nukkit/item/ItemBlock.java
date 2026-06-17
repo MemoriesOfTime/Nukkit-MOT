@@ -53,9 +53,4 @@ public class ItemBlock extends Item {
         
         return super.getMaxStackSize();
     }
-
-    @Override
-    public boolean isBrewingIngredient() {
-        return true;
-    }
 }

@@ -57,9 +57,4 @@ public class BlockSlime extends BlockSolid {
     public boolean diffusesSkyLight() {
         return true;
     }
-
-    @Override
-    public boolean isBrewingIngredient() {
-        return true;
-    }
 }
