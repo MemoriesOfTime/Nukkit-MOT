@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDropper;
+import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.InventoryHolder;
@@ -166,7 +167,7 @@ public class BlockDropper extends BlockSolidMeta implements Faceable {
             target = target.clone();
 
             // 优先推入相邻容器；失败则弹入世界（原版 dropper 行为）
-            if (!this.dispenseToContainer(target)) {
+            if (!this.dispenseToContainer((BlockEntityDropper) blockEntity, target)) {
                 this.drop(target);
             }
 
@@ -180,18 +181,30 @@ public class BlockDropper extends BlockSolidMeta implements Faceable {
      *
      * @return true 表示已插入容器；false 表示相邻方块非容器或已拒收
      */
-    private boolean dispenseToContainer(Item item) {
+    private boolean dispenseToContainer(BlockEntityDropper dropper, Item item) {
         BlockEntity be = this.level.getBlockEntityIfLoaded(this.getSide(this.getBlockFace()));
         if (!(be instanceof InventoryHolder)) {
             return false;
         }
-        Inventory inventory = ((InventoryHolder) be).getInventory();
+        Inventory target = ((InventoryHolder) be).getInventory();
         Item one = item.clone();
         one.setCount(1);
-        if (!inventory.canAddItem(one)) {
+        if (!target.canAddItem(one)) {
             return false;
         }
-        inventory.addItem(one);
+        // 与 BlockHopper 一致：插入前触发 InventoryMoveItemEvent，允许插件拦截/修改 dropper→container 自动传输
+        InventoryMoveItemEvent ev = new InventoryMoveItemEvent(
+                dropper.getInventory(),
+                target,
+                dropper,
+                one,
+                InventoryMoveItemEvent.Action.SLOT_CHANGE
+        );
+        ev.call();
+        if (ev.isCancelled()) {
+            return false;
+        }
+        target.addItem(one);
         return true;
     }
 
