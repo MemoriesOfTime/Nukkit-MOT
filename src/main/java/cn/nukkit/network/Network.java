@@ -1,12 +1,10 @@
 package cn.nukkit.network;
 
-import cn.nukkit.GameVersion;
-import cn.nukkit.Nukkit;
-import cn.nukkit.Player;
-import cn.nukkit.Server;
+import cn.nukkit.*;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
+import cn.nukkit.network.protocol.netease.PyRpcPacket;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -49,7 +47,9 @@ public class Network {
 
     private PacketPool packetPool113;
     private PacketPool packetPool137;
+    private PacketPool packetPool137NetEase;
     private PacketPool packetPoolCurrent;
+    private PacketPool packetPoolCurrentNetEase;
 
     private final Server server;
 
@@ -186,13 +186,16 @@ public class Network {
     }
 
     public void registerPacket(@Nonnegative int protocol, byte id, Class<? extends DataPacket> clazz) {
-        PacketPool pool = this.getPacketPool(protocol);
-        if (pool != null) {
-            this.setPacketPool(protocol, pool.toBuilder()
-                    .registerPacket(id, clazz)
-                    .build()
-            );
-        }
+        this.registerPacketForProtocolBranches(protocol, ProtocolInfo.toNewProtocolID(id), clazz);
+    }
+
+    public void registerPacket(@NotNull GameVersion gameVersion, byte id, Class<? extends DataPacket> clazz) {
+        Objects.requireNonNull(gameVersion, "gameVersion");
+        this.registerPacket0(gameVersion, ProtocolInfo.toNewProtocolID(id), clazz);
+    }
+
+    public void registerNetEasePacket(@NotNull GameVersion gameVersion, byte id, Class<? extends DataPacket> clazz) {
+        this.registerPacket(requireNetEaseGameVersion(gameVersion), id, clazz);
     }
 
     @Deprecated
@@ -202,13 +205,50 @@ public class Network {
     }
 
     public void registerPacketNew(@Nonnegative int protocol, @Nonnegative int id, @NotNull Class<? extends DataPacket> clazz) {
-        PacketPool pool = this.getPacketPool(protocol);
+        this.registerPacketForProtocolBranches(protocol, id, clazz);
+    }
+
+    public void registerPacketNew(@NotNull GameVersion gameVersion, @Nonnegative int id, @NotNull Class<? extends DataPacket> clazz) {
+        Objects.requireNonNull(gameVersion, "gameVersion");
+        this.registerPacket0(gameVersion, id, clazz);
+    }
+
+    public void registerNetEasePacketNew(@NotNull GameVersion gameVersion, @Nonnegative int id, @NotNull Class<? extends DataPacket> clazz) {
+        this.registerPacketNew(requireNetEaseGameVersion(gameVersion), id, clazz);
+    }
+
+    private void registerPacketForProtocolBranches(@Nonnegative int protocol, @Nonnegative int id,
+                                                   @NotNull Class<? extends DataPacket> clazz) {
+        this.registerPacket0(protocol, false, id, clazz);
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.registerPacket0(protocol, true, id, clazz);
+        }
+    }
+
+    private void registerPacket0(@NotNull GameVersion gameVersion, @Nonnegative int id,
+                                 @NotNull Class<? extends DataPacket> clazz) {
+        Objects.requireNonNull(gameVersion, "gameVersion");
+        this.registerPacket0(gameVersion.getProtocol(), gameVersion.isNetEase(), id, clazz);
+    }
+
+    private void registerPacket0(@Nonnegative int protocol, boolean netEase, @Nonnegative int id,
+                                 @NotNull Class<? extends DataPacket> clazz) {
+        Objects.requireNonNull(clazz, "clazz");
+        PacketPool pool = this.getPacketPool(protocol, netEase);
         if (pool != null) {
-            this.setPacketPool(protocol, pool.toBuilder()
+            this.setPacketPool(protocol, netEase, pool.toBuilder()
                     .registerPacket(id, clazz)
                     .build()
             );
         }
+    }
+
+    private GameVersion requireNetEaseGameVersion(GameVersion gameVersion) {
+        Objects.requireNonNull(gameVersion, "gameVersion");
+        if (!gameVersion.isNetEase()) {
+            throw new IllegalArgumentException("GameVersion must be NetEase: " + gameVersion);
+        }
+        return gameVersion;
     }
 
     public Server getServer() {
@@ -256,7 +296,8 @@ public class Network {
 
                 ByteArrayInputStream bais = new ByteArrayInputStream(buf);
 
-                if (raknetProtocol == 8 && Server.getInstance().netEaseMode) {
+                boolean netEaseRaknet = raknetProtocol == 8 && Server.getInstance().netEaseMode;
+                if (netEaseRaknet) {
                     raknetProtocol = 9;
                 }
 
@@ -277,22 +318,28 @@ public class Network {
                         break;
                 }
 
-                DataPacket pk = this.getPacket(packetId, player == null ? ProtocolInfo.CURRENT_PROTOCOL : player.protocol);
+                // Save the player's original protocol before resolveBatchGameVersion mutates it
+                int originalPlayerProtocol = player != null ? player.protocol : 0;
+                GameVersion packetGameVersion = this.resolveBatchGameVersion(player, netEaseRaknet);
+                DataPacket pk = this.getPacket(packetId, packetGameVersion);
 
                 if (pk != null) {
-                    if (player != null) {
-                        pk.protocol = player.protocol;
-                        pk.gameVersion = player.getGameVersion();
-                    } else {
-                        pk.protocol = Integer.MAX_VALUE;
-                        pk.gameVersion = GameVersion.getLastVersion();
-                    }
+                    pk.protocol = packetGameVersion.getProtocol();
+                    pk.gameVersion = packetGameVersion;
                     pk.setBuffer(buf, buf.length - bais.available());
                     try {
                         if (raknetProtocol > 8) {
                             pk.decode();
                         } else { // version < 1.6
-                            pk.setBuffer(buf, pk.protocol < ProtocolInfo.v1_2_0 ? 1 : 3);
+                            int headerLength;
+                            if (player != null && originalPlayerProtocol == Integer.MAX_VALUE) {
+                                // Pre-login legacy clients have not negotiated a concrete MCPE protocol yet.
+                                // Infer the packet header width from the RakNet protocol to avoid misaligned LoginPacket decoding.
+                                headerLength = raknetProtocol == 7 ? 1 : 3;
+                            } else {
+                                headerLength = pk.protocol < ProtocolInfo.v1_2_0 ? 1 : 3;
+                            }
+                            pk.setBuffer(buf, headerLength);
                             pk.decode();
                         }
                     } catch (Exception e) {
@@ -318,6 +365,29 @@ public class Network {
             return false;
         }
         return count > 0;
+    }
+
+    private GameVersion resolveBatchGameVersion(Player player, boolean netEase) {
+        if (player == null) {
+            return GameVersion.getLastVersion();
+        }
+
+        GameVersion gameVersion = player.getGameVersion();
+        if (gameVersion != null) {
+            return gameVersion;
+        }
+
+        if (player.protocol == Integer.MAX_VALUE) {
+            gameVersion = GameVersion.getLastVersion();
+        } else {
+            gameVersion = GameVersion.byProtocol(player.protocol, netEase);
+            if (gameVersion == null) {
+                gameVersion = GameVersion.getLastVersion();
+            }
+        }
+
+        new PlayerHandle(player).setGameVersion(gameVersion);
+        return gameVersion;
     }
 
     /**
@@ -347,20 +417,55 @@ public class Network {
         return getPacketPool(protocol).getPacket(id);
     }
 
+    public DataPacket getPacket(int id, @NotNull GameVersion gameVersion) {
+        Objects.requireNonNull(gameVersion, "gameVersion");
+        return getPacketPool(gameVersion).getPacket(id);
+    }
+
     public PacketPool getPacketPool(int protocol) {
+        return getPacketPool(protocol, false);
+    }
+
+    public PacketPool getPacketPool(@NotNull GameVersion gameVersion) {
+        Objects.requireNonNull(gameVersion, "gameVersion");
+        return getPacketPool(gameVersion.getProtocol(), gameVersion.isNetEase());
+    }
+
+    private PacketPool getPacketPool(int protocol, boolean netEase) {
         if (protocol >= ProtocolInfo.v1_21_80) {
-            return this.packetPoolCurrent;
+            return netEase ? this.packetPoolCurrentNetEase : this.packetPoolCurrent;
         } else if (protocol >= ProtocolInfo.v1_2_0) {
-            return this.packetPool137;
+            return netEase ? this.packetPool137NetEase : this.packetPool137;
         }
         return this.packetPool113;
     }
 
     public void setPacketPool(int protocol, PacketPool packetPool) {
+        setPacketPool(protocol, false, packetPool);
+    }
+
+    public void setPacketPool(@NotNull GameVersion gameVersion, PacketPool packetPool) {
+        Objects.requireNonNull(gameVersion, "gameVersion");
+        setPacketPool(gameVersion.getProtocol(), gameVersion.isNetEase(), packetPool);
+    }
+
+    private void setPacketPool(int protocol, boolean netEase, PacketPool packetPool) {
+        Objects.requireNonNull(packetPool, "packetPool");
+        if (packetPool.isNetEase() != netEase) {
+            throw new IllegalArgumentException("PacketPool netEase flag does not match target branch");
+        }
         if (protocol >= ProtocolInfo.v1_21_80) {
-            this.packetPoolCurrent = packetPool;
+            if (netEase) {
+                this.packetPoolCurrentNetEase = packetPool;
+            } else {
+                this.packetPoolCurrent = packetPool;
+            }
         } else if (protocol >= ProtocolInfo.v1_2_0) {
-            this.packetPool137 = packetPool;
+            if (netEase) {
+                this.packetPool137NetEase = packetPool;
+            } else {
+                this.packetPool137 = packetPool;
+            }
         } else {
             this.packetPool113 = packetPool;
         }
@@ -392,293 +497,302 @@ public class Network {
 
     private void registerPackets() {
         this.packetPool113 = PacketPool.builder()
-                .protocolVersion(ProtocolInfo.v1_1_0)
-                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v1_1_0))
-                .registerPacket(ProtocolInfoV113.ADD_ENTITY_PACKET, AddEntityPacket.class)
-                .registerPacket(ProtocolInfoV113.ADD_HANGING_ENTITY_PACKET, AddHangingEntityPacketV113.class)
-                .registerPacket(ProtocolInfoV113.ADD_ITEM_ENTITY_PACKET, AddItemEntityPacket.class)
-                .registerPacket(ProtocolInfoV113.ADD_ITEM_PACKET, AddItemPacketV113.class)
-                .registerPacket(ProtocolInfoV113.ADD_PAINTING_PACKET, AddPaintingPacket.class)
-                .registerPacket(ProtocolInfoV113.ADD_PLAYER_PACKET, AddPlayerPacket.class)
-                .registerPacket(ProtocolInfoV113.ADVENTURE_SETTINGS_PACKET, AdventureSettingsPacket.class)
-                .registerPacket(ProtocolInfoV113.ANIMATE_PACKET, AnimatePacket.class)
-                .registerPacket(ProtocolInfoV113.AVAILABLE_COMMANDS_PACKET, AvailableCommandsPacket.class)
-                .registerPacket(ProtocolInfoV113.BATCH_PACKET, BatchPacket.class)
-                .registerPacket(ProtocolInfoV113.BLOCK_ENTITY_DATA_PACKET, BlockEntityDataPacket.class)
-                .registerPacket(ProtocolInfoV113.BLOCK_EVENT_PACKET, BlockEventPacket.class)
-                .registerPacket(ProtocolInfoV113.BLOCK_PICK_REQUEST_PACKET, BlockPickRequestPacket.class)
-                .registerPacket(ProtocolInfoV113.BOSS_EVENT_PACKET, BossEventPacket.class)
-                .registerPacket(ProtocolInfoV113.CHANGE_DIMENSION_PACKET, ChangeDimensionPacket.class)
-                .registerPacket(ProtocolInfoV113.CHUNK_RADIUS_UPDATED_PACKET, ChunkRadiusUpdatedPacket.class)
-                .registerPacket(ProtocolInfoV113.CLIENTBOUND_MAP_ITEM_DATA_PACKET, ClientboundMapItemDataPacket.class)
-                .registerPacket(ProtocolInfoV113.COMMAND_STEP_PACKET, CommandStepPacketV113.class)
-                .registerPacket(ProtocolInfoV113.CONTAINER_CLOSE_PACKET, ContainerClosePacket.class)
-                .registerPacket(ProtocolInfoV113.CONTAINER_OPEN_PACKET, ContainerOpenPacket.class)
-                .registerPacket(ProtocolInfoV113.CONTAINER_SET_CONTENT_PACKET, ContainerSetContentPacketV113.class)
-                .registerPacket(ProtocolInfoV113.CONTAINER_SET_DATA_PACKET, ContainerSetDataPacket.class)
-                .registerPacket(ProtocolInfoV113.CONTAINER_SET_SLOT_PACKET, ContainerSetSlotPacketV113.class)
-                .registerPacket(ProtocolInfoV113.CRAFTING_DATA_PACKET, CraftingDataPacket.class)
-                .registerPacket(ProtocolInfoV113.CRAFTING_EVENT_PACKET, CraftingEventPacket.class)
-                .registerPacket(ProtocolInfoV113.DISCONNECT_PACKET, DisconnectPacket.class)
-                .registerPacket(ProtocolInfoV113.DROP_ITEM_PACKET, DropItemPacketV113.class)
-                .registerPacket(ProtocolInfoV113.ENTITY_EVENT_PACKET, EntityEventPacket.class)
-                .registerPacket(ProtocolInfoV113.UPDATE_ATTRIBUTES_PACKET, UpdateAttributesPacket.class)
-                .registerPacket(ProtocolInfoV113.ENTITY_FALL_PACKET, EntityFallPacket.class)
-                .registerPacket(ProtocolInfoV113.EXPLODE_PACKET, ExplodePacketV113.class)
-                .registerPacket(ProtocolInfoV113.FULL_CHUNK_DATA_PACKET, LevelChunkPacket.class)
-                .registerPacket(ProtocolInfoV113.GAME_RULES_CHANGED_PACKET, GameRulesChangedPacket.class)
-                .registerPacket(ProtocolInfoV113.HURT_ARMOR_PACKET, HurtArmorPacket.class)
-                .registerPacket(ProtocolInfoV113.INTERACT_PACKET, InteractPacket.class)
-                .registerPacket(ProtocolInfoV113.INVENTORY_ACTION_PACKET, InventoryActionPacketV113.class)
-                .registerPacket(ProtocolInfoV113.ITEM_FRAME_DROP_ITEM_PACKET, ItemFrameDropItemPacket.class)
-                .registerPacket(ProtocolInfoV113.LEVEL_EVENT_PACKET, LevelEventPacket.class)
-                .registerPacket(ProtocolInfoV113.LEVEL_SOUND_EVENT_PACKET, LevelSoundEventPacketV1.class)
-                .registerPacket(ProtocolInfoV113.LOGIN_PACKET, LoginPacket.class)
-                .registerPacket(ProtocolInfoV113.MAP_INFO_REQUEST_PACKET, MapInfoRequestPacket.class)
-                .registerPacket(ProtocolInfoV113.MOB_ARMOR_EQUIPMENT_PACKET, MobArmorEquipmentPacket.class)
-                .registerPacket(ProtocolInfoV113.MOB_EQUIPMENT_PACKET, MobEquipmentPacket.class)
-                .registerPacket(ProtocolInfoV113.MOVE_ENTITY_PACKET, MoveEntityAbsolutePacket.class)
-                .registerPacket(ProtocolInfoV113.MOVE_PLAYER_PACKET, MovePlayerPacket.class)
-                .registerPacket(ProtocolInfoV113.PLAYER_ACTION_PACKET, PlayerActionPacket.class)
-                .registerPacket(ProtocolInfoV113.PLAYER_INPUT_PACKET, PlayerInputPacket.class)
-                .registerPacket(ProtocolInfoV113.PLAYER_LIST_PACKET, PlayerListPacket.class)
-                .registerPacket(ProtocolInfoV113.PLAY_SOUND_PACKET, PlaySoundPacket.class)
-                .registerPacket(ProtocolInfoV113.PLAY_STATUS_PACKET, PlayStatusPacket.class)
-                .registerPacket(ProtocolInfoV113.REMOVE_BLOCK_PACKET, RemoveBlockPacketV113.class)
-                .registerPacket(ProtocolInfoV113.REMOVE_ENTITY_PACKET, RemoveEntityPacket.class)
-                .registerPacket(ProtocolInfoV113.REPLACE_ITEM_IN_SLOT_PACKET, ReplaceItemInSlotPacketV113.class)
-                .registerPacket(ProtocolInfoV113.REQUEST_CHUNK_RADIUS_PACKET, RequestChunkRadiusPacket.class)
-                .registerPacket(ProtocolInfoV113.RESOURCE_PACKS_INFO_PACKET, ResourcePacksInfoPacket.class)
-                .registerPacket(ProtocolInfoV113.RESOURCE_PACK_STACK_PACKET, ResourcePackStackPacket.class)
-                .registerPacket(ProtocolInfoV113.RESOURCE_PACK_CLIENT_RESPONSE_PACKET, ResourcePackClientResponsePacket.class)
-                .registerPacket(ProtocolInfoV113.RESOURCE_PACK_DATA_INFO_PACKET, ResourcePackDataInfoPacket.class)
-                .registerPacket(ProtocolInfoV113.RESOURCE_PACK_CHUNK_DATA_PACKET, ResourcePackChunkDataPacket.class)
-                .registerPacket(ProtocolInfoV113.RESOURCE_PACK_CHUNK_REQUEST_PACKET, ResourcePackChunkRequestPacket.class)
-                .registerPacket(ProtocolInfoV113.RESPAWN_PACKET, RespawnPacket.class)
-                .registerPacket(ProtocolInfoV113.RIDER_JUMP_PACKET, RiderJumpPacket.class)
-                .registerPacket(ProtocolInfoV113.SET_COMMANDS_ENABLED_PACKET, SetCommandsEnabledPacket.class)
-                .registerPacket(ProtocolInfoV113.SET_DIFFICULTY_PACKET, SetDifficultyPacket.class)
-                .registerPacket(ProtocolInfoV113.SET_ENTITY_DATA_PACKET, SetEntityDataPacket.class)
-                .registerPacket(ProtocolInfoV113.SET_ENTITY_LINK_PACKET, SetEntityLinkPacket.class)
-                .registerPacket(ProtocolInfoV113.SET_ENTITY_MOTION_PACKET, SetEntityMotionPacket.class)
-                .registerPacket(ProtocolInfoV113.SET_HEALTH_PACKET, SetHealthPacket.class)
-                .registerPacket(ProtocolInfoV113.SET_PLAYER_GAME_TYPE_PACKET, SetPlayerGameTypePacket.class)
-                .registerPacket(ProtocolInfoV113.SET_SPAWN_POSITION_PACKET, SetSpawnPositionPacket.class)
-                .registerPacket(ProtocolInfoV113.SET_TITLE_PACKET, SetTitlePacket.class)
-                .registerPacket(ProtocolInfoV113.SET_TIME_PACKET, SetTimePacket.class)
-                .registerPacket(ProtocolInfoV113.SHOW_CREDITS_PACKET, ShowCreditsPacket.class)
-                .registerPacket(ProtocolInfoV113.SPAWN_EXPERIENCE_ORB_PACKET, SpawnExperienceOrbPacket.class)
-                .registerPacket(ProtocolInfoV113.START_GAME_PACKET, StartGamePacket.class)
-                .registerPacket(ProtocolInfoV113.TAKE_ITEM_ENTITY_PACKET, TakeItemEntityPacket.class)
-                .registerPacket(ProtocolInfoV113.TEXT_PACKET, TextPacket.class)
-                .registerPacket(ProtocolInfoV113.UPDATE_BLOCK_PACKET, UpdateBlockPacket.class)
-                .registerPacket(ProtocolInfoV113.USE_ITEM_PACKET, UseItemPacketV113.class)
-                .registerPacket(ProtocolInfoV113.UPDATE_TRADE_PACKET, UpdateTradePacket.class)
-                .build();
+            .protocolVersion(ProtocolInfo.v1_1_0)
+            .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v1_1_0))
+            .registerPacket(ProtocolInfo_v113.ADD_ENTITY_PACKET, AddEntityPacket.class)
+            .registerPacket(ProtocolInfo_v113.ADD_HANGING_ENTITY_PACKET, AddHangingEntityPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.ADD_ITEM_ENTITY_PACKET, AddItemEntityPacket.class)
+            .registerPacket(ProtocolInfo_v113.ADD_ITEM_PACKET, AddItemPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.ADD_PAINTING_PACKET, AddPaintingPacket.class)
+            .registerPacket(ProtocolInfo_v113.ADD_PLAYER_PACKET, AddPlayerPacket.class)
+            .registerPacket(ProtocolInfo_v113.ADVENTURE_SETTINGS_PACKET, AdventureSettingsPacket.class)
+            .registerPacket(ProtocolInfo_v113.ANIMATE_PACKET, AnimatePacket.class)
+            .registerPacket(ProtocolInfo_v113.AVAILABLE_COMMANDS_PACKET, AvailableCommandsPacket.class)
+            .registerPacket(ProtocolInfo_v113.BATCH_PACKET, BatchPacket.class)
+            .registerPacket(ProtocolInfo_v113.BLOCK_ENTITY_DATA_PACKET, BlockEntityDataPacket.class)
+            .registerPacket(ProtocolInfo_v113.BLOCK_EVENT_PACKET, BlockEventPacket.class)
+            .registerPacket(ProtocolInfo_v113.BLOCK_PICK_REQUEST_PACKET, BlockPickRequestPacket.class)
+            .registerPacket(ProtocolInfo_v113.BOSS_EVENT_PACKET, BossEventPacket.class)
+            .registerPacket(ProtocolInfo_v113.CHANGE_DIMENSION_PACKET, ChangeDimensionPacket.class)
+            .registerPacket(ProtocolInfo_v113.CHUNK_RADIUS_UPDATED_PACKET, ChunkRadiusUpdatedPacket.class)
+            .registerPacket(ProtocolInfo_v113.CLIENTBOUND_MAP_ITEM_DATA_PACKET, ClientboundMapItemDataPacket.class)
+            .registerPacket(ProtocolInfo_v113.COMMAND_STEP_PACKET, CommandStepPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.CONTAINER_CLOSE_PACKET, ContainerClosePacket.class)
+            .registerPacket(ProtocolInfo_v113.CONTAINER_OPEN_PACKET, ContainerOpenPacket.class)
+            .registerPacket(ProtocolInfo_v113.CONTAINER_SET_CONTENT_PACKET, ContainerSetContentPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.CONTAINER_SET_DATA_PACKET, ContainerSetDataPacket.class)
+            .registerPacket(ProtocolInfo_v113.CONTAINER_SET_SLOT_PACKET, ContainerSetSlotPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.CRAFTING_DATA_PACKET, CraftingDataPacket.class)
+            .registerPacket(ProtocolInfo_v113.CRAFTING_EVENT_PACKET, CraftingEventPacket.class)
+            .registerPacket(ProtocolInfo_v113.DISCONNECT_PACKET, DisconnectPacket.class)
+            .registerPacket(ProtocolInfo_v113.DROP_ITEM_PACKET, DropItemPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.ENTITY_EVENT_PACKET, EntityEventPacket.class)
+            .registerPacket(ProtocolInfo_v113.UPDATE_ATTRIBUTES_PACKET, UpdateAttributesPacket.class)
+            .registerPacket(ProtocolInfo_v113.ENTITY_FALL_PACKET, EntityFallPacket.class)
+            .registerPacket(ProtocolInfo_v113.EXPLODE_PACKET, ExplodePacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.FULL_CHUNK_DATA_PACKET, LevelChunkPacket.class)
+            .registerPacket(ProtocolInfo_v113.GAME_RULES_CHANGED_PACKET, GameRulesChangedPacket.class)
+            .registerPacket(ProtocolInfo_v113.HURT_ARMOR_PACKET, HurtArmorPacket.class)
+            .registerPacket(ProtocolInfo_v113.INTERACT_PACKET, InteractPacket.class)
+            .registerPacket(ProtocolInfo_v113.INVENTORY_ACTION_PACKET, InventoryActionPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.ITEM_FRAME_DROP_ITEM_PACKET, ItemFrameDropItemPacket.class)
+            .registerPacket(ProtocolInfo_v113.LEVEL_EVENT_PACKET, LevelEventPacket.class)
+            .registerPacket(ProtocolInfo_v113.LEVEL_SOUND_EVENT_PACKET, LevelSoundEventPacketV1.class)
+            .registerPacket(ProtocolInfo_v113.LOGIN_PACKET, LoginPacket.class)
+            .registerPacket(ProtocolInfo_v113.MAP_INFO_REQUEST_PACKET, MapInfoRequestPacket.class)
+            .registerPacket(ProtocolInfo_v113.MOB_ARMOR_EQUIPMENT_PACKET, MobArmorEquipmentPacket.class)
+            .registerPacket(ProtocolInfo_v113.MOB_EQUIPMENT_PACKET, MobEquipmentPacket.class)
+            .registerPacket(ProtocolInfo_v113.MOVE_ENTITY_PACKET, MoveEntityAbsolutePacket.class)
+            .registerPacket(ProtocolInfo_v113.MOVE_PLAYER_PACKET, MovePlayerPacket.class)
+            .registerPacket(ProtocolInfo_v113.PLAYER_ACTION_PACKET, PlayerActionPacket.class)
+            .registerPacket(ProtocolInfo_v113.PLAYER_INPUT_PACKET, PlayerInputPacket.class)
+            .registerPacket(ProtocolInfo_v113.PLAYER_LIST_PACKET, PlayerListPacket.class)
+            .registerPacket(ProtocolInfo_v113.PLAY_SOUND_PACKET, PlaySoundPacket.class)
+            .registerPacket(ProtocolInfo_v113.PLAY_STATUS_PACKET, PlayStatusPacket.class)
+            .registerPacket(ProtocolInfo_v113.REMOVE_BLOCK_PACKET, RemoveBlockPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.REMOVE_ENTITY_PACKET, RemoveEntityPacket.class)
+            .registerPacket(ProtocolInfo_v113.REPLACE_ITEM_IN_SLOT_PACKET, ReplaceItemInSlotPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.REQUEST_CHUNK_RADIUS_PACKET, RequestChunkRadiusPacket.class)
+            .registerPacket(ProtocolInfo_v113.RESOURCE_PACKS_INFO_PACKET, ResourcePacksInfoPacket.class)
+            .registerPacket(ProtocolInfo_v113.RESOURCE_PACK_STACK_PACKET, ResourcePackStackPacket.class)
+            .registerPacket(ProtocolInfo_v113.RESOURCE_PACK_CLIENT_RESPONSE_PACKET, ResourcePackClientResponsePacket.class)
+            .registerPacket(ProtocolInfo_v113.RESOURCE_PACK_DATA_INFO_PACKET, ResourcePackDataInfoPacket.class)
+            .registerPacket(ProtocolInfo_v113.RESOURCE_PACK_CHUNK_DATA_PACKET, ResourcePackChunkDataPacket.class)
+            .registerPacket(ProtocolInfo_v113.RESOURCE_PACK_CHUNK_REQUEST_PACKET, ResourcePackChunkRequestPacket.class)
+            .registerPacket(ProtocolInfo_v113.RESPAWN_PACKET, RespawnPacket.class)
+            .registerPacket(ProtocolInfo_v113.RIDER_JUMP_PACKET, RiderJumpPacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_COMMANDS_ENABLED_PACKET, SetCommandsEnabledPacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_DIFFICULTY_PACKET, SetDifficultyPacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_ENTITY_DATA_PACKET, SetEntityDataPacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_ENTITY_LINK_PACKET, SetEntityLinkPacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_ENTITY_MOTION_PACKET, SetEntityMotionPacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_HEALTH_PACKET, SetHealthPacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_PLAYER_GAME_TYPE_PACKET, SetPlayerGameTypePacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_SPAWN_POSITION_PACKET, SetSpawnPositionPacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_TITLE_PACKET, SetTitlePacket.class)
+            .registerPacket(ProtocolInfo_v113.SET_TIME_PACKET, SetTimePacket.class)
+            .registerPacket(ProtocolInfo_v113.SHOW_CREDITS_PACKET, ShowCreditsPacket.class)
+            .registerPacket(ProtocolInfo_v113.SPAWN_EXPERIENCE_ORB_PACKET, SpawnExperienceOrbPacket.class)
+            .registerPacket(ProtocolInfo_v113.START_GAME_PACKET, StartGamePacket.class)
+            .registerPacket(ProtocolInfo_v113.TAKE_ITEM_ENTITY_PACKET, TakeItemEntityPacket.class)
+            .registerPacket(ProtocolInfo_v113.TEXT_PACKET, TextPacket.class)
+            .registerPacket(ProtocolInfo_v113.UPDATE_BLOCK_PACKET, UpdateBlockPacket.class)
+            .registerPacket(ProtocolInfo_v113.USE_ITEM_PACKET, UseItemPacket_v113.class)
+            .registerPacket(ProtocolInfo_v113.UPDATE_TRADE_PACKET, UpdateTradePacket.class)
+            .build();
 
         this.packetPool137 = PacketPool.builder()
-                .protocolVersion(ProtocolInfo.v1_2_0)
-                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v1_2_0))
-                .registerPacket(ProtocolInfo.SERVER_TO_CLIENT_HANDSHAKE_PACKET, ServerToClientHandshakePacket.class)
-                .registerPacket(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET, ClientToServerHandshakePacket.class)
-                .registerPacket(ProtocolInfo.ADD_ENTITY_PACKET, AddEntityPacket.class)
-                .registerPacket(ProtocolInfo.ADD_ITEM_ENTITY_PACKET, AddItemEntityPacket.class)
-                .registerPacket(ProtocolInfo.ADD_PAINTING_PACKET, AddPaintingPacket.class)
-                .registerPacket(ProtocolInfo.TICK_SYNC_PACKET, TickSyncPacket.class)
-                .registerPacket(ProtocolInfo.ADD_PLAYER_PACKET, AddPlayerPacket.class)
-                .registerPacket(ProtocolInfo.ADVENTURE_SETTINGS_PACKET, AdventureSettingsPacket.class)
-                .registerPacket(ProtocolInfo.ANIMATE_PACKET, AnimatePacket.class)
-                .registerPacket(ProtocolInfo.SETTINGS_COMMAND_PACKET, SettingsCommandPacket.class)
-                .registerPacket(ProtocolInfo.ANVIL_DAMAGE_PACKET, AnvilDamagePacket.class)
-                .registerPacket(ProtocolInfo.AVAILABLE_COMMANDS_PACKET, AvailableCommandsPacket.class)
-                .registerPacket(ProtocolInfo.BATCH_PACKET, BatchPacket.class)
-                .registerPacket(ProtocolInfo.BLOCK_ENTITY_DATA_PACKET, BlockEntityDataPacket.class)
-                .registerPacket(ProtocolInfo.BLOCK_EVENT_PACKET, BlockEventPacket.class)
-                .registerPacket(ProtocolInfo.BLOCK_PICK_REQUEST_PACKET, BlockPickRequestPacket.class)
-                .registerPacket(ProtocolInfo.BOOK_EDIT_PACKET, BookEditPacket.class)
-                .registerPacket(ProtocolInfo.BOSS_EVENT_PACKET, BossEventPacket.class)
-                .registerPacket(ProtocolInfo.CHANGE_DIMENSION_PACKET, ChangeDimensionPacket.class)
-                .registerPacket(ProtocolInfo.CHUNK_RADIUS_UPDATED_PACKET, ChunkRadiusUpdatedPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_MAP_ITEM_DATA_PACKET, ClientboundMapItemDataPacket.class)
-                .registerPacket(ProtocolInfo.COMMAND_REQUEST_PACKET, CommandRequestPacket.class)
-                .registerPacket(ProtocolInfo.CONTAINER_CLOSE_PACKET, ContainerClosePacket.class)
-                .registerPacket(ProtocolInfo.CONTAINER_OPEN_PACKET, ContainerOpenPacket.class)
-                .registerPacket(ProtocolInfo.CONTAINER_SET_DATA_PACKET, ContainerSetDataPacket.class)
-                .registerPacket(ProtocolInfo.CRAFTING_DATA_PACKET, CraftingDataPacket.class)
-                .registerPacket(ProtocolInfo.CRAFTING_EVENT_PACKET, CraftingEventPacket.class)
-                .registerPacket(ProtocolInfo.DISCONNECT_PACKET, DisconnectPacket.class)
-                .registerPacket(ProtocolInfo.ENTITY_EVENT_PACKET, EntityEventPacket.class)
-                .registerPacket(ProtocolInfo.ENTITY_FALL_PACKET, EntityFallPacket.class)
-                .registerPacket(ProtocolInfo.FULL_CHUNK_DATA_PACKET, LevelChunkPacket.class)
-                .registerPacket(ProtocolInfo.GAME_RULES_CHANGED_PACKET, GameRulesChangedPacket.class)
-                .registerPacket(ProtocolInfo.HURT_ARMOR_PACKET, HurtArmorPacket.class)
-                .registerPacket(ProtocolInfo.INTERACT_PACKET, InteractPacket.class)
-                .registerPacket(ProtocolInfo.INVENTORY_CONTENT_PACKET, InventoryContentPacket.class)
-                .registerPacket(ProtocolInfo.INVENTORY_SLOT_PACKET, InventorySlotPacket.class)
-                .registerPacket(ProtocolInfo.INVENTORY_TRANSACTION_PACKET, InventoryTransactionPacket.class)
-                .registerPacket(ProtocolInfo.ITEM_FRAME_DROP_ITEM_PACKET, ItemFrameDropItemPacket.class)
-                .registerPacket(ProtocolInfo.LEVEL_EVENT_PACKET, LevelEventPacket.class)
-                .registerPacket(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V1, LevelSoundEventPacketV1.class)
-                .registerPacket(ProtocolInfo.LOGIN_PACKET, LoginPacket.class)
-                .registerPacket(ProtocolInfo.MAP_INFO_REQUEST_PACKET, MapInfoRequestPacket.class)
-                .registerPacket(ProtocolInfo.MOB_ARMOR_EQUIPMENT_PACKET, MobArmorEquipmentPacket.class)
-                .registerPacket(ProtocolInfo.MOB_EQUIPMENT_PACKET, MobEquipmentPacket.class)
-                .registerPacket(ProtocolInfo.MODAL_FORM_REQUEST_PACKET, ModalFormRequestPacket.class)
-                .registerPacket(ProtocolInfo.MODAL_FORM_RESPONSE_PACKET, ModalFormResponsePacket.class)
-                .registerPacket(ProtocolInfo.MOVE_ENTITY_ABSOLUTE_PACKET, MoveEntityAbsolutePacket.class)
-                .registerPacket(ProtocolInfo.MOVE_PLAYER_PACKET, MovePlayerPacket.class)
-                .registerPacket(ProtocolInfo.PLAYER_ACTION_PACKET, PlayerActionPacket.class)
-                .registerPacket(ProtocolInfo.PLAYER_INPUT_PACKET, PlayerInputPacket.class)
-                .registerPacket(ProtocolInfo.PLAYER_LIST_PACKET, PlayerListPacket.class)
-                .registerPacket(ProtocolInfo.PLAYER_HOTBAR_PACKET, PlayerHotbarPacket.class)
-                .registerPacket(ProtocolInfo.PLAY_SOUND_PACKET, PlaySoundPacket.class)
-                .registerPacket(ProtocolInfo.PLAY_STATUS_PACKET, PlayStatusPacket.class)
-                .registerPacket(ProtocolInfo.REMOVE_ENTITY_PACKET, RemoveEntityPacket.class)
-                .registerPacket(ProtocolInfo.REQUEST_CHUNK_RADIUS_PACKET, RequestChunkRadiusPacket.class)
-                .registerPacket(ProtocolInfo.RESOURCE_PACKS_INFO_PACKET, ResourcePacksInfoPacket.class)
-                .registerPacket(ProtocolInfo.RESOURCE_PACK_STACK_PACKET, ResourcePackStackPacket.class)
-                .registerPacket(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET, ResourcePackClientResponsePacket.class)
-                .registerPacket(ProtocolInfo.RESOURCE_PACK_DATA_INFO_PACKET, ResourcePackDataInfoPacket.class)
-                .registerPacket(ProtocolInfo.RESOURCE_PACK_CHUNK_DATA_PACKET, ResourcePackChunkDataPacket.class)
-                .registerPacket(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET, ResourcePackChunkRequestPacket.class)
-                .registerPacket(ProtocolInfo.PLAYER_SKIN_PACKET, PlayerSkinPacket.class)
-                .registerPacket(ProtocolInfo.RESPAWN_PACKET, RespawnPacket.class)
-                .registerPacket(ProtocolInfo.RIDER_JUMP_PACKET, RiderJumpPacket.class)
-                .registerPacket(ProtocolInfo.SET_COMMANDS_ENABLED_PACKET, SetCommandsEnabledPacket.class)
-                .registerPacket(ProtocolInfo.SET_DIFFICULTY_PACKET, SetDifficultyPacket.class)
-                .registerPacket(ProtocolInfo.SET_ENTITY_DATA_PACKET, SetEntityDataPacket.class)
-                .registerPacket(ProtocolInfo.SET_ENTITY_LINK_PACKET, SetEntityLinkPacket.class)
-                .registerPacket(ProtocolInfo.SET_ENTITY_MOTION_PACKET, SetEntityMotionPacket.class)
-                .registerPacket(ProtocolInfo.SET_HEALTH_PACKET, SetHealthPacket.class)
-                .registerPacket(ProtocolInfo.SET_PLAYER_GAME_TYPE_PACKET, SetPlayerGameTypePacket.class)
-                .registerPacket(ProtocolInfo.SET_SPAWN_POSITION_PACKET, SetSpawnPositionPacket.class)
-                .registerPacket(ProtocolInfo.SET_TITLE_PACKET, SetTitlePacket.class)
-                .registerPacket(ProtocolInfo.SET_TIME_PACKET, SetTimePacket.class)
-                .registerPacket(ProtocolInfo.SERVER_SETTINGS_REQUEST_PACKET, ServerSettingsRequestPacket.class)
-                .registerPacket(ProtocolInfo.SERVER_SETTINGS_RESPONSE_PACKET, ServerSettingsResponsePacket.class)
-                .registerPacket(ProtocolInfo.SHOW_CREDITS_PACKET, ShowCreditsPacket.class)
-                .registerPacket(ProtocolInfo.SPAWN_EXPERIENCE_ORB_PACKET, SpawnExperienceOrbPacket.class)
-                .registerPacket(ProtocolInfo.START_GAME_PACKET, StartGamePacket.class)
-                .registerPacket(ProtocolInfo.TAKE_ITEM_ENTITY_PACKET, TakeItemEntityPacket.class)
-                .registerPacket(ProtocolInfo.TEXT_PACKET, TextPacket.class)
-                .registerPacket(ProtocolInfo.SERVER_POST_MOVE_POSITION, ServerPostMovePositionPacket.class)
-                .registerPacket(ProtocolInfo.TRANSFER_PACKET, TransferPacket.class)
-                .registerPacket(ProtocolInfo.UPDATE_ATTRIBUTES_PACKET, UpdateAttributesPacket.class)
-                .registerPacket(ProtocolInfo.UPDATE_BLOCK_PACKET, UpdateBlockPacket.class)
-                .registerPacket(ProtocolInfo.COMMAND_BLOCK_UPDATE_PACKET, CommandBlockUpdatePacket.class)
-                .registerPacket(ProtocolInfo.COMMAND_OUTPUT_PACKET, CommandOutputPacket.class)
-                .registerPacket(ProtocolInfo.UPDATE_TRADE_PACKET, UpdateTradePacket.class)
-                .registerPacket(ProtocolInfo.SET_DISPLAY_OBJECTIVE_PACKET, SetDisplayObjectivePacket.class)
-                .registerPacket(ProtocolInfo.SET_SCORE_PACKET, SetScorePacket.class)
-                .registerPacket(ProtocolInfo.MOVE_ENTITY_DELTA_PACKET, MoveEntityDeltaPacket.class)
-                .registerPacket(ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET, SetLocalPlayerAsInitializedPacket.class)
-                .registerPacket(ProtocolInfo.NETWORK_STACK_LATENCY_PACKET, NetworkStackLatencyPacket.class)
-                .registerPacket(ProtocolInfo.UPDATE_SOFT_ENUM_PACKET, UpdateSoftEnumPacket.class)
-                .registerPacket(ProtocolInfo.NETWORK_CHUNK_PUBLISHER_UPDATE_PACKET, NetworkChunkPublisherUpdatePacket.class)
-                .registerPacket(ProtocolInfo.AVAILABLE_ENTITY_IDENTIFIERS_PACKET, AvailableEntityIdentifiersPacket.class)
-                .registerPacket(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V2, LevelSoundEventPacket.class)
-                .registerPacket(ProtocolInfo.SCRIPT_CUSTOM_EVENT_PACKET, ScriptCustomEventPacket.class)
-                .registerPacket(ProtocolInfo.SCRIPT_MESSAGE_PACKET, ScriptMessagePacket.class)
-                .registerPacket(ProtocolInfo.SPAWN_PARTICLE_EFFECT_PACKET, SpawnParticleEffectPacket.class)
-                .registerPacket(ProtocolInfo.BIOME_DEFINITION_LIST_PACKET, BiomeDefinitionListPacket.class)
-                .registerPacket(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET, LevelSoundEventPacket.class)
-                .registerPacket(ProtocolInfo.LEVEL_EVENT_GENERIC_PACKET, LevelEventGenericPacket.class)
-                .registerPacket(ProtocolInfo.LECTERN_UPDATE_PACKET, LecternUpdatePacket.class)
-                .registerPacket(ProtocolInfo.VIDEO_STREAM_CONNECT_PACKET, VideoStreamConnectPacket.class)
-                .registerPacket(ProtocolInfo.CLIENT_CACHE_STATUS_PACKET, ClientCacheStatusPacket.class)
-                .registerPacket(ProtocolInfo.MAP_CREATE_LOCKED_COPY_PACKET, MapCreateLockedCopyPacket.class)
-                .registerPacket(ProtocolInfo.ON_SCREEN_TEXTURE_ANIMATION_PACKET, OnScreenTextureAnimationPacket.class)
-                .registerPacket(ProtocolInfo.COMPLETED_USING_ITEM_PACKET, CompletedUsingItemPacket.class)
-                .registerPacket(ProtocolInfo.NETWORK_SETTINGS_PACKET, NetworkSettingsPacket.class)
-                .registerPacket(ProtocolInfo.CODE_BUILDER_PACKET, CodeBuilderPacket.class)
-                .registerPacket(ProtocolInfo.PLAYER_AUTH_INPUT_PACKET, PlayerAuthInputPacket.class)
-                .registerPacket(ProtocolInfo.CREATIVE_CONTENT_PACKET, CreativeContentPacket.class)
-                .registerPacket(ProtocolInfo.DEBUG_INFO_PACKET, DebugInfoPacket.class)
-                .registerPacket(ProtocolInfo.EMOTE_LIST_PACKET, EmoteListPacket.class)
-                .registerPacket(ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET, PacketViolationWarningPacket.class)
-                .registerPacket(ProtocolInfo.PLAYER_ARMOR_DAMAGE_PACKET, PlayerArmorDamagePacket.class)
-                .registerPacket(ProtocolInfo.PLAYER_ENCHANT_OPTIONS_PACKET, PlayerEnchantOptionsPacket.class)
-                .registerPacket(ProtocolInfo.UPDATE_PLAYER_GAME_TYPE_PACKET, UpdatePlayerGameTypePacket.class)
-                .registerPacket(ProtocolInfo.UPDATE_ABILITIES_PACKET, UpdateAbilitiesPacket.class)
-                .registerPacket(ProtocolInfo.DIMENSION_DATA_PACKET, DimensionDataPacket.class)
-                .registerPacket(ProtocolInfo.REQUEST_ABILITY_PACKET, RequestAbilityPacket.class)
-                .registerPacket(ProtocolInfo.UPDATE_ADVENTURE_SETTINGS_PACKET, UpdateAdventureSettingsPacket.class)
-                .registerPacket(ProtocolInfo.DEATH_INFO_PACKET, DeathInfoPacket.class)
-                .registerPacket(ProtocolInfo.EMOTE_PACKET, EmotePacket.class)
-                .registerPacket(ProtocolInfo.ANIMATE_ENTITY_PACKET, AnimateEntityPacket.class)
-                .registerPacket(ProtocolInfo.PLAYER_FOG_PACKET, PlayerFogPacket.class)
-                .registerPacket(ProtocolInfo.CORRECT_PLAYER_MOVE_PREDICTION_PACKET, CorrectPlayerMovePredictionPacket.class)
-                .registerPacket(ProtocolInfo.ITEM_COMPONENT_PACKET, ItemComponentPacket.class)
-                .registerPacket(ProtocolInfo.FILTER_TEXT_PACKET, FilterTextPacket.class)
-                .registerPacket(ProtocolInfo.ITEM_STACK_REQUEST_PACKET, ItemStackRequestPacket.class)
-                .registerPacket(ProtocolInfo.ITEM_STACK_RESPONSE_PACKET, ItemStackResponsePacket.class)
-                .registerPacket(ProtocolInfo.SYNC_ENTITY_PROPERTY_PACKET, SyncEntityPropertyPacket.class)
-                .registerPacket(ProtocolInfo.NPC_REQUEST_PACKET, NPCRequestPacket.class)
-                .registerPacket(ProtocolInfo.NPC_DIALOGUE_PACKET, NPCDialoguePacket.class)
-                .registerPacket(ProtocolInfo.TOAST_REQUEST_PACKET, ToastRequestPacket.class)
-                .registerPacket(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET, RequestNetworkSettingsPacket.class)
-                .registerPacket(ProtocolInfo.UPDATE_CLIENT_INPUT_LOCKS, UpdateClientInputLocksPacket.class)
-                .registerPacket(ProtocolInfo.CAMERA_PRESETS_PACKET, CameraPresetsPacket.class)
-                .registerPacket(ProtocolInfo.SUB_CHUNK_PACKET, SubChunkPacket.class)
-                .registerPacket(ProtocolInfo.SUB_CHUNK_REQUEST_PACKET, SubChunkRequestPacket.class)
+            .protocolVersion(ProtocolInfo.v1_2_0)
+            .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v1_2_0))
+            .registerPacket(ProtocolInfo.SERVER_TO_CLIENT_HANDSHAKE_PACKET, ServerToClientHandshakePacket.class)
+            .registerPacket(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET, ClientToServerHandshakePacket.class)
+            .registerPacket(ProtocolInfo.ADD_ENTITY_PACKET, AddEntityPacket.class)
+            .registerPacket(ProtocolInfo.ADD_ITEM_ENTITY_PACKET, AddItemEntityPacket.class)
+            .registerPacket(ProtocolInfo.ADD_PAINTING_PACKET, AddPaintingPacket.class)
+            .registerPacket(ProtocolInfo.TICK_SYNC_PACKET, TickSyncPacket.class)
+            .registerPacket(ProtocolInfo.ADD_PLAYER_PACKET, AddPlayerPacket.class)
+            .registerPacket(ProtocolInfo.ADVENTURE_SETTINGS_PACKET, AdventureSettingsPacket.class)
+            .registerPacket(ProtocolInfo.ANIMATE_PACKET, AnimatePacket.class)
+            .registerPacket(ProtocolInfo.SETTINGS_COMMAND_PACKET, SettingsCommandPacket.class)
+            .registerPacket(ProtocolInfo.ANVIL_DAMAGE_PACKET, AnvilDamagePacket.class)
+            .registerPacket(ProtocolInfo.AVAILABLE_COMMANDS_PACKET, AvailableCommandsPacket.class)
+            .registerPacket(ProtocolInfo.BATCH_PACKET, BatchPacket.class)
+            .registerPacket(ProtocolInfo.BLOCK_ENTITY_DATA_PACKET, BlockEntityDataPacket.class)
+            .registerPacket(ProtocolInfo.BLOCK_EVENT_PACKET, BlockEventPacket.class)
+            .registerPacket(ProtocolInfo.BLOCK_PICK_REQUEST_PACKET, BlockPickRequestPacket.class)
+            .registerPacket(ProtocolInfo.BOOK_EDIT_PACKET, BookEditPacket.class)
+            .registerPacket(ProtocolInfo.BOSS_EVENT_PACKET, BossEventPacket.class)
+            .registerPacket(ProtocolInfo.CHANGE_DIMENSION_PACKET, ChangeDimensionPacket.class)
+            .registerPacket(ProtocolInfo.CHUNK_RADIUS_UPDATED_PACKET, ChunkRadiusUpdatedPacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_MAP_ITEM_DATA_PACKET, ClientboundMapItemDataPacket.class)
+            .registerPacket(ProtocolInfo.COMMAND_REQUEST_PACKET, CommandRequestPacket.class)
+            .registerPacket(ProtocolInfo.CONTAINER_CLOSE_PACKET, ContainerClosePacket.class)
+            .registerPacket(ProtocolInfo.CONTAINER_OPEN_PACKET, ContainerOpenPacket.class)
+            .registerPacket(ProtocolInfo.CONTAINER_SET_DATA_PACKET, ContainerSetDataPacket.class)
+            .registerPacket(ProtocolInfo.CRAFTING_DATA_PACKET, CraftingDataPacket.class)
+            .registerPacket(ProtocolInfo.CRAFTING_EVENT_PACKET, CraftingEventPacket.class)
+            .registerPacket(ProtocolInfo.DISCONNECT_PACKET, DisconnectPacket.class)
+            .registerPacket(ProtocolInfo.ENTITY_EVENT_PACKET, EntityEventPacket.class)
+            .registerPacket(ProtocolInfo.ENTITY_FALL_PACKET, EntityFallPacket.class)
+            .registerPacket(ProtocolInfo.FULL_CHUNK_DATA_PACKET, LevelChunkPacket.class)
+            .registerPacket(ProtocolInfo.GAME_RULES_CHANGED_PACKET, GameRulesChangedPacket.class)
+            .registerPacket(ProtocolInfo.HURT_ARMOR_PACKET, HurtArmorPacket.class)
+            .registerPacket(ProtocolInfo.INTERACT_PACKET, InteractPacket.class)
+            .registerPacket(ProtocolInfo.INVENTORY_CONTENT_PACKET, InventoryContentPacket.class)
+            .registerPacket(ProtocolInfo.INVENTORY_SLOT_PACKET, InventorySlotPacket.class)
+            .registerPacket(ProtocolInfo.INVENTORY_TRANSACTION_PACKET, InventoryTransactionPacket.class)
+            .registerPacket(ProtocolInfo.ITEM_FRAME_DROP_ITEM_PACKET, ItemFrameDropItemPacket.class)
+            .registerPacket(ProtocolInfo.LEVEL_EVENT_PACKET, LevelEventPacket.class)
+            .registerPacket(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V1, LevelSoundEventPacketV1.class)
+            .registerPacket(ProtocolInfo.LOGIN_PACKET, LoginPacket.class)
+            .registerPacket(ProtocolInfo.MAP_INFO_REQUEST_PACKET, MapInfoRequestPacket.class)
+            .registerPacket(ProtocolInfo.MOB_ARMOR_EQUIPMENT_PACKET, MobArmorEquipmentPacket.class)
+            .registerPacket(ProtocolInfo.MOB_EQUIPMENT_PACKET, MobEquipmentPacket.class)
+            .registerPacket(ProtocolInfo.MODAL_FORM_REQUEST_PACKET, ModalFormRequestPacket.class)
+            .registerPacket(ProtocolInfo.MODAL_FORM_RESPONSE_PACKET, ModalFormResponsePacket.class)
+            .registerPacket(ProtocolInfo.MOVE_ENTITY_ABSOLUTE_PACKET, MoveEntityAbsolutePacket.class)
+            .registerPacket(ProtocolInfo.MOVE_PLAYER_PACKET, MovePlayerPacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_ACTION_PACKET, PlayerActionPacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_INPUT_PACKET, PlayerInputPacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_LIST_PACKET, PlayerListPacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_HOTBAR_PACKET, PlayerHotbarPacket.class)
+            .registerPacket(ProtocolInfo.PLAY_SOUND_PACKET, PlaySoundPacket.class)
+            .registerPacket(ProtocolInfo.PLAY_STATUS_PACKET, PlayStatusPacket.class)
+            .registerPacket(ProtocolInfo.REMOVE_ENTITY_PACKET, RemoveEntityPacket.class)
+            .registerPacket(ProtocolInfo.REQUEST_CHUNK_RADIUS_PACKET, RequestChunkRadiusPacket.class)
+            .registerPacket(ProtocolInfo.RESOURCE_PACKS_INFO_PACKET, ResourcePacksInfoPacket.class)
+            .registerPacket(ProtocolInfo.RESOURCE_PACK_STACK_PACKET, ResourcePackStackPacket.class)
+            .registerPacket(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET, ResourcePackClientResponsePacket.class)
+            .registerPacket(ProtocolInfo.RESOURCE_PACK_DATA_INFO_PACKET, ResourcePackDataInfoPacket.class)
+            .registerPacket(ProtocolInfo.RESOURCE_PACK_CHUNK_DATA_PACKET, ResourcePackChunkDataPacket.class)
+            .registerPacket(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET, ResourcePackChunkRequestPacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_SKIN_PACKET, PlayerSkinPacket.class)
+            .registerPacket(ProtocolInfo.RESPAWN_PACKET, RespawnPacket.class)
+            .registerPacket(ProtocolInfo.RIDER_JUMP_PACKET, RiderJumpPacket.class)
+            .registerPacket(ProtocolInfo.SET_COMMANDS_ENABLED_PACKET, SetCommandsEnabledPacket.class)
+            .registerPacket(ProtocolInfo.SET_DIFFICULTY_PACKET, SetDifficultyPacket.class)
+            .registerPacket(ProtocolInfo.SET_ENTITY_DATA_PACKET, SetEntityDataPacket.class)
+            .registerPacket(ProtocolInfo.SET_ENTITY_LINK_PACKET, SetEntityLinkPacket.class)
+            .registerPacket(ProtocolInfo.SET_ENTITY_MOTION_PACKET, SetEntityMotionPacket.class)
+            .registerPacket(ProtocolInfo.SET_HEALTH_PACKET, SetHealthPacket.class)
+            .registerPacket(ProtocolInfo.SET_PLAYER_GAME_TYPE_PACKET, SetPlayerGameTypePacket.class)
+            .registerPacket(ProtocolInfo.SET_SPAWN_POSITION_PACKET, SetSpawnPositionPacket.class)
+            .registerPacket(ProtocolInfo.SET_TITLE_PACKET, SetTitlePacket.class)
+            .registerPacket(ProtocolInfo.SET_TIME_PACKET, SetTimePacket.class)
+            .registerPacket(ProtocolInfo.SERVER_SETTINGS_REQUEST_PACKET, ServerSettingsRequestPacket.class)
+            .registerPacket(ProtocolInfo.SERVER_SETTINGS_RESPONSE_PACKET, ServerSettingsResponsePacket.class)
+            .registerPacket(ProtocolInfo.SHOW_CREDITS_PACKET, ShowCreditsPacket.class)
+            .registerPacket(ProtocolInfo.SPAWN_EXPERIENCE_ORB_PACKET, SpawnExperienceOrbPacket.class)
+            .registerPacket(ProtocolInfo.START_GAME_PACKET, StartGamePacket.class)
+            .registerPacket(ProtocolInfo.TAKE_ITEM_ENTITY_PACKET, TakeItemEntityPacket.class)
+            .registerPacket(ProtocolInfo.TEXT_PACKET, TextPacket.class)
+            .registerPacket(ProtocolInfo.SERVER_POST_MOVE_POSITION, ServerPostMovePositionPacket.class)
+            .registerPacket(ProtocolInfo.TRANSFER_PACKET, TransferPacket.class)
+            .registerPacket(ProtocolInfo.UPDATE_ATTRIBUTES_PACKET, UpdateAttributesPacket.class)
+            .registerPacket(ProtocolInfo.UPDATE_BLOCK_PACKET, UpdateBlockPacket.class)
+            .registerPacket(ProtocolInfo.COMMAND_BLOCK_UPDATE_PACKET, CommandBlockUpdatePacket.class)
+            .registerPacket(ProtocolInfo.COMMAND_OUTPUT_PACKET, CommandOutputPacket.class)
+            .registerPacket(ProtocolInfo.UPDATE_TRADE_PACKET, UpdateTradePacket.class)
+            .registerPacket(ProtocolInfo.SET_DISPLAY_OBJECTIVE_PACKET, SetDisplayObjectivePacket.class)
+            .registerPacket(ProtocolInfo.SET_SCORE_PACKET, SetScorePacket.class)
+            .registerPacket(ProtocolInfo.MOVE_ENTITY_DELTA_PACKET, MoveEntityDeltaPacket.class)
+            .registerPacket(ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET, SetLocalPlayerAsInitializedPacket.class)
+            .registerPacket(ProtocolInfo.NETWORK_STACK_LATENCY_PACKET, NetworkStackLatencyPacket.class)
+            .registerPacket(ProtocolInfo.UPDATE_SOFT_ENUM_PACKET, UpdateSoftEnumPacket.class)
+            .registerPacket(ProtocolInfo.NETWORK_CHUNK_PUBLISHER_UPDATE_PACKET, NetworkChunkPublisherUpdatePacket.class)
+            .registerPacket(ProtocolInfo.AVAILABLE_ENTITY_IDENTIFIERS_PACKET, AvailableEntityIdentifiersPacket.class)
+            .registerPacket(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V2, LevelSoundEventPacket.class)
+            .registerPacket(ProtocolInfo.SCRIPT_CUSTOM_EVENT_PACKET, ScriptCustomEventPacket.class)
+            .registerPacket(ProtocolInfo.SCRIPT_MESSAGE_PACKET, ScriptMessagePacket.class)
+            .registerPacket(ProtocolInfo.SPAWN_PARTICLE_EFFECT_PACKET, SpawnParticleEffectPacket.class)
+            .registerPacket(ProtocolInfo.BIOME_DEFINITION_LIST_PACKET, BiomeDefinitionListPacket.class)
+            .registerPacket(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET, LevelSoundEventPacket.class)
+            .registerPacket(ProtocolInfo.LEVEL_EVENT_GENERIC_PACKET, LevelEventGenericPacket.class)
+            .registerPacket(ProtocolInfo.LECTERN_UPDATE_PACKET, LecternUpdatePacket.class)
+            .registerPacket(ProtocolInfo.VIDEO_STREAM_CONNECT_PACKET, VideoStreamConnectPacket.class)
+            .registerPacket(ProtocolInfo.CLIENT_CACHE_STATUS_PACKET, ClientCacheStatusPacket.class)
+            .registerPacket(ProtocolInfo.MAP_CREATE_LOCKED_COPY_PACKET, MapCreateLockedCopyPacket.class)
+            .registerPacket(ProtocolInfo.ON_SCREEN_TEXTURE_ANIMATION_PACKET, OnScreenTextureAnimationPacket.class)
+            .registerPacket(ProtocolInfo.COMPLETED_USING_ITEM_PACKET, CompletedUsingItemPacket.class)
+            .registerPacket(ProtocolInfo.NETWORK_SETTINGS_PACKET, NetworkSettingsPacket.class)
+            .registerPacket(ProtocolInfo.CODE_BUILDER_PACKET, CodeBuilderPacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_AUTH_INPUT_PACKET, PlayerAuthInputPacket.class)
+            .registerPacket(ProtocolInfo.CREATIVE_CONTENT_PACKET, CreativeContentPacket.class)
+            .registerPacket(ProtocolInfo.DEBUG_INFO_PACKET, DebugInfoPacket.class)
+            .registerPacket(ProtocolInfo.EMOTE_LIST_PACKET, EmoteListPacket.class)
+            .registerPacket(ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET, PacketViolationWarningPacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_ARMOR_DAMAGE_PACKET, PlayerArmorDamagePacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_ENCHANT_OPTIONS_PACKET, PlayerEnchantOptionsPacket.class)
+            .registerPacket(ProtocolInfo.UPDATE_PLAYER_GAME_TYPE_PACKET, UpdatePlayerGameTypePacket.class)
+            .registerPacket(ProtocolInfo.UPDATE_ABILITIES_PACKET, UpdateAbilitiesPacket.class)
+            .registerPacket(ProtocolInfo.DIMENSION_DATA_PACKET, DimensionDataPacket.class)
+            .registerPacket(ProtocolInfo.REQUEST_ABILITY_PACKET, RequestAbilityPacket.class)
+            .registerPacket(ProtocolInfo.UPDATE_ADVENTURE_SETTINGS_PACKET, UpdateAdventureSettingsPacket.class)
+            .registerPacket(ProtocolInfo.DEATH_INFO_PACKET, DeathInfoPacket.class)
+            .registerPacket(ProtocolInfo.EMOTE_PACKET, EmotePacket.class)
+            .registerPacket(ProtocolInfo.ANIMATE_ENTITY_PACKET, AnimateEntityPacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_FOG_PACKET, PlayerFogPacket.class)
+            .registerPacket(ProtocolInfo.CORRECT_PLAYER_MOVE_PREDICTION_PACKET, CorrectPlayerMovePredictionPacket.class)
+            .registerPacket(ProtocolInfo.ITEM_COMPONENT_PACKET, ItemComponentPacket.class)
+            .registerPacket(ProtocolInfo.FILTER_TEXT_PACKET, FilterTextPacket.class)
+            .registerPacket(ProtocolInfo.ITEM_STACK_REQUEST_PACKET, ItemStackRequestPacket.class)
+            .registerPacket(ProtocolInfo.ITEM_STACK_RESPONSE_PACKET, ItemStackResponsePacket.class)
+            .registerPacket(ProtocolInfo.SYNC_ENTITY_PROPERTY_PACKET, SyncEntityPropertyPacket.class)
+            .registerPacket(ProtocolInfo.NPC_REQUEST_PACKET, NPCRequestPacket.class)
+            .registerPacket(ProtocolInfo.NPC_DIALOGUE_PACKET, NPCDialoguePacket.class)
+            .registerPacket(ProtocolInfo.TOAST_REQUEST_PACKET, ToastRequestPacket.class)
+            .registerPacket(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET, RequestNetworkSettingsPacket.class)
+            .registerPacket(ProtocolInfo.UPDATE_CLIENT_INPUT_LOCKS, UpdateClientInputLocksPacket.class)
+            .registerPacket(ProtocolInfo.CAMERA_PRESETS_PACKET, CameraPresetsPacket.class)
+            .registerPacket(ProtocolInfo.SUB_CHUNK_PACKET, SubChunkPacket.class)
+            .registerPacket(ProtocolInfo.SUB_CHUNK_REQUEST_PACKET, SubChunkRequestPacket.class)
 
-                .registerPacket(ProtocolInfo.CAMERA_INSTRUCTION_PACKET, CameraInstructionPacket.class)
-                .registerPacket(ProtocolInfo.TRIM_DATA_PACKET, TrimDataPacket.class)
-                .registerPacket(ProtocolInfo.OPEN_SIGN_PACKET, OpenSignPacket.class)
-                .registerPacket(ProtocolInfo.AGENT_ANIMATION_PACKET, AgentAnimationPacket.class)
-                .registerPacket(ProtocolInfo.REFRESH_ENTITLEMENTS_PACKET, RefreshEntitlementsPacket.class)
-                .registerPacket(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST_PACKET, ToggleCrafterSlotRequestPacket.class)
-                .registerPacket(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class)
-                .registerPacket(ProtocolInfo.SET_HUD_PACKET, SetHudPacket.class)
-                .registerPacket(ProtocolInfo.AWARD_ACHIEVEMENT_PACKET, AwardAchievementPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET, ClientboundCloseFormPacket.class)
-                .registerPacket(ProtocolInfo.SERVERBOUND_LOADING_SCREEN_PACKET, ServerboundLoadingScreenPacket.class)
-                .registerPacket(ProtocolInfo.JIGSAW_STRUCTURE_DATA_PACKET, JigsawStructureDataPacket.class)
-                .registerPacket(ProtocolInfo.CURRENT_STRUCTURE_FEATURE_PACKET, CurrentStructureFeaturePacket.class)
-                .registerPacket(ProtocolInfo.SERVERBOUND_DIAGNOSTICS_PACKET, ServerboundDiagnosticsPacket.class)
-                .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PACKET, CameraAimAssistPacket.class)
-                .registerPacket(ProtocolInfo.CONTAINER_REGISTRY_CLEANUP_PACKET, ContainerRegistryCleanupPacket.class)
-                .registerPacket(ProtocolInfo.MOVEMENT_EFFECT_PACKET, MovementEffectPacket.class)
-                .registerPacket(ProtocolInfo.SET_MOVEMENT_AUTHORITY_PACKET, SetMovementAuthorityPacket.class)
-                .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PRESETS_PACKET, CameraAimAssistPresetsPacket.class)
-                .registerPacket(ProtocolInfo.CLIENT_CAMERA_AIM_ASSIST_PACKET, ClientCameraAimAssistPacket.class)
-                .registerPacket(ProtocolInfo.DEBUG_DRAWER_PACKET, DebugDrawerPacket.class)
+            .registerPacket(ProtocolInfo.CAMERA_INSTRUCTION_PACKET, CameraInstructionPacket.class)
+            .registerPacket(ProtocolInfo.TRIM_DATA_PACKET, TrimDataPacket.class)
+            .registerPacket(ProtocolInfo.OPEN_SIGN_PACKET, OpenSignPacket.class)
+            .registerPacket(ProtocolInfo.AGENT_ANIMATION_PACKET, AgentAnimationPacket.class)
+            .registerPacket(ProtocolInfo.REFRESH_ENTITLEMENTS_PACKET, RefreshEntitlementsPacket.class)
+            .registerPacket(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST_PACKET, ToggleCrafterSlotRequestPacket.class)
+            .registerPacket(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class)
+            .registerPacket(ProtocolInfo.SET_HUD_PACKET, SetHudPacket.class)
+            .registerPacket(ProtocolInfo.AWARD_ACHIEVEMENT_PACKET, AwardAchievementPacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET, ClientboundCloseFormPacket.class)
+            .registerPacket(ProtocolInfo.SERVERBOUND_LOADING_SCREEN_PACKET, ServerboundLoadingScreenPacket.class)
+            .registerPacket(ProtocolInfo.JIGSAW_STRUCTURE_DATA_PACKET, JigsawStructureDataPacket.class)
+            .registerPacket(ProtocolInfo.CURRENT_STRUCTURE_FEATURE_PACKET, CurrentStructureFeaturePacket.class)
+            .registerPacket(ProtocolInfo.SERVERBOUND_DIAGNOSTICS_PACKET, ServerboundDiagnosticsPacket.class)
+            .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PACKET, CameraAimAssistPacket.class)
+            .registerPacket(ProtocolInfo.CONTAINER_REGISTRY_CLEANUP_PACKET, ContainerRegistryCleanupPacket.class)
+            .registerPacket(ProtocolInfo.MOVEMENT_EFFECT_PACKET, MovementEffectPacket.class)
+            .registerPacket(ProtocolInfo.SET_MOVEMENT_AUTHORITY_PACKET, SetMovementAuthorityPacket.class)
+            .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PRESETS_PACKET, CameraAimAssistPresetsPacket.class)
+            .registerPacket(ProtocolInfo.CLIENT_CAMERA_AIM_ASSIST_PACKET, ClientCameraAimAssistPacket.class)
+            .registerPacket(ProtocolInfo.DEBUG_DRAWER_PACKET, DebugDrawerPacket.class)
+            .build();
 
-                // NetEase
-                .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
-                .build();
+        this.packetPool137NetEase = this.packetPool137.toBuilder()
+            .netEase(true)
+            .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
+            .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
+            .build();
 
         this.packetPoolCurrent = this.packetPool137.toBuilder()
-                .protocolVersion(ProtocolInfo.CURRENT_PROTOCOL)
-                .minecraftVersion(ProtocolInfo.MINECRAFT_VERSION)
-                .deregisterPacket(ProtocolInfo.PLAYER_INPUT_PACKET)
-                .deregisterPacket(ProtocolInfo.RIDER_JUMP_PACKET)
-                .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
-                // v924 packets
-                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET, ClientboundDataDrivenUIShowScreenPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_SCREEN_PACKET, ClientboundDataDrivenUICloseScreenPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_RELOAD_PACKET, ClientboundDataDrivenUIReloadPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_TEXTURE_SHIFT_PACKET, ClientboundTextureShiftPacket.class)
-                .registerPacket(ProtocolInfo.VOXEL_SHAPES_PACKET, VoxelShapesPacket.class)
-                .registerPacket(ProtocolInfo.CAMERA_SPLINE_PACKET, CameraSplinePacket.class)
-                .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_ACTOR_PRIORITY_PACKET, CameraAimAssistActorPriorityPacket.class)
-                // v897 packets
-                .registerPacket(ProtocolInfo.SERVERBOUND_DATA_STORE_PACKET, ServerboundDataStorePacket.class)
-                // v944 packets
-                .registerPacket(ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET, ResourcePacksReadyForValidationPacket.class)
-                .registerPacket(ProtocolInfo.LOCATOR_BAR_PACKET, LocatorBarPacket.class)
-                .registerPacket(ProtocolInfo.PARTY_CHANGED_PACKET, PartyChangedPacket.class)
-                .registerPacket(ProtocolInfo.SERVERBOUND_DATA_DRIVEN_SCREEN_CLOSED_PACKET, ServerboundDataDrivenScreenClosedPacket.class)
-                .registerPacket(ProtocolInfo.SYNC_WORLD_CLOCKS_PACKET, SyncWorldClocksPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_ATTRIBUTE_LAYER_SYNC_PACKET, ClientboundAttributeLayerSyncPacket.class)
-                // v975 packets
-                .registerPacket(ProtocolInfo.SERVER_STORE_INFO_PACKET, ServerStoreInfoPacket.class)
-                .registerPacket(ProtocolInfo.SERVER_PRESENCE_INFO_PACKET, ServerPresenceInfoPacket.class)
-                // v1001 packets
-                .registerPacket(ProtocolInfo.CLIENTBOUND_UPDATE_SOUND_DATA_PACKET, ClientboundUpdateSoundDataPacket.class)
-                .registerPacket(ProtocolInfo.SEND_PARTY_DESTINATION_COOKIE_PACKET, SendPartyDestinationCookiePacket.class)
-                .registerPacket(ProtocolInfo.PARTY_DESTINATION_COOKIE_RESPONSE_PACKET, PartyDestinationCookieResponsePacket.class)
-                .build();
+            .protocolVersion(ProtocolInfo.CURRENT_PROTOCOL)
+            .minecraftVersion(ProtocolInfo.MINECRAFT_VERSION)
+            .deregisterPacket(ProtocolInfo.PLAYER_INPUT_PACKET)
+            .deregisterPacket(ProtocolInfo.RIDER_JUMP_PACKET)
+            .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
+            // v924 packets
+            .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET, ClientboundDataDrivenUIShowScreenPacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_SCREEN_PACKET, ClientboundDataDrivenUICloseScreenPacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_RELOAD_PACKET, ClientboundDataDrivenUIReloadPacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_TEXTURE_SHIFT_PACKET, ClientboundTextureShiftPacket.class)
+            .registerPacket(ProtocolInfo.VOXEL_SHAPES_PACKET, VoxelShapesPacket.class)
+            .registerPacket(ProtocolInfo.CAMERA_SPLINE_PACKET, CameraSplinePacket.class)
+            .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_ACTOR_PRIORITY_PACKET, CameraAimAssistActorPriorityPacket.class)
+            // v897 packets
+            .registerPacket(ProtocolInfo.SERVERBOUND_DATA_STORE_PACKET, ServerboundDataStorePacket.class)
+            // v944 packets
+            .registerPacket(ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET, ResourcePacksReadyForValidationPacket.class)
+            .registerPacket(ProtocolInfo.LOCATOR_BAR_PACKET, LocatorBarPacket.class)
+            .registerPacket(ProtocolInfo.PARTY_CHANGED_PACKET, PartyChangedPacket.class)
+            .registerPacket(ProtocolInfo.SERVERBOUND_DATA_DRIVEN_SCREEN_CLOSED_PACKET, ServerboundDataDrivenScreenClosedPacket.class)
+            .registerPacket(ProtocolInfo.SYNC_WORLD_CLOCKS_PACKET, SyncWorldClocksPacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_ATTRIBUTE_LAYER_SYNC_PACKET, ClientboundAttributeLayerSyncPacket.class)
+            // v975 packets
+            .registerPacket(ProtocolInfo.SERVER_STORE_INFO_PACKET, ServerStoreInfoPacket.class)
+            .registerPacket(ProtocolInfo.SERVER_PRESENCE_INFO_PACKET, ServerPresenceInfoPacket.class)
+            // v1001 packets
+            .registerPacket(ProtocolInfo.CLIENTBOUND_UPDATE_SOUND_DATA_PACKET, ClientboundUpdateSoundDataPacket.class)
+            .registerPacket(ProtocolInfo.SEND_PARTY_DESTINATION_COOKIE_PACKET, SendPartyDestinationCookiePacket.class)
+            .registerPacket(ProtocolInfo.PARTY_DESTINATION_COOKIE_RESPONSE_PACKET, PartyDestinationCookieResponsePacket.class)
+            .build();
+
+        this.packetPoolCurrentNetEase = this.packetPoolCurrent.toBuilder()
+            .netEase(true)
+            .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
+            .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
+            .build();
     }
 
     @AllArgsConstructor

@@ -55,6 +55,19 @@ public class AddPlayerPacket extends DataPacket {
         this.reset();
         this.putUUID(this.uuid);
         this.putString(this.username);
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.entityUniqueId);
+            this.putEntityUniqueId(this.entityRuntimeId);
+            this.putVector3f(this.x, this.y, this.z);
+            this.putVector3f(this.speedX, this.speedY, this.speedZ);
+            this.putLFloat(this.pitch);
+            this.putLFloat(this.headYaw == -1 ? this.yaw : this.headYaw);
+            this.putLFloat(this.yaw);
+            this.putSlot(gameVersion, this.item);
+            this.put(Binary.writeMetadata(gameVersion, this.metadata));
+            return;
+        }
+
         if (protocol >= 223 && protocol <= 282) {
             this.putString("");
             this.putVarInt(0);

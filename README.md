@@ -75,17 +75,62 @@ dependencies {
 ```
 
 ## Credits
-[<img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="18"/>]() [Nukkit](https://github.com/CloudburstMC/Nukkit)  
-[<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]() [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
-[<img src="https://avatars.githubusercontent.com/u/20168691?v=4" width="18"/>]() [EaseCation](https://www.easecation.net/) [Nukkit](https://github.com/EaseCation/Nukkit) & [SynapseAPI](https://github.com/EaseCation/SynapseAPI)  
-[<img src="https://docs.powernukkitx.org/img/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)  
 
-![YourKit](https://www.yourkit.com/images/yklogo.png)  
-YourKit supports open source projects with innovative and intelligent tools
-for monitoring and profiling Java and .NET applications.
-YourKit is the creator of <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a>,
-<a href="https://www.yourkit.com/dotnet-profiler/">YourKit .NET Profiler</a>,
-and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.
+### Projects
+
+<table>
+  <tr>
+    <td align="center" width="20%">
+      <a href="https://github.com/CloudburstMC/Nukkit">
+        <img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="50"><br>
+        <b>Nukkit</b>
+      </a>
+    </td>
+    <td align="center" width="20%">
+      <a href="https://github.com/PetteriM1/NukkitPetteriM1Edition">
+        <img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="50"><br>
+        <b>NukkitPetteriM1</b>
+      </a>
+    </td>
+    <td align="center" width="20%">
+      <a href="https://github.com/EaseCation/Nukkit">
+        <img src="https://avatars.githubusercontent.com/u/20168691?v=4" width="50"><br>
+        <b>EaseCation/Nukkit</b>
+      </a>
+    </td>
+    <td align="center" width="20%">
+      <a href="https://github.com/PowerNukkitX/PowerNukkitX">
+        <img src="https://avatars.githubusercontent.com/u/99014792?s=200&v=4" width="50"><br>
+        <b>PowerNukkitX</b>
+      </a>
+    </td>
+    <td align="center" width="20%">
+      <a href="https://github.com/KoshakMineDEV/Lumi">
+        <img src="https://avatars.githubusercontent.com/u/122298065?s=200&v=4" width="50"><br>
+        <b>Lumi</b>
+      </a>
+    </td>
+  </tr>
+</table>
+
+### Sponsors
+
+<table>
+  <tr>
+    <td width="80" align="center">
+      <a href="https://www.yourkit.com/java/profiler/">
+        <img src="https://www.yourkit.com/images/yklogo.png" width="60">
+      </a>
+    </td>
+    <td>
+      YourKit supports open source projects with innovative and intelligent tools
+      for monitoring and profiling Java and .NET applications.<br>
+      <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a> ·
+      <a href="https://www.yourkit.com/dotnet-profiler/">YourKit .NET Profiler</a> ·
+      <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>
+    </td>
+  </tr>
+</table>
 
 ## Star History
 

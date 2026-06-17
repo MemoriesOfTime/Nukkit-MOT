@@ -81,10 +81,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         int protocolVersion = channel.config().getProtocolVersion();
         if (protocolVersion == 8 && Server.getInstance().netEaseMode) {
             this.compressionIn = CompressionProvider.NETEASE_UNKNOWN;
+            this.compressionOut = CompressionProvider.ZLIB;
         } else {
             this.compressionIn = protocolVersion >= 11 ? CompressionProvider.NONE : (protocolVersion < 10 ? CompressionProvider.ZLIB : CompressionProvider.ZLIB_RAW);
+            this.compressionOut = this.compressionIn;
         }
-        this.compressionOut = this.compressionIn;
         long acceptedAt = System.nanoTime();
         this.state.getConnection().setSessionCreatedNanos(acceptedAt);
         this.state.getConnection().setChildChannelAcceptedNanos(acceptedAt);

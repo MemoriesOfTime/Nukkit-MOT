@@ -199,6 +199,10 @@ public class Anvil2LevelDBConverter {
         newChunk.heightMap = Arrays.copyOf(oldChunk.getHeightMapArray(), oldChunk.getHeightMapArray().length);
         newChunk.tiles = new Long2ObjectNonBlockingMap<>();
         newChunk.tiles.putAll(oldChunk.getBlockEntities());
+        if (oldChunk.unknownTiles != null) {
+            newChunk.unknownTiles = new Long2ObjectNonBlockingMap<>();
+            newChunk.unknownTiles.putAll(oldChunk.unknownTiles);
+        }
         newChunk.entities = new Long2ObjectNonBlockingMap<>();
         newChunk.entities.putAll(oldChunk.getEntities());
         newChunk.tileList = oldChunk.tileList;

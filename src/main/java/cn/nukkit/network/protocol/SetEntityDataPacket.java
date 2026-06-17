@@ -35,7 +35,11 @@ public class SetEntityDataPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putEntityRuntimeId(this.eid);
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.eid);
+        } else {
+            this.putEntityRuntimeId(this.eid);
+        }
         this.put(Binary.writeMetadata(gameVersion, this.metadata));
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (protocol >= ProtocolInfo.v1_19_40) {

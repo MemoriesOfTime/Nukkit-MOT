@@ -62,8 +62,8 @@ public class BatchingHelper {
                 packet.protocol = players[0].protocol;
                 packet.gameVersion = players[0].getGameVersion();
                 players[0].getNetworkSession().sendPacket(packet);
-           }
-           return;
+            }
+            return;
         }
 
         Object2ObjectMap<GameVersion, ObjectList<Player>> targets = new Object2ObjectOpenHashMap<>();

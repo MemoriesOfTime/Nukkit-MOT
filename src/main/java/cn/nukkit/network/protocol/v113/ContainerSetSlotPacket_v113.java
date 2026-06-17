@@ -6,8 +6,8 @@ import cn.nukkit.item.Item;
  * author: MagicDroidX
  * Nukkit Project
  */
-public class ContainerSetSlotPacketV113 extends DataPacket_v113 {
-    public static final byte NETWORK_ID = ProtocolInfoV113.CONTAINER_SET_SLOT_PACKET;
+public class ContainerSetSlotPacket_v113 extends DataPacket_v113 {
+    public static final byte NETWORK_ID = ProtocolInfo_v113.CONTAINER_SET_SLOT_PACKET;
 
     @Override
     public byte pid() {

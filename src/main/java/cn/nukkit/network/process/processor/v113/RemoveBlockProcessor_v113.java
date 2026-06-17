@@ -12,7 +12,7 @@ import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.UpdateBlockPacket;
-import cn.nukkit.network.protocol.v113.RemoveBlockPacketV113;
+import cn.nukkit.network.protocol.v113.RemoveBlockPacket_v113;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -23,12 +23,12 @@ import org.jetbrains.annotations.NotNull;
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Log4j2
-public class RemoveBlockProcessor_v113 extends DataPacketProcessor<RemoveBlockPacketV113> {
+public class RemoveBlockProcessor_v113 extends DataPacketProcessor<RemoveBlockPacket_v113> {
 
     public static final RemoveBlockProcessor_v113 INSTANCE = new RemoveBlockProcessor_v113();
 
     @Override
-    public void handle(@NotNull PlayerHandle playerHandle, @NotNull RemoveBlockPacketV113 pk) {
+    public void handle(@NotNull PlayerHandle playerHandle, @NotNull RemoveBlockPacket_v113 pk) {
         //TODO
         //InventoryTransactionPacket.USE_ITEM_ACTION_BREAK_BLOCK
         Player player = playerHandle.player;
@@ -76,12 +76,12 @@ public class RemoveBlockProcessor_v113 extends DataPacketProcessor<RemoveBlockPa
 
     @Override
     public int getPacketId() {
-        return ProtocolInfo.toNewProtocolID(RemoveBlockPacketV113.NETWORK_ID);
+        return ProtocolInfo.toNewProtocolID(RemoveBlockPacket_v113.NETWORK_ID);
     }
 
     @Override
     public Class<? extends DataPacket> getPacketClass() {
-        return RemoveBlockPacketV113.class;
+        return RemoveBlockPacket_v113.class;
     }
 
     @Override

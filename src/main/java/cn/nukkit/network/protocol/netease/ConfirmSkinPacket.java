@@ -9,6 +9,9 @@ import lombok.ToString;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Confirm which custom skins have passed censorship checks.
+ */
 @OnlyNetEase
 @ToString
 public class ConfirmSkinPacket extends DataPacket {

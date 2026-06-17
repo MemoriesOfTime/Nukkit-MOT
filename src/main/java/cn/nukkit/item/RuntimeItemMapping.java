@@ -382,6 +382,11 @@ public class RuntimeItemMapping {
             nbtBytes = new byte[0];
         }
 
+        Item stringItem = parseCreativeStringItem(identifier, json, nbtBytes);
+        if (stringItem != null) {
+            return normalizeCreativeItemForTargetVersion(gameVersion, stringItem);
+        }
+
         int legacyId = ItemID.STRING_IDENTIFIED_ITEM;
         if (legacyEntry != null) {
             legacyId = legacyEntry.getLegacyId();
@@ -446,6 +451,24 @@ public class RuntimeItemMapping {
             item.setCompoundTag(nbtBytes);
         }
         return normalizeCreativeItemForTargetVersion(gameVersion, item);
+    }
+
+    private Item parseCreativeStringItem(String identifier, JsonObject json, byte[] nbtBytes) {
+        if (this.getNetworkIdByNamespaceId(identifier).isEmpty()) {
+            return null;
+        }
+
+        Item item = Item.fromString(identifier);
+        if (item.getId() != Item.STRING_IDENTIFIED_ITEM) {
+            return null;
+        }
+
+        if (json.has("damage")) {
+            item.setDamage(json.get("damage").getAsInt());
+        }
+        item.setCount(json.has("count") ? json.get("count").getAsInt() : 1);
+        item.setCompoundTag(nbtBytes);
+        return item;
     }
 
     private int resolveLegacyFullIdFromBlockState(GameVersion gameVersion, String identifier, byte[] blockStateBytes, boolean ignoreUnknown) {
