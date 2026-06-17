@@ -33,6 +33,21 @@ public class InventoryTransactionPacket extends DataPacket {
     public static final int USE_ITEM_ON_ENTITY_ACTION_ATTACK = 1;
     public static final int USE_ITEM_ON_ENTITY_ACTION_ITEM_INTERACT = 2;
 
+    /**
+     * Maximum number of legacy set-item-slot entries accepted from the client.
+     * <p>
+     * Mirrors CloudburstMC Protocol's {@code EncodingSettings.maxListSize} default (1536) that
+     * bounds {@code readArray} on the inventory-transaction legacy-slots path.
+     */
+    public static final int MAX_LEGACY_SLOT_ENTRIES = 1536;
+
+    /**
+     * Maximum byte length of a single legacy set-item-slot blob accepted from the client.
+     * <p>
+     * Mirrors CloudburstMC Protocol's {@code InventoryTransactionSerializer_v1001} hard cap of 89
+     * (the largest known slot count) used when reading a legacy slot byte array.
+     */
+    public static final int MAX_LEGACY_SLOT_BLOB_LENGTH = 89;
 
     public static final int ACTION_MAGIC_SLOT_DROP_ITEM = 0;
     public static final int ACTION_MAGIC_SLOT_PICKUP_ITEM = 1;
@@ -293,9 +308,15 @@ public class InventoryTransactionPacket extends DataPacket {
     private void readLegacySlots() {
         this.legacySlots = new ArrayList<>();
         int length = (int) this.getUnsignedVarInt();
+        if (length < 0 || length > MAX_LEGACY_SLOT_ENTRIES) {
+            throw new IllegalStateException("Invalid legacy slot count: " + length);
+        }
         for (int i = 0; i < length; i++) {
             int containerId = this.getByte();
             int bufLen = (int) this.getUnsignedVarInt();
+            if (bufLen < 0 || bufLen > MAX_LEGACY_SLOT_BLOB_LENGTH) {
+                throw new IllegalStateException("Invalid legacy slot blob length: " + bufLen);
+            }
             this.legacySlots.add(new LegacySetItemSlotData(containerId, this.get(bufLen)));
         }
     }
