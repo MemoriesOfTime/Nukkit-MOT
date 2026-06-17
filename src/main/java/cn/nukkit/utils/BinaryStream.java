@@ -1808,7 +1808,7 @@ public class BinaryStream {
         Map<GameRule, GameRules.Value> rulesToSend = new HashMap<>();
         allGameRules.forEach((gameRule, value) -> {
             int protocol = gameVersion.getProtocol();
-            if (protocol > value.getMinProtocol() && protocol < value.getMaxProtocol()) {
+            if (protocol >= value.getMinProtocol() && protocol < value.getMaxProtocol()) {
                 rulesToSend.put(gameRule, value);
             }
         });
@@ -1828,7 +1828,7 @@ public class BinaryStream {
         Map<GameRule, GameRules.Value> rulesToSend = new HashMap<>();
         allGameRules.forEach((gameRule, value) -> {
             int protocol = gameVersion.getProtocol();
-            if (protocol > value.getMinProtocol() && protocol < value.getMaxProtocol()) {
+            if (protocol >= value.getMinProtocol() && protocol < value.getMaxProtocol()) {
                 rulesToSend.put(gameRule, value);
             }
         });

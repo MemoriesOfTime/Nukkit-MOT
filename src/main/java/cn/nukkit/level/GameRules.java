@@ -59,7 +59,7 @@ public class GameRules {
         gameRules.gameRules.put(TNT_EXPLOSION_DROP_DECAY, new Value<>(Type.BOOLEAN, false, 685));
         gameRules.gameRules.put(SHOW_BORDER_EFFECT, new Value<>(Type.BOOLEAN, true, 618));
         gameRules.gameRules.put(PLAYERS_SLEEPING_PERCENTAGE, new Value<>(Type.INTEGER, 100, 618));
-        gameRules.gameRules.put(RECIPES_UNLOCK, new Value<>(Type.BOOLEAN, false, ProtocolInfo.v1_18_0));
+        gameRules.gameRules.put(RECIPES_UNLOCK, new Value<>(Type.BOOLEAN, false, ProtocolInfo.v1_20_30));
         gameRules.gameRules.put(RESPAWN_BLOCKS_EXPLODE, new Value<>(Type.BOOLEAN, true, 618));
         gameRules.gameRules.put(DO_LIMITED_CRAFTING, new Value<>(Type.BOOLEAN, false, 618));
         gameRules.gameRules.put(SHOW_RECIPE_MESSAGES, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_20_50));
@@ -292,7 +292,21 @@ public class GameRules {
         private final Type type;
         private T value;
         private boolean canBeChanged;
+        /**
+         * Inclusive lower bound of the protocol range in which this game rule is sent.
+         * <p>
+         * Semantics: {@code minProtocol} is the protocol version in which the rule was
+         * first introduced (e.g. {@code v1_26_30} for {@code PLAYER_WAYPOINTS}). The rule
+         * is sent to clients whose protocol {@code p} satisfies {@code minProtocol <= p}.
+         */
         private int minProtocol;
+        /**
+         * Exclusive upper bound of the protocol range in which this game rule is sent.
+         * The rule is sent to clients whose protocol {@code p} satisfies {@code p < maxProtocol}.
+         * Defaults to {@link Integer#MAX_VALUE} (sent on all newer versions).
+         * <p>
+         * Overall range is the half-open interval {@code [minProtocol, maxProtocol)}.
+         */
         private int maxProtocol = Integer.MAX_VALUE;
 
         public Value(Type type, T value) {
@@ -300,12 +314,19 @@ public class GameRules {
             this.value = value;
         }
 
+        /**
+         * @param minProtocol inclusive lower bound; the first protocol version that receives this rule
+         */
         public Value(Type type, T value, int minProtocol) {
             this.type = type;
             this.value = value;
             this.minProtocol = minProtocol;
         }
 
+        /**
+         * @param minProtocol inclusive lower bound; the first protocol version that receives this rule
+         * @param maxProtocol exclusive upper bound; the rule is no longer sent at or above this version
+         */
         public Value(Type type, T value, int minProtocol, int maxProtocol) {
             this.type = type;
             this.value = value;
