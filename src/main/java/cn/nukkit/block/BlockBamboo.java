@@ -246,6 +246,16 @@ public class BlockBamboo extends BlockTransparentMeta {
         return ItemTool.TYPE_AXE;
     }
 
+    @Override
+    public boolean breaksWhenMoved() {
+        return true;
+    }
+
+    @Override
+    public boolean sticksToPiston() {
+        return false;
+    }
+
     public int getLeafSize() {
         return (this.getDamage() >> 1) & 0x3;
     }
