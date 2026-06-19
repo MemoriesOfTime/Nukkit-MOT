@@ -183,8 +183,11 @@ public class BlockEntitySculkSensor extends BlockEntity implements VibrationList
                 VibrationSelector.Candidate candidate = chosen.get();
                 this.selector.startOver();
                 this.currentVibration = candidate.vibration;
+                // JE VibrationSystem.getTravelTimeInTicks: signal moves at 0.5 blocks/tick, so
+                // travel time is round(distance * 2). Matches the particle animation and the
+                // manager-scheduled arrival path for non-self-scheduling listeners.
                 this.arrivalTick = this.level.getCurrentTick()
-                        + Math.max(1, (int) Math.floor(candidate.distance));
+                        + Math.max(1, (int) Math.round(candidate.distance * 2.0));
             } else if (!this.selector.isEmpty()) {
                 // selection still pending within the same tick; keep ticking
                 return true;

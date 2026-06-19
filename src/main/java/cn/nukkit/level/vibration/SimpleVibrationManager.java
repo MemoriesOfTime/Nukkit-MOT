@@ -67,7 +67,7 @@ public class SimpleVibrationManager implements VibrationManager {
                 continue;
             }
 
-            int delay = Math.max(1, (int) source.distance(listenerPos));
+            int delay = getTravelTimeInTicks(source.distance(listenerPos));
             this.level.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
                 if (!listeners.contains(listener)) {
                     return;
@@ -173,6 +173,14 @@ public class SimpleVibrationManager implements VibrationManager {
      */
     protected boolean canVibrationArrive(Level level, Vector3 from, Vector3 to) {
         return !isOccluded(level, from, to);
+    }
+
+    /**
+     * JE {@code VibrationSystem.getTravelTimeInTicks}: the signal particle moves at 0.5 blocks/tick,
+     * so travel time is {@code round(distance * 2)}; clamped to at least 1 tick.
+     */
+    protected static int getTravelTimeInTicks(double distance) {
+        return Math.max(1, (int) Math.round(distance * 2.0));
     }
 
     /**

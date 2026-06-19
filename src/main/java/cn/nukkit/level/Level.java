@@ -2366,7 +2366,6 @@ public class Level implements ChunkManager, Metadatable {
             this.setBlock(block, Block.get(Block.AIR));
             Position position = block.add(0.5, 0.5, 0.5);
             this.addParticle(new DestroyBlockParticle(position, block));
-            //this.getVibrationManager().callVibrationEvent(new VibrationEvent(null, position, VibrationType.BLOCK_DESTROY));
         }
     }
 

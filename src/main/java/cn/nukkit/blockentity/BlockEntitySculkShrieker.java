@@ -145,8 +145,10 @@ public class BlockEntitySculkShrieker extends BlockEntity implements VibrationLi
 
     @Override
     public void onVibrationArrive(VibrationEvent event) {
+        // Arrival runs on a delayed task, so the initiator may have logged out, switched worlds,
+        // or lost its projectile ownership in the meantime — re-resolve and re-check before reacting.
         Player player = resolvePlayer(event);
-        if (player != null) {
+        if (player != null && player.isOnline() && player.getLevel() == this.level) {
             tryShriek(player);
         }
     }
@@ -196,6 +198,9 @@ public class BlockEntitySculkShrieker extends BlockEntity implements VibrationLi
      * the warden-response is gated by a successful warning.
      */
     public void tryShriek(Player player) {
+        if (!player.isOnline() || player.getLevel() != this.level) {
+            return;
+        }
         Block block = getLevelBlock();
         if (!(block instanceof BlockSculkShrieker shrieker) || shrieker.isShrieking()) {
             return;

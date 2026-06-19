@@ -2313,8 +2313,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (this.isGliding()) {
                     this.tryEmitMovementVibration(VibrationType.ELYTRA_GLIDE);
-                } else if (this.isSwimming() || this.isInsideOfWater()) {
+                } else if (this.isSwimming()) {
                     if (!this.isSneaking()) {
+                        this.tryEmitMovementVibration(VibrationType.SWIM);
+                    }
+                } else if (this.isInsideOfWater() && !this.isSneaking()) {
+                    // Vanilla SWIM fires only when the entity actually swims, not when idling in
+                    // water. Require a real position change this movement packet so standing still
+                    // in water does not spam a swim vibration every block boundary.
+                    if (from.distanceSquared(to) > 1.0E-8) {
                         this.tryEmitMovementVibration(VibrationType.SWIM);
                     }
                 } else if (this.isOnGround()) {
