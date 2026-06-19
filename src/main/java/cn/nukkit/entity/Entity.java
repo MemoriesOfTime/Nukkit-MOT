@@ -1272,6 +1272,19 @@ public abstract class Entity extends Location implements Metadatable {
         return false;
     }
 
+    /**
+     * Checks whether the given entity implementation class exposes a constructor that
+     * {@link #createEntity(Class, FullChunk, cn.nukkit.nbt.tag.CompoundTag, Object...)}
+     * can invoke. Public wrapper so other registries (e.g. {@code EntityManager}) can
+     * validate custom entities the same way before registration.
+     *
+     * @param clazz the entity implementation class, possibly {@code null}
+     * @return {@code true} if a {@code (FullChunk, CompoundTag)} constructor exists
+     */
+    public static boolean hasDefaultConstructor(Class<? extends Entity> clazz) {
+        return hasMatchingConstructor(clazz, 0);
+    }
+
     public static boolean isKnown(String name) {
         if (knownEntities.containsKey(name) || EntityManager.get().getDefinition(name) != null) {
             return true;
@@ -1332,6 +1345,24 @@ public abstract class Entity extends Location implements Metadatable {
         if (clazz == null) {
             return false;
         }
+
+        if (CustomEntity.class.isAssignableFrom(clazz)) {
+            MainLogger.getLogger().error("Entity \"" + name + "\" (" + clazz.getName()
+                    + ") implements CustomEntity and must be registered via "
+                    + "EntityManager.registerDefinition(EntityDefinition), not Entity.registerEntity. "
+                    + "Registration skipped; Nukkit-MOT cannot process this entity.",
+                    new RuntimeException("CustomEntity registered via Entity.registerEntity"));
+            return false;
+        }
+
+        if (!hasDefaultConstructor(clazz)) {
+            MainLogger.getLogger().error("Registered entity \"" + name + "\" (" + clazz.getName()
+                    + ") does not expose a (FullChunk, CompoundTag) constructor. "
+                    + "Nukkit-MOT cannot process this entity.",
+                new RuntimeException("Entity without (FullChunk, CompoundTag) constructor"));
+            return false;
+        }
+
         try {
             int networkId = clazz.getField("NETWORK_ID").getInt(null);
             knownEntities.put(String.valueOf(networkId), clazz);
