@@ -97,7 +97,7 @@ public class SparkInstaller {
 
     private static JsonObject getLatestInfo() {
         try {
-            String apiUrl = "https://ci.lucko.me/job/spark-extra-platforms/lastBuild/api/json?tree=number,artifacts[fileName,relativePath],result,description,timestamp";
+            String apiUrl = "https://ci.lucko.me/job/spark-extra-platforms/lastBuild/api/json?tree=number%2Cartifacts%5BfileName%2CrelativePath%5D%2Cresult%2Cdescription%2Ctimestamp";
             URL url = new URL(apiUrl);
             try (InputStream in = url.openStream()) {
                 StringBuilder builder = new StringBuilder();
@@ -107,7 +107,7 @@ public class SparkInstaller {
                     builder.append(new String(buff, 0, len));
                 }
                 String json = builder.toString();
-                JsonObject object = JsonParser.parseString(builder.toString()).getAsJsonObject();
+                JsonObject object = JsonParser.parseString(json).getAsJsonObject();
                 JsonArray artifacts = object.getAsJsonArray("artifacts");
                 for (int i = 0; i < artifacts.size(); i++) {
                     JsonObject artifact = artifacts.get(i).getAsJsonObject();
