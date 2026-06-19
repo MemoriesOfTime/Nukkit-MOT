@@ -3,6 +3,7 @@ package cn.nukkit.blockentity;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockSculkSensor;
+import cn.nukkit.event.level.VibrationArriveEvent;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.vibration.VibrationEvent;
@@ -210,6 +211,13 @@ public class BlockEntitySculkSensor extends BlockEntity implements VibrationList
             return;
         }
         if (getPhase() != BlockSculkSensor.PHASE_INACTIVE) {
+            return;
+        }
+        // handleArrivalSelf() == true means the manager skips the delayed arrival path, so fire
+        // VibrationArriveEvent here to keep plugins able to cancel activation at arrival time.
+        VibrationArriveEvent arriveEvent = new VibrationArriveEvent(event, this);
+        this.level.getServer().getPluginManager().callEvent(arriveEvent);
+        if (arriveEvent.isCancelled()) {
             return;
         }
         this.lastVibrationEvent = event;

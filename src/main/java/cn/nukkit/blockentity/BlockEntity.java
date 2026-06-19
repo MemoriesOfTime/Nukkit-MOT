@@ -259,9 +259,21 @@ public abstract class BlockEntity extends Position {
         blockEntity.getPersistentDataContainer().setStorage(this.getPersistentDataContainer().getStorage().clone());
     }
 
+    /**
+     * Instance identity. A {@link BlockEntity} is uniquely identified by its runtime instance, not
+     * by class + coordinates — otherwise a tile removed and recreated at the same position would be
+     * treated as the same object by collections (e.g. the sculk vibration listener set), routing
+     * callbacks to the stale, closed instance. Pair with {@link #hashCode()} (identity-based) so
+     * every collection membership check matches actual lifecycle.
+     */
     @Override
     public boolean equals(Object obj) {
-        return obj instanceof BlockEntity && this.getClass().equals(obj.getClass()) && super.equals(obj);
+        return this == obj;
+    }
+
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
     }
 
     public boolean canSaveToStorage() {
