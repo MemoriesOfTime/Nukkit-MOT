@@ -16,6 +16,7 @@ import cn.nukkit.network.protocol.LevelEventGenericPacket;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.plugin.InternalPlugin;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
@@ -62,12 +63,15 @@ public class SimpleVibrationManager implements VibrationManager {
             this.createVibration(listener, listenerPos, event);
 
             if (listener.handleArrivalSelf()) {
-                // listener schedules its own arrival (persistence + single-flight); manager does not
+                // listener owns arrival (persistence + single-flight); manager skips scheduling
                 continue;
             }
 
             int delay = Math.max(1, (int) source.distance(listenerPos));
             this.level.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
+                if (!listeners.contains(listener)) {
+                    return;
+                }
                 VibrationArriveEvent vibrationArrivePluginEvent = new VibrationArriveEvent(event, listener);
                 this.level.getServer().getPluginManager().callEvent(vibrationArrivePluginEvent);
                 if (vibrationArrivePluginEvent.isCancelled()) {
@@ -79,33 +83,22 @@ public class SimpleVibrationManager implements VibrationManager {
     }
 
     /**
-     * Mirrors vanilla {@code VibrationSystem.User.isValidVibration}: an entity-triggered event is
-     * rejected when its source entity is silent/spectator, is sneaking (for events in
-     * {@link VibrationType#IGNORE_VIBRATIONS_SNEAKING}), or is standing on a vibration-dampening
-     * block (wool / wool carpet).
-     * <p>
-     * NOTE: this intentionally does <b>not</b> filter by the {@code #minecraft:vibrations} tag.
-     * Unlike vanilla (where every listener filters via its own {@code getListenableEvents()}),
-     * this manager routes all emitted events and relies on each listener to decide relevance —
-     * e.g. {@code SCULK_SENSOR_TENDRILS_CLICKING} is excluded from {@code vibrations} in vanilla
-     * but must still reach shriekers here.
+     * Mirrors vanilla {@code VibrationSystem.User.isValidVibration}: rejects events from silent/spectator
+     * entities, sneaking entities ({@link VibrationType#IGNORE_VIBRATIONS_SNEAKING}), or entities on wool.
+     * Skips the {@code #minecraft:vibrations} tag — routing is per-listener (shriekers still need tendril clicks).
      */
     protected boolean isValidVibration(VibrationEvent event) {
         Object initiator = event.initiator();
         if (initiator instanceof Entity entity) {
-            // Silent flag (e.g. silently tagged mobs)
             if (entity.getDataFlag(Entity.DATA_FLAGS, Entity.DATA_FLAG_SILENT)) {
                 return false;
             }
-            // Spectator players never emit vibrations
             if (entity instanceof Player player && player.getGamemode() == Player.SPECTATOR) {
                 return false;
             }
-            // Sneaking entities suppress events tagged ignore_vibrations_sneaking (step, swim, ...)
             if (entity.isSneaking() && VibrationType.IGNORE_VIBRATIONS_SNEAKING.contains(event.type())) {
                 return false;
             }
-            // Entity standing on wool/carpet dampens the vibration (JE dampensVibrations)
             if (entityDampensVibrations(entity)) {
                 return false;
             }
@@ -114,9 +107,8 @@ public class SimpleVibrationManager implements VibrationManager {
     }
 
     /**
-     * Whether the entity is currently standing on a vibration-dampening block (wool or wool
-     * carpet), matching JE {@code Entity.dampensVibrations()} / the {@code #minecraft:dampens_vibrations}
-     * block tag for the supporting surface.
+     * Entity standing on wool/carpet — JE {@code Entity.dampensVibrations()} /
+     * {@code #minecraft:dampens_vibrations} for the supporting surface.
      */
     protected boolean entityDampensVibrations(Entity entity) {
         if (!entity.onGround) {
@@ -147,9 +139,16 @@ public class SimpleVibrationManager implements VibrationManager {
         LevelEventGenericPacket packet = new LevelEventGenericPacket();
         packet.eventId = LevelEventPacket.EVENT_PARTICLE_VIBRATION_SIGNAL;
         packet.tag = tag;
-        // Broadcast to every player in the level; region-scoped chunk-loader delivery misses the
-        // triggering player when it isn't a loader of the source/listener chunks.
-        Server.broadcastPacket(this.level.getPlayers().values(), packet);
+        // Scope to players tracking the source/listener chunk (signal particle only visible there),
+        // plus the triggering player. Generic packets carry no position, so the server must scope them.
+        Vector3 source = event.source();
+        Set<Player> viewers = new HashSet<>();
+        viewers.addAll(this.level.getChunkPlayers(source.getFloorX() >> 4, source.getFloorZ() >> 4).values());
+        viewers.addAll(this.level.getChunkPlayers(listenerPos.getFloorX() >> 4, listenerPos.getFloorZ() >> 4).values());
+        if (event.initiator() instanceof Player player) {
+            viewers.add(player);
+        }
+        Server.broadcastPacket(viewers, packet);
     }
 
     protected CompoundTag createVec3fTag(Vector3f vec3f) {
@@ -168,21 +167,17 @@ public class SimpleVibrationManager implements VibrationManager {
     }
 
     /**
-     * Whether a vibration signal can travel from {@code from} to {@code to}. Mirrors vanilla
-     * {@code VibrationSystem.Listener.isOccluded}: the signal is blocked (occluded) only when the
-     * line from the source's center to the listener's center is blocked by a wool block on
-     * <b>every</b> one of the 6 face-offset rays. If any single ray has a clear line, the signal
-     * gets through. Wool (not carpet) is the only occluding block per the vanilla tag
-     * {@code #minecraft:occludes_vibration_signals}.
+     * Mirrors vanilla {@code VibrationSystem.Listener.isOccluded}: blocked only when wool
+     * ({@code #minecraft:occludes_vibration_signals}, not carpet) occludes all 6 face-offset rays
+     * from source center to listener center; any clear ray lets the signal through.
      */
     protected boolean canVibrationArrive(Level level, Vector3 from, Vector3 to) {
         return !isOccluded(level, from, to);
     }
 
     /**
-     * Vanilla isOccluded: nudges the source center by a tiny epsilon along each of the 6 axis
-     * directions and traces a voxel line to the destination center. Only if ALL six rays hit a
-     * wool block is the signal considered occluded.
+     * Vanilla isOccluded: nudges the source center by epsilon along each of 6 axes and traces a
+     * voxel line to the destination — occluded only if all six rays hit wool.
      */
     protected boolean isOccluded(Level level, Vector3 from, Vector3 to) {
         double fx = from.getFloorX() + 0.5;
@@ -198,7 +193,6 @@ public class SimpleVibrationManager implements VibrationManager {
         };
         for (double[] offset : directions) {
             if (!lineHitsOccluder(level, fx + offset[0], fy + offset[1], fz + offset[2], tx, ty, tz)) {
-                // At least one direction has a clear path -> not occluded
                 return false;
             }
         }
@@ -206,29 +200,25 @@ public class SimpleVibrationManager implements VibrationManager {
     }
 
     /**
-     * Voxel DDA ray traversal from ({@code ox,oy,oz}) to ({@code dx,dy,dz}); returns true if a wool
-     * block is hit along the way (before reaching the destination cell). Mirrors JE
+     * Voxel DDA traversal; returns true if wool is hit before the destination cell. Mirrors JE
      * {@code Level.isBlockInLine} with the OCCLUDES_VIBRATION_SIGNALS predicate.
      */
     protected boolean lineHitsOccluder(Level level, double ox, double oy, double oz, double dx, double dy, double dz) {
         int x = floor(ox), y = floor(oy), z = floor(oz);
         int ex = floor(dx), ey = floor(dy), ez = floor(dz);
-        // JE isBlockInLine tests every voxel the ray passes through, starting from the source cell.
         if (isOccluder(level, x, y, z)) {
             return true;
         }
-        // Already in the same cell: the source-cell check above is enough.
+        // Source and destination in the same cell: already checked above.
         if (x == ex && y == ey && z == ez) {
             return false;
         }
         double stepX = Math.signum(dx - ox);
         double stepY = Math.signum(dy - oy);
         double stepZ = Math.signum(dz - oz);
-        // Distance (in ray-progress units) to cross one voxel along each axis
         double tDeltaX = stepX != 0 ? Math.abs(1.0 / (dx - ox)) : Double.POSITIVE_INFINITY;
         double tDeltaY = stepY != 0 ? Math.abs(1.0 / (dy - oy)) : Double.POSITIVE_INFINITY;
         double tDeltaZ = stepZ != 0 ? Math.abs(1.0 / (dz - oz)) : Double.POSITIVE_INFINITY;
-        // Distance to the first voxel boundary along each axis
         double tMaxX = stepX > 0 ? (x + 1 - ox) * tDeltaX : (stepX < 0 ? (ox - x) * tDeltaX : Double.POSITIVE_INFINITY);
         double tMaxY = stepY > 0 ? (y + 1 - oy) * tDeltaY : (stepY < 0 ? (oy - y) * tDeltaY : Double.POSITIVE_INFINITY);
         double tMaxZ = stepZ > 0 ? (z + 1 - oz) * tDeltaZ : (stepZ < 0 ? (oz - z) * tDeltaZ : Double.POSITIVE_INFINITY);
@@ -269,10 +259,7 @@ public class SimpleVibrationManager implements VibrationManager {
         return block instanceof BlockWool;
     }
 
-    /**
-     * JE {@code #minecraft:dampens_vibrations}: wool and wool carpets dampen vibrations emitted by
-     * entities standing on them. Used by {@link #entityDampensVibrations}.
-     */
+    /** JE {@code #minecraft:dampens_vibrations}: wool and wool carpets dampen for entities on them. */
     protected boolean isDampener(Block block) {
         return block instanceof BlockWool || block.getId() == BlockID.CARPET;
     }

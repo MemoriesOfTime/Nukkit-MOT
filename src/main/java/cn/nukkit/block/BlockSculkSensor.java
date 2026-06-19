@@ -100,6 +100,7 @@ public class BlockSculkSensor extends BlockTransparentMeta implements BlockEntit
 
     @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
+        this.setDamage(PHASE_INACTIVE);
         this.getLevel().setBlock(block, this, true, true);
         this.createBlockEntity();
         return true;

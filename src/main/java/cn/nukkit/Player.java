@@ -206,6 +206,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected final WardenWarningData wardenWarningData = new WardenWarningData();
 
+    /**
+     * Last block position (floor coords) at which a STEP/SWIM/ELYTRA_GLIDE vibration was emitted.
+     * Movement vibrations are emitted only when the player crosses into a new block (vanilla
+     * cadence), not on every movement packet.
+     */
+    private int lastMovementVibrationX = Integer.MIN_VALUE;
+    private int lastMovementVibrationY = Integer.MIN_VALUE;
+    private int lastMovementVibrationZ = Integer.MIN_VALUE;
+
     protected int windowCnt = MINIMUM_OTHER_WINDOW_ID;
 
     protected final BiMap<Inventory, Integer> windows = HashBiMap.create();
@@ -2303,14 +2312,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.collisionBlocks = null;
 
                 if (this.isGliding()) {
-                    this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), VibrationType.ELYTRA_GLIDE));
+                    this.tryEmitMovementVibration(VibrationType.ELYTRA_GLIDE);
                 } else if (this.isSwimming() || this.isInsideOfWater()) {
                     if (!this.isSneaking()) {
-                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), VibrationType.SWIM));
+                        this.tryEmitMovementVibration(VibrationType.SWIM);
                     }
                 } else if (this.isOnGround()) {
                     if (!this.isSneaking()) {
-                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), VibrationType.STEP));
+                        this.tryEmitMovementVibration(VibrationType.STEP);
                     }
                 }
 
@@ -3087,6 +3096,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // Restore warden warning state (per-player, persists across reconnect/restart)
         this.wardenWarningData.warningLevel = this.namedTag.getInt("wardenWarningLevel");
         this.wardenWarningData.lastWarningTick = this.namedTag.getLong("wardenLastWarningTick");
+        this.wardenWarningData.lastShriekTick = this.namedTag.getLong("wardenLastShriekTick");
 
         if (this.isSpectator()) {
             this.keepMovement = true;
@@ -6178,6 +6188,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.namedTag.putInt("wardenWarningLevel", this.wardenWarningData.warningLevel);
             this.namedTag.putLong("wardenLastWarningTick", this.wardenWarningData.lastWarningTick);
+            this.namedTag.putLong("wardenLastShriekTick", this.wardenWarningData.lastShriekTick);
 
             if (!this.username.isEmpty() && this.namedTag != null) {
                 if (this.server.savePlayerDataByUuid) {
@@ -8578,5 +8589,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public WardenWarningData getWardenWarningData() {
         return this.wardenWarningData;
+    }
+
+    /**
+     * Emits a movement vibration (STEP/SWIM/ELYTRA_GLIDE) only when the player has entered a new
+     * block since the last emission — matching vanilla's per-block-boundary cadence instead of
+     * firing on every movement packet.
+     */
+    private void tryEmitMovementVibration(VibrationType type) {
+        int fx = this.getFloorX();
+        int fy = this.getFloorY();
+        int fz = this.getFloorZ();
+        if (fx == this.lastMovementVibrationX && fy == this.lastMovementVibrationY && fz == this.lastMovementVibrationZ) {
+            return;
+        }
+        this.lastMovementVibrationX = fx;
+        this.lastMovementVibrationY = fy;
+        this.lastMovementVibrationZ = fz;
+        this.level.getVibrationManager().callVibrationEvent(
+                new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), type));
     }
 }

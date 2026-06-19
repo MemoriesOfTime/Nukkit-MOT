@@ -1809,10 +1809,12 @@ public abstract class Entity extends Location implements Metadatable {
             }
         }
         this.setHealth(newHealth);
-        if (source.getEntity() != null) {
-            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(source.getEntity(), new Vector3(this.x, this.y, this.z), VibrationType.ENTITY_DAMAGE));
-        } else {
-            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y, this.z), VibrationType.ENTITY_DAMAGE));
+        if (source.getFinalDamage() > 0) {
+            if (source.getEntity() != null) {
+                this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(source.getEntity(), new Vector3(this.x, this.y, this.z), VibrationType.ENTITY_DAMAGE));
+            } else {
+                this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y, this.z), VibrationType.ENTITY_DAMAGE));
+            }
         }
         return true;
     }

@@ -277,9 +277,8 @@ public class BlockEntitySculkSensor extends BlockEntity implements VibrationList
         }
     }
 
-    /** JE: power = max(1, 15 - floor((15 / radius) * distance)). */
     protected int getRedstoneStrengthForDistance(float distance) {
-        return Math.max(1, 15 - (int) Math.floor((15.0 / LISTENER_RADIUS) * distance));
+        return Math.max(1, 15 - (int) Math.floor((15.0 / getListenRange()) * distance));
     }
 
     public void setPower(int power) {

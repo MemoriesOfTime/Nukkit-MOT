@@ -198,6 +198,7 @@ public abstract class EntityProjectile extends Entity {
                     this.hadCollision = true;
 
                     this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this.shootingEntity, new Vector3(this.x, this.y, this.z), VibrationType.PROJECTILE_LAND));
+                    this.shootVibrationSent = true;
 
                     this.motionX = 0;
                     this.motionY = 0;

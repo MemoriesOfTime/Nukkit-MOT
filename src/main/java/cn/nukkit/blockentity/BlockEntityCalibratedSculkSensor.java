@@ -32,11 +32,6 @@ public class BlockEntityCalibratedSculkSensor extends BlockEntitySculkSensor {
     }
 
     @Override
-    protected int getRedstoneStrengthForDistance(float distance) {
-        return Math.max(1, 15 - (int) Math.floor((15.0 / LISTENER_RADIUS) * distance));
-    }
-
-    @Override
     public boolean onVibrationOccur(VibrationEvent event) {
         if (!this.isBlockEntityValid() || this.currentVibration != null) {
             return false;
