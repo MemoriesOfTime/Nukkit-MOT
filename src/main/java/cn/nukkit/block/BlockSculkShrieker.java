@@ -1,7 +1,9 @@
 package cn.nukkit.block;
 
+import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntitySculkShrieker;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -15,10 +17,18 @@ import javax.annotation.Nullable;
  * Reacts to vibrations by shrieking, applying Darkness, and summoning a warden. The damage value
  * stores bit 0 = shrieking, bit 1 = can_summon (set by world gen). Adapted from PowerNukkitX.
  */
-public class BlockSculkShrieker extends BlockTransparent implements BlockEntityHolder<BlockEntitySculkShrieker> {
+public class BlockSculkShrieker extends BlockTransparentMeta implements BlockEntityHolder<BlockEntitySculkShrieker> {
 
     private static final int FLAG_SHRIEKING = 0x01;
     private static final int FLAG_CAN_SUMMON = 0x02;
+
+    public BlockSculkShrieker() {
+        this(0);
+    }
+
+    public BlockSculkShrieker(int meta) {
+        super(meta);
+    }
 
     @Override
     public int getId() {
@@ -98,6 +108,20 @@ public class BlockSculkShrieker extends BlockTransparent implements BlockEntityH
         this.getLevel().setBlock(block, this, true, true);
         this.createBlockEntity();
         return true;
+    }
+
+    /**
+     * When a player steps on the shrieker it shrieks directly (no sensor chain), forwarding to the
+     * block entity's tryShriek.
+     */
+    @Override
+    public void onEntityCollide(Entity entity) {
+        if (entity instanceof Player player) {
+            BlockEntitySculkShrieker shrieker = this.getOrCreateBlockEntity();
+            if (shrieker != null) {
+                shrieker.tryShriek(player);
+            }
+        }
     }
 
     /** Whether this shrieker is in the shrieking animation. */

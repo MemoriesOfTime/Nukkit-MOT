@@ -18,6 +18,14 @@ public class BlockCalibratedSculkSensor extends BlockSculkSensor {
     private static final int FACING_MASK = 0x03;
     private static final int PHASE_SHIFT = 2;
 
+    public BlockCalibratedSculkSensor() {
+        this(0);
+    }
+
+    public BlockCalibratedSculkSensor(int meta) {
+        super(meta);
+    }
+
     @Override
     public int getId() {
         return CALIBRATED_SCULK_SENSOR;
@@ -73,11 +81,7 @@ public class BlockCalibratedSculkSensor extends BlockSculkSensor {
 
     @Override
     public void setPhase(int phase) {
-        if (phase == PHASE_ACTIVE) {
-            this.level.addSound(this.add(0.5, 0.5, 0.5), cn.nukkit.level.Sound.POWER_ON_SCULK_SENSOR);
-        } else {
-            this.level.addSound(this.add(0.5, 0.5, 0.5), cn.nukkit.level.Sound.POWER_OFF_SCULK_SENSOR);
-        }
+        playPhaseSound(phase);
         this.setDamage((this.getDamage() & FACING_MASK) | ((phase & 0x03) << PHASE_SHIFT));
         this.level.setBlock(this, this, true, false);
     }

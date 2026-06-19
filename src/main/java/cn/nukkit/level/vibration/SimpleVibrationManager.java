@@ -16,7 +16,6 @@ import cn.nukkit.network.protocol.LevelEventGenericPacket;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.plugin.InternalPlugin;
 
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
@@ -48,13 +47,15 @@ public class SimpleVibrationManager implements VibrationManager {
         for (var listener : listeners) {
             Vector3 listenerPos = listener.getListenerVector();
             double range = listener.getListenRange();
-            if (listenerPos.distanceSquared(source) > range * range) {
+            double distSq = listenerPos.distanceSquared(source);
+            if (distSq > range * range) {
                 continue;
             }
             if (!canVibrationArrive(level, source, listenerPos)) {
                 continue;
             }
-            if (!listener.onVibrationOccur(event)) {
+            boolean accepted = listener.onVibrationOccur(event);
+            if (!accepted) {
                 continue;
             }
 
@@ -146,32 +147,9 @@ public class SimpleVibrationManager implements VibrationManager {
         LevelEventGenericPacket packet = new LevelEventGenericPacket();
         packet.eventId = LevelEventPacket.EVENT_PARTICLE_VIBRATION_SIGNAL;
         packet.tag = tag;
-        broadcastVibrationPacket(event.source(), listenerPos, packet);
-    }
-
-    /**
-     * Broadcast the vibration signal particle only to players near the source or the listener
-     * position (covering the signal's travel path), instead of every player in the level.
-     */
-    protected void broadcastVibrationPacket(Vector3 source, Vector3 listenerPos, LevelEventGenericPacket packet) {
-        Set<Player> viewers = new HashSet<>();
-        collectChunkPlayers(source, viewers);
-        collectChunkPlayers(listenerPos, viewers);
-        if (viewers.isEmpty()) {
-            return;
-        }
-        Server.broadcastPacket(viewers, packet);
-    }
-
-    @SuppressWarnings("unchecked")
-    protected void collectChunkPlayers(Vector3 pos, Set<Player> out) {
-        int chunkX = pos.getFloorX() >> 4;
-        int chunkZ = pos.getFloorZ() >> 4;
-        for (int cx = chunkX - 1; cx <= chunkX + 1; cx++) {
-            for (int cz = chunkZ - 1; cz <= chunkZ + 1; cz++) {
-                out.addAll(level.getChunkPlayers(cx, cz).values());
-            }
-        }
+        // Broadcast to every player in the level; region-scoped chunk-loader delivery misses the
+        // triggering player when it isn't a loader of the source/listener chunks.
+        Server.broadcastPacket(this.level.getPlayers().values(), packet);
     }
 
     protected CompoundTag createVec3fTag(Vector3f vec3f) {

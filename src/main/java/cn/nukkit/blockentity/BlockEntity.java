@@ -68,7 +68,7 @@ public abstract class BlockEntity extends Position {
     public static final String CREAKING_HEART = "CreakingHeart";
     public static final String COPPER_GOLEM_STATUE = "CopperGolemStatue";
     public static final String SCULK_SENSOR = "SculkSensor";
-    public static final String CALIBRATED_SCULK_SENSOR = "SculkSensorCalibrated";
+    public static final String CALIBRATED_SCULK_SENSOR = "CalibratedSculkSensor";
     public static final String SCULK_SHRIEKER = "SculkShrieker";
 
     // Not a vanilla block entity

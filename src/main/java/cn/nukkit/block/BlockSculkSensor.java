@@ -16,11 +16,19 @@ import org.jetbrains.annotations.NotNull;
  * Emits a redstone signal proportional to the vibration source distance. Damage value stores the
  * sculk_sensor_phase (0=inactive, 1=active, 2=cooldown). Adapted from PowerNukkitX.
  */
-public class BlockSculkSensor extends BlockTransparent implements BlockEntityHolder<BlockEntitySculkSensor> {
+public class BlockSculkSensor extends BlockTransparentMeta implements BlockEntityHolder<BlockEntitySculkSensor> {
 
     public static final int PHASE_INACTIVE = 0;
     public static final int PHASE_ACTIVE = 1;
     public static final int PHASE_COOLDOWN = 2;
+
+    public BlockSculkSensor() {
+        this(0);
+    }
+
+    public BlockSculkSensor(int meta) {
+        super(meta);
+    }
 
     protected static final int ACTIVE_TICKS = 30;
     protected static final int COOLDOWN_TICKS = 10;
@@ -147,13 +155,28 @@ public class BlockSculkSensor extends BlockTransparent implements BlockEntityHol
     }
 
     public void setPhase(int phase) {
+        playPhaseSound(phase);
+        this.setDamage(phase);
+        this.level.setBlock(this, this, true, false);
+    }
+
+    /**
+     * Plays the activate/deactivate click sound, suppressed when the sensor is waterlogged.
+     */
+    protected void playPhaseSound(int phase) {
+        if (isWaterlogged()) {
+            return;
+        }
         if (phase == PHASE_ACTIVE) {
             this.level.addSound(this.add(0.5, 0.5, 0.5), Sound.POWER_ON_SCULK_SENSOR);
         } else {
             this.level.addSound(this.add(0.5, 0.5, 0.5), Sound.POWER_OFF_SCULK_SENSOR);
         }
-        this.setDamage(phase);
-        this.level.setBlock(this, this, true, false);
+    }
+
+    /** Whether this sensor currently has water in its secondary layer (waterlogged). */
+    protected boolean isWaterlogged() {
+        return this.getLevelBlockAtLayer(1) instanceof BlockWater;
     }
 
     @Override

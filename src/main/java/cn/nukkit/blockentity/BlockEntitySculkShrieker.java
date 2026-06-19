@@ -1,6 +1,7 @@
 package cn.nukkit.blockentity;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockSculkShrieker;
@@ -22,13 +23,18 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.potion.Effect;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Shrieks when it receives a tendrils-clicking vibration (chained from a sculk sensor), applying
- * Darkness and incrementing the triggerer's warden warning level; summons a warden at level 4.
- * Adapted from PowerNukkitX.
+ * Bedrock sculk shrieker: shrieks when a player steps on it or receives a sculk-sensor
+ * tendrils-clicking vibration, applies Darkness to nearby Survival/Adventure players, and
+ * tracks a per-player warden warning level (reaching 4 spawns a warden after the shriek ends).
+ * Each activation blames all players within 16 blocks together, raising everyone to one above
+ * the highest current level. Adapted from PowerNukkitX.
  */
 public class BlockEntitySculkShrieker extends BlockEntity implements VibrationListener {
 
@@ -38,13 +44,30 @@ public class BlockEntitySculkShrieker extends BlockEntity implements VibrationLi
     protected static final int WARNING_DECAY_TICKS = 12000;
     protected static final int DARKNESS_DURATION_TICKS = 260;
     protected static final int DARKNESS_RANGE = 40;
+    /**
+     * Minimum remaining ticks on a player's existing Darkness to skip refreshing it, so repeated
+     * shrieks don't keep resetting the full duration.
+     */
+    protected static final int DARKNESS_DISPLAY_LIMIT_TICKS = 200;
     protected static final int WARDEN_WARNING_LEVEL = 4;
     protected static final int WARDEN_SPAWN_RANGE_XZ = 5;
     protected static final int WARDEN_SPAWN_RANGE_Y = 6;
+    /**
+     * Radius within which players share the warning-level update (the triggerer is always included
+     * even if outside) — the 16-block blame radius.
+     */
+    protected static final double PLAYER_SEARCH_RADIUS = 16.0;
 
     protected UUID triggeringPlayer;
     protected boolean summonAfterShriek;
     protected long shriekEndTick;
+    /**
+     * Warning level resolved for the in-progress shriek: set by {@link #tryWarn}, read by
+     * {@link #tryRespond}. 0 means no warning was added this shriek. Shrieker-local snapshot that
+     * drives the warden spawn/reply; the authoritative per-player level lives on
+     * {@link WardenWarningData}.
+     */
+    protected int warningLevel = 0;
 
     public BlockEntitySculkShrieker(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -110,7 +133,7 @@ public class BlockEntitySculkShrieker extends BlockEntity implements VibrationLi
         if (!this.isBlockEntityValid()) {
             return false;
         }
-        // JE: shriekers only listen to sculk_sensor_tendrils_clicking
+        // Shriekers only listen to sculk_sensor_tendrils_clicking (chained from a sensor).
         if (event.type() != VibrationType.SCULK_SENSOR_TENDRILS_CLICKING) {
             return false;
         }
@@ -134,8 +157,9 @@ public class BlockEntitySculkShrieker extends BlockEntity implements VibrationLi
     }
 
     /**
-     * JE tryGetPlayer: resolve the triggering player from the initiator (direct player, vehicle
-     * controlling passenger, projectile shooter, or dropped item owner).
+     * Resolves the triggering player from the vibration initiator (direct player, vehicle
+     * passenger, projectile shooter, or dropped-item owner) — i.e. whether the vibration was
+     * caused by a player.
      */
     protected Player resolvePlayer(VibrationEvent event) {
         Object initiator = event.initiator();
@@ -166,27 +190,22 @@ public class BlockEntitySculkShrieker extends BlockEntity implements VibrationLi
         return null;
     }
 
-    /** JE tryShriek: shriek unless can summon and currently on cooldown (tryToWarn returned false). */
+    /**
+     * Resets the resolved warning level, then (if the shrieker can respond) tries to warn nearby
+     * players via {@link #tryWarn}. The shriek still happens even when no warning is added — only
+     * the warden-response is gated by a successful warning.
+     */
     public void tryShriek(Player player) {
         Block block = getLevelBlock();
         if (!(block instanceof BlockSculkShrieker shrieker) || shrieker.isShrieking()) {
             return;
         }
-        WardenWarningData warning = warningFor(player);
+        this.warningLevel = 0;
         boolean canRespond = canRespond(shrieker);
-        boolean warned = false;
         if (canRespond) {
-            if (level.getCurrentTick() - warning.lastShriekTick >= PLAYER_COOLDOWN_TICKS) {
-                warning.warningLevel++;
-                warning.lastWarningTick = level.getCurrentTick();
-                warning.lastShriekTick = level.getCurrentTick();
-                warned = true;
-                this.summonAfterShriek = warning.warningLevel >= WARDEN_WARNING_LEVEL;
-            }
-        }
-        // JE: shriek unless canRespond && !warned (i.e. on cooldown)
-        if (canRespond && !warned) {
-            return;
+            // tryWarn sets warningLevel/summonAfterShriek on success; on failure the shriek still
+            // proceeds without advancing the warning.
+            tryWarn(player);
         }
         this.triggeringPlayer = player.getUniqueId();
         shrieker.setShrieking(true);
@@ -209,8 +228,8 @@ public class BlockEntitySculkShrieker extends BlockEntity implements VibrationLi
     }
 
     /**
-     * JE canRespond: only naturally-generated shriekers respond, in non-peaceful difficulty, and
-     * only when mob spawning is permitted by the game rules.
+     * Only naturally-generated shriekers (can_summon) respond — in non-peaceful difficulty when
+     * mob spawning is enabled.
      */
     protected boolean canRespond(BlockSculkShrieker shrieker) {
         return shrieker.canSummon()
@@ -218,32 +237,94 @@ public class BlockEntitySculkShrieker extends BlockEntity implements VibrationLi
                 && level.getGameRules().getBoolean(GameRule.DO_MOB_SPAWNING);
     }
 
-    /** JE tryRespond: if can summon, summon warden (or play reply sound) + apply Darkness. */
+    /**
+     * Advances the warden warning level for the triggerer and every player within 16 blocks
+     * (blamed together), setting each to one above the highest current level and resetting their
+     * decay timers.
+     * <p>
+     * Returns false when a warden is already within 48 blocks or any blamed player is on the
+     * per-player 10-second cooldown; the shriek still proceeds in that case.
+     */
+    protected boolean tryWarn(Player triggerPlayer) {
+        if (hasNearbyWarden()) {
+            return false;
+        }
+        List<Player> players = getNearbyPlayers();
+        if (!players.contains(triggerPlayer)) {
+            players.add(triggerPlayer);
+        }
+        // If any blamed player is still on cooldown, no warning is added.
+        for (Player p : players) {
+            if (level.getCurrentTick() - warningFor(p).lastShriekTick < PLAYER_COOLDOWN_TICKS) {
+                return false;
+            }
+        }
+        // Set every blamed player to +1 of the highest current level.
+        Player highest = players.stream()
+                .max(Comparator.comparingInt(p -> warningFor(p).warningLevel))
+                .orElse(triggerPlayer);
+        WardenWarningData winner = warningFor(highest);
+        int newLevel = Math.min(WARDEN_WARNING_LEVEL, winner.warningLevel + 1);
+        long tick = level.getCurrentTick();
+        this.warningLevel = newLevel;
+        this.summonAfterShriek = newLevel >= WARDEN_WARNING_LEVEL;
+        for (Player p : players) {
+            WardenWarningData w = warningFor(p);
+            w.warningLevel = newLevel;
+            w.lastShriekTick = tick;
+            w.lastWarningTick = tick;
+        }
+        return true;
+    }
+
+    /**
+     * When shrieking ends a summon-capable shrieker spawns a warden (at warning level 4) or plays
+     * a reply sound, and applies Darkness. Darkness is tied to can_summon, not to whether the
+     * warning level was incremented this shriek.
+     */
     public void tryRespond() {
         Block block = getLevelBlock();
         if (!(block instanceof BlockSculkShrieker shrieker) || !canRespond(shrieker)) {
             return;
         }
-        Player player = triggeringPlayer != null ? level.getServer().getPlayer(triggeringPlayer).orElse(null) : null;
         boolean summoned = false;
         if (summonAfterShriek) {
             summoned = spawnWarden();
         }
-        if (!summoned && player != null) {
-            playWardenReplySound(warningFor(player).warningLevel);
+        if (!summoned && this.warningLevel > 0) {
+            playWardenReplySound(this.warningLevel);
         }
         addDarkness();
     }
 
+    /**
+     * Lazily decays a player's warning level: every 12000 ticks (10 minutes) without an activation
+     * drops it by 1, computed from the time since the last warning.
+     */
     protected WardenWarningData warningFor(Player player) {
         WardenWarningData warning = player.getWardenWarningData();
-        // JE WardenSpawnTracker.tick: after 12000 ticks the level drops by exactly 1 and resets.
         long elapsed = level.getCurrentTick() - warning.lastWarningTick;
         if (elapsed >= WARNING_DECAY_TICKS && warning.warningLevel > 0) {
-            warning.warningLevel--;
+            int decay = (int) (elapsed / WARNING_DECAY_TICKS);
+            warning.warningLevel = Math.max(0, warning.warningLevel - decay);
             warning.lastWarningTick = level.getCurrentTick();
         }
+        if (warning.warningLevel > WARDEN_WARNING_LEVEL) {
+            warning.warningLevel = WARDEN_WARNING_LEVEL;
+        }
         return warning;
+    }
+
+    /** Non-spectator, alive players within PLAYER_SEARCH_RADIUS of the shrieker. */
+    protected List<Player> getNearbyPlayers() {
+        List<Player> result = new ArrayList<>();
+        double rangeSq = PLAYER_SEARCH_RADIUS * PLAYER_SEARCH_RADIUS;
+        for (Player player : level.getPlayers().values()) {
+            if (!player.isSpectator() && player.isAlive() && player.distanceSquared(this) <= rangeSq) {
+                result.add(player);
+            }
+        }
+        return result;
     }
 
     protected void playWardenReplySound(int warningLevel) {
@@ -261,9 +342,15 @@ public class BlockEntitySculkShrieker extends BlockEntity implements VibrationLi
 
     protected void addDarkness() {
         for (Player player : level.getPlayers().values()) {
-            if ((player.isSurvival() || player.isAdventure()) && player.distanceSquared(this) <= DARKNESS_RANGE * DARKNESS_RANGE) {
-                player.addEffect(Effect.getEffect(Effect.DARKNESS).setDuration(DARKNESS_DURATION_TICKS));
+            if (!(player.isSurvival() || player.isAdventure()) || player.distanceSquared(this) > DARKNESS_RANGE * DARKNESS_RANGE) {
+                continue;
             }
+            // Skip players whose existing Darkness still has at least DARKNESS_DISPLAY_LIMIT ticks.
+            Effect existing = player.getEffect(Effect.DARKNESS);
+            if (existing != null && existing.getDuration() >= DARKNESS_DISPLAY_LIMIT_TICKS) {
+                continue;
+            }
+            player.addEffect(Effect.getEffect(Effect.DARKNESS).setDuration(DARKNESS_DURATION_TICKS));
         }
     }
 

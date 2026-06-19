@@ -73,6 +73,14 @@ public class BlockEntitySculkSensor extends BlockEntity implements VibrationList
                 deliverVibration();
             }
         }
+        // Reload: the phase-transition tick isn't persisted, so re-arm it for an ACTIVE/COOLDOWN
+        // sensor that would otherwise stay stuck.
+        if (getPhase() != BlockSculkSensor.PHASE_INACTIVE && this.level != null) {
+            Block block = this.getLevelBlock();
+            if (block instanceof BlockSculkSensor sensor && !this.level.isUpdateScheduled(this, sensor)) {
+                this.level.scheduleUpdate(sensor, 0);
+            }
+        }
     }
 
     @Override
