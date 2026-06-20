@@ -2024,6 +2024,21 @@ public class BinaryStream {
         return getTag(ByteOrder.LITTLE_ENDIAN, true);
     }
 
+    /**
+     * Reads a headerless (no root type id / name) network little-endian NBT value, as written by
+     * {@code LevelEventGenericPacket} (see {@link NBTIO#writeValue}).
+     */
+    @SneakyThrows(IOException.class)
+    public CompoundTag getTagValueNetworkLE() {
+        ByteArrayInputStream is = new ByteArrayInputStream(buffer, offset, buffer.length);
+        int initial = is.available();
+        try {
+            return NBTIO.readValue(is, ByteOrder.LITTLE_ENDIAN, true);
+        } finally {
+            offset += initial - is.available();
+        }
+    }
+
     @SneakyThrows(IOException.class)
     public CompoundTag getTag(ByteOrder endianness, boolean network) {
         ByteArrayInputStream is = new ByteArrayInputStream(buffer, offset, buffer.length);

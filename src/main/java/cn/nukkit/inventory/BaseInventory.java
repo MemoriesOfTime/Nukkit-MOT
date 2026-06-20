@@ -321,7 +321,7 @@ public abstract class BaseInventory implements Inventory {
             this.setItem(slot, item);
         }
     }
-    
+
     @Override
     public boolean canAddItem(Item item) {
         int count = item.getCount();
@@ -546,11 +546,31 @@ public abstract class BaseInventory implements Inventory {
     @Override
     public void onOpen(Player who) {
         this.viewers.add(who);
+        if (isContainerVibrationSource() && this.holder instanceof cn.nukkit.level.Position pos) {
+            who.getLevel().getVibrationManager().callVibrationEvent(
+                    new cn.nukkit.level.vibration.VibrationEvent(who, pos.add(0.5, 0.5, 0.5), cn.nukkit.level.vibration.VibrationType.CONTAINER_OPEN));
+        }
     }
 
     @Override
     public void onClose(Player who) {
         this.viewers.remove(who);
+        if (isContainerVibrationSource() && this.holder instanceof cn.nukkit.level.Position pos) {
+            who.getLevel().getVibrationManager().callVibrationEvent(
+                    new cn.nukkit.level.vibration.VibrationEvent(who, pos.add(0.5, 0.5, 0.5), cn.nukkit.level.vibration.VibrationType.CONTAINER_CLOSE));
+        }
+    }
+
+    /**
+     * Whether opening/closing this inventory emits a vibration (genuine container types only).
+     */
+    protected boolean isContainerVibrationSource() {
+        return switch (this.type) {
+            case CHEST, ENDER_CHEST, DOUBLE_CHEST, FURNACE, BLAST_FURNACE, SMOKER, BREWING_STAND,
+                    DISPENSER, DROPPER, HOPPER, SHULKER_BOX, BARREL, CRAFTER,
+                    MINECART_CHEST, MINECART_HOPPER, CHEST_BOAT -> true;
+            default -> false;
+        };
     }
 
     @Override

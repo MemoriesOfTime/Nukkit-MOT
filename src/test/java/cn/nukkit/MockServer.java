@@ -8,6 +8,7 @@ import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.vibration.VibrationManager;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.MainLogger;
@@ -188,6 +189,9 @@ public final class MockServer {
                 Vector3 pos = invocation.getArgument(0);
                 return createSimpleBlock(pos);
             });
+        // BaseInventory#onOpen/onClose fires container vibrations; avoid NPEs in inventory tests.
+        Mockito.lenient().when(mockLevel.getVibrationManager())
+            .thenReturn(Mockito.mock(VibrationManager.class));
     }
 
     /**

@@ -16,6 +16,7 @@ import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.data.property.EntityProperty;
+import cn.nukkit.entity.data.warden.WardenWarningData;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
@@ -62,6 +63,8 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.PunchBlockParticle;
 import cn.nukkit.level.sound.ExperienceOrbSound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.nbt.NBTIO;
@@ -207,6 +210,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public int gamemode;
     public long lastBreak = -1;
     private BlockVector3 lastBreakPosition = new BlockVector3();
+
+    protected final WardenWarningData wardenWarningData = new WardenWarningData();
+
+    /**
+     * Last block position (floor coords) at which a STEP/SWIM/ELYTRA_GLIDE vibration was emitted.
+     * Movement vibrations are emitted only when the player crosses into a new block (vanilla
+     * cadence), not on every movement packet.
+     */
+    private int lastMovementVibrationX = Integer.MIN_VALUE;
+    private int lastMovementVibrationY = Integer.MIN_VALUE;
+    private int lastMovementVibrationZ = Integer.MIN_VALUE;
 
     protected int windowCnt = MINIMUM_OTHER_WINDOW_ID;
 
@@ -2306,6 +2320,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.blocksAround = null;
                 this.collisionBlocks = null;
 
+                if (this.isGliding()) {
+                    this.tryEmitMovementVibration(VibrationType.ELYTRA_GLIDE);
+                } else if (this.isSwimming()) {
+                    if (!this.isSneaking()) {
+                        this.tryEmitMovementVibration(VibrationType.SWIM);
+                    }
+                } else if (this.isInsideOfWater() && !this.isSneaking()) {
+                    // Vanilla SWIM fires only when the entity actually swims, not when idling in
+                    // water. Require a real position change this movement packet so standing still
+                    // in water does not spam a swim vibration every block boundary.
+                    if (from.distanceSquared(to) > 1.0E-8) {
+                        this.tryEmitMovementVibration(VibrationType.SWIM);
+                    }
+                } else if (this.isOnGround()) {
+                    if (!this.isSneaking()) {
+                        this.tryEmitMovementVibration(VibrationType.STEP);
+                    }
+                }
+
                 if (!to.equals(moveEvent.getTo())) { // If plugins modify the destination
                     this.teleport(moveEvent.getTo(), null);
                 } else {
@@ -3075,6 +3108,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.foodData = new PlayerFood(this, this.namedTag.getInt("foodLevel"), this.namedTag.getFloat("foodSaturationLevel"));
+
+        // Restore warden warning state (per-player, persists across reconnect/restart)
+        this.wardenWarningData.warningLevel = this.namedTag.getInt("wardenWarningLevel");
+        this.wardenWarningData.lastWarningTick = this.namedTag.getLong("wardenLastWarningTick");
+        this.wardenWarningData.lastShriekTick = this.namedTag.getLong("wardenLastShriekTick");
 
         if (this.isSpectator()) {
             this.keepMovement = true;
@@ -5427,6 +5465,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         this.getInventory().decreaseCount(this.getInventory().getHeldItemIndex());
                                         this.inventory.addItem(new ItemGlassBottle());
                                     }
+                                    this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0, this.getEyeHeight()), VibrationType.DRINK));
                                     if (potion != null) {
                                         potion.applyPotion(this);
                                     }
@@ -5440,6 +5479,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     Food food = Food.getByRelative(itemInHand);
                                     if (food != null && food.eatenBy(this)) {
                                         this.getInventory().decreaseCount(this.getInventory().getHeldItemIndex());
+                                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0, this.getEyeHeight()), VibrationType.EAT));
                                     }
                                 }
                                 return;
@@ -6269,6 +6309,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.namedTag.putList(fogIdentifiers);
             this.namedTag.putList(userProvidedFogIds);
 
+            this.namedTag.putInt("wardenWarningLevel", this.wardenWarningData.warningLevel);
+            this.namedTag.putLong("wardenLastWarningTick", this.wardenWarningData.lastWarningTick);
+            this.namedTag.putLong("wardenLastShriekTick", this.wardenWarningData.lastShriekTick);
+
             if (!this.username.isEmpty() && this.namedTag != null) {
                 if (this.server.savePlayerDataByUuid) {
                     this.server.saveOfflinePlayerData(this.uuid, this.namedTag, async);
@@ -7024,6 +7068,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.setSwimming(false);
             this.setCrawling(false);
+
+            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, from.clone(), VibrationType.TELEPORT));
 
             this.stopFishing(false);
             return true;
@@ -8675,5 +8721,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         DebugDrawerPacket packet = new DebugDrawerPacket();
         packet.shapes.addAll(entries);
         this.dataPacket(packet);
+    }
+
+    /**
+     * Returns the warden-related warning data for this player.
+     *
+     * @return the warden warning data
+     */
+    public WardenWarningData getWardenWarningData() {
+        return this.wardenWarningData;
+    }
+
+    /**
+     * Emits a movement vibration (STEP/SWIM/ELYTRA_GLIDE) only when the player has entered a new
+     * block since the last emission — matching vanilla's per-block-boundary cadence instead of
+     * firing on every movement packet.
+     */
+    private void tryEmitMovementVibration(VibrationType type) {
+        int fx = this.getFloorX();
+        int fy = this.getFloorY();
+        int fz = this.getFloorZ();
+        if (fx == this.lastMovementVibrationX && fy == this.lastMovementVibrationY && fz == this.lastMovementVibrationZ) {
+            return;
+        }
+        this.lastMovementVibrationX = fx;
+        this.lastMovementVibrationY = fy;
+        this.lastMovementVibrationZ = fz;
+        this.level.getVibrationManager().callVibrationEvent(
+                new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), type));
     }
 }

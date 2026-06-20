@@ -10,6 +10,8 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.particle.SmokeParticle;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -141,6 +143,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
                         this.level.setBlock(this, this, true);
                         cauldron.clearCustomColor();
                         this.getLevel().addSoundToViewers(this, Sound.CAULDRON_TAKEWATER);
+                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player, this.add(0.5, 0.5, 0.5), VibrationType.FLUID_PICKUP));
                     }
                 } else if (item.getDamage() == 8 || item.getDamage() == 10) {//water and lava buckets
                     if (isFull() && !cauldron.isCustomColor() && !cauldron.hasPotion() && item.getDamage() == 8) {
@@ -164,6 +167,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
                             cauldron.clearCustomColor();
                             this.level.setBlock(this, this, true);
                             this.getLevel().addSoundToViewers(this, Sound.CAULDRON_FILLWATER);
+                            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player, this.add(0.5, 0.5, 0.5), VibrationType.FLUID_PLACE));
                         } else { // lava bucket
                             if (!isEmpty()) {
                                 clearWithFizz(cauldron);
