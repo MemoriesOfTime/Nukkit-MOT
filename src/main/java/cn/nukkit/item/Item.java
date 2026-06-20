@@ -1038,6 +1038,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return new HashMap<>(CUSTOM_ITEM_DEFINITIONS);
     }
 
+    /** Direct lookup without cloning; for hot paths instead of {@link #getCustomItemDefinition()}{@code .get(id)}. */
+    public static CustomItemDefinition getCustomItemDefinition(String namespaceId) {
+        return CUSTOM_ITEM_DEFINITIONS.get(namespaceId);
+    }
+
     public static Item get(int id) {
         return get(id, 0);
     }

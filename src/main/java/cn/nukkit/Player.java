@@ -227,6 +227,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected final BiMap<Inventory, Integer> windows = HashBiMap.create();
     protected final BiMap<Integer, Inventory> windowIndex = windows.inverse();
     protected final Set<Integer> permanentWindows = new IntOpenHashSet();
+    // Most recently opened non-permanent window; getTopWindow() is deterministic
+    // regardless of the undefined iteration order of the {@link HashBiMap} windows.
+    protected Inventory topWindow;
     private boolean inventoryOpen;
     protected int closingWindowId = Integer.MIN_VALUE;
 
@@ -6214,6 +6217,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     String.valueOf(this.getPort()),
                     this.getServer().getLanguage().translateString(reason)));
             this.windows.clear();
+            this.topWindow = null;
             this.hasSpawned.clear();
             this.spawnPosition = null;
 
@@ -7339,6 +7343,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (isPermanent) {
             this.permanentWindows.add(cnt);
+        } else {
+            this.topWindow = inventory;
         }
 
         if (this.spawned && !this.inventoryOpen && inventory.open(this)) {
@@ -7346,6 +7352,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         } else if (!alwaysOpen) {
             if (!this.permanentWindows.contains(cnt)) {
                 this.windows.remove(inventory);
+                if (this.topWindow == inventory) {
+                    this.topWindow = null;
+                }
             }
 
             return -1;
@@ -7357,12 +7366,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public Optional<Inventory> getTopWindow() {
+        if (this.topWindow != null && this.windows.containsKey(this.topWindow)
+                && !this.permanentWindows.contains(this.windows.get(this.topWindow))) {
+            return Optional.of(this.topWindow);
+        }
+        // Re-scan if the tracked reference is stale (e.g. removed outside removeWindow).
+        Inventory fallback = null;
         for (Entry<Inventory, Integer> entry : this.windows.entrySet()) {
             if (!this.permanentWindows.contains(entry.getValue())) {
-                return Optional.of(entry.getKey());
+                fallback = entry.getKey();
+                break;
             }
         }
-        return Optional.empty();
+        this.topWindow = fallback;
+        return Optional.ofNullable(fallback);
     }
 
     public void removeWindow(Inventory inventory) {
@@ -7375,6 +7392,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // Requiring isResponse here causes issues with inventory events and an item duplication glitch
         if (/*isResponse &&*/ !this.permanentWindows.contains(this.getWindowId(inventory))) {
             this.windows.remove(inventory);
+            if (inventory == this.topWindow) {
+                this.topWindow = null;
+            }
         }
     }
 

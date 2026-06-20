@@ -41,7 +41,7 @@ public interface CustomItem extends StringItem {
      * @return 物品定义
      */
     default CustomItemDefinition resolveDefinition() {
-        var definition = Item.getCustomItemDefinition().get(this.getNamespaceId());
+        var definition = Item.getCustomItemDefinition(this.getNamespaceId());
         return definition != null ? definition : this.getDefinition();
     }
 

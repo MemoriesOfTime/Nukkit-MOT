@@ -53,6 +53,18 @@ public class BundleInventory extends BaseInventory {
         return changed;
     }
 
+    // Force-set still rejects shulker boxes and bundle cycles to keep the
+    // setItem invariants intact on the rollback path. Weight is not re-checked:
+    // a rollback must restore the exact prior slot.
+    @Override
+    public void setItemForce(int index, Item item) {
+        if (!canStore(item) || wouldCreateBundleCycle(item)) {
+            return;
+        }
+        super.setItemForce(index, item);
+        getHolder().saveNBT();
+    }
+
     @Override
     public boolean clear(int index, boolean send) {
         boolean changed = super.clear(index, send);

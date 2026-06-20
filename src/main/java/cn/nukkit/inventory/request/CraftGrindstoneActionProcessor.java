@@ -42,6 +42,15 @@ public class CraftGrindstoneActionProcessor implements ItemStackRequestActionPro
             return context.error();
         }
 
+        // Validate the consume plan before firing the event so a rejected
+        // request never surfaces to plugin handlers as a success.
+        List<Item> expectedConsumes = new ArrayList<>(2);
+        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, grindstone.getEquipment(), 1);
+        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, grindstone.getIngredient(), 1);
+        if (!CraftRecipeActionProcessor.validateExpectedConsumePlan(player, expectedConsumes, context)) {
+            return context.error();
+        }
+
         int experience = grindstone.calculateExperience();
         GrindItemEvent event = new GrindItemEvent(
                 grindstone,
@@ -53,13 +62,6 @@ public class CraftGrindstoneActionProcessor implements ItemStackRequestActionPro
         );
         player.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
-            return context.error();
-        }
-
-        List<Item> expectedConsumes = new ArrayList<>(2);
-        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, grindstone.getEquipment(), 1);
-        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, grindstone.getIngredient(), 1);
-        if (!CraftRecipeActionProcessor.validateExpectedConsumePlan(player, expectedConsumes, context)) {
             return context.error();
         }
 

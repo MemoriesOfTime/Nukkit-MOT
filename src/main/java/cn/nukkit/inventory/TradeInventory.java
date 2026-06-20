@@ -69,12 +69,17 @@ public class TradeInventory extends BaseInventory {
 
     @Override
     public void onClose(Player who) {
+        // Return input slots, dropping the unplaced remainder so it isn't lost.
         for (int i = 0; i <= 1; i++) {
-            Item item = getItem(i);
-            if (who.getInventory().canAddItem(item)) {
-                who.getInventory().addItem(item);
-            } else {
-                who.dropItem(item);
+            Item item = this.getItem(i);
+            if (item.isNull()) {
+                continue;
+            }
+            Item[] drops = who.getInventory().addItem(item);
+            for (Item drop : drops) {
+                if (!who.dropItem(drop)) {
+                    who.getLevel().dropItem(who, drop);
+                }
             }
             this.clear(i);
         }

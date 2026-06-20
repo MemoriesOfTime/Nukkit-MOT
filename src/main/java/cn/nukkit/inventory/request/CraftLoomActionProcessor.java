@@ -112,6 +112,16 @@ public class CraftLoomActionProcessor implements ItemStackRequestActionProcessor
         }
 
         int times = Math.max(1, action.getTimesCrafted());
+
+        // Validate the consume plan before firing the event so a rejected
+        // request never surfaces to plugin handlers as a success.
+        List<Item> expectedConsumes = new ArrayList<>(2);
+        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, banner, times);
+        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, dye, times);
+        if (!CraftRecipeActionProcessor.validateExpectedConsumePlan(player, expectedConsumes, context)) {
+            return context.error();
+        }
+
         ItemBanner result = (ItemBanner) bannerItem.clone();
         result.setCount(times);
         if (patternType != null) {
@@ -123,13 +133,6 @@ public class CraftLoomActionProcessor implements ItemStackRequestActionProcessor
         LoomItemEvent event = new LoomItemEvent(loomInventory, result.clone(), player);
         Server.getInstance().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
-            return context.error();
-        }
-
-        List<Item> expectedConsumes = new ArrayList<>(2);
-        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, banner, times);
-        CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, dye, times);
-        if (!CraftRecipeActionProcessor.validateExpectedConsumePlan(player, expectedConsumes, context)) {
             return context.error();
         }
 
