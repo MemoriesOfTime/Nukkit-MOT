@@ -568,6 +568,69 @@ class ItemStackRequestProcessorTest {
     }
 
     /**
+     * {@code ItemCustomTool} does not extend {@code ItemCustom}; verify its off-hand admission
+     * is not blocked by the base {@code Item} implementation.
+     */
+    @Test
+    void offhandAcceptsCustomToolThatAllowsOffHand() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+
+        Item custom = new TestCustomTool("test:offhand_tool_allowed", "Offhand Tool", true);
+        custom.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, custom, false));
+        custom = inventory.getItem(0);
+
+        TakeAction action = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, custom.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.OFFHAND, 0, 0, null)
+        );
+
+        ActionResponse response = new TakeActionProcessor().handle(action, player, context());
+
+        assertNotNull(response);
+        assertTrue(response.success());
+        assertTrue(inventory.getItem(0).isNull());
+        assertEquals(custom.getNamespaceId(), offhand.getItem(0).getNamespaceId());
+    }
+
+    /**
+     * Counterpart: a custom tool without {@code allowOffHand} must still be rejected by the off-hand slot.
+     */
+    @Test
+    void offhandRejectsCustomToolThatDisallowsOffHand() {
+        Player player = mockPlayer();
+        PlayerInventory inventory = new PlayerInventory(player);
+        PlayerOffhandInventory offhand = new PlayerOffhandInventory(player);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getOffhandInventory()).thenReturn(offhand);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+
+        Item custom = new TestCustomTool("test:offhand_tool_disallowed", "Offhand Tool No", false);
+        custom.autoAssignStackNetworkId();
+        assertTrue(inventory.setItem(0, custom, false));
+        custom = inventory.getItem(0);
+
+        TakeAction action = new TakeAction(
+                1,
+                new ItemStackRequestSlotData(ContainerSlotType.HOTBAR, 0, custom.getStackNetId(), null),
+                new ItemStackRequestSlotData(ContainerSlotType.OFFHAND, 0, 0, null)
+        );
+
+        ActionResponse response = new TakeActionProcessor().handle(action, player, context());
+
+        assertNotNull(response);
+        assertFalse(response.success());
+        assertEquals(custom.getNamespaceId(), inventory.getItem(0).getNamespaceId());
+        assertTrue(offhand.getItem(0).isNull());
+    }
+
+    /**
      * Minimal {@link cn.nukkit.item.customitem.ItemCustom} used by the off-hand tests.
      * Its {@link cn.nukkit.item.customitem.CustomItemDefinition} is built with the
      * {@code allow_off_hand} property driven by the constructor argument.
@@ -605,6 +668,29 @@ class ItemStackRequestProcessorTest {
             return cn.nukkit.item.customitem.CustomItemDefinition
                     .legacyBuilder(this)
                     .build();
+        }
+    }
+
+    /**
+     * Minimal {@link cn.nukkit.item.customitem.ItemCustomTool} driven by {@code allowOffHand},
+     * covering the subclass branch that does not extend {@code ItemCustom}.
+     */
+    private static final class TestCustomTool extends cn.nukkit.item.customitem.ItemCustomTool {
+        private final boolean allowOffHand;
+
+        TestCustomTool(String id, String name, boolean allowOffHand) {
+            super(id, name);
+            this.allowOffHand = allowOffHand;
+        }
+
+        @Override
+        public cn.nukkit.item.customitem.CustomItemDefinition getDefinition() {
+            var builder = cn.nukkit.item.customitem.CustomItemDefinition
+                    .toolBuilder(this, cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory.EQUIPMENT)
+                    .attackDamage(5)
+                    .maxDurability(100)
+                    .tier(cn.nukkit.item.ItemTool.TIER_IRON);
+            return builder.allowOffHand(this.allowOffHand).build();
         }
     }
 

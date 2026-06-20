@@ -37,6 +37,11 @@ public abstract class ItemCustomTool extends StringItemToolBase implements ItemD
         return textureName;
     }
 
+    @Override
+    public boolean canBePutInOffhandSlot() {
+        return CustomItem.isAllowedInOffHand(this);
+    }
+
     /**
      * 判断物品是否含有指定的 item_tag（写入 {@code components.item_tags} 中的标签）。
      * <p>

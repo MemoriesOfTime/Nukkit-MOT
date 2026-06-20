@@ -40,29 +40,9 @@ public abstract class ItemCustom extends StringItemBase implements CustomItem {
     @Override
     public abstract CustomItemDefinition getDefinition();
 
-    /**
-     * Component-based 模式下，仅当 {@link CustomItemDefinition.SimpleBuilder#allowOffHand(boolean)}
-     * 设置为 {@code true} 时允许放入副手槽。
-     * <p>
-     * Legacy 模式的物品定义由客户端 behavior pack 提供，服务端不持有 {@code allow_off_hand}
-     * 信息，因此信任客户端裁决（返回 {@code true}），避免服务端误拒 behavior pack 已放行的物品。
-     * <p>
-     * For component-based items, the off-hand slot is allowed only when
-     * {@link CustomItemDefinition.SimpleBuilder#allowOffHand(boolean)} is {@code true}.
-     * Legacy-mode items are defined by the client behavior pack, so the server has no
-     * {@code allow_off_hand} information and defers to the client (returns {@code true}).
-     */
     @Override
     public boolean canBePutInOffhandSlot() {
-        var def = this.resolveDefinition();
-        if (!def.isComponentBased()) {
-            // Legacy 模式：物品定义在 behavior pack，服务端无 allow_off_hand 信息，信任客户端
-            return true;
-        }
-        return def.getNbt()
-                .getCompound("components")
-                .getCompound("item_properties")
-                .getBoolean("allow_off_hand");
+        return CustomItem.isAllowedInOffHand(this);
     }
 
     @Override

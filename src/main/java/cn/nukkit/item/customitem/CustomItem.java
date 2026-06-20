@@ -57,4 +57,27 @@ public interface CustomItem extends StringItem {
     default CompoundTag getDefinitionNbt() {
         return this.resolveDefinition().getNbt();
     }
+
+    /**
+     * 判断自定义物品是否允许放入副手槽。Component-based 模式遵循 {@code allow_off_hand}；
+     * legacy 模式交由客户端 behavior pack 裁决（返回 {@code true}）。
+     * <p>
+     * 因 Java "类优先"规则，无法作为接口 default 覆盖 {@link cn.nukkit.item.Item#canBePutInOffhandSlot()}，
+     * 各 {@code ItemCustom*} 子类需自行 {@code @Override} 并委托本方法。
+     * <p>
+     * Whether a custom item may enter the off-hand slot. Component-based honors {@code allow_off_hand};
+     * legacy defers to the client behavior pack (returns {@code true}). Cannot be a {@code default}
+     * override of {@code Item.canBePutInOffhandSlot()} due to Java's "class wins" rule — each
+     * {@code ItemCustom*} subclass must {@code @Override} and delegate here.
+     */
+    static boolean isAllowedInOffHand(CustomItem item) {
+        var def = item.resolveDefinition();
+        if (!def.isComponentBased()) {
+            return true;
+        }
+        return def.getNbt()
+                .getCompound("components")
+                .getCompound("item_properties")
+                .getBoolean("allow_off_hand");
+    }
 }
