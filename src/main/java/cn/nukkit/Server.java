@@ -3214,6 +3214,9 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.COPPER_GOLEM_STATUE, BlockEntityCopperGolemStatue.class);
         BlockEntity.registerBlockEntity(BlockEntity.CREAKING_HEART, BlockEntityCreakingHeart.class);
         BlockEntity.registerBlockEntity(BlockEntity.COMMAND_BLOCK, BlockEntityCommandBlock.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SCULK_SENSOR, BlockEntitySculkSensor.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CALIBRATED_SCULK_SENSOR, BlockEntityCalibratedSculkSensor.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SCULK_SHRIEKER, BlockEntitySculkShrieker.class);
 
         // Persistent container, not on vanilla
         BlockEntity.registerBlockEntity(BlockEntity.PERSISTENT_CONTAINER, PersistentDataContainerBlockEntity.class);

@@ -765,7 +765,8 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
         stream.getUnsignedVarInt();
 
         assertEquals(17, stream.getVarInt());
-        var decodedTag = stream.getTagNetworkLE();
+        // LevelEventGenericPacket writes a headerless (no root type id / name) NBT value.
+        var decodedTag = stream.getTagValueNetworkLE();
         assertEquals("test", decodedTag.getString("name"));
         assertEquals(7, decodedTag.getInt("value"));
         assertEquals(0, stream.readableBytes());

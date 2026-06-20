@@ -561,7 +561,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             this.unknownTiles.remove(index); // a real tile now occupies this slot
         }
         var existing = this.tileList.put(index, blockEntity);
-        if (existing != null && !existing.equals(blockEntity)) {
+        if (existing != null && existing != blockEntity) {
             this.tiles.remove(existing.getId());
             existing.onReplacedWith(blockEntity);
             existing.close();

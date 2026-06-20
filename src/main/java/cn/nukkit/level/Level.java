@@ -46,6 +46,10 @@ import cn.nukkit.level.generator.task.PopulationTask;
 import cn.nukkit.level.particle.DestroyBlockParticle;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.Particle;
+import cn.nukkit.level.vibration.SimpleVibrationManager;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationManager;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.level.persistence.impl.DelegatePersistentDataContainer;
 import cn.nukkit.level.sound.Sound;
@@ -345,6 +349,8 @@ public class Level implements ChunkManager, Metadatable {
     private final Long2ObjectOpenHashMap<Boolean> chunkGenerationQueue = new Long2ObjectOpenHashMap<>();
     private final int chunkGenerationQueueSize;
     private final int chunkPopulationQueueSize;
+
+    private final VibrationManager vibrationManager = new SimpleVibrationManager(this);
 
     private boolean autoSave;
     private boolean autoCompaction;
@@ -2360,7 +2366,6 @@ public class Level implements ChunkManager, Metadatable {
             this.setBlock(block, Block.get(Block.AIR));
             Position position = block.add(0.5, 0.5, 0.5);
             this.addParticle(new DestroyBlockParticle(position, block));
-            //this.getVibrationManager().callVibrationEvent(new VibrationEvent(null, position, VibrationType.BLOCK_DESTROY));
         }
     }
 
@@ -2720,6 +2725,8 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
+        this.vibrationManager.callVibrationEvent(new VibrationEvent(player, vector.add(0.5, 0.5, 0.5), VibrationType.BLOCK_DESTROY));
+
         return item;
     }
 
@@ -3012,6 +3019,7 @@ public class Level implements ChunkManager, Metadatable {
         if (item.getCount() <= 0) {
             item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
         }
+        this.vibrationManager.callVibrationEvent(new VibrationEvent(player, hand.add(0.5, 0.5, 0.5), VibrationType.BLOCK_PLACE));
         return item;
     }
 
@@ -4250,6 +4258,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public long getCurrentTick() {
         return this.levelCurrentTick;
+    }
+
+    public VibrationManager getVibrationManager() {
+        return this.vibrationManager;
     }
 
     public String getName() {

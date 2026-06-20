@@ -27,6 +27,8 @@ import cn.nukkit.item.ItemTotem;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.metadata.Metadatable;
@@ -1807,6 +1809,13 @@ public abstract class Entity extends Location implements Metadatable {
             }
         }
         this.setHealth(newHealth);
+        if (source.getFinalDamage() > 0) {
+            if (source.getEntity() != null) {
+                this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(source.getEntity(), new Vector3(this.x, this.y, this.z), VibrationType.ENTITY_DAMAGE));
+            } else {
+                this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y, this.z), VibrationType.ENTITY_DAMAGE));
+            }
+        }
         return true;
     }
 
@@ -2510,6 +2519,9 @@ public abstract class Entity extends Location implements Metadatable {
                     }
 
                     if (damage > 0 && (!(this instanceof Player) || level.getGameRules().getBoolean(GameRule.FALL_DAMAGE))) {
+                        if (!this.isSneaking()) {
+                            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y, this.z), VibrationType.HIT_GROUND));
+                        }
                         this.attack(new EntityDamageEvent(this, DamageCause.FALL, damage));
                     }
                 }
