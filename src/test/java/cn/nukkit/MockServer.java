@@ -12,6 +12,7 @@ import cn.nukkit.level.vibration.VibrationManager;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.MainLogger;
+import cn.nukkit.utils.serverconfig.ServerConfig;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
@@ -177,6 +178,15 @@ public final class MockServer {
         Level mockLevel = Mockito.mock(Level.class);
         setupLevelBlockStub(mockLevel);
         Mockito.lenient().when(mock.getDefaultLevel()).thenReturn(mockLevel);
+
+        // CustomBlockManager's constructor reads server config to decide whether to auto-download
+        // vanilla palettes. Tests must stay hermetic (no network), so serve a real ServerConfig
+        // with auto-download disabled. Without this stub getServerConfig() returns null and the
+        // constructor throws, leaving CustomBlockManager.get() == null and breaking every test
+        // that encodes a StartGamePacket.
+        ServerConfig serverConfig = new ServerConfig();
+        serverConfig.customBlockSettings().autoDownloadVanillaPalette(false);
+        Mockito.lenient().when(mock.getServerConfig()).thenReturn(serverConfig);
     }
 
     /**
