@@ -11,9 +11,6 @@ import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URL;
 import java.nio.file.Files;
 import java.util.Locale;
 
@@ -73,18 +70,11 @@ public class SparkInstaller {
         if (download) {
             log.info("Downloading spark...");
             log.info("If the download fails, please download it manually from https://ci.lucko.me/job/spark-extra-platforms/");
-            log.info("Or set enable-spark=off in server.properties to disable automatic download.");
+            // Key mirrors PerformanceSettings (@CustomKey "enable-spark" in nukkit-mot.yml).
+            log.info("Or set \"enable-spark: false\" under performance-settings in nukkit-mot.yml to disable automatic download.");
             File newFile = new File(server.getPluginPath() + "/" + fileName);
-            try (InputStream in = new URL(downloadUrl).openStream()) {
-                try (OutputStream out = Files.newOutputStream(newFile.toPath())) {
-                    byte[] buff = new byte[1024 * 10];
-                    int len;
-                    while ((len = in.read(buff)) != -1) {
-                        out.write(buff, 0, len);
-                        out.flush();
-                    }
-                }
-                //Files.copy(in, sparkFile.toPath());
+            try {
+                HttpUtils.downloadFile(downloadUrl, newFile.toPath());
                 server.getPluginManager().loadPlugin(newFile);
                 log.info("Spark has been installed.");
             } catch (Throwable e) {
@@ -98,23 +88,14 @@ public class SparkInstaller {
     private static JsonObject getLatestInfo() {
         try {
             String apiUrl = "https://ci.lucko.me/job/spark-extra-platforms/lastBuild/api/json?tree=number%2Cartifacts%5BfileName%2CrelativePath%5D%2Cresult%2Cdescription%2Ctimestamp";
-            URL url = new URL(apiUrl);
-            try (InputStream in = url.openStream()) {
-                StringBuilder builder = new StringBuilder();
-                byte[] buff = new byte[1024 * 10];
-                int len;
-                while ((len = in.read(buff)) != -1) {
-                    builder.append(new String(buff, 0, len));
-                }
-                String json = builder.toString();
-                JsonObject object = JsonParser.parseString(json).getAsJsonObject();
-                JsonArray artifacts = object.getAsJsonArray("artifacts");
-                for (int i = 0; i < artifacts.size(); i++) {
-                    JsonObject artifact = artifacts.get(i).getAsJsonObject();
-                    String fileName = artifact.get("fileName").getAsString();
-                    if (fileName.toLowerCase(Locale.ROOT).contains("nukkit")) {
-                        return artifact;
-                    }
+            String json = HttpUtils.fetchString(apiUrl);
+            JsonObject object = JsonParser.parseString(json).getAsJsonObject();
+            JsonArray artifacts = object.getAsJsonArray("artifacts");
+            for (int i = 0; i < artifacts.size(); i++) {
+                JsonObject artifact = artifacts.get(i).getAsJsonObject();
+                String fileName = artifact.get("fileName").getAsString();
+                if (fileName.toLowerCase(Locale.ROOT).contains("nukkit")) {
+                    return artifact;
                 }
             }
         } catch (Exception e) {
