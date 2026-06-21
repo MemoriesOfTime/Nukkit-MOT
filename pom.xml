@@ -44,7 +44,8 @@
         <jose4j.version>0.9.6</jose4j.version>
         <nukkitx-natives.version>1.0.3</nukkitx-natives.version>
         <raknet.version>1.1.0.CR1-20260606.034627-2</raknet.version>
-        <cloudburst-common.version>3.0.0.Beta12-20260609.111529-26</cloudburst-common.version>
+        <cloudburst-common.version>3.0.0.Beta12-20260602.165120-26</cloudburst-common.version>
+        <cloudburst-codec.version>3.0.0.Beta12-20260609.111529-26</cloudburst-codec.version>
         <jackson-dataformat-toml.version>2.20.1</jackson-dataformat-toml.version>
         <eu.okaeri.version>6.1.0-beta.1</eu.okaeri.version>
 
@@ -549,7 +550,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>bedrock-codec</artifactId>
-            <version>${cloudburst-common.version}</version>
+            <version>${cloudburst-codec.version}</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
