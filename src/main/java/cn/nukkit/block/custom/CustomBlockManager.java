@@ -26,6 +26,7 @@ import cn.nukkit.level.format.leveldb.NukkitLegacyMapper;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.utils.VanillaPaletteDownloader;
 import com.google.gson.*;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.objects.*;
@@ -89,6 +90,10 @@ public class CustomBlockManager {
             } catch (IOException e) {
                 throw new IllegalStateException("Failed to create BIN_DIRECTORY", e);
             }
+        }
+
+        if (this.server.getServerConfig().customBlockSettings().autoDownloadVanillaPalette()) {
+            VanillaPaletteDownloader.downloadMissing(filesPath);
         }
 
         this.loadIdMapping();
