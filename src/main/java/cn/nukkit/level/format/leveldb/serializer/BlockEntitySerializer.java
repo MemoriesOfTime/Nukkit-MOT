@@ -12,6 +12,7 @@ import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Collection;
@@ -48,7 +49,8 @@ public class BlockEntitySerializer {
 
         byte[] key = LevelDBKey.BLOCK_ENTITIES.getKey(chunk.getX(), chunk.getZ(), chunk.getProvider().getLevel().getDimension());
         Collection<CompoundTag> unknownTiles = chunk.getUnknownTiles();
-        if (chunk.getBlockEntities().isEmpty() && unknownTiles.isEmpty()) {
+        Collection<BlockEntity> entities = chunk.getBlockEntities().values();
+        if (entities.isEmpty() && unknownTiles.isEmpty()) {
             db.delete(key);
             return;
         }
@@ -65,9 +67,10 @@ public class BlockEntitySerializer {
             // Round-trip tiles that could not be constructed (unknown/modded types) verbatim so
             // their data is preserved instead of being deleted on save.
             for (CompoundTag unknown : unknownTiles) {
-                NBTIO.write(unknown, stream, ByteOrder.LITTLE_ENDIAN);
+                NBTIO.write(unknown, baos, ByteOrder.LITTLE_ENDIAN);
             }
-            value = stream.toByteArray();
+            byte[] value = baos.toByteArray();
+            db.put(key, value);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
