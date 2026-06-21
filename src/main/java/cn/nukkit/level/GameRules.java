@@ -25,7 +25,7 @@ public class GameRules {
     public static GameRules getDefault() {
         GameRules gameRules = new GameRules();
 
-        gameRules.gameRules.put(COMMAND_BLOCKS_ENABLED, new Value<>(Type.BOOLEAN, false, 291)); // Vanilla: default true
+        gameRules.gameRules.put(COMMAND_BLOCKS_ENABLED, new Value<>(Type.BOOLEAN, true, 291)); // Vanilla: default true
         gameRules.gameRules.put(COMMAND_BLOCK_OUTPUT, new Value<>(Type.BOOLEAN, true));
         gameRules.gameRules.put(DO_DAYLIGHT_CYCLE, new Value<>(Type.BOOLEAN, true));
         gameRules.gameRules.put(DO_ENTITY_DROPS, new Value<>(Type.BOOLEAN, true));
@@ -42,7 +42,8 @@ public class GameRules {
         gameRules.gameRules.put(FREEZE_DAMAGE, new Value<>(Type.BOOLEAN, true, 440));
         gameRules.gameRules.put(FUNCTION_COMMAND_LIMIT, new Value<>(Type.INTEGER, 10000, 332));
         gameRules.gameRules.put(KEEP_INVENTORY, new Value<>(Type.BOOLEAN, false));
-        gameRules.gameRules.put(LOCATOR_BAR, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_21_80));
+        gameRules.gameRules.put(LOCATOR_BAR, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_21_80, ProtocolInfo.v1_26_30));
+        gameRules.gameRules.put(PLAYER_WAYPOINTS, new Value<>(Type.INTEGER, PlayerWaypointsMode.OFF.ordinal(), ProtocolInfo.v1_26_30));
         gameRules.gameRules.put(MAX_COMMAND_CHAIN_LENGTH, new Value<>(Type.INTEGER, 65536));
         gameRules.gameRules.put(MOB_GRIEFING, new Value<>(Type.BOOLEAN, true));
         gameRules.gameRules.put(NATURAL_REGENERATION, new Value<>(Type.BOOLEAN, true));
@@ -58,7 +59,7 @@ public class GameRules {
         gameRules.gameRules.put(TNT_EXPLOSION_DROP_DECAY, new Value<>(Type.BOOLEAN, false, 685));
         gameRules.gameRules.put(SHOW_BORDER_EFFECT, new Value<>(Type.BOOLEAN, true, 618));
         gameRules.gameRules.put(PLAYERS_SLEEPING_PERCENTAGE, new Value<>(Type.INTEGER, 100, 618));
-        gameRules.gameRules.put(RECIPES_UNLOCK, new Value<>(Type.BOOLEAN, false, ProtocolInfo.v1_18_0));
+        gameRules.gameRules.put(RECIPES_UNLOCK, new Value<>(Type.BOOLEAN, false, ProtocolInfo.v1_20_30));
         gameRules.gameRules.put(RESPAWN_BLOCKS_EXPLODE, new Value<>(Type.BOOLEAN, true, 618));
         gameRules.gameRules.put(DO_LIMITED_CRAFTING, new Value<>(Type.BOOLEAN, false, 618));
         gameRules.gameRules.put(SHOW_RECIPE_MESSAGES, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_20_50));
@@ -291,17 +292,46 @@ public class GameRules {
         private final Type type;
         private T value;
         private boolean canBeChanged;
+        /**
+         * Inclusive lower bound of the protocol range in which this game rule is sent.
+         * <p>
+         * Semantics: {@code minProtocol} is the protocol version in which the rule was
+         * first introduced (e.g. {@code v1_26_30} for {@code PLAYER_WAYPOINTS}). The rule
+         * is sent to clients whose protocol {@code p} satisfies {@code minProtocol <= p}.
+         */
         private int minProtocol;
+        /**
+         * Exclusive upper bound of the protocol range in which this game rule is sent.
+         * The rule is sent to clients whose protocol {@code p} satisfies {@code p < maxProtocol}.
+         * Defaults to {@link Integer#MAX_VALUE} (sent on all newer versions).
+         * <p>
+         * Overall range is the half-open interval {@code [minProtocol, maxProtocol)}.
+         */
+        private int maxProtocol = Integer.MAX_VALUE;
 
         public Value(Type type, T value) {
             this.type = type;
             this.value = value;
         }
 
+        /**
+         * @param minProtocol inclusive lower bound; the first protocol version that receives this rule
+         */
         public Value(Type type, T value, int minProtocol) {
             this.type = type;
             this.value = value;
             this.minProtocol = minProtocol;
+        }
+
+        /**
+         * @param minProtocol inclusive lower bound; the first protocol version that receives this rule
+         * @param maxProtocol exclusive upper bound; the rule is no longer sent at or above this version
+         */
+        public Value(Type type, T value, int minProtocol, int maxProtocol) {
+            this.type = type;
+            this.value = value;
+            this.minProtocol = minProtocol;
+            this.maxProtocol = maxProtocol;
         }
 
         private void setValue(T value, Type type) {
@@ -325,6 +355,10 @@ public class GameRules {
 
         public int getMinProtocol() {
             return minProtocol;
+        }
+
+        public int getMaxProtocol() {
+            return maxProtocol;
         }
 
         private boolean getValueAsBoolean() {

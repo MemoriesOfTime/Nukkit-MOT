@@ -1,5 +1,7 @@
 package cn.nukkit.item.enchantment;
 
+import cn.nukkit.item.Item;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
@@ -23,5 +25,10 @@ public class EnchantmentKnockback extends Enchantment {
     @Override
     public int getMaxLevel() {
         return 2;
+    }
+
+    @Override
+    public boolean canEnchant(Item item) {
+        return item.isSpear() || super.canEnchant(item);
     }
 }

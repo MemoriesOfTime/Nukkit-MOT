@@ -8,6 +8,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.network.protocol.BlockEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
@@ -252,6 +254,7 @@ public class BlockNoteblock extends BlockSolid implements BlockEntityHolder<Bloc
         if (player.isSneaking()) return false;
         this.increaseStrength();
         this.emitSound();
+        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player != null ? player : this, this.add(0.5, 0.5, 0.5), VibrationType.BLOCK_CHANGE));
         return true;
     }
 

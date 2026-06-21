@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -39,17 +40,17 @@ public class ConfigComments {
         applyFieldComments(config, comments, null);
 
         // Field-level comments on each category config
-        Map<String, OkaeriConfig> categories = Map.of(
-                "performanceSettings", config.performanceSettings(),
-                "networkSettings", config.networkSettings(),
-                "chunkSettings", config.chunkSettings(),
-                "entitySettings", config.entitySettings(),
-                "worldSettings", config.worldSettings(),
-                "playerSettings", config.playerSettings(),
-                "debugSettings", config.debugSettings(),
-                "gameFeatureSettings", config.gameFeatureSettings(),
-                "neteaseSettings", config.neteaseSettings()
-        );
+        Map<String, OkaeriConfig> categories = new HashMap<>();
+        categories.put("performanceSettings", config.performanceSettings());
+        categories.put("networkSettings", config.networkSettings());
+        categories.put("chunkSettings", config.chunkSettings());
+        categories.put("entitySettings", config.entitySettings());
+        categories.put("worldSettings", config.worldSettings());
+        categories.put("playerSettings", config.playerSettings());
+        categories.put("debugSettings", config.debugSettings());
+        categories.put("gameFeatureSettings", config.gameFeatureSettings());
+        categories.put("neteaseSettings", config.neteaseSettings());
+        categories.put("customBlockSettings", config.customBlockSettings());
 
         for (Map.Entry<String, OkaeriConfig> entry : categories.entrySet()) {
             applyFieldComments(entry.getValue(), comments, entry.getKey());

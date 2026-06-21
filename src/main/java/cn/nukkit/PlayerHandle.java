@@ -74,6 +74,10 @@ public final class PlayerHandle {
         player.sendPlayStatus(status, immediate);
     }
 
+    public boolean handleRespawnRequest() {
+        return player.handleRespawnRequest();
+    }
+
     /*public long getBreakingBlockTime() {
         return player.breakingBlockTime;
     }

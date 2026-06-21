@@ -46,7 +46,14 @@ val mockitoAgent by configurations.creating {
 }
 
 dependencies {
-    api(libs.raknet)
+    api(libs.raknet) {
+        exclude("io.netty", "netty-common")
+        exclude("io.netty", "netty-codec")
+        exclude("io.netty", "netty-buffer")
+        exclude("io.netty", "netty-transport")
+        exclude("io.netty", "netty-transport-native-unix-common")
+        exclude("io.netty", "netty-codec-haproxy")
+    }
     api(libs.netty.epoll)
     api(libs.netty.codec.haproxy)
     api(libs.nukkitx.natives)
@@ -149,6 +156,24 @@ tasks {
                 classpath.from(mockitoAgent)
             }
         )
+    }
+
+    // Minify all .json resources in the build output to shrink the JAR.
+    // Source files in src/main/resources stay readable; only the copied artifacts are minified.
+    // Idempotent: already-minified files are unchanged on a second pass.
+    processResources {
+        doLast {
+            val minifyGson = com.google.gson.GsonBuilder().disableHtmlEscaping().create()
+            @Suppress("DEPRECATION")
+            val outDir = destinationDir
+            outDir.walkTopDown()
+                .filter { it.isFile && it.extension.equals("json", ignoreCase = true) }
+                .forEach { file ->
+                    val parsed = com.google.gson.JsonParser.parseReader(file.reader(Charsets.UTF_8))
+                    file.writeText(minifyGson.toJson(parsed), Charsets.UTF_8)
+                    logger.debug("Minified ${file.name}")
+                }
+        }
     }
 
     jar {

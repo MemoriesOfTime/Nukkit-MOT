@@ -21,8 +21,8 @@
         <jline.version>3.30.6</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.11</leveldb-mcpe-jni.version>
-        <block-state-updater.version>1.21.110-SNAPSHOT</block-state-updater.version>
-        <netty.version>4.2.13.Final</netty.version>
+        <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
+        <netty.version>4.1.135.Final</netty.version>
         <caffeine.version>3.2.3</caffeine.version>
         <guava.version>33.1.0-jre</guava.version>
         <gson.version>2.13.2</gson.version>
@@ -43,14 +43,14 @@
         <annotations.version>26.0.2</annotations.version>
         <jose4j.version>0.9.6</jose4j.version>
         <nukkitx-natives.version>1.0.3</nukkitx-natives.version>
-        <raknet.version>1.0.0.CR4-20260426.145646-4</raknet.version>
-        <cloudburst-common.version>3.0.0.Beta12-20260428.175455-16</cloudburst-common.version>
+        <raknet.version>1.1.0.CR1-20260606.034627-2</raknet.version>
+        <cloudburst-common.version>3.0.0.Beta12-20260602.165120-26</cloudburst-common.version>
         <jackson-dataformat-toml.version>2.20.1</jackson-dataformat-toml.version>
         <eu.okaeri.version>6.1.0-beta.1</eu.okaeri.version>
 
         <!-- Test -->
         <allaymc.version>0.1.6</allaymc.version>
-        <cloudburstmc-math.version>2.0-SNAPSHOT</cloudburstmc-math.version>
+        <cloudburstmc-math.version>2.0-20220327.162752-1</cloudburstmc-math.version>
         <junit.version>5.10.2</junit.version>
         <junit-platform.version>1.10.2</junit-platform.version>
         <mockito.version>5.23.0</mockito.version>
@@ -143,6 +143,10 @@
                 <exclusion>
                     <groupId>io.netty</groupId>
                     <artifactId>netty-transport-native-unix-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-codec-haproxy</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -607,6 +611,28 @@
                 </configuration>
             </plugin>
             <plugin>
+                <!-- Register src/build-tools/java as an additional source root so the build-time
+                     helper (MinifyJsonResources) is compiled and available on the classpath during
+                     process-classes. Bound before the compile phase. -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>add-build-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/src/build-tools/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.5</version>
             </plugin>
@@ -618,6 +644,31 @@
                     <execution>
                         <id>attach-javadocs</id>
                         <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- Minify every .json resource in the build output to shrink the JAR.
+                     Source files stay readable; only the copied artifacts under target/classes are minified.
+                     Runs in process-classes (after compile, before package) so the helper class is compiled,
+                     and after the default process-resources copy. Idempotent: already-minified files are unchanged.
+                     Uses Gson (compile classpath) to parse and re-serialize without whitespace. -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>minify-json-resources</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>cn.nukkit.buildtools.MinifyJsonResources</mainClass>
+                            <arguments>
+                                <argument>${project.build.outputDirectory}</argument>
+                            </arguments>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -670,6 +721,14 @@
                                 <exclude>META-INF/NOTICE*</exclude>
                                 <exclude>META-INF/DEPENDENCIES*</exclude>
                                 <exclude>module-info.class</exclude>
+                            </excludes>
+                        </filter>
+                        <!-- Exclude build-time helper classes from the shaded JAR.
+                             MinifyJsonResources only runs during process-classes. -->
+                        <filter>
+                            <artifact>${project.groupId}:${project.artifactId}</artifact>
+                            <excludes>
+                                <exclude>cn/nukkit/buildtools/**</exclude>
                             </excludes>
                         </filter>
                     </filters>

@@ -12,6 +12,8 @@ import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
@@ -36,6 +38,7 @@ public abstract class EntityProjectile extends Entity {
 
     public Entity shootingEntity;
     public boolean hadCollision = false;
+    private boolean shootVibrationSent = false;
     public int piercing;
 
     @Getter
@@ -194,6 +197,9 @@ public abstract class EntityProjectile extends Entity {
                 if (!hitEvent.isCancelled()) {
                     this.hadCollision = true;
 
+                    this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this.shootingEntity, new Vector3(this.x, this.y, this.z), VibrationType.PROJECTILE_LAND));
+                    this.shootVibrationSent = true;
+
                     this.motionX = 0;
                     this.motionY = 0;
                     this.motionZ = 0;
@@ -205,6 +211,13 @@ public abstract class EntityProjectile extends Entity {
                 }
             } else if (!this.isCollided && this.hadCollision) {
                 this.hadCollision = false;
+            } else if (!this.isCollided && !this.hadCollision && this.shootingEntity != null && !this.shootVibrationSent) {
+                this.shootVibrationSent = true;
+                Entity shooter = this.shootingEntity;
+                Vector3 origin = shooter != null
+                        ? new Vector3(shooter.x, shooter.y + shooter.getEyeHeight(), shooter.z)
+                        : new Vector3(this.x, this.y, this.z);
+                this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(shooter, origin, VibrationType.PROJECTILE_SHOOT));
             }
 
             if (!this.hadCollision || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001) {

@@ -17,10 +17,7 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.ContainerSetDataPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 
 public class BlockEntityBrewingStand extends BlockEntitySpawnable implements InventoryHolder, BlockEntityContainer, BlockEntityNameable {
 
@@ -31,8 +28,6 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
     public int brewTime;
     public int fuelTotal;
     public int fuelAmount;
-
-    public static final List<Integer> ingredients = new ArrayList<>(Arrays.asList(Item.NETHER_WART, Item.GHAST_TEAR, Item.GLOWSTONE_DUST, Item.REDSTONE_DUST, Item.GUNPOWDER, Item.MAGMA_CREAM, Item.BLAZE_POWDER, Item.GOLDEN_CARROT, Item.SPIDER_EYE, Item.FERMENTED_SPIDER_EYE, Item.GLISTERING_MELON, Item.SUGAR, Item.RABBIT_FOOT, Item.PUFFERFISH, Item.TURTLE_SHELL, Item.PHANTOM_MEMBRANE, Item.DRAGON_BREATH));
 
     public BlockEntityBrewingStand(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -168,10 +163,6 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
     @Override
     public BrewingInventory getInventory() {
         return inventory;
-    }
-
-    protected boolean checkIngredient(Item ingredient) {
-        return ingredients.contains(ingredient.getId());
     }
 
     @Override

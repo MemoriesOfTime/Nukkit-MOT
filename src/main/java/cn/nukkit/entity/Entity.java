@@ -27,6 +27,8 @@ import cn.nukkit.item.ItemTotem;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.metadata.Metadatable;
@@ -1272,6 +1274,19 @@ public abstract class Entity extends Location implements Metadatable {
         return false;
     }
 
+    /**
+     * Checks whether the given entity implementation class exposes a constructor that
+     * {@link #createEntity(Class, FullChunk, cn.nukkit.nbt.tag.CompoundTag, Object...)}
+     * can invoke. Public wrapper so other registries (e.g. {@code EntityManager}) can
+     * validate custom entities the same way before registration.
+     *
+     * @param clazz the entity implementation class, possibly {@code null}
+     * @return {@code true} if a {@code (FullChunk, CompoundTag)} constructor exists
+     */
+    public static boolean hasDefaultConstructor(Class<? extends Entity> clazz) {
+        return hasMatchingConstructor(clazz, 0);
+    }
+
     public static boolean isKnown(String name) {
         if (knownEntities.containsKey(name) || EntityManager.get().getDefinition(name) != null) {
             return true;
@@ -1332,6 +1347,24 @@ public abstract class Entity extends Location implements Metadatable {
         if (clazz == null) {
             return false;
         }
+
+        if (CustomEntity.class.isAssignableFrom(clazz)) {
+            MainLogger.getLogger().error("Entity \"" + name + "\" (" + clazz.getName()
+                    + ") implements CustomEntity and must be registered via "
+                    + "EntityManager.registerDefinition(EntityDefinition), not Entity.registerEntity. "
+                    + "Registration skipped; Nukkit-MOT cannot process this entity.",
+                    new RuntimeException("CustomEntity registered via Entity.registerEntity"));
+            return false;
+        }
+
+        if (!hasDefaultConstructor(clazz)) {
+            MainLogger.getLogger().error("Registered entity \"" + name + "\" (" + clazz.getName()
+                    + ") does not expose a (FullChunk, CompoundTag) constructor. "
+                    + "Nukkit-MOT cannot process this entity.",
+                new RuntimeException("Entity without (FullChunk, CompoundTag) constructor"));
+            return false;
+        }
+
         try {
             int networkId = clazz.getField("NETWORK_ID").getInt(null);
             knownEntities.put(String.valueOf(networkId), clazz);
@@ -1776,6 +1809,13 @@ public abstract class Entity extends Location implements Metadatable {
             }
         }
         this.setHealth(newHealth);
+        if (source.getFinalDamage() > 0) {
+            if (source.getEntity() != null) {
+                this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(source.getEntity(), new Vector3(this.x, this.y, this.z), VibrationType.ENTITY_DAMAGE));
+            } else {
+                this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y, this.z), VibrationType.ENTITY_DAMAGE));
+            }
+        }
         return true;
     }
 
@@ -2479,6 +2519,9 @@ public abstract class Entity extends Location implements Metadatable {
                     }
 
                     if (damage > 0 && (!(this instanceof Player) || level.getGameRules().getBoolean(GameRule.FALL_DAMAGE))) {
+                        if (!this.isSneaking()) {
+                            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y, this.z), VibrationType.HIT_GROUND));
+                        }
                         this.attack(new EntityDamageEvent(this, DamageCause.FALL, damage));
                     }
                 }

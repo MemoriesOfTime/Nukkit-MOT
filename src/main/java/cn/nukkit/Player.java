@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.AdventureSettings.Type;
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCampfire;
@@ -15,6 +16,7 @@ import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.data.property.EntityProperty;
+import cn.nukkit.entity.data.warden.WardenWarningData;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
@@ -58,6 +60,8 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.PunchBlockParticle;
 import cn.nukkit.level.sound.ExperienceOrbSound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.nbt.NBTIO;
@@ -66,6 +70,8 @@ import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.netease.PyRpcPacket;
+import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.session.NetworkPlayerSession;
@@ -120,6 +126,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -197,6 +204,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public long lastBreak = -1;
     private BlockVector3 lastBreakPosition = new BlockVector3();
 
+    protected final WardenWarningData wardenWarningData = new WardenWarningData();
+
+    /**
+     * Last block position (floor coords) at which a STEP/SWIM/ELYTRA_GLIDE vibration was emitted.
+     * Movement vibrations are emitted only when the player crosses into a new block (vanilla
+     * cadence), not on every movement packet.
+     */
+    private int lastMovementVibrationX = Integer.MIN_VALUE;
+    private int lastMovementVibrationY = Integer.MIN_VALUE;
+    private int lastMovementVibrationZ = Integer.MIN_VALUE;
+
     protected int windowCnt = MINIMUM_OTHER_WINDOW_ID;
 
     protected final BiMap<Inventory, Integer> windows = HashBiMap.create();
@@ -248,7 +266,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Client game version
      */
     @Getter
-    protected GameVersion gameVersion;
+    protected GameVersion gameVersion = GameVersion.getLastVersion();
     /**
      * Client RakNet protocol version
      */
@@ -782,11 +800,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return commands enabled
      */
     public boolean isEnableClientCommand() {
-        return this.enableClientCommand;
+        return this.enableClientCommand && this.protocol >= ProtocolInfo.v1_2_0;
     }
 
     public void setEnableClientCommand(boolean enable) {
         this.enableClientCommand = enable;
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            return;
+        }
         SetCommandsEnabledPacket pk = new SetCommandsEnabledPacket();
         pk.enabled = enable;
         this.dataPacket(pk);
@@ -794,6 +815,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void sendCommandData() {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            return;
+        }
         Map<String, CommandDataVersions> data = new HashMap<>();
 
         for (Command command : this.server.getCommandMap().getCommands().values()) {
@@ -1173,6 +1197,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.adventureSettings.update();
+            this.sendPotionEffects(this);
+            this.sendData(this, this.dataProperties.clone());
+            this.getLevel().sendTime(this);
+        }
+
         if (this.protocol >= ProtocolInfo.v1_21_60) {
             this.server.sendRecipeList(this);
         }
@@ -1232,6 +1263,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.spawned = true;
+
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.sendAllInventories();
+            this.inventory.sendHeldItemIfNotAir(this);
+        }
 
         PlayerJoinEvent playerJoinEvent = new PlayerJoinEvent(this,
                 new TranslationContainer(TextFormat.YELLOW + "%multiplayer.player.joined", new String[]{this.displayName})
@@ -1442,6 +1478,58 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
         } : callback), mode);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpcData(byte[] data) {
+        return this.sendPyRpcData(data, PyRpcPacket.DEFAULT_MSG_ID);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpcData(byte[] data, long msgId) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        PyRpcPacket packet = new PyRpcPacket();
+        packet.setData(data);
+        packet.setMsgId(msgId);
+        return this.dataPacket(packet);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket) {
+        return this.sendPyRpc(subPacket, PyRpcPacket.DEFAULT_MSG_ID);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket, long msgId) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createSubPacket(subPacket, msgId));
+    }
+
+    @OnlyNetEase
+    public boolean modNotifyToClient(String modName, String systemName, String eventName, Map<String, ?> eventData) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createModEventPacket(modName, systemName, eventName, eventData));
+    }
+
+    @OnlyNetEase
+    public boolean modNotifyToClientEncrypted(String modName, String systemName, String eventName,
+                                              String data, Function<String, String> encMethod) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createEncryptedModEventPacket(
+            modName, systemName, eventName, data, encMethod
+        ));
+    }
+
+    private boolean canUseNetEaseModApi() {
+        return this.gameVersion != null && this.gameVersion.isNetEase();
     }
 
     /**
@@ -2223,6 +2311,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.blocksAround = null;
                 this.collisionBlocks = null;
 
+                if (this.isGliding()) {
+                    this.tryEmitMovementVibration(VibrationType.ELYTRA_GLIDE);
+                } else if (this.isSwimming()) {
+                    if (!this.isSneaking()) {
+                        this.tryEmitMovementVibration(VibrationType.SWIM);
+                    }
+                } else if (this.isInsideOfWater() && !this.isSneaking()) {
+                    // Vanilla SWIM fires only when the entity actually swims, not when idling in
+                    // water. Require a real position change this movement packet so standing still
+                    // in water does not spam a swim vibration every block boundary.
+                    if (from.distanceSquared(to) > 1.0E-8) {
+                        this.tryEmitMovementVibration(VibrationType.SWIM);
+                    }
+                } else if (this.isOnGround()) {
+                    if (!this.isSneaking()) {
+                        this.tryEmitMovementVibration(VibrationType.STEP);
+                    }
+                }
+
                 if (!to.equals(moveEvent.getTo())) { // If plugins modify the destination
                     this.teleport(moveEvent.getTo(), null);
                 } else {
@@ -2993,6 +3100,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.foodData = new PlayerFood(this, this.namedTag.getInt("foodLevel"), this.namedTag.getFloat("foodSaturationLevel"));
 
+        // Restore warden warning state (per-player, persists across reconnect/restart)
+        this.wardenWarningData.warningLevel = this.namedTag.getInt("wardenWarningLevel");
+        this.wardenWarningData.lastWarningTick = this.namedTag.getLong("wardenLastWarningTick");
+        this.wardenWarningData.lastShriekTick = this.namedTag.getLong("wardenLastShriekTick");
+
         if (this.isSpectator()) {
             this.keepMovement = true;
             this.onGround = false;
@@ -3031,6 +3143,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.server.getPluginManager().callEvent(ev = new PlayerLoginEvent(this, "Plugin reason"));
         if (ev.isCancelled()) {
             this.close(this.getLeaveMessage(), ev.getKickMessage());
+            return;
+        }
+
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.completeLegacyLoginSequence();
             return;
         }
 
@@ -3212,6 +3329,78 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             this.server.addOnlinePlayer(this);
+        } catch (Exception e) {
+            this.close("", "Internal Server Error");
+            this.server.getLogger().logException(e);
+        }
+    }
+
+    private void completeLegacyLoginSequence() {
+        Position spawnPosition = this.getSpawn();
+
+        this.server.addOnlinePlayer(this);
+        this.loggedIn = true;
+        this.syncLoginPhase(SessionLoginPhase.LOGGED_IN);
+
+        if (this.isCreative()) {
+            this.inventory.setHeldItemSlot(0);
+        } else {
+            this.inventory.setHeldItemSlot(this.inventory.getHotbarSlotIndex(0));
+        }
+
+        if (this.isSpectator()) {
+            this.keepMovement = true;
+        }
+
+        StartGamePacket startGamePacket = new StartGamePacket();
+        startGamePacket.entityUniqueId = this.id;
+        startGamePacket.entityRuntimeId = this.id;
+        startGamePacket.playerGamemode = this.getClientFriendlyGamemode(this.gamemode);
+        startGamePacket.x = (float) this.x;
+        startGamePacket.y = (float) this.y;
+        startGamePacket.z = (float) this.z;
+        startGamePacket.yaw = (float) this.yaw;
+        startGamePacket.pitch = (float) this.pitch;
+        startGamePacket.seed = -1;
+        startGamePacket.dimension = (byte) (this.level.getDimension() & 0xff);
+        startGamePacket.worldGamemode = this.getClientFriendlyGamemode(this.gamemode);
+        startGamePacket.difficulty = this.server.getDifficulty();
+        startGamePacket.spawnX = (int) spawnPosition.x;
+        startGamePacket.spawnY = (int) spawnPosition.y;
+        startGamePacket.spawnZ = (int) spawnPosition.z;
+        startGamePacket.hasAchievementsDisabled = true;
+        startGamePacket.dayCycleStopTime = -1;
+        startGamePacket.eduMode = false;
+        startGamePacket.commandsEnabled = this.isEnableClientCommand();
+        startGamePacket.gameRules = this.getLevel().getGameRules();
+        startGamePacket.levelId = "";
+        startGamePacket.worldName = this.getServer().getNetwork().getName();
+        startGamePacket.version = this.getLoginChainData().getGameVersion();
+        startGamePacket.vanillaVersion = Utils.getVersionByProtocol(this.protocol);
+        this.forceDataPacket(startGamePacket, null);
+
+        this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logIn",
+                TextFormat.AQUA + this.username + TextFormat.WHITE,
+                this.getAddress(),
+                String.valueOf(this.getPort()),
+                this.protocol + " (" + this.gameVersion.toString() + ")"));
+
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
+        this.setDataProperty(new ByteEntityData(DATA_ALWAYS_SHOW_NAMETAG, 1), false);
+
+        try {
+            this.getLevel().sendTime(this);
+            this.sendAttributes();
+            this.inventory.sendCreativeContents();
+            this.server.sendFullPlayerListData(this);
+
+            if (this.isOp() || this.hasPermission("nukkit.textcolor")) {
+                this.setRemoveFormat(false);
+            }
+
+            this.forceMovement = this.getLocation();
+            this.teleportPosition = this.getLocation();
         } catch (Exception e) {
             this.close("", "Internal Server Error");
             this.server.getLogger().logException(e);
@@ -3970,11 +4159,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.stopSleep();
                         break;
                     case PlayerActionPacket.ACTION_RESPAWN:
-                        if (!this.spawned || this.isAlive() || !this.isOnline()) {
-                            break;
-                        }
-
-                        this.respawn();
+                        this.handleRespawnRequest();
                         break;
                     case PlayerActionPacket.ACTION_JUMP:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput()) break;
@@ -5221,6 +5406,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                             this.inventory.addItem(new ItemGlassBottle());
                                         }
 
+                                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0, this.getEyeHeight()), VibrationType.DRINK));
+
                                         if (potion != null) {
                                             potion.applyPotion(this);
                                         }
@@ -5234,6 +5421,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         Food food = Food.getByRelative(itemInHand);
                                         if (food != null && food.eatenBy(this)) {
                                             this.getInventory().decreaseCount(this.getInventory().getHeldItemIndex());
+                                            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0, this.getEyeHeight()), VibrationType.EAT));
                                         }
                                     }
                                     return;
@@ -5834,7 +6022,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
                 if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
-                    pk.message = TextFormat.clean(reason);
+                    pk.message = TextFormat.clean(TextFormat.colorize(reason));
                 } else {
                     pk.message = reason;
                 }
@@ -6004,6 +6192,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             });
             this.namedTag.putList(fogIdentifiers);
             this.namedTag.putList(userProvidedFogIds);
+
+            this.namedTag.putInt("wardenWarningLevel", this.wardenWarningData.warningLevel);
+            this.namedTag.putLong("wardenLastWarningTick", this.wardenWarningData.lastWarningTick);
+            this.namedTag.putLong("wardenLastShriekTick", this.wardenWarningData.lastShriekTick);
 
             if (!this.username.isEmpty() && this.namedTag != null) {
                 if (this.server.savePlayerDataByUuid) {
@@ -6260,6 +6452,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.dataPacket(healthPk);
             }
         }
+    }
+
+    protected boolean handleRespawnRequest() {
+        if (!this.spawned || this.isAlive() || !this.isOnline()) {
+            return false;
+        }
+
+        this.respawn();
+        return true;
     }
 
     protected void respawn() {
@@ -6746,6 +6947,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.setSwimming(false);
             this.setCrawling(false);
+
+            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, from.clone(), VibrationType.TELEPORT));
 
             this.stopFishing(false);
             return true;
@@ -8384,5 +8587,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         DebugDrawerPacket packet = new DebugDrawerPacket();
         packet.shapes.addAll(entries);
         this.dataPacket(packet);
+    }
+
+    /**
+     * Returns the warden-related warning data for this player.
+     *
+     * @return the warden warning data
+     */
+    public WardenWarningData getWardenWarningData() {
+        return this.wardenWarningData;
+    }
+
+    /**
+     * Emits a movement vibration (STEP/SWIM/ELYTRA_GLIDE) only when the player has entered a new
+     * block since the last emission — matching vanilla's per-block-boundary cadence instead of
+     * firing on every movement packet.
+     */
+    private void tryEmitMovementVibration(VibrationType type) {
+        int fx = this.getFloorX();
+        int fy = this.getFloorY();
+        int fz = this.getFloorZ();
+        if (fx == this.lastMovementVibrationX && fy == this.lastMovementVibrationY && fz == this.lastMovementVibrationZ) {
+            return;
+        }
+        this.lastMovementVibrationX = fx;
+        this.lastMovementVibrationY = fy;
+        this.lastMovementVibrationZ = fz;
+        this.level.getVibrationManager().callVibrationEvent(
+                new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), type));
     }
 }

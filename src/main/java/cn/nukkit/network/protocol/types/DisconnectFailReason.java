@@ -142,5 +142,81 @@ public enum DisconnectFailReason {
      * @since v827
      */
     NETHER_NET_DATA_CHANNEL_CLOSED,
+    /**
+     * @since v859
+     */
+    DISCOVERY_ENVIRONMENT_MISMATCH,
+    /**
+     * @since v859
+     */
+    HOST_WITHOUT_KEYS,
+    /**
+     * @since v924
+     */
+    HOST_SIGNED_OUT,
+    /**
+     * @since v924
+     */
+    SCRIPT_WATCHDOG_EXCEPTION,
+    /**
+     * @since v924
+     */
+    SCRIPT_MEMORY_LIMIT_EXCEEDED,
+    /**
+     * @since v924
+     */
+    STORAGE_LOW_DURING_GAMEPLAY,
+    /**
+     * @since v924
+     */
+    STORAGE_FULL_DURING_GAMEPLAY,
+    /**
+     * @since v924
+     */
+    LEVEL_STORAGE_CORRUPTION,
+    /**
+     * @since v924
+     */
+    EDITION_MISMATCH_VANILLA_TO_EDU,
+    /**
+     * @since v924
+     */
+    EDITION_MISMATCH_EDU_TO_VANILLA,
+    /**
+     * @since v924
+     */
+    EDITOR_MISMATCH_EDITOR_TO_VANILLA,
+    /**
+     * @since v924
+     */
+    EDITOR_MISMATCH_VANILLA_TO_EDITOR,
+    /**
+     * @since v924
+     */
+    DENY_LISTED,
+    /**
+     * @since v975
+     */
+    NONCE_MISSING,
+    /**
+     * @since v975
+     */
+    NONCE_NOT_FOUND,
+    /**
+     * @since v975
+     */
+    NONCE_EXPIRED,
+    /**
+     * @since v975
+     */
+    NONCE_NOT_VALID,
+    /**
+     * @since v1001
+     */
+    HOST_DISCONNECTED,
+    /**
+     * @since v1001
+     */
+    EDITOR_JOIN_INTENT_POLICY_FAILURE,
 }
 

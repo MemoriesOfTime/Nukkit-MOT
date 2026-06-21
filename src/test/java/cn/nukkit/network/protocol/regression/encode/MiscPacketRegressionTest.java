@@ -1,28 +1,99 @@
 package cn.nukkit.network.protocol.regression.encode;
 
 import cn.nukkit.MockServer;
+import cn.nukkit.Player;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.CompressionProvider;
+import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.MovementEffectType;
 import cn.nukkit.network.protocol.types.ServerAuthMovementMode;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
+import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
 
+    private static final int LEGACY_PROTOCOL_113 = ProtocolInfo.v1_1_0;
+    private static final String LEGACY_113_MOVE_PLAYER_HEX =
+            "0B0000A03F00008042000020C0000048410000624200000A42000163";
+    private static final String LEGACY_113_START_GAME_HEX =
+            "0102060000A03F00008142000070C0000028410000A241540204080A14400F0101000000803E0000003F01000008776F726C642D696405526574726F00";
+    private static final String LEGACY_113_CONTAINER_SET_CONTENT_HEX = "000B0000";
+    private static final java.util.UUID LEGACY_PLAYER_LIST_UUID =
+            java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static Network network;
+
     @BeforeAll
     static void setUp() {
         MockServer.init();
+        network = new Network(MockServer.get());
+        org.mockito.Mockito.lenient().when(MockServer.get().getNetwork()).thenReturn(network);
+    }
+
+    @Test
+    void testLegacy113LoginPacketBatchDecodesWhenPlayerProtocolUnknown() {
+        Player player = org.mockito.Mockito.mock(Player.class);
+        player.protocol = Integer.MAX_VALUE;
+
+        byte[] skinBytes = new byte[64 * 32 * 4];
+        java.util.UUID clientUuid = java.util.UUID.fromString("12345678-1234-5678-9abc-def012345678");
+        byte[] batchPayload = buildLegacy113LoginBatch("TestUser", clientUuid, 12345L, skinBytes);
+
+        var packets = new ArrayList<DataPacket>();
+        assertTrue(network.processBatch(batchPayload, packets, CompressionProvider.NONE, 7, player));
+        assertEquals(1, packets.size());
+        assertInstanceOf(LoginPacket.class, packets.get(0));
+
+        LoginPacket loginPacket = (LoginPacket) packets.get(0);
+        assertEquals(ProtocolInfo.v1_1_0, loginPacket.getProtocol());
+        assertEquals("TestUser", loginPacket.username);
+        assertEquals(clientUuid, loginPacket.clientUUID);
+        assertEquals(12345L, loginPacket.clientId);
+        assertNotNull(loginPacket.skin);
+        assertEquals("legacy-skin", loginPacket.skin.getSkinId());
+        assertEquals(64, loginPacket.skin.getSkinData().width);
+        assertEquals(32, loginPacket.skin.getSkinData().height);
+    }
+
+    @Test
+    void testLegacy137LoginPacketBatchDecodesWhenPlayerProtocolUnknown() {
+        Player player = org.mockito.Mockito.mock(Player.class);
+        player.protocol = Integer.MAX_VALUE;
+
+        byte[] skinBytes = new byte[64 * 32 * 4];
+        java.util.UUID clientUuid = java.util.UUID.fromString("87654321-4321-8765-cba9-876543210fed");
+        byte[] batchPayload = buildLegacy137LoginBatch("TestUser137", clientUuid, 54321L, skinBytes);
+
+        var packets = new ArrayList<DataPacket>();
+        assertTrue(network.processBatch(batchPayload, packets, CompressionProvider.NONE, 8, player));
+        assertEquals(1, packets.size());
+        assertInstanceOf(LoginPacket.class, packets.get(0));
+
+        LoginPacket loginPacket = (LoginPacket) packets.get(0);
+        assertEquals(ProtocolInfo.v1_2_0, loginPacket.getProtocol());
+        assertEquals("TestUser137", loginPacket.username);
+        assertEquals(clientUuid, loginPacket.clientUUID);
+        assertEquals(54321L, loginPacket.clientId);
+        assertNotNull(loginPacket.skin);
+        assertEquals("legacy137-skin", loginPacket.skin.getSkinId());
+        assertEquals(64, loginPacket.skin.getSkinData().width);
+        assertEquals(32, loginPacket.skin.getSkinData().height);
     }
 
     static Stream<Arguments> versionsFrom313to799() {
@@ -69,6 +140,202 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
 
     static Stream<Arguments> versionsFrom800() {
         return filteredVersions(800);
+    }
+
+    private static String encodeLegacy113BodyHex(DataPacket packet) {
+        packet.encode();
+        byte[] raw = packet.getBuffer();
+        return Binary.bytesToHexString(Binary.subBytes(raw, 1, raw.length - 1));
+    }
+
+    private static byte[] buildLegacy113LoginBatch(String username, java.util.UUID clientUuid, long clientId, byte[] skinBytes) {
+        String authJwt = fakeJwt("{\"extraData\":{\"displayName\":\"" + username + "\",\"identity\":\"" + clientUuid + "\"}}");
+        String authPayload = "{\"chain\":[\"" + authJwt + "\"]}";
+        String skinJwt = fakeJwt("{\"ClientRandomId\":" + clientId
+                + ",\"SkinId\":\"legacy-skin\",\"SkinData\":\""
+                + Base64.getEncoder().encodeToString(skinBytes) + "\"}");
+
+        BinaryStream loginPayload = new BinaryStream();
+        byte[] authBytes = authPayload.getBytes(StandardCharsets.UTF_8);
+        byte[] skinTokenBytes = skinJwt.getBytes(StandardCharsets.UTF_8);
+        loginPayload.putLInt(authBytes.length);
+        loginPayload.put(authBytes);
+        loginPayload.putLInt(skinTokenBytes.length);
+        loginPayload.put(skinTokenBytes);
+
+        BinaryStream loginPacket = new BinaryStream();
+        loginPacket.putInt(ProtocolInfo.v1_1_0);
+        loginPacket.putByte((byte) 0); // gameEdition
+        loginPacket.putByteArray(loginPayload.getBuffer());
+
+        BinaryStream rawPacket = new BinaryStream();
+        rawPacket.putByte(LoginPacket.NETWORK_ID);
+        rawPacket.put(loginPacket.getBuffer());
+
+        BinaryStream batch = new BinaryStream();
+        batch.putByteArray(rawPacket.getBuffer());
+        return batch.getBuffer();
+    }
+
+    private static byte[] buildLegacy137LoginBatch(String username, java.util.UUID clientUuid, long clientId, byte[] skinBytes) {
+        String authJwt = fakeJwt("{\"extraData\":{\"displayName\":\"" + username + "\",\"identity\":\"" + clientUuid + "\"}}");
+        String authPayload = "{\"chain\":[\"" + authJwt + "\"]}";
+        String skinJwt = fakeJwt("{\"ClientRandomId\":" + clientId
+                + ",\"SkinId\":\"legacy137-skin\",\"SkinData\":\""
+                + Base64.getEncoder().encodeToString(skinBytes) + "\"}");
+
+        BinaryStream loginPayload = new BinaryStream();
+        byte[] authBytes = authPayload.getBytes(StandardCharsets.UTF_8);
+        byte[] skinTokenBytes = skinJwt.getBytes(StandardCharsets.UTF_8);
+        loginPayload.putLInt(authBytes.length);
+        loginPayload.put(authBytes);
+        loginPayload.putLInt(skinTokenBytes.length);
+        loginPayload.put(skinTokenBytes);
+
+        BinaryStream loginPacket = new BinaryStream();
+        loginPacket.putInt(ProtocolInfo.v1_2_0);
+        loginPacket.putByteArray(loginPayload.getBuffer());
+
+        BinaryStream rawPacket = new BinaryStream();
+        rawPacket.putByte(LoginPacket.NETWORK_ID);
+        rawPacket.putShort(0);
+        rawPacket.put(loginPacket.getBuffer());
+
+        BinaryStream batch = new BinaryStream();
+        batch.putByteArray(rawPacket.getBuffer());
+        return batch.getBuffer();
+    }
+
+    private static String fakeJwt(String payloadJson) {
+        return encodeBase64("{}") + "." + encodeBase64(payloadJson) + ".signature";
+    }
+
+    private static String encodeBase64(String value) {
+        return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void testMovePlayerPacketLegacy113MatchesGenisysProHex() {
+        var nukkitPacket = new MovePlayerPacket();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.eid = 11;
+        nukkitPacket.x = 1.25f;
+        nukkitPacket.y = 64.0f;
+        nukkitPacket.z = -2.5f;
+        nukkitPacket.pitch = 12.5f;
+        nukkitPacket.yaw = 56.5f;
+        nukkitPacket.headYaw = 34.5f;
+        nukkitPacket.mode = MovePlayerPacket.MODE_NORMAL;
+        nukkitPacket.onGround = true;
+        nukkitPacket.ridingEid = 99;
+
+        assertEquals(LEGACY_113_MOVE_PLAYER_HEX, encodeLegacy113BodyHex(nukkitPacket));
+    }
+
+    @Test
+    void testMovePlayerPacketLegacy113DecodesGenisysProHex() {
+        var nukkitPacket = new MovePlayerPacket();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.setBuffer(Binary.hexStringToBytes(LEGACY_113_MOVE_PLAYER_HEX));
+        nukkitPacket.decode();
+
+        assertEquals(11, nukkitPacket.eid);
+        assertEquals(1.25f, nukkitPacket.x);
+        assertEquals(64.0f, nukkitPacket.y);
+        assertEquals(-2.5f, nukkitPacket.z);
+        assertEquals(12.5f, nukkitPacket.pitch);
+        assertEquals(56.5f, nukkitPacket.yaw);
+        assertEquals(34.5f, nukkitPacket.headYaw);
+        assertEquals(MovePlayerPacket.MODE_NORMAL, nukkitPacket.mode);
+        assertTrue(nukkitPacket.onGround);
+        assertEquals(99, nukkitPacket.ridingEid);
+    }
+
+    @Test
+    void testStartGamePacketLegacy113MatchesGenisysProHex() {
+        var nukkitPacket = new StartGamePacket();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.entityUniqueId = 1;
+        nukkitPacket.entityRuntimeId = 2;
+        nukkitPacket.playerGamemode = 3;
+        nukkitPacket.x = 1.25f;
+        nukkitPacket.y = 64.5f;
+        nukkitPacket.z = -3.75f;
+        nukkitPacket.pitch = 10.5f;
+        nukkitPacket.yaw = 20.25f;
+        nukkitPacket.seed = 42;
+        nukkitPacket.dimension = 1;
+        nukkitPacket.generator = 2;
+        nukkitPacket.worldGamemode = 4;
+        nukkitPacket.difficulty = 5;
+        nukkitPacket.spawnX = 10;
+        nukkitPacket.spawnY = 64;
+        nukkitPacket.spawnZ = -8;
+        nukkitPacket.hasAchievementsDisabled = true;
+        nukkitPacket.dayCycleStopTime = -1;
+        nukkitPacket.eduMode = false;
+        nukkitPacket.rainLevel = 0.25f;
+        nukkitPacket.lightningLevel = 0.5f;
+        nukkitPacket.commandsEnabled = true;
+        nukkitPacket.isTexturePacksRequired = false;
+        nukkitPacket.gameRules = new GameRules();
+        nukkitPacket.levelId = "world-id";
+        nukkitPacket.worldName = "Retro";
+        nukkitPacket.premiumWorldTemplateId = "";
+
+        assertEquals(LEGACY_113_START_GAME_HEX, encodeLegacy113BodyHex(nukkitPacket));
+    }
+
+    @Test
+    void testContainerSetContentPacketLegacy113MatchesGenisysProEntityIdEncoding() {
+        var nukkitPacket = new ContainerSetContentPacket_v113();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.windowid = ContainerSetContentPacket_v113.SPECIAL_INVENTORY;
+        nukkitPacket.eid = 11;
+        nukkitPacket.slots = cn.nukkit.item.Item.EMPTY_ARRAY;
+        nukkitPacket.hotbar = new int[0];
+
+        assertEquals(LEGACY_113_CONTAINER_SET_CONTENT_HEX, encodeLegacy113BodyHex(nukkitPacket));
+    }
+
+    @Test
+    void testContainerSetContentPacketLegacy113DecodesLegacyEntityIdEncoding() {
+        var nukkitPacket = new ContainerSetContentPacket_v113();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.setBuffer(Binary.hexStringToBytes(LEGACY_113_CONTAINER_SET_CONTENT_HEX));
+        nukkitPacket.decode();
+
+        assertEquals(ContainerSetContentPacket_v113.SPECIAL_INVENTORY, nukkitPacket.windowid);
+        assertEquals(11, nukkitPacket.eid);
+        assertEquals(0, nukkitPacket.slots.length);
+        assertEquals(0, nukkitPacket.hotbar.length);
+    }
+
+    @Test
+    void testPlayerListPacketLegacy113UsesLegacyEntityIdEncoding() {
+        var nukkitPacket = new PlayerListPacket();
+        nukkitPacket.protocol = LEGACY_PROTOCOL_113;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(LEGACY_PROTOCOL_113, false);
+        nukkitPacket.type = PlayerListPacket.TYPE_ADD;
+        nukkitPacket.entries = new PlayerListPacket.Entry[]{
+                new PlayerListPacket.Entry(LEGACY_PLAYER_LIST_UUID, 11, "Tester", cn.nukkit.entity.data.Skin.NO_PERSONA_SKIN)
+        };
+
+        String bodyHex = encodeLegacy113BodyHex(nukkitPacket);
+        // Pre-v223 (v1_2_13) does not write UUID.
+        // The encoding starts with: type(ADD=0x00) + count(1=0x01) + entityId + name + skin...
+        // Verify type and count are correct, and the name "Tester" appears in the encoded output.
+        assertTrue(bodyHex.startsWith("0001"), "type and count should be ADD=00, count=01, got: " + bodyHex.substring(0, Math.min(20, bodyHex.length())));
+        // Name "Tester" as UTF-8 hex should be present in the output
+        assertTrue(bodyHex.contains("546573746572"), "name 'Tester' hex should appear");
+        // Skin id "Standard_Custom" should be present
+        assertTrue(bodyHex.contains("5374616E646172645F437573746F6D"), "skin id 'Standard_Custom' hex should appear");
+        assertTrue(bodyHex.contains("546573746572"), "name 'Tester' should be in output: " + bodyHex.substring(0, 100));
     }
 
     @ParameterizedTest(name = "GameRulesChangedPacket v{0}")
@@ -498,7 +765,8 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
         stream.getUnsignedVarInt();
 
         assertEquals(17, stream.getVarInt());
-        var decodedTag = stream.getTagNetworkLE();
+        // LevelEventGenericPacket writes a headerless (no root type id / name) NBT value.
+        var decodedTag = stream.getTagValueNetworkLE();
         assertEquals("test", decodedTag.getString("name"));
         assertEquals(7, decodedTag.getInt("value"));
         assertEquals(0, stream.readableBytes());

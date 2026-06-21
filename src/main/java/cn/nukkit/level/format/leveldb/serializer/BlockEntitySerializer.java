@@ -45,15 +45,10 @@ public class BlockEntitySerializer {
     }
 
     public static void saveBlockEntities(WriteBatch db, LevelDBChunk chunk) {
-        byte[] key = LevelDBKey.BLOCK_ENTITIES.getKey(
-                chunk.getX(),
-                chunk.getZ(),
-                chunk.getProvider().getLevel().getDimension()
-        );
 
-        Collection<BlockEntity> entities = chunk.getBlockEntities().values();
-
-        if (entities.isEmpty()) {
+        byte[] key = LevelDBKey.BLOCK_ENTITIES.getKey(chunk.getX(), chunk.getZ(), chunk.getProvider().getLevel().getDimension());
+        Collection<CompoundTag> unknownTiles = chunk.getUnknownTiles();
+        if (chunk.getBlockEntities().isEmpty() && unknownTiles.isEmpty()) {
             db.delete(key);
             return;
         }
@@ -67,11 +62,12 @@ public class BlockEntitySerializer {
                     NBTIO.write(blockEntity.namedTag, baos, LEVELDB_ORDER, false);
                 }
             }
-
-            byte[] value = baos.toByteArray();
-
-            db.put(key, value);
-
+            // Round-trip tiles that could not be constructed (unknown/modded types) verbatim so
+            // their data is preserved instead of being deleted on save.
+            for (CompoundTag unknown : unknownTiles) {
+                NBTIO.write(unknown, stream, ByteOrder.LITTLE_ENDIAN);
+            }
+            value = stream.toByteArray();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

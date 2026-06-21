@@ -12,8 +12,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
-import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
+import cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -22,12 +22,12 @@ import org.jetbrains.annotations.NotNull;
  * @author LT_Name
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<ContainerSetSlotPacketV113> {
+public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<ContainerSetSlotPacket_v113> {
     
     public static final ContainerSetSlotProcessor_v113 INSTANCE = new ContainerSetSlotProcessor_v113();
 
     @Override
-    public void handle(@NotNull PlayerHandle playerHandle, @NotNull ContainerSetSlotPacketV113 pk) {
+    public void handle(@NotNull PlayerHandle playerHandle, @NotNull ContainerSetSlotPacket_v113 pk) {
         Player player = playerHandle.player;
         if (!player.spawned || !player.isAlive()) {
             return;
@@ -51,7 +51,7 @@ public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<Containe
                 }
             }
             transaction = new SlotChangeAction(inv, pk.slot, inv.getItem(pk.slot), pk.item);
-        } else if (pk.windowid == ContainerSetContentPacketV113.SPECIAL_ARMOR) { //Our armor
+        } else if (pk.windowid == ContainerSetContentPacket_v113.SPECIAL_ARMOR) { //Our armor
             inv = player.getInventory();
             if (pk.slot >= 4) {
                 return;
@@ -147,12 +147,12 @@ public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<Containe
 
     @Override
     public int getPacketId() {
-        return ProtocolInfo.toNewProtocolID(ContainerSetContentPacketV113.NETWORK_ID);
+        return ProtocolInfo.toNewProtocolID(ContainerSetContentPacket_v113.NETWORK_ID);
     }
 
     @Override
     public Class<? extends DataPacket> getPacketClass() {
-        return ContainerSetSlotPacketV113.class;
+        return ContainerSetSlotPacket_v113.class;
     }
 
     @Override

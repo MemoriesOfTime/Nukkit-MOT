@@ -9,6 +9,8 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.Sound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
@@ -369,6 +371,8 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
         }
 
         this.level.setBlockDataAt(down.getFloorX(), down.getFloorY(), down.getFloorZ(), down.getDamage() ^ 0x04);
+        boolean open = ((down.getDamage() ^ 0x04) & DOOR_OPEN_BIT) > 0;
+        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player != null ? player : this, this.add(0.5, 0.5, 0.5), open ? VibrationType.BLOCK_OPEN : VibrationType.BLOCK_CLOSE));
         this.playOpenCloseSound();
         return true;
     }

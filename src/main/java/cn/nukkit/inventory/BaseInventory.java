@@ -13,8 +13,8 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
-import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
+import cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 
@@ -256,7 +256,7 @@ public abstract class BaseInventory implements Inventory {
             this.setItem(slot, item);
         }
     }
-    
+
     @Override
     public boolean canAddItem(Item item) {
         int count = item.getCount();
@@ -455,11 +455,31 @@ public abstract class BaseInventory implements Inventory {
     @Override
     public void onOpen(Player who) {
         this.viewers.add(who);
+        if (isContainerVibrationSource() && this.holder instanceof cn.nukkit.level.Position pos) {
+            who.getLevel().getVibrationManager().callVibrationEvent(
+                    new cn.nukkit.level.vibration.VibrationEvent(who, pos.add(0.5, 0.5, 0.5), cn.nukkit.level.vibration.VibrationType.CONTAINER_OPEN));
+        }
     }
 
     @Override
     public void onClose(Player who) {
         this.viewers.remove(who);
+        if (isContainerVibrationSource() && this.holder instanceof cn.nukkit.level.Position pos) {
+            who.getLevel().getVibrationManager().callVibrationEvent(
+                    new cn.nukkit.level.vibration.VibrationEvent(who, pos.add(0.5, 0.5, 0.5), cn.nukkit.level.vibration.VibrationType.CONTAINER_CLOSE));
+        }
+    }
+
+    /**
+     * Whether opening/closing this inventory emits a vibration (genuine container types only).
+     */
+    protected boolean isContainerVibrationSource() {
+        return switch (this.type) {
+            case CHEST, ENDER_CHEST, DOUBLE_CHEST, FURNACE, BLAST_FURNACE, SMOKER, BREWING_STAND,
+                    DISPENSER, DROPPER, HOPPER, SHULKER_BOX, BARREL, CRAFTER,
+                    MINECART_CHEST, MINECART_HOPPER, CHEST_BOAT -> true;
+            default -> false;
+        };
     }
 
     @Override
@@ -483,7 +503,7 @@ public abstract class BaseInventory implements Inventory {
         }
 
         if (Server.getInstance().minimumProtocol <= ProtocolInfo.v1_1_0) {
-            ContainerSetContentPacketV113 pk2 = new ContainerSetContentPacketV113();
+            ContainerSetContentPacket_v113 pk2 = new ContainerSetContentPacket_v113();
             pk2.slots = pk.slots.clone();
             for (Player player : players) {
                 if (player.protocol > ProtocolInfo.v1_1_0) {
@@ -585,7 +605,7 @@ public abstract class BaseInventory implements Inventory {
             pk.inventoryId = id;
             player.dataPacket(pk);
         } else {
-            ContainerSetSlotPacketV113 pk = new ContainerSetSlotPacketV113();
+            ContainerSetSlotPacket_v113 pk = new ContainerSetSlotPacket_v113();
             pk.slot = index;
             pk.item = this.getItem(index).clone();
             int id = player.getWindowId(this);
@@ -604,7 +624,7 @@ public abstract class BaseInventory implements Inventory {
         pk.slot = index;
         pk.item = this.getItem(index).clone();
 
-        ContainerSetSlotPacketV113 pk2 = new ContainerSetSlotPacketV113();
+        ContainerSetSlotPacket_v113 pk2 = new ContainerSetSlotPacket_v113();
         pk2.slot = index;
         pk2.item = pk.item.clone();
 

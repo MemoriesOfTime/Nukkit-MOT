@@ -4,6 +4,7 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockEntityHolder;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
@@ -25,10 +26,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -61,6 +59,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     protected short[] heightMap;
 
     protected List<CompoundTag> NBTtiles;
+
+    /**
+     * Raw NBT of tiles that failed to construct at load time (unregistered/unknown id, or a
+     * constructor that threw). Retained verbatim and round-tripped on save so foreign/modded
+     * tile data is not silently destroyed. Keyed by the same packed local index as {@link #tileList}.
+     */
+    protected Long2ObjectNonBlockingMap<CompoundTag> unknownTiles;
 
     protected List<CompoundTag> NBTentities;
 
@@ -134,6 +139,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         chunk.tileList = null;
         chunk.NBTentities = null;
         chunk.NBTtiles = null;
+        chunk.unknownTiles = null;
         chunk.extraData = null;
         return chunk;
     }
@@ -205,7 +211,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                         }
                         BlockEntity blockEntity = BlockEntity.createBlockEntity(nbt.getString("id").replaceFirst("BlockEntity", ""), this, nbt);
                         if (blockEntity == null) {
-                            changed = true;
+                            // Valid id and coordinates, but the tile type could not be built
+                            // (unregistered/unknown type such as a modded or custom tile, or a
+                            // constructor that threw). Retain the raw NBT so it is round-tripped on
+                            // save instead of being permanently deleted. Do NOT set changed=true:
+                            // force-marking the chunk dirty here is exactly what turned a transient
+                            // load failure into permanent, irreversible data loss.
+                            this.retainUnknownTile(nbt);
                         }
                     }
                 }
@@ -545,8 +557,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         this.tiles.put(blockEntity.getId(), blockEntity);
         int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
         int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
+        if (this.unknownTiles != null) {
+            this.unknownTiles.remove(index); // a real tile now occupies this slot
+        }
         var existing = this.tileList.put(index, blockEntity);
-        if (existing != null && !existing.equals(blockEntity)) {
+        if (existing != null && existing != blockEntity) {
             this.tiles.remove(existing.getId());
             existing.onReplacedWith(blockEntity);
             existing.close();
@@ -588,6 +603,57 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public Map<Long, BlockEntity> getBlockEntities() {
         return tiles == null ? Collections.emptyMap() : tiles;
+    }
+
+    /**
+     * Raw NBT of tiles whose type could not be constructed at load time, kept verbatim so the
+     * data survives a load/save round-trip instead of being silently deleted. Consumed by the
+     * disk chunk serializers only; never sent to clients.
+     */
+    public Collection<CompoundTag> getUnknownTiles() {
+        return this.unknownTiles == null ? Collections.emptyList() : this.unknownTiles.values();
+    }
+
+    /**
+     * Retain a tile NBT that could not be turned into a {@link BlockEntity} (unknown/unregistered
+     * type or failing constructor) so it is preserved on the next save rather than deleted.
+     */
+    private void retainUnknownTile(CompoundTag nbt) {
+        if (this.getProvider() == null) {
+            return;
+        }
+        int index = ((nbt.getInt("z") & 0x0f) << 16) | ((nbt.getInt("x") & 0x0f) << 12)
+                | (nbt.getInt("y") - this.getProvider().getMinBlockY());
+        if (this.tileList != null && this.tileList.get(index) != null) {
+            return; // a successfully-constructed tile already occupies this slot
+        }
+        if (this.unknownTiles == null) {
+            this.unknownTiles = new Long2ObjectNonBlockingMap<>();
+        }
+        this.unknownTiles.put(index, nbt);
+    }
+
+    /**
+     * Drop a retained unknown-tile NBT (see {@link #retainUnknownTile}) once the block at this
+     * position can no longer host a block entity — e.g. it was broken to air or replaced with a
+     * non-tile block such as stone. Without this, a removed/replaced modded tile would be
+     * resurrected from {@link #unknownTiles} on the next save. Coordinates are chunk-local
+     * (x, z in 0..15; y absolute).
+     */
+    protected void removeInvalidUnknownTile(int x, int y, int z) {
+        if (this.unknownTiles == null || this.getProvider() == null) {
+            return;
+        }
+        int index = ((z & 0x0f) << 16) | ((x & 0x0f) << 12) | (y - this.getProvider().getMinBlockY());
+        if (!this.unknownTiles.containsKey(index)) {
+            return;
+        }
+        // Keep it while the slot can still legitimately hold a block entity: the matching tile may
+        // simply not be constructed yet, and a real tile placed later is deduplicated by
+        // addBlockEntity(). Only drop it when the current block clearly cannot host one.
+        if (!(Block.get(this.getBlockId(x, y, z)) instanceof BlockEntityHolder)) {
+            this.unknownTiles.remove(index);
+        }
     }
 
     @Override
