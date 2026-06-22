@@ -5316,6 +5316,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 Enchantment[] enchantments = item.getEnchantments();
 
                                 float itemDamage = item.getAttackDamage(this);
+                                float maceFallDistance = item.isMace() ? (float) (this.highestPosition - this.y) : 0f;
                                 for (Enchantment enchantment : enchantments) {
                                     itemDamage += enchantment.getDamageBonus(target, this);
                                 }
@@ -5345,6 +5346,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                                 for (Enchantment enchantment : item.getEnchantments()) {
                                     enchantment.doPostAttack(this, target);
+                                }
+
+                                if (item instanceof ItemMace mace) {
+                                    mace.onPostAttack(this, target, maceFallDistance, itemDamage);
                                 }
 
                                 if (item.isTool() && !this.isCreative()) {
