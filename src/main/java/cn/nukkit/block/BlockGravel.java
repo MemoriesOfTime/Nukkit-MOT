@@ -40,15 +40,15 @@ public class BlockGravel extends BlockFallable {
 
     @Override
     public Item[] getDrops(Item item) {
-        if (Utils.random.nextInt(9) == 0 && !item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
-            return new Item[]{
-                    new ItemFlint()
-            };
-        } else {
-            return new Item[]{
-                    toItem()
-            };
+        if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
+            return new Item[]{toItem()};
         }
+        int fortuneLevel = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
+        int divisor = Math.max(1, 10 - fortuneLevel * 3);
+        if (Utils.random.nextInt(divisor) == 0) {
+            return new Item[]{new ItemFlint()};
+        }
+        return new Item[]{toItem()};
     }
 
     @Override
