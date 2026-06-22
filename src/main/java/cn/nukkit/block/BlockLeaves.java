@@ -10,10 +10,10 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
-import cn.nukkit.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author Angelic47
@@ -108,6 +108,7 @@ public class BlockLeaves extends BlockTransparentMeta {
                 return new Item[]{this.toItem()};
             }
             int fortune = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
+            ThreadLocalRandom random = ThreadLocalRandom.current();
             int appleOdds;
             int stickOdds;
             int saplingOdds;
@@ -134,17 +135,17 @@ public class BlockLeaves extends BlockTransparentMeta {
                     saplingOdds = isJungle ? 24 : 10;
                 }
             }
-            if (this.canDropApple() && Utils.random.nextInt(appleOdds) == 0) {
+            if (this.canDropApple() && random.nextInt(appleOdds) == 0) {
                 return new Item[]{
                         Item.get(Item.APPLE)
                 };
             }
-            if (Utils.random.nextInt(stickOdds) == 0) {
+            if (random.nextInt(stickOdds) == 0) {
                 return new Item[]{
-                        Item.get(Item.STICK, 0, Utils.random.nextInt(1, 3))
+                        Item.get(Item.STICK, 0, random.nextInt(1, 3))
                 };
             }
-            if (Utils.random.nextInt(saplingOdds) == 0) {
+            if (random.nextInt(saplingOdds) == 0) {
                 return new Item[]{
                         this.getSapling()
                 };

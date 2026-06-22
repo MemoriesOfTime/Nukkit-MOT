@@ -5,7 +5,8 @@ import cn.nukkit.item.ItemFlint;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.utils.BlockColor;
-import cn.nukkit.utils.Utils;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author MagicDroidX
@@ -45,7 +46,7 @@ public class BlockGravel extends BlockFallable {
         }
         int fortuneLevel = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
         int divisor = Math.max(1, 10 - fortuneLevel * 3);
-        if (Utils.random.nextInt(divisor) == 0) {
+        if (ThreadLocalRandom.current().nextInt(divisor) == 0) {
             return new Item[]{new ItemFlint()};
         }
         return new Item[]{toItem()};
