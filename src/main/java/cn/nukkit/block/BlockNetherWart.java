@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemNetherWart;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
@@ -81,8 +82,13 @@ public class BlockNetherWart extends BlockFlowable {
     @Override
     public Item[] getDrops(Item item) {
         if (this.getDamage() == 0x03) {
+            int count = 2 + Utils.random.nextInt(3);
+            int fortuneLevel = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
+            if (fortuneLevel > 0) {
+                count += Utils.random.nextInt(fortuneLevel + 1);
+            }
             return new Item[]{
-                    new ItemNetherWart(0, 2 + (int) (Math.random() * (3)))
+                    new ItemNetherWart(0, count)
             };
         } else {
             return new Item[]{

@@ -9,6 +9,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemSweetBerries;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.Sound;
@@ -97,6 +98,10 @@ public class BlockSweetBerryBush extends BlockFlowable {
         }
 
         int amount = age - 1 + ThreadLocalRandom.current().nextInt(2);
+        int fortuneLevel = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
+        if (fortuneLevel > 0) {
+            amount += ThreadLocalRandom.current().nextInt(fortuneLevel + 1);
+        }
 
         BlockHarvestEvent event = new BlockHarvestEvent(this, new BlockSweetBerryBush(1), new Item[]{new ItemSweetBerries(0, amount)});
         event.call();
@@ -179,6 +184,10 @@ public class BlockSweetBerryBush extends BlockFlowable {
         int amount = 0;
         if(age > 1) {
             amount = age - 1 + ThreadLocalRandom.current().nextInt(2);
+            int fortuneLevel = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
+            if (fortuneLevel > 0) {
+                amount += ThreadLocalRandom.current().nextInt(fortuneLevel + 1);
+            }
         }
 
         return new Item[]{ new ItemSweetBerries(0, amount) };
