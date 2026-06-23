@@ -1633,6 +1633,9 @@ public abstract class Entity extends Location implements Metadatable {
 
     public void sendPotionEffects(Player player) {
         for (Effect effect : this.effects.values()) {
+            if (!player.canReceiveEffectPacket(effect.getId())) {
+                continue;
+            }
             MobEffectPacket pk = new MobEffectPacket();
             pk.eid = this.id;
             pk.effectId = effect.getId();
