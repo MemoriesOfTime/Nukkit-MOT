@@ -149,11 +149,11 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
     }
 
     public boolean hasHorseArmor() {
-        return !this.horseArmor.isNull();
+        return this.horseArmor != null && !this.horseArmor.isNull();
     }
 
     public Item getHorseArmor() {
-        return this.horseArmor;
+        return this.horseArmor == null ? Item.AIR_ITEM : this.horseArmor;
     }
 
     public void setHorseArmor(Item armor) {
