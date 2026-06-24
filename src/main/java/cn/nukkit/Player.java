@@ -1897,6 +1897,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.gamemode == ADVENTURE;
     }
 
+    /**
+     * Whether this player's client can render a {@code MobEffectPacket} for the
+     * given effect id without crashing. Effects are still applied server-side
+     * regardless of this value; it only gates whether the packet is sent.
+     * <p>
+     * Wind Charged / Weaving / Oozing / Infested were introduced in 1.21.0
+     * (protocol v685); sending them to older clients crashes the client.
+     *
+     * @param effectId effect id to check
+     * @return whether the player's client can receive a packet for this effect
+     */
+    public boolean canReceiveEffectPacket(int effectId) {
+        if (this.protocol < ProtocolInfo.v1_21_0) {
+            return effectId != Effect.WIND_CHARGED
+                    && effectId != Effect.WEAVING
+                    && effectId != Effect.OOZING
+                    && effectId != Effect.INFESTED;
+        }
+        return true;
+    }
+
     @Override
     public Item[] getDrops() {
         if (!this.isCreative() && !this.isSpectator()) {
