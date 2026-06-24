@@ -1,7 +1,10 @@
 package cn.nukkit.item.customitem;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.item.*;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemDurable;
+import cn.nukkit.item.StringItem;
+import cn.nukkit.item.StringItemToolBase;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
@@ -63,6 +66,10 @@ public abstract class ItemCustomTool extends StringItemToolBase implements ItemD
 
     @Override
     public int getMaxDurability() {
+        //构建期间回退 super 以避免 getDefinitionNbt() → getDefinition() → build() 递归（见 CustomItemDefinition.BUILDING）。
+        if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
+            return super.getMaxDurability();
+        }
         return this.getDefinitionNbt()
                 .getCompound("components")
                 .getCompound("minecraft:durability")
@@ -71,6 +78,9 @@ public abstract class ItemCustomTool extends StringItemToolBase implements ItemD
 
     @Override
     public int getTier() {
+        if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
+            return super.getTier();
+        }
         return this.getDefinitionNbt()
                 .getCompound("components")
                 .getCompound("item_properties")
@@ -79,6 +89,9 @@ public abstract class ItemCustomTool extends StringItemToolBase implements ItemD
 
     @Override
     public int getAttackDamage() {
+        if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
+            return super.getAttackDamage();
+        }
         return this.getDefinitionNbt()
                 .getCompound("components")
                 .getCompound("item_properties")
@@ -87,31 +100,49 @@ public abstract class ItemCustomTool extends StringItemToolBase implements ItemD
 
     @Override
     public boolean isPickaxe() {
+        if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
+            return super.isPickaxe();
+        }
         return hasItemTag("minecraft:is_pickaxe");
     }
 
     @Override
     public boolean isAxe() {
+        if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
+            return super.isAxe();
+        }
         return hasItemTag("minecraft:is_axe");
     }
 
     @Override
     public boolean isShovel() {
+        if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
+            return super.isShovel();
+        }
         return hasItemTag("minecraft:is_shovel");
     }
 
     @Override
     public boolean isHoe() {
+        if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
+            return super.isHoe();
+        }
         return hasItemTag("minecraft:is_hoe");
     }
 
     @Override
     public boolean isShears() {
+        if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
+            return super.isShears();
+        }
         return hasItemTag("minecraft:is_shears");
     }
 
     @Override
     public boolean isSword() {
+        if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
+            return super.isSword();
+        }
         //剑无 item_tag，通过 enchantable_slot 判定
         //Swords have no item tag, so determine via enchantable_slot
         String slot = this.getDefinitionNbt()

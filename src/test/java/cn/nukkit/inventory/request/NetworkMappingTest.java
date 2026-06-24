@@ -29,15 +29,52 @@ class NetworkMappingTest {
     }
 
     @Test
-    void levelEntityResolvesToTopWindow() {
+    void levelEntityResolvesToRealTopWindow() {
         Player player = Mockito.mock(Player.class);
+        // A real level/entity container (chest/hopper/...) is not a PlayerUIComponent,
+        // so LEVEL_ENTITY returns the open window without a stricter type check.
         Inventory topWindow = Mockito.mock(Inventory.class);
 
         Mockito.when(player.getTopWindow()).thenReturn(Optional.of(topWindow));
-
-        // LEVEL_ENTITY is a catch-all (chest/hopper/dispenser/...) and intentionally
-        // returns the open window without a type check.
         assertSame(topWindow, NetworkMapping.getInventory(player, ContainerSlotType.LEVEL_ENTITY, null));
+    }
+
+    @Test
+    void levelEntityRejectsFakeBlockUiWindows() {
+        Player player = Mockito.mock(Player.class);
+
+        // FakeBlockUIComponent windows (anvil/stonecutter/enchant/beacon/...) live on
+        // PlayerUIInventory at an offset and only return a subset of slots on close.
+        // LEVEL_ENTITY must not identity-map to them, or a malicious SAI request could
+        // touch UI slots never returned on close (item loss). Each has its own typed branch.
+        AnvilInventory anvil = Mockito.mock(AnvilInventory.class);
+        Mockito.when(anvil.getFakeBlockType()).thenReturn(InventoryType.ANVIL);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(anvil));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.LEVEL_ENTITY, null));
+
+        StonecutterInventory stonecutter = Mockito.mock(StonecutterInventory.class);
+        Mockito.when(stonecutter.getFakeBlockType()).thenReturn(InventoryType.STONECUTTER);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(stonecutter));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.LEVEL_ENTITY, null));
+
+        EnchantInventory enchant = Mockito.mock(EnchantInventory.class);
+        Mockito.when(enchant.getFakeBlockType()).thenReturn(InventoryType.ENCHANT_TABLE);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(enchant));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.LEVEL_ENTITY, null));
+
+        BeaconInventory beacon = Mockito.mock(BeaconInventory.class);
+        Mockito.when(beacon.getFakeBlockType()).thenReturn(InventoryType.BEACON);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(beacon));
+        assertNull(NetworkMapping.getInventory(player, ContainerSlotType.LEVEL_ENTITY, null));
+    }
+
+    @Test
+    void levelEntityRejectsRealContainerInventory() {
+        // ContainerInventory subclasses (chest/hopper/...) are real containers and must still resolve through LEVEL_ENTITY.
+        Player player = Mockito.mock(Player.class);
+        BarrelInventory barrel = Mockito.mock(BarrelInventory.class);
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.of(barrel));
+        assertSame(barrel, NetworkMapping.getInventory(player, ContainerSlotType.LEVEL_ENTITY, null));
     }
 
     @Test

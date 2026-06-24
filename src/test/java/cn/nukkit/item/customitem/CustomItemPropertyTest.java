@@ -374,6 +374,60 @@ class CustomItemPropertyTest {
                 "shears with no blocks should not write minecraft:digger");
     }
 
+    // ===== 旧式覆写契约回归测试 =====
+    //旧插件不调用 builder setter，仅覆写 Item 方法（isHelmet/getArmorPoints/...、isPickaxe/getTier/...）声明属性；
+    //build() 须写入这些覆写值且不因 getDefinitionNbt() 递归抛 StackOverflowError。
+
+    @Test
+    void legacyOverrideArmorWritesOverrideValuesAndIsEquippable() {
+        LegacyOverrideArmor chest = new LegacyOverrideArmor("test:legacy_armor", "Legacy Armor");
+        //build() 不得递归
+        assertDoesNotThrow(chest::getDefinition);
+        CompoundTag nbt = chest.getDefinition().getNbt();
+        assertEquals(7, nbt.getCompound("components").getCompound("minecraft:wearable").getInt("protection"));
+        assertEquals(3, nbt.getCompound("components").getCompound("minecraft:wearable").getInt("toughness"));
+        assertEquals(ItemArmor.TIER_DIAMOND, nbt.getCompound("components").getCompound("item_properties").getInt("tier"));
+        assertEquals(363, nbt.getCompound("components").getCompound("minecraft:durability").getInt("max_durability"));
+        //slot 由 isChestplate() 覆写推断
+        assertEquals("slot.armor.chest", nbt.getCompound("components").getCompound("minecraft:wearable").getString("slot"));
+        assertEquals("armor_torso", nbt.getCompound("components").getCompound("item_properties").getString("enchantable_slot"));
+        //服务端读回
+        assertTrue(chest.isChestplate());
+        assertFalse(chest.isHelmet());
+        assertEquals(7, chest.getArmorPoints());
+        assertEquals(3, chest.getToughness());
+        assertEquals(ItemArmor.TIER_DIAMOND, chest.getTier());
+        assertEquals(363, chest.getMaxDurability());
+        //附魔能力分派于 tier，DIAMOND(6) -> 10
+        assertEquals(10, chest.getEnchantAbility());
+    }
+
+    @Test
+    void legacyOverrideToolWritesOverrideValuesAndToolType() {
+        LegacyOverrideTool pick = new LegacyOverrideTool("test:legacy_tool", "Legacy Tool");
+        //build() 不得递归
+        assertDoesNotThrow(pick::getDefinition);
+        CompoundTag nbt = pick.getDefinition().getNbt();
+        assertEquals(9, nbt.getCompound("components").getCompound("item_properties").getInt("damage"));
+        assertEquals(ItemTool.TIER_DIAMOND, nbt.getCompound("components").getCompound("item_properties").getInt("tier"));
+        assertEquals(1234, nbt.getCompound("components").getCompound("minecraft:durability").getInt("max_durability"));
+        //isPickaxe() 覆写 → toolType 回退 → 写入 item_tag / enchantable_slot / 可挖掘方块
+        assertTrue(nbt.getCompound("components").contains("item_tags"));
+        boolean found = false;
+        for (var tag : nbt.getCompound("components").getList("item_tags").getAll()) {
+            if ("minecraft:is_pickaxe".equals(tag.parseValue())) { found = true; break; }
+        }
+        assertTrue(found, "isPickaxe() override should cause minecraft:is_pickaxe tag to be written");
+        assertEquals("pickaxe", nbt.getCompound("components").getCompound("item_properties").getString("enchantable_slot"));
+        assertTrue(nbt.getCompound("components").contains("minecraft:digger"),
+                "isPickaxe() override should cause digger blocks to be written");
+        //服务端读回
+        assertTrue(pick.isPickaxe());
+        assertEquals(9, pick.getAttackDamage());
+        assertEquals(ItemTool.TIER_DIAMOND, pick.getTier());
+        assertEquals(1234, pick.getMaxDurability());
+    }
+
     // ===== 测试用自定义物品 =====
 
     private static final class CustomArmor extends ItemCustomArmor {
@@ -513,6 +567,79 @@ class CustomItemPropertyTest {
                     .toolType(toolType)
                     .tier(tier)
                     .build();
+        }
+    }
+
+    /** 旧式覆写契约盔甲：不调用 builder setter，仅覆写 Item/ItemArmor 方法，build() 须从中读取写入 NBT。 */
+    private static final class LegacyOverrideArmor extends ItemCustomArmor {
+        LegacyOverrideArmor(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            return CustomItemDefinition
+                    .armorBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .build();
+        }
+
+        @Override
+        public boolean isChestplate() {
+            return true;
+        }
+
+        @Override
+        public int getArmorPoints() {
+            return 7;
+        }
+
+        @Override
+        public int getToughness() {
+            return 3;
+        }
+
+        @Override
+        public int getTier() {
+            return ItemArmor.TIER_DIAMOND;
+        }
+
+        @Override
+        public int getMaxDurability() {
+            return 363;
+        }
+    }
+
+    /** 旧式覆写契约工具：不设 toolType/attackDamage/...，仅覆写 Item 方法，isPickaxe() 须触发工具类型回退。 */
+    private static final class LegacyOverrideTool extends ItemCustomTool {
+        LegacyOverrideTool(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            return CustomItemDefinition
+                    .toolBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .build();
+        }
+
+        @Override
+        public boolean isPickaxe() {
+            return true;
+        }
+
+        @Override
+        public int getAttackDamage() {
+            return 9;
+        }
+
+        @Override
+        public int getTier() {
+            return ItemTool.TIER_DIAMOND;
+        }
+
+        @Override
+        public int getMaxDurability() {
+            return 1234;
         }
     }
 }

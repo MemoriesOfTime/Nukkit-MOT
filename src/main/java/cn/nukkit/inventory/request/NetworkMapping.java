@@ -77,9 +77,10 @@ public final class NetworkMapping {
             case SHULKER_BOX -> typedContainer(topWindow, ShulkerBoxInventory.class);
             case BARREL -> typedContainer(topWindow, BarrelInventory.class);
             case CRAFTER_BLOCK_CONTAINER -> typedContainer(topWindow, CrafterInventory.class);
-            // LEVEL_ENTITY 是 chest/hopper/dispenser/dropper/ender chest 等多种
-            // 方块实体容器的共用泛化槽类型，无法精确校验窗口类型，保留返回 topWindow。
-            case LEVEL_ENTITY -> topWindow;
+            // LEVEL_ENTITY 是多种方块实体容器的共用泛化槽类型，无法精确校验窗口类型。
+            // 但须拒绝 PlayerUIComponent（铁砧/切石机/附魔台等 FakeBlockUI 及合成格/光标）：
+            // 它们按偏移读写槽位且关闭时只回收部分槽，身份映射会被恶意 SAI 请求利用造成物品丢失。
+            case LEVEL_ENTITY -> topWindow instanceof PlayerUIComponent ? null : topWindow;
             case DYNAMIC_CONTAINER -> resolveDynamicContainer(player, dynamicId);
             default -> null;
         };

@@ -59,6 +59,35 @@ public class CustomItemDefinition {
     private static final ConcurrentHashMap<String, Integer> INTERNAL_ALLOCATION_ID_MAP = new ConcurrentHashMap<>();
     private static final AtomicInteger nextRuntimeId = new AtomicInteger(10000);
 
+    /**
+     * 当前线程正在构建中的物品标识符集合，用于打破 build() 递归：ItemCustom* 的覆写从
+     * getDefinitionNbt() 读属性，而 build() 早于注册会经 resolveDefinition() → getDefinition()
+     * 重入 build()；构建期间覆写检测到自身在此集合即回退 super，既断开递归又保留旧契约。
+     * <p>
+     * Thread-local set of identifiers currently being built, used to break build() recursion:
+     * ItemCustom* overrides read from getDefinitionNbt(), but build() runs before registration and
+     * resolveDefinition() → getDefinition() re-enters it; while building, overrides fall back to super,
+     * breaking the cycle while preserving the legacy contract.
+     */
+    private static final ThreadLocal<Set<String>> BUILDING = ThreadLocal.withInitial(HashSet::new);
+
+    /**
+     * 当前线程是否正在构建给定标识符的自定义物品定义。
+     * <p>
+     * Whether the current thread is currently building the definition for the given identifier.
+     */
+    public static boolean isBuilding(@NotNull String identifier) {
+        return BUILDING.get().contains(identifier);
+    }
+
+    private static void beginBuild(@NotNull String identifier) {
+        BUILDING.get().add(identifier);
+    }
+
+    private static void endBuild(@NotNull String identifier) {
+        BUILDING.get().remove(identifier);
+    }
+
     private final String identifier;
     private final CompoundTag nbt; //649
     private final CompoundTag nbt465;
@@ -444,7 +473,13 @@ public class CustomItemDefinition {
         }
 
         public CustomItemDefinition build() {
-            return calculateID();
+            //构建期间标记：使 ItemCustom* 覆写回退 super 以避免 NBT 递归（见 BUILDING）。
+            beginBuild(this.identifier);
+            try {
+                return calculateID();
+            } finally {
+                endBuild(this.identifier);
+            }
         }
 
         protected CustomItemDefinition calculateID() {
@@ -758,12 +793,24 @@ public class CustomItemDefinition {
 
         @Override
         public CustomItemDefinition build() {
-            //附加耐久 攻击伤害 tier 信息。
-            //注意：不能用 item.getXxx() 作为 fallback，因为 ItemCustomTool 的覆写会调用 getDefinitionNbt()
-            //→ getDefinition() → build()，造成无限递归。未设置时使用基类默认值。
-            int resolvedDurability = this.maxDurability != null ? this.maxDurability : ItemTool.DURABILITY_WOODEN;
-            int resolvedDamage = this.attackDamage != null ? this.attackDamage : 1;
-            int resolvedTier = this.tier != null ? this.tier : 0;
+            //标记正在构建：使 ItemCustomTool 覆写（getAttackDamage/getTier/...）回退 super，
+            //避免 getDefinitionNbt() → getDefinition() → build() 递归（见 BUILDING）。
+            beginBuild(this.identifier);
+            try {
+                return doBuild();
+            } finally {
+                endBuild(this.identifier);
+            }
+        }
+
+        private CustomItemDefinition doBuild() {
+            //fallback 走 item.getXxx()：构建期间覆写已回退 super（见 BUILDING），可安全调用并继承插件覆写值。
+            int resolvedDamage = this.attackDamage != null ? this.attackDamage : item.getAttackDamage();
+            int resolvedTier = this.tier != null ? this.tier : item.getTier();
+            //耐久 fallback：super 链回基类返回 -1 时用 DURABILITY_WOODEN 作下限，避免负耐久。
+            int itemDurability = item.getMaxDurability();
+            int resolvedDurability = this.maxDurability != null ? this.maxDurability
+                    : (itemDurability > 0 ? itemDurability : ItemTool.DURABILITY_WOODEN);
             this.nbt.getCompound("components")
                     .putCompound("minecraft:durability", new CompoundTag().putInt("max_durability", resolvedDurability))
                     .getCompound("item_properties")
@@ -783,16 +830,14 @@ public class CustomItemDefinition {
                     default -> 1;  // TIER_COPPER(4) 等
                 };
             }
-            //确定工具类型：仅使用显式设置的 toolType。避免调用 item.isPickaxe() 等实例方法，
-            //因为这些方法现在从本 NBT 读取，构造期调用会造成无限递归。
-            //模组作者应通过 toolType(ToolType) 显式指定工具类型。
+            //工具类型：优先显式 toolType，否则回退 item.isPickaxe() 等（构建期已回退 super，见 BUILDING）。
             Identifier type = null;
-            boolean isPickaxe = this.toolType == ToolType.PICKAXE;
-            boolean isAxe = this.toolType == ToolType.AXE;
-            boolean isShovel = this.toolType == ToolType.SHOVEL;
-            boolean isHoe = this.toolType == ToolType.HOE;
-            boolean isSword = this.toolType == ToolType.SWORD;
-            boolean isShears = this.toolType == ToolType.SHEARS;
+            boolean isPickaxe = this.toolType == ToolType.PICKAXE || (this.toolType == null && item.isPickaxe());
+            boolean isAxe = this.toolType == ToolType.AXE || (this.toolType == null && item.isAxe() && !isPickaxe);
+            boolean isShovel = this.toolType == ToolType.SHOVEL || (this.toolType == null && item.isShovel() && !isPickaxe && !isAxe);
+            boolean isHoe = this.toolType == ToolType.HOE || (this.toolType == null && item.isHoe() && !isPickaxe && !isAxe && !isShovel);
+            boolean isSword = this.toolType == ToolType.SWORD || (this.toolType == null && item.isSword() && !isPickaxe && !isAxe && !isShovel && !isHoe);
+            boolean isShears = this.toolType == ToolType.SHEARS || (this.toolType == null && item.isShears() && !isPickaxe && !isAxe && !isShovel && !isHoe && !isSword);
             if (isPickaxe) {
                 //添加可挖掘方块Tags
                 this.blockTags.addAll(List.of("'stone'", "'metal'", "'diamond_pick_diggable'", "'mob_spawner'", "'rail'", "'slab_block'", "'stair_block'", "'smooth stone slab'", "'sandstone slab'", "'cobblestone slab'", "'brick slab'", "'stone bricks slab'", "'quartz slab'", "'nether brick slab'", "'glazed terracotta'", "coral"));
@@ -1010,12 +1055,25 @@ public class CustomItemDefinition {
 
         @Override
         public CustomItemDefinition build() {
-            //注意：不能用 item.getXxx() 作为 fallback，因为 ItemCustomArmor 的覆写会调用 getDefinitionNbt()
-            //→ getDefinition() → build()，造成无限递归。未设置时使用默认值。
-            int resolvedProtection = this.armorPoints != null ? this.armorPoints : 0;
-            int resolvedToughness = this.toughness != null ? this.toughness : 0;
-            int resolvedTier = this.tier != null ? this.tier : 0;
-            int resolvedDurability = this.maxDurability != null ? this.maxDurability : DURABILITY_DEFAULT;
+            //标记正在构建：使 ItemCustomArmor 覆写（getArmorPoints/getTier/...）回退 super，
+            //避免 getDefinitionNbt() → getDefinition() → build() 递归（见 BUILDING）。
+            beginBuild(this.identifier);
+            try {
+                return doBuild();
+            } finally {
+                endBuild(this.identifier);
+            }
+        }
+
+        private CustomItemDefinition doBuild() {
+            //fallback 走 item.getXxx()：构建期间覆写已回退 super（见 BUILDING），可安全调用并继承插件覆写值。
+            int resolvedProtection = this.armorPoints != null ? this.armorPoints : item.getArmorPoints();
+            int resolvedToughness = this.toughness != null ? this.toughness : item.getToughness();
+            int resolvedTier = this.tier != null ? this.tier : item.getTier();
+            //耐久 fallback：super 链回基类返回 -1 时用 DURABILITY_DEFAULT 作下限，避免护甲被秒毁。
+            int itemDurability = item.getMaxDurability();
+            int resolvedDurability = this.maxDurability != null ? this.maxDurability
+                    : (itemDurability > 0 ? itemDurability : DURABILITY_DEFAULT);
             this.nbt.getCompound("components")
                     .putCompound("minecraft:durability", new CompoundTag()
                             .putInt("max_durability", resolvedDurability))
@@ -1025,10 +1083,19 @@ public class CustomItemDefinition {
                     .getCompound("item_properties")
                     .putInt("tier", resolvedTier)
                     .putInt("enchantable_value", tierToArmorEnchantAbility(resolvedTier));
-            //确定槽位：仅使用显式设置的 slot。避免调用 item.isHelmet() 等实例方法，
-            //因为这些方法现在从本 NBT 读取，构造期调用会造成无限递归。
-            //模组作者应通过 slot(ArmorSlot) 显式指定装备槽位。
+            //槽位：优先显式 slot，否则回退 item.isHelmet()/isChestplate()/...（构建期已回退 super，见 BUILDING）。
             ArmorSlot resolvedSlot = this.slot;
+            if (resolvedSlot == null) {
+                if (item.isHelmet()) {
+                    resolvedSlot = ArmorSlot.HEAD;
+                } else if (item.isChestplate()) {
+                    resolvedSlot = ArmorSlot.CHEST;
+                } else if (item.isLeggings()) {
+                    resolvedSlot = ArmorSlot.LEGS;
+                } else if (item.isBoots()) {
+                    resolvedSlot = ArmorSlot.FEET;
+                }
+            }
             if (resolvedSlot != null) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", resolvedSlot.getEnchantableSlot());
