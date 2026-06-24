@@ -1,8 +1,8 @@
 package cn.nukkit;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -138,8 +138,16 @@ public final class MockServer {
 
     /**
      * Reset Mock Server state (for use between tests).
+     * <p>
+     * Also restores {@code Server.instance} in case another test class cleared
+     * it via reflection (e.g. {@code @AfterAll} hooks that set the field to
+     * {@code null}). The static initializer only runs once per JVM, so without
+     * this guarantee a test that runs after such a class would see a null
+     * instance and crash in code that calls {@code Server.getInstance()}
+     * (notably the {@code Player} constructor).
      */
     public static void reset() {
+        ensureInstance();
         if (mockInstance != null) {
             Mockito.reset(mockInstance);
             setupDefaults(mockInstance);
