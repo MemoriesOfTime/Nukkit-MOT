@@ -2416,9 +2416,6 @@ public class Server {
 
         if (this.isLevelLoaded(name)) {
             return true;
-        } else if (!this.isLevelGenerated(name)) {
-            log.warn(this.baseLang.translateString("nukkit.level.notFound", name));
-            return false;
         }
 
         String path;
@@ -2427,6 +2424,12 @@ public class Server {
             path = name;
         } else {
             path = this.dataPath + "worlds/" + name + '/';
+        }
+
+        if (!this.isLevelGenerated(name)) {
+            log.warn(this.baseLang.translateString("nukkit.level.notFound", name));
+            log.warn(this.baseLang.translateString("nukkit.level.notFoundHint", new String[]{path, diagnoseLevelPath(path)}));
+            return false;
         }
 
         Class<? extends LevelProvider> provider = LevelProviderManager.getProvider(path);
@@ -2452,6 +2455,29 @@ public class Server {
 
         this.pluginManager.callEvent(new LevelLoadEvent(level));
         return true;
+    }
+
+    /**
+     * Explain why a level directory was rejected by the providers, so the
+     * "not found" warning points at the concrete cause (missing dir, missing
+     * level.dat, missing data folder, or unrecognized region files).
+     */
+    private static String diagnoseLevelPath(String path) {
+        File dir = new File(path);
+        if (!dir.exists() || !dir.isDirectory()) {
+            return "directory does not exist";
+        }
+        if (!new File(dir, "level.dat").exists()) {
+            return "missing level.dat";
+        }
+        if (new File(dir, "db").isDirectory()) {
+            return "leveldb folder present but provider rejected it";
+        }
+        File region = new File(dir, "region");
+        if (!region.isDirectory()) {
+            return "missing db/ or region/ data folder";
+        }
+        return "region folder present but no valid .mca files";
     }
 
     /**
