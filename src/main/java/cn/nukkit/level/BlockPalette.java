@@ -350,7 +350,7 @@ public class BlockPalette {
     }
 
     private void logMissingRuntimeIdMapping(String message, Object... args) {
-        if (this.gameVersion == GameVersion.getLastVersion() || this.gameVersion == GameVersion.V1_21_93_NETEASE) {
+        if (this.gameVersion == GameVersion.getLastVersion() || this.gameVersion == GameVersion.V1_21_93_NETEASE || this.gameVersion == GameVersion.V1_21_124_NETEASE) {
             log.info(message, args);
             return;
         }
