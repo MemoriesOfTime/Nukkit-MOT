@@ -28,10 +28,9 @@ public class PluginClassLoader extends URLClassLoader {
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         if (name.startsWith("com.nimbusds.jose.shaded.")) {
             Server.getInstance().getLogger().warning(
-                    "Plugin code loaded server-internal shaded class '" + name + "'. " +
-                            "com.nimbusds.jose.shaded is an internal compatibility shim (not public API), " +
-                            "and may break without notice on upgrades. Migrate to the server-bundled " +
-                            "Gson (com.google.gson.Gson) instead.");
+                    "Plugin attempted to load removed class '" + name + "'. " +
+                            "com.nimbusds.jose.shaded has been removed from the server. " +
+                            "Migrate to the server-bundled Gson (com.google.gson.Gson) instead.");
         }
         return super.loadClass(name, resolve);
     }
