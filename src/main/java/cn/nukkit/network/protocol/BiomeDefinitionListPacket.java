@@ -168,8 +168,8 @@ public class BiomeDefinitionListPacket extends DataPacket {
                     Utils.loadJsonResource("biome/stripped_biome_definitions_844.json"),
                     new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
             );
-            pk.protocol = ProtocolInfo.v1_21_110;
-            pk.gameVersion = GameVersion.V1_21_110;
+            pk.protocol = ProtocolInfo.v1_21_111;
+            pk.gameVersion = GameVersion.V1_21_111;
             pk.tryEncode();
             CACHED_PACKET = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
@@ -275,7 +275,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
         this.putLFloat(definition.getTemperature());
         this.putLFloat(definition.getDownfall());
-        if (protocol >= GameVersion.V1_21_110.getProtocol()) {
+        if (protocol >= GameVersion.V1_21_111.getProtocol()) {
             this.putLFloat(definition.getFoliageSnow());
         } else {
             this.putLFloat(definition.getRedSporeDensity());
@@ -307,7 +307,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
         this.putOptionalNull(definitionChunkGen.getSurfaceMaterialAdjustment(),
                 (surfaceMaterialAdjustment) -> this.putSurfaceMaterialAdjustment(surfaceMaterialAdjustment, strings));
         this.putOptionalNull(definitionChunkGen.getSurfaceMaterial(), this::putSurfaceMaterial);
-        if (protocol >= ProtocolInfo.v1_21_110) {
+        if (protocol >= ProtocolInfo.v1_21_111) {
             this.putBoolean(definitionChunkGen.isHasDefaultOverworldSurface());
         }
         this.putBoolean(definitionChunkGen.isHasSwampSurface());
