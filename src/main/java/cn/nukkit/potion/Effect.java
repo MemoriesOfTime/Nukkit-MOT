@@ -276,20 +276,22 @@ public class Effect implements Cloneable {
 
         if (entity instanceof EntityLiving entityLiving) {
             if (entity instanceof Player player) {
-                MobEffectPacket pk = new MobEffectPacket();
-                pk.eid = entity.getId();
-                pk.effectId = this.getId();
-                pk.amplifier = this.getAmplifier();
-                pk.particles = this.isVisible();
-                pk.duration = this.getDuration();
-                pk.tick = player.getServer().getTick();
-                if (oldEffect != null) {
-                    pk.eventId = MobEffectPacket.EVENT_MODIFY;
-                } else {
-                    pk.eventId = MobEffectPacket.EVENT_ADD;
-                }
+                if (player.canReceiveEffectPacket(this.getId())) {
+                    MobEffectPacket pk = new MobEffectPacket();
+                    pk.eid = entity.getId();
+                    pk.effectId = this.getId();
+                    pk.amplifier = this.getAmplifier();
+                    pk.particles = this.isVisible();
+                    pk.duration = this.getDuration();
+                    pk.tick = player.getServer().getTick();
+                    if (oldEffect != null) {
+                        pk.eventId = MobEffectPacket.EVENT_MODIFY;
+                    } else {
+                        pk.eventId = MobEffectPacket.EVENT_ADD;
+                    }
 
-                player.dataPacket(pk);
+                    player.dataPacket(pk);
+                }
             }
 
             if (this.id == Effect.SPEED) {
@@ -326,14 +328,15 @@ public class Effect implements Cloneable {
 
         if (entity instanceof EntityLiving entityLiving) {
             if (entityLiving instanceof Player player) {
-                MobEffectPacket pk = new MobEffectPacket();
-                pk.eid = player.getId();
-                pk.effectId = this.getId();
-                pk.eventId = MobEffectPacket.EVENT_REMOVE;
-                pk.tick = player.getServer().getTick();
+                if (player.canReceiveEffectPacket(this.getId())) {
+                    MobEffectPacket pk = new MobEffectPacket();
+                    pk.eid = player.getId();
+                    pk.effectId = this.getId();
+                    pk.eventId = MobEffectPacket.EVENT_REMOVE;
+                    pk.tick = player.getServer().getTick();
 
-                player.dataPacket(pk);
-
+                    player.dataPacket(pk);
+                }
             }
             if (this.id == Effect.SPEED) {
                 entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED);

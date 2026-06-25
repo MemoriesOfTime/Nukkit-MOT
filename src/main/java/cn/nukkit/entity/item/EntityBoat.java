@@ -5,7 +5,6 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockWater;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.utils.CollisionHelper;
 import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.FloatEntityData;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
@@ -26,6 +25,7 @@ import cn.nukkit.network.protocol.AnimatePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.SetEntityLinkPacket;
 import cn.nukkit.network.protocol.SetEntityMotionPacket;
+import cn.nukkit.utils.CollisionHelper;
 
 import java.util.ArrayList;
 
@@ -180,6 +180,8 @@ public class EntityBoat extends EntityVehicle {
             }
         }
 
+        this.move(this.motionX, this.motionY, this.motionZ);
+
         Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
         Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
 
@@ -188,8 +190,6 @@ public class EntityBoat extends EntityVehicle {
         if (!from.equals(to)) {
             this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
         }
-
-        this.move(this.motionX, this.motionY, this.motionZ);
 
         if (this.age % 5 == 0) {
             if (!this.passengers.isEmpty() && this.passengers.get(0) instanceof Player) {

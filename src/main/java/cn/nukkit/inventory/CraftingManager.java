@@ -977,7 +977,7 @@ public class CraftingManager {
             return packet859;
         } else if (protocol >= GameVersion.V1_21_110_26.getProtocol()) {
             if (packet844 == null) {
-                packet844 = packetFor(GameVersion.V1_21_110);
+                packet844 = packetFor(GameVersion.V1_21_111);
             }
             return packet844;
         } else if (protocol >= GameVersion.V1_21_100.getProtocol()) {
