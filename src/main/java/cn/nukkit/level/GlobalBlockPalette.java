@@ -95,7 +95,7 @@ public class GlobalBlockPalette {
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_80, GameVersion.V1_21_80);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_90, GameVersion.V1_21_90);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_100, GameVersion.V1_21_100);
-        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_110_26, GameVersion.V1_21_110);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_110_26, GameVersion.V1_21_111);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_10, GameVersion.V1_26_10);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_20_26, GameVersion.V1_26_20);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_30, GameVersion.V1_26_30);

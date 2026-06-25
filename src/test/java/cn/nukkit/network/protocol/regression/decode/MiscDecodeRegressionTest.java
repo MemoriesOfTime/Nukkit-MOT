@@ -108,7 +108,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
     }
 
     static Stream<Arguments> versionsFrom407PreV844() {
-        return filteredVersionsRange(ProtocolInfo.v1_16_0, ProtocolInfo.v1_21_110);
+        return filteredVersionsRange(ProtocolInfo.v1_16_0, ProtocolInfo.v1_21_111);
     }
 
     static Stream<Arguments> versionsFrom486() {
