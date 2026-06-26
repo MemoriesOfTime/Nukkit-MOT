@@ -300,7 +300,7 @@ public class RuntimeItemMapping {
                 if (Server.getInstance().enableExperimentMode && protocolId >= ProtocolInfo.v1_16_100) {
                     paletteBuffer.putString(entry.getIdentifier());
                     paletteBuffer.putLShort(entry.getRuntimeId());
-                    var def = Item.getCustomItemDefinition().get(entry.getIdentifier());
+                    var def = Item.getCustomItemDefinition(entry.getIdentifier());
                     paletteBuffer.putBoolean(def != null && def.isComponentBased());
                 }
             } else {

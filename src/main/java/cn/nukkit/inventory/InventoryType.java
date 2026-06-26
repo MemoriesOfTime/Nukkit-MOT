@@ -37,6 +37,8 @@ public enum InventoryType {
     SMITHING_TABLE(3, "Smithing Table", 33),
     GRINDSTONE(3, "Grindstone", 26),
     STONECUTTER(2, "Stonecutter", 29),
+    CARTOGRAPHY(2, "Cartography Table", 30),
+    HORSE(17, "Horse", 12), //1 SADDLE, 1 ARMOR, up to 15 CHEST
     CRAFTER(9, "Crafter", 36),
     COMMAND_BLOCK(0, "Command Block", 16);
 

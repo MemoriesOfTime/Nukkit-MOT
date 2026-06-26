@@ -170,6 +170,16 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         return Stream.of(Arguments.of(ProtocolInfo.v1_21_30));
     }
 
+    static Stream<Arguments> versionsForCraftResultsDeprecatedItemInstance() {
+        return Stream.of(
+                Arguments.of(ProtocolInfo.v1_16_220),
+                Arguments.of(ProtocolInfo.v1_17_40),
+                Arguments.of(ProtocolInfo.v1_18_10),
+                Arguments.of(ProtocolInfo.v1_21_30),
+                Arguments.of(ProtocolInfo.CURRENT_PROTOCOL)
+        );
+    }
+
     static Stream<Arguments> versionsFrom818() {
         return filteredVersions(818);
     }
@@ -3153,6 +3163,46 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(nk.getCount(), nk.getOffset(), "ItemStackRequestPacket decode should consume the full payload");
     }
 
+    @ParameterizedTest(name = "ItemStackRequestPacket v{0} craft results use item instance")
+    @MethodSource("versionsForCraftResultsDeprecatedItemInstance")
+    void itemStackRequestCraftResultsDeprecatedUsesItemInstance(int protocol) {
+        var gameVersion = GameVersion.byProtocol(protocol, false);
+        int runtimeId = cn.nukkit.item.RuntimeItems.getMapping(gameVersion)
+                .toRuntime(cn.nukkit.item.Item.DIAMOND_SWORD, 0)
+                .getRuntimeId();
+
+        ItemStackRequestPacket nk = decodeRawItemStackRequestPacket(protocol, stream -> {
+            stream.putUnsignedVarInt(1);
+            stream.putVarInt(91);
+            stream.putUnsignedVarInt(1);
+
+            stream.putByte((byte) craftResultsDeprecatedActionId(protocol));
+            stream.putUnsignedVarInt(1);
+            writeItemInstance(stream, runtimeId, 1, 0, 0);
+            stream.putByte((byte) 1);
+
+            if (protocol >= ProtocolInfo.v1_16_200) {
+                stream.putUnsignedVarInt(0);
+            }
+            if (protocol >= ProtocolInfo.v1_19_30) {
+                stream.putLInt(-1);
+            }
+        });
+
+        assertEquals(1, nk.getRequests().size());
+        var request = nk.getRequests().get(0);
+        assertEquals(91, request.getRequestId());
+        assertEquals(1, request.getActions().length);
+        assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftResultsDeprecatedAction.class,
+                request.getActions()[0]);
+        var action = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftResultsDeprecatedAction)
+                request.getActions()[0];
+        assertEquals(1, action.getTimesCrafted());
+        assertEquals(1, action.getResultItems().length);
+        assertEquals(cn.nukkit.item.Item.DIAMOND_SWORD, action.getResultItems()[0].getId());
+        assertEquals(1, action.getResultItems()[0].getCount());
+    }
+
     @ParameterizedTest(name = "ItemStackRequestPacket pre-v554 without text origin v{0}")
     @MethodSource("versionsFrom407ToV554")
     void itemStackRequestBeforeTextProcessingOrigin(int protocol) {
@@ -3772,6 +3822,36 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         }
         stream.putByte((byte) slot);
         stream.putVarInt(stackNetworkId);
+    }
+
+    private static int craftResultsDeprecatedActionId(int protocol) {
+        if (protocol >= ProtocolInfo.v1_18_10_26) {
+            return cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType
+                    .CRAFT_RESULTS_DEPRECATED.getId();
+        }
+        if (protocol >= ProtocolInfo.v1_17_40) {
+            return 17;
+        }
+        if (protocol >= ProtocolInfo.v1_16_210) {
+            return 15;
+        }
+        if (protocol >= ProtocolInfo.v1_16_200) {
+            return 14;
+        }
+        return 13;
+    }
+
+    private static void writeItemInstance(BinaryStream stream, int runtimeId, int count, int damage, int blockRuntimeId) {
+        BinaryStream userData = new BinaryStream();
+        userData.putLShort(0);
+        userData.putLInt(0);
+        userData.putLInt(0);
+
+        stream.putVarInt(runtimeId);
+        stream.putLShort(count);
+        stream.putUnsignedVarInt(damage);
+        stream.putVarInt(blockRuntimeId);
+        stream.putByteArray(userData.getBuffer());
     }
 
     private static <T> T readField(Object instance, String fieldName, Class<T> type) {

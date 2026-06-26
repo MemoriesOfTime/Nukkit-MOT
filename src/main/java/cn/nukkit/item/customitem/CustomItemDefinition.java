@@ -3,6 +3,8 @@ package cn.nukkit.item.customitem;
 import cn.nukkit.GameVersion;
 import cn.nukkit.inventory.ItemTag;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemArmor;
+import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.customitem.data.DigProperty;
 import cn.nukkit.item.customitem.data.ItemCreativeGroup;
@@ -56,6 +58,35 @@ public class CustomItemDefinition {
 
     private static final ConcurrentHashMap<String, Integer> INTERNAL_ALLOCATION_ID_MAP = new ConcurrentHashMap<>();
     private static final AtomicInteger nextRuntimeId = new AtomicInteger(10000);
+
+    /**
+     * 当前线程正在构建中的物品标识符集合，用于打破 build() 递归：ItemCustom* 的覆写从
+     * getDefinitionNbt() 读属性，而 build() 早于注册会经 resolveDefinition() → getDefinition()
+     * 重入 build()；构建期间覆写检测到自身在此集合即回退 super，既断开递归又保留旧契约。
+     * <p>
+     * Thread-local set of identifiers currently being built, used to break build() recursion:
+     * ItemCustom* overrides read from getDefinitionNbt(), but build() runs before registration and
+     * resolveDefinition() → getDefinition() re-enters it; while building, overrides fall back to super,
+     * breaking the cycle while preserving the legacy contract.
+     */
+    private static final ThreadLocal<Set<String>> BUILDING = ThreadLocal.withInitial(HashSet::new);
+
+    /**
+     * 当前线程是否正在构建给定标识符的自定义物品定义。
+     * <p>
+     * Whether the current thread is currently building the definition for the given identifier.
+     */
+    public static boolean isBuilding(@NotNull String identifier) {
+        return BUILDING.get().contains(identifier);
+    }
+
+    private static void beginBuild(@NotNull String identifier) {
+        BUILDING.get().add(identifier);
+    }
+
+    private static void endBuild(@NotNull String identifier) {
+        BUILDING.get().remove(identifier);
+    }
 
     private final String identifier;
     private final CompoundTag nbt; //649
@@ -402,8 +433,10 @@ public class CustomItemDefinition {
          */
         public SimpleBuilder tag(String... tags) {
             Arrays.stream(tags).forEach(Identifier::assertValid);
-            var list = this.nbt.getCompound("components").getList("item_tags", StringTag.class);
-            if (list == null) {
+            ListTag<StringTag> list;
+            if (this.nbt.getCompound("components").contains("item_tags")) {
+                list = this.nbt.getCompound("components").getList("item_tags", StringTag.class);
+            } else {
                 list = new ListTag<>("item_tags");
                 this.nbt.getCompound("components").putList(list);
             }
@@ -440,7 +473,13 @@ public class CustomItemDefinition {
         }
 
         public CustomItemDefinition build() {
-            return calculateID();
+            //构建期间标记：使 ItemCustom* 覆写回退 super 以避免 NBT 递归（见 BUILDING）。
+            beginBuild(this.identifier);
+            try {
+                return calculateID();
+            } finally {
+                endBuild(this.identifier);
+            }
         }
 
         protected CustomItemDefinition calculateID() {
@@ -513,6 +552,10 @@ public class CustomItemDefinition {
         private final CompoundTag diggerRoot = new CompoundTag("minecraft:digger")
                 .putBoolean("use_efficiency", true)
                 .putList(new ListTag<>("destroy_speeds"));
+        private @Nullable ToolType toolType = null;
+        private @Nullable Integer attackDamage = null;
+        private @Nullable Integer maxDurability = null;
+        private @Nullable Integer tier = null;
 
         public static Map<Identifier, Map<String, DigProperty>> toolBlocks = new HashMap<>();
 
@@ -544,19 +587,15 @@ public class CustomItemDefinition {
             }
             toolBlocks.put(ItemTag.IS_HOE, hoeBlocks);
 
-            for (var name : List.of("minecraft:web", "minecraft:bamboo")) {
-                swordBlocks.put(name, new DigProperty());
-            }
+            //web 须显式写入原版 cobweb 速度 15，否则被 tier 默认值覆盖致回归；bamboo 瞬间破坏，不经 toolBreakTimeBonus0。
+            swordBlocks.put("minecraft:web", new DigProperty(new CompoundTag(), 15));
+            swordBlocks.put("minecraft:bamboo", new DigProperty());
             toolBlocks.put(ItemTag.IS_SWORD, swordBlocks);
         }
 
         private ToolBuilder(ItemCustomTool item, CreativeItemCategory creativeCategory) {
             super(item, creativeCategory);
             this.item = item;
-            this.nbt.getCompound("components")
-                    .getCompound("item_properties")
-                    .putInt("enchantable_value", item.getEnchantAbility());
-
             this.nbt.getCompound("components")
                     .getCompound("item_properties")
                     .putFloat("mining_speed", 1f)
@@ -584,6 +623,54 @@ public class CustomItemDefinition {
         }
 
         /**
+         * 指定工具类型。决定可挖掘方块、{@code enchantable_slot}、{@code item_tags}，
+         * 并使服务端的 {@code isPickaxe()/isAxe()/...} 返回 {@code true}。
+         * <p>
+         * Specifies the tool type. Determines mineable blocks, {@code enchantable_slot},
+         * {@code item_tags}, and makes server-side {@code isPickaxe()/isAxe()/...} return {@code true}.
+         */
+        public ToolBuilder toolType(@NotNull ToolType toolType) {
+            this.toolType = toolType;
+            return this;
+        }
+
+        /**
+         * 设置攻击伤害。服务端的 {@link Item#getAttackDamage()} 会读取此值。
+         * 未设置时默认为 1。
+         * <p>
+         * Sets the attack damage. Server-side {@link Item#getAttackDamage()} reads this value.
+         * Defaults to 1 when unset.
+         */
+        public ToolBuilder attackDamage(int attackDamage) {
+            this.attackDamage = attackDamage;
+            return this;
+        }
+
+        /**
+         * 设置最大耐久。服务端的 {@link Item#getMaxDurability()} 会读取此值。
+         * 未设置时默认为 {@link ItemTool#DURABILITY_WOODEN}。
+         * <p>
+         * Sets the max durability. Server-side {@link Item#getMaxDurability()} reads this value.
+         * Defaults to {@link ItemTool#DURABILITY_WOODEN} when unset.
+         */
+        public ToolBuilder maxDurability(int maxDurability) {
+            this.maxDurability = maxDurability;
+            return this;
+        }
+
+        /**
+         * 设置工具层级（tier）。影响 {@code getEnchantAbility()} 及默认挖掘速度。
+         * 未设置时默认为 0（无附魔能力）。
+         * <p>
+         * Sets the tool tier. Affects {@code getEnchantAbility()} and the default mining speed.
+         * Defaults to 0 (no enchantability) when unset.
+         */
+        public ToolBuilder tier(int tier) {
+            this.tier = tier;
+            return this;
+        }
+
+        /**
          * 控制采集类工具的挖掘速度
          *
          * @param speed 挖掘速度
@@ -593,9 +680,9 @@ public class CustomItemDefinition {
                 log.warn("speed has an invalid value!");
                 return this;
             }
-            if (item.isPickaxe() || item.isShovel() || item.isHoe() || item.isAxe() || item.isShears()) {
-                this.speed = speed;
-            }
+            //不调用 item.isPickaxe() 等实例方法，因为它们会通过 getDefinitionNbt() 递归。
+            //直接接受 speed 值；若 toolType 未设置，build() 也不会应用工具类型方块挖掘速度。
+            this.speed = speed;
             return this;
         }
 
@@ -706,25 +793,52 @@ public class CustomItemDefinition {
 
         @Override
         public CustomItemDefinition build() {
-            //附加耐久 攻击伤害信息
+            //标记正在构建：使 ItemCustomTool 覆写（getAttackDamage/getTier/...）回退 super，
+            //避免 getDefinitionNbt() → getDefinition() → build() 递归（见 BUILDING）。
+            beginBuild(this.identifier);
+            try {
+                return doBuild();
+            } finally {
+                endBuild(this.identifier);
+            }
+        }
+
+        private CustomItemDefinition doBuild() {
+            //fallback 走 item.getXxx()：构建期间覆写已回退 super（见 BUILDING），可安全调用并继承插件覆写值。
+            int resolvedDamage = this.attackDamage != null ? this.attackDamage : item.getAttackDamage();
+            int resolvedTier = this.tier != null ? this.tier : item.getTier();
+            //耐久 fallback：super 链回基类返回 -1 时用 DURABILITY_WOODEN 作下限，避免负耐久。
+            int itemDurability = item.getMaxDurability();
+            int resolvedDurability = this.maxDurability != null ? this.maxDurability
+                    : (itemDurability > 0 ? itemDurability : ItemTool.DURABILITY_WOODEN);
             this.nbt.getCompound("components")
-                    .putCompound("minecraft:durability", new CompoundTag().putInt("max_durability", item.getMaxDurability()))
+                    .putCompound("minecraft:durability", new CompoundTag().putInt("max_durability", resolvedDurability))
                     .getCompound("item_properties")
-                    .putInt("damage", item.getAttackDamage());
+                    .putInt("damage", resolvedDamage)
+                    .putInt("tier", resolvedTier)
+                    .putInt("enchantable_value", tierToToolEnchantAbility(resolvedTier));
 
             if (speed == null) {
-                speed = switch (item.getTier()) {
-                    case 6 -> 7;
-                    case 5 -> 6;
-                    case 4 -> 5;
-                    case 3 -> 4;
-                    case 2 -> 3;
-                    case 1 -> 2;
-                    default -> 1;
+                //对齐 Block.toolBreakTimeBonus0 的 tier→speed 查表（WOODEN=1,GOLD=2,STONE=3,COPPER=4,IRON=5,DIAMOND=6,NETHERITE=7）；COPPER 等无对应原版工具，回退 1。
+                speed = switch (resolvedTier) {
+                    case 1 -> 2;   // TIER_WOODEN
+                    case 2 -> 12;  // TIER_GOLD
+                    case 3 -> 4;   // TIER_STONE
+                    case 5 -> 6;   // TIER_IRON
+                    case 6 -> 8;   // TIER_DIAMOND
+                    case 7 -> 9;   // TIER_NETHERITE
+                    default -> 1;  // TIER_COPPER(4) 等
                 };
             }
+            //工具类型：优先显式 toolType，否则回退 item.isPickaxe() 等（构建期已回退 super，见 BUILDING）。
             Identifier type = null;
-            if (item.isPickaxe()) {
+            boolean isPickaxe = this.toolType == ToolType.PICKAXE || (this.toolType == null && item.isPickaxe());
+            boolean isAxe = this.toolType == ToolType.AXE || (this.toolType == null && item.isAxe() && !isPickaxe);
+            boolean isShovel = this.toolType == ToolType.SHOVEL || (this.toolType == null && item.isShovel() && !isPickaxe && !isAxe);
+            boolean isHoe = this.toolType == ToolType.HOE || (this.toolType == null && item.isHoe() && !isPickaxe && !isAxe && !isShovel);
+            boolean isSword = this.toolType == ToolType.SWORD || (this.toolType == null && item.isSword() && !isPickaxe && !isAxe && !isShovel && !isHoe);
+            boolean isShears = this.toolType == ToolType.SHEARS || (this.toolType == null && item.isShears() && !isPickaxe && !isAxe && !isShovel && !isHoe && !isSword);
+            if (isPickaxe) {
                 //添加可挖掘方块Tags
                 this.blockTags.addAll(List.of("'stone'", "'metal'", "'diamond_pick_diggable'", "'mob_spawner'", "'rail'", "'slab_block'", "'stair_block'", "'smooth stone slab'", "'sandstone slab'", "'cobblestone slab'", "'brick slab'", "'stone bricks slab'", "'quartz slab'", "'nether brick slab'", "'glazed terracotta'", "coral"));
                 //添加可挖掘方块
@@ -734,31 +848,34 @@ public class CustomItemDefinition {
                         .putString("enchantable_slot", "pickaxe");
                 this.tag("minecraft:is_pickaxe");
                 //this.isWeapon();
-            } else if (item.isAxe()) {
+            } else if (isAxe) {
                 this.blockTags.addAll(List.of("'wood'", "'pumpkin'", "'plant'"));
                 type = ItemTag.IS_AXE;
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "axe");
                 this.tag("minecraft:is_axe");
                 //this.isWeapon();
-            } else if (item.isShovel()) {
+            } else if (isShovel) {
                 this.blockTags.addAll(List.of("'sand'", "'dirt'", "'gravel'", "'grass'", "'snow'"));
                 type = ItemTag.IS_SHOVEL;
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "shovel");
                 this.tag("minecraft:is_shovel");
                 //this.isWeapon();
-            } else if (item.isHoe()) {
+            } else if (isHoe) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "hoe");
                 type = ItemTag.IS_HOE;
                 this.tag("minecraft:is_hoe");
                 //this.isWeapon();
-            } else if (item.isSword()) {
+            } else if (isSword) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "sword");
                 type = ItemTag.IS_SWORD;
                 //this.isWeapon();
+            } else if (isShears) {
+                type = null;
+                this.tag("minecraft:is_shears");
             } else {
                 if (this.nbt.getCompound("components").contains("item_tags")) {
                     var list = this.nbt.getCompound("components").getList("item_tags", StringTag.class).getAll();
@@ -774,14 +891,15 @@ public class CustomItemDefinition {
             if (type != null) {
                 toolBlocks.get(type).forEach(
                         (k, v) -> {
-                            if (v.getSpeed() == null) v.setSpeed(speed);
+                            //不修改共享 DigProperty（static toolBlocks），否则首次 build 会污染后续不同 tier 的 build。
+                            int blockSpeed = v.getSpeed() != null ? v.getSpeed() : speed;
                             blocks.add(new CompoundTag()
                                     .putCompound("block", new CompoundTag()
                                             .putString("name", k)
                                             .putCompound("states", v.getStates())
                                             .putString("tags", "")
                                     )
-                                    .putInt("speed", v.getSpeed()));
+                                    .putInt("speed", blockSpeed));
                         }
                 );
             }
@@ -795,27 +913,62 @@ public class CustomItemDefinition {
                         )
                         .putInt("speed", speed);
                 this.diggerRoot.getList("destroy_speeds", CompoundTag.class).add(cmp);
+            }
+
+            //toolType 导出方块 + addExtraBlock 方块
+            for (var k : this.blocks) {
+                this.diggerRoot.getList("destroy_speeds", CompoundTag.class).add(k);
+            }
+
+            //有 destroy_speeds 条目才写回 digger：避免无 blockTags（SWORD/HOE/孤立 addExtraBlock）
+            //时 digger 缺失导致 getSpeed() 返回 null。putCompound 按引用存储，前面追加的条目一并生效。
+            if (!this.diggerRoot.getList("destroy_speeds", CompoundTag.class).isEmpty()) {
                 this.nbt.getCompound("components")
                         .putCompound("minecraft:digger", this.diggerRoot);
             }
 
-            //添加可挖掘的方块
-            for (var k : this.blocks) {
-                this.diggerRoot.getList("destroy_speeds", CompoundTag.class).add(k);
-            }
             return calculateID();
+        }
+
+        /**
+         * tier → 工具附魔能力映射，复刻 {@link cn.nukkit.item.ItemTool#getEnchantAbility()}。
+         * <p>
+         * tier → tool enchantability mapping, mirroring {@link cn.nukkit.item.ItemTool#getEnchantAbility()}.
+         */
+        private static int tierToToolEnchantAbility(int tier) {
+            return switch (tier) {
+                case ItemTool.TIER_STONE -> 5;
+                case ItemTool.TIER_WOODEN -> 15;
+                case ItemTool.TIER_DIAMOND -> 10;
+                case ItemTool.TIER_GOLD -> 22;
+                case ItemTool.TIER_IRON -> 14;
+                case ItemTool.TIER_NETHERITE -> 10;
+                default -> 0;
+            };
         }
     }
 
     public static class ArmorBuilder extends SimpleBuilder {
+        /**
+         * 自定义盔甲未显式调用 {@link #maxDurability(int)} 时的默认耐久。
+         * 取原版最低值（皮革头盔 = 56）作安全下限，避免 {@code max_durability=0} 在
+         * {@link cn.nukkit.entity.EntityHumanType#damageArmor} 中首次受击即摧毁护甲。
+         * 需不可损坏的盔甲应显式设置较大耐久或用 {@link cn.nukkit.item.Item#setUnbreakable()}。
+         */
+        public static final int DURABILITY_DEFAULT = 56;
+
         private final ItemCustomArmor item;
+        private @Nullable ArmorSlot slot = null;
+        private @Nullable Integer armorPoints = null;
+        private @Nullable Integer toughness = null;
+        private @Nullable Integer tier = null;
+        private @Nullable Integer maxDurability = null;
 
         private ArmorBuilder(ItemCustomArmor item, CreativeItemCategory creativeCategory) {
             super(item, creativeCategory);
             this.item = item;
             this.nbt.getCompound("components")
                     .getCompound("item_properties")
-                    .putInt("enchantable_value", item.getEnchantAbility())
                     .putBoolean("can_destroy_in_creative", true);
         }
 
@@ -839,39 +992,135 @@ public class CustomItemDefinition {
             return this;
         }
 
+        /**
+         * 指定盔甲装备槽位。决定 {@code wearable.slot}、{@code enchantable_slot}，
+         * 并使服务端的 {@code isHelmet()/isChestplate()/isLeggings()/isBoots()} 返回 {@code true}。
+         * <p>
+         * <b>重要：未设置时不会写入槽位，自定义盔甲将无法装备。</b>
+         * <p>
+         * Specifies the armor equipment slot. Determines {@code wearable.slot}, {@code enchantable_slot},
+         * and makes server-side {@code isHelmet()/isChestplate()/isLeggings()/isBoots()} return {@code true}.
+         * <p>
+         * <b>Important: when unset, no slot is written and the custom armor cannot be equipped.</b>
+         */
+        public ArmorBuilder slot(@NotNull ArmorSlot slot) {
+            this.slot = slot;
+            return this;
+        }
+
+        /**
+         * 设置护甲值。服务端的 {@link Item#getArmorPoints()} 会读取此值。
+         * 未设置时默认为 0。
+         * <p>
+         * Sets the armor points. Server-side {@link Item#getArmorPoints()} reads this value.
+         * Defaults to 0 when unset.
+         */
+        public ArmorBuilder armorPoints(int armorPoints) {
+            this.armorPoints = armorPoints;
+            return this;
+        }
+
+        /**
+         * 设置盔甲韧性（toughness）。服务端的 {@link Item#getToughness()} 会读取此值。
+         * 未设置时默认为 0。
+         * <p>
+         * Sets the armor toughness. Server-side {@link Item#getToughness()} reads this value.
+         * Defaults to 0 when unset.
+         */
+        public ArmorBuilder toughness(int toughness) {
+            this.toughness = toughness;
+            return this;
+        }
+
+        /**
+         * 设置盔甲层级（tier）。影响 {@code getEnchantAbility()}。
+         * 未设置时默认为 0（无附魔能力）。
+         * <p>
+         * Sets the armor tier. Affects {@code getEnchantAbility()}.
+         * Defaults to 0 (no enchantability) when unset.
+         */
+        public ArmorBuilder tier(int tier) {
+            this.tier = tier;
+            return this;
+        }
+
+        /**
+         * 设置最大耐久。服务端的 {@link Item#getMaxDurability()} 会读取此值。
+         * 未设置时默认为 {@link #DURABILITY_DEFAULT}（正数安全值），避免护甲受击时被摧毁。
+         */
+        public ArmorBuilder maxDurability(int maxDurability) {
+            this.maxDurability = maxDurability;
+            return this;
+        }
+
         @Override
         public CustomItemDefinition build() {
+            //标记正在构建：使 ItemCustomArmor 覆写（getArmorPoints/getTier/...）回退 super，
+            //避免 getDefinitionNbt() → getDefinition() → build() 递归（见 BUILDING）。
+            beginBuild(this.identifier);
+            try {
+                return doBuild();
+            } finally {
+                endBuild(this.identifier);
+            }
+        }
+
+        private CustomItemDefinition doBuild() {
+            //fallback 走 item.getXxx()：构建期间覆写已回退 super（见 BUILDING），可安全调用并继承插件覆写值。
+            int resolvedProtection = this.armorPoints != null ? this.armorPoints : item.getArmorPoints();
+            int resolvedToughness = this.toughness != null ? this.toughness : item.getToughness();
+            int resolvedTier = this.tier != null ? this.tier : item.getTier();
+            //耐久 fallback：super 链回基类返回 -1 时用 DURABILITY_DEFAULT 作下限，避免护甲被秒毁。
+            int itemDurability = item.getMaxDurability();
+            int resolvedDurability = this.maxDurability != null ? this.maxDurability
+                    : (itemDurability > 0 ? itemDurability : DURABILITY_DEFAULT);
             this.nbt.getCompound("components")
                     .putCompound("minecraft:durability", new CompoundTag()
-                            .putInt("max_durability", item.getMaxDurability()))
+                            .putInt("max_durability", resolvedDurability))
                     .putCompound("minecraft:wearable", new CompoundTag()
-                            .putInt("protection", item.getArmorPoints()));
-            if (item.isHelmet()) {
+                    .putInt("protection", resolvedProtection)
+                    .putInt("toughness", resolvedToughness))
+                    .getCompound("item_properties")
+                    .putInt("tier", resolvedTier)
+                    .putInt("enchantable_value", tierToArmorEnchantAbility(resolvedTier));
+            //槽位：优先显式 slot，否则回退 item.isHelmet()/isChestplate()/...（构建期已回退 super，见 BUILDING）。
+            ArmorSlot resolvedSlot = this.slot;
+            if (resolvedSlot == null) {
+                if (item.isHelmet()) {
+                    resolvedSlot = ArmorSlot.HEAD;
+                } else if (item.isChestplate()) {
+                    resolvedSlot = ArmorSlot.CHEST;
+                } else if (item.isLeggings()) {
+                    resolvedSlot = ArmorSlot.LEGS;
+                } else if (item.isBoots()) {
+                    resolvedSlot = ArmorSlot.FEET;
+                }
+            }
+            if (resolvedSlot != null) {
                 this.nbt.getCompound("components").getCompound("item_properties")
-                        .putString("enchantable_slot", "armor_head");
+                        .putString("enchantable_slot", resolvedSlot.getEnchantableSlot());
                 this.nbt.getCompound("components")
                         .getCompound("minecraft:wearable")
-                                .putString("slot", "slot.armor.head");
-            } else if (item.isChestplate()) {
-                this.nbt.getCompound("components").getCompound("item_properties")
-                        .putString("enchantable_slot", "armor_torso");
-                this.nbt.getCompound("components")
-                        .getCompound("minecraft:wearable")
-                        .putString("slot", "slot.armor.chest");
-            } else if (item.isLeggings()) {
-                this.nbt.getCompound("components").getCompound("item_properties")
-                        .putString("enchantable_slot", "armor_legs");
-                this.nbt.getCompound("components")
-                        .getCompound("minecraft:wearable")
-                                .putString("slot", "slot.armor.legs");
-            } else if (item.isBoots()) {
-                this.nbt.getCompound("components").getCompound("item_properties")
-                        .putString("enchantable_slot", "armor_feet");
-                this.nbt.getCompound("components")
-                        .getCompound("minecraft:wearable")
-                                .putString("slot", "slot.armor.feet");
+                        .putString("slot", resolvedSlot.getWearableSlot());
             }
             return calculateID();
+        }
+
+        /**
+         * tier → 盔甲附魔能力映射，复刻 {@link cn.nukkit.item.ItemArmor#getEnchantAbility()}。
+         * <p>
+         * tier → armor enchantability mapping, mirroring {@link cn.nukkit.item.ItemArmor#getEnchantAbility()}.
+         */
+        private static int tierToArmorEnchantAbility(int tier) {
+            return switch (tier) {
+                case ItemArmor.TIER_CHAIN, ItemArmor.TIER_COPPER -> 12;
+                case ItemArmor.TIER_LEATHER -> 15;
+                case ItemArmor.TIER_DIAMOND -> 10;
+                case ItemArmor.TIER_GOLD -> 25;
+                case ItemArmor.TIER_IRON -> 9;
+                case ItemArmor.TIER_NETHERITE -> 10;
+                default -> 0;
+            };
         }
     }
 
