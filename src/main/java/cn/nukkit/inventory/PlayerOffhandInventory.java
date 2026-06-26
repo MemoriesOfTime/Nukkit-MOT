@@ -80,6 +80,26 @@ public class PlayerOffhandInventory extends BaseInventory {
         }
     }
 
+    /**
+     * Sends an empty offhand view to the holder's client without modifying the stored item, so the
+     * holder sees no offhand item. Used to suppress the client-side Totem-of-Undying revival on a
+     * death the server deliberately lets bypass the totem (e.g. {@code /kill}, void), which would
+     * otherwise leave a "ghost" state (client survived, server dead). Only the holder's client is
+     * affected; other viewers are untouched.
+     */
+    public void sendEmptyContentsToHolder() {
+        EntityHuman holder = this.getHolder();
+        if (!(holder instanceof Player)) {
+            return;
+        }
+        Player player = (Player) holder;
+        player.dataPacket(this.createMobEquipmentPacket(Item.AIR_ITEM));
+        InventoryContentPacket pk = new InventoryContentPacket();
+        pk.inventoryId = ContainerIds.OFFHAND;
+        pk.slots = new Item[]{Item.AIR_ITEM};
+        player.dataPacket(pk);
+    }
+
     private MobEquipmentPacket createMobEquipmentPacket(Item item) {
         MobEquipmentPacket pk = new MobEquipmentPacket();
         pk.eid = this.getHolder().getId();
