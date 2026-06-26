@@ -1066,7 +1066,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                     c = Block.list[blockId];
                 }
             } else {
-                c = list[id];
+                if (id >= 0 && id < list.length) {
+                    c = list[id];
+                } else {
+                    c = null;
+                }
             }
             Item item;
 
