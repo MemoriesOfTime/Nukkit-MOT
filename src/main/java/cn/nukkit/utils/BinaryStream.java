@@ -1269,7 +1269,7 @@ public class BinaryStream {
 
     public void putNetworkItemStackDescriptor(GameVersion gameVersion, Item item) {
         int protocolId = gameVersion.getProtocol();
-        if (protocolId < ProtocolInfo.v1_26_20_26 && !(gameVersion.isNetEase() && protocolId >= GameVersion.V1_21_124_NETEASE.getProtocol())) {
+        if (protocolId < ProtocolInfo.v1_26_20_26) {
             this.putSlot(gameVersion, item);
             return;
         }

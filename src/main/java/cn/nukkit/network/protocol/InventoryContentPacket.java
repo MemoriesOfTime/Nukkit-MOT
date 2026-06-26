@@ -1,6 +1,5 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.GameVersion;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
@@ -68,13 +67,11 @@ public class InventoryContentPacket extends DataPacket {
         this.reset();
         this.putUnsignedVarInt(this.inventoryId);
         this.putUnsignedVarInt(this.slots.length);
-        boolean useNetworkItemStackDescriptor = this.protocol >= ProtocolInfo.v1_26_30
-                || (this.gameVersion.isNetEase() && this.protocol >= GameVersion.V1_21_124_NETEASE.getProtocol());
         for (Item slot : this.slots) {
             if (protocol >= 407 && protocol < ProtocolInfo.v1_16_220) {
                 this.putVarInt(networkId);
             }
-            if (useNetworkItemStackDescriptor) {
+            if (this.protocol >= ProtocolInfo.v1_26_30) {
                 this.putNetworkItemStackDescriptor(gameVersion, slot);
             } else {
                 this.putSlot(gameVersion, slot);
@@ -83,7 +80,7 @@ public class InventoryContentPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_30) {
             this.putByte((byte) this.containerNameData.getContainer().getId());
             this.putOptionalNull(this.containerNameData.getDynamicId(), this::putLInt);
-            if (useNetworkItemStackDescriptor) {
+            if (this.protocol >= ProtocolInfo.v1_26_30) {
                 this.putNetworkItemStackDescriptor(gameVersion, this.storageItem);
             } else if (this.protocol >= ProtocolInfo.v1_21_40) {
                 this.putSlot(gameVersion, this.storageItem);
