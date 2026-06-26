@@ -51,6 +51,9 @@ public enum ItemStackRequestActionType {
 
     public static ItemStackRequestActionType fromId(int id, GameVersion gameVersion) {
         int protocol = gameVersion.getProtocol();
+        if (protocol >= ProtocolInfo.v1_21_40) {
+            return fromId(id);
+        }
         if (protocol >= ProtocolInfo.v1_21_20) {
             return switch (id) {
                 case 7, 8 -> null;

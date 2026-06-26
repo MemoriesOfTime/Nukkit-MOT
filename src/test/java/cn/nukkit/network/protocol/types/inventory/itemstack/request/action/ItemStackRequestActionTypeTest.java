@@ -14,5 +14,7 @@ class ItemStackRequestActionTypeTest {
         assertSame(ItemStackRequestActionType.TAKE_FROM_ITEM_CONTAINER, ItemStackRequestActionType.fromId(8, GameVersion.V1_20_50));
         assertNull(ItemStackRequestActionType.fromId(7, GameVersion.V1_21_20));
         assertNull(ItemStackRequestActionType.fromId(8, GameVersion.V1_21_20));
+        assertSame(ItemStackRequestActionType.PLACE_IN_ITEM_CONTAINER, ItemStackRequestActionType.fromId(7, GameVersion.V1_21_40));
+        assertSame(ItemStackRequestActionType.TAKE_FROM_ITEM_CONTAINER, ItemStackRequestActionType.fromId(8, GameVersion.V1_21_40));
     }
 }

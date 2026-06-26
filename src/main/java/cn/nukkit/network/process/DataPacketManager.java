@@ -171,6 +171,7 @@ public final class DataPacketManager {
                 ClientToServerHandshakeProcessor.INSTANCE,
                 EmotePacketProcessor.INSTANCE,
                 ItemFrameDropItemProcessor.INSTANCE,
+                InventoryTransactionProcessor.INSTANCE,
                 LevelSoundEventProcessor.INSTANCE,
                 LevelSoundEventProcessorV1.INSTANCE,
                 LevelSoundEventProcessorV2.INSTANCE,
@@ -224,6 +225,11 @@ public final class DataPacketManager {
         registerProcessor(
                 ProtocolInfo.v1_16_200,
                 FilterTextProcessor_v422.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_16_100,
+                ItemStackRequestProcessor.INSTANCE
         );
 
         registerProcessor(

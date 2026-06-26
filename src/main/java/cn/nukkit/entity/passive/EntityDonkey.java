@@ -48,11 +48,11 @@ public class EntityDonkey extends EntityHorseBase {
     public void initEntity() {
         this.setMaxHealth(15);
 
-        super.initEntity();
-
         if (this.namedTag.contains("ChestedHorse")) {
             this.setChested(this.namedTag.getBoolean("ChestedHorse"));
         }
+
+        super.initEntity();
     }
 
     @Override
@@ -115,7 +115,16 @@ public class EntityDonkey extends EntityHorseBase {
     }
 
     public void setChested(boolean chested) {
+        boolean changed = this.chested != chested;
         this.chested = chested;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CHESTED, chested);
+        if (changed) {
+            this.syncHorseInventoryChestSize();
+        }
+    }
+
+    @Override
+    protected int getChestSize() {
+        return this.chested ? 15 : 0;
     }
 }

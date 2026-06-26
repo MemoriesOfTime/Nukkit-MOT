@@ -96,6 +96,14 @@ public class CraftingManager {
     private final Map<UUID, SmithingRecipe> smithingRecipes = new Object2ObjectOpenHashMap<>();
     private final List<StonecutterRecipe> stonecutterRecipes = new ArrayList<>();
 
+    /**
+     * Lookup table for recipes by their assigned network ID. Populated for recipes
+     * that carry a networkId (Shaped/Shapeless/Stonecutter/Multi/Smithing). Used by
+     * the Server Authoritative ItemStackRequest flow to resolve a CraftRecipeAction
+     * back to its Recipe instance without iterating the full recipe catalog.
+     */
+    private final Map<Integer, Recipe> networkIdRecipes = new Int2ObjectOpenHashMap<>();
+
     private final Object2DoubleOpenHashMap<Recipe> recipeXpMap = new Object2DoubleOpenHashMap<>();
 
     private static int RECIPE_COUNT = 0;
@@ -249,7 +257,7 @@ public class CraftingManager {
                 ingredients.add(ingredientItem);
             }
 
-            this.registerSmithingRecipe(new SmithingRecipe(recipeId, 0, ingredients, item));
+            this.registerSmithingRecipe(new SmithingTransformRecipe(recipeId, 0, ingredients, item));
         }
 
         this.rebuildPacket();
@@ -1334,6 +1342,7 @@ public class CraftingManager {
         int resultHash = getItemHash(recipe.getResult());
         Map<UUID, ShapedRecipe> map = this.shapedRecipes.computeIfAbsent(resultHash, k -> new HashMap<>());
         map.put(getMultiItemHash(new LinkedList<>(recipe.getIngredientsAggregate())), recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
 
     @Deprecated
@@ -1380,6 +1389,7 @@ public class CraftingManager {
         int resultHash = getItemHash(recipe.getResult());
         Map<UUID, ShapelessRecipe> map = this.shapelessRecipes.computeIfAbsent(resultHash, k -> new HashMap<>());
         map.put(hash, recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
 
     @Deprecated
@@ -1401,11 +1411,13 @@ public class CraftingManager {
     public void registerSmithingRecipe(SmithingRecipe recipe) {
         UUID multiItemHash = getMultiItemHash(recipe.getIngredientsAggregate());
         this.smithingRecipes.put(multiItemHash, recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
 
     public void registerStonecutterRecipe(StonecutterRecipe recipe) {
         recipe.setId(UUID.randomUUID());
         this.stonecutterRecipes.add(recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
 
     @Deprecated
@@ -1492,6 +1504,15 @@ public class CraftingManager {
 
     public void registerMultiRecipe(MultiRecipe recipe) {
         this.multiRecipes.put(recipe.getId(), recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
+    }
+
+    /**
+     * Lookup a Recipe by the network ID emitted to the client in CraftingDataPacket.
+     * Returns null if no matching recipe is registered.
+     */
+    public Recipe getRecipeByNetworkId(int networkId) {
+        return this.networkIdRecipes.get(networkId);
     }
 
     @Deprecated

@@ -10,7 +10,7 @@ import javax.annotation.Nullable;
 /**
  * 继承这个类实现自定义物品,重写{@link Item}中的方法控制方块属性
  * <p>
- * Inherit this class to implement a custom item, override the methods in the {@link Item} to control the feature of the item.
+ * Inherit this class to implement a custom item, override the methods in {@link Item} to control the feature of the item.
  *
  * @author lt_name
  */
@@ -39,6 +39,11 @@ public abstract class ItemCustom extends StringItemBase implements CustomItem {
      */
     @Override
     public abstract CustomItemDefinition getDefinition();
+
+    @Override
+    public boolean canBePutInOffhandSlot() {
+        return CustomItem.isAllowedInOffHand(this);
+    }
 
     @Override
     public ItemCustom clone() {

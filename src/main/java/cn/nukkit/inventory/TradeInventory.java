@@ -6,25 +6,37 @@ import cn.nukkit.item.Item;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.UpdateTradePacket;
+import cn.nukkit.utils.TradeRecipeBuildUtils;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.HashSet;
+import java.util.Set;
 
 public class TradeInventory extends BaseInventory {
-    
+
     public static final int TRADE_INPUT1_UI_SLOT = 4;
     public static final int TRADE_INPUT2_UI_SLOT = 5;
-    
+
+    /**
+     * Trade recipe network ids allocated for this villager session. Cleared on
+     * close to avoid leaking entries in {@link TradeRecipeBuildUtils#RECIPE_MAP}.
+     */
+    private final Set<Integer> assignedRecipeIds = new HashSet<>();
+
     public TradeInventory(InventoryHolder holder) {
         super(holder, InventoryType.TRADING);
     }
-    
+
     @Override
     public void onOpen(Player who) {
         super.onOpen(who);
         EntityVillager villager = this.getHolder();
-        
+
+        assignRecipeNetIds(villager.getRecipes());
+
         UpdateTradePacket pk = new UpdateTradePacket();
         pk.windowId = (byte) who.getWindowId(this);
         pk.windowType = (byte) InventoryType.TRADING.getNetworkType();
@@ -49,31 +61,79 @@ public class TradeInventory extends BaseInventory {
 
         pk.newTradingUi = true;
         pk.usingEconomyTrade = true;
-        
+
         who.dataPacket(pk);
-        
+
         this.sendContents(who);
     }
-    
+
     @Override
     public void onClose(Player who) {
+        // Return input slots, dropping the unplaced remainder so it isn't lost.
         for (int i = 0; i <= 1; i++) {
-            Item item = getItem(i);
-            if (who.getInventory().canAddItem(item)) {
-                who.getInventory().addItem(item);
-            } else {
-                who.dropItem(item);
+            Item item = this.getItem(i);
+            if (item.isNull()) {
+                continue;
+            }
+            Item[] drops = who.getInventory().addItem(item);
+            for (Item drop : drops) {
+                if (!who.dropItem(drop)) {
+                    who.getLevel().dropItem(who, drop);
+                }
             }
             this.clear(i);
         }
-        
+
         super.onClose(who);
 
         this.getHolder().setTradingPlayer(0L);
+        releaseAssignedRecipeIds();
     }
-    
+
     @Override
     public EntityVillager getHolder() {
         return (EntityVillager) this.holder;
+    }
+
+    private void assignRecipeNetIds(ListTag<Tag> recipes) {
+        if (recipes == null) {
+            return;
+        }
+        releaseAssignedRecipeIds();
+        for (Tag tag : recipes.getAll()) {
+            if (tag instanceof CompoundTag recipe) {
+                int id = TradeRecipeBuildUtils.assignRecipeId(recipe);
+                recipe.putInt("netId", id);
+                assignedRecipeIds.add(id);
+            }
+        }
+    }
+
+    private void releaseAssignedRecipeIds() {
+        if (assignedRecipeIds.isEmpty()) {
+            return;
+        }
+        for (Integer id : assignedRecipeIds) {
+            TradeRecipeBuildUtils.RECIPE_MAP.remove(id.intValue());
+        }
+        assignedRecipeIds.clear();
+    }
+
+    public CompoundTag getAssignedRecipe(int recipeNetId) {
+        if (!assignedRecipeIds.contains(recipeNetId)) {
+            return null;
+        }
+        ListTag<Tag> recipes = this.getHolder().getRecipes();
+        if (recipes == null) {
+            return null;
+        }
+        for (Tag tag : recipes.getAll()) {
+            if (tag instanceof CompoundTag recipe
+                    && recipe.contains("netId")
+                    && recipe.getInt("netId") == recipeNetId) {
+                return recipe;
+            }
+        }
+        return null;
     }
 }
