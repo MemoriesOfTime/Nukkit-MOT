@@ -1809,6 +1809,11 @@ public abstract class Entity extends Location implements Metadatable {
                     source.setCancelled(true);
                     return false;
                 }
+            } else if (p.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                // This damage bypasses the totem (SUICIDE/VOID) and will kill the player. Hide the
+                // offhand totem before the death/damage signal reaches the client to prevent its
+                // local auto-revival creating a "ghost" state; the real item is left untouched.
+                p.getOffhandInventory().sendEmptyContentsToHolder();
             }
         }
         this.setHealth(newHealth);

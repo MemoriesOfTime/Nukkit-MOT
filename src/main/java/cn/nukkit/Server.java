@@ -2420,17 +2420,15 @@ public class Server {
             throw new LevelException("Invalid empty level name");
         }
 
-        if (this.isLevelLoaded(name)) {
+        // Canonical path so equivalent spellings (relative/absolute/symlink) match.
+        File resolved = this.resolveLevelFile(name);
+
+        // Raw-name lookup for backwards compat; path check below is authoritative.
+        if (this.isLevelLoaded(name) || this.isLevelPathLoaded(resolved)) {
             return true;
         }
 
-        String path;
-
-        if (name.contains("/") || name.contains("\\")) {
-            path = name;
-        } else {
-            path = this.dataPath + "worlds/" + name + '/';
-        }
+        String path = resolved.getPath() + '/';
 
         if (!this.isLevelGenerated(name)) {
             log.warn(this.baseLang.translateString("nukkit.level.notFound", name));
@@ -2445,9 +2443,12 @@ public class Server {
             return false;
         }
 
+        // Last path segment keeps folderName clean when a path was passed.
+        String folderName = resolved.getName();
+
         Level level;
         try {
-            level = new Level(this, name, path, provider);
+            level = new Level(this, folderName, path, provider);
         } catch (Exception e) {
             log.error(this.baseLang.translateString("nukkit.level.loadError", new String[]{name, e.getMessage()}));
             return false;
@@ -2461,6 +2462,49 @@ public class Server {
 
         this.pluginManager.callEvent(new LevelLoadEvent(level));
         return true;
+    }
+
+    /**
+     * Resolve a level name or path to a canonical world directory, so
+     * equivalent spellings (plain name, relative/absolute path, symlink)
+     * always match. Falls back to the absolute path on canonicalization
+     * failure to avoid throwing {@link IOException}.
+     */
+    private File resolveLevelFile(String name) {
+        File f = (name.contains("/") || name.contains("\\"))
+                ? new File(name)
+                : new File(this.dataPath + "worlds/" + name);
+        try {
+            return f.getCanonicalFile();
+        } catch (IOException e) {
+            return f.getAbsoluteFile();
+        }
+    }
+
+    /**
+     * Whether a world directory is already loaded, matched by canonical
+     * provider path rather than folderName, so a world loaded by plain
+     * name is recognized when re-requested via an equivalent path.
+     */
+    private boolean isLevelPathLoaded(File resolved) {
+        for (Level level : this.levelArray) {
+            String providerPath;
+            try {
+                providerPath = level.requireProvider().getPath();
+            } catch (Exception ignored) {
+                continue;
+            }
+            File loaded;
+            try {
+                loaded = new File(providerPath).getCanonicalFile();
+            } catch (IOException e) {
+                loaded = new File(providerPath).getAbsoluteFile();
+            }
+            if (loaded.equals(resolved)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -2559,19 +2603,16 @@ public class Server {
             provider = LevelProviderManager.getProviderByName("leveldb");
         }
 
-        String path;
-
-        if (name.contains("/") || name.contains("\\")) {
-            path = name;
-        } else {
-            path = this.dataPath + "worlds/" + name + '/';
-        }
+        // Canonical path: dedupes equivalent spellings and keeps folderName clean.
+        File resolved = this.resolveLevelFile(name);
+        String path = resolved.getPath() + '/';
+        String folderName = resolved.getName();
 
         Level level;
         try {
-            provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, name, seed, generator, options);
+            provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, folderName, seed, generator, options);
 
-            level = new Level(this, name, path, provider);
+            level = new Level(this, folderName, path, provider);
             this.levels.put(level.getId(), level);
 
             level.initLevel();
@@ -2599,14 +2640,7 @@ public class Server {
         }
 
         if (this.getLevelByName(name) == null) {
-            String path;
-
-            if (name.contains("/") || name.contains("\\")) {
-                path = name;
-            } else {
-                path = this.dataPath + "worlds/" + name + '/';
-            }
-
+            String path = this.resolveLevelFile(name).getPath() + '/';
             return LevelProviderManager.getProvider(path) != null;
         }
 

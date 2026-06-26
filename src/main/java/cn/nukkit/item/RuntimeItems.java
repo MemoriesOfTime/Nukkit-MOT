@@ -156,7 +156,7 @@ public class RuntimeItems {
         mapping818 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_90);
         mapping819 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_93);
         mapping827 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_100);
-        mapping844 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_110);
+        mapping844 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_111);
         mapping859 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_120);
         mapping898 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_130);
         mapping924 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_26_0);
