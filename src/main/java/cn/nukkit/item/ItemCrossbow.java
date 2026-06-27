@@ -178,7 +178,7 @@ public class ItemCrossbow extends ItemBow {
 
                     EntityArrow arrow = new EntityArrow(player.chunk, nbt, player, false);
                     arrow.piercing = penetrationLevel;
-                    if (launchCount > 1 && i != 0) {
+                    if (launchCount > 1 && i != 1) {
                         arrow.setPickupMode(EntityArrow.PICKUP_NONE);
                     }
                     if (chargedItem.getDamage() != ItemArrow.NORMAL_ARROW) {
