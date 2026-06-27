@@ -908,6 +908,100 @@ class ItemStackRequestProcessorTest {
     }
 
     @Test
+    void craftRecipeValidatesWhenGridHoldsFullStack() {
+        // 回归:SAI 下玩家常在合成格放整堆材料再多次合成。matchRecipe 的 matchItemList 要求
+        // grid 数量严格等于"材料×multiplier",整堆会被判不匹配 → 合成回弹。现在封顶后再匹配,
+        // 精确消耗由 validateCraftingConsumePlan 兜底。
+        Player player = mockPlayer();
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerInventory inventory = new PlayerInventory(player);
+        CraftingManager craftingManager = Mockito.mock(CraftingManager.class);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getServer().getCraftingManager()).thenReturn(craftingManager);
+
+        // 1 原木 -> 4 木板
+        ShapelessRecipe recipe = new ShapelessRecipe("test:planks_full_stack", 10,
+                Item.get(Item.PLANKS, 0, 4),
+                List.of(Item.get(Item.LOG, 0, 1)));
+        // 模拟真实 matchRecipe:inputs 必须恰好等于"单份材料×multiplier"才返回配方(整堆会失配)。
+        Mockito.when(craftingManager.matchRecipe(anyList(), any(Item.class), anyList())).thenAnswer(invocation -> {
+            List<Item> inputs = cloneItems(invocation.getArgument(0));
+            Item output = invocation.getArgument(1);
+            if (output.getId() != Item.PLANKS) {
+                return null;
+            }
+            int mult = output.getCount() / 4;
+            List<Item> need = new ArrayList<>(List.of(Item.get(Item.LOG, 0, 1)));
+            for (Item n : need) n.setCount(n.getCount() * mult);
+            return Recipe.matchItemList(inputs, need) ? recipe : null;
+        });
+
+        // 合成格放一整堆(64 原木)。
+        Item logStack = Item.get(Item.LOG, 0, 64);
+        logStack.autoAssignStackNetworkId();
+        assertTrue(ui.getCraftingGrid().setItem(0, logStack, false));
+
+        assertTrue(CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, Item.get(Item.PLANKS, 0, 4), 1),
+                "single craft must validate even when grid holds a full stack");
+        assertTrue(CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, Item.get(Item.PLANKS, 0, 4), 16),
+                "multi craft must validate when grid holds enough material (no exact-count requirement)");
+
+        // 仍拒绝网格物品类型不匹配(数量兜底交给 validateCraftingConsumePlan)。
+        Item wrongItem = Item.get(Item.STONE, 0, 64);
+        wrongItem.autoAssignStackNetworkId();
+        assertTrue(ui.getCraftingGrid().setItem(0, wrongItem, false));
+        assertFalse(CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, Item.get(Item.PLANKS, 0, 4), 1),
+                "must reject when the grid holds an item the recipe does not use");
+    }
+
+    @Test
+    void craftRecipeMultiSlotSameMaterialFullStacks() {
+        // 回归:配方需多个同类材料(木棍=2木板),多个槽各放整堆(32)。旧版封顶会把配额耗尽的槽
+        // 误设为 1,导致 capped 总量超标 → matchItemList 失败。现在配额耗尽的槽被跳过。
+        Player player = mockPlayer();
+        PlayerUIInventory ui = new PlayerUIInventory(player);
+        PlayerInventory inventory = new PlayerInventory(player);
+        CraftingManager craftingManager = Mockito.mock(CraftingManager.class);
+        Mockito.when(player.getUIInventory()).thenReturn(ui);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
+        Mockito.when(player.getCraftingGrid()).thenReturn(ui.getCraftingGrid());
+        Mockito.when(player.getTopWindow()).thenReturn(Optional.empty());
+        Mockito.when(player.getServer().getCraftingManager()).thenReturn(craftingManager);
+
+        // 2 木板 -> 4 木棍
+        ShapelessRecipe recipe = new ShapelessRecipe("test:sticks_multi_slot", 10,
+                Item.get(Item.STICK, 0, 4),
+                List.of(Item.get(Item.PLANKS, 0, 1), Item.get(Item.PLANKS, 0, 1)));
+        Mockito.when(craftingManager.matchRecipe(anyList(), any(Item.class), anyList())).thenAnswer(invocation -> {
+            List<Item> inputs = cloneItems(invocation.getArgument(0));
+            Item output = invocation.getArgument(1);
+            if (output.getId() != Item.STICK) {
+                return null;
+            }
+            int mult = output.getCount() / 4;
+            List<Item> need = new ArrayList<>(List.of(Item.get(Item.PLANKS, 0, 2)));
+            for (Item n : need) n.setCount(n.getCount() * mult);
+            return Recipe.matchItemList(inputs, need) ? recipe : null;
+        });
+
+        // 两个槽各放一整堆 32 木板(grid=[木板x32, 木板x32])。
+        Item planksA = Item.get(Item.PLANKS, 0, 32);
+        planksA.autoAssignStackNetworkId();
+        Item planksB = Item.get(Item.PLANKS, 0, 32);
+        planksB.autoAssignStackNetworkId();
+        assertTrue(ui.getCraftingGrid().setItem(0, planksA, false));
+        assertTrue(ui.getCraftingGrid().setItem(1, planksB, false));
+
+        assertTrue(CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, Item.get(Item.STICK, 0, 4), 1),
+                "single craft with full-stack multi-slot grid must validate");
+        assertTrue(CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, Item.get(Item.STICK, 0, 4), 16),
+                "multi craft with full-stack multi-slot grid must validate");
+    }
+
+    @Test
     void beaconPaymentRequiresDestroyFromPaymentSlot() {
         Player player = mockPlayer();
         PlayerUIInventory ui = new PlayerUIInventory(player);
