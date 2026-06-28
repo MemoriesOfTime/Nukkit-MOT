@@ -400,8 +400,49 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         Item primaryOutput = output.clone();
         primaryOutput.setCount(primaryOutput.getCount() * Math.max(1, multiplier));
         List<Item> extraOutputs = scaleItems(craftingRecipe.getExtraResults(), Math.max(1, multiplier));
-        Recipe matched = player.getServer().getCraftingManager().matchRecipe(inputs, primaryOutput, extraOutputs);
+        List<Item> cappedInputs = capInputsToIngredients(inputs, craftingRecipe.getIngredientsAggregate(), Math.max(1, multiplier));
+        Recipe matched = player.getServer().getCraftingManager().matchRecipe(cappedInputs, primaryOutput, extraOutputs);
         return matched == recipe;
+    }
+
+
+    /**
+     * 将合成格物品数量封顶到"配方材料×multiplier",使 matchItemList 的严格相等匹配在玩家放入整堆材料时仍成立。
+     * <p>
+     * Caps grid item counts at "ingredient×multiplier" so matchItemList's exact-equality match holds even with full stacks.
+     */
+    static List<Item> capInputsToIngredients(List<Item> inputs, List<Item> ingredientsAggregate, int multiplier) {
+        List<Item> need = new ArrayList<>();
+        for (Item ingredient : ingredientsAggregate) {
+            if (ingredient == null || ingredient.isNull()) {
+                continue;
+            }
+            Item clone = ingredient.clone();
+            clone.setCount(clone.getCount() * multiplier);
+            need.add(clone);
+        }
+        List<Item> capped = new ArrayList<>(inputs.size());
+        for (Item input : inputs) {
+            if (input == null || input.isNull()) {
+                continue;
+            }
+            Item clone = input.clone();
+            int allowed = 0;
+            for (Item n : need) {
+                if (n.getCount() > 0 && n.equals(clone, n.hasMeta(), n.hasCompoundTag())) {
+                    int take = Math.min(n.getCount(), clone.getCount());
+                    allowed += take;
+                    n.setCount(n.getCount() - take);
+                }
+            }
+            if (allowed <= 0) {
+                // 配额耗尽或配方不需要此材料:跳过,否则总量超标会让 matchItemList 失败。
+                continue;
+            }
+            clone.setCount(Math.min(clone.getCount(), allowed));
+            capped.add(clone);
+        }
+        return capped;
     }
 
     static List<Item> scaleItems(List<Item> items, int multiplier) {

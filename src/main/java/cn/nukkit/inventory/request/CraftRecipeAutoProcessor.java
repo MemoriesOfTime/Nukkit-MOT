@@ -235,7 +235,10 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         Item primaryOutput = output.clone();
         primaryOutput.setCount(primaryOutput.getCount() * Math.max(1, multiplier));
         List<Item> extraOutputs = CraftRecipeActionProcessor.scaleItems(craftingRecipe.getExtraResults(), Math.max(1, multiplier));
-        Recipe matched = player.getServer().getCraftingManager().matchRecipe(inputs, primaryOutput, extraOutputs);
+        // 与 validateCraftingRecipe 保持一致:匹配前封顶到"材料×multiplier",避免 matchItemList 严格相等误判。
+        List<Item> cappedInputs = CraftRecipeActionProcessor.capInputsToIngredients(
+                inputs, craftingRecipe.getIngredientsAggregate(), Math.max(1, multiplier));
+        Recipe matched = player.getServer().getCraftingManager().matchRecipe(cappedInputs, primaryOutput, extraOutputs);
         return matched == recipe;
     }
 
