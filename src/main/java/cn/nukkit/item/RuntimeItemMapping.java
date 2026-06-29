@@ -101,10 +101,20 @@ public class RuntimeItemMapping {
 
         CompoundTag itemComponents = null;
         if (protocolId >= ProtocolInfo.v1_21_60) {
-            try (InputStream inputStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream("ItemComponents/item_components_" + protocolId + ".nbt")) {
+            String componentsFile = "ItemComponents/item_components_" + protocolId + ".nbt";
+            if (gameVersion.isNetEase()) {
+                String neteaseFile = "ItemComponents/item_components_netease_" + protocolId + ".nbt";
+                try (InputStream neteaseStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream(neteaseFile)) {
+                    if (neteaseStream != null) {
+                        componentsFile = neteaseFile;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            try (InputStream inputStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream(componentsFile)) {
                 itemComponents = NBTIO.read(new BufferedInputStream(new GZIPInputStream(inputStream)), ByteOrder.BIG_ENDIAN, false);
             } catch (Exception e) {
-                throw new AssertionError("Error while loading item_components_" + protocolId + ".nbt", e);
+                throw new AssertionError("Error while loading " + componentsFile, e);
             }
         }
 
