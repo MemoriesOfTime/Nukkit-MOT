@@ -7,6 +7,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.entity.projectile.EntityProjectile;
+import cn.nukkit.event.entity.EntityDamageByChildEntityEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
@@ -102,12 +103,16 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     @Override
     public boolean attack(EntityDamageEvent source) {
         if (source instanceof EntityDamageByEntityEvent damageByEntityEvent) {
-            Entity direct = damageByEntityEvent.getDamager();
+            Entity direct = damageByEntityEvent instanceof EntityDamageByChildEntityEvent childEvent
+                    ? childEvent.getChild()
+                    : damageByEntityEvent.getDamager();
             if (direct instanceof EntityProjectile projectile && projectile.isOnFire()) {
                 double speedSqr = projectile.motionX * projectile.motionX
                         + projectile.motionY * projectile.motionY
                         + projectile.motionZ * projectile.motionZ;
-                this.explode(speedSqr);
+                if (this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
+                    this.explode(speedSqr);
+                }
                 return true;
             }
         }
