@@ -55,7 +55,7 @@ public class InventorySlotPacket extends DataPacket {
             this.putBoolean(false); // optional storage item present
         } else {
             if (this.protocol >= ProtocolInfo.v1_21_30) {
-                this.putByte((byte) this.containerNameData.getContainer().getId());
+                this.putByte((byte) this.containerNameData.getContainer().getId(this.gameVersion));
                 this.putOptionalNull(this.containerNameData.getDynamicId(), this::putLInt);
                 if (this.protocol >= ProtocolInfo.v1_21_40) {
                     this.putSlot(gameVersion, this.storageItem);
