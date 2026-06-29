@@ -5547,15 +5547,44 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 || actions.size() != 2) {
             return false;
         }
-        if (!(actions.get(0) instanceof DropItemAction) || !(actions.get(1) instanceof SlotChangeAction slotChange)) {
+
+        DropItemAction dropAction = null;
+        SlotChangeAction slotChange = null;
+        for (InventoryAction action : actions) {
+            if (action instanceof DropItemAction) {
+                dropAction = (DropItemAction) action;
+            } else if (action instanceof SlotChangeAction) {
+                slotChange = (SlotChangeAction) action;
+            } else {
+                return false;
+            }
+        }
+        if (dropAction == null || slotChange == null) {
             return false;
         }
 
-        NetworkInventoryAction worldAction = packet.actions[0];
-        NetworkInventoryAction containerAction = packet.actions[1];
-        if (worldAction.sourceType != NetworkInventoryAction.SOURCE_WORLD
-                || worldAction.inventorySlot != InventoryTransactionPacket.ACTION_MAGIC_SLOT_DROP_ITEM
-                || containerAction.sourceType != NetworkInventoryAction.SOURCE_CONTAINER
+        NetworkInventoryAction worldAction = null;
+        NetworkInventoryAction containerAction = null;
+        for (NetworkInventoryAction networkAction : packet.actions) {
+            if (networkAction.sourceType == NetworkInventoryAction.SOURCE_WORLD) {
+                if (worldAction != null) {
+                    return false;
+                }
+                worldAction = networkAction;
+            } else if (networkAction.sourceType == NetworkInventoryAction.SOURCE_CONTAINER) {
+                if (containerAction != null) {
+                    return false;
+                }
+                containerAction = networkAction;
+            } else {
+                return false;
+            }
+        }
+        if (worldAction == null || containerAction == null) {
+            return false;
+        }
+
+        if (worldAction.inventorySlot != InventoryTransactionPacket.ACTION_MAGIC_SLOT_DROP_ITEM
                 || containerAction.windowId != ContainerIds.INVENTORY
                 || slotChange.getSlot() != containerAction.inventorySlot
                 || !(slotChange.getInventory() instanceof PlayerInventory)) {
@@ -5571,21 +5600,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
         int droppedCount = droppedItem.getCount();
-        if (droppedCount <= 0 || oldItem.getCount() < droppedCount) {
+        // Client may report the emptied slot as AIR with a non-zero count → treat as 0.
+        int remainingCount = newItem.isNull() ? 0 : newItem.getCount();
+        // Count conservation only (drop + remainder = old). NBT is not re-checked
+        // here: SlotChangeAction.isValid() validates it against server slot state.
+        if (droppedCount <= 0 || oldItem.getCount() != remainingCount + droppedCount) {
             return false;
         }
-        if (!slotChange.getSourceItem().equalsExact(oldItem) || !slotChange.getTargetItem().equalsExact(newItem)) {
+        if (!droppedItem.equals(oldItem, true, false)) {
             return false;
         }
-
-        Item expectedDrop = oldItem.clone();
-        expectedDrop.setCount(droppedCount);
-        Item expectedRemainder = oldItem.clone();
-        expectedRemainder.setCount(oldItem.getCount() - droppedCount);
-        if (expectedRemainder.getCount() <= 0) {
-            expectedRemainder = Item.get(Item.AIR);
-        }
-        return droppedItem.equalsExact(expectedDrop) && newItem.equalsExact(expectedRemainder);
+        return newItem.isNull() || newItem.equals(oldItem, true, false);
     }
 
     private boolean handleQuickCraft(InventoryTransactionPacket packet, List<InventoryAction> actions, InventoryTransaction transaction) {
