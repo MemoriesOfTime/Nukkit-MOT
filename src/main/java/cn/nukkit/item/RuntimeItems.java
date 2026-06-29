@@ -66,6 +66,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping_netease_686;
     private static RuntimeItemMapping mapping_netease_766;
     private static RuntimeItemMapping mapping_netease_819;
+    private static RuntimeItemMapping mapping_netease_860;
 
     public static RuntimeItemMapping[] VALUES;
 
@@ -168,6 +169,7 @@ public class RuntimeItems {
         mapping_netease_686 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_2_NETEASE);
         mapping_netease_766 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_50_NETEASE);
         mapping_netease_819 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_93_NETEASE);
+        mapping_netease_860 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_124_NETEASE);
 
         VALUES = new RuntimeItemMapping[]{
                 mapping361,
@@ -212,7 +214,8 @@ public class RuntimeItems {
                 mapping_netease_630,
                 mapping_netease_686,
                 mapping_netease_766,
-                mapping_netease_819
+                mapping_netease_819,
+                mapping_netease_860
         };
     }
 
@@ -305,7 +308,9 @@ public class RuntimeItems {
     }
 
     private static RuntimeItemMapping getMappingNetEase(int protocolId) {
-        if (protocolId >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
+        if (protocolId >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+            return mapping_netease_860;
+        } else if (protocolId >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
             return mapping_netease_819;
         } else if (protocolId >= GameVersion.V1_21_50_NETEASE.getProtocol()) {
             return mapping_netease_766;
