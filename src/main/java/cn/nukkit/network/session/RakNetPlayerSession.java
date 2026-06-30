@@ -113,6 +113,17 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             }
 
             byte[] packetBuffer;
+
+            byte oldPacketId = (byte) (buffer.getUnsignedByte(1) & 0xff);
+            if(oldPacketId == (byte) 0x78 && (byte) (buffer.getUnsignedByte(2) & 0xff) == (byte) 0xda){ //1.1的数据包，0xfe后面必定是 0x78 0xda这两个字节
+                // 1.1 batchpacket 处理
+                packetBuffer = new byte[buffer.readableBytes()];
+                buffer.readBytes(packetBuffer);
+                int protocol = ProtocolInfo.v1_1_0;
+                this.server.getNetwork().processBatch(packetBuffer, this.inbound, compressionIn, protocol, this.player);
+                return;
+            }
+
             boolean ci = this.shouldUsePrefixedCompression();
 
             if (this.decryptionCipher != null) {
