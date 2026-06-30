@@ -6,7 +6,10 @@ import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.entity.data.IntEntityData;
+import cn.nukkit.entity.projectile.EntityProjectile;
+import cn.nukkit.event.entity.EntityDamageByChildEntityEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
+import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMinecartTNT;
@@ -90,6 +93,31 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     public void activate(int x, int y, int z, boolean flag) {
         level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_IGNITE);
         this.fuse = 80;
+    }
+
+    /**
+     * Mirrors vanilla {@code MinecartTNT#hurtServer}: a projectile that is
+     * itself on fire (e.g. a Flame-enchanted bow's arrow) primes and
+     * immediately detonates the TNT minecart instead of merely damaging it.
+     */
+    @Override
+    public boolean attack(EntityDamageEvent source) {
+        if (source instanceof EntityDamageByEntityEvent damageByEntityEvent) {
+            Entity direct = damageByEntityEvent instanceof EntityDamageByChildEntityEvent childEvent
+                    ? childEvent.getChild()
+                    : damageByEntityEvent.getDamager();
+            if (direct instanceof EntityProjectile projectile && projectile.isOnFire()) {
+                double speedSqr = projectile.motionX * projectile.motionX
+                        + projectile.motionY * projectile.motionY
+                        + projectile.motionZ * projectile.motionZ;
+                if (this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
+                    this.explode(speedSqr);
+                }
+                return true;
+            }
+        }
+
+        return super.attack(source);
     }
 
     @Override
