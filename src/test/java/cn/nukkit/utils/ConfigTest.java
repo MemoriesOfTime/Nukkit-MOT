@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -268,31 +269,48 @@ public class ConfigTest {
     public void testServerConfigRemovesUnknownYamlKeysOnUpdate() throws Exception {
         Path configPath = tempDir.resolve("nukkit-mot.yml");
         Files.writeString(configPath, """
-                unknown-top-level:
-                  enabled: true
-                performance-settings:
-                  async-workers: "2"
-                  unknown-performance-setting: true
-                network-settings:
-                  compression-level: 6
-                  unknown-network-setting: stale
-                """, StandardCharsets.UTF_8);
+            unknown-top-level:
+              enabled: true
+            performance-settings:
+              async-workers: "2"
+              unknown-performance-setting: true
+            network-settings:
+              compression-level: 6
+              unknown-network-setting: stale
+            """, StandardCharsets.UTF_8);
 
-        ServerConfig config = ConfigManager.create(ServerConfig.class, it -> {
-            it.configure(opt -> {
-                opt.configurer(new YamlSnakeYamlConfigurer());
-                opt.bindFile(configPath);
-                opt.removeOrphans(true);
+        ServerConfig config = null;
+        try {
+            config = ConfigManager.create(ServerConfig.class, it -> {
+                it.configure(opt -> {
+                    opt.configurer(new YamlSnakeYamlConfigurer());
+                    opt.bindFile(configPath);
+                    opt.removeOrphans(true);
+                });
+                it.load(true);
             });
-            it.load(true);
-        });
 
-        String saved = Files.readString(configPath, StandardCharsets.UTF_8);
-        Assertions.assertEquals("2", config.performanceSettings().asyncWorkers());
-        Assertions.assertEquals(6, config.networkSettings().compressionLevel());
-        Assertions.assertFalse(saved.contains("unknown-top-level"));
-        Assertions.assertFalse(saved.contains("unknown-performance-setting"));
-        Assertions.assertFalse(saved.contains("unknown-network-setting"));
+            String saved = Files.readString(configPath, StandardCharsets.UTF_8);
+            Assertions.assertEquals("2", config.performanceSettings().asyncWorkers());
+            Assertions.assertEquals(6, config.networkSettings().compressionLevel());
+            Assertions.assertFalse(saved.contains("unknown-top-level"));
+            Assertions.assertFalse(saved.contains("unknown-performance-setting"));
+            Assertions.assertFalse(saved.contains("unknown-network-setting"));
+        } finally {
+            if (config instanceof AutoCloseable) {
+                try {
+                    ((AutoCloseable) config).close();
+                } catch (Exception _) {}
+            }
+
+            try {
+                Files.deleteIfExists(configPath);
+            } catch (IOException e) {
+                System.gc();
+                Thread.sleep(100);
+                Files.deleteIfExists(configPath);
+            }
+        }
     }
 
     @Test
