@@ -1695,7 +1695,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     /**
-     * Check if player's hit should be critical
+     * 检查玩家的攻击是否应为暴击 / Check if player's hit should be critical
+     *
      * @param player player
      * @return can make a critical hit
      */
@@ -1703,6 +1704,37 @@ public abstract class Entity extends Location implements Metadatable {
         if (player.isOnGround() || player.riding != null || player.speed == null || player.speed.y <= 0 || player.hasEffect(Effect.BLINDNESS)) return false;
         int b = player.getLevel().getBlockIdAt(player.chunk, player.getFloorX(), player.getFloorY(), player.getFloorZ());
         return b != Block.LADDER && b != Block.VINES && !Block.isWater(b);
+    }
+
+    protected void applyCriticalHitModifier(EntityDamageEvent source) {
+        if (this instanceof EntityLiving
+                && source instanceof EntityDamageByEntityEvent damageByEntityEvent
+                && !(source instanceof EntityDamageByChildEntityEvent)
+                && !source.isApplicable(EntityDamageEvent.DamageModifier.CRITICAL)
+                && damageByEntityEvent.getDamager() instanceof Player damager
+                && canCriticalHit(damager)) {
+            source.setDamage(getDamageBeforeTargetReductions(source) * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
+        }
+    }
+
+    protected static float getDamageBeforeTargetReductions(EntityDamageEvent source) {
+        return source.getFinalDamage()
+                - source.getDamage(EntityDamageEvent.DamageModifier.ARMOR)
+                - source.getDamage(EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS)
+                - source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE)
+                - source.getDamage(EntityDamageEvent.DamageModifier.ABSORPTION);
+    }
+
+    protected void recalculateResistanceDamage(EntityDamageEvent source) {
+        float resistance = source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE);
+        float originalBaseDamage = source.getOriginalDamage(EntityDamageEvent.DamageModifier.BASE);
+        if (resistance != 0f && originalBaseDamage != 0f) {
+            float ratio = -resistance / originalBaseDamage;
+            float preResistanceDamage = source.getFinalDamage()
+                    - resistance
+                    - source.getDamage(EntityDamageEvent.DamageModifier.ABSORPTION);
+            source.setDamage(-preResistanceDamage * ratio, EntityDamageEvent.DamageModifier.RESISTANCE);
+        }
     }
 
     public boolean attack(EntityDamageEvent source) {
@@ -1713,11 +1745,8 @@ public abstract class Entity extends Location implements Metadatable {
             return false;
         }
 
-        if (this instanceof EntityLiving && source instanceof EntityDamageByEntityEvent && !(source instanceof EntityDamageByChildEntityEvent)) {
-            Entity damager = ((EntityDamageByEntityEvent) source).getDamager();
-            if (damager instanceof Player && canCriticalHit((Player) damager)) {
-                source.setDamage(source.getFinalDamage() * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
-            }
+        if (!(this instanceof EntityHumanType)) {
+            this.recalculateResistanceDamage(source);
         }
 
         server.getPluginManager().callEvent(source);
