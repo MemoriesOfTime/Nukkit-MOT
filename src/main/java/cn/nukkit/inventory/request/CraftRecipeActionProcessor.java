@@ -402,7 +402,23 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         List<Item> extraOutputs = scaleItems(craftingRecipe.getExtraResults(), Math.max(1, multiplier));
         List<Item> cappedInputs = capInputsToIngredients(inputs, craftingRecipe.getIngredientsAggregate(), Math.max(1, multiplier));
         Recipe matched = player.getServer().getCraftingManager().matchRecipe(cappedInputs, primaryOutput, extraOutputs);
-        return matched == recipe;
+        if (matched == recipe) {
+            return true;
+        }
+        // 兜底：插件若绕过去重注册了重复配方，matchRecipe 返回的实例与 client 所选不同；
+        // 此时按输出、副产物、材料聚合做内容等价比较，等价即放行。
+        // <p>Fallback: accept a content-equivalent recipe when matchRecipe returns a different instance.
+        if (matched instanceof CraftingRecipe matchedCR
+                && matchedCR.getResult().equals(craftingRecipe.getResult())
+                && matchedCR.getIngredientsAggregate().equals(craftingRecipe.getIngredientsAggregate())
+                && matchedCR.getExtraResults().equals(craftingRecipe.getExtraResults())) {
+            log.debug("{}: accepted content-equivalent recipe (client recipeId={}, server matched recipeId={})",
+                    player.getName(), craftingRecipe.getRecipeId(), matchedCR.getRecipeId());
+            return true;
+        }
+        log.debug("{}: crafting recipe validation failed, no match for client-selected recipe (recipeId={})",
+                player.getName(), craftingRecipe.getRecipeId());
+        return false;
     }
 
 

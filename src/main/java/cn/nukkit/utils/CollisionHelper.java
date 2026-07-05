@@ -1,5 +1,6 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockBarrier;
 import cn.nukkit.entity.Entity;
@@ -9,10 +10,7 @@ import cn.nukkit.math.NukkitMath;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.function.Predicate;
 
 /**
@@ -20,6 +18,90 @@ import java.util.function.Predicate;
  * @author labarjni
  */
 public record CollisionHelper(Entity entity) {
+
+    /** Cap on block positions visited per collision query; guards against runaway loops from malformed AABBs (cf. EaseCation). */
+    private static final int MAX_BOUNDING_BOX_ITERATIONS = 1_000_000;
+
+    /** Per-axis cap on motion-based AABB expansion; vanilla speeds stay well below it (elytra ≈ 3/tick), preventing a single bogus motion from exploding the sweep. {@link #MAX_BOUNDING_BOX_ITERATIONS} still backstops oversized base boxes. */
+    private static final double MAX_MOTION_EXPANSION = 64.0;
+
+    /** Minimum interval (ms) between duplicate runaway-AABB log entries for the same entity. */
+    private static final long LOG_THROTTLE_MS = 30_000L;
+
+    /** Per-entity last-log timestamp for throttling runaway-AABB warnings. Weak keys auto-clear when the entity is GC'd. */
+    private static final Map<Entity, Long> RUNAWAY_LOG_TIMES = Collections.synchronizedMap(new WeakHashMap<>());
+
+    /** Test-only hook to reset the throttle map between tests. Not part of the public API. */
+    static void resetThrottleStateForTests() {
+        RUNAWAY_LOG_TIMES.clear();
+    }
+
+    /** Rejects non-finite AABBs: NaN/Infinity make floor/ceil overflow and throw NegativeArraySizeException. */
+    private static boolean isFinite(AxisAlignedBB boundingBox) {
+        return boundingBox != null
+                && Double.isFinite(boundingBox.getMinX())
+                && Double.isFinite(boundingBox.getMinY())
+                && Double.isFinite(boundingBox.getMinZ())
+                && Double.isFinite(boundingBox.getMaxX())
+                && Double.isFinite(boundingBox.getMaxY())
+                && Double.isFinite(boundingBox.getMaxZ());
+    }
+
+    /** True if the AABB's block range exceeds {@link #MAX_BOUNDING_BOX_ITERATIONS}; uses long arithmetic, and non-positive sizes count as exceeding. */
+    private static boolean exceedsMaxIterations(int minX, int minY, int minZ,
+                                                int maxX, int maxY, int maxZ) {
+        long sx = (long) maxX - minX + 1;
+        long sy = (long) maxY - minY + 1;
+        long sz = (long) maxZ - minZ + 1;
+        if (sx <= 0 || sy <= 0 || sz <= 0) {
+            return true;
+        }
+        return sx * sy * sz > MAX_BOUNDING_BOX_ITERATIONS;
+    }
+
+    /**
+     * Logs a runaway-AABB warning once per {@link #LOG_THROTTLE_MS} window per entity, to aid tracing without log flooding.
+     * Throttling uses a single atomic {@link Map#compute} to prevent duplicate concurrent warnings.
+     */
+    private static void logRunawayAABB(@Nullable Entity entity, AxisAlignedBB bb, String where) {
+        if (entity == null) return;
+        Server server = Server.getInstance();
+        if (server == null) return;
+        MainLogger logger = server.getLogger();
+        if (logger == null) return;
+
+        long now = System.currentTimeMillis();
+        boolean[] shouldLog = {false};
+        RUNAWAY_LOG_TIMES.compute(entity, (k, last) -> {
+            if (last != null && now - last < LOG_THROTTLE_MS) {
+                return last; // within window
+            }
+            shouldLog[0] = true;
+            return now;
+        });
+        if (!shouldLog[0]) return;
+
+        logger.warning("Runaway collision AABB in " + where
+                + " (truncated to " + MAX_BOUNDING_BOX_ITERATIONS + " blocks)"
+                + " entity=" + entity.getClass().getSimpleName()
+                + " id=" + entity.getId()
+                + " pos=(" + entity.x + ", " + entity.y + ", " + entity.z + ")"
+                + " motion=(" + entity.motionX + ", " + entity.motionY + ", " + entity.motionZ + ")"
+                + " bb=[(" + bb.getMinX() + ", " + bb.getMinY() + ", " + bb.getMinZ() + ")"
+                + " -> (" + bb.getMaxX() + ", " + bb.getMaxY() + ", " + bb.getMaxZ() + ")]");
+    }
+
+    /** Logs a runaway-AABB condition for the static (level-only) collision APIs, where no entity is available. */
+    private static void logRunawayAABBStatic(AxisAlignedBB bb, String where) {
+        Server server = Server.getInstance();
+        if (server == null) return;
+        MainLogger logger = server.getLogger();
+        if (logger == null) return;
+        logger.warning("Runaway collision AABB in " + where
+                + " (truncated to " + MAX_BOUNDING_BOX_ITERATIONS + " blocks)"
+                + " bb=[(" + bb.getMinX() + ", " + bb.getMinY() + ", " + bb.getMinZ() + ")"
+                + " -> (" + bb.getMaxX() + ", " + bb.getMaxY() + ", " + bb.getMaxZ() + ")]");
+    }
 
     /**
      * Gets blocks that collide with current entity's AABB.
@@ -37,9 +119,10 @@ public record CollisionHelper(Entity entity) {
         double motionAbsX = Math.abs(entity.motionX);
         double motionAbsY = Math.abs(entity.motionY);
         double motionAbsZ = Math.abs(entity.motionZ);
-        double expandX = Math.max(0.5, motionAbsX + 0.3);
-        double expandY = Math.max(0.5, motionAbsY + 0.3);
-        double expandZ = Math.max(0.5, motionAbsZ + 0.3);
+        // Cap per-axis expansion; see MAX_MOTION_EXPANSION.
+        double expandX = Math.min(MAX_MOTION_EXPANSION, Math.max(0.5, motionAbsX + 0.3));
+        double expandY = Math.min(MAX_MOTION_EXPANSION, Math.max(0.5, motionAbsY + 0.3));
+        double expandZ = Math.min(MAX_MOTION_EXPANSION, Math.max(0.5, motionAbsZ + 0.3));
 
         Block[] blocks = this.getBlocksInBoundingBox(boundingBox.grow(expandX, expandY, expandZ));
 
@@ -51,8 +134,8 @@ public record CollisionHelper(Entity entity) {
         for (Block block : blocks) {
             if (block.canPassThrough()) {
                 if (block.hasDynamicCollision()) {
-                    // Dynamic collision of traversable blocks, where x, y, z can change rapidly
-                    AxisAlignedBB trajectoryBB = boundingBox.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3);
+                    // Dynamic traversable-block collision; reuse the per-axis cap to bound the trajectory BB.
+                    AxisAlignedBB trajectoryBB = boundingBox.grow(expandX, expandY, expandZ);
                     if (block.collidesWithBB(trajectoryBB, true)) {
                         if (count == result.length) {
                             result = Arrays.copyOf(result, result.length << 1);
@@ -99,7 +182,7 @@ public record CollisionHelper(Entity entity) {
      */
     public Block[] getBlocksInBoundingBox(AxisAlignedBB boundingBox) {
         Level level = entity.getLevel();
-        if (level == null || entity.isClosed()) return Block.EMPTY_ARRAY;
+        if (level == null || entity.isClosed() || !isFinite(boundingBox)) return Block.EMPTY_ARRAY;
 
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
@@ -114,8 +197,14 @@ public record CollisionHelper(Entity entity) {
         int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
         if (clampedMinY > clampedMaxY) return Block.EMPTY_ARRAY;
 
-        int estimatedCount = (maxX - minX + 1) * (maxZ - minZ + 1) * (clampedMaxY - clampedMinY + 1);
-        Block[] result = new Block[Math.min(estimatedCount, 64)];
+        // long arithmetic avoids int overflow (NegativeArraySizeException); cap bounds runaway queries.
+        long estimatedCount = (long) (maxX - minX + 1) * (maxZ - minZ + 1) * (clampedMaxY - clampedMinY + 1);
+        if (estimatedCount <= 0 || estimatedCount > MAX_BOUNDING_BOX_ITERATIONS) {
+            logRunawayAABB(entity, boundingBox, "getBlocksInBoundingBox");
+            return Block.EMPTY_ARRAY;
+        }
+
+        Block[] result = new Block[(int) Math.min(estimatedCount, 64)];
         int count = 0;
 
         for (int x = minX; x <= maxX; x++) {
@@ -125,7 +214,7 @@ public record CollisionHelper(Entity entity) {
                     if (block == null || block.isAir()) continue;
 
                     if (count == result.length) {
-                        result = Arrays.copyOf(result, Math.min(result.length * 2, estimatedCount));
+                        result = Arrays.copyOf(result, (int) Math.min((long) result.length * 2, estimatedCount));
                     }
 
                     result[count++] = block.clone();
@@ -148,7 +237,7 @@ public record CollisionHelper(Entity entity) {
             int targetBlockId
     ) {
         Level level = entity.getLevel();
-        if (level == null || entity.isClosed()) return false;
+        if (level == null || entity.isClosed() || !isFinite(boundingBox)) return false;
 
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
@@ -162,6 +251,10 @@ public record CollisionHelper(Entity entity) {
         int clampedMinY = Math.max(minY, level.getMinBlockY());
         int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
         if (clampedMinY > clampedMaxY) return false;
+        if (exceedsMaxIterations(minX, clampedMinY, minZ, maxX, clampedMaxY, maxZ)) {
+            logRunawayAABB(entity, boundingBox, "isInsideBlock");
+            return false;
+        }
 
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
@@ -169,7 +262,7 @@ public record CollisionHelper(Entity entity) {
                     Block block = level.getBlock(entity.chunk, x, y, z, 0, false);
                     if (block == null || block.getId() != targetBlockId) continue;
 
-                    if (block.collidesWithBB(boundingBox)) {
+                    if (block.collidesWithBB(boundingBox, true)) {
                         return true;
                     }
                 }
@@ -206,11 +299,22 @@ public record CollisionHelper(Entity entity) {
     public static List<Entity> getCollidingEntities(Level level, AxisAlignedBB boundingBox, @Nullable Entity entity) {
         List<Entity> nearby = new ArrayList<>();
 
-        if (entity == null || entity.canCollide()) {
+        if ((entity == null || entity.canCollide()) && isFinite(boundingBox)) {
             int minX = NukkitMath.floorDouble((boundingBox.getMinX() - 2) / 16);
             int maxX = NukkitMath.ceilDouble((boundingBox.getMaxX() + 2) / 16);
             int minZ = NukkitMath.floorDouble((boundingBox.getMinZ() - 2) / 16);
             int maxZ = NukkitMath.ceilDouble((boundingBox.getMaxZ() + 2) / 16);
+
+            // Guard against oversized chunk ranges (e.g. from corrupted positions): a 1M-block sweep is already unreasonable.
+            long chunkRange = (long) (maxX - minX + 1) * (maxZ - minZ + 1);
+            if (chunkRange <= 0 || chunkRange > MAX_BOUNDING_BOX_ITERATIONS) {
+                if (entity != null) {
+                    logRunawayAABB(entity, boundingBox, "getCollidingEntities");
+                } else {
+                    logRunawayAABBStatic(boundingBox, "getCollidingEntities");
+                }
+                return nearby;
+            }
 
             for (int x = minX; x <= maxX; ++x) {
                 for (int z = minZ; z <= maxZ; ++z) {
@@ -317,7 +421,7 @@ public record CollisionHelper(Entity entity) {
             boolean ignoreCollidesCheck,
             Predicate<Block> condition
     ) {
-        if (level == null) return Collections.emptyList();
+        if (level == null || !isFinite(boundingBox)) return Collections.emptyList();
 
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
@@ -331,6 +435,14 @@ public record CollisionHelper(Entity entity) {
         int clampedMinY = Math.max(minY, level.getMinBlockY());
         int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
         if (clampedMinY > clampedMaxY) return Collections.emptyList();
+        if (exceedsMaxIterations(minX, clampedMinY, minZ, maxX, clampedMaxY, maxZ)) {
+            if (entity != null) {
+                logRunawayAABB(entity, boundingBox, "getCollisionBlocks(static)");
+            } else {
+                logRunawayAABBStatic(boundingBox, "getCollisionBlocks(static)");
+            }
+            return Collections.emptyList();
+        }
 
         if (targetFirst) {
             for (int z = minZ; z <= maxZ; ++z) {
@@ -379,7 +491,7 @@ public record CollisionHelper(Entity entity) {
             AxisAlignedBB boundingBox,
             boolean checkCanPassThrough
     ) {
-        if (level == null) return false;
+        if (level == null || !isFinite(boundingBox)) return false;
 
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
@@ -393,6 +505,14 @@ public record CollisionHelper(Entity entity) {
         int clampedMinY = Math.max(minY, level.getMinBlockY());
         int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
         if (clampedMinY > clampedMaxY) return false;
+        if (exceedsMaxIterations(minX, clampedMinY, minZ, maxX, clampedMaxY, maxZ)) {
+            if (entity != null) {
+                logRunawayAABB(entity, boundingBox, "hasCollisionBlocks");
+            } else {
+                logRunawayAABBStatic(boundingBox, "hasCollisionBlocks");
+            }
+            return false;
+        }
 
         for (int z = minZ; z <= maxZ; ++z) {
             for (int x = minX; x <= maxX; ++x) {
@@ -448,7 +568,7 @@ public record CollisionHelper(Entity entity) {
             boolean entities,
             boolean solidEntities
     ) {
-        if (level == null) return Block.EMPTY_LIST;
+        if (level == null || !isFinite(boundingBox)) return Block.EMPTY_LIST;
 
         List<AxisAlignedBB> collides = new ArrayList<>();
 
@@ -466,6 +586,14 @@ public record CollisionHelper(Entity entity) {
         int clampedMinY = Math.max(minY, level.getMinBlockY());
         int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
         if (clampedMinY > clampedMaxY) {
+            return collides;
+        }
+        if (exceedsMaxIterations(minX, clampedMinY, minZ, maxX, clampedMaxY, maxZ)) {
+            if (entity != null) {
+                logRunawayAABB(entity, boundingBox, "getCollisionCubes");
+            } else {
+                logRunawayAABBStatic(boundingBox, "getCollisionCubes");
+            }
             return collides;
         }
 
