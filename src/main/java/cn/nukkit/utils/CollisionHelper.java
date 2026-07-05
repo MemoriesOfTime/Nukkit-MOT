@@ -262,7 +262,7 @@ public record CollisionHelper(Entity entity) {
                     Block block = level.getBlock(entity.chunk, x, y, z, 0, false);
                     if (block == null || block.getId() != targetBlockId) continue;
 
-                    if (block.collidesWithBB(boundingBox)) {
+                    if (block.collidesWithBB(boundingBox, true)) {
                         return true;
                     }
                 }

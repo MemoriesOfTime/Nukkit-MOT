@@ -178,6 +178,28 @@ public class CollisionHelperRunawayTest {
         assertEquals(0, result.length, "Oversized AABB must short-circuit to empty array");
     }
 
+    @Test
+    public void isInsideBlockUsesCollisionBoxForLava() {
+        AxisAlignedBB bb = new SimpleAxisAlignedBB(0.3, 0, 0.3, 0.7, 1.8, 0.7);
+        Level level = Mockito.mock(Level.class);
+        Entity entity = Mockito.mock(Entity.class);
+        Block lava = Block.get(Block.LAVA);
+        lava.setLevel(level);
+        lava.setComponents(0, 0, 0);
+
+        Mockito.when(level.getMinBlockY()).thenReturn(-64);
+        Mockito.when(level.getMaxBlockY()).thenReturn(319);
+        Mockito.when(level.getBlock(Mockito.any(), Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt(),
+                Mockito.anyInt(), Mockito.anyBoolean())).thenReturn(lava);
+        Mockito.when(entity.getLevel()).thenReturn(level);
+        Mockito.when(entity.isClosed()).thenReturn(false);
+
+        CollisionHelper helper = new CollisionHelper(entity);
+
+        assertTrue(helper.isInsideBlock(bb, Block.LAVA),
+                "Lava has no normal bounding box, so inside checks must use its collision box");
+    }
+
     /** A bogus motion on a normal BB must NOT trip the cap: motion expansion is clamped per-axis, so the real collision volume is still scanned correctly. */
     @Test
     public void getCollisionBlocksWithBogusMotionStillScansBaseBoundingBox() {

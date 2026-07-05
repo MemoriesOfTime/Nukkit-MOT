@@ -2,11 +2,14 @@ package cn.nukkit.entity;
 
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
+import cn.nukkit.event.entity.EntityDamageByBlockEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.level.GameRules;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
@@ -28,8 +31,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
@@ -59,6 +61,58 @@ public class ArmorDamageReductionTest {
     public void testNoArmorFullDamage() {
         assertEquals(4.0f, finalDamage(4f, 0, 0, 0), 0.001f);
         assertEquals(10.0f, finalDamage(10f, 0, 0, 0), 0.001f);
+    }
+
+    @Test
+    public void testLavaDamageUsesFourBaseDamage() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+
+        EntityDamageByBlockEvent event = new EntityDamageByBlockEvent(Block.get(Block.LAVA), target,
+                EntityDamageEvent.DamageCause.LAVA, 4f);
+
+        assertTrue(target.attack(event));
+        assertEquals(4f, event.getDamage(), 0.001f);
+        assertEquals(4f, event.getFinalDamage(), 0.001f);
+        assertEquals(16f, target.getHealth(), 0.001f);
+    }
+
+    @Test
+    public void testLavaDamageIsReducedByDiamondArmorAfterFourBaseDamage() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.getInventory().setArmorContents(new Item[]{
+                Item.get(ItemID.DIAMOND_HELMET),
+                Item.get(ItemID.DIAMOND_CHESTPLATE),
+                Item.get(ItemID.DIAMOND_LEGGINGS),
+                Item.get(ItemID.DIAMOND_BOOTS)
+        });
+
+        EntityDamageByBlockEvent event = new EntityDamageByBlockEvent(Block.get(Block.LAVA), target,
+                EntityDamageEvent.DamageCause.LAVA, 4f);
+
+        assertTrue(target.attack(event));
+        assertEquals(4f, event.getDamage(), 0.001f);
+        assertEquals(0.96f, event.getFinalDamage(), 0.001f);
+        assertEquals(19.04f, target.getHealth(), 0.001f);
+    }
+
+    @Test
+    public void testEntityBaseTickAppliesLavaDamageWhileStandingInLava() {
+        Level level = newMockLevel();
+        stubLevelAsLava(level);
+        TestLiving target = new TestLiving(newMockChunk(level), baseNbt());
+
+        assertTrue(target.isInsideOfLava());
+        for (int i = 0; i < 10; i++) {
+            target.entityBaseTick(1);
+        }
+
+        EntityDamageEvent event = target.getLastDamageCause();
+        assertEquals(EntityDamageEvent.DamageCause.LAVA, event.getCause());
+        assertEquals(4f, event.getDamage(), 0.001f);
+        assertEquals(4f, event.getFinalDamage(), 0.001f);
+        assertEquals(16f, target.getHealth(), 0.001f);
     }
 
     @Test
@@ -407,8 +461,12 @@ public class ArmorDamageReductionTest {
     private static Level newMockLevel() {
         Level level = mock(Level.class);
         lenient().when(level.getServer()).thenReturn(MockServer.get());
+        lenient().when(level.getMinBlockY()).thenReturn(-64);
+        lenient().when(level.getMaxBlockY()).thenReturn(319);
+        lenient().when(level.getGameRules()).thenReturn(GameRules.getDefault());
         lenient().when(level.getChunkPlayers(0, 0)).thenReturn(Collections.emptyMap());
         lenient().when(level.getNearbyEntities(any(), any())).thenReturn(new Entity[0]);
+        lenient().when(level.getNearbyEntities(any(), any(), anyBoolean(), anyBoolean())).thenReturn(new Entity[0]);
         lenient().when(level.getBlockIdAt(any(FullChunk.class), anyInt(), anyInt(), anyInt())).thenReturn(0);
         lenient().when(level.getVibrationManager()).thenReturn(mock(VibrationManager.class));
         try {
@@ -419,6 +477,41 @@ public class ArmorDamageReductionTest {
             throw new RuntimeException(e);
         }
         return level;
+    }
+
+    private static void stubLevelAsLava(Level level) {
+        lenient().when(level.getBlock(any(Vector3.class))).thenAnswer(invocation -> blockAt(level, Block.LAVA,
+                invocation.getArgument(0, Vector3.class).getFloorX(),
+                invocation.getArgument(0, Vector3.class).getFloorY(),
+                invocation.getArgument(0, Vector3.class).getFloorZ()));
+        lenient().when(level.getBlock(any(Vector3.class), anyInt())).thenAnswer(invocation -> blockAt(level,
+                invocation.getArgument(1, Integer.class) == 0 ? Block.LAVA : Block.AIR,
+                invocation.getArgument(0, Vector3.class).getFloorX(),
+                invocation.getArgument(0, Vector3.class).getFloorY(),
+                invocation.getArgument(0, Vector3.class).getFloorZ()));
+        lenient().when(level.getBlock(anyInt(), anyInt(), anyInt())).thenAnswer(invocation -> blockAt(level,
+                Block.LAVA,
+                invocation.getArgument(0, Integer.class),
+                invocation.getArgument(1, Integer.class),
+                invocation.getArgument(2, Integer.class)));
+        lenient().when(level.getBlock(nullable(FullChunk.class), anyInt(), anyInt(), anyInt(), anyBoolean()))
+                .thenAnswer(invocation -> blockAt(level, Block.LAVA,
+                        invocation.getArgument(1, Integer.class),
+                        invocation.getArgument(2, Integer.class),
+                        invocation.getArgument(3, Integer.class)));
+        lenient().when(level.getBlock(nullable(FullChunk.class), anyInt(), anyInt(), anyInt(), anyInt(), anyBoolean()))
+                .thenAnswer(invocation -> blockAt(level,
+                        invocation.getArgument(4, Integer.class) == 0 ? Block.LAVA : Block.AIR,
+                        invocation.getArgument(1, Integer.class),
+                        invocation.getArgument(2, Integer.class),
+                        invocation.getArgument(3, Integer.class)));
+    }
+
+    private static Block blockAt(Level level, int id, int x, int y, int z) {
+        Block block = Block.get(id);
+        block.setLevel(level);
+        block.setComponents(x, y, z);
+        return block;
     }
 
     private static FullChunk newMockChunk(Level level) {
@@ -455,6 +548,16 @@ public class ArmorDamageReductionTest {
         @Override
         public int getNetworkId() {
             return -1;
+        }
+
+        @Override
+        public float getWidth() {
+            return 0.6f;
+        }
+
+        @Override
+        public float getHeight() {
+            return 1.8f;
         }
     }
 
