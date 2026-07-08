@@ -1,5 +1,6 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.AdventureSettings.Type;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -2563,7 +2564,7 @@ public abstract class Entity extends Location implements Metadatable {
                     }
                 }
 
-                if (down.getId() == BlockID.FARMLAND) {
+                if (down.getId() == BlockID.FARMLAND && canTrampleFarmland()) {
                     Event ev;
 
                     if (this instanceof Player player) {
@@ -2580,6 +2581,13 @@ public abstract class Entity extends Location implements Metadatable {
                 }
             }
         }
+    }
+
+    protected boolean canTrampleFarmland() {
+        if (this instanceof Player player) {
+            return !player.getAdventureSettings().get(Type.FLYING);
+        }
+        return true;
     }
 
     public void moveFlying(float strafe, float forward, float friction) {
