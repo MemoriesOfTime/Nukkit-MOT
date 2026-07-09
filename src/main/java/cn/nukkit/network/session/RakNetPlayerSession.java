@@ -113,31 +113,6 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             }
 
             byte[] packetBuffer;
-
-            if(buffer.readableBytes() >= 3 && (byte) (buffer.getUnsignedByte(1) & 0xff) == (byte) 0x78 && buffer.readableBytes() >= 3 && (byte) (buffer.getUnsignedByte(2) & 0xff) == (byte) 0xda){ //1.1的数据包，0xfe后面必定是 0x78 0xda这两个字节
-                // 1.1 batchpacket 处理
-                packetBuffer = new byte[buffer.readableBytes()];
-                buffer.readBytes(packetBuffer);
-
-                if(!this.server.getNetwork().processBatch(packetBuffer, this.inbound, compressionIn, 7, this.player)){
-                    this.disconnect("Sent malformed packet");
-                    Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
-                        try {
-                            InetAddress address = this.channel.remoteAddress().getAddress();
-                            this.channel.unsafe().close(this.channel.voidPromise());
-                            if (shouldBlockAddressAfterMalformed(this.state.getLogin().getPhase(), address)) {
-                                this.server.blockAddress(address, 60);
-                            }
-                        } catch (Throwable throwable) {
-                            if (Nukkit.DEBUG > 1) {
-                                log.info("Error while closing channel", throwable);
-                            }
-                        }
-                    }, 10);
-                }
-                return;
-            }
-
             boolean ci = this.shouldUsePrefixedCompression();
 
             if (this.decryptionCipher != null) {
@@ -182,6 +157,28 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                 packetBuffer = new byte[buffer.readableBytes()];
             }
 
+            if ( buffer.readableBytes() >= 3 && (byte) ((buffer.getUnsignedByte(buffer.readerIndex()) & 0xff)) == (byte) 0x78  && (byte) (buffer.getUnsignedByte(buffer.readerIndex()+1) & 0xff) == (byte) 0xda && decryptionCipher == null){ //1.1的数据包，0xfe后面必定是 0x78 0xda这两个字节
+                // 1.1 batchpacket 处理
+                buffer.readBytes(packetBuffer);
+
+                if (!this.server.getNetwork().processBatch(packetBuffer, this.inbound, compressionIn, 7, this.player)){
+                    this.disconnect("Sent malformed packet");
+                    Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
+                        try {
+                            InetAddress address = this.channel.remoteAddress().getAddress();
+                            this.channel.unsafe().close(this.channel.voidPromise());
+                            if (shouldBlockAddressAfterMalformed(this.state.getLogin().getPhase(), address)) {
+                                this.server.blockAddress(address, 60);
+                            }
+                        } catch (Throwable throwable) {
+                            if (Nukkit.DEBUG > 1) {
+                                log.info("Error while closing channel", throwable);
+                            }
+                        }
+                    }, 10);
+                }
+                return;
+            }
             buffer.readBytes(packetBuffer);
 
             if (!this.processInboundBatch(packetBuffer, ci)) {
