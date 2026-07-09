@@ -285,7 +285,9 @@ public class CraftingManager {
                 String type = (String) ingredient.get("type");
                 if (!"default".equals(type)) {
                     if ("item_tag".equals(type)) {
-                        buildShapelessRecipeItemTagOverrides(itemMapping, input, outputItem, (String) ingredient.get("itemTag"), null, null);
+                        int priority = (int) recipe.getOrDefault("priority", 0);
+                        buildShapelessRecipeItemTagOverrides(itemMapping, input, outputItem,
+                                (String) recipe.get("id"), priority, (String) ingredient.get("itemTag"), null, null);
                     } else {
                         log.trace("Unknown shapeless ingredient type: {}", recipe);
                     }
@@ -381,7 +383,9 @@ public class CraftingManager {
                 String type = (String) ingredientEntry.getValue().get("type");
                 if (!"default".equals(type)) {
                     if ("item_tag".equals(type)) {
-                        buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs, (String) ingredientEntry.getValue().get("itemTag"), null, null);
+                        int priority = (int) recipe.getOrDefault("priority", 0);
+                        buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs,
+                                (String) recipe.get("id"), priority, (String) ingredientEntry.getValue().get("itemTag"), null, null);
                     } else if ("complex_alias".equals(type)) {
                         switch ((String) recipe.get("id")) {
                             case "minecraft:painting":
@@ -604,7 +608,9 @@ public class CraftingManager {
     }
 
     @SuppressWarnings("unchecked")
-    private void buildShapelessRecipeItemTagOverrides(RuntimeItemMapping itemMapping, List<Map> input, Item outputItem, String toReplaceTag, String replaceOtherTagKey, String replaceOtherTagValue) {
+    private void buildShapelessRecipeItemTagOverrides(RuntimeItemMapping itemMapping, List<Map> input, Item outputItem,
+                                                      String recipeId, int priority, String toReplaceTag,
+                                                      String replaceOtherTagKey, String replaceOtherTagValue) {
         Set<String> tags = ItemTag.getItemSet(toReplaceTag);
         if (tags.isEmpty()) {
             log.trace("Unknown item tag: {}", toReplaceTag);
@@ -635,7 +641,8 @@ public class CraftingManager {
                                     expandLegacy = expandableLegacyId;
                                 }
                             } else {
-                                buildShapelessRecipeItemTagOverrides(itemMapping, input, outputItem, itemTag, toReplaceTag, material);
+                                buildShapelessRecipeItemTagOverrides(itemMapping, input, outputItem, recipeId, priority,
+                                        itemTag, toReplaceTag, material);
                                 continue top;
                             }
                         } else {
@@ -674,16 +681,21 @@ public class CraftingManager {
                             item.setDamage(meta);
                         }
                     }
-                    this.registerRecipe(new ShapelessRecipe(null, 0, outputItem, sorted));
+                    this.registerRecipe(new ShapelessRecipe(recipeIdForTagExpansion(recipeId, sorted), priority,
+                            outputItem, sorted));
                 }
             } else {
-                this.registerRecipe(new ShapelessRecipe(null, 0, outputItem, sorted));
+                this.registerRecipe(new ShapelessRecipe(recipeIdForTagExpansion(recipeId, sorted), priority,
+                        outputItem, sorted));
             }
         }
     }
 
     @SuppressWarnings("unchecked")
-    private void buildShapedRecipeItemTagOverrides(RuntimeItemMapping itemMapping, Map<String, Map<String, Object>> input, String[] shape, Item outputItem, List<Item> extraOutputs, String toReplaceTag, String replaceOtherTagKey, String replaceOtherTagValue) {
+    private void buildShapedRecipeItemTagOverrides(RuntimeItemMapping itemMapping, Map<String, Map<String, Object>> input,
+                                                   String[] shape, Item outputItem, List<Item> extraOutputs,
+                                                   String recipeId, int priority, String toReplaceTag,
+                                                   String replaceOtherTagKey, String replaceOtherTagValue) {
         Set<String> tags = ItemTag.getItemSet(toReplaceTag);
         if (tags.isEmpty()) {
             log.trace("Unknown item tag: {}", toReplaceTag);
@@ -714,7 +726,8 @@ public class CraftingManager {
                                     expandLegacy = expandableLegacyId;
                                 }
                             } else {
-                                buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs, itemTag, toReplaceTag, material);
+                                buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs,
+                                        recipeId, priority, itemTag, toReplaceTag, material);
                                 continue top;
                             }
                         } else {
@@ -751,12 +764,35 @@ public class CraftingManager {
                             item.setDamage(meta);
                         }
                     }
-                    this.registerRecipe(new ShapedRecipe(null, 0, outputItem, shape, ingredients, extraOutputs));
+                    this.registerRecipe(new ShapedRecipe(recipeIdForTagExpansion(recipeId, ingredients.values()),
+                            priority, outputItem, shape, ingredients, extraOutputs));
                 }
             } else {
-                this.registerRecipe(new ShapedRecipe(null, 0, outputItem, shape, ingredients, extraOutputs));
+                this.registerRecipe(new ShapedRecipe(recipeIdForTagExpansion(recipeId, ingredients.values()),
+                        priority, outputItem, shape, ingredients, extraOutputs));
             }
         }
+    }
+
+    private static String recipeIdForTagExpansion(String recipeId, Collection<Item> ingredients) {
+        if (recipeId == null) {
+            return null;
+        }
+        StringJoiner suffix = new StringJoiner("_", recipeId + "_from_", "");
+        ingredients.stream()
+                .map(CraftingManager::recipeIdIngredientName)
+                .distinct()
+                .sorted()
+                .forEach(suffix::add);
+        return suffix.toString();
+    }
+
+    private static String recipeIdIngredientName(Item item) {
+        String namespaceId = item.getNamespaceId(GameVersion.getLastVersion());
+        int colon = namespaceId.indexOf(':');
+        String name = colon >= 0 ? namespaceId.substring(colon + 1) : namespaceId;
+        int meta = item.getDamage();
+        return meta == 0 ? name : name + "_" + meta;
     }
 
     private BatchPacket packetFor(GameVersion gameVersion) {
