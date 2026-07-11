@@ -379,7 +379,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private volatile int tickRate;
     public volatile int tickRateTime = 0;
-    public int tickRateCounter = 0;
+    public volatile int tickRateCounter = 0;
 
     // Notice: These shouldn't be used in the internal methods
     // Check the dimension id instead
@@ -432,7 +432,8 @@ public class Level implements ChunkManager, Metadatable {
     // === Parallel level tick fields ===
     private volatile boolean parallelTickEnabled;
     private volatile boolean intentionalStop;
-    private GameLoop gameLoop;
+    // volatile: addSyncPacketToQueue/scheduleSyncTask 可从其他线程读取 gameLoop / readable from other threads via scheduleSyncTask/addSyncPacketToQueue
+    private volatile GameLoop gameLoop;
     private volatile Thread levelThread;
     private volatile long nextLevelThreadTick;
     private final Queue<Runnable> syncTaskQueue = new ConcurrentLinkedQueue<>();

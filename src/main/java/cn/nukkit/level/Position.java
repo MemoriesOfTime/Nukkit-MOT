@@ -17,7 +17,8 @@ import java.util.Set;
  */
 public class Position extends Vector3 {
 
-    public Level level;
+    // volatile: 并行世界线程下，switchLevel 对该字段的写入需要对其他线程可见 / volatile so switchLevel writes are visible to level threads reading getLevel()
+    public volatile Level level;
 
     public Position() {
         this(0, 0, 0, null);

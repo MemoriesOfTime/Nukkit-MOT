@@ -24,8 +24,10 @@ public final class GameLoop {
     private final int loopCountPerSec;
     private final float[] tickSummary;
     private final float[] msptSummary;
-    private int ringIndex;
-    private long tick;
+    // volatile: 保证 getTPS/getMSPT 读取时能看到最新的 ringIndex / visible to getTPS/getMSPT callers on other threads
+    private volatile int ringIndex;
+    // volatile: getTick() 会被主线程读取（如 stopLevelThread），而 tick++ 在 loop 线程 / volatile so getTick() reads from the main thread see the latest value
+    private volatile long tick;
 
     private GameLoop(Runnable onStart, GameLoopTickCallback onTick,
                      Runnable onIdle, Runnable onStop,

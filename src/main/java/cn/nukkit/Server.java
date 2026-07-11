@@ -259,7 +259,8 @@ public class Server {
         }
     };
 
-    private Level[] levelArray = new Level[0];
+    // volatile 保证并行世界线程能及时看到 levelArray 的更新 / volatile so level threads observe the latest array reference
+    private volatile Level[] levelArray = new Level[0];
     private final ServiceManager serviceManager = new NKServiceManager();
     private Level defaultLevel;
     private final Thread currentThread;

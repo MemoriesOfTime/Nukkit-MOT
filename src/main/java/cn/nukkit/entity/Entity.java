@@ -52,6 +52,7 @@ import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
 import static cn.nukkit.utils.Utils.dynamic;
@@ -428,7 +429,8 @@ public abstract class Entity extends Location implements Metadatable {
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
 
-    public static long entityCount = 1;
+    // 使用 AtomicLong 防止并行世界线程并发分配实体 ID 导致重复 / Use AtomicLong to prevent duplicate entity IDs when levels tick in parallel
+    public static final AtomicLong entityCount = new AtomicLong(1);
 
     private static final Map<String, Class<? extends Entity>> knownEntities = new HashMap<>();
     private static final Map<String, String> shortNames = new HashMap<>();
@@ -696,19 +698,18 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (Server.getInstance().netEaseMode) {
             // 2^31 - 2^33 给网易uid预留使用
-            if (entityCount >= Integer.MAX_VALUE && entityCount < Integer.MAX_VALUE * 4L) {
-                entityCount = Integer.MAX_VALUE * 4L;
+            if (entityCount.get() >= Integer.MAX_VALUE && entityCount.get() < Integer.MAX_VALUE * 4L) {
+                entityCount.set(Integer.MAX_VALUE * 4L);
             }
 
             if (this instanceof Player player) {
                 long uid = player.getLoginChainData().getNetEaseUID();
-                this.id = uid > Integer.MAX_VALUE ? uid : entityCount;
+                this.id = uid > Integer.MAX_VALUE ? uid : entityCount.getAndIncrement();
             } else {
-                this.id = entityCount;
+                this.id = entityCount.getAndIncrement();
             }
-            entityCount++;
         } else {
-            this.id = entityCount++;
+            this.id = entityCount.getAndIncrement();
         }
 
         this.justCreated = true;
