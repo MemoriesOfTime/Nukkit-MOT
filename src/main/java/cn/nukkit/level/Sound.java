@@ -427,6 +427,7 @@ public enum Sound {
     ITEM_SHIELD_BLOCK("item.shield.block"),
     ITEM_SPYGLASS_STOP_USING("item.spyglass.stop_using"),
     ITEM_SPYGLASS_USE("item.spyglass.use"),
+    ITEM_SPEAR_LUNGE("item.spear.lunge"),
     ITEM_TRIDENT_HIT("item.trident.hit"),
     ITEM_TRIDENT_HIT_GROUND("item.trident.hit_ground"),
     ITEM_TRIDENT_RETURN("item.trident.return"),

@@ -43,3 +43,4 @@ dependency-reduced-pom.xml
 /logs
 /.gradle/
 /bin/
+.codex

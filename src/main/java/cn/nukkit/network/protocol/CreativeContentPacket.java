@@ -5,6 +5,8 @@ import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemGroup;
 import lombok.ToString;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @ToString
@@ -47,15 +49,20 @@ public class CreativeContentPacket extends DataPacket {
         }
 
         if (this.protocol >= ProtocolInfo.v1_21_60) {
-            this.putArray(this.creativeItems.getGroups(), this::writeGroup);
-
             Map<Item, CreativeItemGroup> contents = this.creativeItems.getContents(this.gameVersion);
+            List<CreativeItemGroup> groups = this.creativeItems.getGroups(this.gameVersion);
+            Map<CreativeItemGroup, Integer> groupIdMap = new HashMap<>(groups.size());
+            for (int i = 0; i < groups.size(); i++) {
+                groupIdMap.put(groups.get(i), i);
+            }
+
+            this.putArray(groups, this::writeGroup);
             this.putUnsignedVarInt(contents.size());
             int creativeNetId = 1; // 0 is not indexed by client
             for (Map.Entry<Item, CreativeItemGroup> entry : contents.entrySet()) {
                 this.putUnsignedVarInt(creativeNetId++);
                 this.putSlot(gameVersion, entry.getKey(), true);
-                this.putUnsignedVarInt(entry.getValue() != null ? entry.getValue().getGroupId() : 0);
+                this.putUnsignedVarInt(entry.getValue() != null ? groupIdMap.getOrDefault(entry.getValue(), 0) : 0);
             }
         } else {
             Collection<Item> items = this.creativeItems.getItems(this.gameVersion);

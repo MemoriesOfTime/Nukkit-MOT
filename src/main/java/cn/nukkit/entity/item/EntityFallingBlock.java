@@ -24,6 +24,10 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.utils.CollisionHelper;
+
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * @author MagicDroidX
@@ -31,6 +35,11 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class EntityFallingBlock extends Entity {
 
     public static final int NETWORK_ID = 66;
+
+    protected static final int OUT_OF_WORLD_DESPAWN_TIME = 100;
+    protected static final int DESPAWN_TIME = 600;
+    protected static final double OVERLAP_RELOCATION_STEP = 1.001;
+    protected static final int MAX_CONSECUTIVE_OVERLAP_RELOCATIONS = 3;
 
     @Override
     public float getWidth() {
@@ -70,6 +79,9 @@ public class EntityFallingBlock extends Entity {
     protected int blockId;
     protected int damage;
     protected boolean breakOnLava;
+    protected int aliveTime;
+    protected int overlapRelocationCount;
+    protected boolean relocatedForOverlap;
 
     public EntityFallingBlock(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -92,6 +104,7 @@ public class EntityFallingBlock extends Entity {
             }
 
             this.breakOnLava = this.namedTag.getBoolean("BreakOnLava");
+            this.aliveTime = this.namedTag.getInt("Time");
         }
 
         if (this.blockId == 0) {
@@ -146,6 +159,8 @@ public class EntityFallingBlock extends Entity {
             return false;
         }
 
+        refreshOverlapRelocationState();
+
         int tickDiff = currentTick - lastUpdate;
         if (tickDiff <= 0 && !justCreated) {
             return true;
@@ -165,8 +180,17 @@ public class EntityFallingBlock extends Entity {
             motionX *= friction;
             motionY *= 1 - this.getDrag();
             motionZ *= friction;
+            this.aliveTime += tickDiff;
 
             Vector3 pos = new Vector3(x - 0.5, y, z - 0.5).round();
+            if (shouldDespawn(this.aliveTime, this.onGround, this.getFloorY(), this.level.getDimensionData().getMinHeight(), this.level.getDimensionData().getMaxHeight())) {
+                this.close();
+                if (this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
+                    this.level.dropItem(this, Block.get(this.getBlock(), this.getDamage()).toItem());
+                }
+                return true;
+            }
+
             if (breakOnLava && level.getBlock(pos.subtract(0, 1, 0)) instanceof BlockLava) {
                 this.close();
                 if (this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
@@ -176,19 +200,29 @@ public class EntityFallingBlock extends Entity {
                 return true;
             }
 
+            if (!this.onGround && this.motionY >= 0) {
+                Block below = this.level.getBlock(this.getFloorX(), this.getFloorY() - 1, this.getFloorZ());
+                if (!below.canPassThrough()) {
+                    this.close();
+                    if (this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
+                        this.level.dropItem(this, Block.get(this.getBlock(), this.getDamage()).toItem());
+                    }
+                    return true;
+                }
+            }
+
             if (this.onGround) {
                 this.close();
 
-                Block block = this.level.getBlock(pos);
-                Block floorBlock = this.level.getBlock(pos);
-                if (this.getBlock() == Block.SNOW_LAYER && floorBlock.getId() == Block.SNOW_LAYER && (floorBlock.getDamage() & 0x7) != 0x7) {
-                    int mergedHeight = (floorBlock.getDamage() & 0x7) + 1 + (this.getDamage() & 0x7) + 1;
+                Block landingBlock = this.level.getBlock(this.add(0, 0.0001, 0));
+                if (this.getBlock() == Block.SNOW_LAYER && landingBlock.getId() == Block.SNOW_LAYER && (landingBlock.getDamage() & 0x7) != 0x7) {
+                    int mergedHeight = (landingBlock.getDamage() & 0x7) + 1 + (this.getDamage() & 0x7) + 1;
                     if (mergedHeight > 8) {
-                        EntityBlockChangeEvent event = new EntityBlockChangeEvent(this, floorBlock, Block.get(Block.SNOW_LAYER, 0x7));
+                        EntityBlockChangeEvent event = new EntityBlockChangeEvent(this, landingBlock, Block.get(Block.SNOW_LAYER, 0x7));
                         this.server.getPluginManager().callEvent(event);
                         if (!event.isCancelled()) {
-                            this.level.setBlock(pos, event.getTo(), true);
-                            Vector3 abovePos = pos.up();
+                            this.level.setBlock(landingBlock, event.getTo(), true);
+                            Vector3 abovePos = landingBlock.up();
                             Block aboveBlock = this.level.getBlock(abovePos);
                             if (aboveBlock.getId() == Block.AIR) {
                                 EntityBlockChangeEvent event2 = new EntityBlockChangeEvent(this, aboveBlock, Block.get(Block.SNOW_LAYER, mergedHeight - 9)); // -8-1
@@ -199,35 +233,27 @@ public class EntityFallingBlock extends Entity {
                             }
                         }
                     } else {
-                        EntityBlockChangeEvent event = new EntityBlockChangeEvent(this, floorBlock, Block.get(Block.SNOW_LAYER, mergedHeight - 1));
+                        EntityBlockChangeEvent event = new EntityBlockChangeEvent(this, landingBlock, Block.get(Block.SNOW_LAYER, mergedHeight - 1));
                         this.server.getPluginManager().callEvent(event);
                         if (!event.isCancelled()) {
-                            this.level.setBlock(pos, event.getTo(), true);
+                            this.level.setBlock(landingBlock, event.getTo(), true);
                         }
                     }
-                } else if ((block.isTransparent() && !block.canBeReplaced() || this.getBlock() == Block.SNOW_LAYER && block instanceof BlockLiquid)) {
+                } else if (shouldDropOnLanding(landingBlock, this.getBlock())) {
                     if (this.getBlock() != Block.SNOW_LAYER ? this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS) : this.level.getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
                         this.level.dropItem(this, Block.get(this.getBlock(), this.getDamage()).toItem());
                     }
-                } else if (floorBlock.canBeReplaced()) {
-                    EntityBlockChangeEvent event = new EntityBlockChangeEvent(this, block, Block.get(blockId, damage));
+                } else if (landingBlock.canBeReplaced()) {
+                    EntityBlockChangeEvent event = new EntityBlockChangeEvent(this, landingBlock, Block.get(blockId, damage));
                     this.server.getPluginManager().callEvent(event);
                     if (!event.isCancelled()) {
-                        this.level.setBlock(pos, event.getTo(), true, true);
-                        this.level.scheduleUpdate(this.level.getBlock(pos), 1);
+                        this.level.setBlock(landingBlock, event.getTo(), true, true);
+                        this.level.scheduleUpdate(this.level.getBlock(landingBlock), 1);
 
-                        //== 临时修复掉落方块问题
-                        // 可能原因：onGround更新不及时 或者两个EntityFallingBlock离得太近，导致核心误判为同一位置
-                        // 这里检查重叠的EntityFallingBlock，并将其上移一格，防止多个EntityFallingBlock设置到同一坐标
+                        // Relocate overlapping falling blocks upward to avoid repeated landing in the same position
                         AxisAlignedBB bb = this.getBoundingBox();
                         bb.setMaxY(bb.getMaxY() + 0.021); //实体高度为0.98，这里增加一点防止误判
-                        Entity[] entities = level.getCollidingEntities(bb);
-                        for (Entity entity : entities) {
-                            if (entity instanceof EntityFallingBlock) {
-                                entity.teleport(entity.add(0, 1.1, 0), null);
-                            }
-                        }
-                        //== 临时修复掉落方块问题
+                        resolveOverlappingFallingBlocks(CollisionHelper.getCollidingEntities(this.level, bb), landingBlock.y);
 
                         if (event.getTo().getId() == Item.ANVIL || blockId == Item.POINTED_DRIPSTONE) {
                             if (blockId == Item.ANVIL) {
@@ -236,7 +262,7 @@ public class EntityFallingBlock extends Entity {
                                 this.getLevel().dropItem(this, Block.get(blockId, event.getTo().getDamage()).toItem());
                             }
 
-                            Entity[] e = level.getCollidingEntities(this.getBoundingBox(), this);
+                            List<Entity> e = CollisionHelper.getCollidingEntities(this.level, this.getBoundingBox(), this);
                             for (Entity entity : e) {
                                 if (entity instanceof EntityLiving && highestPosition > y) {
                                     entity.attack(new EntityDamageByBlockEvent(event.getTo(), entity, DamageCause.CONTACT, (float) Math.min(40, Math.max(0, (highestPosition - y) * 2))));
@@ -269,12 +295,79 @@ public class EntityFallingBlock extends Entity {
 
     @Override
     public void saveNBT() {
+        super.saveNBT();
+
         namedTag.putInt("TileID", blockId);
         namedTag.putByte("Data", damage);
+        namedTag.putInt("Time", aliveTime);
     }
 
     @Override
     public boolean canBeMovedByCurrents() {
+        return !this.onGround;
+    }
+
+    protected static boolean shouldDespawn(int aliveTime, boolean onGround, int blockY, int minHeight, int maxHeight) {
+        return !onGround && ((aliveTime > OUT_OF_WORLD_DESPAWN_TIME && (blockY <= minHeight || blockY > maxHeight))
+                || aliveTime > DESPAWN_TIME);
+    }
+
+    protected static boolean shouldDropOnLanding(Block landingBlock, int fallingBlockId) {
+        return !landingBlock.canBeReplaced()
+                || fallingBlockId == Block.SNOW_LAYER && landingBlock instanceof BlockLiquid;
+    }
+
+    protected static void resolveOverlappingFallingBlocks(List<Entity> collidingEntities, double baseY) {
+        List<EntityFallingBlock> overlaps = collidingEntities.stream()
+                .filter(EntityFallingBlock.class::isInstance)
+                .map(EntityFallingBlock.class::cast)
+                .filter(entity -> !entity.closed)
+                .sorted(Comparator.comparingDouble((EntityFallingBlock entity) -> entity.y)
+                        .thenComparingLong(Entity::getId))
+                .toList();
+
+        double targetY = baseY + OVERLAP_RELOCATION_STEP;
+        for (EntityFallingBlock overlap : overlaps) {
+            overlap.relocateForContinuedFalling(new Vector3(overlap.x, targetY, overlap.z));
+            targetY += OVERLAP_RELOCATION_STEP;
+        }
+    }
+
+    protected void refreshOverlapRelocationState() {
+        if (this.relocatedForOverlap) {
+            this.relocatedForOverlap = false;
+        } else if (this.overlapRelocationCount != 0) {
+            this.overlapRelocationCount = 0;
+        }
+    }
+
+    protected boolean relocateForContinuedFalling(Vector3 targetPos) {
+        int nextRelocationCount = this.overlapRelocationCount + 1;
+        if (nextRelocationCount > MAX_CONSECUTIVE_OVERLAP_RELOCATIONS) {
+            return dropDueToRepeatedOverlapRelocation();
+        }
+
+        if (!this.setPosition(targetPos)) {
+            return false;
+        }
+
+        this.overlapRelocationCount = nextRelocationCount;
+        this.relocatedForOverlap = true;
+        this.onGround = false;
+        this.isCollided = false;
+        this.isCollidedVertically = false;
+        this.isCollidedHorizontally = false;
+        this.blocksAround = null;
+        this.collisionBlocks = null;
+        this.updateMovement();
+        return true;
+    }
+
+    protected boolean dropDueToRepeatedOverlapRelocation() {
+        this.close();
+        if (this.level != null && this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
+            this.level.dropItem(this, Block.get(this.getBlock(), this.getDamage()).toItem());
+        }
         return false;
     }
 

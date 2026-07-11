@@ -105,6 +105,7 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_21_30.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_40.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_60.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_110.INSTANCE);
 
         blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
 

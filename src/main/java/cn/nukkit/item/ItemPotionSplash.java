@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.nbt.tag.CompoundTag;
 
 /**
@@ -39,5 +40,10 @@ public class ItemPotionSplash extends ProjectileItem {
     @Override
     protected void correctNBT(CompoundTag nbt) {
         nbt.putInt("PotionId", this.meta);
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return ItemPotion.isPotionMetaSupported(this.getDamage(), protocolId);
     }
 }

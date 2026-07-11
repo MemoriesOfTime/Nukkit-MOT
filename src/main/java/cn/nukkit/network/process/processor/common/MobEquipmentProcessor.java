@@ -29,7 +29,7 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull MobEquipmentPacket pk) {
         Player player = playerHandle.player;
-        
+
         if (!player.spawned || !player.isAlive()) {
             return;
         }
@@ -55,7 +55,6 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
             } else {
                 player.getServer().getLogger().debug("Tried to equip " + pk.item + " but have " + fixItem + " in target slot");
                 inv.sendContents(player);
-                return;
             }
         }
 

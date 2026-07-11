@@ -46,15 +46,15 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
         }
     }
 
-    private static int getArmorSlot(ItemArmor armorItem) {
+    private static int getArmorSlot(Item armorItem) {
         if (armorItem.canBePutInHelmetSlot()) {
-            return 0;
+            return EntityArmorInventory.SLOT_HEAD;
         } else if (armorItem.isChestplate()) {
-            return 1;
+            return EntityArmorInventory.SLOT_CHEST;
         } else if (armorItem.isLeggings()) {
-            return 2;
+            return EntityArmorInventory.SLOT_LEGS;
         } else {
-            return 3;
+            return EntityArmorInventory.SLOT_FEET;
         }
     }
 
@@ -134,48 +134,50 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
                 this.setPose(this.getPose() + 1);
             }
             this.sendData(this.getViewers().values().toArray(Player.EMPTY_ARRAY));
+            this.markChunkChanged();
             return false; // do not consume item
         }
 
         if (this.isValid() && !player.isSpectator()) {
-            int i = 0;
-            boolean flag = !item.isNull();
-            boolean isArmorSlot = false;
+            int slot;
+            boolean isArmorSlot;
+            boolean hasItemInHand = !item.isNull();
 
-            if (flag && item instanceof ItemArmor itemArmor) {
-                i = getArmorSlot(itemArmor);
+            if (hasItemInHand && (item.isArmor() || item instanceof ItemArmor)) {
+                slot = getArmorSlot(item);
                 isArmorSlot = true;
-            }
-
-            if (flag && (item.getId() == Item.SKULL) || item.getId() == (255 - BlockID.CARVED_PUMPKIN)) {
-                i = 0;
+            } else if (hasItemInHand && (item.getId() == Item.SKULL || item.getBlockId() == BlockID.CARVED_PUMPKIN)) {
+                slot = EntityArmorInventory.SLOT_HEAD;
                 isArmorSlot = true;
+            } else if (hasItemInHand) {
+                slot = item.isShield() ? EntityEquipmentInventory.OFFHAND : EntityEquipmentInventory.MAINHAND;
+                isArmorSlot = false;
+            } else {
+                double d3 = clickedPos.y - this.y;
+                if (d3 >= 0.1 && d3 < 0.55 && !this.armorInventory.getItemFast(EntityArmorInventory.SLOT_FEET).isNull()) {
+                    slot = EntityArmorInventory.SLOT_FEET;
+                    isArmorSlot = true;
+                } else if (d3 >= 0.9 && d3 < 1.6 && !this.armorInventory.getItemFast(EntityArmorInventory.SLOT_CHEST).isNull()) {
+                    slot = EntityArmorInventory.SLOT_CHEST;
+                    isArmorSlot = true;
+                } else if (d3 >= 0.4 && d3 < 1.2 && !this.armorInventory.getItemFast(EntityArmorInventory.SLOT_LEGS).isNull()) {
+                    slot = EntityArmorInventory.SLOT_LEGS;
+                    isArmorSlot = true;
+                } else if (d3 >= 1.6 && !this.armorInventory.getItemFast(EntityArmorInventory.SLOT_HEAD).isNull()) {
+                    slot = EntityArmorInventory.SLOT_HEAD;
+                    isArmorSlot = true;
+                } else if (!this.equipmentInventory.getItemFast(EntityEquipmentInventory.OFFHAND).isNull()) {
+                    slot = EntityEquipmentInventory.OFFHAND;
+                    isArmorSlot = false;
+                } else if (!this.equipmentInventory.getItemFast(EntityEquipmentInventory.MAINHAND).isNull()) {
+                    slot = EntityEquipmentInventory.MAINHAND;
+                    isArmorSlot = false;
+                } else {
+                    return false;
+                }
             }
 
-            int j = 0;
-            double d3 = clickedPos.y - this.y;
-            boolean flag2 = false;
-
-            if (d3 >= 0.1 && d3 < 0.55 && !this.armorInventory.getItemFast(EntityArmorInventory.SLOT_FEET).isNull()) {
-                j = 3;
-                flag2 = isArmorSlot = true;
-            } else if (d3 >= 0.9 && d3 < 1.6 && !this.armorInventory.getItemFast(EntityArmorInventory.SLOT_CHEST).isNull()) {
-                j = 1;
-                flag2 = isArmorSlot = true;
-            } else if (d3 >= 0.4 && d3 < 1.2 && !this.armorInventory.getItemFast(EntityArmorInventory.SLOT_LEGS).isNull()) {
-                j = 2;
-                flag2 = isArmorSlot = true;
-            } else if (d3 >= 1.6 && !this.armorInventory.getItemFast(EntityArmorInventory.SLOT_HEAD).isNull()) {
-                flag2 = isArmorSlot = true;
-            } else if (!this.equipmentInventory.getItemFast(j).isNull()) {
-                flag2 = true;
-            }
-
-            if (flag) {
-                this.tryChangeEquipment(player, item, i, isArmorSlot);
-            } else if (flag2) {
-                this.tryChangeEquipment(player, item, j, isArmorSlot);
-            }
+            this.tryChangeEquipment(player, item, slot, isArmorSlot);
             return false; // Item set in tryChangeEquipment
         }
         return false;
@@ -215,6 +217,13 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
         Collection<Player> viewers = this.getViewers().values();
         this.equipmentInventory.sendContents(viewers);
         this.armorInventory.sendContents(viewers);
+        this.markChunkChanged();
+    }
+
+    private void markChunkChanged() {
+        if (this.chunk != null) {
+            this.chunk.setChanged();
+        }
     }
 
     public int getPose() {

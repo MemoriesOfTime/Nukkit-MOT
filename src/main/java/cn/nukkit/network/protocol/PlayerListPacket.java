@@ -33,8 +33,10 @@ public class PlayerListPacket extends DataPacket {
         switch (type) {
             case TYPE_ADD:
                 for (Entry entry : this.entries) {
-                    this.putUUID(entry.uuid);
-                    this.putVarLong(entry.entityId);
+                    if (protocol >= ProtocolInfo.v1_2_13) {
+                        this.putUUID(entry.uuid);
+                    }
+                    this.putEntityUniqueId(entry.entityId);
                     this.putString(entry.name);
                     if (protocol >= ProtocolInfo.v1_2_13 && protocol <= ProtocolInfo.v1_6_0) {
                         this.putString("");
@@ -42,9 +44,6 @@ public class PlayerListPacket extends DataPacket {
                     }
                     if (protocol < ProtocolInfo.v1_13_0) {
                         this.putSkin(protocol, entry.skin);
-                        if (protocol < ProtocolInfo.v1_2_13) {
-                            this.putByteArray(new byte[0]);
-                        }
                     }
                     this.putString(entry.xboxUserId);
                     if (protocol >= ProtocolInfo.v1_2_13) {
@@ -71,7 +70,9 @@ public class PlayerListPacket extends DataPacket {
                 break;
             case TYPE_REMOVE:
                 for (Entry entry : this.entries) {
-                    this.putUUID(entry.uuid);
+                    if (protocol >= ProtocolInfo.v1_2_13) {
+                        this.putUUID(entry.uuid);
+                    }
                 }
         }
     }

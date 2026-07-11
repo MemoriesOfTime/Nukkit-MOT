@@ -42,11 +42,12 @@ public class InventoryContentPacket extends DataPacket {
     /**
      * @since v748
      */
-    public Item storageItem;
+    public Item storageItem = Item.AIR_ITEM.clone();
 
     @Override
     public DataPacket clean() {
         this.slots = Item.EMPTY_ARRAY;
+        this.storageItem = Item.AIR_ITEM.clone();
         return super.clean();
     }
 
@@ -70,12 +71,18 @@ public class InventoryContentPacket extends DataPacket {
             if (protocol >= 407 && protocol < ProtocolInfo.v1_16_220) {
                 this.putVarInt(networkId);
             }
-            this.putSlot(gameVersion, slot);
+            if (this.protocol >= ProtocolInfo.v1_26_30) {
+                this.putNetworkItemStackDescriptor(gameVersion, slot);
+            } else {
+                this.putSlot(gameVersion, slot);
+            }
         }
         if (this.protocol >= ProtocolInfo.v1_21_30) {
-            this.putByte((byte) this.containerNameData.getContainer().getId());
+            this.putByte((byte) this.containerNameData.getContainer().getId(this.gameVersion));
             this.putOptionalNull(this.containerNameData.getDynamicId(), this::putLInt);
-            if (this.protocol >= ProtocolInfo.v1_21_40) {
+            if (this.protocol >= ProtocolInfo.v1_26_30) {
+                this.putNetworkItemStackDescriptor(gameVersion, this.storageItem);
+            } else if (this.protocol >= ProtocolInfo.v1_21_40) {
                 this.putSlot(gameVersion, this.storageItem);
             } else {
                 this.putUnsignedVarInt(this.dynamicContainerSize);

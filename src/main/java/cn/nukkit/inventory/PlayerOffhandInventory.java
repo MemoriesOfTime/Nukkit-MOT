@@ -13,14 +13,15 @@ import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 
 public class PlayerOffhandInventory extends BaseInventory {
+    private static final int OFFHAND_CONTAINER_DYNAMIC_ID = 0;
 
     /**
      * Items that can be put to offhand inventory on Bedrock Edition
      */
-    //private static final IntSet OFFHAND_ITEMS = new IntOpenHashSet(Arrays.asList(ItemID.SHIELD, ItemID.ARROW, ItemID.TOTEM, ItemID.MAP, ItemID.FIREWORKS, ItemID.NAUTILUS_SHELL, ItemID.SPARKLER));
-
     public PlayerOffhandInventory(EntityHumanType holder) {
         super(holder, InventoryType.OFFHAND);
     }
@@ -56,6 +57,7 @@ public class PlayerOffhandInventory extends BaseInventory {
                 InventoryContentPacket pk2 = new InventoryContentPacket();
                 pk2.inventoryId = ContainerIds.OFFHAND;
                 pk2.slots = new Item[]{item};
+                pk2.containerNameData = new FullContainerName(ContainerSlotType.OFFHAND, OFFHAND_CONTAINER_DYNAMIC_ID);
                 player.dataPacket(pk2);
             } else {
                 player.dataPacket(pk);
@@ -73,11 +75,32 @@ public class PlayerOffhandInventory extends BaseInventory {
                 InventorySlotPacket pk2 = new InventorySlotPacket();
                 pk2.inventoryId = ContainerIds.OFFHAND;
                 pk2.item = item;
+                pk2.containerNameData = new FullContainerName(ContainerSlotType.OFFHAND, OFFHAND_CONTAINER_DYNAMIC_ID);
                 player.dataPacket(pk2);
             } else {
                 player.dataPacket(pk);
             }
         }
+    }
+
+    /**
+     * Sends an empty offhand view to the holder's client without modifying the stored item, so the
+     * holder sees no offhand item. Used to suppress the client-side Totem-of-Undying revival on a
+     * death the server deliberately lets bypass the totem (e.g. {@code /kill}, void), which would
+     * otherwise leave a "ghost" state (client survived, server dead). Only the holder's client is
+     * affected; other viewers are untouched.
+     */
+    public void sendEmptyContentsToHolder() {
+        EntityHuman holder = this.getHolder();
+        if (!(holder instanceof Player)) {
+            return;
+        }
+        Player player = (Player) holder;
+        player.dataPacket(this.createMobEquipmentPacket(Item.AIR_ITEM));
+        InventoryContentPacket pk = new InventoryContentPacket();
+        pk.inventoryId = ContainerIds.OFFHAND;
+        pk.slots = new Item[]{Item.AIR_ITEM};
+        player.dataPacket(pk);
     }
 
     private MobEquipmentPacket createMobEquipmentPacket(Item item) {
@@ -96,7 +119,6 @@ public class PlayerOffhandInventory extends BaseInventory {
 
     @Override
     public boolean allowedToAdd(Item item) {
-        //return OFFHAND_ITEMS.contains(item.getId());
         return true;
     }
 
@@ -130,6 +152,10 @@ public class PlayerOffhandInventory extends BaseInventory {
                 return false;
             }
             item = ev2.getNewItem();
+        }
+
+        if (item instanceof cn.nukkit.item.ItemBundle bundle) {
+            ensureUniqueBundleId(index, bundle);
         }
 
         this.slots.put(index, item.clone());

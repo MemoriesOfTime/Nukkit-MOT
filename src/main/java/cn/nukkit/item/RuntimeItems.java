@@ -52,17 +52,21 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping786;
     private static RuntimeItemMapping mapping800;
     private static RuntimeItemMapping mapping818;
+    private static RuntimeItemMapping mapping819;
     private static RuntimeItemMapping mapping827;
     private static RuntimeItemMapping mapping844;
     private static RuntimeItemMapping mapping859;
     private static RuntimeItemMapping mapping898;
     private static RuntimeItemMapping mapping924;
     private static RuntimeItemMapping mapping944;
+    private static RuntimeItemMapping mapping975;
+    private static RuntimeItemMapping mapping1001;
 
     private static RuntimeItemMapping mapping_netease_630;
     private static RuntimeItemMapping mapping_netease_686;
     private static RuntimeItemMapping mapping_netease_766;
     private static RuntimeItemMapping mapping_netease_819;
+    private static RuntimeItemMapping mapping_netease_860;
 
     public static RuntimeItemMapping[] VALUES;
 
@@ -151,17 +155,21 @@ public class RuntimeItems {
         mapping786 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_70);
         mapping800 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_80);
         mapping818 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_90);
+        mapping819 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_93);
         mapping827 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_100);
-        mapping844 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_110);
+        mapping844 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_111);
         mapping859 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_120);
         mapping898 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_130);
         mapping924 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_26_0);
         mapping944 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_26_10);
+        mapping975 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_26_20);
+        mapping1001 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_26_30);
 
         mapping_netease_630 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_50_NETEASE);
         mapping_netease_686 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_2_NETEASE);
         mapping_netease_766 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_50_NETEASE);
         mapping_netease_819 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_93_NETEASE);
+        mapping_netease_860 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_124_NETEASE);
 
         VALUES = new RuntimeItemMapping[]{
                 mapping361,
@@ -193,17 +201,21 @@ public class RuntimeItems {
                 mapping786,
                 mapping800,
                 mapping818,
+                mapping819,
                 mapping827,
                 mapping844,
                 mapping859,
                 mapping898,
                 mapping924,
                 mapping944,
+                mapping975,
+                mapping1001,
                 // NetEase
                 mapping_netease_630,
                 mapping_netease_686,
                 mapping_netease_766,
-                mapping_netease_819
+                mapping_netease_819,
+                mapping_netease_860
         };
     }
 
@@ -217,7 +229,11 @@ public class RuntimeItems {
         if (gameVersion.isNetEase()) {
             return getMappingNetEase(protocolId);
         }
-        if (protocolId >= ProtocolInfo.v1_26_10) {
+        if (protocolId >= ProtocolInfo.v1_26_30) {
+            return mapping1001;
+        } else if (protocolId >= ProtocolInfo.v1_26_20_26) {
+            return mapping975;
+        } else if (protocolId >= ProtocolInfo.v1_26_10) {
             return mapping944;
         } else if (protocolId >= ProtocolInfo.v1_26_0) {
             return mapping924;
@@ -229,6 +245,8 @@ public class RuntimeItems {
             return mapping844;
         } else if (protocolId >= ProtocolInfo.v1_21_100) {
             return mapping827;
+        } else if (protocolId >= ProtocolInfo.v1_21_93) {
+            return mapping819;
         } else if (protocolId >= ProtocolInfo.v1_21_90) {
             return mapping818;
         } else if (protocolId >= ProtocolInfo.v1_21_80) {
@@ -290,7 +308,9 @@ public class RuntimeItems {
     }
 
     private static RuntimeItemMapping getMappingNetEase(int protocolId) {
-        if (protocolId >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
+        if (protocolId >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+            return mapping_netease_860;
+        } else if (protocolId >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
             return mapping_netease_819;
         } else if (protocolId >= GameVersion.V1_21_50_NETEASE.getProtocol()) {
             return mapping_netease_766;

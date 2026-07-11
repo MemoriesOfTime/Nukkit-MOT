@@ -5,11 +5,13 @@ import cn.nukkit.Server;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemNetherWart;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
-import cn.nukkit.utils.Utils;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Created by Leonidius20 on 22.03.17.
@@ -42,7 +44,7 @@ public class BlockNetherWart extends BlockFlowable {
                 return Level.BLOCK_UPDATE_NORMAL;
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
-            if (Utils.random.nextInt(10) == 1) {
+            if (ThreadLocalRandom.current().nextInt(10) == 1) {
                 if (this.getDamage() < 0x03) {
                     BlockNetherWart block = (BlockNetherWart) this.clone();
                     block.setDamage(block.getDamage() + 1);
@@ -81,8 +83,14 @@ public class BlockNetherWart extends BlockFlowable {
     @Override
     public Item[] getDrops(Item item) {
         if (this.getDamage() == 0x03) {
+            ThreadLocalRandom random = ThreadLocalRandom.current();
+            int count = 2 + random.nextInt(3);
+            int fortuneLevel = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
+            if (fortuneLevel > 0) {
+                count += random.nextInt(fortuneLevel + 1);
+            }
             return new Item[]{
-                    new ItemNetherWart(0, 2 + (int) (Math.random() * (3)))
+                    new ItemNetherWart(0, count)
             };
         } else {
             return new Item[]{

@@ -49,38 +49,45 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
 
     public void play() {
         if (this.recordItem instanceof ItemRecord) {
-            this.getLevel().addLevelSoundEvent(this, switch (this.recordItem.getId()) {
-                case Item.RECORD_13 -> LevelSoundEventPacket.SOUND_RECORD_13;
-                case Item.RECORD_CAT -> LevelSoundEventPacket.SOUND_RECORD_CAT;
-                case Item.RECORD_BLOCKS -> LevelSoundEventPacket.SOUND_RECORD_BLOCKS;
-                case Item.RECORD_CHIRP -> LevelSoundEventPacket.SOUND_RECORD_CHIRP;
-                case Item.RECORD_FAR -> LevelSoundEventPacket.SOUND_RECORD_FAR;
-                case Item.RECORD_MALL -> LevelSoundEventPacket.SOUND_RECORD_MALL;
-                case Item.RECORD_MELLOHI -> LevelSoundEventPacket.SOUND_RECORD_MELLOHI;
-                case Item.RECORD_STAL -> LevelSoundEventPacket.SOUND_RECORD_STAL;
-                case Item.RECORD_STRAD -> LevelSoundEventPacket.SOUND_RECORD_STRAD;
-                case Item.RECORD_WARD -> LevelSoundEventPacket.SOUND_RECORD_WARD;
-                case Item.RECORD_11 -> LevelSoundEventPacket.SOUND_RECORD_11;
-                case Item.RECORD_WAIT -> LevelSoundEventPacket.SOUND_RECORD_WAIT;
-                case Item.RECORD_PIGSTEP -> LevelSoundEventPacket.SOUND_RECORD_PIGSTEP;
-                case Item.RECORD_OTHERSIDE -> LevelSoundEventPacket.SOUND_RECORD_OTHERSIDE;
-                case Item.RECORD_5 -> LevelSoundEventPacket.SOUND_RECORD_5;
-                case Item.RECORD_RELIC -> LevelSoundEventPacket.SOUND_RECORD_RELIC;
-                case Item.STRING_IDENTIFIED_ITEM -> {
-                    switch (this.recordItem.getNamespaceId()) {
-                        case Item.MUSIC_DISC_CREATOR:
-                            yield LevelSoundEventPacket.SOUND_RECORD_CREATOR;
-                        case Item.MUSIC_DISC_CREATOR_BOX:
-                            yield LevelSoundEventPacket.SOUND_RECORD_CREATOR_MUSIC_BOX;
-                        case Item.MUSIC_DISC_PRECIPICE:
-                            yield LevelSoundEventPacket.SOUND_RECORD_PRECIPICE;
-                    }
-                    throw new IllegalStateException("Sound is not implemented for item: " + this.recordItem.getNamespaceId());
-                }
-                default ->
-                    throw new IllegalStateException("Sound is not implemented for item: " + this.recordItem.getId());
-            });
+            this.getLevel().addLevelSoundEvent(this, getRecordSoundEvent(this.recordItem));
         }
+    }
+
+    static int getRecordSoundEvent(Item recordItem) {
+        return switch (recordItem.getId()) {
+            case Item.RECORD_13 -> LevelSoundEventPacket.SOUND_RECORD_13;
+            case Item.RECORD_CAT -> LevelSoundEventPacket.SOUND_RECORD_CAT;
+            case Item.RECORD_BLOCKS -> LevelSoundEventPacket.SOUND_RECORD_BLOCKS;
+            case Item.RECORD_CHIRP -> LevelSoundEventPacket.SOUND_RECORD_CHIRP;
+            case Item.RECORD_FAR -> LevelSoundEventPacket.SOUND_RECORD_FAR;
+            case Item.RECORD_MALL -> LevelSoundEventPacket.SOUND_RECORD_MALL;
+            case Item.RECORD_MELLOHI -> LevelSoundEventPacket.SOUND_RECORD_MELLOHI;
+            case Item.RECORD_STAL -> LevelSoundEventPacket.SOUND_RECORD_STAL;
+            case Item.RECORD_STRAD -> LevelSoundEventPacket.SOUND_RECORD_STRAD;
+            case Item.RECORD_WARD -> LevelSoundEventPacket.SOUND_RECORD_WARD;
+            case Item.RECORD_11 -> LevelSoundEventPacket.SOUND_RECORD_11;
+            case Item.RECORD_WAIT -> LevelSoundEventPacket.SOUND_RECORD_WAIT;
+            case Item.RECORD_PIGSTEP -> LevelSoundEventPacket.SOUND_RECORD_PIGSTEP;
+            case Item.RECORD_OTHERSIDE -> LevelSoundEventPacket.SOUND_RECORD_OTHERSIDE;
+            case Item.RECORD_5 -> LevelSoundEventPacket.SOUND_RECORD_5;
+            case Item.RECORD_RELIC -> LevelSoundEventPacket.SOUND_RECORD_RELIC;
+            case Item.STRING_IDENTIFIED_ITEM -> {
+                switch (recordItem.getNamespaceId()) {
+                    case Item.MUSIC_DISC_CREATOR:
+                        yield LevelSoundEventPacket.SOUND_RECORD_CREATOR;
+                    case Item.MUSIC_DISC_CREATOR_BOX:
+                        yield LevelSoundEventPacket.SOUND_RECORD_CREATOR_MUSIC_BOX;
+                    case Item.MUSIC_DISC_PRECIPICE:
+                        yield LevelSoundEventPacket.SOUND_RECORD_PRECIPICE;
+                    case Item.MUSIC_DISC_TEARS:
+                        yield LevelSoundEventPacket.SOUND_RECORD_TEARS;
+                    case Item.MUSIC_DISC_LAVA_CHICKEN:
+                        yield LevelSoundEventPacket.SOUND_RECORD_LAVA_CHICKEN;
+                }
+                throw new IllegalStateException("Sound is not implemented for item: " + recordItem.getNamespaceId());
+            }
+            default -> throw new IllegalStateException("Sound is not implemented for item: " + recordItem.getId());
+        };
     }
 
     public void stop() {
@@ -125,8 +132,12 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
      *         The comparator signal strength value, ranging from 0 to 15.
      */
     public int getComparatorSignal() {
-        if (this.recordItem instanceof ItemRecord) {
-            switch (this.recordItem.getId()) {
+        return getRecordComparatorSignal(this.recordItem);
+    }
+
+    static int getRecordComparatorSignal(Item recordItem) {
+        if (recordItem instanceof ItemRecord) {
+            switch (recordItem.getId()) {
                 case Item.RECORD_13:
                     return 1;
                 case Item.RECORD_CAT:
@@ -154,10 +165,18 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
                 case Item.RECORD_PIGSTEP:
                     return 13;
                 case Item.RECORD_OTHERSIDE:
+                case Item.RECORD_RELIC:
                     return 14;
                 case Item.RECORD_5:
-                case Item.RECORD_RELIC:
                     return 15;
+                case Item.STRING_IDENTIFIED_ITEM:
+                    return switch (recordItem.getNamespaceId()) {
+                        case Item.MUSIC_DISC_CREATOR_BOX -> 11;
+                        case Item.MUSIC_DISC_CREATOR -> 12;
+                        case Item.MUSIC_DISC_PRECIPICE -> 13;
+                        case Item.MUSIC_DISC_TEARS, Item.MUSIC_DISC_LAVA_CHICKEN -> 15;
+                        default -> 0;
+                    };
             }
         }
         return 0;

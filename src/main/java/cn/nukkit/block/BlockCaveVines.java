@@ -232,6 +232,16 @@ public class BlockCaveVines extends BlockTransparentMeta {
         return true;
     }
 
+    @Override
+    public boolean breaksWhenMoved() {
+        return true;
+    }
+
+    @Override
+    public boolean sticksToPiston() {
+        return false;
+    }
+
     public static boolean isCaveVine(Block block) {
         switch (block.getId()) {
             case CAVE_VINES:

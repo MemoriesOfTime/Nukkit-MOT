@@ -44,18 +44,16 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
         return nbtMaps;
     }
 
+    private BlockPalette blockPalette;
+
     @Override
     public int legacyToRuntime(int legacyId, int meta) {
-        // Always return runtime ID, not hash ID
-        // Hash ID should only be used for network transmission, not for internal world data loading
-        GameVersion gameVersion = GameVersion.getFeatureVersion();
-        BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
-        return palette.getRuntimeId(legacyId, meta);
+        return this.getBlockPalette().getRuntimeId(legacyId, meta);
     }
 
     @Override
     public int runtimeToFullId(int runtimeId) {
-        return GlobalBlockPalette.getLegacyFullId(GameVersion.getFeatureVersion(), runtimeId);
+        return this.getBlockPalette().getLegacyFullId(runtimeId);
     }
 
     @Override
@@ -68,6 +66,13 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
     public int runtimeToLegacyData(int runtimeId) {
         int fullId = this.runtimeToFullId(runtimeId);
         return fullId == -1 ? -1 : fullId & Block.DATA_MASK;
+    }
+
+    private BlockPalette getBlockPalette() {
+        if (this.blockPalette == null) {
+            this.blockPalette = GlobalBlockPalette.getPaletteByProtocol(GameVersion.getFeatureVersion());
+        }
+        return this.blockPalette;
     }
 
 }

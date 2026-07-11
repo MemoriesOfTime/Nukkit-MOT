@@ -337,6 +337,7 @@ public class Chunk extends BaseChunk {
                 tiles.add(blockEntity.namedTag);
             }
         }
+        tiles.addAll(this.getUnknownTiles()); // preserve unknown/unconstructable tiles verbatim
         ListTag<CompoundTag> tileListTag = new ListTag<>("TileEntities");
         tileListTag.setAll(tiles);
         nbt.putList(tileListTag);
@@ -425,6 +426,7 @@ public class Chunk extends BaseChunk {
                 tiles.add(blockEntity.namedTag);
             }
         }
+        tiles.addAll(this.getUnknownTiles()); // preserve unknown/unconstructable tiles verbatim
         ListTag<CompoundTag> tileListTag = new ListTag<>("TileEntities");
         tileListTag.setAll(tiles);
         nbt.putList(tileListTag);

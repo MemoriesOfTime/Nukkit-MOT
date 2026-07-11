@@ -1,13 +1,18 @@
 package cn.nukkit;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.level.Level;
+import cn.nukkit.level.vibration.VibrationManager;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.MainLogger;
+import cn.nukkit.utils.serverconfig.ServerConfig;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
@@ -134,8 +139,16 @@ public final class MockServer {
 
     /**
      * Reset Mock Server state (for use between tests).
+     * <p>
+     * Also restores {@code Server.instance} in case another test class cleared
+     * it via reflection (e.g. {@code @AfterAll} hooks that set the field to
+     * {@code null}). The static initializer only runs once per JVM, so without
+     * this guarantee a test that runs after such a class would see a null
+     * instance and crash in code that calls {@code Server.getInstance()}
+     * (notably the {@code Player} constructor).
      */
     public static void reset() {
+        ensureInstance();
         if (mockInstance != null) {
             Mockito.reset(mockInstance);
             setupDefaults(mockInstance);
@@ -169,6 +182,56 @@ public final class MockServer {
         Mockito.lenient().when(mock.getOnlinePlayers()).thenReturn(Collections.emptyMap());
         Mockito.lenient().when(mock.getGamemode()).thenReturn(0);
         Mockito.lenient().when(mock.getDataPath()).thenReturn(System.getProperty("java.io.tmpdir"));
+
+        Level mockLevel = Mockito.mock(Level.class);
+        setupLevelBlockStub(mockLevel);
+        Mockito.lenient().when(mock.getDefaultLevel()).thenReturn(mockLevel);
+
+        // CustomBlockManager's constructor reads server config to decide whether to auto-download
+        // vanilla palettes. Tests must stay hermetic (no network), so serve a real ServerConfig
+        // with auto-download disabled. Without this stub getServerConfig() returns null and the
+        // constructor throws, leaving CustomBlockManager.get() == null and breaking every test
+        // that encodes a StartGamePacket.
+        ServerConfig serverConfig = new ServerConfig();
+        serverConfig.customBlockSettings().autoDownloadVanillaPalette(false);
+        Mockito.lenient().when(mock.getServerConfig()).thenReturn(serverConfig);
+    }
+
+    /**
+     * Setup getBlock() stub for mock Level to return a simple Block for any position.
+     * This is needed for BlockIterator and other ray tracing tests.
+     */
+    private static void setupLevelBlockStub(Level mockLevel) {
+        Mockito.lenient().when(mockLevel.getBlock(Mockito.any(Vector3.class)))
+            .thenAnswer(invocation -> {
+                Vector3 pos = invocation.getArgument(0);
+                return createSimpleBlock(pos);
+            });
+        // BaseInventory#onOpen/onClose fires container vibrations; avoid NPEs in inventory tests.
+        Mockito.lenient().when(mockLevel.getVibrationManager())
+            .thenReturn(Mockito.mock(VibrationManager.class));
+    }
+
+    /**
+     * Create a simple Block instance for testing purposes.
+     * Returns a minimal Block that reports its position correctly.
+     */
+    private static Block createSimpleBlock(Vector3 pos) {
+        Block block = new Block() {
+            @Override
+            public String getName() {
+                return "Air";
+            }
+
+            @Override
+            public int getId() {
+                return BlockID.AIR;
+            }
+        };
+        block.x = pos.x;
+        block.y = pos.y;
+        block.z = pos.z;
+        return block;
     }
 
     private MockServer() {}

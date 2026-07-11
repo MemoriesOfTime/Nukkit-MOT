@@ -34,13 +34,11 @@ public class AnimateEntityPacket extends DataPacket {
         this.nextState = this.getString();
         this.stopExpression = this.getString();
         if (this.protocol >= ProtocolInfo.v1_17_30) {
-            this.stopExpressionVersion = this.getInt();
+            this.stopExpressionVersion = this.getLInt();
         }
         this.controller = this.getString();
         this.blendOutTime = this.getLFloat();
-        for (int i = 0, len = (int) this.getUnsignedVarInt(); i < len; i++) {
-            this.entityRuntimeIds.add(this.getEntityRuntimeId());
-        }
+        this.getArray(this.entityRuntimeIds, bs -> bs.getEntityRuntimeId());
     }
 
     @Override
@@ -50,14 +48,11 @@ public class AnimateEntityPacket extends DataPacket {
         this.putString(this.nextState);
         this.putString(this.stopExpression);
         if (this.protocol >= ProtocolInfo.v1_17_30) {
-            this.putInt(this.stopExpressionVersion);
+            this.putLInt(this.stopExpressionVersion);
         }
         this.putString(this.controller);
         this.putLFloat(this.blendOutTime);
-        this.putUnsignedVarInt(this.entityRuntimeIds.size());
-        for (long entityRuntimeId : this.entityRuntimeIds) {
-            this.putEntityRuntimeId(entityRuntimeId);
-        }
+        this.putArray(this.entityRuntimeIds, this::putEntityRuntimeId);
     }
 
     public void setEntityRuntimeIds(List<Long> entityRuntimeIds) {

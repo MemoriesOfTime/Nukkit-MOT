@@ -38,7 +38,9 @@ import org.iq80.leveldb.*;
 
 import javax.annotation.Nullable;
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -58,6 +60,8 @@ import static cn.nukkit.level.format.leveldb.LevelDBKey.*;
 public class LevelDBProvider implements LevelProvider {
 
     private static final DBProvider JAVA_LDB_PROVIDER = (DBProvider) FeatureBuilder.create(LevelDBProvider.class).addJava("net.daporkchop.ldbjni.java.JavaDBProvider").build();
+    private static final byte[] FINALIZATION_STATE_ENCODING_KEY = "NukkitMOTFinalizationStateEncoding".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] FINALIZATION_STATE_ENCODING_BEDROCK = new byte[]{1};
 
     protected final Long2ObjectMap<BaseFullChunk> chunks = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
 
@@ -137,6 +141,7 @@ public class LevelDBProvider implements LevelProvider {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        this.migrateLegacyNukkitFinalizationStates();
 
         this.gcLock = new ReentrantLock();
 
@@ -225,6 +230,123 @@ public class LevelDBProvider implements LevelProvider {
                 .cacheSize(1024L * 1024L * Server.getInstance().levelDbCache)
                 .blockSize(64 * 1024);
         return Server.getInstance().useNativeLevelDB ? LevelDB.PROVIDER.open(dir, options) : JAVA_LDB_PROVIDER.open(dir, options);
+    }
+
+    private void migrateLegacyNukkitFinalizationStates() {
+        byte[] encodingMarker = this.db.get(FINALIZATION_STATE_ENCODING_KEY);
+        if (Arrays.equals(encodingMarker, FINALIZATION_STATE_ENCODING_BEDROCK)) {
+            return;
+        }
+        int storageVersion = this.levelData.getInt("StorageVersion");
+        if (storageVersion <= 0 || storageVersion >= CURRENT_STORAGE_VERSION) {
+            return;
+        }
+
+        Set<ByteBuffer> legacyNukkitChunks = findLegacyNukkitChunkMarkers(this.db, this.path);
+        int migrated = 0;
+        try (DBIterator iterator = this.db.iterator(); WriteBatch writeBatch = this.db.createWriteBatch()) {
+            while (iterator.hasNext()) {
+                Entry<byte[], byte[]> entry = iterator.next();
+                byte[] key = entry.getKey();
+                if (!isFinalizationStateKey(key)) {
+                    continue;
+                }
+
+                int legacyValue = readFinalizationStateValue(entry.getValue());
+                if (!isLegacyNukkitFinalizationState(key, legacyValue, legacyNukkitChunks)) {
+                    continue;
+                }
+
+                ChunkState state = switch (legacyValue) {
+                    case 0, 1 -> ChunkState.GENERATED;
+                    case 2 -> ChunkState.POPULATED;
+                    case 3 -> ChunkState.FINISHED;
+                    default -> throw new IllegalArgumentException("Unsupported legacy Nukkit chunk finalization state: " + legacyValue);
+                };
+                writeBatch.put(Arrays.copyOf(key, key.length), serializeFinalizationState(state));
+                migrated++;
+            }
+
+            if (migrated == 0) {
+                return;
+            }
+
+            writeBatch.put(FINALIZATION_STATE_ENCODING_KEY, FINALIZATION_STATE_ENCODING_BEDROCK);
+            this.db.write(writeBatch);
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to migrate legacy Nukkit LevelDB finalization states for " + this.path, e);
+        }
+
+        this.levelData.putInt("StorageVersion", CURRENT_STORAGE_VERSION);
+        this.saveLevelData();
+        log.info("Migrated {} legacy Nukkit LevelDB finalization states for {}", migrated, this.getName());
+    }
+
+    static boolean hasLegacyNukkitFinalizationState(DB db, String path) {
+        Set<ByteBuffer> legacyNukkitChunks = findLegacyNukkitChunkMarkers(db, path);
+        try (DBIterator iterator = db.iterator()) {
+            while (iterator.hasNext()) {
+                Entry<byte[], byte[]> entry = iterator.next();
+                if (!isFinalizationStateKey(entry.getKey())) {
+                    continue;
+                }
+                if (isLegacyNukkitFinalizationState(entry.getKey(), readFinalizationStateValue(entry.getValue()), legacyNukkitChunks)) {
+                    return true;
+                }
+            }
+        } catch (RuntimeException e) {
+            throw new RuntimeException("Unable to scan LevelDB finalization states for " + path, e);
+        }
+        return false;
+    }
+
+    static boolean isLegacyNukkitFinalizationState(byte[] finalizationKey, int value, Set<ByteBuffer> legacyNukkitChunks) {
+        if (value == ChunkState.FINISHED.ordinal()) {
+            return true;
+        }
+        return legacyNukkitChunks.contains(ByteBuffer.wrap(finalizationKey))
+                && (value == ChunkState.GENERATED.ordinal() || value == ChunkState.POPULATED.ordinal());
+    }
+
+    private static Set<ByteBuffer> findLegacyNukkitChunkMarkers(DB db, String path) {
+        Set<ByteBuffer> chunks = new HashSet<>();
+        try (DBIterator iterator = db.iterator()) {
+            while (iterator.hasNext()) {
+                byte[] key = iterator.next().getKey();
+                if (isLegacyNukkitChunkMarkerKey(key)) {
+                    chunks.add(ByteBuffer.wrap(toFinalizationStateKey(key)));
+                }
+            }
+        } catch (RuntimeException e) {
+            throw new RuntimeException("Unable to scan LevelDB Nukkit chunk markers for " + path, e);
+        }
+        return chunks;
+    }
+
+    private static boolean isLegacyNukkitChunkMarkerKey(byte[] key) {
+        if (key.length == 10) {
+            return key[8] == NUKKIT_BLOCK_LIGHT.getCode() || key[8] == NUKKIT_SKY_LIGHT.getCode();
+        }
+        if (key.length == 14) {
+            return key[12] == NUKKIT_BLOCK_LIGHT.getCode() || key[12] == NUKKIT_SKY_LIGHT.getCode();
+        }
+        return false;
+    }
+
+    private static byte[] toFinalizationStateKey(byte[] nukkitMarkerKey) {
+        if (nukkitMarkerKey.length == 10) {
+            byte[] key = Arrays.copyOf(nukkitMarkerKey, 9);
+            key[8] = STATE_FINALIZATION.getCode();
+            return key;
+        }
+        byte[] key = Arrays.copyOf(nukkitMarkerKey, 13);
+        key[12] = STATE_FINALIZATION.getCode();
+        return key;
+    }
+
+    private static boolean isFinalizationStateKey(byte[] key) {
+        return (key.length == 9 && key[8] == STATE_FINALIZATION.getCode())
+                || (key.length == 13 && key[12] == STATE_FINALIZATION.getCode());
     }
 
     public static void updateLevelData(CompoundTag levelData) {
@@ -414,11 +536,7 @@ public class LevelDBProvider implements LevelProvider {
         ChunkBuilder chunkBuilder = new ChunkBuilder(chunkX, chunkZ, this);
 
         byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
-        if (finalized == null) {
-            chunkBuilder.state(ChunkState.FINISHED);
-        } else {
-            chunkBuilder.state(ChunkState.values()[Unpooled.wrappedBuffer(finalized).readIntLE()]);
-        }
+        chunkBuilder.state(deserializeFinalizationState(finalized));
 
         byte chunkVersion = versionData[0];
 
@@ -441,7 +559,7 @@ public class LevelDBProvider implements LevelProvider {
             loadBlockTickingQueue(tickingData, false);
         }
 
-        byte[] randomTickingData = this.db.get(PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ, this.level.getDimension()));
+        byte[] randomTickingData = this.db.get(RANDOM_TICKS.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (randomTickingData != null && randomTickingData.length != 0) {
             loadBlockTickingQueue(randomTickingData, true);
         }
@@ -547,10 +665,14 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         writeBatch.put(LevelDBKey.VERSION.getKey(chunkX, chunkZ, this.level.getDimension()), CHUNK_VERSION_SAVE_DATA);
-        writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()), Binary.writeLInt(chunk.getState().ordinal()));
+        writeBatch.put(LevelDBKey.VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimension()), LEGACY_CHUNK_VERSION_SAVE_DATA);
+        writeBatch.put(LevelDBKey.GENERATED_PRE_CAVES_AND_CLIFFS_BLENDING.getKey(chunkX, chunkZ, this.level.getDimension()), GENERATED_PRE_CAVES_AND_CLIFFS_BLENDING_SAVE_DATA);
+        writeBatch.put(LevelDBKey.BLENDING_DATA.getKey(chunkX, chunkZ, this.level.getDimension()), BLENDING_DATA_SAVE_DATA);
+        writeBatch.put(FINALIZATION_STATE_ENCODING_KEY, FINALIZATION_STATE_ENCODING_BEDROCK);
+        writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()), serializeFinalizationState(chunk.getState()));
 
         BlockEntitySerializer.saveBlockEntities(writeBatch, chunk);
-        EntitySerializer.saveEntities(writeBatch, chunk);
+        EntitySerializer.saveEntities(this.db, writeBatch, chunk);
 
         Collection<BlockUpdateEntry> blockUpdateEntries = null;
         // TODO randomBlockUpdate
@@ -588,7 +710,7 @@ public class LevelDBProvider implements LevelProvider {
             writeBatch.delete(pendingScheduledTicksKey);
         }
 
-       /* byte[] pendingRandomTicksKey = PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ);
+       /* byte[] pendingRandomTicksKey = RANDOM_TICKS.getKey(chunkX, chunkZ);
         if (randomBlockUpdateEntries != null && !randomBlockUpdateEntries.isEmpty()) {
             CompoundTag ticks = saveBlockTickingQueue(randomBlockUpdateEntries, currentTick);
             if (ticks != null) {
@@ -967,7 +1089,7 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         StateBlockStorage[] extraDataLayers = new StateBlockStorage[16];
-        BinaryStream stream = new BinaryStream();
+        BinaryStream stream = new BinaryStream(extraRawData);
         int count = stream.getLInt();
         for (int i = 0; i < count; i++) {
             int posKey = stream.getLInt();
@@ -983,7 +1105,7 @@ public class LevelDBProvider implements LevelProvider {
                 storage = new StateBlockStorage();
                 extraDataLayers[chunkY] = storage;
             }
-            storage.set(pos, (blockId << Block.DATA_BITS) | blockData);
+            storage.set(pos.x, pos.y & 0xF, pos.z, (blockId << Block.DATA_BITS) | blockData);
         }
         return extraDataLayers;
     }
@@ -1069,21 +1191,20 @@ public class LevelDBProvider implements LevelProvider {
 
     public void forEachChunks(Function<FullChunk, Boolean> action, boolean skipCorrupted) {
         try (DBIterator iter = db.iterator()) {
+            Set<Long> seenChunks = new HashSet<>();
             while (iter.hasNext()) {
                 Entry<byte[], byte[]> entry = iter.next();
                 byte[] key = entry.getKey();
-                if (key.length != 9) {
-                    continue;
-                }
-
-                byte type = key[8];
-                if (/*type != NEW_VERSION.getCode() &&*/ type != VERSION_OLD.getCode()) {
+                if (!isChunkVersionKeyForDimension(key, this.level.getDimensionData().getDimensionId())) {
                     continue;
                 }
 
                 int chunkX = Binary.readLInt(key);
                 int chunkZ = Binary.readLInt(key, 4);
                 long index = Level.chunkHash(chunkX, chunkZ);
+                if (!seenChunks.add(index)) {
+                    continue;
+                }
                 BaseFullChunk chunk = this.chunks.get(index);
                 if (chunk == null) {
                     try {
@@ -1108,6 +1229,22 @@ public class LevelDBProvider implements LevelProvider {
         } catch (Exception e) {
             throw new RuntimeException("iteration failed", e);
         }
+    }
+
+    static boolean isChunkVersionKeyForDimension(byte[] key, int currentDimension) {
+        if (key.length != 9 && key.length != 13) {
+            return false;
+        }
+
+        boolean hasDimension = key.length == 13;
+        byte type = key[hasDimension ? 12 : 8];
+        if (type != VERSION.getCode() && type != VERSION_OLD.getCode()) {
+            return false;
+        }
+        if (!hasDimension) {
+            return currentDimension == 0;
+        }
+        return Binary.readLInt(key, 8) == currentDimension;
     }
 
     private class AutoCompaction implements Runnable {

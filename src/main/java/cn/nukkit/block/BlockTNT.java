@@ -11,6 +11,8 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.sound.TNTPrimeSound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
@@ -90,6 +92,7 @@ public class BlockTNT extends BlockSolid {
         );
         tnt.spawnToAll();
         this.level.addSound(new TNTPrimeSound(this));
+        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(source != null ? source : this, this.add(0.5, 0.5, 0.5), VibrationType.PRIME_FUSE));
     }
 
     @Override
@@ -125,12 +128,12 @@ public class BlockTNT extends BlockSolid {
     public BlockColor getColor() {
         return BlockColor.TNT_BLOCK_COLOR;
     }
-    
+
     @Override
     public boolean hasEntityCollision() {
         return true;
     }
-    
+
     @Override
     public void onEntityCollide(Entity entity) {
         if ((entity instanceof EntityArrow && entity.isOnFire()) || entity instanceof EntitySmallFireBall) {

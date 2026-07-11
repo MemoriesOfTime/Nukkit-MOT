@@ -10,9 +10,12 @@ import cn.nukkit.utils.ChunkException;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.*;
 
+import java.util.Arrays;
+
 public class PalettedBlockStorage {
 
     protected static final int SIZE = 4096; // 16 * 16 * 16
+    public static final byte COPY_LAST_MARKER = (byte) ((0x7F << 1) | 1);
 
     protected IntList palette;
     protected BitArray bitArray;
@@ -153,7 +156,7 @@ public class PalettedBlockStorage {
     public void writeToStorage(ByteBuf byteBuf) {
         int paletteSize = this.palette.size();
         BitArrayVersion version = paletteSize <= 1 ? BitArrayVersion.V0 : this.bitArray.getVersion();
-        byteBuf.writeByte(this.getPaletteHeader(version, false));
+        byteBuf.writeByte(this.getPaletteHeader(version, true));
 
         if (version != BitArrayVersion.V0) {
             for (int i : this.bitArray.getWords()) {
@@ -233,5 +236,11 @@ public class PalettedBlockStorage {
 
     public PalettedBlockStorage copy() {
         return new PalettedBlockStorage(this.bitArray.copy(), new IntArrayList(this.palette));
+    }
+
+    public boolean contentEquals(PalettedBlockStorage other) {
+        if (this == other) return true;
+        if (other == null || !this.palette.equals(other.palette)) return false;
+        return Arrays.equals(this.bitArray.getWords(), other.bitArray.getWords());
     }
 }

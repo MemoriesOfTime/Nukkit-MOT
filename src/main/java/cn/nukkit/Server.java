@@ -530,6 +530,12 @@ public class Server {
      */
     public boolean serverAuthoritativeBlockBreaking;
     /**
+     * Server authoritative inventory mode
+     * When enabled, server has final authority over inventory changes
+     * @since v1.16.100 (protocol 407+)
+     */
+    public boolean serverAuthoritativeInventory;
+    /**
      * Network encryption
      */
     public boolean encryptionEnabled;
@@ -604,7 +610,8 @@ public class Server {
      */
     public boolean enableProxyProtocol;
     /**
-     * Whitelist of proxy IPs/CIDRs allowed to send Proxy Protocol headers (e.g. "127.0.0.1", "10.0.0.0/8")
+     * Whitelist of proxy IPv4/IPv6 CIDRs allowed to send Proxy Protocol headers
+     * (e.g. "127.0.0.1", "10.0.0.0/8", "2001:db8::/32")
      */
     public List<String> proxyProtocolWhitelist;
     /**
@@ -972,7 +979,7 @@ public class Server {
         // Check for updates
         CompletableFuture.runAsync(() -> {
             try {
-                URLConnection request = new URL(Nukkit.BRANCH).openConnection();
+                URLConnection request = URI.create(Nukkit.BRANCH).toURL().openConnection();
                 request.connect();
                 InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
                 String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
@@ -1272,6 +1279,7 @@ public class Server {
             this.getLogger().debug("Stopping all tasks...");
             this.scheduler.cancelAllTasks();
             this.scheduler.mainThreadHeartbeat(Integer.MAX_VALUE);
+            this.scheduler.shutdown();
 
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
@@ -1460,7 +1468,7 @@ public class Server {
         PlayerListPacket pk = new PlayerListPacket();
         pk.type = PlayerListPacket.TYPE_ADD;
         pk.entries = new PlayerListPacket.Entry[]{playerListEntry};
-        this.batchPackets(players, new DataPacket[]{pk}); // This is sent "directly" so it always gets thru before possible TYPE_REMOVE packet for NPCs etc.
+        Server.broadcastPacket(players, pk); // This is sent "directly" so it always gets thru before possible TYPE_REMOVE packet for NPCs etc.
     }
 
     public void removePlayerListData(UUID uuid) {
@@ -2480,19 +2488,20 @@ public class Server {
             throw new LevelException("Invalid empty level name");
         }
 
-        if (this.isLevelLoaded(name)) {
+        // Canonical path so equivalent spellings (relative/absolute/symlink) match.
+        File resolved = this.resolveLevelFile(name);
+
+        // Raw-name lookup for backwards compat; path check below is authoritative.
+        if (this.isLevelLoaded(name) || this.isLevelPathLoaded(resolved)) {
             return true;
-        } else if (!this.isLevelGenerated(name)) {
-            log.warn(this.baseLang.translateString("nukkit.level.notFound", name));
-            return false;
         }
 
-        String path;
+        String path = resolved.getPath() + '/';
 
-        if (name.contains("/") || name.contains("\\")) {
-            path = name;
-        } else {
-            path = this.dataPath + "worlds/" + name + '/';
+        if (!this.isLevelGenerated(name)) {
+            log.warn(this.baseLang.translateString("nukkit.level.notFound", name));
+            log.warn(this.baseLang.translateString("nukkit.level.notFoundHint", new String[]{path, diagnoseLevelPath(path)}));
+            return false;
         }
 
         Class<? extends LevelProvider> provider = LevelProviderManager.getProvider(path);
@@ -2502,9 +2511,12 @@ public class Server {
             return false;
         }
 
+        // Last path segment keeps folderName clean when a path was passed.
+        String folderName = resolved.getName();
+
         Level level;
         try {
-            level = new Level(this, name, path, provider);
+            level = new Level(this, folderName, path, provider);
         } catch (Exception e) {
             log.error(this.baseLang.translateString("nukkit.level.loadError", new String[]{name, e.getMessage()}));
             return false;
@@ -2520,6 +2532,72 @@ public class Server {
         this.startLevelThreadIfReady(level);
 
         return true;
+    }
+
+    /**
+     * Resolve a level name or path to a canonical world directory, so
+     * equivalent spellings (plain name, relative/absolute path, symlink)
+     * always match. Falls back to the absolute path on canonicalization
+     * failure to avoid throwing {@link IOException}.
+     */
+    private File resolveLevelFile(String name) {
+        File f = (name.contains("/") || name.contains("\\"))
+                ? new File(name)
+                : new File(this.dataPath + "worlds/" + name);
+        try {
+            return f.getCanonicalFile();
+        } catch (IOException e) {
+            return f.getAbsoluteFile();
+        }
+    }
+
+    /**
+     * Whether a world directory is already loaded, matched by canonical
+     * provider path rather than folderName, so a world loaded by plain
+     * name is recognized when re-requested via an equivalent path.
+     */
+    private boolean isLevelPathLoaded(File resolved) {
+        for (Level level : this.levelArray) {
+            String providerPath;
+            try {
+                providerPath = level.requireProvider().getPath();
+            } catch (Exception ignored) {
+                continue;
+            }
+            File loaded;
+            try {
+                loaded = new File(providerPath).getCanonicalFile();
+            } catch (IOException e) {
+                loaded = new File(providerPath).getAbsoluteFile();
+            }
+            if (loaded.equals(resolved)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Explain why a level directory was rejected by the providers, so the
+     * "not found" warning points at the concrete cause (missing dir, missing
+     * level.dat, missing data folder, or unrecognized region files).
+     */
+    private static String diagnoseLevelPath(String path) {
+        File dir = new File(path);
+        if (!dir.exists() || !dir.isDirectory()) {
+            return "directory does not exist";
+        }
+        if (!new File(dir, "level.dat").exists()) {
+            return "missing level.dat";
+        }
+        if (new File(dir, "db").isDirectory()) {
+            return "leveldb folder present but provider rejected it";
+        }
+        File region = new File(dir, "region");
+        if (!region.isDirectory()) {
+            return "missing db/ or region/ data folder";
+        }
+        return "region folder present but no valid .mca files";
     }
 
     /**
@@ -2595,19 +2673,16 @@ public class Server {
             provider = LevelProviderManager.getProviderByName("leveldb");
         }
 
-        String path;
-
-        if (name.contains("/") || name.contains("\\")) {
-            path = name;
-        } else {
-            path = this.dataPath + "worlds/" + name + '/';
-        }
+        // Canonical path: dedupes equivalent spellings and keeps folderName clean.
+        File resolved = this.resolveLevelFile(name);
+        String path = resolved.getPath() + '/';
+        String folderName = resolved.getName();
 
         Level level;
         try {
-            provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, name, seed, generator, options);
+            provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, folderName, seed, generator, options);
 
-            level = new Level(this, name, path, provider);
+            level = new Level(this, folderName, path, provider);
             this.levels.put(level.getId(), level);
 
             level.initLevel();
@@ -2637,14 +2712,7 @@ public class Server {
         }
 
         if (this.getLevelByName(name) == null) {
-            String path;
-
-            if (name.contains("/") || name.contains("\\")) {
-                path = name;
-            } else {
-                path = this.dataPath + "worlds/" + name + '/';
-            }
-
+            String path = this.resolveLevelFile(name).getPath() + '/';
             return LevelProviderManager.getProvider(path) != null;
         }
 
@@ -2691,6 +2759,7 @@ public class Server {
                 it.configure(opt -> {
                     opt.configurer(new YamlSnakeYamlConfigurer());
                     opt.bindFile(configFile);
+                    opt.removeOrphans(true);
                 });
                 if (firstLoad) {
                     it.saveDefaults();
@@ -3223,6 +3292,7 @@ public class Server {
         Entity.registerEntity("MinecartChest", EntityMinecartChest.class);
         Entity.registerEntity("MinecartHopper", EntityMinecartHopper.class);
         Entity.registerEntity("MinecartTnt", EntityMinecartTNT.class);
+        Entity.registerEntity("MinecartCommandBlock", EntityMinecartCommandBlock.class);
         Entity.registerEntity("Boat", EntityBoat.class);
         Entity.registerEntity("ChestBoat", EntityChestBoat.class);
         //Others
@@ -3275,6 +3345,16 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.TARGET, BlockEntityTarget.class);
         BlockEntity.registerBlockEntity(BlockEntity.BRUSHABLE_BLOCK, BlockEntityBrushableBlock.class);
         BlockEntity.registerBlockEntity(BlockEntity.CONDUIT, BlockEntityConduit.class);
+        BlockEntity.registerBlockEntity(BlockEntity.POTENT_SULFUR, BlockEntityPotentSulfur.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CHISELED_BOOKSHELF, BlockEntityChiseledBookshelf.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CRAFTER, BlockEntityCrafter.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SHELF, BlockEntityShelf.class);
+        BlockEntity.registerBlockEntity(BlockEntity.COPPER_GOLEM_STATUE, BlockEntityCopperGolemStatue.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CREAKING_HEART, BlockEntityCreakingHeart.class);
+        BlockEntity.registerBlockEntity(BlockEntity.COMMAND_BLOCK, BlockEntityCommandBlock.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SCULK_SENSOR, BlockEntitySculkSensor.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CALIBRATED_SCULK_SENSOR, BlockEntityCalibratedSculkSensor.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SCULK_SHRIEKER, BlockEntitySculkShrieker.class);
 
         // Persistent container, not on vanilla
         BlockEntity.registerBlockEntity(BlockEntity.PERSISTENT_CONTAINER, PersistentDataContainerBlockEntity.class);
@@ -3390,6 +3470,7 @@ public class Server {
             default -> this.serverAuthoritativeMovementMode = 1; // server-auth
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
+        this.serverAuthoritativeInventory = this.getPropertyBoolean("server-authoritative-inventory", true);
 
         // === Advanced MOT settings from nukkit-mot.yml ===
         ServerConfig config = this.serverConfig;
@@ -3614,6 +3695,7 @@ public class Server {
 
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
+            put("server-authoritative-inventory", true);
         }
     }
 

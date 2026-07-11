@@ -258,6 +258,21 @@ public class ServerScheduler {
         this.currentTaskId.set(0);
     }
 
+    /**
+     * Gracefully shut down the async worker pool. Call after {@link #cancelAllTasks()}
+     * and the final {@link #mainThreadHeartbeat(int)} so any submitted async tasks
+     * get a chance to finish and their {@code onCompletion} callbacks run.
+     */
+    public void shutdown() {
+        shutdown(5);
+    }
+
+    public void shutdown(long timeoutSeconds) {
+        this.asyncPool.shutdownGracefully(timeoutSeconds);
+        // Flush any onCompletion callbacks queued by tasks that finished during shutdown.
+        AsyncTask.collectTask();
+    }
+
     public boolean isQueued(int taskId) {
         return this.taskMap.containsKey(taskId);
     }

@@ -1,5 +1,7 @@
 package cn.nukkit.plugin;
 
+import cn.nukkit.Server;
+
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -20,6 +22,17 @@ public class PluginClassLoader extends URLClassLoader {
     public PluginClassLoader(JavaPluginLoader loader, ClassLoader parent, File file) throws MalformedURLException {
         super(new URL[]{file.toURI().toURL()}, parent);
         this.loader = loader;
+    }
+
+    @Override
+    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+        if (name.startsWith("com.nimbusds.jose.shaded.")) {
+            Server.getInstance().getLogger().warning(
+                    "Plugin attempted to load removed class '" + name + "'. " +
+                            "com.nimbusds.jose.shaded has been removed from the server. " +
+                            "Migrate to the server-bundled Gson (com.google.gson.Gson) instead.");
+        }
+        return super.loadClass(name, resolve);
     }
 
     @Override

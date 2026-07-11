@@ -12,32 +12,43 @@ import cn.nukkit.entity.passive.EntitySheep;
 import cn.nukkit.entity.passive.EntityTurtle;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemDye;
-import cn.nukkit.item.ItemID;
+import cn.nukkit.inventory.EntityArmorInventory;
+import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.InventoryHolder;
+import cn.nukkit.item.*;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Utils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
-public class EntityWolf extends EntityTameableMob {
+public class EntityWolf extends EntityTameableMob implements InventoryHolder {
 
     public static final int NETWORK_ID = 14;
 
     private static final String NBT_KEY_ANGRY = "Angry";
     private static final String NBT_KEY_COLLAR_COLOR = "CollarColor";
+    private static final String NBT_KEY_ARMOR = "Armor";
+    private static final int WOLF_ARMOR_REPAIR_DURABILITY = 8;
+    private static final int[] WOLF_ARMOR_CRACK_THRESHOLDS = {60, 44, 20};
 
     private final Vector3 tempVector = new Vector3();
     private DyeColor collarColor = DyeColor.RED;
     private boolean angry;
     private int angryDuration;
     private int afterInWater = -1;
+    private EntityArmorInventory armorInventory;
 
     public EntityWolf(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -70,6 +81,14 @@ public class EntityWolf extends EntityTameableMob {
         super.initEntity();
 
         this.setFriendly(true);
+        this.armorInventory = new EntityArmorInventory(this);
+
+        if (this.namedTag.containsList(NBT_KEY_ARMOR)) {
+            ListTag<CompoundTag> armorList = this.namedTag.getList(NBT_KEY_ARMOR, CompoundTag.class);
+            for (CompoundTag armorTag : armorList.getAll()) {
+                this.armorInventory.setItem(armorTag.getByte("Slot"), NBTIO.getItemHelper(armorTag));
+            }
+        }
 
         if (this.namedTag.contains(NBT_KEY_ANGRY) && this.namedTag.getByte(NBT_KEY_ANGRY) == 1) {
             this.setAngry(true);
@@ -93,6 +112,14 @@ public class EntityWolf extends EntityTameableMob {
 
         this.namedTag.putBoolean(NBT_KEY_ANGRY, this.angry);
         this.namedTag.putByte(NBT_KEY_COLLAR_COLOR, this.collarColor.getDyeData());
+
+        if (this.armorInventory != null) {
+            ListTag<CompoundTag> armorTag = new ListTag<>(NBT_KEY_ARMOR);
+            for (int i = 0; i < this.armorInventory.getSize(); i++) {
+                armorTag.add(NBTIO.putItemHelper(this.armorInventory.getItem(i), i));
+            }
+            this.namedTag.putList(armorTag);
+        }
     }
 
     @Override
@@ -189,6 +216,38 @@ public class EntityWolf extends EntityTameableMob {
 
                 return true;
             }
+        } else if (item instanceof ItemWolfArmor && this.canOwnerEditArmor(player) && !this.isBaby()) {
+            if (this.getWolfArmor().isNull()) {
+                Item armor = item.clone();
+                armor.setCount(1);
+                this.getArmorInventory().setBody(armor);
+                this.getArmorInventory().sendContents(this.getViewers().values());
+                this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EQUIP_WOLF);
+                if (!player.isCreative()) {
+                    player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
+                }
+            }
+            return false;
+        } else if (item instanceof ItemShears && this.canOwnerEditArmor(player) && !this.getWolfArmor().isNull()) {
+            Item armor = this.getWolfArmor();
+            this.getArmorInventory().setBody(Item.AIR_ITEM);
+            if (player.getInventory().canAddItem(armor)) {
+                player.getInventory().addItem(armor);
+            } else {
+                this.getLevel().dropItem(this, armor);
+            }
+            this.getArmorInventory().sendContents(this.getViewers().values());
+            this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_UNEQUIP_WOLF);
+            this.damageHeldTool(player, item);
+            return false;
+        } else if (item instanceof ItemArmadilloScute && this.canOwnerEditArmor(player)) {
+            if (this.repairWolfArmor()) {
+                this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ARMOR_REPAIR_WOLF);
+                if (!player.isCreative()) {
+                    player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
+                }
+            }
+            return false;
         } else if (item.getId() == Item.DYE) {
             if (this.hasOwner() && player.equals(this.getOwner())) {
                 this.setCollarColor(((ItemDye) item).getDyeColor());
@@ -218,21 +277,141 @@ public class EntityWolf extends EntityTameableMob {
 
     @Override
     public boolean attack(EntityDamageEvent ev) {
-        if (super.attack(ev)) {
-            this.setSitting(false);
-            if (ev instanceof EntityDamageByEntityEvent) {
-                if (((EntityDamageByEntityEvent) ev).getDamager() instanceof Player player) {
-                    if (!(player.isSurvival() || player.isAdventure()) || (this.hasOwner() && player.equals(this.getOwner()))) {
-                        return true;
-                    }
-                }
-                this.isAngryTo = ((EntityDamageByEntityEvent) ev).getDamager().getId();
-                this.setAngry(true);
+        if (!this.getWolfArmor().isNull() && ev.canBeReducedByArmor() && ev.getCause() != EntityDamageEvent.DamageCause.THORNS) {
+            int armorDamage = applyWolfArmorAbsorption(ev);
+            boolean attacked = super.attack(ev);
+            if (attacked) {
+                this.afterSuccessfulAttack(ev);
+                this.damageWolfArmor(armorDamage);
             }
+            return attacked;
+        }
+
+        if (super.attack(ev)) {
+            this.afterSuccessfulAttack(ev);
             return true;
         }
 
         return false;
+    }
+
+    static int applyWolfArmorAbsorption(EntityDamageEvent ev) {
+        float finalDamage = ev.getFinalDamage();
+        ev.setDamage(ev.getDamage(EntityDamageEvent.DamageModifier.ARMOR) - finalDamage,
+                EntityDamageEvent.DamageModifier.ARMOR);
+        return Math.max(1, (int) Math.ceil(Math.max(0, finalDamage)));
+    }
+
+    @Override
+    public Inventory getInventory() {
+        return this.getArmorInventory();
+    }
+
+    public EntityArmorInventory getArmorInventory() {
+        if (this.armorInventory == null) {
+            this.armorInventory = new EntityArmorInventory(this);
+        }
+        return this.armorInventory;
+    }
+
+    public Item getWolfArmor() {
+        return this.getArmorInventory().getBody();
+    }
+
+    @Override
+    public void spawnTo(Player player) {
+        super.spawnTo(player);
+        this.getArmorInventory().sendContents(player);
+    }
+
+    @Override
+    public Item[] getDrops() {
+        List<Item> drops = new ArrayList<>();
+        Item armor = this.getWolfArmor();
+        if (!armor.isNull()) {
+            drops.add(armor);
+        }
+        return drops.toArray(Item.EMPTY_ARRAY);
+    }
+
+    private boolean canOwnerEditArmor(Player player) {
+        return this.hasOwner() && player.equals(this.getOwner());
+    }
+
+    private boolean repairWolfArmor() {
+        Item armor = this.getWolfArmor();
+        if (!(armor instanceof ItemWolfArmor) || armor.getDamage() <= 0) {
+            return false;
+        }
+
+        armor.setDamage(Math.max(0, armor.getDamage() - WOLF_ARMOR_REPAIR_DURABILITY));
+        this.getArmorInventory().setBody(armor);
+        this.getArmorInventory().sendContents(this.getViewers().values());
+        return true;
+    }
+
+    private void damageWolfArmor(int amount) {
+        Item armor = this.getWolfArmor();
+        if (armor.isNull() || armor.isUnbreakable() || armor.getMaxDurability() < 0) {
+            return;
+        }
+
+        Enchantment durability = armor.getEnchantment(Enchantment.ID_DURABILITY);
+        if (durability != null && durability.getLevel() > 0
+                && (100 / (durability.getLevel() + 1)) <= Utils.random.nextInt(100)) {
+            return;
+        }
+
+        int oldDamage = armor.getDamage();
+        int maxDurability = armor.getMaxDurability();
+        armor.setDamage(oldDamage + amount);
+        if (armor.getDamage() >= maxDurability) {
+            this.getArmorInventory().setBody(Item.AIR_ITEM);
+            this.getArmorInventory().sendContents(this.getViewers().values());
+            this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ARMOR_BREAK_WOLF);
+            return;
+        }
+
+        this.getArmorInventory().setBody(armor);
+        this.getArmorInventory().sendContents(this.getViewers().values());
+        this.playWolfArmorCrackSoundIfNeeded(maxDurability - oldDamage, maxDurability - armor.getDamage());
+    }
+
+    private void playWolfArmorCrackSoundIfNeeded(int oldRemaining, int newRemaining) {
+        for (int threshold : WOLF_ARMOR_CRACK_THRESHOLDS) {
+            if (oldRemaining > threshold && newRemaining <= threshold) {
+                this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ARMOR_CRACK_WOLF);
+                return;
+            }
+        }
+    }
+
+    private void damageHeldTool(Player player, Item item) {
+        if (player.isCreative()) {
+            return;
+        }
+
+        item.useOn((Entity) null);
+        if (item.getDamage() >= item.getMaxDurability()) {
+            this.level.addSoundToViewers(player, Sound.RANDOM_BREAK);
+            this.level.addParticle(new ItemBreakParticle(player, item));
+            player.getInventory().setItemInHand(Item.get(Item.AIR));
+        } else {
+            player.getInventory().setItemInHand(item);
+        }
+    }
+
+    private void afterSuccessfulAttack(EntityDamageEvent ev) {
+        this.setSitting(false);
+        if (ev instanceof EntityDamageByEntityEvent damageByEntityEvent) {
+            if (damageByEntityEvent.getDamager() instanceof Player player) {
+                if (!(player.isSurvival() || player.isAdventure()) || (this.hasOwner() && player.equals(this.getOwner()))) {
+                    return;
+                }
+            }
+            this.isAngryTo = damageByEntityEvent.getDamager().getId();
+            this.setAngry(true);
+        }
     }
 
     @Override

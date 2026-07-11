@@ -6,13 +6,19 @@ import cn.nukkit.entity.EntityControllable;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityRideable;
 import cn.nukkit.entity.data.Vector3fEntityData;
+import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.inventory.HorseInventory;
+import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
+import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.MobArmorEquipmentPacket;
 import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
@@ -24,9 +30,14 @@ import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
 /**
  * @author PetteriM1
  */
-public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideable, EntityControllable {
+public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideable, EntityControllable, InventoryHolder {
+
+    private static final String TAG_CHEST_ITEMS = "ChestItems";
+
+    private static final String NBT_KEY_ARMOR_ITEM = "ArmorItem";
 
     private boolean saddled;
+    private HorseInventory horseInventory;
 
     public EntityHorseBase(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -46,8 +57,22 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
     protected void initEntity() {
         super.initEntity();
 
-        if (this.namedTag.contains("Saddle")) {
-            this.setSaddled(this.namedTag.getBoolean("Saddle"));
+        this.horseInventory = new HorseInventory(this, this.getChestSize());
+        if (this.namedTag.containsList(TAG_CHEST_ITEMS)) {
+            this.horseInventory.loadFromNBT(this.namedTag.getList(TAG_CHEST_ITEMS, CompoundTag.class));
+        }
+
+        boolean hasSaddleItem = !this.horseInventory.getItem(HorseInventory.SLOT_SADDLE).isNull();
+        boolean legacySaddle = this.namedTag.contains("Saddle") && this.namedTag.getBoolean("Saddle");
+        if (hasSaddleItem || legacySaddle) {
+            this.setSaddled(true);
+            if (!hasSaddleItem) {
+                this.horseInventory.applySaddleWithoutSync(Item.get(Item.SADDLE));
+            }
+        }
+
+        if (this.namedTag.containsCompound(NBT_KEY_ARMOR_ITEM)) {
+            this.setHorseArmor(NBTIO.getItemHelper(this.namedTag.getCompound(NBT_KEY_ARMOR_ITEM)), false);
         }
     }
 
@@ -55,6 +80,34 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
     public void saveNBT() {
         super.saveNBT();
         this.namedTag.putBoolean("Saddle", this.isSaddled());
+        if (this.horseInventory != null) {
+            this.namedTag.putList(TAG_CHEST_ITEMS, this.horseInventory.saveToNBT());
+        }
+        Item armor = this.getHorseArmor();
+        if (!armor.isNull()) {
+            this.namedTag.putCompound(NBT_KEY_ARMOR_ITEM, NBTIO.putItemHelper(armor));
+        } else {
+            this.namedTag.remove(NBT_KEY_ARMOR_ITEM);
+        }
+    }
+
+    @Override
+    public HorseInventory getInventory() {
+        return this.horseInventory;
+    }
+
+    protected void syncHorseInventoryChestSize() {
+        if (this.horseInventory != null) {
+            this.horseInventory.setChestSize(this.getChestSize());
+        }
+    }
+
+    /**
+     * Number of additional storage slots beyond saddle (0) and armor (1).
+     * Defaults to 0; chested horses (donkey/mule/llama) override.
+     */
+    protected int getChestSize() {
+        return 0;
     }
 
     @Override
@@ -97,6 +150,13 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_SADDLE);
             this.setSaddled(true);
+        } else if (this.canWearHorseArmor() && !this.hasHorseArmor() && item.isHorseArmor()) {
+            Item armor = item.clone();
+            armor.setCount(1);
+            this.setHorseArmor(armor);
+            if (this.hasHorseArmor() && !player.isCreative()) {
+                player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
+            }
         } else if (this.passengers.isEmpty() && !this.isBaby() && !player.isSneaking() && (!this.canBeSaddled() || this.isSaddled())) {
             if (player.riding == null) {
                 this.mountEntity(player);
@@ -110,6 +170,10 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
         return !this.isBaby();
     }
 
+    public boolean canWearHorseArmor() {
+        return false;
+    }
+
     public boolean isSaddled() {
         return this.saddled;
     }
@@ -118,7 +182,65 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
         if (this.canBeSaddled()) {
             this.saddled = saddled;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_SADDLED, saddled);
+            if (this.horseInventory != null) {
+                Item current = this.horseInventory.getItem(HorseInventory.SLOT_SADDLE);
+                boolean slotHasSaddle = !current.isNull();
+                if (saddled != slotHasSaddle) {
+                    Item target = saddled ? Item.get(Item.SADDLE) : Item.get(Item.AIR);
+                    this.horseInventory.applySaddleWithoutSync(target);
+                }
+            }
         }
+    }
+
+    public boolean hasHorseArmor() {
+        return !this.getHorseArmor().isNull();
+    }
+
+    public Item getHorseArmor() {
+        if (this.horseInventory == null) {
+            return Item.AIR_ITEM;
+        }
+        Item armor = this.horseInventory.getItem(HorseInventory.SLOT_ARMOR);
+        return armor == null ? Item.AIR_ITEM : armor;
+    }
+
+    public void setHorseArmor(Item armor) {
+        this.setHorseArmor(armor, true);
+    }
+
+    private void setHorseArmor(Item armor, boolean send) {
+        if (this.horseInventory == null) {
+            return;
+        }
+
+        Item target = Item.get(Item.AIR);
+        if (this.canWearHorseArmor() && armor != null && armor.isHorseArmor()) {
+            target = armor.clone();
+            target.setCount(1);
+        }
+
+        if (!this.horseInventory.applyArmorWithoutVisual(target)) {
+            return;
+        }
+
+        if (send) {
+            Item current = this.getHorseArmor();
+            if (!current.isNull() && this.level != null) {
+                this.level.addSound(this, Sound.MOB_HORSE_ARMOR);
+            }
+            this.sendHorseArmor(this.getViewers().values().toArray(Player.EMPTY_ARRAY));
+        }
+    }
+
+    @Override
+    public boolean attack(EntityDamageEvent source) {
+        Item armor = this.getHorseArmor();
+        if (!armor.isNull() && source.canBeReducedByArmor()) {
+            float reduction = source.getFinalDamage() * armor.getArmorPoints() * 0.04f;
+            source.setDamage(-reduction, EntityDamageEvent.DamageModifier.ARMOR);
+        }
+        return super.attack(source);
     }
 
     @Override
@@ -194,11 +316,36 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
 
     @Override
     public boolean canDespawn() {
-        if (this.isSaddled()) {
+        if (this.isSaddled() || this.hasHorseArmor()) {
             return false;
         }
 
         return super.canDespawn();
+    }
+
+    @Override
+    public void spawnTo(Player player) {
+        super.spawnTo(player);
+        this.sendHorseArmor(player);
+    }
+
+    private void sendHorseArmor(Player... players) {
+        if (players.length == 0) {
+            return;
+        }
+
+        Item armor = this.getHorseArmor();
+        if (armor.isNull()) {
+            armor = Item.AIR_ITEM;
+        }
+        MobArmorEquipmentPacket packet = new MobArmorEquipmentPacket();
+        packet.eid = this.getId();
+        packet.slots = new Item[]{Item.AIR_ITEM, armor, Item.AIR_ITEM, Item.AIR_ITEM};
+        packet.body = armor;
+
+        for (Player player : players) {
+            player.dataPacket(packet);
+        }
     }
 
     @Override

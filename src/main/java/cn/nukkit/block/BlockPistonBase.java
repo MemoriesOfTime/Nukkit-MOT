@@ -10,6 +10,8 @@ import cn.nukkit.event.block.BlockPistonEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
@@ -151,6 +153,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             }
 
             this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_PISTON_OUT);
+            this.getLevel().getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0.5, 0.5, 0.5), VibrationType.BLOCK_ACTIVATE));
             return true;
         } else if (!isPowered && isExtended()) {
             if (!this.doMove(false)) {
@@ -158,6 +161,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             }
 
             this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_PISTON_IN);
+            this.getLevel().getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0.5, 0.5, 0.5), VibrationType.BLOCK_DEACTIVATE));
             return true;
         }
 

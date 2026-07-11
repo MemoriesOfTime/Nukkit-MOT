@@ -184,6 +184,7 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
                     Block moved = movingBlock.getBlock();
 
                     this.level.setBlock(movingBlock, moved);
+                    this.level.scheduleUpdate(moved, 0);
 
                     CompoundTag blockEntityNbt = ((BlockEntityMovingBlock) movingBlock).getBlockEntity();
 

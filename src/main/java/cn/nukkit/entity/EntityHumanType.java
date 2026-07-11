@@ -148,28 +148,49 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             return false;
         }
 
-        if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.CUSTOM && source.getCause() != DamageCause.MAGIC && source.getCause() != DamageCause.HUNGER) {
+        this.applyCriticalHitModifier(source);
+
+        if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.CUSTOM && source.getCause() != DamageCause.HUNGER) {
+            int breach = 0;
+            if (source instanceof EntityDamageByEntityEvent damageByEntityEvent) {
+                Enchantment[] enchantments = damageByEntityEvent.getWeaponEnchantments();
+                if (enchantments != null) {
+                    for (Enchantment enchantment : enchantments) {
+                        if (enchantment.getId() == Enchantment.ID_BREACH) {
+                            breach = enchantment.getLevel();
+                            break;
+                        }
+                    }
+                }
+            }
+
             int armorPoints = 0;
+            int toughness = 0;
             int epf = 0;
 
             for (Item armor : inventory.getArmorContents()) {
                 armorPoints += armor.getArmorPoints();
+                toughness += armor.getToughness();
                 epf += calculateEnchantmentProtectionFactor(armor, source);
             }
 
-            //float originalDamage = source.getDamage();
-            //float r = (source.getDamage(EntityDamageEvent.DamageModifier.ARMOR) - (originalDamage - originalDamage * (1 - Math.max(armorPoints / 5, armorPoints - originalDamage / 2) / 25)));
-            //originalDamage += r;
-            //epf = Math.min(20, epf);
-            //source.setDamage(r, EntityDamageEvent.DamageModifier.ARMOR);
-            //source.setDamage(source.getDamage(EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS) - (originalDamage - originalDamage * (1 - epf / 25f)), EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
-
+            // RESISTANCE 在事件构造函数按 BASE 全量预算,但原版中它在护甲后生效,故护甲输入需排除它,之后再重算
+            // RESISTANCE is pre-computed on full BASE in ctor; vanilla applies it after armor, so exclude it here and recompute below
+            float resistance = source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE);
             if (source.canBeReducedByArmor()) {
-                source.setDamage(-source.getFinalDamage() * armorPoints * 0.04f, EntityDamageEvent.DamageModifier.ARMOR);
+                float preArmorDamage = getDamageBeforeTargetReductions(source);
+                float armorFraction = calculateArmorReductionFraction(preArmorDamage, armorPoints, toughness, breach);
+                source.setDamage(-preArmorDamage * armorFraction, EntityDamageEvent.DamageModifier.ARMOR);
             }
 
-            source.setDamage(-source.getFinalDamage() * Math.min(NukkitMath.ceilFloat(Math.min(epf, 25) * ((float) Utils.random.nextInt(50, 100) / 100)), 20) * 0.04f,
+            // 原版 EPF 无随机波动,上限 20 / Vanilla EPF is non-random, capped at 20
+            float preEnchantmentDamage = source.getFinalDamage() - source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE);
+            source.setDamage(-preEnchantmentDamage * (Math.min(epf, 20) / 25f),
                     EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
+
+            // 基于护甲+附魔减免后的伤害重算 RESISTANCE(原版顺序: ARMOR → ENCHANTMENTS → RESISTANCE → ABSORPTION)
+            // Recompute RESISTANCE on post-armor/enchantment damage (vanilla order: ARMOR → ENCHANTMENTS → RESISTANCE → ABSORPTION)
+            this.recalculateResistanceDamage(source);
         }
 
         source.setDamage(-Math.min(this.getAbsorption(), source.getFinalDamage()), EntityDamageEvent.DamageModifier.ABSORPTION);
@@ -249,6 +270,26 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
         }
 
         return epf ;
+    }
+
+    /**
+     * 计算护甲减免比例(基岩版 1.18.30+ 公式),破甲每级降低 15%,护甲/韧性按属性上限截断。
+     * <p>
+     * Computes armor reduction fraction (Bedrock 1.18.30+ formula); Breach reduces 15% per level, armor/toughness are capped by attributes.
+     * 参考 / See: <a href="https://minecraft.wiki/w/Armor#Damage_reduction">Minecraft Wiki - Armor</a>
+     */
+    protected static float calculateArmorReductionFraction(float damage, int armorPoints, int toughness, int breach) {
+        armorPoints = NukkitMath.clamp(armorPoints, 0, 30);
+        toughness = NukkitMath.clamp(toughness, 0, 20);
+        float armorFraction = NukkitMath.clamp(
+                armorPoints - damage / (2f + toughness / 4f),
+                armorPoints * 0.2f, // 有效护甲下界 / effective armor floor
+                20
+        ) / 25f;
+        if (breach > 0) {
+            armorFraction = Math.max(armorFraction - breach * 0.15f, 0);
+        }
+        return armorFraction;
     }
 
     @Override

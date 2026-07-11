@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol.types.inventory.itemstack.request;
 
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import lombok.Value;
 
 /**
@@ -18,4 +19,11 @@ public class ItemStackRequestSlotData {
     // must check if these IDs match. If they do not match, servers should reject the stack request that the
     // action holding this info was in.
     int stackNetworkId;
+
+    // dynamicId for FullContainerName, may be null on protocols that don't carry one
+    Integer dynamicId;
+
+    public FullContainerName getContainerName() {
+        return new FullContainerName(container, dynamicId);
+    }
 }

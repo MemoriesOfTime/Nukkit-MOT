@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.zip.GZIPOutputStream;
 
@@ -210,13 +211,17 @@ public class Metrics {
 
     /**
      * Creates an SSLSocketFactory decorator that routes hostname-based connections to the
-     * pre-selected best IP address, while preserving SNI for correct TLS handshake.
+     * pre-selected best IP address, while preserving the requested host for TLS wrapping.
      *
      * @param targetAddress The pre-selected IP address to connect to.
      * @return The routing SSLSocketFactory.
      */
     private static SSLSocketFactory createRoutingSocketFactory(InetAddress targetAddress) {
-        SSLSocketFactory delegate = (SSLSocketFactory) SSLSocketFactory.getDefault();
+        return createRoutingSocketFactory(targetAddress, (SSLSocketFactory) SSLSocketFactory.getDefault());
+    }
+
+    static SSLSocketFactory createRoutingSocketFactory(InetAddress targetAddress, SSLSocketFactory delegate) {
+        Objects.requireNonNull(delegate, "delegate");
         return new SSLSocketFactory() {
             @Override
             public String[] getDefaultCipherSuites() {
@@ -229,19 +234,26 @@ public class Metrics {
             }
 
             @Override
+            public Socket createSocket() throws IOException {
+                return createRoutingSocket(targetAddress);
+            }
+
+            @Override
             public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
                 return delegate.createSocket(s, host, port, autoClose);
             }
 
             @Override
             public Socket createSocket(String host, int port) throws IOException {
-                // Route to pre-selected IP instead of resolving DNS again
-                return delegate.createSocket(targetAddress, port);
+                return connectAndWrapTlsSocket(delegate, targetAddress, host, port, null);
             }
 
             @Override
             public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
-                return delegate.createSocket(targetAddress, port, localHost, localPort);
+                InetSocketAddress localAddress = localHost == null
+                        ? new InetSocketAddress(localPort)
+                        : new InetSocketAddress(localHost, localPort);
+                return connectAndWrapTlsSocket(delegate, targetAddress, host, port, localAddress);
             }
 
             @Override
@@ -254,6 +266,54 @@ public class Metrics {
                 return delegate.createSocket(address, port, localAddress, localPort);
             }
         };
+    }
+
+    static Socket createRoutingSocket(InetAddress targetAddress) {
+        return new RoutingSocket(targetAddress);
+    }
+
+    private static Socket connectAndWrapTlsSocket(SSLSocketFactory delegate,
+                                                  InetAddress targetAddress,
+                                                  String host,
+                                                  int port,
+                                                  InetSocketAddress localAddress) throws IOException {
+        Socket socket = createRoutingSocket(targetAddress);
+        if (localAddress != null) {
+            socket.bind(localAddress);
+        }
+        socket.connect(InetSocketAddress.createUnresolved(host, port));
+        try {
+            return delegate.createSocket(socket, host, port, true);
+        } catch (IOException e) {
+            socket.close();
+            throw e;
+        }
+    }
+
+    private static SocketAddress rerouteEndpoint(SocketAddress endpoint, InetAddress targetAddress) {
+        if (endpoint instanceof InetSocketAddress inetEndpoint) {
+            return new InetSocketAddress(targetAddress, inetEndpoint.getPort());
+        }
+        return endpoint;
+    }
+
+    private static final class RoutingSocket extends Socket {
+
+        private final InetAddress targetAddress;
+
+        private RoutingSocket(InetAddress targetAddress) {
+            this.targetAddress = Objects.requireNonNull(targetAddress, "targetAddress");
+        }
+
+        @Override
+        public void connect(SocketAddress endpoint) throws IOException {
+            super.connect(rerouteEndpoint(endpoint, this.targetAddress));
+        }
+
+        @Override
+        public void connect(SocketAddress endpoint, int timeout) throws IOException {
+            super.connect(rerouteEndpoint(endpoint, this.targetAddress), timeout);
+        }
     }
 
     /**

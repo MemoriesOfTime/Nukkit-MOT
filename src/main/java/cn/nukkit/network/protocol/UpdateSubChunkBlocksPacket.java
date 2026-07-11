@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.types.BlockChangeEntry;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
@@ -11,9 +12,7 @@ public class UpdateSubChunkBlocksPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.UPDATE_SUB_CHUNK_BLOCKS_PACKET;
 
-    public int chunkX;
-    public int chunkY;
-    public int chunkZ;
+    public BlockVector3 position;
 
     public final List<BlockChangeEntry> standardBlocks = new ObjectArrayList<>();
     public final List<BlockChangeEntry> extraBlocks = new ObjectArrayList<>();
@@ -31,9 +30,7 @@ public class UpdateSubChunkBlocksPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        putVarInt(this.chunkX);
-        putUnsignedVarInt(this.chunkY);
-        putVarInt(this.chunkZ);
+        putBlockVector3(this.position);
         this.putArray(this.standardBlocks, ((stream, entry) -> {
             putBlockVector3(entry.blockPos());
             putUnsignedVarInt(entry.runtimeID());
@@ -50,16 +47,8 @@ public class UpdateSubChunkBlocksPacket extends DataPacket {
         }));
     }
 
-    public int getChunkX() {
-        return this.chunkX;
-    }
-
-    public int getChunkY() {
-        return this.chunkY;
-    }
-
-    public int getChunkZ() {
-        return this.chunkZ;
+    public BlockVector3 getPosition() {
+        return this.position;
     }
 
     public List<BlockChangeEntry> getStandardBlocks() {

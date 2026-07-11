@@ -79,6 +79,7 @@ public abstract class ContainerInventory extends BaseInventory {
         if (holder instanceof BlockEntity be && !be.closed && be.getLevel() != null) {
             be.setDirty();
             BlockEntityHopper.wakeupHoppersAround(be.getLevel(), be.getFloorX(), be.getFloorY(), be.getFloorZ());
+            be.getLevel().updateComparatorOutputLevel(be);
         } else if (holder instanceof Entity entity && entity.chunk != null) {
             entity.chunk.setChanged();
         }

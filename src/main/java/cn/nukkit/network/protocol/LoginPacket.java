@@ -47,24 +47,15 @@ public class LoginPacket extends DataPacket {
     @Override
     public void decode() {
         this.protocol_ = this.getInt();
-        if (this.protocol_ > ProtocolInfo.CURRENT_PROTOCOL + 1000) {
-            int ofs = this.getOffset();
-            this.setOffset(1);
-            try {
-                this.protocol_ = this.getInt();
-                if (this.protocol_ >= ProtocolInfo.v1_2_0) {
-                    throw new RuntimeException();
-                }
-                this.getByte(); //gameEdition
-            } catch (Throwable th) {
-                setOffset(ofs);
-            }
-        }
         if (this.protocol_ == 0) {
             setOffset(getOffset() + 2);
             this.protocol_ = getInt();
         }
         if (ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol_)) { // Avoid errors with unsupported versions
+            // v1.1 login format: protocol(int) + gameEdition(byte) + payload(byteArray)
+            if (this.protocol_ >= ProtocolInfo.v1_1_0 && this.protocol_ < ProtocolInfo.v1_2_0) {
+                this.getByte(); // gameEdition
+            }
             this.setBuffer(this.getByteArray(), 0);
             decodeChainData();
             decodeSkinData();
@@ -197,6 +188,8 @@ public class LoginPacket extends DataPacket {
 
             if (skinToken.has("SkinGeometry")) {
                 skin.setGeometryData(new String(Base64.getDecoder().decode(skinToken.get("SkinGeometry").getAsString()), StandardCharsets.UTF_8));
+            } else {
+                skin.setGeometryData(Skin.STEVE_GEOMETRY_OLD);
             }
         } else {
             if (skinToken.has("PlayFabId")) {
@@ -209,16 +202,9 @@ public class LoginPacket extends DataPacket {
 
             if (protocol_ >= ProtocolInfo.v1_19_60) {
                 if (skinToken.has("SkinId")) {
-                    //这边获取到的"SkinId"是FullId
-                    //FullId = SkinId + CapeId
-                    //而Skin对象中的skinId不是FullId,我们需要减掉CapeId
-                    String fullSkinId = skinToken.get("SkinId").getAsString();
-                    skin.setFullSkinId(fullSkinId);
-                    if (skin.getCapeId() != null) {
-                        skin.setSkinId(fullSkinId.substring(0, fullSkinId.length() - skin.getCapeId().length()));
-                    }else {
-                        skin.setSkinId(fullSkinId);
-                    }
+                    String skinId = skinToken.get("SkinId").getAsString();
+                    skin.setSkinId(skinId);
+                    skin.setFullSkinId(skinId);
                 }
             }
 

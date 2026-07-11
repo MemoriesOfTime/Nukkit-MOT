@@ -64,12 +64,13 @@ public class Potion implements Cloneable {
     public static final int TURTLE_MASTER_II = 39;
     public static final int SLOW_FALLING = 40;
     public static final int SLOW_FALLING_LONG = 41;
-    public static final int SLOWNESS_LONG_II = 42;
-    public static final int SLOWNESS_IV = 43;
-    public static final int WIND_CHARGED = 44;
-    public static final int WEAVING = 45;
-    public static final int OOZING = 46;
-    public static final int INFESTED = 47;
+    public static final int SLOWNESS_IV = 42;
+    @Deprecated
+    public static final int SLOWNESS_LONG_II = SLOWNESS_IV;
+    public static final int WIND_CHARGED = 43;
+    public static final int WEAVING = 44;
+    public static final int OOZING = 45;
+    public static final int INFESTED = 46;
 
     protected static Potion[] potions;
 
@@ -118,7 +119,6 @@ public class Potion implements Cloneable {
         potions[Potion.TURTLE_MASTER_II] = new Potion(Potion.TURTLE_MASTER_II, 2);
         potions[Potion.SLOW_FALLING] = new Potion(Potion.SLOW_FALLING);
         potions[Potion.SLOW_FALLING_LONG] = new Potion(Potion.SLOW_FALLING_LONG);
-        potions[Potion.SLOWNESS_LONG_II] = new Potion(Potion.SLOWNESS_LONG_II, 2);
         potions[Potion.SLOWNESS_IV] = new Potion(Potion.SLOWNESS, 4);
         potions[Potion.WIND_CHARGED] = new Potion(Potion.WIND_CHARGED);
         potions[Potion.WEAVING] = new Potion(Potion.WEAVING);
@@ -301,7 +301,6 @@ public class Potion implements Cloneable {
                 break;
             case SLOWNESS:
             case SLOWNESS_LONG:
-            case SLOWNESS_LONG_II:
             case SLOWNESS_IV:
                 effect = Effect.getEffect(Effect.SLOWNESS);
                 break;
@@ -398,7 +397,6 @@ public class Potion implements Cloneable {
             case STRENGTH_II:
             case WITHER_II:
             case TURTLE_MASTER_II:
-            case SLOWNESS_LONG_II:
                 return 2;
             default:
                 return 1;
@@ -462,7 +460,6 @@ public class Potion implements Cloneable {
             case TURTLE_MASTER_II -> 20;
             case SLOW_FALLING -> 90;
             case SLOW_FALLING_LONG -> 240;
-            case SLOWNESS_LONG_II -> 60;
             case SLOWNESS_IV -> 20;
             case WIND_CHARGED, WEAVING, OOZING, INFESTED -> 180;
             default -> 0;

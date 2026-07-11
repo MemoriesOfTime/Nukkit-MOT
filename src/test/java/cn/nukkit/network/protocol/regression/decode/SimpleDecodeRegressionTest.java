@@ -29,6 +29,10 @@ public class SimpleDecodeRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersions(ProtocolInfo.v1_19_80);
     }
 
+    static Stream<Arguments> versionsAt1001() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_26_30));
+    }
+
     // ==================== SetLocalPlayerAsInitializedPacket ====================
 
     @ParameterizedTest(name = "SetLocalPlayerAsInitializedPacket v{0}")
@@ -122,5 +126,35 @@ public class SimpleDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(-10, nk.z);
         assertTrue(nk.addUserData);
         assertEquals(3, nk.selectedSlot);
+    }
+
+    // ==================== PartyDestinationCookieResponsePacket ====================
+
+    @ParameterizedTest(name = "PartyDestinationCookieResponsePacket v{0}")
+    @MethodSource("versionsAt1001")
+    void partyDestinationCookieResponse(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PartyDestinationCookieResponsePacket();
+        cb.setCookie("cookie-1");
+        cb.setAccepted(true);
+
+        PartyDestinationCookieResponsePacket nk =
+                crossEncode(cb, PartyDestinationCookieResponsePacket::new, protocol);
+
+        assertEquals("cookie-1", nk.cookie);
+        assertTrue(nk.accepted);
+    }
+
+    @ParameterizedTest(name = "PartyDestinationCookieResponsePacket encode unsupported v{0}")
+    @MethodSource("versionsAt1001")
+    void partyDestinationCookieResponseEncodeUnsupported(int protocol) {
+        var nk = new PartyDestinationCookieResponsePacket();
+        nk.protocol = protocol;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(protocol, false);
+        nk.cookie = "cookie-1";
+        nk.accepted = true;
+
+        nk.encode();
+
+        assertEquals(0, nk.getCount(), "serverbound packet encode should not produce a payload");
     }
 }

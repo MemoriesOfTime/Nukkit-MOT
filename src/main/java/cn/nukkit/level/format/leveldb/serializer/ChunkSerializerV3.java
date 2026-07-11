@@ -26,7 +26,7 @@ public class ChunkSerializerV3 implements ChunkSerializer {
     public void serializer(WriteBatch writeBatch, Chunk chunk) {
         DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
         for (int ySection = dimensionData.getMinSectionY(); ySection <= dimensionData.getMaxSectionY(); ++ySection) {
-            byte[] key = LevelDBKey.CHUNK_SECTION_PREFIX.getKey(
+            byte[] key = LevelDBKey.SUB_CHUNK_PREFIX.getKey(
                     chunk.getX(), chunk.getZ(), ySection, dimensionData.getDimensionId()
             );
 
@@ -71,7 +71,7 @@ public class ChunkSerializerV3 implements ChunkSerializer {
         LevelDBChunkSection[] sections = new LevelDBChunkSection[dimensionInfo.getHeight() >> 4];
         for (int ySection = dimensionInfo.getMinSectionY(); ySection <= dimensionInfo.getMaxSectionY(); ++ySection) {
             StateBlockStorage[] stateBlockStorageArray;
-            byte[] bytes = db.get(LevelDBKey.CHUNK_SECTION_PREFIX.getKey(chunkX, chunkZ, ySection, chunkBuilder.getDimensionData().getDimensionId()));
+            byte[] bytes = db.get(LevelDBKey.SUB_CHUNK_PREFIX.getKey(chunkX, chunkZ, ySection, chunkBuilder.getDimensionData().getDimensionId()));
             if (bytes != null) {
                 ByteBuf byteBuf = Unpooled.wrappedBuffer(bytes);
                 if (!byteBuf.isReadable()) {
@@ -87,7 +87,7 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                 if (extraBlocks != null) {
                     for (int x = 0; x < 16; ++x) {
                         for (int z = 0; z < 16; ++z) {
-                            for (int y = ySection << 4; y < y + 16; ++y) {
+                            for (int y = ySection << 4, limit = y + 16; y < limit; ++y) {
                                 short index = (short) (x & 0xF | (z & 0xF) << 4 | (y & 0xFF) << 9);
                                 if (!extraBlocks.containsKey(index)) {
                                     continue;
@@ -95,7 +95,7 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                                 short fullBlock = extraBlocks.get(index);
                                 int blockId = fullBlock & 0xFF;
                                 int blockData = fullBlock >> 8 & 0xF;
-                                stateBlockStorageArray[1].set(StateBlockStorage.elementIndex(x, y, z), BlockStateMapping.get().getState(blockId, blockData));
+                                stateBlockStorageArray[1].set(StateBlockStorage.elementIndex(x, y & 0xF, z), BlockStateMapping.get().getState(blockId, blockData));
                             }
                         }
                     }

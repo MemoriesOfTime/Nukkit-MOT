@@ -41,7 +41,6 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
     private static final String NAME_TRIDENT = "Trident";
     private static final Vector3 defaultCollisionPos = new Vector3(0, 0, 0);
     private static final BlockVector3 defaultStuckToBlockPos = new BlockVector3(0, 0, 0);
-    public boolean alreadyCollided;
     protected Item trident;
     // Default Values
     protected float gravity = 0.04f;
@@ -56,6 +55,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
     private boolean hasChanneling;
     private int riptideLevel;
     private int impalingLevel;
+    private boolean didHit;
 
     @Override
     public int getNetworkId() {
@@ -245,8 +245,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
             return;
         }
 
-        if (this.alreadyCollided) {
-            this.move(this.motionX, this.motionY, this.motionZ);
+        if (this.didHit) {
             return;
         }
 
@@ -271,6 +270,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
         this.onHit();
         this.setCollisionPos(this);
         this.setMotion(new Vector3(this.getMotion().getX() * -0.01, this.getMotion().getY() * -0.1, this.getMotion().getZ() * -0.01));
+        this.didHit = true;
 
         if (trident != null && level.isThundering() && this.hasChanneling && this.canSeeSky()) {
             EntityLightning bolt = new EntityLightning(this.getChunk(), getDefaultNBT(this));

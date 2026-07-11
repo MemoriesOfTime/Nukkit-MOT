@@ -10,6 +10,8 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.particle.SmokeParticle;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -115,6 +117,13 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
 
         BlockEntityCauldron cauldron = (BlockEntityCauldron) be;
 
+        if (item instanceof ItemWolfArmor) {
+            if (dyeColorableArmor(item, player, cauldron)) {
+                this.level.updateComparatorOutputLevel(this);
+            }
+            return true;
+        }
+
         switch (item.getId()) {
             case Item.BUCKET:
                 if (item.getDamage() == 0) {//empty bucket
@@ -134,6 +143,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
                         this.level.setBlock(this, this, true);
                         cauldron.clearCustomColor();
                         this.getLevel().addSoundToViewers(this, Sound.CAULDRON_TAKEWATER);
+                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player, this.add(0.5, 0.5, 0.5), VibrationType.FLUID_PICKUP));
                     }
                 } else if (item.getDamage() == 8 || item.getDamage() == 10) {//water and lava buckets
                     if (isFull() && !cauldron.isCustomColor() && !cauldron.hasPotion() && item.getDamage() == 8) {
@@ -157,6 +167,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
                             cauldron.clearCustomColor();
                             this.level.setBlock(this, this, true);
                             this.getLevel().addSoundToViewers(this, Sound.CAULDRON_FILLWATER);
+                            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player, this.add(0.5, 0.5, 0.5), VibrationType.FLUID_PLACE));
                         } else { // lava bucket
                             if (!isEmpty()) {
                                 clearWithFizz(cauldron);
@@ -202,18 +213,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
             case Item.LEATHER_PANTS:
             case Item.LEATHER_BOOTS:
             case Item.LEATHER_HORSE_ARMOR:
-                if (isEmpty() || cauldron.hasPotion()) {
-                    break;
-                }
-
-                CompoundTag compoundTag = item.hasCompoundTag() ? item.getNamedTag() : new CompoundTag();
-                compoundTag.putInt("customColor", cauldron.getCustomColor().getRGB());
-                item.setCompoundTag(compoundTag);
-                player.getInventory().setItemInHand(item);
-
-                setFillLevel(getFillLevel() - 1);
-                this.level.setBlock(this, this, true, true);
-                this.level.addSoundToViewers(this, Sound.CAULDRON_DYEARMOR);
+                dyeColorableArmor(item, player, cauldron);
                 break;
             case Item.POTION:
             case Item.SPLASH_POTION:
@@ -305,6 +305,24 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
         }
 
         this.level.updateComparatorOutputLevel(this);
+        return true;
+    }
+
+    private boolean dyeColorableArmor(Item item, Player player, BlockEntityCauldron cauldron) {
+        if (isEmpty() || cauldron.hasPotion() || !cauldron.isCustomColor()) {
+            return false;
+        }
+
+        CompoundTag compoundTag = item.hasCompoundTag() ? item.getNamedTag() : new CompoundTag();
+        compoundTag.putInt("customColor", cauldron.getCustomColor().getRGB());
+        item.setCompoundTag(compoundTag);
+        if (player != null) {
+            player.getInventory().setItemInHand(item);
+        }
+
+        setFillLevel(getFillLevel() - 1);
+        this.level.setBlock(this, this, true, true);
+        this.level.addSoundToViewers(this, Sound.CAULDRON_DYEARMOR);
         return true;
     }
 
