@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.util.RedstoneToggleHelper;
 import cn.nukkit.event.block.DoorToggleEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
@@ -158,6 +159,12 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
 
         this.setDamage(direction | ((~this.getDamage()) & OPEN_BIT));
         this.level.setBlock(this, this, false, true);
+        // 玩家手动 toggle 时记录 override，避免红石随后把它"对齐"回去 (issue #782)
+        if (player != null) {
+            boolean powered = RedstoneToggleHelper.isPowered(this.level, this.getLocation());
+            boolean open = this.isOpen();
+            RedstoneToggleHelper.setManualOverride(this.level, this.getFloorX(), this.getFloorY(), this.getFloorZ(), powered != open);
+        }
         if (this.isOpen()) {
             this.level.addSound(this, Sound.RANDOM_DOOR_OPEN);
         } else {
@@ -174,13 +181,24 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_REDSTONE) {
-            if ((!isOpen() && this.level.isBlockPowered(this.getLocation())) || (isOpen() && !this.level.isBlockPowered(this.getLocation()))) {
+            // 玩家手动操作过的栅栏门不被红石强制对齐 (issue #782)
+            boolean powered = RedstoneToggleHelper.isPowered(this.level, this.getLocation());
+            boolean manualOverride = RedstoneToggleHelper.isManualOverride(this.level, this.getFloorX(), this.getFloorY(), this.getFloorZ());
+            if (((!this.isOpen() && powered) || (this.isOpen() && !powered)) && !manualOverride) {
                 this.toggle(null);
                 return type;
+            } else if (manualOverride && powered == this.isOpen()) {
+                RedstoneToggleHelper.setManualOverride(this.level, this.getFloorX(), this.getFloorY(), this.getFloorZ(), false);
             }
         }
 
         return 0;
+    }
+
+    @Override
+    public boolean onBreak(Item item) {
+        RedstoneToggleHelper.setManualOverride(this.level, this.getFloorX(), this.getFloorY(), this.getFloorZ(), false);
+        return super.onBreak(item);
     }
 
     @Override
