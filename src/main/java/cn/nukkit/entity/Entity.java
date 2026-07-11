@@ -559,6 +559,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     private volatile boolean init;
     private volatile boolean initEntity;
+    private volatile boolean published;
 
     protected volatile boolean saveWithChunk = true;
 
@@ -668,8 +669,6 @@ public abstract class Entity extends Location implements Metadatable {
         this.dataProperties.putFloat(DATA_BOUNDING_BOX_WIDTH, this.getWidth());
         this.dataProperties.putInt(DATA_HEALTH, (int) this.health);
 
-        this.scheduleUpdate();
-
         if (this instanceof Player) {
             this.sendData((Player) this);
         } else {
@@ -776,15 +775,28 @@ public abstract class Entity extends Location implements Metadatable {
         this.scale = this.namedTag.getFloat("Scale");
         this.setDataProperty(new FloatEntityData(DATA_SCALE, scale), false);
 
-        this.chunk.addEntity(this);
-        this.level.addEntity(this);
+        try {
+            this.initEntity();
+            if (this.closed) {
+                return;
+            }
 
-        this.initEntity();
+            this.chunk.addEntity(this);
+            this.level.addEntity(this);
+            this.lastUpdate = this.server.getTick();
+            this.published = true;
 
-        this.lastUpdate = this.server.getTick();
-        this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
+            this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
 
-        this.scheduleUpdate();
+            this.scheduleUpdate();
+        } catch (RuntimeException | Error e) {
+            try {
+                this.close(false);
+            } catch (RuntimeException | Error rollbackFailure) {
+                e.addSuppressed(rollbackFailure);
+            }
+            throw e;
+        }
     }
 
     /**
@@ -2437,7 +2449,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final void scheduleUpdate() {
-        if (!this.closed && !this.level.isBeingConverted) {
+        if (this.published && !this.closed && !this.level.isBeingConverted) {
             this.level.updateEntities.put(this.id, this);
         }
     }
@@ -3232,31 +3244,42 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void close() {
+        this.close(true);
+    }
+
+    private void close(boolean callDespawnEvent) {
         if (!this.closed) {
             this.closed = true;
-            this.server.getPluginManager().callEvent(new EntityDespawnEvent(this));
-            this.despawnFromAll();
-
-            this.collisionHelper = null;
-            this.blocksAround = null;
-            this.collisionBlocks = null;
-
-            this.removeAllEffects(EntityPotionEffectEvent.Cause.DEATH);
-            this.passengers.clear();
-
-            if (this.intProperties != null) {
-                this.intProperties.clear();
+            if (callDespawnEvent) {
+                this.server.getPluginManager().callEvent(new EntityDespawnEvent(this));
             }
-            if (this.floatProperties != null) {
-                this.floatProperties.clear();
-            }
+            this.published = false;
+            try {
+                this.despawnFromAll();
 
-            if (this.chunk != null) {
-                this.chunk.removeEntity(this);
-            }
+                this.collisionHelper = null;
+                this.blocksAround = null;
+                this.collisionBlocks = null;
 
-            if (this.level != null) {
-                this.level.removeEntity(this);
+                this.removeAllEffects(callDespawnEvent ? EntityPotionEffectEvent.Cause.DEATH : null);
+                this.passengers.clear();
+
+                if (this.intProperties != null) {
+                    this.intProperties.clear();
+                }
+                if (this.floatProperties != null) {
+                    this.floatProperties.clear();
+                }
+            } finally {
+                try {
+                    if (this.chunk != null) {
+                        this.chunk.removeEntity(this);
+                    }
+                } finally {
+                    if (this.level != null) {
+                        this.level.removeEntity(this);
+                    }
+                }
             }
         }
     }
