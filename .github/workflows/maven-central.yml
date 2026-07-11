@@ -150,7 +150,14 @@ jobs:
           SONATYPE_SECRET_KEY: ${{ secrets.SONATYPE_SECRET_KEY }}
         run: |
           set -euo pipefail
-          printf '%s' "$SONATYPE_SECRET_KEY" | base64 --decode | gpg --batch --import
+          if ! printf '%s' "$SONATYPE_SECRET_KEY" | gpg --batch --import; then
+              echo "::error::Failed to import SONATYPE_SECRET_KEY as an OpenPGP private key"
+              exit 1
+          fi
+          if ! gpg --batch --list-secret-keys --with-colons | grep -q '^sec:'; then
+              echo "::error::SONATYPE_SECRET_KEY did not contain an OpenPGP secret key"
+              exit 1
+          fi
 
       - name: Publish to Maven Central
         env:
