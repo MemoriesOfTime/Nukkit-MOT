@@ -33,7 +33,7 @@ public class BlockBush extends BlockFlowable {
 
     @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
-        if (BlockSweetBerryBush.isSupportValid(down())) {
+        if (isSupportValid(down())) {
             this.getLevel().setBlock(block, this, true);
             return true;
         }
@@ -43,11 +43,19 @@ public class BlockBush extends BlockFlowable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (!BlockSweetBerryBush.isSupportValid(down(1, 0))) {
+            if (!isSupportValid(down())) {
                 this.getLevel().useBreakOn(this);
             }
         }
         return 0;
+    }
+
+    public static boolean isSupportValid(Block block) {
+        return switch (block.getId()) {
+            case GRASS, DIRT, MYCELIUM, PODZOL, FARMLAND, ROOTED_DIRT, MOSS_BLOCK,
+                    MUD, MUDDY_MANGROVE_ROOTS, PALE_MOSS_BLOCK -> true;
+            default -> false;
+        };
     }
 
     @Override
