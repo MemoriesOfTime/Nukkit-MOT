@@ -11,10 +11,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -26,6 +23,29 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
     protected final File path;
 
     protected ResourcePack.SupportType supportType = ResourcePack.SupportType.UNIVERSAL;
+
+    /**
+     * 根据文件名后缀检测资源包类型
+     * <p>
+     * Detect the resource pack support type by filename suffix.
+     * 文件名含 {@code .netease.} 或以 {@code .netease} 结尾时视为网易版。
+     * <p>
+     * Names containing {@code .netease.} or ending with {@code .netease} are treated as NetEase packs.
+     *
+     * @param fileName the pack file/directory name
+     * @return detected {@link ResourcePack.SupportType}
+     */
+    protected ResourcePack.SupportType detectSupportType(String fileName) {
+        String normalizedName = fileName.toLowerCase(Locale.ROOT);
+        if (normalizedName.endsWith(".netease") || normalizedName.contains(".netease.")) {
+            return ResourcePack.SupportType.NETEASE;
+        }
+        return this.supportType;
+    }
+
+    protected boolean shouldIgnoreFile(String fileName) {
+        return fileName.equalsIgnoreCase("packs.yml") || Files.getFileExtension(fileName).equalsIgnoreCase("key");
+    }
 
     public ZippedResourcePackLoader(File path) {
         this.path = path;
@@ -54,17 +74,21 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         var baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
         for (File pack : path.listFiles()) {
+            if (shouldIgnoreFile(pack.getName())) {
+                continue;
+            }
             try {
                 ResourcePack resourcePack = null;
                 String fileExt = Files.getFileExtension(pack.getName());
+                ResourcePack.SupportType packType = detectSupportType(pack.getName());
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null) {
-                        resourcePack = new ZippedResourcePack(file, this.supportType);
+                        resourcePack = new ZippedResourcePack(file, packType);
                     }
-                } else if (!fileExt.equals("key")) { //directory resource packs temporarily unsupported
+                } else {
                     switch (fileExt) {
-                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack, this.supportType);
+                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack, packType);
                         default -> log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
                     }
                 }

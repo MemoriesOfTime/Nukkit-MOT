@@ -26,7 +26,6 @@ public class JarPluginResourcePack extends AbstractResourcePack {
     protected File jarPluginFile;
     protected ByteBuffer zippedByteBuffer;
     protected byte[] sha256;
-    protected String encryptionKey = "";
 
     public static boolean hasResourcePack(File jarPluginFile) {
         try {
@@ -84,8 +83,8 @@ public class JarPluginResourcePack extends AbstractResourcePack {
 
             ZipEntry encryptionKeyEntry = jar.getEntry(RESOURCE_PACK_PATH + "encryption.key");
             if (encryptionKeyEntry != null) {
-                this.encryptionKey = new String(jar.getInputStream(encryptionKeyEntry).readAllBytes(),StandardCharsets.UTF_8);
-                log.debug(this.encryptionKey);
+                this.setEncryptionKey(new String(jar.getInputStream(encryptionKeyEntry).readAllBytes(), StandardCharsets.UTF_8));
+                log.debug(this.getEncryptionKey());
             }
 
             jar.stream().forEach(entry -> {
@@ -130,11 +129,6 @@ public class JarPluginResourcePack extends AbstractResourcePack {
     @Override
     public byte[] getSha256() {
         return this.sha256;
-    }
-
-    @Override
-    public String getEncryptionKey() {
-        return encryptionKey;
     }
 
     @Override

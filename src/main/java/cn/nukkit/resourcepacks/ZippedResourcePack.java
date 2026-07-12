@@ -19,9 +19,6 @@ public class ZippedResourcePack extends AbstractResourcePack {
     private File file;
     private byte[] sha256;
 
-    private String encryptionKey = "";
-    private String cdnUrl = "";
-
     public ZippedResourcePack(File file) {
         this(file, SupportType.UNIVERSAL);
     }
@@ -74,7 +71,7 @@ public class ZippedResourcePack extends AbstractResourcePack {
             }
             File keyFile = new File(parentFolder, this.file.getName() + ".key");
             if (keyFile.exists()) {
-                this.encryptionKey = Files.readString(keyFile.toPath());
+                this.setEncryptionKey(Files.readString(keyFile.toPath()));
             }
         } catch (IOException e) {
             Server.getInstance().getLogger().logException(e);
@@ -123,17 +120,11 @@ public class ZippedResourcePack extends AbstractResourcePack {
         return chunk;
     }
 
-    @Override
-    public String getEncryptionKey() {
-        return this.encryptionKey;
-    }
-
-    @Override
-    public String getCDNUrl() {
-        return this.cdnUrl;
-    }
-
+    /**
+     * @deprecated Use {@link #setCDNUrl(String)} instead
+     */
+    @Deprecated
     public void setCdnUrl(String cdnUrl) {
-        this.cdnUrl = cdnUrl;
+        this.setCDNUrl(cdnUrl);
     }
 }
