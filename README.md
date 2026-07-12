@@ -2,6 +2,7 @@
 <h3 align="center">Nukkit-MOT</h3>
 <p align="center">
   <a href="https://www.gnu.org/licenses/lgpl-3.0.html"><img alt="License: LGPL v3" src="https://img.shields.io/github/license/MemoriesOfTime/Nukkit-MOT"></a>
+    <a href="https://central.sonatype.com/artifact/com.nukkit-mot/nukkit-mot"><img alt="Maven Central" src="https://img.shields.io/maven-central/v/com.nukkit-mot/nukkit-mot?label=maven-central"></a>
     <a href="https://motci.cn/job/Nukkit-MOT/job/master/"><img alt="Jenkins Build" src="https://img.shields.io/jenkins/build?jobUrl=https%3A%2F%2Fmotci.cn%2Fjob%2FNukkit-MOT%2Fjob%2Fmaster%2F&label=jenkins&logo=jenkins"></a>
     <a href="https://discord.gg/pJjQDQC"><img alt="Discord" src="https://img.shields.io/discord/710480168598372354?label=Discord&logo=discord"></a>
 <p align="center">
@@ -39,6 +40,7 @@ Only interested in newer versions? You might want to try [Lumi](https://github.c
 #### Repository:
 ```xml
 <repositories>
+    <!-- Release builds come from Maven Central; SNAPSHOT builds require the repo.lanink.cn repo -->
     <repository>
         <id>repo-lanink-cn</id>
         <url>https://repo.lanink.cn/repository/maven-public/</url>
@@ -48,6 +50,17 @@ Only interested in newer versions? You might want to try [Lumi](https://github.c
 
 #### Dependencies:
 ```xml
+<!-- Release -->
+<dependencies>
+    <dependency>
+        <groupId>com.nukkit-mot</groupId>
+        <artifactId>nukkit-mot</artifactId>
+        <version>1.26.30-R1</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+
+<!-- SNAPSHOT -->
 <dependencies>
     <dependency>
         <groupId>cn.nukkit</groupId>
@@ -63,12 +76,19 @@ Only interested in newer versions? You might want to try [Lumi](https://github.c
 ```kts
 repositories {
     mavenCentral()
+    // SNAPSHOT builds require the repo.lanink.cn repo
     maven("https://repo.lanink.cn/repository/maven-public/")
 } 
 ```
 
 #### Dependencies:
 ```kts
+// Release
+dependencies {
+    compileOnly("com.nukkit-mot:nukkit-mot:1.26.30-R1")
+}
+
+// SNAPSHOT
 dependencies {
     compileOnly("cn.nukkit:Nukkit:MOT-SNAPSHOT")
 }

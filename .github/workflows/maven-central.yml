@@ -165,3 +165,78 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
         run: mvn -B -f pom-central.xml -Pcentral-release deploy -DskipTests
+
+  bump-readme:
+    # After a successful release, bump the release version in the READMEs to the published version.
+    needs: publish
+    if: github.repository == 'MemoriesOfTime/Nukkit-MOT'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout default branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump README version placeholders
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          version = os.environ["VERSION"]
+          pattern = re.compile(r"^\d+\.\d+\.\d+-R\d+(\.\d+)?$")
+          if not pattern.match(version):
+              sys.exit(f"Unexpected release version: {version}")
+
+          # Only bump placeholders tied to the Maven Central coordinate
+          # com.nukkit-mot:nukkit-mot, leaving the SNAPSHOT coordinate untouched.
+          xml_re = re.compile(
+              r'(<groupId>com\.nukkit-mot</groupId>\s*<artifactId>nukkit-mot</artifactId>\s*<version>)([\d.]+-R\d+(?:\.\d+)?)(</version>)',
+              re.DOTALL,
+          )
+          gradle_re = re.compile(r'(com\.nukkit-mot:nukkit-mot:)([\d.]+-R\d+(?:\.\d+)?)')
+
+          targets = ["README.md", "docs/README_zh.md"]
+          changed = False
+          for path in targets:
+              with open(path, "r", encoding="utf-8") as f:
+                  content = f.read()
+              new_content, xml_n = xml_re.subn(rf"\g<1>{version}\g<3>", content)
+              new_content, gradle_n = gradle_re.subn(rf"\g<1>{version}", new_content)
+              if xml_n or gradle_n:
+                  with open(path, "w", encoding="utf-8") as f:
+                      f.write(new_content)
+                  changed = True
+                  print(f"Updated {path}: xml={xml_n}, gradle={gradle_n}")
+
+          if not changed:
+              print("No release version placeholders matched; nothing to commit.")
+          PY
+
+      - name: Commit README bump
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git add README.md docs/README_zh.md
+          if git diff --cached --quiet; then
+            echo "No README changes to commit."
+            exit 0
+          fi
+          git commit -m "docs(readme): bump Maven Central version to ${VERSION}"
+          git push
