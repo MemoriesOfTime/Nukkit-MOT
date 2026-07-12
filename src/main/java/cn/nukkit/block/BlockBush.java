@@ -2,6 +2,8 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import org.jetbrains.annotations.NotNull;
 
@@ -36,5 +38,26 @@ public class BlockBush extends BlockFlowable {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public int onUpdate(int type) {
+        if (type == Level.BLOCK_UPDATE_NORMAL) {
+            if (!BlockSweetBerryBush.isSupportValid(down(1, 0))) {
+                this.getLevel().useBreakOn(this);
+            }
+        }
+        return 0;
+    }
+
+    @Override
+    public Item[] getDrops(Item item) {
+        if (item.isShears() || item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
+            return new Item[]{
+                toItem()
+            };
+        }
+
+        return Item.EMPTY_ARRAY;
     }
 }
