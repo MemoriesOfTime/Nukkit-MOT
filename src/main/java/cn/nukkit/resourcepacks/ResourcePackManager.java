@@ -7,6 +7,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 import cn.nukkit.utils.Config;
+import cn.nukkit.utils.ConfigSection;
 import cn.nukkit.utils.Utils;
 import com.google.common.collect.Sets;
 import com.google.gson.JsonArray;
@@ -126,7 +127,17 @@ public class ResourcePackManager {
                 return;
             }
         }
-        Config config = new Config(this.packConfigFile, Config.YAML);
+        Config config;
+        try {
+            config = new Config(this.packConfigFile, Config.YAML);
+        } catch (RuntimeException e) {
+            log.warn("Failed to load packs.yml; pack-specific configuration was ignored", e);
+            return;
+        }
+        if (!hasValidPackConfigStructure(config)) {
+            log.warn("Invalid packs.yml structure: every top-level entry must be a pack section");
+            return;
+        }
         for (String packId : config.getSections("").keySet()) {
             ResourcePack pack;
             try {
@@ -148,6 +159,15 @@ public class ResourcePackManager {
                 pack.setEncryptionKey(key);
             }
         }
+    }
+
+    private static boolean hasValidPackConfigStructure(Config config) {
+        for (Object value : config.getRootSection().values()) {
+            if (!(value instanceof ConfigSection)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     protected static class ProtocolConverter {

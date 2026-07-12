@@ -14,7 +14,7 @@ public abstract class AbstractResourcePack implements ResourcePack {
     private int protocol = 0;
     private SupportType supportType = SupportType.UNIVERSAL;
     private String cdnUrl = "";
-    private String encryptionKey = "";
+    protected String encryptionKey = "";
 
     protected boolean verifyManifest() {
         if (this.manifest.has("format_version") && this.manifest.has("header") && this.manifest.has("modules")) {

@@ -84,7 +84,6 @@ public class JarPluginResourcePack extends AbstractResourcePack {
             ZipEntry encryptionKeyEntry = jar.getEntry(RESOURCE_PACK_PATH + "encryption.key");
             if (encryptionKeyEntry != null) {
                 this.setEncryptionKey(new String(jar.getInputStream(encryptionKeyEntry).readAllBytes(), StandardCharsets.UTF_8));
-                log.debug(this.getEncryptionKey());
             }
 
             jar.stream().forEach(entry -> {
