@@ -35,6 +35,9 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
         BaseLang baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
         for (File pack : this.path.listFiles()) {
+            if (shouldIgnoreFile(pack.getName())) {
+                continue;
+            }
             try {
                 ZippedBehaviourPack resourcePack = null;
                 String fileExt = Files.getFileExtension(pack.getName());
@@ -43,7 +46,7 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
                     File file = loadDirectoryPack(pack);
                     if (file != null)
                         resourcePack = new ZippedBehaviourPack(file, packType);
-                } else if (!fileExt.equals("key")) {
+                } else {
                     switch (fileExt) {
                         case "zip":
                         case "mcpack":

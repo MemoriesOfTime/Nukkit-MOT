@@ -44,7 +44,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
     }
 
     protected boolean shouldIgnoreFile(String fileName) {
-        return fileName.equalsIgnoreCase("packs.yml") || Files.getFileExtension(fileName).equalsIgnoreCase("key");
+        return fileName.equalsIgnoreCase("packs.yml");
     }
 
     public ZippedResourcePackLoader(File path) {

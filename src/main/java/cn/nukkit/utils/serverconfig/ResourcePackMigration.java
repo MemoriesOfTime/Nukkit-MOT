@@ -20,16 +20,18 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * 将旧的分离式网易资源包/行为包目录迁移到统一目录结构。
+ * 将旧的分离式网易资源包/行为包目录迁移到统一目录结构，并将磁盘加密密钥迁入 {@code packs.yml}。
  * <p>
  * Migrates legacy separated NetEase resource/behaviour pack directories into the unified
- * directory structure with {@code .netease.} filename suffixes.
+ * directory structure with {@code .netease.} filename suffixes, and consolidates on-disk
+ * encryption key files into {@code packs.yml}.
  *
  * <h3>迁移规则 / Migration rules</h3>
  * <ul>
  *   <li>{@code resource_packs_netease/*} → {@code resource_packs/*}（文件名加 {@code .netease.}）</li>
  *   <li>{@code behaviour_packs_netease/*} → {@code behaviour_packs/*}（文件名加 {@code .netease.}）</li>
- *   <li>加密密钥文件 {@code <pack>.key} 的内容写入 {@code packs.yml} 的对应 UUID，然后删除原文件</li>
+ *   <li>加密密钥文件 {@code <pack>.key}（无论来自旧网易目录还是统一目录）的内容写入 {@code packs.yml} 的对应 UUID，然后删除原文件</li>
+ *   <li>读不到 pack UUID 的 {@code <pack>.key} 原地保留并记录警告，留待手动处理</li>
  *   <li>迁移完成后删除空的旧目录</li>
  * </ul>
  */
@@ -42,9 +44,10 @@ public final class ResourcePackMigration {
     private static final String NETEASE_SUFFIX = ".netease";
 
     /**
-     * 执行迁移。仅在旧目录存在时生效。
+     * 执行迁移：先处理旧网易目录，再扫描统一目录中就地残留的 {@code .key} 文件。
      * <p>
-     * Perform the migration. Only takes effect when legacy directories exist.
+     * Performs migration: first handles legacy NetEase directories, then scans the unified
+     * directories for in-place {@code .key} files left over from the deprecated on-disk key mechanism.
      *
      * @param dataPath 服务器数据根目录（Nukkit.DATA_PATH）
      */
@@ -52,7 +55,11 @@ public final class ResourcePackMigration {
         File packConfigFile = new File(dataPath, "resource_packs" + File.separator + "packs.yml");
         File resourcePacksSource = new File(dataPath, "resource_packs_netease");
         File behaviourPacksSource = new File(dataPath, "behaviour_packs_netease");
-        if (!isDirectory(resourcePacksSource) && !isDirectory(behaviourPacksSource)) {
+        File resourcePacksDest = new File(dataPath, "resource_packs");
+        File behaviourPacksDest = new File(dataPath, "behaviour_packs");
+
+        boolean hasLegacyNetease = isDirectory(resourcePacksSource) || isDirectory(behaviourPacksSource);
+        if (!hasLegacyNetease && !isDirectory(resourcePacksDest) && !isDirectory(behaviourPacksDest)) {
             return;
         }
 
@@ -61,18 +68,11 @@ public final class ResourcePackMigration {
             return;
         }
 
-        migrateDirectory(
-                resourcePacksSource,
-                new File(dataPath, "resource_packs"),
-                packConfigFile,
-                packConfig
-        );
-        migrateDirectory(
-                behaviourPacksSource,
-                new File(dataPath, "behaviour_packs"),
-                packConfigFile,
-                packConfig
-        );
+        migrateDirectory(resourcePacksSource, resourcePacksDest, packConfigFile, packConfig);
+        migrateDirectory(behaviourPacksSource, behaviourPacksDest, packConfigFile, packConfig);
+        // 磁盘 <pack>.key 已弃用，把统一目录里就地残留的 .key 也并入 packs.yml。
+        migrateInPlaceKeys(resourcePacksDest, packConfigFile, packConfig);
+        migrateInPlaceKeys(behaviourPacksDest, packConfigFile, packConfig);
     }
 
     /**
@@ -156,6 +156,37 @@ public final class ResourcePackMigration {
         // 清理系统生成的隐藏文件（如 macOS .DS_Store），然后删除空目录
         cleanSystemFiles(srcDir);
         deleteIfEmpty(srcDir);
+    }
+
+    /**
+     * 扫描统一目录中就地残留的 {@code <pack>.key} 文件，将其内容写入共享 packs.yml 后删除。
+     * 读不到 pack UUID 时原地保留 {@code .key} 并记录警告。
+     * <p>
+     * Scans the unified directory for in-place {@code <pack>.key} leftovers, persists their content
+     * into the shared packs.yml, then deletes them. Keys whose pack UUID cannot be read are kept
+     * in place with a warning.
+     *
+     * @param packDir 统一资源包/行为包目录
+     * @param packConfigFile 资源包共享配置文件
+     * @param packConfig 已验证的资源包配置
+     */
+    private static void migrateInPlaceKeys(File packDir, File packConfigFile, Config packConfig) {
+        if (!isDirectory(packDir)) {
+            return;
+        }
+        File[] files = packDir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File file : files) {
+            if (!file.getName().endsWith(".key") || !file.isFile()) {
+                continue;
+            }
+            String packName = file.getName().substring(0, file.getName().length() - 4);
+            File packFile = new File(packDir, packName);
+            KeyMigrationResult keyResult = prepareKeyMigration(file, packFile, packConfigFile, packConfig);
+            finishKeyMigration(file, packFile, keyResult);
+        }
     }
 
     /**

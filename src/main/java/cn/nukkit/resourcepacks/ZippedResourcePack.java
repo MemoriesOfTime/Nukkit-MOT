@@ -69,10 +69,8 @@ public class ZippedResourcePack extends AbstractResourcePack {
             if (parentFolder == null || !parentFolder.isDirectory()) {
                 throw new IOException("Invalid resource pack path");
             }
-            File keyFile = new File(parentFolder, this.file.getName() + ".key");
-            if (keyFile.exists()) {
-                this.setEncryptionKey(Files.readString(keyFile.toPath()));
-            }
+            // 加密密钥只能来自 packs.yml（由 ResourcePackManager.applyPackConfig 注入）。
+            // Encryption keys now come exclusively from packs.yml (injected by ResourcePackManager.applyPackConfig).
         } catch (IOException e) {
             Server.getInstance().getLogger().logException(e);
         }

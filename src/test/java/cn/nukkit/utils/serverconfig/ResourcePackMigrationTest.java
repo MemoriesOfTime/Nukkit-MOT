@@ -187,6 +187,59 @@ class ResourcePackMigrationTest {
     }
 
     @Test
+    void migrateInPlaceKeyFromUnifiedDirectory() throws IOException {
+        Path destinationDir = Files.createDirectories(tempDir.resolve("resource_packs"));
+        createPack(destinationDir.resolve("plain.mcpack"), RESOURCE_PACK_ID, "resources");
+        Path key = Files.writeString(
+                destinationDir.resolve("plain.mcpack.key"),
+                ENCRYPTION_KEY,
+                StandardCharsets.UTF_8
+        );
+
+        ResourcePackMigration.migrate(tempDir.toFile());
+
+        assertFalse(Files.exists(key));
+        Config config = new Config(destinationDir.resolve("packs.yml").toFile(), Config.YAML);
+        assertEquals(ENCRYPTION_KEY, config.getString(RESOURCE_PACK_ID + ".key"));
+    }
+
+    @Test
+    void migrateInPlaceKeyWithoutReadableUuidKeepsKey() throws IOException {
+        Path destinationDir = Files.createDirectories(tempDir.resolve("resource_packs"));
+        Path pack = destinationDir.resolve("broken.mcpack");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(pack))) {
+            zip.putNextEntry(new ZipEntry("readme.txt"));
+            zip.write("missing manifest".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        Path key = Files.writeString(
+                destinationDir.resolve("broken.mcpack.key"),
+                ENCRYPTION_KEY,
+                StandardCharsets.UTF_8
+        );
+
+        ResourcePackMigration.migrate(tempDir.toFile());
+
+        // 读不到 UUID 时 .key 原地保留，留待手动处理
+        assertTrue(Files.exists(key));
+        assertEquals(ENCRYPTION_KEY, Files.readString(key, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void migrateTriggersEvenWithoutLegacyNeteaseDirectories() throws IOException {
+        Path destinationDir = Files.createDirectories(tempDir.resolve("resource_packs"));
+        createPack(destinationDir.resolve("plain.mcpack"), RESOURCE_PACK_ID, "resources");
+        Files.writeString(destinationDir.resolve("plain.mcpack.key"), ENCRYPTION_KEY, StandardCharsets.UTF_8);
+
+        // 没有任何 *_netease 目录，仅统一目录有 .key，迁移仍应触发
+        ResourcePackMigration.migrate(tempDir.toFile());
+
+        Config config = new Config(destinationDir.resolve("packs.yml").toFile(), Config.YAML);
+        assertEquals(ENCRYPTION_KEY, config.getString(RESOURCE_PACK_ID + ".key"));
+        assertFalse(Files.exists(destinationDir.resolve("plain.mcpack.key")));
+    }
+
+    @Test
     void destinationCollisionMovesLegacyPackToAvailableName() throws IOException {
         UUID existingPackId = UUID.fromString("44444444-4444-4444-4444-444444444444");
         Path legacyDir = Files.createDirectories(tempDir.resolve("resource_packs_netease"));
@@ -302,7 +355,8 @@ class ResourcePackMigrationTest {
         ExposedResourcePackLoader loader = new ExposedResourcePackLoader(Files.createDirectory(tempDir.resolve("configured-packs")));
 
         assertTrue(loader.ignore("packs.yml"));
-        assertTrue(loader.ignore("archive.mcpack.key"));
+        // 磁盘 .key 已弃用，Loader 不再跳过它们，而是走 unknown-format 警告提醒用户迁移。
+        assertFalse(loader.ignore("archive.mcpack.key"));
         assertFalse(loader.ignore("archive.mcpack"));
     }
 
