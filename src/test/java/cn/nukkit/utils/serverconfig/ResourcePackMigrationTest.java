@@ -42,6 +42,26 @@ class ResourcePackMigrationTest {
     }
 
     @Test
+    void migrateEmptyKeyClearsExistingConfiguredKey() throws IOException {
+        Path legacyDir = Files.createDirectories(tempDir.resolve("resource_packs_netease"));
+        createPack(legacyDir.resolve("legacy.mcpack"), RESOURCE_PACK_ID, "resources");
+        Path sourceKey = Files.createFile(legacyDir.resolve("legacy.mcpack.key"));
+        Path destinationDir = Files.createDirectories(tempDir.resolve("resource_packs"));
+        Files.writeString(
+                destinationDir.resolve("packs.yml"),
+                RESOURCE_PACK_ID + ":\n  key: stale-key\n",
+                StandardCharsets.UTF_8
+        );
+
+        ResourcePackMigration.migrate(tempDir.toFile());
+
+        Config config = new Config(destinationDir.resolve("packs.yml").toFile(), Config.YAML);
+        assertTrue(config.exists(RESOURCE_PACK_ID + ".key"));
+        assertEquals("", config.getString(RESOURCE_PACK_ID + ".key"));
+        assertFalse(Files.exists(sourceKey));
+    }
+
+    @Test
     void migrateKeyPreservesExistingPackConfigWithoutTemporaryFiles() throws IOException {
         UUID configuredPackId = UUID.fromString("66666666-6666-6666-6666-666666666666");
         Path legacyDir = Files.createDirectories(tempDir.resolve("resource_packs_netease"));

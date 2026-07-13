@@ -80,4 +80,21 @@ class ResourcePackManagerTest {
         verify(pack).setCDNUrl("https://example.invalid/pack.mcpack");
         verify(pack).setEncryptionKey("test-key");
     }
+
+    @Test
+    void emptyConfiguredKeyDisablesPackEncryption() throws IOException {
+        UUID packId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+        ResourcePack pack = mock(ResourcePack.class);
+        when(pack.getPackId()).thenReturn(packId);
+        when(pack.isBehaviourPack()).thenReturn(false);
+        Path packConfig = Files.writeString(
+                tempDir.resolve("packs.yml"),
+                packId + ":\n  key: \"\"\n",
+                StandardCharsets.UTF_8
+        );
+
+        new ResourcePackManager(Set.of(() -> List.of(pack)), packConfig.toFile());
+
+        verify(pack).setEncryptionKey("");
+    }
 }

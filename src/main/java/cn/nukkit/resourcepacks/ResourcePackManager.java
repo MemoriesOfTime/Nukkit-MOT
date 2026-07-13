@@ -154,9 +154,9 @@ public class ResourcePackManager {
             if (!cdn.isEmpty()) {
                 pack.setCDNUrl(cdn);
             }
-            String key = config.getString(packId + ".key");
-            if (!key.isEmpty()) {
-                pack.setEncryptionKey(key);
+            String keyPath = packId + ".key";
+            if (config.exists(keyPath)) {
+                pack.setEncryptionKey(config.getString(keyPath));
             }
         }
     }

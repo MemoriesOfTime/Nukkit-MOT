@@ -181,9 +181,6 @@ public final class ResourcePackMigration {
 
         try {
             String key = Files.readString(keyFile.toPath());
-            if (key.isEmpty()) {
-                return KeyMigrationResult.PERSISTED;
-            }
             File parent = packConfigFile.getParentFile();
             if (parent != null) {
                 Files.createDirectories(parent.toPath());
