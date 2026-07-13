@@ -3,6 +3,7 @@ package cn.nukkit.plugin.annotation;
 import cn.nukkit.plugin.PluginLoadOrder;
 
 import javax.annotation.processing.*;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
@@ -147,5 +148,10 @@ public class AnnotationProcessor extends AbstractProcessor {
         }
         TypeMirror erasedSuper = types.erasure(superType.asType());
         return types.isAssignable(types.erasure(type.asType()), erasedSuper);
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SourceVersion.latestSupported();
     }
 }
