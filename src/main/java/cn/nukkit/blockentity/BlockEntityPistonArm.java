@@ -2,7 +2,6 @@ package cn.nukkit.blockentity;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockAir;
-import cn.nukkit.block.BlockChest;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityMoveByPistonEvent;
@@ -89,19 +88,16 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
 
         super.initBlockEntity();
 
-        // Fix for issue #410: If the piston is in the middle of moving when the chunk/server was unloaded,
-        // we need to ensure the movement completes properly to prevent invisible bedrock
+        // Fix issue #410: ensure mid-move pistons complete after reload.
         boolean needsUpdate = !this.attachedBlocks.isEmpty() || (this.state == 1 || this.state == 3);
 
         if (needsUpdate) {
-            // Reset lastProgress to ensure onUpdate continues moving and doesn't immediately think it's done
-            // This prevents the edge case where progress == lastProgress after loading from NBT
+            // Ensure lastProgress != progress to avoid immediate finalize on first tick.
+            // May exceed [0,1]; onUpdate clamps via Math.min/Math.max.
             if (this.extending) {
-                // When extending, ensure lastProgress is behind progress
-                this.lastProgress = Math.max(0, this.progress - MOVE_STEP);
+                this.lastProgress = this.progress - MOVE_STEP;
             } else {
-                // When retracting, ensure lastProgress is ahead of progress
-                this.lastProgress = Math.min(1, this.progress + MOVE_STEP);
+                this.lastProgress = this.progress + MOVE_STEP;
             }
 
             this.scheduleUpdate();
@@ -146,14 +142,14 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
 
     public void move(boolean extending, List<BlockVector3> attachedBlocks) {
         this.extending = extending;
-        this.lastProgress = this.progress = extending ? 0 : 1;
+        this.progress = extending ? 0 : 1;
         this.state = this.newState = extending ? 1 : 3;
         this.attachedBlocks = attachedBlocks;
         this.movable = false;
 
         this.level.addChunkPacket(this.getChunkX(), this.getChunkZ(), this.createSpawnPacket());
+        // Do NOT call moveCollidedEntities() here — it would push entities an extra time.
         this.lastProgress = extending ? -MOVE_STEP : 1 + MOVE_STEP;
-        this.moveCollidedEntities();
         this.scheduleUpdate();
     }
 
@@ -177,25 +173,19 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
             BlockFace pushDir = this.extending ? facing : facing.getOpposite();
 
             for (BlockVector3 pos : this.attachedBlocks) {
-                BlockEntity movingBlock = this.level.getBlockEntity(pos.getSide(pushDir));
+                BlockVector3 targetPos = pos.getSide(pushDir);
+                BlockEntity movingBlock = this.level.getBlockEntity(targetPos);
 
-                if (movingBlock instanceof BlockEntityMovingBlock) {
-                    movingBlock.close();
-                    Block moved = movingBlock.getBlock();
-
-                    this.level.setBlock(movingBlock, moved);
-                    this.level.scheduleUpdate(moved, 0);
-
-                    CompoundTag blockEntityNbt = ((BlockEntityMovingBlock) movingBlock).getBlockEntity();
-
-                    if (blockEntityNbt != null) {
-                        blockEntityNbt.putInt("x", movingBlock.getFloorX());
-                        blockEntityNbt.putInt("y", movingBlock.getFloorY());
-                        blockEntityNbt.putInt("z", movingBlock.getFloorZ());
-                        BlockEntity blockEntity = BlockEntity.createBlockEntity(blockEntityNbt.getString("id"), this.level.getChunk(movingBlock.getChunkX(), movingBlock.getChunkZ()), blockEntityNbt);
-                        if (blockEntity != null && blockEntity.getBlock() instanceof BlockChest chest) {
-                            chest.tryPair();
-                        }
+                if (movingBlock instanceof BlockEntityMovingBlock movingBlockEntity) {
+                    Block moved = movingBlockEntity.restoreBlock();
+                    if (moved != null) {
+                        this.level.scheduleUpdate(moved, targetPos.asVector3(), 0);
+                    }
+                } else {
+                    // Fallback: clear orphaned MOVING_BLOCK to AIR to prevent ghost blocks.
+                    Block blockAtTarget = this.level.getBlock(targetPos.x, targetPos.y, targetPos.z);
+                    if (blockAtTarget.getId() == BlockID.MOVING_BLOCK) {
+                        this.level.setBlock(targetPos.x, targetPos.y, targetPos.z, Block.get(BlockID.AIR), true, true);
                     }
                 }
             }

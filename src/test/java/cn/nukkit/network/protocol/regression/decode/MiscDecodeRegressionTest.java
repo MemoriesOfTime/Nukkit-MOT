@@ -386,12 +386,13 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         UUID packId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         var cb = new org.cloudburstmc.protocol.bedrock.packet.ResourcePackChunkRequestPacket();
         cb.setPackId(packId);
-        // packVersion intentionally null so CB writes just "uuid" (no _version suffix)
+        cb.setPackVersion("1.2.3");
         cb.setChunkIndex(3);
 
         ResourcePackChunkRequestPacket nk = crossEncode(cb, ResourcePackChunkRequestPacket::new, protocol);
 
         assertEquals(packId, nk.packId);
+        assertEquals("1.2.3", nk.packVersion);
         assertEquals(3, nk.chunkIndex);
     }
 
@@ -2244,6 +2245,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         UUID packId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         var cb = new org.cloudburstmc.protocol.bedrock.packet.ResourcePackChunkDataPacket();
         cb.setPackId(packId);
+        cb.setPackVersion("1.2.3");
         cb.setChunkIndex(2);
         cb.setProgress(65536L);
         cb.setData(Unpooled.wrappedBuffer(new byte[]{1, 2, 3}));
@@ -2251,6 +2253,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         ResourcePackChunkDataPacket nk = crossEncode(cb, ResourcePackChunkDataPacket::new, protocol);
 
         assertEquals(packId, nk.packId);
+        assertEquals("1.2.3", nk.packVersion);
         assertEquals(2, nk.chunkIndex);
         assertEquals(65536L, nk.progress);
         assertArrayEquals(new byte[]{1, 2, 3}, nk.data);
@@ -2265,6 +2268,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         byte[] sha256 = new byte[]{0x1, 0x2, 0x3, 0x4};
         var cb = new org.cloudburstmc.protocol.bedrock.packet.ResourcePackDataInfoPacket();
         cb.setPackId(packId);
+        cb.setPackVersion("1.2.3");
         cb.setMaxChunkSize(1024L);
         cb.setChunkCount(3L);
         cb.setCompressedPackSize(100000L);
@@ -2275,6 +2279,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         ResourcePackDataInfoPacket nk = crossEncode(cb, ResourcePackDataInfoPacket::new, protocol);
 
         assertEquals(packId, nk.packId);
+        assertEquals("1.2.3", nk.packVersion);
         assertEquals(1024, nk.maxChunkSize);
         assertEquals(3, nk.chunkCount);
         assertEquals(100000L, nk.compressedPackSize);

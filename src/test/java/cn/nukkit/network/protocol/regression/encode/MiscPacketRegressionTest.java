@@ -421,6 +421,9 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
                 org.cloudburstmc.protocol.bedrock.packet.ResourcePackStackPacket.class);
 
         assertFalse(cbPacket.isForcedToAccept());
+        if (protocolVersion >= 388) {
+            assertEquals("*", cbPacket.getGameVersion());
+        }
     }
 
     @ParameterizedTest(name = "HurtArmorPacket v{0}")

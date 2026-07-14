@@ -83,6 +83,7 @@ dependencies {
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
+    annotationProcessor(libs.log4j.core)
 
     compileOnly(libs.jsr305)
 
@@ -148,6 +149,12 @@ publishing {
 tasks {
     compileJava {
         options.encoding = "UTF-8"
+        options.compilerArgs.addAll(
+            listOf(
+                "-Alog4j.graalvm.groupId=cn.nukkit",
+                "-Alog4j.graalvm.artifactId=Nukkit"
+            )
+        )
     }
 
     test {
