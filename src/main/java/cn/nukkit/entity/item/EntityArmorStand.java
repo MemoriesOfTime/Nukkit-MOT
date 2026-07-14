@@ -20,6 +20,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.Tag;
 
 import java.util.Collection;
 
@@ -58,6 +59,32 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
         }
     }
 
+    /**
+     * 读取单个物品 NBT，兼容 CompoundTag（旧格式）与 ListTag&lt;CompoundTag&gt;（新原版格式）。
+     * <p>
+     * Reads a single item NBT, accepting both a CompoundTag (legacy) and a ListTag&lt;CompoundTag&gt; (new vanilla format).
+     *
+     * @param parent 包含物品标签的父 CompoundTag
+     * @param name 物品标签键名（如 {@link #TAG_MAINHAND}）
+     * @return 解析后的物品，标签不存在时返回 {@code null}
+     */
+    private static Item readSingleItemTag(CompoundTag parent, String name) {
+        if (!parent.contains(name)) {
+            return null;
+        }
+        Tag tag = parent.get(name);
+        if (tag instanceof CompoundTag compound) {
+            return NBTIO.getItemHelper(compound);
+        }
+        if (tag instanceof ListTag<?> list && !list.getAll().isEmpty()) {
+            Tag first = list.getAll().get(0);
+            if (first instanceof CompoundTag compound) {
+                return NBTIO.getItemHelper(compound);
+            }
+        }
+        return null;
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
@@ -90,12 +117,19 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
         this.equipmentInventory = new EntityEquipmentInventory(this);
         this.armorInventory = new EntityArmorInventory(this);
 
-        if (this.namedTag.contains(TAG_MAINHAND)) {
-            this.equipmentInventory.setItemInHand(NBTIO.getItemHelper(this.namedTag.getCompound(TAG_MAINHAND)), true);
+        // Mainhand/Offhand 在 1.21.120+ 原版存档中为 ListTag<CompoundTag>（单元素，带 Slot 字节），
+        // 旧版本则为裸 CompoundTag，两种格式都需兼容。
+        // <p>
+        // In vanilla 1.21.120+ saves Mainhand/Offhand are ListTag<CompoundTag> (single entry with a Slot byte),
+        // while older worlds stored them as a bare CompoundTag; both formats must be accepted.
+        Item mainhandItem = readSingleItemTag(this.namedTag, TAG_MAINHAND);
+        if (mainhandItem != null) {
+            this.equipmentInventory.setItemInHand(mainhandItem, true);
         }
 
-        if (this.namedTag.contains(TAG_OFFHAND)) {
-            this.equipmentInventory.setOffhandItem(NBTIO.getItemHelper(this.namedTag.getCompound(TAG_OFFHAND)), true);
+        Item offhandItem = readSingleItemTag(this.namedTag, TAG_OFFHAND);
+        if (offhandItem != null) {
+            this.equipmentInventory.setOffhandItem(offhandItem, true);
         }
 
         if (this.namedTag.contains(TAG_ARMOR)) {
@@ -239,8 +273,13 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
     public void saveNBT() {
         super.saveNBT();
 
-        this.namedTag.put(TAG_MAINHAND, NBTIO.putItemHelper(this.equipmentInventory.getItemInHand()));
-        this.namedTag.put(TAG_OFFHAND, NBTIO.putItemHelper(this.equipmentInventory.getOffHandItem()));
+        // 与原版 1.21.120+ 一致，以 ListTag<CompoundTag> 形式持久化，便于原版客户端读取存档
+        // <p>
+        // Persist as ListTag<CompoundTag> to match vanilla 1.21.120+, keeping saves readable by vanilla clients
+        this.namedTag.putList(new ListTag<CompoundTag>(TAG_MAINHAND)
+                .add(NBTIO.putItemHelper(this.equipmentInventory.getItemInHand(), EntityEquipmentInventory.MAINHAND)));
+        this.namedTag.putList(new ListTag<CompoundTag>(TAG_OFFHAND)
+                .add(NBTIO.putItemHelper(this.equipmentInventory.getOffHandItem(), EntityEquipmentInventory.OFFHAND)));
 
         if (this.armorInventory != null) {
             ListTag<CompoundTag> armorTag = new ListTag<>(TAG_ARMOR);
