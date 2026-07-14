@@ -109,7 +109,7 @@ dependencies {
         exclude("io.netty", "netty-buffer")
     }
     testImplementation(libs.cloudburst.math)
-    testImplementation(libs.allay.protocol.extension)
+    testImplementation(libs.netease.protocol.extension)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.bundles.mockito)
