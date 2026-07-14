@@ -195,7 +195,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int PERMISSION_MEMBER = 1;
     public static final int PERMISSION_VISITOR = 0;
 
-    public static final int RESOURCE_PACK_CHUNK_SIZE = 8 * 1024; // 8KB
+    public static final int RESOURCE_PACK_CHUNK_SIZE = 100 * 1024; // 100 KB
 
     protected final SourceInterface interfaz;
     protected final NetworkPlayerSession networkSession;
@@ -387,6 +387,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
+    private final LinkedHashMap<UUID, PendingResourcePack> pendingResourcePacks = new LinkedHashMap<>();
+    private boolean resourcePackChunkSendScheduled;
 
     private int lastEmote;
     private int lastEnderPearl = 20;
@@ -3476,6 +3478,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             log.trace("Inbound {}: {}", this.getName(), packet);
         }
 
+        if (pid == ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET) {
+            if (this.networkSession != null && this.networkSession.getState() != null) {
+                this.networkSession.getState().getLogin().touchActivity();
+            }
+            return;
+        }
+
         if (DataPacketManager.canProcess(packet.protocol, packet.getClass())) {
             DataPacketManager.processPacket(this.playerHandle, packet);
             return;
@@ -3696,6 +3705,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.close("", "disconnectionScreen.noReason");
                         break;
                     case ResourcePackClientResponsePacket.STATUS_SEND_PACKS:
+                        this.pendingResourcePacks.clear();
                         for (ResourcePackClientResponsePacket.Entry entry : responsePacket.packEntries) {
                             ResourcePack resourcePack = this.server.getResourcePackManager().getPackById(entry.uuid);
                             if (resourcePack == null) {
@@ -3705,6 +3715,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             ResourcePackDataInfoPacket dataInfoPacket = new ResourcePackDataInfoPacket();
                             dataInfoPacket.packId = resourcePack.getPackId();
+                            dataInfoPacket.packVersion = resourcePack.getPackVersion();
                             dataInfoPacket.maxChunkSize = RESOURCE_PACK_CHUNK_SIZE;
                             dataInfoPacket.chunkCount = MathHelper.ceil(resourcePack.getPackSize() / (float) RESOURCE_PACK_CHUNK_SIZE);
                             dataInfoPacket.compressedPackSize = resourcePack.getPackSize();
@@ -8232,6 +8243,93 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.networkSession;
     }
 
+    void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {
+        PendingResourcePack pending = this.pendingResourcePacks.computeIfAbsent(resourcePack.getPackId(),
+                ignored -> new PendingResourcePack(resourcePack));
+        pending.request(chunkIndex);
+        this.scheduleNextResourcePackChunk();
+    }
+
+    private void scheduleNextResourcePackChunk() {
+        if (this.resourcePackChunkSendScheduled || this.pendingResourcePacks.isEmpty()) {
+            return;
+        }
+        this.resourcePackChunkSendScheduled = true;
+        this.server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, this::sendNextResourcePackChunk);
+    }
+
+    private void sendNextResourcePackChunk() {
+        this.resourcePackChunkSendScheduled = false;
+        if (!this.connected) {
+            this.pendingResourcePacks.clear();
+            return;
+        }
+
+        Iterator<PendingResourcePack> iterator = this.pendingResourcePacks.values().iterator();
+        PendingResourcePack pending = null;
+        int chunkIndex = -1;
+        while (iterator.hasNext()) {
+            PendingResourcePack candidate = iterator.next();
+            chunkIndex = candidate.pollChunkIndex();
+            if (candidate.isEmpty()) {
+                iterator.remove();
+            }
+            if (chunkIndex >= 0) {
+                pending = candidate;
+                break;
+            }
+        }
+        if (pending == null) {
+            return;
+        }
+
+        ResourcePackChunkDataPacket dataPacket = new ResourcePackChunkDataPacket();
+        dataPacket.packId = pending.resourcePack.getPackId();
+        dataPacket.packVersion = pending.resourcePack.getPackVersion();
+        dataPacket.chunkIndex = chunkIndex;
+        dataPacket.progress = (long) RESOURCE_PACK_CHUNK_SIZE * chunkIndex;
+        dataPacket.data = pending.resourcePack.getPackChunk(RESOURCE_PACK_CHUNK_SIZE * chunkIndex, RESOURCE_PACK_CHUNK_SIZE);
+        this.dataPacket(dataPacket);
+        if (this.networkSession != null && this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().touchActivity();
+        }
+
+        if (!this.pendingResourcePacks.isEmpty()) {
+            this.resourcePackChunkSendScheduled = true;
+            this.server.getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, this::sendNextResourcePackChunk, 1);
+        }
+    }
+
+    /**
+     * Tracks pending chunks per pack to avoid overwhelming clients with burst delivery.
+     * <p>
+     * Adapted from PowerNukkitX (<a href="https://github.com/PowerNukkitX/PowerNukkitX">PowerNukkitX</a>)
+     */
+    static final class PendingResourcePack {
+        private final ResourcePack resourcePack;
+        private final BitSet requestedChunks = new BitSet();
+
+        PendingResourcePack(ResourcePack resourcePack) {
+            this.resourcePack = resourcePack;
+        }
+
+        void request(int chunkIndex) {
+            this.requestedChunks.set(chunkIndex);
+        }
+
+        int pollChunkIndex() {
+            int chunkIndex = this.requestedChunks.nextSetBit(0);
+            if (chunkIndex >= 0) {
+                this.requestedChunks.clear(chunkIndex);
+            }
+            return chunkIndex;
+        }
+
+        boolean isEmpty() {
+            return this.requestedChunks.isEmpty();
+        }
+    }
+
     protected void processPreLogin() {
         this.syncLoginVerified(true);
         this.syncLoginPhase(SessionLoginPhase.PRE_LOGIN);
@@ -8277,6 +8375,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
             case ENCRYPTION_RESPONSE_RECEIVED, PRE_LOGIN, RESOURCE_PACK, READY_TO_LOGIN -> packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET)
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET)
+                    || packetId == ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
             case LOGGED_IN, DISCONNECTED -> false;
         };

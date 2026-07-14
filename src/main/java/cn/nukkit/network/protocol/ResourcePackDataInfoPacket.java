@@ -21,6 +21,7 @@ public class ResourcePackDataInfoPacket extends DataPacket {
     public static final int TYPE_COUNT = 9;
 
     public UUID packId;
+    public String packVersion;
     public int maxChunkSize;
     public int chunkCount;
     public long compressedPackSize;
@@ -30,7 +31,9 @@ public class ResourcePackDataInfoPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.packId = UUID.fromString(this.getString());
+        String[] packInfo = this.getString().split("_", 3);
+        this.packId = UUID.fromString(packInfo[0]);
+        this.packVersion = packInfo.length > 1 ? packInfo[1] : null;
         this.maxChunkSize = this.getLInt();
         this.chunkCount = this.getLInt();
         this.compressedPackSize = this.getLLong();
@@ -44,7 +47,7 @@ public class ResourcePackDataInfoPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putString(this.packId.toString());
+        this.putString(this.packId + (this.protocol >= ProtocolInfo.v1_6_0_5 && this.packVersion != null ? '_' + this.packVersion : ""));
         this.putLInt(this.maxChunkSize);
         this.putLInt(this.chunkCount);
         this.putLLong(this.compressedPackSize);

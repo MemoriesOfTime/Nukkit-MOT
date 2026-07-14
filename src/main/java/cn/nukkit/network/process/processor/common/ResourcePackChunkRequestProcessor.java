@@ -5,7 +5,6 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.ResourcePackChunkDataPacket;
 import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.resourcepacks.ResourcePack;
@@ -32,17 +31,18 @@ public class ResourcePackChunkRequestProcessor extends DataPacketProcessor<Resou
             return;
         }
 
+        int chunkCount = (resourcePack.getPackSize() + RESOURCE_PACK_CHUNK_SIZE - 1) / RESOURCE_PACK_CHUNK_SIZE;
+        if (pk.chunkIndex < 0 || pk.chunkIndex >= chunkCount) {
+            player.close("", "disconnectionScreen.resourcePack");
+            return;
+        }
+
         NetworkPlayerSession networkSession = player.getNetworkSession();
         if (networkSession != null && networkSession.getState() != null) {
             networkSession.getState().getLogin().touchActivity();
         }
 
-        ResourcePackChunkDataPacket dataPacket = new ResourcePackChunkDataPacket();
-        dataPacket.packId = resourcePack.getPackId();
-        dataPacket.chunkIndex = pk.chunkIndex;
-        dataPacket.data = resourcePack.getPackChunk(RESOURCE_PACK_CHUNK_SIZE * pk.chunkIndex, RESOURCE_PACK_CHUNK_SIZE);
-        dataPacket.progress = (long) RESOURCE_PACK_CHUNK_SIZE * pk.chunkIndex;
-        player.dataPacket(dataPacket);
+        playerHandle.queueResourcePackChunk(resourcePack, pk.chunkIndex);
     }
 
     @Override
