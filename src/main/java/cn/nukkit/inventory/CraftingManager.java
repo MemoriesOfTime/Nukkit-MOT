@@ -165,6 +165,7 @@ public class CraftingManager {
                     case 4: // multi (hardcoded)
                         break;
                     case 5: // shulker_box
+                        loadShapelessRecipe(itemMapping, recipe);
                         break;
                 }
             } catch (Exception e) {
