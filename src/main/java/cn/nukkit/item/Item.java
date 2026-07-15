@@ -45,7 +45,6 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1662,10 +1661,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     final public Short getFuelTime() {
+        if (this instanceof StringItem stringItem) {
+            return Fuel.getDuration(stringItem.getNamespaceId());
+        }
         if (!Fuel.duration.containsKey(id)) {
             return null;
         }
-        if (this.id != BUCKET || this.meta == 10) {
+        if (this.id != BUCKET || this.meta == ItemBucket.LAVA_BUCKET) {
             return Fuel.duration.get(this.id);
         }
         return null;
