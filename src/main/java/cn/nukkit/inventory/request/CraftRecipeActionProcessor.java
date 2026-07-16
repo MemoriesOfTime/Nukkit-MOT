@@ -131,6 +131,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         }
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
+        if (recipe instanceof UserDataShapelessRecipe) {
+            applyInputNbt(output, collectCraftingInputList(player));
+        }
         output.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
 
@@ -377,6 +380,18 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             }
         }
         return items;
+    }
+
+    /**
+     * Copies the NBT of the first NBT-carrying input onto the output, so {@link UserDataShapelessRecipe} dyeing keeps container contents.
+     */
+    static void applyInputNbt(Item output, List<Item> inputs) {
+        for (Item inputItem : inputs) {
+            if (inputItem != null && !inputItem.isNull() && inputItem.hasCompoundTag()) {
+                output.setCompoundTag(inputItem.getCompoundTag());
+                return;
+            }
+        }
     }
 
     private static CraftingGrid getActiveCraftingGrid(Player player) {
