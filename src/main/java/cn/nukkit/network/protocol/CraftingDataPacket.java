@@ -107,6 +107,7 @@ public class CraftingDataPacket extends DataPacket {
                 this.putVarInt(networkType.getNetworkType(protocol));
                 switch (recipe.getType()) {
                     case SHAPELESS:
+                    case SHULKER_BOX: // UserDataShapelessRecipe: same wire format as SHAPELESS
                         ShapelessRecipe shapeless = (ShapelessRecipe) recipe;
                         if (protocol >= 361) {
                             this.putString(shapeless.getRecipeId());

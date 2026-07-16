@@ -164,8 +164,8 @@ public class CraftingManager {
                         break;
                     case 4: // multi (hardcoded)
                         break;
-                    case 5: // shulker_box
-                        loadShapelessRecipe(itemMapping, recipe);
+                    case 5: // shulker_box (UserDataShapelessRecipe): shapeless 结构，但需保留输入 NBT
+                        loadUserDataShapelessRecipe(itemMapping, recipe);
                         break;
                 }
             } catch (Exception e) {
@@ -320,6 +320,42 @@ public class CraftingManager {
                 this.registerRecipe(new ShapelessRecipe(null, 0, outputItem, sorted));
             }
         }
+    }
+
+    /**
+     * Loads "shulker_box" (type 5) recipes, wrapped in {@link UserDataShapelessRecipe} to preserve input NBT.
+     */
+    @SuppressWarnings("unchecked")
+    private void loadUserDataShapelessRecipe(RuntimeItemMapping itemMapping, Map recipe) {
+        if (!"crafting_table".equals(recipe.get("block"))) {
+            return;
+        }
+
+        Map outputMap = (Map) ((List) recipe.get("output")).get(0);
+        Item outputItem = loadRecipeOutputItem(itemMapping, outputMap);
+        if (outputItem == null || outputItem.isNull()) {
+            log.trace("Unknown shulker_box recipe output: {}", recipe);
+            return;
+        }
+
+        List<Map> input = (List<Map>) recipe.get("input");
+        List<Item> sorted = new ArrayList<>();
+        for (Map<String, Object> ingredient : input) {
+            if (!"default".equals(ingredient.get("type"))) {
+                log.trace("Unsupported shulker_box ingredient type: {}", recipe);
+                return;
+            }
+            Item inputItem = loadRecipeIngredientItem(itemMapping, ingredient);
+            if (inputItem == null || inputItem.isNull()) {
+                log.trace("Unknown shulker_box input: {}", recipe);
+                return;
+            }
+            sorted.add(inputItem);
+        }
+        sorted.sort(recipeComparator);
+
+        int priority = (int) recipe.getOrDefault("priority", 0);
+        this.registerRecipe(new UserDataShapelessRecipe((String) recipe.get("id"), priority, outputItem, sorted));
     }
 
     @SuppressWarnings("unchecked")
