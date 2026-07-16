@@ -152,6 +152,14 @@ dependencies {
   </tr>
 </table>
 
+## Contributors
+
+Thanks to everyone who has contributed to this project!
+
+<a href="https://github.com/MemoriesOfTime/Nukkit-MOT/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=MemoriesOfTime/Nukkit-MOT" />
+</a>
+
 ## Star History
 
 If you like this project, please give us a Star ⭐
