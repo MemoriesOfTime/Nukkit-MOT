@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.transaction.action.CraftingTakeResultAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -104,10 +105,37 @@ public class CraftingTransaction extends InventoryTransaction {
             MultiRecipe multiRecipe = source.getServer().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
             if (multiRecipe != null) {
                 recipe = multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList());
+                // Multi-recipe output is rebuilt authoritatively by the server, overriding the client NBT (#798).
+                applyAuthoritativeOutput(recipe.getResult());
             }
         }
         this.setTransactionRecipe(recipe);
         return this.getTransactionRecipe() != null && super.canExecute();
+    }
+
+    /**
+     * Replaces the client-authored output with the server-rebuilt one, covering primaryOutput,
+     * CraftingTakeResultAction source and the inventory SlotChangeAction target, so that the
+     * authoritative NBT lands in the player's inventory.
+     */
+    void applyAuthoritativeOutput(Item authoritativeOutput) {
+        if (authoritativeOutput == null || authoritativeOutput.equalsExact(this.primaryOutput)) {
+            return;
+        }
+
+        this.primaryOutput = authoritativeOutput.clone();
+
+        for (InventoryAction action : this.actions) {
+            if (action instanceof CraftingTakeResultAction resultAction) {
+                resultAction.setSourceItem(authoritativeOutput.clone());
+            } else if (action instanceof SlotChangeAction slotChangeAction) {
+                if (slotChangeAction.getSourceItem().isNull()
+                        && slotChangeAction.getTargetItem().getId() == authoritativeOutput.getId()
+                        && slotChangeAction.getTargetItem().getCount() > 0) {
+                    slotChangeAction.setTargetItem(authoritativeOutput.clone());
+                }
+            }
+        }
     }
 
     @Override

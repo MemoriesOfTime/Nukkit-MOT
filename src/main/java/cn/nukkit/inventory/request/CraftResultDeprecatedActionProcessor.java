@@ -35,6 +35,11 @@ public class CraftResultDeprecatedActionProcessor implements ItemStackRequestAct
             Item[] results = action.getResultItems();
             if (results != null && results.length > 0) {
                 Item output = results[0].clone();
+                // Scale the single-craft result by the requested craft count (#798).
+                Integer times = context.get(CraftRecipeActionProcessor.TIMES_CRAFTED_KEY);
+                if (times != null && times > 1) {
+                    output.setCount(output.getCount() * times);
+                }
                 if (!CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, output, 1)) {
                     return context.error();
                 }

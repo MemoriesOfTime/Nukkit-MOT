@@ -43,6 +43,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
 
     public static final String RECIPE_NET_ID_KEY = "recipeNetId";
     public static final String ENCH_RECIPE_KEY = "enchRecipe";
+    public static final String TIMES_CRAFTED_KEY = "timesCrafted";
 
     @Override
     public ItemStackRequestActionType getType() {
@@ -89,6 +90,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
 
         if (recipe instanceof MultiRecipe multiRecipe) {
+            int times = Math.max(1, action.getNumberOfRequestedCrafts());
+            context.put(TIMES_CRAFTED_KEY, times);
             CraftResultsDeprecatedAction resultsAction = findCraftResultsAction(
                     context.getItemStackRequest().getActions(),
                     context.getCurrentActionIndex() + 1

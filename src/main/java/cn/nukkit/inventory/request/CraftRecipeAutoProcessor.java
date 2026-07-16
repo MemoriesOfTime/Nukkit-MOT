@@ -79,6 +79,7 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         }
 
         if (recipe instanceof MultiRecipe multiRecipe) {
+            context.put(CraftRecipeActionProcessor.TIMES_CRAFTED_KEY, Math.max(1, action.getTimesCrafted()));
             CraftResultsDeprecatedAction resultsAction = findCraftResultsAction(
                     context.getItemStackRequest().getActions(), context.getCurrentActionIndex() + 1);
             if (resultsAction == null || resultsAction.getResultItems() == null || resultsAction.getResultItems().length == 0) {
