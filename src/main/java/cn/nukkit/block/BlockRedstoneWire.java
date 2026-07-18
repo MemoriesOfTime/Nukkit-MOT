@@ -272,9 +272,13 @@ public class BlockRedstoneWire extends BlockFlowable {
                     }
                 }
 
-                if (side.getAxis().isHorizontal() && enumset.isEmpty()) {
+                BlockFace outputSide = side.getAxis().isHorizontal() ? side.getOpposite() : side;
+                if (outputSide.getAxis().isHorizontal() && enumset.isEmpty()) {
                     return power;
-                } else if (enumset.contains(side) && !enumset.contains(side.rotateYCCW()) && !enumset.contains(side.rotateY())) {
+                } else if (enumset.size() == 1) {
+                    BlockFace connectedSide = enumset.iterator().next();
+                    return outputSide == connectedSide || outputSide == connectedSide.getOpposite() ? power : 0;
+                } else if (enumset.contains(outputSide)) {
                     return power;
                 } else {
                     return 0;

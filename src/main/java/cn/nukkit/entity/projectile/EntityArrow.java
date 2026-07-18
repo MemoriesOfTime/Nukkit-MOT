@@ -8,12 +8,15 @@ import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.event.entity.EntityRegainHealthEvent;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.AddEntityPacket;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -98,6 +101,50 @@ public class EntityArrow extends EntitySlenderProjectile {
 
         this.auxValue = this.namedTag.getByte("auxValue");
         this.getDataProperties().putByte(DATA_ARROW_AUX_VALUE, this.auxValue);
+    }
+
+    /**
+     * Override spawn-to so the tipped-arrow {@code auxValue} is downgraded for
+     * viewers whose clients predate the special arrows introduced in 1.21.0
+     * (Weaving/Oozing/Infested use arrow meta >= 44). Sending those unknown
+     * values to older clients (e.g. 1.20.12) crashes the client instantly.
+     * <p>
+     * {@code DATA_ARROW_AUX_VALUE} is only written once in {@link #initEntity()}
+     * and never broadcast again, so covering the initial spawn is sufficient.
+     */
+    @Override
+    public void spawnTo(Player player) {
+        boolean needsDowngrade = player.protocol < ProtocolInfo.v1_21_0 && this.auxValue >= 44;
+        if (!needsDowngrade) {
+            super.spawnTo(player);
+            return;
+        }
+
+        // Build a viewer-specific AddEntityPacket with auxValue zeroed out so
+        // the older client sees a plain arrow instead of an unknown tipped one.
+        if (this.hasSpawned.containsKey(player.getLoaderId())
+                || !player.usedChunks.containsKey(Level.chunkHash(this.chunk.getX(), this.chunk.getZ()))) {
+            return;
+        }
+
+        AddEntityPacket addEntity = new AddEntityPacket();
+        addEntity.type = this.getNetworkId();
+        addEntity.entityUniqueId = this.id;
+        addEntity.entityRuntimeId = this.id;
+        addEntity.yaw = (float) this.yaw;
+        addEntity.headYaw = (float) this.yaw;
+        addEntity.pitch = (float) this.pitch;
+        addEntity.x = (float) this.x;
+        addEntity.y = (float) this.y + this.getBaseOffset();
+        addEntity.z = (float) this.z;
+        addEntity.speedX = (float) this.motionX;
+        addEntity.speedY = (float) this.motionY;
+        addEntity.speedZ = (float) this.motionZ;
+        addEntity.metadata = this.dataProperties.clone().putByte(DATA_ARROW_AUX_VALUE, 0);
+        addEntity.properties = this.propertySyncData();
+
+        player.dataPacket(addEntity);
+        this.hasSpawned.put(player.getLoaderId(), player);
     }
 
     public void setCritical() {

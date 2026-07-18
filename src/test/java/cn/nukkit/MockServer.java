@@ -1,13 +1,14 @@
 package cn.nukkit;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.vibration.VibrationManager;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.MainLogger;
@@ -138,8 +139,16 @@ public final class MockServer {
 
     /**
      * Reset Mock Server state (for use between tests).
+     * <p>
+     * Also restores {@code Server.instance} in case another test class cleared
+     * it via reflection (e.g. {@code @AfterAll} hooks that set the field to
+     * {@code null}). The static initializer only runs once per JVM, so without
+     * this guarantee a test that runs after such a class would see a null
+     * instance and crash in code that calls {@code Server.getInstance()}
+     * (notably the {@code Player} constructor).
      */
     public static void reset() {
+        ensureInstance();
         if (mockInstance != null) {
             Mockito.reset(mockInstance);
             setupDefaults(mockInstance);
@@ -198,6 +207,9 @@ public final class MockServer {
                 Vector3 pos = invocation.getArgument(0);
                 return createSimpleBlock(pos);
             });
+        // BaseInventory#onOpen/onClose fires container vibrations; avoid NPEs in inventory tests.
+        Mockito.lenient().when(mockLevel.getVibrationManager())
+            .thenReturn(Mockito.mock(VibrationManager.class));
     }
 
     /**

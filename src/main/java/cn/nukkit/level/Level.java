@@ -5,6 +5,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.api.NonComputationAtomic;
 import cn.nukkit.block.*;
+import cn.nukkit.block.util.RedstoneToggleHelper;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
@@ -46,13 +47,13 @@ import cn.nukkit.level.generator.task.PopulationTask;
 import cn.nukkit.level.particle.DestroyBlockParticle;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.Particle;
+import cn.nukkit.level.persistence.PersistentDataContainer;
+import cn.nukkit.level.persistence.impl.DelegatePersistentDataContainer;
+import cn.nukkit.level.sound.Sound;
 import cn.nukkit.level.vibration.SimpleVibrationManager;
 import cn.nukkit.level.vibration.VibrationEvent;
 import cn.nukkit.level.vibration.VibrationManager;
 import cn.nukkit.level.vibration.VibrationType;
-import cn.nukkit.level.persistence.PersistentDataContainer;
-import cn.nukkit.level.persistence.impl.DelegatePersistentDataContainer;
-import cn.nukkit.level.sound.Sound;
 import cn.nukkit.math.*;
 import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.metadata.BlockMetadataStore;
@@ -428,9 +429,9 @@ public class Level implements ChunkManager, Metadatable {
 
     private final boolean antiXray;
 
-    // 用于实现世界监听的回调
+    // 用于实现世界监听的回调，参数为 (previousBlock, newBlock) / Callbacks for world listening, params (previousBlock, newBlock)
     private static final AtomicInteger callbackIdCounter = new AtomicInteger();
-    private final Int2ObjectMap<Consumer<Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<BiConsumer<Block, Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<BiConsumer<Long, DataPacket>> callbackChunkPacketSend = new Int2ObjectOpenHashMap<>();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
@@ -500,6 +501,9 @@ public class Level implements ChunkManager, Metadatable {
         if (this.server.asyncChunkSending) {
             this.asyncChuckExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("AsyncChunkThread for " + name).build());
         }
+
+        // 注册方块变更回调，用于清理红石 override 标记 (issue #782)
+        this.addCallbackBlockSet(RedstoneToggleHelper::onBlockChanged);
     }
 
     public static long chunkHash(int x, int z) {
@@ -2321,10 +2325,16 @@ public class Level implements ChunkManager, Metadatable {
         block.z = z;
         block.level = this;
         block.layer = layer;
+        // blockPrevious 来自 Block.get(id, damage)，未设置 level/坐标；此处补全供回调使用
+        blockPrevious.x = x;
+        blockPrevious.y = y;
+        blockPrevious.z = z;
+        blockPrevious.level = this;
+        blockPrevious.layer = layer;
 
         try {
-            for (Consumer<Block> callback : this.callbackBlockSet.values()) {
-                callback.accept(block);
+            for (BiConsumer<Block, Block> callback : this.callbackBlockSet.values()) {
+                callback.accept(blockPrevious, block);
             }
         } catch (Exception e) {
             Server.getInstance().getLogger().error("Error while calling block set callback", e);
@@ -5288,15 +5298,21 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     /**
-     * 添加方块设置回调，当世界中有方块被更改时，会触发回调
-     *
-     * @param consumer 回调
-     * @return 回调id
+     * 添加方块变更回调，参数为 (previousBlock, newBlock)。
+     * <p>Adds a callback fired when a block changes; params are (previousBlock, newBlock).
      */
-    public int addCallbackBlockSet(Consumer<Block> consumer) {
+    public int addCallbackBlockSet(BiConsumer<Block, Block> consumer) {
         int id = callbackIdCounter.incrementAndGet();
         callbackBlockSet.put(id, consumer);
         return id;
+    }
+
+    /**
+     * 仅传递新方块的旧版重载，保留以兼容现有插件。
+     * <p>Legacy overload forwarding only the new block, kept for plugin compatibility.
+     */
+    public int addCallbackBlockSet(Consumer<Block> consumer) {
+        return addCallbackBlockSet((previous, current) -> consumer.accept(current));
     }
 
     public void removeCallbackBlockSet(int id) {
@@ -5370,7 +5386,9 @@ public class Level implements ChunkManager, Metadatable {
     private GameVersion getChunkProtocol(GameVersion version) {
         int protocol = version.getProtocol();
         if (version.isNetEase()) {
-            if (protocol >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
+            if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+                return GameVersion.V1_21_124_NETEASE;
+            } else if (protocol >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
                 return GameVersion.V1_21_93_NETEASE;
             } else if (protocol >= GameVersion.V1_21_50_NETEASE.getProtocol()) {
                 return GameVersion.V1_21_50_NETEASE;
@@ -5386,7 +5404,7 @@ public class Level implements ChunkManager, Metadatable {
         } else if (protocol >= GameVersion.V1_26_10.getProtocol()) {
             return GameVersion.V1_26_10;
         } else if (protocol >= GameVersion.V1_21_110_26.getProtocol()) {
-            return GameVersion.V1_21_110;
+            return GameVersion.V1_21_111;
         } else if (protocol >= GameVersion.V1_21_100.getProtocol()) {
             return GameVersion.V1_21_100;
         } else if (protocol >= ProtocolInfo.v1_21_90) {
@@ -5534,7 +5552,7 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_21_90)
             if (player >= ProtocolInfo.v1_21_90) if (player <= ProtocolInfo.v1_21_93) return true;
         if (chunk == GameVersion.V1_21_100.getProtocol()) if (player == GameVersion.V1_21_100.getProtocol()) return true;
-        if (chunk == GameVersion.V1_21_110.getProtocol())
+        if (chunk == GameVersion.V1_21_111.getProtocol())
             if (player >= GameVersion.V1_21_110_26.getProtocol()) if (player <= GameVersion.V1_26_0.getProtocol()) return true;
         if (chunk == GameVersion.V1_26_10.getProtocol())  if (player == GameVersion.V1_26_10.getProtocol()) return true;
         if (chunk == GameVersion.V1_26_20.getProtocol())

@@ -78,7 +78,7 @@ public class InventoryContentPacket extends DataPacket {
             }
         }
         if (this.protocol >= ProtocolInfo.v1_21_30) {
-            this.putByte((byte) this.containerNameData.getContainer().getId());
+            this.putByte((byte) this.containerNameData.getContainer().getId(this.gameVersion));
             this.putOptionalNull(this.containerNameData.getDynamicId(), this::putLInt);
             if (this.protocol >= ProtocolInfo.v1_26_30) {
                 this.putNetworkItemStackDescriptor(gameVersion, this.storageItem);

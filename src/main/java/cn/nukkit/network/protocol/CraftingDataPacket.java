@@ -29,6 +29,7 @@ public class CraftingDataPacket extends DataPacket {
     public static final String CRAFTING_TAG_BLAST_FURNACE = "blast_furnace";
     public static final String CRAFTING_TAG_SMOKER = "smoker";
     public static final String CRAFTING_TAG_SMITHING_TABLE = "smithing_table";
+    public static final int SMITHING_ARMOR_TRIM_NETWORK_ID = 1;
 
     private List<Recipe> entries = new ArrayList<>();
     private final List<StonecutterRecipe> stonecutterEntries = new ArrayList<>();
@@ -106,6 +107,7 @@ public class CraftingDataPacket extends DataPacket {
                 this.putVarInt(networkType.getNetworkType(protocol));
                 switch (recipe.getType()) {
                     case SHAPELESS:
+                    case SHULKER_BOX: // UserDataShapelessRecipe: same wire format as SHAPELESS
                         ShapelessRecipe shapeless = (ShapelessRecipe) recipe;
                         if (protocol >= 361) {
                             this.putString(shapeless.getRecipeId());
@@ -277,7 +279,7 @@ public class CraftingDataPacket extends DataPacket {
                 this.putRecipeIngredient(protocol, "minecraft:trimmable_armors", 1);
                 this.putRecipeIngredient(protocol, "minecraft:trim_materials", 1);
                 this.putString(CRAFTING_TAG_SMITHING_TABLE);
-                this.putUnsignedVarInt(1); // Network ID (hardcoded in CraftingManager)
+                this.putUnsignedVarInt(SMITHING_ARMOR_TRIM_NETWORK_ID); // Reserved by CraftingManager
             }
 
             if (protocol >= 388) {

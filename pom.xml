@@ -8,6 +8,29 @@
     <groupId>cn.nukkit</groupId>
     <artifactId>Nukkit</artifactId>
     <version>MOT-SNAPSHOT</version>
+    <description>Minecraft Bedrock Edition server software supporting multi-version clients and NetEase clients.</description>
+    <url>https://www.nukkit-mot.com/</url>
+
+    <licenses>
+        <license>
+            <name>GNU Lesser General Public License, version 3</name>
+            <url>https://www.gnu.org/licenses/lgpl-3.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>MemoriesOfTime</name>
+            <organization>MemoriesOfTime</organization>
+            <organizationUrl>https://github.com/MemoriesOfTime</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/MemoriesOfTime/Nukkit-MOT.git</connection>
+        <developerConnection>scm:git:ssh://github.com:MemoriesOfTime/Nukkit-MOT.git</developerConnection>
+        <url>https://github.com/MemoriesOfTime/Nukkit-MOT</url>
+    </scm>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -23,6 +46,7 @@
         <leveldb-mcpe-jni.version>0.0.11</leveldb-mcpe-jni.version>
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
         <netty.version>4.1.135.Final</netty.version>
+
         <caffeine.version>3.2.3</caffeine.version>
         <guava.version>33.1.0-jre</guava.version>
         <gson.version>2.13.2</gson.version>
@@ -44,7 +68,7 @@
         <jose4j.version>0.9.6</jose4j.version>
         <nukkitx-natives.version>1.0.3</nukkitx-natives.version>
         <raknet.version>1.1.0.CR1-20260606.034627-2</raknet.version>
-        <cloudburst-common.version>3.0.0.Beta12-20260602.165120-26</cloudburst-common.version>
+        <cloudburst-common.version>3.0.0.Beta12-20260609.111529-27</cloudburst-common.version>
         <cloudburst-codec.version>3.0.0.Beta12-20260609.111529-26</cloudburst-codec.version>
         <jackson-dataformat-toml.version>2.20.1</jackson-dataformat-toml.version>
         <eu.okaeri.version>6.1.0-beta.1</eu.okaeri.version>
@@ -59,6 +83,7 @@
         <objenesis.version>3.4</objenesis.version>
 
         <error-prone.version>2.41.0</error-prone.version>
+        <maven.shade.skip>false</maven.shade.skip>
     </properties>
 
     <distributionManagement>
@@ -566,9 +591,9 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.allaymc</groupId>
-            <artifactId>protocol-extension</artifactId>
-            <version>${allaymc.version}</version>
+            <groupId>dev.mot.protocol</groupId>
+            <artifactId>netease-protocol-extension</artifactId>
+            <version>1.21.124-R1</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -580,6 +605,9 @@
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.5.0</version>
                 <configuration>
+                    <excludes>
+                        <exclude>cn/nukkit/buildtools/**</exclude>
+                    </excludes>
                     <archive>
                         <manifestEntries>
                             <addClasspath>true</addClasspath>
@@ -711,6 +739,7 @@
                     </execution>
                 </executions>
                 <configuration>
+                    <skip>${maven.shade.skip}</skip>
                     <filters>
                         <filter>
                             <artifact>*:*</artifact>
@@ -792,6 +821,11 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
                 <version>3.4.0</version>
+                <configuration>
+                    <excludes>
+                        <exclude>cn/nukkit/buildtools/**</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -803,4 +837,68 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>central-release</id>
+            <properties>
+                <maven.shade.skip>true</maven.shade.skip>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.3.0</version>
+                        <executions>
+                            <execution>
+                                <id>attach-central-javadocs</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>attach-artifact</goal>
+                                </goals>
+                                <configuration>
+                                    <artifacts>
+                                        <artifact>
+                                            <file>${project.build.directory}/${project.build.finalName}-javadoc.jar</file>
+                                            <type>jar</type>
+                                            <classifier>javadoc</classifier>
+                                        </artifact>
+                                    </artifacts>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.8</version>
+                        <executions>
+                            <execution>
+                                <id>sign-release-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <bestPractices>true</bestPractices>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.11.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -45,7 +45,6 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -84,7 +83,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
-    private static final AtomicInteger STACK_NETWORK_ID_COUNTER = new AtomicInteger(0);
     /**
      * 存储需要在 initCreativeItems 后重新添加的创造物品
      * Stores creative items that need to be re-added after initCreativeItems
@@ -599,7 +597,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
 
         // Only load the latest version; runtime filtering via isSupportedOn per protocol
-        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_110, CREATIVE_ITEMS);
+        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_111, CREATIVE_ITEMS);
 
         isInitializingCreativeItems = false;
         creativeItemsInitialized = true;
@@ -1037,6 +1035,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static HashMap<String, CustomItemDefinition> getCustomItemDefinition() {
         return new HashMap<>(CUSTOM_ITEM_DEFINITIONS);
+    }
+
+    /** Direct lookup without cloning; for hot paths instead of {@link #getCustomItemDefinition()}{@code .get(id)}. */
+    public static CustomItemDefinition getCustomItemDefinition(String namespaceId) {
+        return CUSTOM_ITEM_DEFINITIONS.get(namespaceId);
     }
 
     public static Item get(int id) {
@@ -1658,10 +1661,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     final public Short getFuelTime() {
+        if (this instanceof StringItem stringItem) {
+            return Fuel.getDuration(stringItem.getNamespaceId());
+        }
         if (!Fuel.duration.containsKey(id)) {
             return null;
         }
-        if (this.id != BUCKET || this.meta == 10) {
+        if (this.id != BUCKET || this.meta == ItemBucket.LAVA_BUCKET) {
             return Fuel.duration.get(this.id);
         }
         return null;
@@ -1717,6 +1723,17 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public boolean isShield() {
         return false;
+    }
+
+    public boolean canBePutInOffhandSlot() {
+        return this.isShield()
+                || this.id == ARROW
+                || this.id == TOTEM
+                || this.id == MAP
+                || this.id == EMPTY_MAP
+                || this.id == FIREWORKS
+                || this.id == NAUTILUS_SHELL
+                || this.id == SPARKLER;
     }
 
     public boolean isHelmet() {
@@ -2002,7 +2019,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     /**
-     * Allocates a fresh positive stack network id from Item's internal counter
+     * Allocates a fresh positive stack network id from ItemStackNetManager
      * and assigns it to this item. Call this whenever a new, distinct stack is
      * produced server-side (for example, the output of a crafting / enchanting
      * / grindstone operation) so the client can reference it in subsequent
@@ -2011,7 +2028,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * @return this item for chaining
      */
     public Item autoAssignStackNetworkId() {
-        this.stackNetId = STACK_NETWORK_ID_COUNTER.updateAndGet(current -> current == Integer.MAX_VALUE ? 1 : current + 1);
+        this.stackNetId = ItemStackNetManager.allocate();
         return this;
     }
 

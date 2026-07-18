@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.util.RedstoneToggleHelper;
 import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.event.block.DoorToggleEvent;
 import cn.nukkit.item.Item;
@@ -59,17 +60,28 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
 
     @Override
     public int onUpdate(int type) {
-        if (type == Level.BLOCK_UPDATE_REDSTONE && (
-                !this.isOpen() && level.isBlockPowered(this) || this.isOpen() && !level.isBlockPowered(this)
-        )) {
-            level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, this.isOpen() ? 15 : 0, this.isOpen() ? 0 : 15));
-            this.setDamage(this.getDamage() ^ TRAPDOOR_OPEN_BIT);
-            level.setBlock(this, this, true);
-            level.addLevelEvent(this.add(0.5, 0.5, 0.5), LevelEventPacket.EVENT_SOUND_DOOR);
-            return type;
+        if (type == Level.BLOCK_UPDATE_REDSTONE) {
+            // 玩家手动操作过的活板门不被红石强制对齐 (issue #782)
+            boolean powered = RedstoneToggleHelper.isPowered(level, this);
+            boolean manualOverride = RedstoneToggleHelper.isManualOverride(level, this.getFloorX(), this.getFloorY(), this.getFloorZ());
+            if ((!this.isOpen() && powered || this.isOpen() && !powered) && !manualOverride) {
+                level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, this.isOpen() ? 15 : 0, this.isOpen() ? 0 : 15));
+                this.setDamage(this.getDamage() ^ TRAPDOOR_OPEN_BIT);
+                level.setBlock(this, this, true);
+                level.addLevelEvent(this.add(0.5, 0.5, 0.5), LevelEventPacket.EVENT_SOUND_DOOR);
+                return type;
+            } else if (manualOverride && powered == this.isOpen()) {
+                RedstoneToggleHelper.setManualOverride(level, this.getFloorX(), this.getFloorY(), this.getFloorZ(), false);
+            }
         }
 
         return 0;
+    }
+
+    @Override
+    public boolean onBreak(Item item) {
+        RedstoneToggleHelper.setManualOverride(level, this.getFloorX(), this.getFloorY(), this.getFloorZ(), false);
+        return super.onBreak(item);
     }
 
     @Override
@@ -184,6 +196,12 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
         }
         this.setDamage(this.getDamage() ^ TRAPDOOR_OPEN_BIT);
         this.getLevel().setBlock(this, this, true);
+        // 玩家手动 toggle 时记录 override，避免红石随后把它"对齐"回去 (issue #782)
+        if (player != null) {
+            boolean powered = RedstoneToggleHelper.isPowered(level, this);
+            boolean open = this.isOpen();
+            RedstoneToggleHelper.setManualOverride(level, this.getFloorX(), this.getFloorY(), this.getFloorZ(), powered != open);
+        }
         this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player != null ? player : this, this.add(0.5, 0.5, 0.5), this.isOpen() ? VibrationType.BLOCK_OPEN : VibrationType.BLOCK_CLOSE));
         return true;
     }

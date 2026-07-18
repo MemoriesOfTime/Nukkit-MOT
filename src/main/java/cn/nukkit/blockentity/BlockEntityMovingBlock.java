@@ -1,8 +1,10 @@
 package cn.nukkit.blockentity;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockChest;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
@@ -39,36 +41,27 @@ public class BlockEntityMovingBlock extends BlockEntitySpawnable {
 
         super.initBlockEntity();
 
-        // Fix for issue #410: Schedule a delayed check to verify the piston exists and will complete the movement
-        // We delay this check to ensure the piston's chunk has time to load and initialize
-        this.level.scheduleUpdate(this.getLevelBlock(), 2);
+        // Must use the block entity update queue, not the block update queue — MOVING_BLOCK's
+        // registered block class has no onUpdate, so block updates would never invoke this.
+        this.scheduleUpdate();
     }
 
     @Override
     public boolean onUpdate() {
-        // Fix for issue #410: Verify the piston still exists and is properly moving this block
+        // Verify the piston still exists and is properly moving this block.
         if (this.level != null) {
             if (!this.level.isChunkLoaded(this.piston.x >> 4, this.piston.z >> 4)) {
-                // Piston chunk not loaded, convert to actual block to prevent orphaned moving blocks
-                this.close();
-                if (this.block != null) {
-                    this.level.setBlock(this, this.block, true, true);
-                }
+                this.restoreBlock();
                 return false;
             }
 
             BlockEntity pistonEntity = this.level.getBlockEntity(this.piston);
             if (!(pistonEntity instanceof BlockEntityPistonArm)) {
-                // Piston is missing, convert moving block to actual block
-                this.close();
-                if (this.block != null) {
-                    this.level.setBlock(this, this.block, true, true);
-                }
+                this.restoreBlock();
                 return false;
             }
 
             BlockEntityPistonArm piston = (BlockEntityPistonArm) pistonEntity;
-            // Check if this block is actually in the piston's attached blocks list
             boolean isAttached = false;
             BlockFace pushDir = piston.extending ? piston.facing : piston.facing.getOpposite();
             BlockVector3 thisPos = new BlockVector3(this.getFloorX(), this.getFloorY(), this.getFloorZ());
@@ -80,16 +73,41 @@ public class BlockEntityMovingBlock extends BlockEntitySpawnable {
             }
 
             if (!isAttached) {
-                // This moving block is not tracked by the piston, convert to actual block
-                this.close();
-                if (this.block != null) {
-                    this.level.setBlock(this, this.block, true, true);
-                }
+                this.restoreBlock();
                 return false;
             }
         }
 
         return super.onUpdate();
+    }
+
+    Block restoreBlock() {
+        Level level = this.level;
+        Block movedBlock = this.block;
+        CompoundTag blockEntityNbt = this.getBlockEntity();
+        int blockX = this.getFloorX();
+        int blockY = this.getFloorY();
+        int blockZ = this.getFloorZ();
+
+        this.close();
+        if (level == null || movedBlock == null) {
+            return movedBlock;
+        }
+
+        level.setBlock(blockX, blockY, blockZ, movedBlock, true, true);
+        if (blockEntityNbt != null) {
+            blockEntityNbt.putInt("x", blockX);
+            blockEntityNbt.putInt("y", blockY);
+            blockEntityNbt.putInt("z", blockZ);
+            BlockEntity blockEntity = BlockEntity.createBlockEntity(
+                    blockEntityNbt.getString("id"),
+                    level.getChunk(blockX >> 4, blockZ >> 4),
+                    blockEntityNbt);
+            if (blockEntity != null && blockEntity.getBlock() instanceof BlockChest chest) {
+                chest.tryPair();
+            }
+        }
+        return movedBlock;
     }
 
     public CompoundTag getBlockEntity() {

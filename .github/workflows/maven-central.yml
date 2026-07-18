@@ -1,0 +1,242 @@
+name: Publish to Maven Central
+
+# Tag name is used as the release version, for example 1.26.30-R1 or 1.26.30-R1.2.
+# The Central coordinate is independent from the repository's default cn.nukkit:Nukkit coordinate.
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+-R[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-R[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maven-central-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'MemoriesOfTime/Nukkit-MOT'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up JDK 17 and Maven Central credentials
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+          cache-dependency-path: pom.xml
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Resolve and validate release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-R[0-9]+(\.[0-9]+)?$ ]]; then
+              echo "::error::Invalid release tag: $VERSION"
+              exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Central release POM
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+
+          namespace = "http://maven.apache.org/POM/4.0.0"
+          qualified = lambda name: f"{{{namespace}}}{name}"
+          ET.register_namespace("", namespace)
+
+          tree = ET.parse("pom.xml")
+          root = tree.getroot()
+          coordinates = {
+              "groupId": "com.nukkit-mot",
+              "artifactId": "nukkit-mot",
+              "version": os.environ["VERSION"],
+          }
+          for name, value in coordinates.items():
+              element = root.find(qualified(name))
+              if element is None:
+                  raise SystemExit(f"Missing project {name} in pom.xml")
+              element.text = value
+
+          tree.write("pom-central.xml", encoding="UTF-8", xml_declaration=True)
+
+          verification = ET.parse("pom-central.xml").getroot()
+          for name, expected in coordinates.items():
+              actual = verification.findtext(qualified(name))
+              if actual != expected:
+                  raise SystemExit(f"Unexpected {name}: {actual!r}, expected {expected!r}")
+          PY
+
+      - name: Build and verify Central artifacts
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mvn -B -f pom-central.xml clean compile dependency:build-classpath \
+              -Dmdep.includeScope=compile \
+              -Dmdep.outputFile=target/javadoc-classpath.txt \
+              -DskipTests
+
+          LOMBOK_JAR=$(python3 -c 'import os; paths = open("target/javadoc-classpath.txt").read().split(":"); print(next(path for path in paths if os.path.basename(path).startswith("lombok-")))')
+          java -jar "$LOMBOK_JAR" delombok \
+              --classpath "$(<target/javadoc-classpath.txt)" \
+              src/main/java \
+              -d target/delombok
+
+          find target/delombok -name '*.java' -print > target/javadoc-sources.txt
+          javadoc \
+              -quiet \
+              -encoding UTF-8 \
+              -charset UTF-8 \
+              -docencoding UTF-8 \
+              -Xdoclint:none \
+              -d target/apidocs-central \
+              -classpath "target/classes:$(<target/javadoc-classpath.txt)" \
+              @target/javadoc-sources.txt
+          jar --create \
+              --file "target/nukkit-mot-${VERSION}-javadoc.jar" \
+              -C target/apidocs-central .
+
+          mvn -B -f pom-central.xml -Pcentral-release package -DskipTests
+
+          ARTIFACT="target/nukkit-mot-${VERSION}.jar"
+          SOURCES="target/nukkit-mot-${VERSION}-sources.jar"
+          JAVADOC="target/nukkit-mot-${VERSION}-javadoc.jar"
+          PROPERTIES="META-INF/maven/com.nukkit-mot/nukkit-mot/pom.properties"
+
+          test -f "$ARTIFACT"
+          test -f "$SOURCES"
+          test -f "$JAVADOC"
+
+          unzip -p "$ARTIFACT" "$PROPERTIES" > target/central-pom.properties
+          grep -qx 'groupId=com.nukkit-mot' target/central-pom.properties
+          grep -qx 'artifactId=nukkit-mot' target/central-pom.properties
+          grep -qx "version=${VERSION}" target/central-pom.properties
+
+          if jar tf "$ARTIFACT" | grep -q '^cn/nukkit/buildtools/'; then
+              echo "::error::Build-time helper classes leaked into the main artifact"
+              exit 1
+          fi
+          if jar tf "$ARTIFACT" | grep -q '^io/netty/'; then
+              echo "::error::The Maven Central main artifact is unexpectedly shaded"
+              exit 1
+          fi
+          if jar tf "$SOURCES" | grep -q '^cn/nukkit/buildtools/'; then
+              echo "::error::Build-time helper sources leaked into the sources artifact"
+              exit 1
+          fi
+
+      - name: Import GPG key
+        env:
+          SONATYPE_SECRET_KEY: ${{ secrets.SONATYPE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$SONATYPE_SECRET_KEY" | gpg --batch --import; then
+              echo "::error::Failed to import SONATYPE_SECRET_KEY as an OpenPGP private key"
+              exit 1
+          fi
+          if ! gpg --batch --list-secret-keys --with-colons | grep -q '^sec:'; then
+              echo "::error::SONATYPE_SECRET_KEY did not contain an OpenPGP secret key"
+              exit 1
+          fi
+
+      - name: Publish to Maven Central
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.SONATYPE_SECRET_KEY_PASSWORD }}
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+        run: mvn -B -f pom-central.xml -Pcentral-release deploy -DskipTests
+
+  bump-readme:
+    # After a successful release, bump the release version in the READMEs to the published version.
+    needs: publish
+    if: github.repository == 'MemoriesOfTime/Nukkit-MOT'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout default branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump README version placeholders
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          version = os.environ["VERSION"]
+          pattern = re.compile(r"^\d+\.\d+\.\d+-R\d+(\.\d+)?$")
+          if not pattern.match(version):
+              sys.exit(f"Unexpected release version: {version}")
+
+          # Only bump placeholders tied to the Maven Central coordinate
+          # com.nukkit-mot:nukkit-mot, leaving the SNAPSHOT coordinate untouched.
+          xml_re = re.compile(
+              r'(<groupId>com\.nukkit-mot</groupId>\s*<artifactId>nukkit-mot</artifactId>\s*<version>)([\d.]+-R\d+(?:\.\d+)?)(</version>)',
+              re.DOTALL,
+          )
+          gradle_re = re.compile(r'(com\.nukkit-mot:nukkit-mot:)([\d.]+-R\d+(?:\.\d+)?)')
+
+          targets = ["README.md", "docs/README_zh.md"]
+          changed = False
+          for path in targets:
+              with open(path, "r", encoding="utf-8") as f:
+                  content = f.read()
+              new_content, xml_n = xml_re.subn(rf"\g<1>{version}\g<3>", content)
+              new_content, gradle_n = gradle_re.subn(rf"\g<1>{version}", new_content)
+              if xml_n or gradle_n:
+                  with open(path, "w", encoding="utf-8") as f:
+                      f.write(new_content)
+                  changed = True
+                  print(f"Updated {path}: xml={xml_n}, gradle={gradle_n}")
+
+          if not changed:
+              print("No release version placeholders matched; nothing to commit.")
+          PY
+
+      - name: Commit README bump
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git add README.md docs/README_zh.md
+          if git diff --cached --quiet; then
+            echo "No README changes to commit."
+            exit 0
+          fi
+          git commit -m "docs(readme): bump Maven Central version to ${VERSION}"
+          git push

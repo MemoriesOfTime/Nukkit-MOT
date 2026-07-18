@@ -21,9 +21,9 @@ public class ResourcePackManager {
 
     private final Map<UUID, ResourcePack> allPacksById = new Object2ObjectLinkedOpenHashMap<>();
     private final Map<UUID, ResourcePack> resourcePacksById = new Object2ObjectLinkedOpenHashMap<>();
-    private final Set<ResourcePack> resourcePacks = new HashSet<>();
+    private final Set<ResourcePack> resourcePacks = new LinkedHashSet<>();
     private final Map<UUID, ResourcePack> behaviorPacksById = new Object2ObjectLinkedOpenHashMap<>();
-    private final Set<ResourcePack> behaviorPacks = new HashSet<>();
+    private final Set<ResourcePack> behaviorPacks = new LinkedHashSet<>();
     private final Set<ResourcePackLoader> loaders;
 
     public ResourcePackManager(ResourcePackLoader... loaders) {

@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.util.RedstoneToggleHelper;
 import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.event.block.DoorToggleEvent;
 import cn.nukkit.item.Item;
@@ -240,9 +241,17 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
         }
 
         if (type == Level.BLOCK_UPDATE_REDSTONE) {
+            // 玩家手动操作过的门不被红石强制对齐状态，避免 quasi-connectivity 假象 (issue #782)
+            // Manually toggled doors are not realigned to live redstone state (issue #782).
             boolean powered = this.isGettingPower();
-            if ((!isOpen() && powered) || (isOpen() && !powered)) {
-                this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, isOpen() ? 15 : 0, isOpen() ? 0 : 15));
+            boolean manualOverride = RedstoneToggleHelper.isManualOverride(this.level, this.getFloorX(), this.getFloorY(), this.getFloorZ());
+            if (manualOverride) {
+                // 红石状态与门状态一致时清除标记，恢复红石控制
+                if (powered == this.isOpen()) {
+                    this.clearManualOverride();
+                }
+            } else if ((!this.isOpen() && powered) || (this.isOpen() && !powered)) {
+                this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, this.isOpen() ? 15 : 0, this.isOpen() ? 0 : 15));
 
                 this.toggle(null);
             }
@@ -272,7 +281,8 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
             }
         }
 
-        return this.level.isBlockPowered(down) || this.level.isBlockPowered(up);
+        return RedstoneToggleHelper.isPowered(this.level, down)
+                || RedstoneToggleHelper.isPowered(this.level, up);
     }
 
     @Override
@@ -314,6 +324,7 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
 
     @Override
     public boolean onBreak(Item item) {
+        this.clearManualOverride();
         if (isTop(this.getDamage())) {
             Block down = this.down();
             if (down.getId() == this.getId()) {
@@ -372,9 +383,37 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
 
         this.level.setBlockDataAt(down.getFloorX(), down.getFloorY(), down.getFloorZ(), down.getDamage() ^ 0x04);
         boolean open = ((down.getDamage() ^ 0x04) & DOOR_OPEN_BIT) > 0;
+
+        // 玩家手动 toggle 时记录 override，避免红石随后把它"对齐"回去 (issue #782)
+        if (player != null) {
+            boolean powered = this.isGettingPower();
+            if (powered != open) {
+                RedstoneToggleHelper.setManualOverride(this.level, down.getFloorX(), down.getFloorY(), down.getFloorZ(), true);
+                RedstoneToggleHelper.setManualOverride(this.level, up.getFloorX(), up.getFloorY(), up.getFloorZ(), true);
+            } else {
+                // 新状态与红石一致，清除历史 override
+                this.clearManualOverride();
+            }
+        }
+
         this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player != null ? player : this, this.add(0.5, 0.5, 0.5), open ? VibrationType.BLOCK_OPEN : VibrationType.BLOCK_CLOSE));
         this.playOpenCloseSound();
         return true;
+    }
+
+    /** 清除该门上下两半的 override 标记。 Clears override flag for both halves. */
+    private void clearManualOverride() {
+        Block down;
+        Block up;
+        if (isTop(this.getDamage())) {
+            down = this.down();
+            up = this;
+        } else {
+            down = this;
+            up = this.up();
+        }
+        RedstoneToggleHelper.setManualOverride(this.level, down.getFloorX(), down.getFloorY(), down.getFloorZ(), false);
+        RedstoneToggleHelper.setManualOverride(this.level, up.getFloorX(), up.getFloorY(), up.getFloorZ(), false);
     }
 
     public void playOpenCloseSound() {

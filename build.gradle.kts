@@ -83,6 +83,7 @@ dependencies {
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
+    annotationProcessor(libs.log4j.core)
 
     compileOnly(libs.jsr305)
 
@@ -108,7 +109,7 @@ dependencies {
         exclude("io.netty", "netty-buffer")
     }
     testImplementation(libs.cloudburst.math)
-    testImplementation(libs.allay.protocol.extension)
+    testImplementation(libs.netease.protocol.extension)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.bundles.mockito)
@@ -147,6 +148,12 @@ publishing {
 tasks {
     compileJava {
         options.encoding = "UTF-8"
+        options.compilerArgs.addAll(
+            listOf(
+                "-Alog4j.graalvm.groupId=cn.nukkit",
+                "-Alog4j.graalvm.artifactId=Nukkit"
+            )
+        )
     }
 
     test {

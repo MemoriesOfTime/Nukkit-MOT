@@ -765,27 +765,13 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getDrops(item);
     }
 
-    private double customToolBreakTimeBonus(int toolType, @Nullable Integer speed) {
-        if (speed != null) return speed;
-        else if (toolType == ItemTool.TYPE_SWORD) {
-            if (this instanceof BlockCobweb) {
-                return 15.0;
-            } else if (this instanceof BlockBamboo) {
-                return 30.0;
-            } else return 1.0;
-        } else if (toolType == ItemTool.TYPE_SHEARS) {
-            if (this instanceof BlockWool || this instanceof BlockLeaves) {
-                return 5.0;
-            } else if (this instanceof BlockCobweb) {
-                return 15.0;
-            } else return 1.0;
-        } else if (toolType == ItemTool.TYPE_NONE) return 1.0;
-        return 0;
-    }
-
     private double toolBreakTimeBonus0(Item item) {
-        if (item instanceof ItemCustomTool itemCustomTool && itemCustomTool.getSpeed() != null) {
-            return customToolBreakTimeBonus(customToolType(item), itemCustomTool.getSpeed());
+        if (item instanceof ItemCustomTool itemCustomTool) {
+            //按当前方块查 destroy_speeds；未命中则回退原版逻辑（tier 查表 + sword/shears 特殊值）
+            Integer speed = itemCustomTool.getSpeedFor(getId());
+            if (speed != null) {
+                return speed;
+            }
         }
         return toolBreakTimeBonus0(toolType0(item, getId()), item.getTier(), this.getId());
     }
@@ -830,10 +816,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return 1.0 + (0.2 * hasteLoreLevel);
     }
 
-    private int customToolType(Item item) {
-        return toolType0(item, this.getId());
-    }
-
     private static int toolType0(Item item, int blockId) {
         if (item.isHoe()) {
             switch (blockId) {
@@ -857,6 +839,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     private static boolean correctTool0(int blockToolType, Item item, int blockId) {
+        //自定义工具：digger 含此方块即视为正确工具（让 addExtraBlock 能挖非自身类型的方块）
+        if (item instanceof ItemCustomTool customTool && customTool.getSpeedFor(blockId) != null) {
+            return true;
+        }
+
         boolean isLeaves = blockId == LEAVES || blockId == LEAVES2 || blockId == AZALEA_LEAVES
                 || blockId == AZALEA_LEAVES_FLOWERED || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES || blockId == PALE_OAK_LEAVES;
 

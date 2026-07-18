@@ -1,5 +1,6 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.AdventureSettings.Type;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -558,6 +559,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     private volatile boolean init;
     private volatile boolean initEntity;
+    private volatile boolean published;
 
     protected volatile boolean saveWithChunk = true;
 
@@ -667,8 +669,6 @@ public abstract class Entity extends Location implements Metadatable {
         this.dataProperties.putFloat(DATA_BOUNDING_BOX_WIDTH, this.getWidth());
         this.dataProperties.putInt(DATA_HEALTH, (int) this.health);
 
-        this.scheduleUpdate();
-
         if (this instanceof Player) {
             this.sendData((Player) this);
         } else {
@@ -775,15 +775,28 @@ public abstract class Entity extends Location implements Metadatable {
         this.scale = this.namedTag.getFloat("Scale");
         this.setDataProperty(new FloatEntityData(DATA_SCALE, scale), false);
 
-        this.chunk.addEntity(this);
-        this.level.addEntity(this);
+        try {
+            this.initEntity();
+            if (this.closed) {
+                return;
+            }
 
-        this.initEntity();
+            this.chunk.addEntity(this);
+            this.level.addEntity(this);
+            this.lastUpdate = this.server.getTick();
+            this.published = true;
 
-        this.lastUpdate = this.server.getTick();
-        this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
+            this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
 
-        this.scheduleUpdate();
+            this.scheduleUpdate();
+        } catch (RuntimeException | Error e) {
+            try {
+                this.close(false);
+            } catch (RuntimeException | Error rollbackFailure) {
+                e.addSuppressed(rollbackFailure);
+            }
+            throw e;
+        }
     }
 
     /**
@@ -1633,6 +1646,9 @@ public abstract class Entity extends Location implements Metadatable {
 
     public void sendPotionEffects(Player player) {
         for (Effect effect : this.effects.values()) {
+            if (!player.canReceiveEffectPacket(effect.getId())) {
+                continue;
+            }
             MobEffectPacket pk = new MobEffectPacket();
             pk.eid = this.id;
             pk.effectId = effect.getId();
@@ -1692,7 +1708,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     /**
-     * Check if player's hit should be critical
+     * 检查玩家的攻击是否应为暴击 / Check if player's hit should be critical
+     *
      * @param player player
      * @return can make a critical hit
      */
@@ -1700,6 +1717,37 @@ public abstract class Entity extends Location implements Metadatable {
         if (player.isOnGround() || player.riding != null || player.speed == null || player.speed.y <= 0 || player.hasEffect(Effect.BLINDNESS)) return false;
         int b = player.getLevel().getBlockIdAt(player.chunk, player.getFloorX(), player.getFloorY(), player.getFloorZ());
         return b != Block.LADDER && b != Block.VINES && !Block.isWater(b);
+    }
+
+    protected void applyCriticalHitModifier(EntityDamageEvent source) {
+        if (this instanceof EntityLiving
+                && source instanceof EntityDamageByEntityEvent damageByEntityEvent
+                && !(source instanceof EntityDamageByChildEntityEvent)
+                && !source.isApplicable(EntityDamageEvent.DamageModifier.CRITICAL)
+                && damageByEntityEvent.getDamager() instanceof Player damager
+                && canCriticalHit(damager)) {
+            source.setDamage(getDamageBeforeTargetReductions(source) * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
+        }
+    }
+
+    protected static float getDamageBeforeTargetReductions(EntityDamageEvent source) {
+        return source.getFinalDamage()
+                - source.getDamage(EntityDamageEvent.DamageModifier.ARMOR)
+                - source.getDamage(EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS)
+                - source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE)
+                - source.getDamage(EntityDamageEvent.DamageModifier.ABSORPTION);
+    }
+
+    protected void recalculateResistanceDamage(EntityDamageEvent source) {
+        float resistance = source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE);
+        float originalBaseDamage = source.getOriginalDamage(EntityDamageEvent.DamageModifier.BASE);
+        if (resistance != 0f && originalBaseDamage != 0f) {
+            float ratio = -resistance / originalBaseDamage;
+            float preResistanceDamage = source.getFinalDamage()
+                    - resistance
+                    - source.getDamage(EntityDamageEvent.DamageModifier.ABSORPTION);
+            source.setDamage(-preResistanceDamage * ratio, EntityDamageEvent.DamageModifier.RESISTANCE);
+        }
     }
 
     public boolean attack(EntityDamageEvent source) {
@@ -1710,11 +1758,8 @@ public abstract class Entity extends Location implements Metadatable {
             return false;
         }
 
-        if (this instanceof EntityLiving && source instanceof EntityDamageByEntityEvent && !(source instanceof EntityDamageByChildEntityEvent)) {
-            Entity damager = ((EntityDamageByEntityEvent) source).getDamager();
-            if (damager instanceof Player && canCriticalHit((Player) damager)) {
-                source.setDamage(source.getFinalDamage() * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
-            }
+        if (!(this instanceof EntityHumanType)) {
+            this.recalculateResistanceDamage(source);
         }
 
         server.getPluginManager().callEvent(source);
@@ -1806,6 +1851,11 @@ public abstract class Entity extends Location implements Metadatable {
                     source.setCancelled(true);
                     return false;
                 }
+            } else if (p.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                // This damage bypasses the totem (SUICIDE/VOID) and will kill the player. Hide the
+                // offhand totem before the death/damage signal reaches the client to prevent its
+                // local auto-revival creating a "ghost" state; the real item is left untouched.
+                p.getOffhandInventory().sendEmptyContentsToHolder();
             }
         }
         this.setHealth(newHealth);
@@ -2399,7 +2449,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final void scheduleUpdate() {
-        if (!this.closed && !this.level.isBeingConverted) {
+        if (this.published && !this.closed && !this.level.isBeingConverted) {
             this.level.updateEntities.put(this.id, this);
         }
     }
@@ -2526,7 +2576,7 @@ public abstract class Entity extends Location implements Metadatable {
                     }
                 }
 
-                if (down.getId() == BlockID.FARMLAND) {
+                if (down.getId() == BlockID.FARMLAND && canTrampleFarmland()) {
                     Event ev;
 
                     if (this instanceof Player player) {
@@ -2543,6 +2593,13 @@ public abstract class Entity extends Location implements Metadatable {
                 }
             }
         }
+    }
+
+    protected boolean canTrampleFarmland() {
+        if (this instanceof Player player) {
+            return !player.getAdventureSettings().get(Type.FLYING);
+        }
+        return true;
     }
 
     public void moveFlying(float strafe, float forward, float friction) {
@@ -3187,31 +3244,42 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void close() {
+        this.close(true);
+    }
+
+    private void close(boolean callDespawnEvent) {
         if (!this.closed) {
             this.closed = true;
-            this.server.getPluginManager().callEvent(new EntityDespawnEvent(this));
-            this.despawnFromAll();
-
-            this.collisionHelper = null;
-            this.blocksAround = null;
-            this.collisionBlocks = null;
-
-            this.removeAllEffects(EntityPotionEffectEvent.Cause.DEATH);
-            this.passengers.clear();
-
-            if (this.intProperties != null) {
-                this.intProperties.clear();
+            if (callDespawnEvent) {
+                this.server.getPluginManager().callEvent(new EntityDespawnEvent(this));
             }
-            if (this.floatProperties != null) {
-                this.floatProperties.clear();
-            }
+            this.published = false;
+            try {
+                this.despawnFromAll();
 
-            if (this.chunk != null) {
-                this.chunk.removeEntity(this);
-            }
+                this.collisionHelper = null;
+                this.blocksAround = null;
+                this.collisionBlocks = null;
 
-            if (this.level != null) {
-                this.level.removeEntity(this);
+                this.removeAllEffects(callDespawnEvent ? EntityPotionEffectEvent.Cause.DEATH : null);
+                this.passengers.clear();
+
+                if (this.intProperties != null) {
+                    this.intProperties.clear();
+                }
+                if (this.floatProperties != null) {
+                    this.floatProperties.clear();
+                }
+            } finally {
+                try {
+                    if (this.chunk != null) {
+                        this.chunk.removeEntity(this);
+                    }
+                } finally {
+                    if (this.level != null) {
+                        this.level.removeEntity(this);
+                    }
+                }
             }
         }
     }

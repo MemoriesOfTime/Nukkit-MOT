@@ -80,6 +80,7 @@ public class CraftingManager {
     private static BatchPacket packet_netease_686;
     private static BatchPacket packet_netease_766;
     private static BatchPacket packet_netease_819;
+    private static BatchPacket packet_netease_860;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes = new Int2ObjectOpenHashMap<>();
 
@@ -94,6 +95,14 @@ public class CraftingManager {
     public final Map<Integer, CampfireRecipe> campfireRecipes = new Int2ObjectOpenHashMap<>();
     private final Map<UUID, SmithingRecipe> smithingRecipes = new Object2ObjectOpenHashMap<>();
     private final List<StonecutterRecipe> stonecutterRecipes = new ArrayList<>();
+
+    /**
+     * Lookup table for recipes by their assigned network ID. Populated for recipes
+     * that carry a networkId (Shaped/Shapeless/Stonecutter/Multi/Smithing). Used by
+     * the Server Authoritative ItemStackRequest flow to resolve a CraftRecipeAction
+     * back to its Recipe instance without iterating the full recipe catalog.
+     */
+    private final Map<Integer, Recipe> networkIdRecipes = new Int2ObjectOpenHashMap<>();
 
     private final Object2DoubleOpenHashMap<Recipe> recipeXpMap = new Object2DoubleOpenHashMap<>();
 
@@ -155,7 +164,8 @@ public class CraftingManager {
                         break;
                     case 4: // multi (hardcoded)
                         break;
-                    case 5: // shulker_box
+                    case 5: // shulker_box (UserDataShapelessRecipe): shapeless 结构，但需保留输入 NBT
+                        loadUserDataShapelessRecipe(itemMapping, recipe);
                         break;
                 }
             } catch (Exception e) {
@@ -248,7 +258,7 @@ public class CraftingManager {
                 ingredients.add(ingredientItem);
             }
 
-            this.registerSmithingRecipe(new SmithingRecipe(recipeId, 0, ingredients, item));
+            this.registerSmithingRecipe(new SmithingTransformRecipe(recipeId, 0, ingredients, item));
         }
 
         this.rebuildPacket();
@@ -276,7 +286,9 @@ public class CraftingManager {
                 String type = (String) ingredient.get("type");
                 if (!"default".equals(type)) {
                     if ("item_tag".equals(type)) {
-                        buildShapelessRecipeItemTagOverrides(itemMapping, input, outputItem, (String) ingredient.get("itemTag"), null, null);
+                        int priority = (int) recipe.getOrDefault("priority", 0);
+                        buildShapelessRecipeItemTagOverrides(itemMapping, input, outputItem,
+                                (String) recipe.get("id"), priority, (String) ingredient.get("itemTag"), null, null);
                     } else {
                         log.trace("Unknown shapeless ingredient type: {}", recipe);
                     }
@@ -308,6 +320,42 @@ public class CraftingManager {
                 this.registerRecipe(new ShapelessRecipe(null, 0, outputItem, sorted));
             }
         }
+    }
+
+    /**
+     * Loads "shulker_box" (type 5) recipes, wrapped in {@link UserDataShapelessRecipe} to preserve input NBT.
+     */
+    @SuppressWarnings("unchecked")
+    private void loadUserDataShapelessRecipe(RuntimeItemMapping itemMapping, Map recipe) {
+        if (!"crafting_table".equals(recipe.get("block"))) {
+            return;
+        }
+
+        Map outputMap = (Map) ((List) recipe.get("output")).get(0);
+        Item outputItem = loadRecipeOutputItem(itemMapping, outputMap);
+        if (outputItem == null || outputItem.isNull()) {
+            log.trace("Unknown shulker_box recipe output: {}", recipe);
+            return;
+        }
+
+        List<Map> input = (List<Map>) recipe.get("input");
+        List<Item> sorted = new ArrayList<>();
+        for (Map<String, Object> ingredient : input) {
+            if (!"default".equals(ingredient.get("type"))) {
+                log.trace("Unsupported shulker_box ingredient type: {}", recipe);
+                return;
+            }
+            Item inputItem = loadRecipeIngredientItem(itemMapping, ingredient);
+            if (inputItem == null || inputItem.isNull()) {
+                log.trace("Unknown shulker_box input: {}", recipe);
+                return;
+            }
+            sorted.add(inputItem);
+        }
+        sorted.sort(recipeComparator);
+
+        int priority = (int) recipe.getOrDefault("priority", 0);
+        this.registerRecipe(new UserDataShapelessRecipe((String) recipe.get("id"), priority, outputItem, sorted));
     }
 
     @SuppressWarnings("unchecked")
@@ -372,7 +420,9 @@ public class CraftingManager {
                 String type = (String) ingredientEntry.getValue().get("type");
                 if (!"default".equals(type)) {
                     if ("item_tag".equals(type)) {
-                        buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs, (String) ingredientEntry.getValue().get("itemTag"), null, null);
+                        int priority = (int) recipe.getOrDefault("priority", 0);
+                        buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs,
+                                (String) recipe.get("id"), priority, (String) ingredientEntry.getValue().get("itemTag"), null, null);
                     } else if ("complex_alias".equals(type)) {
                         switch ((String) recipe.get("id")) {
                             case "minecraft:painting":
@@ -595,7 +645,9 @@ public class CraftingManager {
     }
 
     @SuppressWarnings("unchecked")
-    private void buildShapelessRecipeItemTagOverrides(RuntimeItemMapping itemMapping, List<Map> input, Item outputItem, String toReplaceTag, String replaceOtherTagKey, String replaceOtherTagValue) {
+    private void buildShapelessRecipeItemTagOverrides(RuntimeItemMapping itemMapping, List<Map> input, Item outputItem,
+                                                      String recipeId, int priority, String toReplaceTag,
+                                                      String replaceOtherTagKey, String replaceOtherTagValue) {
         Set<String> tags = ItemTag.getItemSet(toReplaceTag);
         if (tags.isEmpty()) {
             log.trace("Unknown item tag: {}", toReplaceTag);
@@ -626,7 +678,8 @@ public class CraftingManager {
                                     expandLegacy = expandableLegacyId;
                                 }
                             } else {
-                                buildShapelessRecipeItemTagOverrides(itemMapping, input, outputItem, itemTag, toReplaceTag, material);
+                                buildShapelessRecipeItemTagOverrides(itemMapping, input, outputItem, recipeId, priority,
+                                        itemTag, toReplaceTag, material);
                                 continue top;
                             }
                         } else {
@@ -665,16 +718,21 @@ public class CraftingManager {
                             item.setDamage(meta);
                         }
                     }
-                    this.registerRecipe(new ShapelessRecipe(null, 0, outputItem, sorted));
+                    this.registerRecipe(new ShapelessRecipe(recipeIdForTagExpansion(recipeId, sorted), priority,
+                            outputItem, sorted));
                 }
             } else {
-                this.registerRecipe(new ShapelessRecipe(null, 0, outputItem, sorted));
+                this.registerRecipe(new ShapelessRecipe(recipeIdForTagExpansion(recipeId, sorted), priority,
+                        outputItem, sorted));
             }
         }
     }
 
     @SuppressWarnings("unchecked")
-    private void buildShapedRecipeItemTagOverrides(RuntimeItemMapping itemMapping, Map<String, Map<String, Object>> input, String[] shape, Item outputItem, List<Item> extraOutputs, String toReplaceTag, String replaceOtherTagKey, String replaceOtherTagValue) {
+    private void buildShapedRecipeItemTagOverrides(RuntimeItemMapping itemMapping, Map<String, Map<String, Object>> input,
+                                                   String[] shape, Item outputItem, List<Item> extraOutputs,
+                                                   String recipeId, int priority, String toReplaceTag,
+                                                   String replaceOtherTagKey, String replaceOtherTagValue) {
         Set<String> tags = ItemTag.getItemSet(toReplaceTag);
         if (tags.isEmpty()) {
             log.trace("Unknown item tag: {}", toReplaceTag);
@@ -705,7 +763,8 @@ public class CraftingManager {
                                     expandLegacy = expandableLegacyId;
                                 }
                             } else {
-                                buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs, itemTag, toReplaceTag, material);
+                                buildShapedRecipeItemTagOverrides(itemMapping, input, shape, outputItem, extraOutputs,
+                                        recipeId, priority, itemTag, toReplaceTag, material);
                                 continue top;
                             }
                         } else {
@@ -742,12 +801,35 @@ public class CraftingManager {
                             item.setDamage(meta);
                         }
                     }
-                    this.registerRecipe(new ShapedRecipe(null, 0, outputItem, shape, ingredients, extraOutputs));
+                    this.registerRecipe(new ShapedRecipe(recipeIdForTagExpansion(recipeId, ingredients.values()),
+                            priority, outputItem, shape, ingredients, extraOutputs));
                 }
             } else {
-                this.registerRecipe(new ShapedRecipe(null, 0, outputItem, shape, ingredients, extraOutputs));
+                this.registerRecipe(new ShapedRecipe(recipeIdForTagExpansion(recipeId, ingredients.values()),
+                        priority, outputItem, shape, ingredients, extraOutputs));
             }
         }
+    }
+
+    private static String recipeIdForTagExpansion(String recipeId, Collection<Item> ingredients) {
+        if (recipeId == null) {
+            return null;
+        }
+        StringJoiner suffix = new StringJoiner("_", recipeId + "_from_", "");
+        ingredients.stream()
+                .map(CraftingManager::recipeIdIngredientName)
+                .distinct()
+                .sorted()
+                .forEach(suffix::add);
+        return suffix.toString();
+    }
+
+    private static String recipeIdIngredientName(Item item) {
+        String namespaceId = item.getNamespaceId(GameVersion.getLastVersion());
+        int colon = namespaceId.indexOf(':');
+        String name = colon >= 0 ? namespaceId.substring(colon + 1) : namespaceId;
+        int meta = item.getDamage();
+        return meta == 0 ? name : name + "_" + meta;
     }
 
     private BatchPacket packetFor(GameVersion gameVersion) {
@@ -895,10 +977,10 @@ public class CraftingManager {
         packet_netease_686 = null;
         packet_netease_766 = null;
         packet_netease_819 = null;
+        packet_netease_860 = null;
 
         this.getCachedPacket(GameVersion.getLastVersion()); // 缓存当前协议版本的数据包
-        this.getCachedPacket(GameVersion.V1_21_50_NETEASE);
-        this.getCachedPacket(GameVersion.V1_21_93_NETEASE);
+        this.getCachedPacket(GameVersion.getLastNetEaseVersion());
     }
 
     @Deprecated
@@ -922,7 +1004,12 @@ public class CraftingManager {
         int protocol = gameVersion.getProtocol();
 
         if (gameVersion.isNetEase()) {
-            if (protocol >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
+            if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+                if (packet_netease_860 == null) {
+                    packet_netease_860 = this.packetFor(GameVersion.V1_21_124_NETEASE);
+                }
+                return packet_netease_860;
+            } else if (protocol >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
                 if (packet_netease_819 == null) {
                     packet_netease_819 = this.packetFor(GameVersion.V1_21_93_NETEASE);
                 }
@@ -977,7 +1064,7 @@ public class CraftingManager {
             return packet859;
         } else if (protocol >= GameVersion.V1_21_110_26.getProtocol()) {
             if (packet844 == null) {
-                packet844 = packetFor(GameVersion.V1_21_110);
+                packet844 = packetFor(GameVersion.V1_21_111);
             }
             return packet844;
         } else if (protocol >= GameVersion.V1_21_100.getProtocol()) {
@@ -1328,6 +1415,7 @@ public class CraftingManager {
         int resultHash = getItemHash(recipe.getResult());
         Map<UUID, ShapedRecipe> map = this.shapedRecipes.computeIfAbsent(resultHash, k -> new HashMap<>());
         map.put(getMultiItemHash(new LinkedList<>(recipe.getIngredientsAggregate())), recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
 
     @Deprecated
@@ -1374,6 +1462,7 @@ public class CraftingManager {
         int resultHash = getItemHash(recipe.getResult());
         Map<UUID, ShapelessRecipe> map = this.shapelessRecipes.computeIfAbsent(resultHash, k -> new HashMap<>());
         map.put(hash, recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
 
     @Deprecated
@@ -1395,11 +1484,13 @@ public class CraftingManager {
     public void registerSmithingRecipe(SmithingRecipe recipe) {
         UUID multiItemHash = getMultiItemHash(recipe.getIngredientsAggregate());
         this.smithingRecipes.put(multiItemHash, recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
 
     public void registerStonecutterRecipe(StonecutterRecipe recipe) {
         recipe.setId(UUID.randomUUID());
         this.stonecutterRecipes.add(recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
 
     @Deprecated
@@ -1486,6 +1577,15 @@ public class CraftingManager {
 
     public void registerMultiRecipe(MultiRecipe recipe) {
         this.multiRecipes.put(recipe.getId(), recipe);
+        this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
+    }
+
+    /**
+     * Lookup a Recipe by the network ID emitted to the client in CraftingDataPacket.
+     * Returns null if no matching recipe is registered.
+     */
+    public Recipe getRecipeByNetworkId(int networkId) {
+        return this.networkIdRecipes.get(networkId);
     }
 
     @Deprecated
