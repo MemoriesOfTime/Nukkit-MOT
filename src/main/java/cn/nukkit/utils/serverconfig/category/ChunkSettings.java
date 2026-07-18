@@ -51,4 +51,8 @@ public class ChunkSettings extends OkaeriConfig {
     @Comment("Use async chunk loading")
     @CustomKey("async-chunks")
     private boolean asyncChunks = true;
+
+    @Comment("Load chunks from disk off the main thread")
+    @CustomKey("async-chunk-loading")
+    private boolean asyncChunkLoading = true;
 }

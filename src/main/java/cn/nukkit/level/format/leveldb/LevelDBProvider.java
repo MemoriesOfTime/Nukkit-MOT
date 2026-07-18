@@ -50,7 +50,9 @@ import java.util.Map.Entry;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.*;
@@ -77,6 +79,9 @@ public class LevelDBProvider implements LevelProvider {
 
     protected volatile boolean closed;
     protected final Lock gcLock;
+    // 保护 db 句柄不被异步读取与 close 竞争:异步 readChunkOffThread 持读锁(可并发,db.get 本身线程安全),close 释放 db 前持写锁
+    // Guards the db handle against a read/close race: async readChunkOffThread takes the read lock (concurrent — db.get is thread-safe), close takes the write lock before freeing db
+    private final ReadWriteLock dbReadCloseLock = new ReentrantReadWriteLock();
     private final ExecutorService executor;
 
     private Task autoCompactionTask;
@@ -689,8 +694,10 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension());
-        if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
-            NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
+        List<BaseFullChunk.PendingBlockUpdate> deferredBlockUpdates = chunk.getDeferredBlockUpdates();
+        if ((blockUpdateEntries != null && !blockUpdateEntries.isEmpty())
+                || (deferredBlockUpdates != null && !deferredBlockUpdates.isEmpty())) {
+            NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, deferredBlockUpdates, currentTick);
             if (ticks != null) {
                 ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
                 try {
@@ -799,6 +806,115 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     @Override
+    public boolean isOffThreadChunkReadSupported() {
+        return !this.closed && this.level != null;
+    }
+
+    @Override
+    public BaseFullChunk readChunkOffThread(int chunkX, int chunkZ) {
+        // 不再 synchronized(this):LevelDB db.get 本身线程安全,粗粒度 monitor 会让主线程的 putChunkIfAbsent/readOrCreateChunk 阻塞在异步磁盘读之后。
+        // 改持读锁允许并发读,仅与 close()(写锁)互斥,防止读到已释放的 db;读锁内复检 closed 收口 TOCTOU
+        // No longer synchronized(this): LevelDB db.get is thread-safe, so a coarse monitor would block the main thread's putChunkIfAbsent/readOrCreateChunk behind an async disk read.
+        // A read lock allows concurrent reads and excludes only close() (write lock), preventing use of a freed db; the closed re-check inside the lock closes the TOCTOU
+        this.dbReadCloseLock.readLock().lock();
+        try {
+            // close 竞争 fast-path:持读锁后复检;Level.close() 的 awaitTermination 超时分支可能让任务在此期间执行,此时直接放弃,避免读到 level=null / db 已关
+            // close-race fast-path: re-check under the read lock; Level.close()'s awaitTermination timeout branch may let a task run during shutdown — bail out to avoid touching a nulled level / closed db
+            if (this.closed) {
+                return null;
+            }
+            // 一次性快照 level 引用:close() 会把 level 置 null,快照保证本次解码全程使用同一引用,中途为 null 则放弃
+            // Snapshot the level reference once: close() nulls level; the snapshot keeps a stable reference for the whole decode, bailing out if null
+            Level levelSnapshot = this.level;
+            if (levelSnapshot == null) {
+                return null;
+            }
+            // 纯读取+解码,不取 provider 锁、不修改 chunks 缓存;ticking 延迟到挂载阶段(主线程 initChunk)回放;挂载由 putChunkIfAbsent 完成
+            // Pure read+decode without the provider monitor or cache mutation; ticking is deferred to mount (main-thread initChunk); mounting happens via putChunkIfAbsent
+            return this.readChunkDeferred(chunkX, chunkZ, levelSnapshot);
+        } finally {
+            this.dbReadCloseLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * 异步路径专用解码:与 {@link #readChunk} 等价,但 ticking 调度延迟到 {@link BaseFullChunk#initChunk()} 执行,避免在异步线程触碰 Level 游戏状态
+     * <p>
+     * Async-path decode: equivalent to {@link #readChunk} but defers ticking scheduling to {@link BaseFullChunk#initChunk()} so the off-thread path never touches Level game state
+     */
+    @Nullable
+    private LevelDBChunk readChunkDeferred(int chunkX, int chunkZ, Level levelSnapshot) {
+        byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
+        if (versionData == null || versionData.length != 1) {
+            versionData = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
+            if (versionData == null || versionData.length != 1) {
+                return null;
+            }
+        }
+
+        ChunkBuilder chunkBuilder = new ChunkBuilder(chunkX, chunkZ, this);
+
+        byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
+        chunkBuilder.state(deserializeFinalizationState(finalized));
+
+        byte chunkVersion = versionData[0];
+
+        if (chunkVersion < 7) {
+            chunkBuilder.dirty();
+        }
+
+        ChunkSerializers.deserializeChunk(this.db, chunkBuilder, chunkVersion);
+
+        Data3dSerializer.deserialize(this.db, chunkBuilder);
+        if (!chunkBuilder.hasBiome3d()) {
+            Data2dSerializer.deserialize(this.db, chunkBuilder);
+        }
+
+        BlockEntitySerializer.loadBlockEntities(this.db, chunkBuilder);
+        EntitySerializer.loadEntities(this.db, chunkBuilder);
+
+        // ticking 解析收集到 sink,通过 dataLoader 在 build() 时塞入 chunk.pendingBlockUpdates;实际调度留给主线程 initChunk
+        // collect ticking into a sink and attach to chunk.pendingBlockUpdates via a dataLoader at build(); actual scheduling is left to the main-thread initChunk
+        List<BaseFullChunk.PendingBlockUpdate> tickingSink = new ArrayList<>();
+        byte[] tickingData = this.db.get(PENDING_TICKS.getKey(chunkX, chunkZ, levelSnapshot.getDimension()));
+        if (tickingData != null && tickingData.length != 0) {
+            this.loadBlockTickingQueueDeferred(tickingData, false, tickingSink);
+        }
+        byte[] randomTickingData = this.db.get(RANDOM_TICKS.getKey(chunkX, chunkZ, levelSnapshot.getDimension()));
+        if (randomTickingData != null && randomTickingData.length != 0) {
+            this.loadBlockTickingQueueDeferred(randomTickingData, true, tickingSink);
+        }
+        if (!tickingSink.isEmpty()) {
+            List<BaseFullChunk.PendingBlockUpdate> sinkCopy = tickingSink;
+            chunkBuilder.dataLoader((chunk, provider) -> chunk.setPendingBlockUpdates(sinkCopy));
+        }
+
+        LevelDBChunk chunk = chunkBuilder.build();
+
+        if (chunkVersion <= 2) {
+            chunk.setHeightmapOrBiomesDirty();
+        }
+
+        return chunk;
+    }
+
+    @Override
+    public synchronized BaseFullChunk putChunkIfAbsent(int chunkX, int chunkZ, BaseFullChunk chunk) {
+        if (!(chunk instanceof LevelDBChunk)) {
+            throw new IllegalArgumentException("Only LevelDB chunks are supported");
+        }
+        long index = Level.chunkHash(chunkX, chunkZ);
+        BaseFullChunk existing = this.chunks.get(index);
+        if (existing != null) {
+            return existing;
+        }
+        chunk.setProvider(this);
+        chunk.setPosition(chunkX, chunkZ);
+        this.chunks.put(index, chunk);
+        return null;
+    }
+
+    @Override
     public LevelDBChunk getEmptyChunk(int chunkX, int chunkZ) {
         return LevelDBChunk.getEmptyChunk(chunkX, chunkZ, this);
     }
@@ -901,11 +1017,29 @@ public class LevelDBProvider implements LevelProvider {
                 this.executor.shutdownNow();
             }
         } finally {
+            // 关库前拿写锁,与 in-flight 异步读(读锁)互斥,防止在 db.get() 进行中释放 db 造成原生崩溃。
+            // closed 已置 true,新读会在读锁内复检时放弃;正常路径 Level.close() 已先排空 executor,此处 tryLock 立即成功。
+            // 有界 tryLock:若某读卡在不可中断 I/O,超时后仍关库(与修复 #1 的有界排空一致,绝不永久挂起)
+            // Acquire the write lock before closing the db, excluding in-flight async reads (read lock) so db is never freed mid db.get() (native crash).
+            // closed is already true, so new reads bail on the in-lock re-check; on the normal path Level.close() drained the executor first, so tryLock succeeds immediately.
+            // Bounded tryLock: if a read is wedged in uninterruptible I/O, close the db anyway after the timeout (matching fix #1's bounded drain — never hang forever)
+            boolean dbLocked = false;
+            try {
+                dbLocked = this.dbReadCloseLock.writeLock().tryLock(5, TimeUnit.SECONDS);
+                if (!dbLocked) {
+                    log.warn("An async chunk read did not finish before close for: {}; closing database anyway", this.getName());
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             try {
                 this.db.close();
             } catch (IOException e) {
                 log.error("Can not close database: {}", this.getName(), e);
             } finally {
+                if (dbLocked) {
+                    this.dbReadCloseLock.writeLock().unlock();
+                }
                 this.gcLock.unlock();
             }
         }
@@ -1111,6 +1245,38 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     protected void loadBlockTickingQueue(byte[] data, boolean tickingQueueTypeIsRandom) {
+        for (ParsedTickingEntry entry : parseBlockTickingQueue(data)) {
+            // 随机刻队列当前未启用调度,与历史行为保持一致 / Random-tick queue scheduling stays disabled, matching legacy behavior
+            if (tickingQueueTypeIsRandom) {
+                continue;
+            }
+            entry.applyNow(this.level);
+        }
+    }
+
+    /**
+     * 解码阶段(可能在异步线程)解析 ticking 数据为延迟条目,不触碰 Level;挂载时由 {@link BaseFullChunk#initChunk()} 回放
+     * <p>
+     * Parse ticking data into deferred entries at decode time (potentially off-thread) without touching Level; replayed on mount by {@link BaseFullChunk#initChunk()}
+     */
+    protected void loadBlockTickingQueueDeferred(byte[] data, boolean tickingQueueTypeIsRandom, List<BaseFullChunk.PendingBlockUpdate> sink) {
+        if (tickingQueueTypeIsRandom) {
+            return;
+        }
+        for (ParsedTickingEntry entry : parseBlockTickingQueue(data)) {
+            BaseFullChunk.PendingBlockUpdate pending = entry.toPending();
+            if (pending != null) {
+                sink.add(pending);
+            }
+        }
+    }
+
+    /**
+     * 纯解析 ticking NBT:解析方块身份与计时,不设置坐标/Level 字段,不调度;线程安全(只读全局映射表)
+     * <p>
+     * Pure parse of ticking NBT: resolves block identity and timing without setting position/Level or scheduling; thread-safe (reads global mappings only)
+     */
+    private List<ParsedTickingEntry> parseBlockTickingQueue(byte[] data) {
         NbtMap ticks;
         try (NBTInputStream reader = NbtUtils.createReaderLE(new ByteBufInputStream(Unpooled.wrappedBuffer(data)))) {
             ticks = (NbtMap) reader.readTag();
@@ -1119,6 +1285,7 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         int currentTick = ticks.getInt("currentTick");
+        List<ParsedTickingEntry> entries = new ArrayList<>();
         for (NbtMap nbtMap : ticks.getList("tickList", NbtType.COMPOUND)) {
             Block block = null;
 
@@ -1140,44 +1307,100 @@ public class LevelDBProvider implements LevelProvider {
                 log.debug("Unavailable block ticking entry skipped: {}", nbtMap);
                 continue;
             }
-            block.x = nbtMap.getInt("x");
-            block.y = nbtMap.getInt("y");
-            block.z = nbtMap.getInt("z");
-            block.level = level;
-
+            int x = nbtMap.getInt("x");
+            int y = nbtMap.getInt("y");
+            int z = nbtMap.getInt("z");
             int delay = (int) (nbtMap.getLong("time") - currentTick);
             int priority = nbtMap.getInt("p"); // Nukkit only
 
-            if (!tickingQueueTypeIsRandom) {
-                level.scheduleUpdate(block, block, delay, priority, false);
-            }/* else {
-                level.scheduleRandomUpdate(block, block, delay, priority, false);
-            }*/
+            entries.add(new ParsedTickingEntry(block, x, y, z, delay, priority));
+        }
+        return entries;
+    }
+
+    /**
+     * 解析结果:同步路径立即调度,异步路径转 {@link BaseFullChunk.PendingBlockUpdate}
+     * <p>
+     * Parsed result: applied immediately on the sync path, or converted to a {@link BaseFullChunk.PendingBlockUpdate} on the async path
+     */
+    private static final class ParsedTickingEntry {
+        final Block block;
+        final int x;
+        final int y;
+        final int z;
+        final int delay;
+        final int priority;
+
+        ParsedTickingEntry(Block block, int x, int y, int z, int delay, int priority) {
+            this.block = block;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.delay = delay;
+            this.priority = priority;
+        }
+
+        void applyNow(Level level) {
+            Block block = this.block;
+            block.x = this.x;
+            block.y = this.y;
+            block.z = this.z;
+            block.level = level;
+            level.scheduleUpdate(block, block, this.delay, this.priority, false);
+        }
+
+        BaseFullChunk.PendingBlockUpdate toPending() {
+            return new BaseFullChunk.PendingBlockUpdate(this.block, this.x, this.y, this.z, this.delay, this.priority);
         }
     }
 
     @Nullable
     protected NbtMap saveBlockTickingQueue(Collection<BlockUpdateEntry> entries, long currentTick) {
+        return this.saveBlockTickingQueue(entries, null, currentTick);
+    }
+
+    @Nullable
+    protected NbtMap saveBlockTickingQueue(Collection<BlockUpdateEntry> entries,
+                                           Collection<BaseFullChunk.PendingBlockUpdate> deferredEntries,
+                                           long currentTick) {
         ArrayList<NbtMap> list = new ArrayList<>();
-        for (BlockUpdateEntry entry : entries) {
-            Block block = entry.block;
+        if (entries != null) {
+            for (BlockUpdateEntry entry : entries) {
+                Block block = entry.block;
 
-            NbtMap blockTag = BlockStateMapping.get().getBlockStateFromFullId(block.getFullId()).getVanillaState();
-            Vector3 pos = entry.pos;
-            int priority = entry.priority;
+                NbtMap blockTag = BlockStateMapping.get().getBlockStateFromFullId(block.getFullId()).getVanillaState();
+                Vector3 pos = entry.pos;
+                int priority = entry.priority;
 
-            NbtMapBuilder tag = NbtMap.builder()
-                    .putInt("x", pos.getFloorX())
-                    .putInt("y", pos.getFloorY())
-                    .putInt("z", pos.getFloorZ())
-                    .putCompound("blockState", blockTag)
-                    .putLong("time", entry.delay - currentTick);
+                NbtMapBuilder tag = NbtMap.builder()
+                        .putInt("x", pos.getFloorX())
+                        .putInt("y", pos.getFloorY())
+                        .putInt("z", pos.getFloorZ())
+                        .putCompound("blockState", blockTag)
+                        .putLong("time", entry.delay - currentTick);
 
-            if (priority != 0) {
-                tag.putInt("p", priority); // Nukkit only
+                if (priority != 0) {
+                    tag.putInt("p", priority); // Nukkit only
+                }
+
+                list.add(tag.build());
             }
+        }
 
-            list.add(tag.build());
+        if (deferredEntries != null) {
+            for (BaseFullChunk.PendingBlockUpdate entry : deferredEntries) {
+                NbtMap blockTag = BlockStateMapping.get().getBlockStateFromFullId(entry.getBlock().getFullId()).getVanillaState();
+                NbtMapBuilder tag = NbtMap.builder()
+                        .putInt("x", entry.getX())
+                        .putInt("y", entry.getY())
+                        .putInt("z", entry.getZ())
+                        .putCompound("blockState", blockTag)
+                        .putLong("time", entry.getDelay());
+                if (entry.getPriority() != 0) {
+                    tag.putInt("p", entry.getPriority());
+                }
+                list.add(tag.build());
+            }
         }
 
         return list.isEmpty() ? null : NbtMap.builder()
