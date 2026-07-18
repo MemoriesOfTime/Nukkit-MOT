@@ -84,6 +84,25 @@ public class LevelDBProvider implements LevelProvider {
     private final ReadWriteLock dbReadCloseLock = new ReentrantReadWriteLock();
     private final ExecutorService executor;
 
+    // 每区块挂起写槽位:保存/卸载产生的 WriteBatch 在此等待落盘,同区块新批次替换旧批次(旧内容永不落盘),
+    // 落盘互斥于槽位锁,保证同区块写全序、最新内容最终生效;读取入口先认领槽位,防止「卸载→秒回」读到陈旧数据
+    // Per-chunk pending-write slots: WriteBatches from save/unload wait here; a newer batch replaces the older one
+    // (superseded content never hits disk). Commits are mutually exclusive per slot, giving a total order per chunk with
+    // newest-wins; read entry points claim the slot first so an unload-then-reload never observes stale data
+    private final ConcurrentHashMap<Long, PendingWrite> pendingWrites = new ConcurrentHashMap<>();
+    private volatile boolean pendingWriteBacklogWarned;
+
+    private static final int MAX_PENDING_WRITE_RETRIES = 3;
+
+    // 字段仅在持有 lock 时读写 / Fields are read and written only while holding lock
+    static final class PendingWrite {
+        final ReentrantLock lock = new ReentrantLock();
+        WriteBatch batch;
+        long changeSnapshot;
+        LevelDBChunk chunkRef;
+        int retries;
+    }
+
     private Task autoCompactionTask;
 
     public LevelDBProvider(Level level, String path) {
@@ -591,13 +610,37 @@ public class LevelDBProvider implements LevelProvider {
             return false;
         }
         if (chunk instanceof LevelDBChunk levelDBChunk) {
-            // Wait for any pending async save to complete before closing entities
-            levelDBChunk.writeLock().lock();
-            levelDBChunk.writeLock().unlock();
-            // If still dirty (async save failed or hasn't run), retry synchronously
-            // while entities/block entities are still alive
-            if (levelDBChunk.hasChanged()) {
-                this.saveChunkSync(chunkX, chunkZ, levelDBChunk);
+            // async-chunks 统一管理发送/加载/保存 / async-chunks governs sending, loading and saving together
+            if (Server.getInstance().asyncChunkSending) {
+                // 主线程只序列化(实体存活,批次自包含),db.write 交给 executor;不等待、不同步写,消除卸载路径的 DbImpl.write park。
+                // 槽内批次快照与当前 changes 一致才视为内容最新可跳过重复序列化(仅 containsKey 不够:可能是陈旧 autosave 批次);
+                // 区块即将卸载,解除 chunkRef 以免滞留其内存
+                // The main thread only serializes (entities alive, batch self-contained); db.write goes to the executor — no wait,
+                // no sync write, removing the DbImpl.write park from the unload path. The staged batch counts as current only when
+                // its snapshot equals the live changes counter (containsKey alone is insufficient: it may be a stale autosave batch);
+                // the chunk is being evicted, so drop chunkRef to avoid retaining its memory
+                boolean staged = false;
+                PendingWrite pw = this.pendingWrites.get(index);
+                if (pw != null) {
+                    pw.lock.lock();
+                    try {
+                        staged = pw.batch != null && pw.changeSnapshot == levelDBChunk.getChanges();
+                        pw.chunkRef = null;
+                    } finally {
+                        pw.lock.unlock();
+                    }
+                }
+                if (!staged && levelDBChunk.hasChanged() && levelDBChunk.isGenerated()) {
+                    this.stagePendingWrite(index, chunkX, chunkZ, levelDBChunk, false);
+                    this.enqueueCommit(index);
+                }
+            } else {
+                // 配置回退:排空该区块挂起写后按原行为同步兜底保存
+                // Config fallback: drain this chunk's pending write, then sync-save as before
+                this.commitPendingWrite(index);
+                if (levelDBChunk.hasChanged()) {
+                    this.saveChunkSync(chunkX, chunkZ, levelDBChunk);
+                }
             }
         }
         if (!chunk.unload(false, safe)) {
@@ -632,9 +675,16 @@ public class LevelDBProvider implements LevelProvider {
             return CompletableFuture.completedFuture(null);
         }
 
-        long changeSnapshot = chunk.getChanges();
-        WriteBatch batch = this.save0(chunkX, chunkZ, chunk);
-        return CompletableFuture.runAsync(() -> this.saveChunkCallback(batch, chunk, changeSnapshot), this.executor);
+        long hash = Level.chunkHash(chunkX, chunkZ);
+        this.stagePendingWrite(hash, chunkX, chunkZ, chunk, true);
+        try {
+            // commit 会等待/接手 in-flight 写,future 完成即代表本次内容(或更新内容)已落盘
+            // commit waits for / takes over any in-flight write; future completion means this content (or newer) is durable
+            return CompletableFuture.runAsync(() -> this.commitPendingWrite(hash), this.executor);
+        } catch (RejectedExecutionException e) {
+            this.commitPendingWrite(hash);
+            return CompletableFuture.completedFuture(null);
+        }
     }
 
     public void saveChunkSync(int chunkX, int chunkZ, FullChunk fullChunk) {
@@ -649,9 +699,148 @@ public class LevelDBProvider implements LevelProvider {
             return;
         }
 
-        long changeSnapshot = chunk.getChanges();
+        // 同步保存也经槽位:与挂起的异步写保持同区块全序(直接 db.write 会被稍后落盘的旧批次覆盖)
+        // Sync saves also go through the slot: keeps the per-chunk total order with pending async writes (a direct db.write could be overwritten by an older batch landing later)
+        long hash = Level.chunkHash(chunkX, chunkZ);
+        this.stagePendingWrite(hash, chunkX, chunkZ, chunk, true);
+        this.commitPendingWrite(hash);
+    }
+
+    /**
+     * 主线程序列化并放入槽位;新批次替换未落盘的旧批次(合并重复保存)。keepChunkRef 仅在区块仍在缓存时为 true,
+     * 卸载起源传 false 以免滞留已卸载区块内存
+     * <p>
+     * Serialize on the caller thread and stage into the slot; a new batch replaces an unwritten older one (merging duplicate saves).
+     * keepChunkRef is true only while the chunk stays cached; unload-origin saves pass false to avoid retaining evicted chunk memory
+     */
+    private void stagePendingWrite(long hash, int chunkX, int chunkZ, LevelDBChunk chunk, boolean keepChunkRef) {
+        long snapshot = chunk.getChanges();
         WriteBatch batch = this.save0(chunkX, chunkZ, chunk);
-        this.saveChunkCallback(batch, chunk, changeSnapshot);
+        this.pendingWrites.compute(hash, (h, pw) -> {
+            if (pw == null) {
+                pw = new PendingWrite();
+            }
+            pw.lock.lock();
+            try {
+                if (pw.batch != null) {
+                    closeBatchQuietly(pw.batch, this.getName());
+                }
+                pw.batch = batch;
+                pw.changeSnapshot = snapshot;
+                pw.chunkRef = keepChunkRef ? chunk : null;
+                pw.retries = 0;
+            } finally {
+                pw.lock.unlock();
+            }
+            return pw;
+        });
+        this.warnOnPendingWriteBacklog();
+    }
+
+    /**
+     * 落盘该区块的挂起写(executor 任务与认领线程共用):取走槽内最新批次写库;写进行中则等待完成——
+     * 这是读取入口可见性正确的关键(等它落盘再 db.get)。失败重试 ≤{@value MAX_PENDING_WRITE_RETRIES} 次(批次纯字节,重试安全)
+     * <p>
+     * Commit the chunk's pending write (shared by executor tasks and claiming threads): takes the newest staged batch and writes it;
+     * if a write is in flight, waits for it — the key to read-entry visibility (db.get only after it lands).
+     * Failed writes retry up to {@value MAX_PENDING_WRITE_RETRIES} times (batches are pure bytes, safe to retry)
+     */
+    private void commitPendingWrite(long hash) {
+        PendingWrite pw = this.pendingWrites.get(hash);
+        if (pw == null) {
+            return;
+        }
+        boolean needRetry = false;
+        pw.lock.lock();
+        try {
+            WriteBatch batch = pw.batch;
+            if (batch != null) {
+                pw.batch = null;
+                try {
+                    this.db.write(batch);
+                    if (pw.chunkRef != null) {
+                        pw.chunkRef.clearChangesIfUnmodified(pw.changeSnapshot);
+                    }
+                    closeBatchQuietly(batch, this.getName());
+                } catch (Exception e) {
+                    if (pw.retries < MAX_PENDING_WRITE_RETRIES) {
+                        pw.retries++;
+                        pw.batch = batch;
+                        needRetry = true;
+                        log.warn("Chunk write failed for {} at {}, {} (retry {}/{})", this.getName(),
+                                Level.getHashX(hash), Level.getHashZ(hash), pw.retries, MAX_PENDING_WRITE_RETRIES, e);
+                    } else {
+                        closeBatchQuietly(batch, this.getName());
+                        log.error("Giving up chunk write for {} at {}, {} after {} retries", this.getName(),
+                                Level.getHashX(hash), Level.getHashZ(hash), MAX_PENDING_WRITE_RETRIES, e);
+                    }
+                }
+            }
+        } finally {
+            pw.lock.unlock();
+        }
+        if (needRetry) {
+            this.enqueueCommit(hash);
+            return;
+        }
+        // 原子移除空槽;期间若有新批次放入则保留槽位(锁序恒为 CHM bucket → 槽位锁,无反向)
+        // Atomically remove the empty slot; keep it if a new batch was staged meanwhile (lock order is always CHM bucket → slot lock, never reversed)
+        this.pendingWrites.compute(hash, (h, cur) -> {
+            if (cur != pw) {
+                return cur;
+            }
+            cur.lock.lock();
+            try {
+                return cur.batch == null ? null : cur;
+            } finally {
+                cur.lock.unlock();
+            }
+        });
+    }
+
+    private void enqueueCommit(long hash) {
+        try {
+            this.executor.execute(() -> this.commitPendingWrite(hash));
+        } catch (RejectedExecutionException e) {
+            // executor 已关(关服极端时序):调用线程内落盘兜底;重试路径递归深度受重试上限约束
+            // Executor already down (rare close-time ordering): commit inline as a fallback; retry recursion depth is bounded by the retry cap
+            this.commitPendingWrite(hash);
+        }
+    }
+
+    private static void closeBatchQuietly(WriteBatch batch, String levelName) {
+        try {
+            batch.close();
+        } catch (IOException e) {
+            log.error("Failed to close WriteBatch for {}", levelName, e);
+        }
+    }
+
+    private void warnOnPendingWriteBacklog() {
+        int size = this.pendingWrites.size();
+        int max = Server.getInstance().maxPendingChunkWrites;
+        if (size >= max) {
+            if (!this.pendingWriteBacklogWarned) {
+                this.pendingWriteBacklogWarned = true;
+                log.warn("Pending chunk writes for {} reached {} (limit {}); chunk unloading will pause until the backlog drains", this.getName(), size, max);
+            }
+        } else if (this.pendingWriteBacklogWarned && size <= max / 2) {
+            this.pendingWriteBacklogWarned = false;
+        }
+    }
+
+    /**
+     * 当前挂起未落盘的区块写数量(观测用)
+     * <p>
+     * Number of chunk writes staged but not yet durable (for observability)
+     */
+    public int getPendingWriteCount() {
+        return this.pendingWrites.size();
+    }
+
+    @Override
+    public boolean isChunkSaveBacklogged() {
+        return this.pendingWrites.size() >= Server.getInstance().maxPendingChunkWrites;
     }
 
     private WriteBatch save0(int chunkX, int chunkZ, LevelDBChunk chunk) {
@@ -739,23 +928,6 @@ public class LevelDBProvider implements LevelProvider {
         return writeBatch;
     }
 
-    private void saveChunkCallback(WriteBatch batch, LevelDBChunk chunk, long changeSnapshot) {
-        chunk.writeLock().lock();
-        try {
-            this.db.write(batch);
-            chunk.clearChangesIfUnmodified(changeSnapshot);
-        } catch (Exception e) {
-            log.error("Exception in saveChunkCallback for {}", this.getName(), e);
-        } finally {
-            try {
-                batch.close();
-            } catch (IOException e) {
-                log.error("Failed to close WriteBatch for {}", this.getName(), e);
-            }
-            chunk.writeLock().unlock();
-        }
-    }
-
     @Override
     public void saveChunks() {
         for (BaseFullChunk chunk : this.chunks.values()) {
@@ -775,12 +947,11 @@ public class LevelDBProvider implements LevelProvider {
         while (iterator.hasNext()) {
             LevelDBChunk chunk = (LevelDBChunk) iterator.next();
             if (wait) {
-                // Wait for any pending async save before closing entities
-                if (!chunk.writeLock().tryLock()) {
-                    chunk.writeLock().lock();
-                }
-                chunk.writeLock().unlock();
-                // If async save failed, retry synchronously while chunk is still alive
+                // 先认领落盘挂起写(含等待 in-flight);随后 hasChanged 通常已清零,避免关服时的二次序列化
+                // Claim and commit the pending write first (waiting for any in-flight one); hasChanged is then usually cleared, avoiding a second serialization at close
+                this.commitPendingWrite(Level.chunkHash(chunk.getX(), chunk.getZ()));
+                // 落盘后仍脏(落盘后有改动/写失败放弃)才同步重存,此时实体仍存活
+                // Only re-save synchronously if still dirty after the commit (post-write changes / write given up), while entities are still alive
                 if (chunk.hasChanged()) {
                     this.saveChunkSync(chunk.getX(), chunk.getZ(), chunk);
                 }
@@ -829,6 +1000,9 @@ public class LevelDBProvider implements LevelProvider {
             if (levelSnapshot == null) {
                 return null;
             }
+            // 认领挂起写(读锁内,db 必然存活):卸载后未落盘即被异步重载时,先落盘再读
+            // Claim the pending write (inside the read lock, db guaranteed alive): commit before reading if the chunk is async-reloaded before its unload write lands
+            this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
             // 纯读取+解码,不取 provider 锁、不修改 chunks 缓存;ticking 延迟到挂载阶段(主线程 initChunk)回放;挂载由 putChunkIfAbsent 完成
             // Pure read+decode without the provider monitor or cache mutation; ticking is deferred to mount (main-thread initChunk); mounting happens via putChunkIfAbsent
             return this.readChunkDeferred(chunkX, chunkZ, levelSnapshot);
@@ -943,6 +1117,8 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private boolean chunkExists(int chunkX, int chunkZ) {
+        // 认领挂起写,防止「卸载写未落盘」窗口内误判区块不存在 / Claim the pending write so an unwritten unload save can't make the chunk look absent
+        this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
         byte[] data = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (data == null || data.length == 0) {
             data = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimension()));
@@ -963,6 +1139,9 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private synchronized LevelDBChunk readOrCreateChunk(int chunkX, int chunkZ, boolean create) {
+        // 认领挂起写:卸载后未落盘即被重载时,先把最新批次落盘再读,避免读到陈旧数据
+        // Claim the pending write: if the chunk is reloaded before its unload write lands, commit the newest batch first so the read can't be stale
+        this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
         LevelDBChunk chunk = null;
         try {
             chunk = this.readChunk(chunkX, chunkZ);
@@ -1002,8 +1181,10 @@ public class LevelDBProvider implements LevelProvider {
             this.closed = true;
             this.level = null;
             this.executor.shutdown();
+            boolean drained = false;
             try {
-                if (!this.executor.awaitTermination(10, TimeUnit.MINUTES)) {
+                drained = this.executor.awaitTermination(10, TimeUnit.MINUTES);
+                if (!drained) {
                     log.warn("LevelDB executor did not terminate in time, forcing shutdown for: {}", this.getName());
                     java.util.List<Runnable> droppedTasks = this.executor.shutdownNow();
                     if (!droppedTasks.isEmpty()) {
@@ -1015,6 +1196,15 @@ public class LevelDBProvider implements LevelProvider {
                 }
             } catch (InterruptedException e) {
                 this.executor.shutdownNow();
+            }
+            // executor 正常排空后兜底落盘残余槽位(理论上应为空);排空超时说明写路径已卡死,再写只会再挂,跳过并告警
+            // After a clean drain, flush any leftover slots (should be empty in theory); on drain timeout the write path is wedged — more writes would wedge too, so skip and warn
+            if (drained) {
+                for (Long hash : new ArrayList<>(this.pendingWrites.keySet())) {
+                    this.commitPendingWrite(hash);
+                }
+            } else if (!this.pendingWrites.isEmpty()) {
+                log.warn("{} pending chunk writes could not be flushed before close for: {}", this.pendingWrites.size(), this.getName());
             }
         } finally {
             // 关库前拿写锁,与 in-flight 异步读(读锁)互斥,防止在 db.get() 进行中释放 db 造成原生崩溃。

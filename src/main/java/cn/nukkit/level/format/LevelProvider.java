@@ -73,6 +73,15 @@ public interface LevelProvider {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * 挂起区块写是否积压(用于卸载削峰:积压时 Level 本 tick 暂停继续卸载脏区块)
+     * <p>
+     * Whether pending chunk writes are backlogged (throttles unloading: Level pauses further dirty-chunk unloads this tick)
+     */
+    default boolean isChunkSaveBacklogged() {
+        return false;
+    }
+
     BaseFullChunk getEmptyChunk(int chunkX, int chunkZ);
 
     void saveChunks();

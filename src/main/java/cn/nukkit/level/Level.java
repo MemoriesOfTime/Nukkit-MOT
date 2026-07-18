@@ -4212,6 +4212,16 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     /**
+     * 区块写是否积压(积压时本 tick 暂停继续卸载,削峰;见 provider 的挂起写上限)
+     * <p>
+     * Whether chunk writes are backlogged (unloading pauses this tick while backlogged; see the provider's pending-write cap)
+     */
+    public boolean isChunkSaveBacklogged() {
+        LevelProvider levelProvider = this.getProvider();
+        return levelProvider != null && levelProvider.isChunkSaveBacklogged();
+    }
+
+    /**
      * 提交异步区块读取(玩家发送路径专用);读取+解码在异步线程,挂载在主线程 doTick 中完成。
      * 返回 false 表示未受理(不支持/executor 已关),调用方应回退同步路径;true 表示已在加载或已加载。
      * <p>
@@ -4607,6 +4617,9 @@ public class Level implements ChunkManager, Metadatable {
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return;
         }
+        if (!force && this.isChunkSaveBacklogged()) {
+            return;
+        }
 
         if (!this.unloadQueue.isEmpty()) {
             long now = System.currentTimeMillis();
@@ -4658,6 +4671,11 @@ public class Level implements ChunkManager, Metadatable {
     private boolean unloadChunks(long now, long allocatedTime, boolean force) {
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return false;
+        }
+        // 写积压时本 tick 暂停卸载(unloadQueue 保留,下 tick 重试);返回 true 让 provider GC 继续用剩余预算
+        // Pause unloading this tick while writes are backlogged (unloadQueue kept, retried next tick); return true so provider GC still uses the remaining budget
+        if (!force && this.isChunkSaveBacklogged()) {
+            return true;
         }
 
         if (!this.unloadQueue.isEmpty()) {
