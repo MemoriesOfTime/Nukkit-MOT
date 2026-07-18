@@ -511,13 +511,11 @@ public class Server {
      */
     public boolean enableExperimentMode;
     /**
-     * Asynchronous chunk sending (Experiment)
+     * Asynchronous chunk sending and loading (Experiment)
+     * <p>
+     * 异步区块发送与加载(实验性)
      */
     public boolean asyncChunkSending;
-    /**
-     * Load chunks from disk off the main thread
-     */
-    public boolean asyncChunkLoading;
     /**
      * Show a console message when a plugin uses deprecated API methods
      */
@@ -3446,7 +3444,6 @@ public class Server {
         this.lightUpdates = config.chunkSettings().lightUpdates();
         this.cacheChunks = config.chunkSettings().cacheChunks();
         this.asyncChunkSending = config.chunkSettings().asyncChunks();
-        this.asyncChunkLoading = config.chunkSettings().asyncChunkLoading();
 
         // Entity
         this.spawnEggsEnabled = config.entitySettings().spawnEggs();

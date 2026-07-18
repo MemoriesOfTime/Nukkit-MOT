@@ -38,7 +38,7 @@ public class AsyncChunkLoadTest {
 
         this.pluginManager = Mockito.mock(PluginManager.class);
         this.server = Mockito.mock(Server.class);
-        this.server.asyncChunkLoading = true;
+        this.server.asyncChunkSending = true;
         this.server.lightUpdates = false;
         Mockito.lenient().when(this.server.isPrimaryThread()).thenReturn(true);
         Mockito.lenient().when(this.server.getPluginManager()).thenReturn(this.pluginManager);
@@ -97,10 +97,10 @@ public class AsyncChunkLoadTest {
     public void requestChunkLoadAsyncRejectsWhenDisabledOrUnsupported() throws Exception {
         Level level = newLevel(MoreExecutors.newDirectExecutorService());
 
-        this.server.asyncChunkLoading = false;
+        this.server.asyncChunkSending = false;
         Assertions.assertFalse(level.requestChunkLoadAsync(0, 0));
 
-        this.server.asyncChunkLoading = true;
+        this.server.asyncChunkSending = true;
         Mockito.when(this.provider.isOffThreadChunkReadSupported()).thenReturn(false);
         Assertions.assertFalse(level.requestChunkLoadAsync(0, 0));
 

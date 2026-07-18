@@ -523,8 +523,6 @@ public class Level implements ChunkManager, Metadatable {
 
         if (this.server.asyncChunkSending) {
             this.asyncChuckExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("AsyncChunkThread for " + name).build());
-        }
-        if (this.server.asyncChunkLoading) {
             this.asyncChunkLoadExecutor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
                     new ArrayBlockingQueue<>(Math.max(16, this.chunkGenerationQueueSize)),
                     new ThreadFactoryBuilder().setNameFormat("AsyncChunkLoadThread for " + name).build());
@@ -4206,7 +4204,7 @@ public class Level implements ChunkManager, Metadatable {
      * Whether async chunk loading is available (config enabled and provider supports off-thread reads)
      */
     public boolean isAsyncChunkLoadEnabled() {
-        if (!this.server.asyncChunkLoading || this.asyncChunkLoadExecutor == null) {
+        if (!this.server.asyncChunkSending || this.asyncChunkLoadExecutor == null) {
             return false;
         }
         LevelProvider levelProvider = this.getProvider();
