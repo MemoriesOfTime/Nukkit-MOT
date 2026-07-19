@@ -94,6 +94,13 @@ public class LevelDBProvider implements LevelProvider {
 
     private static final int MAX_PENDING_WRITE_RETRIES = 3;
 
+    // close 排空等待与超时清扫参数;包私有非 final,供测试注入(close 为 synchronized,同线程设置后调用,无可见性问题)
+    // Close-time drain wait and timeout-sweep parameters; package-private, non-final for test injection
+    // (close is synchronized and tests set them on the calling thread, so no visibility concern)
+    long closeDrainTimeoutMillis = TimeUnit.MINUTES.toMillis(10);
+    long closeSweepLockTimeoutMillis = TimeUnit.SECONDS.toMillis(5);
+    long closeSweepBudgetMillis = TimeUnit.SECONDS.toMillis(60);
+
     // 字段仅在持有 lock 时读写 / Fields are read and written only while holding lock
     static final class PendingWrite {
         final ReentrantLock lock = new ReentrantLock();
@@ -750,8 +757,42 @@ public class LevelDBProvider implements LevelProvider {
         if (pw == null) {
             return;
         }
-        boolean needRetry = false;
         pw.lock.lock();
+        this.commitLockedPendingWrite(hash, pw);
+    }
+
+    /**
+     * close 超时清扫用的有界变体:槽锁在超时内不可得(残余线程卡在不可中断写中持锁)则跳过并返回 false;
+     * 槽已空或本次落盘完成返回 true
+     * <p>
+     * Bounded variant for the close-timeout sweep: returns false when the slot lock can't be acquired within the
+     * timeout (a leftover thread wedged in an uninterruptible write holds it); true when the slot is empty or committed
+     */
+    private boolean tryCommitPendingWrite(long hash, long lockTimeoutMillis) {
+        PendingWrite pw = this.pendingWrites.get(hash);
+        if (pw == null) {
+            return true;
+        }
+        boolean locked = false;
+        try {
+            locked = pw.lock.tryLock(lockTimeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        if (!locked) {
+            return false;
+        }
+        this.commitLockedPendingWrite(hash, pw);
+        return true;
+    }
+
+    /**
+     * 落盘核心:调用方须已持 pw.lock,本方法负责释放
+     * <p>
+     * Commit core: the caller must hold pw.lock; this method releases it
+     */
+    private void commitLockedPendingWrite(long hash, PendingWrite pw) {
+        boolean needRetry = false;
         try {
             WriteBatch batch = pw.batch;
             if (batch != null) {
@@ -1183,7 +1224,7 @@ public class LevelDBProvider implements LevelProvider {
             this.executor.shutdown();
             boolean drained = false;
             try {
-                drained = this.executor.awaitTermination(10, TimeUnit.MINUTES);
+                drained = this.executor.awaitTermination(this.closeDrainTimeoutMillis, TimeUnit.MILLISECONDS);
                 if (!drained) {
                     log.warn("LevelDB executor did not terminate in time, forcing shutdown for: {}", this.getName());
                     java.util.List<Runnable> droppedTasks = this.executor.shutdownNow();
@@ -1197,14 +1238,33 @@ public class LevelDBProvider implements LevelProvider {
             } catch (InterruptedException e) {
                 this.executor.shutdownNow();
             }
-            // executor 正常排空后兜底落盘残余槽位(理论上应为空);排空超时说明写路径已卡死,再写只会再挂,跳过并告警
-            // After a clean drain, flush any leftover slots (should be empty in theory); on drain timeout the write path is wedged — more writes would wedge too, so skip and warn
+            // close 线程认领落盘残余槽位(批次是已卸载区块数据的唯一副本)。排空超时 ≠ 写路径卡死:
+            // 在跑的 AutoCompaction 共用本单线程 executor 且不被 close 打断,大世界 compactRange 足以合法耗尽等待窗口,
+            // 此时 db 健康,清扫可救回全部数据;若真卡死,随后的 db.close() 同样会挂,清扫不恶化结局。
+            // 超时路径有界:tryLock 跳过被卡死线程持有的槽,槽间总预算防写节流下逐槽慢写拖住关服。
+            // The close thread claims and commits leftover slots (their batches are the only copy of unloaded-chunk data).
+            // A drain timeout != wedged writes: an in-flight AutoCompaction shares this single-thread executor and is not
+            // interrupted by close, so a large-world compactRange can legitimately exhaust the wait while the db stays
+            // healthy — sweeping then recovers everything. If writes truly are wedged, db.close() below would hang anyway,
+            // so sweeping never worsens the outcome. The timeout path is bounded: tryLock skips slots held by wedged
+            // threads, and an overall budget caps per-slot slow writes.
             if (drained) {
                 for (Long hash : new ArrayList<>(this.pendingWrites.keySet())) {
                     this.commitPendingWrite(hash);
                 }
             } else if (!this.pendingWrites.isEmpty()) {
-                log.warn("{} pending chunk writes could not be flushed before close for: {}", this.pendingWrites.size(), this.getName());
+                log.warn("Executor drain timed out with {} pending chunk writes for: {}; attempting bounded inline flush", this.pendingWrites.size(), this.getName());
+                long deadline = System.currentTimeMillis() + this.closeSweepBudgetMillis;
+                int abandoned = 0;
+                for (Long hash : new ArrayList<>(this.pendingWrites.keySet())) {
+                    if (System.currentTimeMillis() > deadline
+                            || !this.tryCommitPendingWrite(hash, this.closeSweepLockTimeoutMillis)) {
+                        abandoned++;
+                    }
+                }
+                if (abandoned > 0) {
+                    log.warn("{} pending chunk writes abandoned during close for: {}", abandoned, this.getName());
+                }
             }
         } finally {
             // 关库前拿写锁,与 in-flight 异步读(读锁)互斥,防止在 db.get() 进行中释放 db 造成原生崩溃。

@@ -21,6 +21,7 @@ import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -313,5 +314,80 @@ public class LevelDBPendingWriteTest {
         // Fallback path writes synchronously: readable without draining the executor
         Assertions.assertEquals(0, this.provider.getPendingWriteCount());
         Assertions.assertEquals(BLOCK_B, this.readBlockFromDisk(11, 3));
+    }
+
+    @Test
+    public void closeFlushesPendingWritesWhenDrainTimesOut() throws Exception {
+        this.newDirtyChunk(12, 5, BLOCK_A);
+        // 占住 executor 模拟在跑的 AutoCompaction(与挂起写共用单线程 executor,close 不打断在跑任务)
+        // Occupy the executor to simulate an in-flight AutoCompaction (shares the single-thread executor; close doesn't interrupt running tasks)
+        CountDownLatch release = this.pauseExecutor();
+        try {
+            Assertions.assertTrue(this.provider.unloadChunk(12, 5, false));
+            Assertions.assertEquals(1, this.provider.getPendingWriteCount());
+
+            // 排空超时进入清扫分支:槽内批次是已卸载区块数据的唯一副本,须在关库前 inline 落盘而非丢弃
+            // Drain times out into the sweep branch: the staged batch is the only copy of the unloaded chunk's data and must be committed inline before the db closes, not dropped
+            this.provider.closeDrainTimeoutMillis = 100;
+            this.provider.close();
+            Assertions.assertEquals(0, this.provider.getPendingWriteCount());
+        } finally {
+            release.countDown();
+        }
+
+        this.provider = new LevelDBProvider(this.level, this.tempDir.toString());
+        Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(12, 5));
+    }
+
+    @Test
+    public void drainTimeoutSweepSkipsSlotHeldByWedgedWriter() throws Exception {
+        this.newDirtyChunk(13, 6, BLOCK_A);
+        CountDownLatch release = this.pauseExecutor();
+        Assertions.assertTrue(this.provider.unloadChunk(13, 6, false));
+
+        // 辅助线程持住槽锁,模拟残余线程卡在不可中断写中;清扫须 tryLock 超时跳过而非无限等待
+        // A helper thread holds the slot lock, simulating a leftover thread wedged in an uninterruptible write; the sweep must skip via tryLock timeout instead of waiting forever
+        LevelDBProvider.PendingWrite pw = this.pendingWrites().get(Level.chunkHash(13, 6));
+        Assertions.assertNotNull(pw);
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch releaseSlotLock = new CountDownLatch(1);
+        Thread wedgedWriter = new Thread(() -> {
+            pw.lock.lock();
+            try {
+                held.countDown();
+                releaseSlotLock.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                pw.lock.unlock();
+            }
+        }, "wedged-writer");
+        wedgedWriter.start();
+        Assertions.assertTrue(held.await(5, TimeUnit.SECONDS));
+
+        try {
+            this.provider.closeDrainTimeoutMillis = 100;
+            this.provider.closeSweepLockTimeoutMillis = 200;
+            long start = System.currentTimeMillis();
+            this.provider.close();
+            Assertions.assertTrue(System.currentTimeMillis() - start < 30_000, "close must return bounded");
+            // 被持有的槽放弃保留(数据注定丢失,批次由 GC 兜底)
+            // The held slot is abandoned in place (its data is already lost; GC reclaims the batch)
+            Assertions.assertEquals(1, this.provider.getPendingWriteCount());
+        } finally {
+            releaseSlotLock.countDown();
+            release.countDown();
+            wedgedWriter.join(5_000);
+        }
+
+        this.provider = new LevelDBProvider(this.level, this.tempDir.toString());
+        Assertions.assertNull(this.provider.readChunk(13, 6), "abandoned batch must never have landed");
+    }
+
+    @SuppressWarnings("unchecked")
+    private ConcurrentHashMap<Long, LevelDBProvider.PendingWrite> pendingWrites() throws Exception {
+        Field field = LevelDBProvider.class.getDeclaredField("pendingWrites");
+        field.setAccessible(true);
+        return (ConcurrentHashMap<Long, LevelDBProvider.PendingWrite>) field.get(this.provider);
     }
 }
