@@ -745,20 +745,38 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     /**
-     * 落盘该区块的挂起写(executor 任务与认领线程共用):取走槽内最新批次写库;写进行中则等待完成——
-     * 这是读取入口可见性正确的关键(等它落盘再 db.get)。失败重试 ≤{@value MAX_PENDING_WRITE_RETRIES} 次(批次纯字节,重试安全)
+     * 先锁定槽位,再在锁内复检 map identity;若槽位已换代则释放旧槽并循环认领最新批次,
+     * 避免 claim 使用已脱离 map 的旧 {@link PendingWrite}。失败重试 ≤{@value MAX_PENDING_WRITE_RETRIES} 次(批次纯字节,重试安全)
      * <p>
-     * Commit the chunk's pending write (shared by executor tasks and claiming threads): takes the newest staged batch and writes it;
-     * if a write is in flight, waits for it — the key to read-entry visibility (db.get only after it lands).
+     * Lock the slot first, then re-check its map identity while locked; if the slot was replaced, release the old slot
+     * and loop to claim the newest batch, so a claim cannot use a stale {@link PendingWrite}.
      * Failed writes retry up to {@value MAX_PENDING_WRITE_RETRIES} times (batches are pure bytes, safe to retry)
      */
     private void commitPendingWrite(long hash) {
-        PendingWrite pw = this.pendingWrites.get(hash);
-        if (pw == null) {
-            return;
+        for (;;) {
+            PendingWrite pw = this.pendingWrites.get(hash);
+            if (pw == null) {
+                return;
+            }
+            boolean needRetry;
+            pw.lock.lock();
+            try {
+                if (this.pendingWrites.get(hash) != pw) {
+                    continue;
+                }
+                needRetry = this.commitPendingWriteLocked(hash, pw);
+            } finally {
+                pw.lock.unlock();
+            }
+            if (needRetry) {
+                this.enqueueCommit(hash);
+                return;
+            }
+            this.removeEmptyPendingWrite(hash, pw);
+            if (this.pendingWrites.get(hash) == null) {
+                return;
+            }
         }
-        pw.lock.lock();
-        this.commitLockedPendingWrite(hash, pw);
     }
 
     /**
@@ -769,63 +787,80 @@ public class LevelDBProvider implements LevelProvider {
      * timeout (a leftover thread wedged in an uninterruptible write holds it); true when the slot is empty or committed
      */
     private boolean tryCommitPendingWrite(long hash, long lockTimeoutMillis) {
-        PendingWrite pw = this.pendingWrites.get(hash);
-        if (pw == null) {
-            return true;
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(lockTimeoutMillis);
+        for (;;) {
+            PendingWrite pw = this.pendingWrites.get(hash);
+            if (pw == null) {
+                return true;
+            }
+            long remainingNanos = deadline - System.nanoTime();
+            if (remainingNanos <= 0L) {
+                return false;
+            }
+            boolean needRetry;
+            boolean acquired;
+            try {
+                acquired = pw.lock.tryLock(remainingNanos, TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            if (!acquired) {
+                return false;
+            }
+            try {
+                if (this.pendingWrites.get(hash) != pw) {
+                    continue;
+                }
+                needRetry = this.commitPendingWriteLocked(hash, pw);
+            } finally {
+                pw.lock.unlock();
+            }
+            if (needRetry) {
+                this.enqueueCommit(hash);
+                return true;
+            }
+            this.removeEmptyPendingWrite(hash, pw);
+            if (this.pendingWrites.get(hash) == null) {
+                return true;
+            }
         }
-        boolean locked = false;
-        try {
-            locked = pw.lock.tryLock(lockTimeoutMillis, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        if (!locked) {
-            return false;
-        }
-        this.commitLockedPendingWrite(hash, pw);
-        return true;
     }
 
     /**
-     * 落盘核心:调用方须已持 pw.lock,本方法负责释放
+     * 落盘核心:调用方须已持有 {@code pw.lock},本方法不负责加解锁
      * <p>
-     * Commit core: the caller must hold pw.lock; this method releases it
+     * Commit core: the caller must hold {@code pw.lock}; this method does not manage the lock
      */
-    private void commitLockedPendingWrite(long hash, PendingWrite pw) {
+    private boolean commitPendingWriteLocked(long hash, PendingWrite pw) {
         boolean needRetry = false;
-        try {
-            WriteBatch batch = pw.batch;
-            if (batch != null) {
-                pw.batch = null;
-                try {
-                    this.db.write(batch);
-                    if (pw.chunkRef != null) {
-                        pw.chunkRef.clearChangesIfUnmodified(pw.changeSnapshot);
-                    }
+        WriteBatch batch = pw.batch;
+        if (batch != null) {
+            pw.batch = null;
+            try {
+                this.db.write(batch);
+                if (pw.chunkRef != null) {
+                    pw.chunkRef.clearChangesIfUnmodified(pw.changeSnapshot);
+                }
+                closeBatchQuietly(batch, this.getName());
+            } catch (Exception e) {
+                if (pw.retries < MAX_PENDING_WRITE_RETRIES) {
+                    pw.retries++;
+                    pw.batch = batch;
+                    needRetry = true;
+                    log.warn("Chunk write failed for {} at {}, {} (retry {}/{})", this.getName(),
+                            Level.getHashX(hash), Level.getHashZ(hash), pw.retries, MAX_PENDING_WRITE_RETRIES, e);
+                } else {
                     closeBatchQuietly(batch, this.getName());
-                } catch (Exception e) {
-                    if (pw.retries < MAX_PENDING_WRITE_RETRIES) {
-                        pw.retries++;
-                        pw.batch = batch;
-                        needRetry = true;
-                        log.warn("Chunk write failed for {} at {}, {} (retry {}/{})", this.getName(),
-                                Level.getHashX(hash), Level.getHashZ(hash), pw.retries, MAX_PENDING_WRITE_RETRIES, e);
-                    } else {
-                        closeBatchQuietly(batch, this.getName());
-                        log.error("Giving up chunk write for {} at {}, {} after {} retries", this.getName(),
-                                Level.getHashX(hash), Level.getHashZ(hash), MAX_PENDING_WRITE_RETRIES, e);
-                    }
+                    log.error("Giving up chunk write for {} at {}, {} after {} retries", this.getName(),
+                            Level.getHashX(hash), Level.getHashZ(hash), MAX_PENDING_WRITE_RETRIES, e);
                 }
             }
-        } finally {
-            pw.lock.unlock();
         }
-        if (needRetry) {
-            this.enqueueCommit(hash);
-            return;
-        }
-        // 原子移除空槽;期间若有新批次放入则保留槽位(锁序恒为 CHM bucket → 槽位锁,无反向)
-        // Atomically remove the empty slot; keep it if a new batch was staged meanwhile (lock order is always CHM bucket → slot lock, never reversed)
+        return needRetry;
+    }
+
+    private void removeEmptyPendingWrite(long hash, PendingWrite pw) {
         this.pendingWrites.compute(hash, (h, cur) -> {
             if (cur != pw) {
                 return cur;

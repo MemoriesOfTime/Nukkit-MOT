@@ -26,6 +26,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * 区块挂起写槽位协议测试:卸载异步落盘、读取认领、批次替换全序、失败重试、close 排空与背压
@@ -100,15 +102,26 @@ public class LevelDBPendingWriteTest {
      * Occupy the single-thread executor, simulating compaction/write latency delaying pending writes
      */
     private CountDownLatch pauseExecutor() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
         CountDownLatch latch = new CountDownLatch(1);
         this.executor().execute(() -> {
+            started.countDown();
             try {
                 latch.await();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         });
+        Assertions.assertTrue(started.await(5, TimeUnit.SECONDS), "executor pause task should start");
         return latch;
+    }
+
+    private void awaitLockQueued(ReentrantLock lock, Thread thread) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!lock.hasQueuedThread(thread) && System.nanoTime() < deadline) {
+            Thread.yield();
+        }
+        Assertions.assertTrue(lock.hasQueuedThread(thread), "reader should have claimed the stale slot reference");
     }
 
     private void drainExecutor() throws Exception {
@@ -152,6 +165,48 @@ public class LevelDBPendingWriteTest {
             release.countDown();
         }
         this.drainExecutor();
+    }
+
+    @Test
+    public void claimDoesNotReadBeforeAConcurrentReplacementBatch() throws Exception {
+        int chunkX = 14;
+        int chunkZ = 4;
+        this.newDirtyChunk(chunkX, chunkZ, BLOCK_A);
+        this.provider.saveChunkFuture(chunkX, chunkZ, this.provider.getChunk(chunkX, chunkZ)).get(10, TimeUnit.SECONDS);
+
+        long hash = Level.chunkHash(chunkX, chunkZ);
+        LevelDBProvider.PendingWrite stale = new LevelDBProvider.PendingWrite();
+        ConcurrentHashMap<Long, LevelDBProvider.PendingWrite> pendingWrites = this.pendingWrites();
+        pendingWrites.put(hash, stale);
+
+        CountDownLatch release = this.pauseExecutor();
+        AtomicReference<BaseFullChunk> loaded = new AtomicReference<>();
+        Thread reader = new Thread(() -> loaded.set(this.provider.readChunkOffThread(chunkX, chunkZ)), "stale-claim-reader");
+        try {
+            stale.lock.lock();
+            reader.start();
+            try {
+                this.awaitLockQueued(stale.lock, reader);
+                Assertions.assertTrue(pendingWrites.remove(hash, stale));
+
+                LevelDBChunk replacement = this.provider.getEmptyChunk(chunkX, chunkZ);
+                replacement.setGenerated(true);
+                replacement.setBlock(0, 64, 0, BLOCK_B);
+                this.provider.saveChunkFuture(chunkX, chunkZ, replacement);
+            } finally {
+                stale.lock.unlock();
+            }
+
+            reader.join(10_000);
+            Assertions.assertFalse(reader.isAlive(), "reader should finish");
+            Assertions.assertNotNull(loaded.get());
+            Assertions.assertEquals(BLOCK_B, loaded.get().getBlockId(0, 64, 0),
+                    "claim must commit a replacement batch before reading the database");
+        } finally {
+            release.countDown();
+            reader.join(10_000);
+            this.drainExecutor();
+        }
     }
 
     @Test
