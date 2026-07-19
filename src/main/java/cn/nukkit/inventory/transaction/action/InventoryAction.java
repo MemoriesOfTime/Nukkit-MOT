@@ -54,6 +54,13 @@ public abstract class InventoryAction {
     }
 
     /**
+     * Replaces the target item of this action.
+     */
+    public void setTargetItem(Item targetItem) {
+        this.targetItem = targetItem;
+    }
+
+    /**
      * Called by inventory transactions before any actions are processed. If this returns false, the transaction will
      * be cancelled.
      *

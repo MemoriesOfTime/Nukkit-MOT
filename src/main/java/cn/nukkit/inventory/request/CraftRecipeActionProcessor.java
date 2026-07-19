@@ -43,6 +43,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
 
     public static final String RECIPE_NET_ID_KEY = "recipeNetId";
     public static final String ENCH_RECIPE_KEY = "enchRecipe";
+    public static final String TIMES_CRAFTED_KEY = "timesCrafted";
 
     @Override
     public ItemStackRequestActionType getType() {
@@ -89,6 +90,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
 
         if (recipe instanceof MultiRecipe multiRecipe) {
+            int times = Math.max(1, action.getNumberOfRequestedCrafts());
+            context.put(TIMES_CRAFTED_KEY, times);
             CraftResultsDeprecatedAction resultsAction = findCraftResultsAction(
                     context.getItemStackRequest().getActions(),
                     context.getCurrentActionIndex() + 1
@@ -131,6 +134,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         }
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
+        if (recipe instanceof UserDataShapelessRecipe) {
+            applyInputNbt(output, collectCraftingInputList(player));
+        }
         output.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
 
@@ -377,6 +383,18 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             }
         }
         return items;
+    }
+
+    /**
+     * Copies the NBT of the first NBT-carrying input onto the output, so {@link UserDataShapelessRecipe} dyeing keeps container contents.
+     */
+    static void applyInputNbt(Item output, List<Item> inputs) {
+        for (Item inputItem : inputs) {
+            if (inputItem != null && !inputItem.isNull() && inputItem.hasCompoundTag()) {
+                output.setCompoundTag(inputItem.getCompoundTag());
+                return;
+            }
+        }
     }
 
     private static CraftingGrid getActiveCraftingGrid(Player player) {

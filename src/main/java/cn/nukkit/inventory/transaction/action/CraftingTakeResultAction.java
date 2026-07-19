@@ -14,6 +14,10 @@ public class CraftingTakeResultAction extends InventoryAction {
         super(sourceItem, targetItem);
     }
 
+    public void setSourceItem(Item sourceItem) {
+        this.sourceItem = sourceItem;
+    }
+
     @Override
     public void onAddToTransaction(InventoryTransaction transaction) {
         if (transaction instanceof CraftingTransaction) {

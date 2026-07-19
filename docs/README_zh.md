@@ -152,15 +152,23 @@ dependencies {
   </tr>
 </table>
 
+## 贡献者
+
+感谢所有为本项目做出贡献的人！
+
+<a href="https://github.com/MemoriesOfTime/Nukkit-MOT/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=MemoriesOfTime/Nukkit-MOT" />
+</a>
+
 ## Star 历史
 
 如果你喜欢这个项目，请帮我们点个 Star ⭐
 
 <a href="https://www.star-history.com/?repos=MemoriesOfTime%2FNukkit-MOT&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=MemoriesOfTime/Nukkit-MOT&type=date&theme=dark&legend=top-left&sealed_token=rpkJyH7BITcbbVSkLa1y4EhTnURtpmFGTNdSAJUCoXYyj21eOQuti54RMaTfE84DhzWCFg2ZIoJ7cFrvaqRfjhQSvwb5R3kmbth69h6JIOfMgmBr3t0npwoXC8VwBdctTg7Pilu2w6R-GPn-qr3NP3wbSylfcGmGUo13Xqo-NqxUdBFIgVhPXiINQR09" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left&sealed_token=rpkJyH7BITcbbVSkLa1y4EhTnURtpmFGTNdSAJUCoXYyj21eOQuti54RMaTfE84DhzWCFg2ZIoJ7cFrvaqRfjhQSvwb5R3kmbth69h6JIOfMgmBr3t0npwoXC8VwBdctTg7Pilu2w6R-GPn-qr3NP3wbSylfcGmGUo13Xqo-NqxUdBFIgVhPXiINQR09" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left&sealed_token=rpkJyH7BITcbbVSkLa1y4EhTnURtpmFGTNdSAJUCoXYyj21eOQuti54RMaTfE84DhzWCFg2ZIoJ7cFrvaqRfjhQSvwb5R3kmbth69h6JIOfMgmBr3t0npwoXC8VwBdctTg7Pilu2w6R-GPn-qr3NP3wbSylfcGmGUo13Xqo-NqxUdBFIgVhPXiINQR09" />
  </picture>
 </a>
 
