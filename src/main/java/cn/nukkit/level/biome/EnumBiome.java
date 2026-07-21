@@ -19,6 +19,7 @@ import cn.nukkit.level.biome.impl.mushroom.MushroomIslandBiome;
 import cn.nukkit.level.biome.impl.mushroom.MushroomIslandShoreBiome;
 import cn.nukkit.level.biome.impl.nether.*;
 import cn.nukkit.level.biome.impl.ocean.*;
+import cn.nukkit.level.biome.impl.plains.MeadowBiome;
 import cn.nukkit.level.biome.impl.plains.PlainsBiome;
 import cn.nukkit.level.biome.impl.plains.SunflowerPlainsBiome;
 import cn.nukkit.level.biome.impl.river.FrozenRiverBiome;
@@ -119,7 +120,12 @@ public enum EnumBiome {
     SOUL_SAND_VALLEY(178, new SoulSandValleyBiome()),
     CRIMSON_FOREST(179, new CrimsonForestBiome()),
     WARPED_FOREST(180, new WarpedForestBiome()),
-    BASALT_DELTAS(181, new BasaltDeltasBiome());
+    BASALT_DELTAS(181, new BasaltDeltasBiome()),
+    JAGGED_PEAKS(182, new JaggedPeaksBiome()),
+    FROZEN_PEAKS(183, new FrozenPeaksBiome()),
+    SNOWY_SLOPES(184, new SnowySlopesBiome()),
+    GROVE(185, new GroveBiome()),
+    MEADOW(186, new MeadowBiome());
 
     public final int id;
     public final Biome biome;
