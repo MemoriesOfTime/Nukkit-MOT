@@ -7,6 +7,9 @@ public class FrozenPeaksBiome extends ExtremeHillsBiome {
 
     public FrozenPeaksBiome() {
         super(false);
+
+        this.setBaseHeight(1.6F);
+        this.setHeightVariation(0.45F);
     }
 
     @Override

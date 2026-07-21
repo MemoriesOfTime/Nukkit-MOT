@@ -7,6 +7,9 @@ public class GroveBiome extends TaigaHillsBiome {
 
     public GroveBiome() {
         super();
+
+        this.setBaseHeight(1.0F);
+        this.setHeightVariation(0.30F);
     }
 
     @Override

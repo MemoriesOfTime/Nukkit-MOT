@@ -7,6 +7,9 @@ public class SnowySlopesBiome extends ExtremeHillsBiome {
 
     public SnowySlopesBiome() {
         super(false);
+
+        this.setBaseHeight(1.3F);
+        this.setHeightVariation(0.35F);
     }
 
     @Override

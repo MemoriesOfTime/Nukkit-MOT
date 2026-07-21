@@ -7,6 +7,9 @@ public class JaggedPeaksBiome extends ExtremeHillsBiome {
 
     public JaggedPeaksBiome() {
         super(false);
+
+        this.setBaseHeight(1.8F);
+        this.setHeightVariation(0.6F);
     }
 
     @Override
