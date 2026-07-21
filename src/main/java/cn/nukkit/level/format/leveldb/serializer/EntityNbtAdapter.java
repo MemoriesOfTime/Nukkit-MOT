@@ -15,7 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-final class EntityNbtAdapter {
+public final class EntityNbtAdapter {
 
     private static volatile Map<String, Integer> identifierToRuntimeIdCache;
 
@@ -55,7 +55,7 @@ final class EntityNbtAdapter {
         return normalizeForNukkitLoad(nbt) == EntityNbtLoadStatus.LOADABLE;
     }
 
-    static EntityNbtLoadStatus normalizeForNukkitLoad(CompoundTag nbt) {
+    public static EntityNbtLoadStatus normalizeForNukkitLoad(CompoundTag nbt) {
         EntityNbtLoadStatus idStatus = normalizeEntityId(nbt);
         if (idStatus != EntityNbtLoadStatus.LOADABLE) {
             return idStatus;
@@ -430,8 +430,3 @@ final class EntityNbtAdapter {
     }
 }
 
-enum EntityNbtLoadStatus {
-    LOADABLE,
-    PRESERVE_ONLY,
-    INVALID
-}

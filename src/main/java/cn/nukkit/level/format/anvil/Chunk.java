@@ -326,6 +326,9 @@ public class Chunk extends BaseChunk {
                 entities.add(entity.namedTag);
             }
         }
+        // 回写无法识别的保留实体 NBT，避免存档数据在保存周期丢失（issue #800）
+        // Write back preserved unrecognized entity NBT to avoid data loss across save cycles
+        entities.addAll(this.getPreservedEntityNbt());
         ListTag<CompoundTag> entityListTag = new ListTag<>("Entities");
         entityListTag.setAll(entities);
         nbt.putList(entityListTag);
@@ -415,6 +418,9 @@ public class Chunk extends BaseChunk {
                 entities.add(entity.namedTag);
             }
         }
+        // 回写无法识别的保留实体 NBT，避免存档数据在保存周期丢失（issue #800）
+        // Write back preserved unrecognized entity NBT to avoid data loss across save cycles
+        entities.addAll(this.getPreservedEntityNbt());
         ListTag<CompoundTag> entityListTag = new ListTag<>("Entities");
         entityListTag.setAll(entities);
         nbt.putList(entityListTag);
