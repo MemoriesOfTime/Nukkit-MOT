@@ -107,6 +107,7 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
                 this.doubleInventory = null;
                 this.namedTag.remove("pairx");
                 this.namedTag.remove("pairz");
+                this.namedTag.remove("pairlead");
             }
         }
     }
@@ -156,8 +157,11 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
     public void createPair(BlockEntityChest chest) {
         this.namedTag.putInt("pairx", (int) chest.x);
         this.namedTag.putInt("pairz", (int) chest.z);
+        this.namedTag.putBoolean("pairlead", true);
+
         chest.namedTag.putInt("pairx", (int) this.x);
         chest.namedTag.putInt("pairz", (int) this.z);
+        chest.namedTag.putBoolean("pairlead", false);
     }
 
     public boolean unpair() {
@@ -170,12 +174,14 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
         this.doubleInventory = null;
         this.namedTag.remove("pairx");
         this.namedTag.remove("pairz");
+        this.namedTag.remove("pairlead");
 
         this.spawnToAll();
 
         if (chest != null) {
             chest.namedTag.remove("pairx");
             chest.namedTag.remove("pairz");
+            chest.namedTag.remove("pairlead");
             chest.doubleInventory = null;
             chest.checkPairing();
             chest.spawnToAll();
@@ -195,7 +201,8 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
                     .putInt("y", (int) this.y)
                     .putInt("z", (int) this.z)
                     .putInt("pairx", this.namedTag.getInt("pairx"))
-                    .putInt("pairz", this.namedTag.getInt("pairz"));
+                    .putInt("pairz", this.namedTag.getInt("pairz"))
+                    .putBoolean("pairlead", this.namedTag.getBoolean("pairlead", false));
         } else {
             c = new CompoundTag()
                     .putString("id", BlockEntity.CHEST)
