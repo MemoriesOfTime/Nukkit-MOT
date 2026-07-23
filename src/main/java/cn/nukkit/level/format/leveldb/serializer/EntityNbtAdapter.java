@@ -1,6 +1,7 @@
 package cn.nukkit.level.format.leveldb.serializer;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
@@ -23,7 +24,57 @@ public final class EntityNbtAdapter {
     }
 
     static boolean isSavable(Entity entity) {
-        return !(entity instanceof Player) && !entity.closed && entity.canBeSavedWithChunk();
+        return !(entity instanceof Player) && !entity.closed && entity.canBeSavedWithChunk()
+                && hasResolvableId(entity);
+    }
+
+    /**
+     * Public façade over the internal savability check, for storage providers that
+     * do not live in this package (e.g. the Anvil chunk writer).
+     *
+     * @param entity the entity to test
+     * @return {@code true} if the entity should be written to the chunk save
+     */
+    public static boolean shouldSaveEntity(Entity entity) {
+        return isSavable(entity);
+    }
+
+    /**
+     * 仅当 saveId 与 identifier 均不可解析时返回 {@code false}。
+     * 保守策略：两者只要有一个有效即保留（可重载或可复活）。
+     * <p>
+     * Returns {@code false} only when both the save id and identifier are unresolvable.
+     * Conservative: as long as one of them resolves, the entity is kept.
+     */
+    private static boolean hasResolvableId(Entity entity) {
+        String saveId = entity.getSaveId();
+        if (saveId != null && !saveId.isEmpty()) {
+            return true;
+        }
+        Identifier identifier = safeGetIdentifier(entity);
+        if (identifier != null) {
+            return true;
+        }
+        Server.getInstance().getLogger().debug(
+                "Skipping save of entity with no saveId and no identifier: "
+                        + entity.getClass().getName() + " (runtime id " + entity.getNetworkId() + ')');
+        return false;
+    }
+
+    /**
+     * CustomEntity 的 {@code getIdentifier()} 在 entityDefinition 为 null 时会 NPE，
+     * 而这种情况下 saveId 已是空字符串。此处做 null 防护。
+     * <p>
+     * CustomEntity.getIdentifier() NPEs when entityDefinition is null, which is exactly
+     * when saveId is already empty. Guard against it here.
+     */
+    private static Identifier safeGetIdentifier(Entity entity) {
+        try {
+            return entity.getIdentifier();
+        } catch (RuntimeException e) {
+            // CustomEntity definition 为 null 等：saveId 与 identifier 均不可用
+            return null;
+        }
     }
 
     static void prepareForSave(Entity entity, CompoundTag nbt) {
@@ -78,21 +129,40 @@ public final class EntityNbtAdapter {
     }
 
     private static EntityNbtLoadStatus normalizeEntityId(CompoundTag nbt) {
-        if (nbt.contains("id")) {
-            return Entity.canCreateEntity(nbt.getString("id"))
-                    ? EntityNbtLoadStatus.LOADABLE
-                    : EntityNbtLoadStatus.PRESERVE_ONLY;
-        }
-        if (!nbt.containsString("identifier")) {
-            return EntityNbtLoadStatus.INVALID;
-        }
+        // 预解析 identifier 字段，供两条分支复用
+        boolean hasIdentifier = nbt.containsString("identifier");
+        String resolvedFromIdentifier = hasIdentifier ? toNukkitEntityId(nbt.getString("identifier")) : null;
+        boolean identifierResolvable = resolvedFromIdentifier != null
+                && Entity.canCreateEntity(resolvedFromIdentifier);
 
-        String entityId = toNukkitEntityId(nbt.getString("identifier"));
-        if (entityId == null) {
+        if (nbt.contains("id")) {
+            String id = nbt.getString("id");
+            if (Entity.canCreateEntity(id)) {
+                return EntityNbtLoadStatus.LOADABLE;
+            }
+            // id 无效 → 尝试用 identifier 救回
+            if (identifierResolvable) {
+                nbt.putString("id", resolvedFromIdentifier);
+                return EntityNbtLoadStatus.LOADABLE;
+            }
+            // id 与 identifier 均不可用：id 为空字符串（对应运行期 saveId 空）且无 identifier → 纯垃圾，丢弃
+            if (id.isEmpty() && !hasIdentifier) {
+                return EntityNbtLoadStatus.DROPPABLE;
+            }
+            // 其余情况保留（id 非空但当前无法识别的残留 / 有 identifier 字段但无法解析，插件可能复活）
             return EntityNbtLoadStatus.PRESERVE_ONLY;
         }
-        nbt.putString("id", entityId);
-        return EntityNbtLoadStatus.LOADABLE;
+        // 无 id 字段
+        if (identifierResolvable) {
+            nbt.putString("id", resolvedFromIdentifier);
+            return EntityNbtLoadStatus.LOADABLE;
+        }
+        if (!hasIdentifier) {
+            // 无 id 无 identifier → 完全不可识别，丢弃
+            return EntityNbtLoadStatus.DROPPABLE;
+        }
+        // 有 identifier 但无法解析 → 保留
+        return EntityNbtLoadStatus.PRESERVE_ONLY;
     }
 
     private static String toNukkitEntityId(String identifier) {
