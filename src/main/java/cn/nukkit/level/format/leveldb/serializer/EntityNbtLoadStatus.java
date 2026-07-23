@@ -23,6 +23,14 @@ public enum EntityNbtLoadStatus {
      */
     PRESERVE_ONLY,
     /**
+     * The NBT has neither a resolvable save id nor an identifier, so it cannot become
+     * a live entity or be revived by reinstalling a plugin. Dropping it is safe.
+     * <p>
+     * NBT 既无可解析的 saveId 也无 identifier，既无法转为活动实体，也无法靠重装插件复活，
+     * 丢弃是安全的。
+     */
+    DROPPABLE,
+    /**
      * The NBT is structurally invalid (missing/illegal Pos, id, etc.) and must be dropped.
      * NBT 结构非法（缺 Pos、id 等），必须丢弃。
      */

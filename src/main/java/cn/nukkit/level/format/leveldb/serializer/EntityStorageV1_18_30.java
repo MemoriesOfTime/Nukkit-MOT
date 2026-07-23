@@ -131,9 +131,11 @@ final class EntityStorageV1_18_30 implements EntityStorage {
                 EntityNbtLoadStatus status = EntityNbtAdapter.normalizeForNukkitLoad(nbt);
                 if (status == EntityNbtLoadStatus.LOADABLE) {
                     result.getLoadableEntities().add(nbt);
-                } else {
+                } else if (status != EntityNbtLoadStatus.DROPPABLE) {
+                    // PRESERVE_ONLY 保留；DROPPABLE 直接跳过（既不入 loadable 也不入 preserved）
                     result.getPreservedActors().add(new LevelDBChunk.PreservedEntityActor(storageKey, value));
                 }
+                // DROPPABLE：不加入任何列表 → 该 actor key 不再被 digp 索引 → 下次保存 deleteStaleActors 自动清除
             } catch (IOException | RuntimeException e) {
                 result.getPreservedActors().add(new LevelDBChunk.PreservedEntityActor(storageKey, value));
             }
