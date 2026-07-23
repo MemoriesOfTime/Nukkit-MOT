@@ -19,10 +19,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
-import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.nbt.tag.DoubleTag;
-import cn.nukkit.nbt.tag.IntTag;
-import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -125,8 +122,12 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
         }
 
         if (namedTag.contains("CollisionPos")) {
-            ListTag<DoubleTag> collisionPosList = this.namedTag.getList("CollisionPos", DoubleTag.class);
-            collisionPos = new Vector3(collisionPosList.get(0).data, collisionPosList.get(1).data, collisionPosList.get(2).data);
+            ListTag<?> collisionPosList = this.namedTag.getList("CollisionPos");
+            collisionPos = new Vector3(
+                    ((NumberTag<?>) collisionPosList.get(0)).getData().doubleValue(),
+                    ((NumberTag<?>) collisionPosList.get(1)).getData().doubleValue(),
+                    ((NumberTag<?>) collisionPosList.get(2)).getData().doubleValue()
+            );
         } else {
             collisionPos = defaultCollisionPos.clone();
         }
