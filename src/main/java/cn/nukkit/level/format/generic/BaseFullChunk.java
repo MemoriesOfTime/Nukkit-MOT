@@ -13,6 +13,8 @@ import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.format.leveldb.serializer.EntityNbtAdapter;
+import cn.nukkit.level.format.leveldb.serializer.EntityNbtLoadStatus;
 import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
@@ -68,6 +70,15 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     protected Long2ObjectNonBlockingMap<CompoundTag> unknownTiles;
 
     protected List<CompoundTag> NBTentities;
+
+    /**
+     * Raw entity NBT that could not be converted into a live Nukkit entity at load time
+     * (unregistered/unknown id, e.g. residual custom entities from a removed plugin).
+     * <p>
+     * 仅在 {@link #initChunk()} 阶段由 {@code PRESERVE_ONLY} 状态填充；Anvil 等不支持
+     * 独立 actor 存储的格式在 {@code toNBT()} 时将其原样回写，避免存档数据在保存周期丢失（issue #800）。
+     */
+    protected List<CompoundTag> preservedEntityNbt = Collections.emptyList();
 
     /**
      * 解码阶段(可能在异步线程)解析出的待调度方块更新;坐标/Level 字段在 {@link #initChunk()}(主线程)才设置并调用 scheduleUpdate,避免异步线程触碰 Level 游戏状态
@@ -189,8 +200,20 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             boolean changed = this.hasChanged();
             if (this.NBTentities != null) {
                 for (CompoundTag nbt : NBTentities) {
-                    if (!nbt.contains("id")) {
-                        this.setChanged();
+                    // 复用 LevelDB 路径的归一化逻辑：无法识别/无效的实体 NBT 不创建实体
+                    // Reuse the LevelDB normalization: unrecognized/invalid entity NBT does not create a live entity
+                    EntityNbtLoadStatus status = EntityNbtAdapter.normalizeForNukkitLoad(nbt);
+                    if (status != EntityNbtLoadStatus.LOADABLE) {
+                        // PRESERVE_ONLY：保留原始 NBT，让保存周期回写，避免静默丢失存档数据（issue #800）
+                        // PRESERVE_ONLY: retain raw NBT so the save cycle can write it back instead of silently dropping saved data
+                        // DROPPABLE / INVALID：不保留，下次保存自然清除（无 saveId 且无 identifier 的纯垃圾）
+                        if (status == EntityNbtLoadStatus.PRESERVE_ONLY) {
+                            if (this.preservedEntityNbt.isEmpty()) {
+                                this.preservedEntityNbt = new ArrayList<>();
+                            }
+                            this.preservedEntityNbt.add(nbt);
+                        }
+                        changed = true;
                         continue;
                     }
                     ListTag<? extends Tag> pos = nbt.getList("Pos");
@@ -727,6 +750,17 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
      */
     public Collection<CompoundTag> getUnknownTiles() {
         return this.unknownTiles == null ? Collections.emptyList() : this.unknownTiles.values();
+    }
+
+    /**
+     * Returns entity NBT records that could not be turned into live Nukkit entities at load time
+     * (e.g. residual custom entities from a removed plugin). Survives a load/save round-trip on
+     * formats without dedicated actor storage (Anvil) instead of being silently deleted.
+     * <p>
+     * 仅由区块序列化器消费；不会发送给客户端（issue #800）。
+     */
+    public List<CompoundTag> getPreservedEntityNbt() {
+        return this.preservedEntityNbt == null ? Collections.emptyList() : this.preservedEntityNbt;
     }
 
     /**

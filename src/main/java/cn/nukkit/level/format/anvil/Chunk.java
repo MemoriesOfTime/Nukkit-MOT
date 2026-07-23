@@ -1,6 +1,5 @@
 package cn.nukkit.level.format.anvil;
 
-import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
@@ -10,6 +9,7 @@ import cn.nukkit.level.format.anvil.palette.BiomePalette;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
+import cn.nukkit.level.format.leveldb.serializer.EntityNbtAdapter;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.utils.BinaryStream;
@@ -321,11 +321,14 @@ public class Chunk extends BaseChunk {
 
         ArrayList<CompoundTag> entities = new ArrayList<>();
         for (Entity entity : this.getEntities().values()) {
-            if (!(entity instanceof Player) && !entity.closed && entity.canBeSavedWithChunk()) {
+            if (EntityNbtAdapter.shouldSaveEntity(entity)) {
                 entity.saveNBT();
                 entities.add(entity.namedTag);
             }
         }
+        // 回写无法识别的保留实体 NBT，避免存档数据在保存周期丢失（issue #800）
+        // Write back preserved unrecognized entity NBT to avoid data loss across save cycles
+        entities.addAll(this.getPreservedEntityNbt());
         ListTag<CompoundTag> entityListTag = new ListTag<>("Entities");
         entityListTag.setAll(entities);
         nbt.putList(entityListTag);
@@ -392,11 +395,14 @@ public class Chunk extends BaseChunk {
 
         ArrayList<CompoundTag> entities = new ArrayList<>();
         for (Entity entity : this.getEntities().values()) {
-            if (!(entity instanceof Player) && !entity.closed && entity.canBeSavedWithChunk()) {
+            if (EntityNbtAdapter.shouldSaveEntity(entity)) {
                 entity.saveNBT();
                 entities.add(entity.namedTag);
             }
         }
+        // 回写无法识别的保留实体 NBT，避免存档数据在保存周期丢失（issue #800）
+        // Write back preserved unrecognized entity NBT to avoid data loss across save cycles
+        entities.addAll(this.getPreservedEntityNbt());
         ListTag<CompoundTag> entityListTag = new ListTag<>("Entities");
         entityListTag.setAll(entities);
         nbt.putList(entityListTag);

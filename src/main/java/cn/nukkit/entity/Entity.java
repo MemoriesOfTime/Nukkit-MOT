@@ -1588,6 +1588,13 @@ public abstract class Entity extends Location implements Metadatable {
         }
 
         if (!this.hasSpawned.containsKey(player.getLoaderId()) && player.usedChunks.containsKey(Level.chunkHash(this.chunk.getX(), this.chunk.getZ()))) {
+            // 防御：无法解析标识符的实体不发送给客户端，避免编码异常阻塞整个发包批次（issue #800）
+            // Guard: skip entities whose identifier cannot be resolved to avoid encode exceptions blocking chunk loading
+            if (this.getIdentifier() == null) {
+                this.server.getLogger().warning("Skipping spawn of entity with unresolvable network id "
+                        + this.getNetworkId() + " (" + this.getClass().getName() + ") to " + player.getName());
+                return;
+            }
             player.dataPacket(createAddEntityPacket());
             this.hasSpawned.put(player.getLoaderId(), player);
 
