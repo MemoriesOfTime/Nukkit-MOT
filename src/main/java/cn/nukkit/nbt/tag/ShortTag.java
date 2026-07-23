@@ -5,7 +5,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 
 import java.io.IOException;
 
-public class ShortTag extends NumberTag<Integer> {
+public final class ShortTag extends NumberTag<Integer> {
 
     public int data;
 

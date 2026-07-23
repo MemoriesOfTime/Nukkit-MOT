@@ -486,12 +486,16 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public BaseFullChunk getLoadedChunk(long hash) {
-        return this.chunks.get(hash);
+        synchronized (this.chunks) {
+            return this.chunks.get(hash);
+        }
     }
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        return ImmutableMap.copyOf(chunks);
+        synchronized (this.chunks) {
+            return ImmutableMap.copyOf(chunks);
+        }
     }
 
     public Long2ObjectMap<? extends FullChunk> getLoadedChunksUnsafe() {
@@ -585,6 +589,7 @@ public class LevelDBProvider implements LevelProvider {
         if (chunk == null) {
             return false;
         }
+
         if (chunk instanceof LevelDBChunk levelDBChunk) {
             // Wait for any pending async save to complete before closing entities
             levelDBChunk.writeLock().lock();
@@ -599,6 +604,7 @@ public class LevelDBProvider implements LevelProvider {
             return false;
         }
         this.chunks.remove(index, chunk);
+
         return true;
     }
 
@@ -810,14 +816,16 @@ public class LevelDBProvider implements LevelProvider {
     @Override
     public void setChunk(int chunkX, int chunkZ, FullChunk chunk) {
         if (!(chunk instanceof LevelDBChunk)) throw new IllegalArgumentException("Only LevelDB chunks are supported");
-        chunk.setProvider(this);
-        chunk.setPosition(chunkX, chunkZ);
+
         long index = Level.chunkHash(chunkX, chunkZ);
 
-        FullChunk oldChunk = this.chunks.get(index);
-        if (oldChunk != null && !oldChunk.equals(chunk)) {
-            this.unloadChunk(chunkX, chunkZ, false);
+        BaseFullChunk oldChunk = this.chunks.remove(index);
+        if (oldChunk != null && oldChunk != chunk) {
+            oldChunk.setProvider(null);
         }
+
+        chunk.setProvider(this);
+        chunk.setPosition(chunkX, chunkZ);
         this.chunks.put(index, (LevelDBChunk) chunk);
     }
 
@@ -847,6 +855,13 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private synchronized LevelDBChunk readOrCreateChunk(int chunkX, int chunkZ, boolean create) {
+        long hash = Level.chunkHash(chunkX, chunkZ);
+
+        LevelDBChunk existing = (LevelDBChunk) this.chunks.get(hash);
+        if (existing != null) {
+            return existing;
+        }
+
         LevelDBChunk chunk = null;
         try {
             chunk = this.readChunk(chunkX, chunkZ);
@@ -860,7 +875,7 @@ public class LevelDBProvider implements LevelProvider {
             return null;
         }
 
-        this.chunks.put(Level.chunkHash(chunkX, chunkZ), chunk);
+        this.chunks.put(hash, chunk);
         return chunk;
     }
 
@@ -1160,18 +1175,18 @@ public class LevelDBProvider implements LevelProvider {
     protected NbtMap saveBlockTickingQueue(Collection<BlockUpdateEntry> entries, long currentTick) {
         ArrayList<NbtMap> list = new ArrayList<>();
         for (BlockUpdateEntry entry : entries) {
-            Block block = entry.block;
+            Block block = entry.block();
 
             NbtMap blockTag = BlockStateMapping.get().getBlockStateFromFullId(block.getFullId()).getVanillaState();
-            Vector3 pos = entry.pos;
-            int priority = entry.priority;
+            Vector3 pos = entry.pos();
+            int priority = entry.priority();
 
             NbtMapBuilder tag = NbtMap.builder()
                     .putInt("x", pos.getFloorX())
                     .putInt("y", pos.getFloorY())
                     .putInt("z", pos.getFloorZ())
                     .putCompound("blockState", blockTag)
-                    .putLong("time", entry.delay - currentTick);
+                    .putLong("time", entry.delay() - currentTick);
 
             if (priority != 0) {
                 tag.putInt("p", priority); // Nukkit only
