@@ -198,7 +198,6 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                     if (status != EntityNbtLoadStatus.LOADABLE) {
                         // PRESERVE_ONLY：保留原始 NBT，让保存周期回写，避免静默丢失存档数据（issue #800）
                         // PRESERVE_ONLY: retain raw NBT so the save cycle can write it back instead of silently dropping saved data
-                        // DROPPABLE / INVALID：不保留，下次保存自然清除（无 saveId 且无 identifier 的纯垃圾）
                         if (status == EntityNbtLoadStatus.PRESERVE_ONLY) {
                             if (this.preservedEntityNbt.isEmpty()) {
                                 this.preservedEntityNbt = new ArrayList<>();
