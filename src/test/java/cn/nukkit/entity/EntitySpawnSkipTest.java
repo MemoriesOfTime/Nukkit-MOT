@@ -3,6 +3,7 @@ package cn.nukkit.entity;
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
 import cn.nukkit.entity.mob.EntityZombie;
+import cn.nukkit.network.protocol.AddEntityPacket;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -10,11 +11,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * 验证 {@link Entity#getIdentifier(int)} 对未知 network id 返回 {@code null}，这是
- * {@link Entity#spawnTo(cn.nukkit.Player)} 的跳过守卫的前置条件（issue #800）。
+ * 验证 {@link Entity#getIdentifier(int)} 对未知 network id 返回 {@code null}。
+ * 该行为本身是 {@link AddEntityPacket#getIdentifier()} 降级为 minecraft:item 的触发条件（issue #800），
+ * 但不再是 {@link Entity#spawnTo(cn.nukkit.Player)} 的前置守卫（该守卫会误伤重写了
+ * {@code createAddEntityPacket()} 的子类，已被移除）。
  * <p>
- * Verifies {@link Entity#getIdentifier(int)} returns {@code null} for unknown network ids,
- * which is the precondition for the skip guard in {@link Entity#spawnTo(cn.nukkit.Player)}.
+ * Verifies {@link Entity#getIdentifier(int)} returns {@code null} for unknown network ids.
+ * This now only documents the lookup contract and is the trigger for the minecraft:item fallback
+ * in {@link AddEntityPacket#getIdentifier()} (issue #800). It is no longer the gate condition for
+ * {@link Entity#spawnTo(cn.nukkit.Player)} — that guard was removed because it skipped subclasses
+ * overriding {@code createAddEntityPacket()} (e.g. EntityItem, EntityPainting).
  */
 public class EntitySpawnSkipTest {
 
@@ -27,9 +33,9 @@ public class EntitySpawnSkipTest {
 
     /**
      * The reported regression: the unknown id 10086 (and its siblings 10089, 10090 from
-     * issue #800) must resolve to a null identifier, which is the gate condition for
-     * {@link Entity#spawnTo(cn.nukkit.Player)} to skip the entity instead of producing
-     * an {@code AddEntityPacket} that throws during encode.
+     * issue #800) must resolve to a null identifier, which triggers the safe
+     * minecraft:item fallback in {@link AddEntityPacket#getIdentifier()} instead of
+     * throwing during encode.
      */
     @Test
     void unknownNetworkIdHasNullIdentifier() {
