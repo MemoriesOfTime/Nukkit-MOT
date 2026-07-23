@@ -8,6 +8,7 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.generator.Flat;
 import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBException;
 import org.iq80.leveldb.WriteBatch;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -23,11 +24,15 @@ import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * 区块挂起写槽位协议测试:卸载异步落盘、读取认领、批次替换全序、失败重试、close 排空与背压
@@ -165,6 +170,43 @@ public class LevelDBPendingWriteTest {
             release.countDown();
         }
         this.drainExecutor();
+    }
+
+    @Test
+    public void reloadAfterTransientWriteFailureStillReadsNewestChunk() throws Exception {
+        int chunkX = 10;
+        int chunkZ = 15;
+        LevelDBChunk chunk = this.newDirtyChunk(chunkX, chunkZ, BLOCK_A);
+        this.provider.saveChunkFuture(chunkX, chunkZ, chunk).get(10, TimeUnit.SECONDS);
+
+        chunk.setBlock(0, 64, 0, BLOCK_B);
+        CountDownLatch release = this.pauseExecutor();
+        Field dbField = LevelDBProvider.class.getDeclaredField("db");
+        dbField.setAccessible(true);
+        DB realDb = (DB) dbField.get(this.provider);
+        AtomicInteger failuresLeft = new AtomicInteger(1);
+        DB flakyDb = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        Mockito.doAnswer(invocation -> {
+            if (failuresLeft.getAndDecrement() > 0) {
+                throw new RuntimeException("injected first-write failure");
+            }
+            realDb.write(invocation.getArgument(0, WriteBatch.class));
+            return null;
+        }).when(flakyDb).write(Mockito.any(WriteBatch.class));
+
+        try {
+            Assertions.assertTrue(this.provider.unloadChunk(chunkX, chunkZ, false));
+            dbField.set(this.provider, flakyDb);
+
+            BaseFullChunk reloaded = this.provider.getChunk(chunkX, chunkZ);
+            Assertions.assertNotNull(reloaded);
+            Assertions.assertEquals(BLOCK_B, reloaded.getBlockId(0, 64, 0),
+                    "reload must not read the old database snapshot while a retry is pending");
+        } finally {
+            release.countDown();
+            this.drainExecutor();
+            dbField.set(this.provider, realDb);
+        }
     }
 
     @Test
@@ -332,6 +374,70 @@ public class LevelDBPendingWriteTest {
     }
 
     @Test
+    public void saveChunkFutureWaitsForRetryToLand() throws Exception {
+        Field dbField = LevelDBProvider.class.getDeclaredField("db");
+        dbField.setAccessible(true);
+        DB realDb = (DB) dbField.get(this.provider);
+        AtomicInteger writes = new AtomicInteger();
+        CountDownLatch retryStarted = new CountDownLatch(1);
+        CountDownLatch releaseRetry = new CountDownLatch(1);
+        DB flakyDb = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        Mockito.doAnswer(invocation -> {
+            int write = writes.incrementAndGet();
+            if (write == 1) {
+                throw new RuntimeException("injected first-write failure");
+            }
+            retryStarted.countDown();
+            if (!releaseRetry.await(10, TimeUnit.SECONDS)) {
+                throw new AssertionError("retry write was not released");
+            }
+            realDb.write(invocation.getArgument(0, WriteBatch.class));
+            return null;
+        }).when(flakyDb).write(Mockito.any(WriteBatch.class));
+        dbField.set(this.provider, flakyDb);
+
+        try {
+            LevelDBChunk chunk = this.newDirtyChunk(15, 10, BLOCK_B);
+            CompletableFuture<Void> save = this.provider.saveChunkFuture(15, 10, chunk);
+
+            Assertions.assertTrue(retryStarted.await(5, TimeUnit.SECONDS), "retry write should start");
+            Assertions.assertFalse(save.isDone(), "save future must remain incomplete while its retry is still blocked");
+
+            releaseRetry.countDown();
+            save.get(10, TimeUnit.SECONDS);
+            Assertions.assertEquals(BLOCK_B, this.readBlockFromDisk(15, 10));
+        } finally {
+            releaseRetry.countDown();
+            dbField.set(this.provider, realDb);
+        }
+    }
+
+    @Test
+    public void saveChunkFutureFailsWithoutDiscardingBatchWhenRetriesAreExhausted() throws Exception {
+        Field dbField = LevelDBProvider.class.getDeclaredField("db");
+        dbField.setAccessible(true);
+        DB realDb = (DB) dbField.get(this.provider);
+        DB failingDb = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        Mockito.doThrow(new RuntimeException("injected persistent write failure"))
+                .when(failingDb).write(Mockito.any(WriteBatch.class));
+        dbField.set(this.provider, failingDb);
+
+        LevelDBChunk chunk = this.newDirtyChunk(16, 11, BLOCK_A);
+        try {
+            CompletableFuture<Void> save = this.provider.saveChunkFuture(16, 11, chunk);
+            ExecutionException failure = Assertions.assertThrows(ExecutionException.class,
+                    () -> save.get(10, TimeUnit.SECONDS));
+
+            Assertions.assertInstanceOf(DBException.class, failure.getCause());
+            Assertions.assertEquals(1, this.provider.getPendingWriteCount(),
+                    "the failed batch is still the only copy of this chunk and must remain pending");
+            Assertions.assertTrue(chunk.hasChanged(), "a failed save must not clear the chunk change marker");
+        } finally {
+            dbField.set(this.provider, realDb);
+        }
+    }
+
+    @Test
     public void saveChunkFutureCompletionMeansDurable() throws Exception {
         LevelDBChunk chunk = this.newDirtyChunk(7, 5, BLOCK_B);
 
@@ -437,6 +543,99 @@ public class LevelDBPendingWriteTest {
 
         this.provider = new LevelDBProvider(this.level, this.tempDir.toString());
         Assertions.assertNull(this.provider.readChunk(13, 6), "abandoned batch must never have landed");
+    }
+
+    @Test
+    public void closeReturnsWhenBackendReadDoesNotFinish() throws Exception {
+        Field dbField = LevelDBProvider.class.getDeclaredField("db");
+        dbField.setAccessible(true);
+        DB realDb = (DB) dbField.get(this.provider);
+        ReadWriteLock backendLock = new ReentrantReadWriteLock();
+        CountDownLatch readStarted = new CountDownLatch(1);
+        CountDownLatch releaseRead = new CountDownLatch(1);
+        CountDownLatch backendClosed = new CountDownLatch(1);
+        AtomicBoolean blockFirstRead = new AtomicBoolean(true);
+        DB nativeStyleDb = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        Mockito.doAnswer(invocation -> {
+            backendLock.readLock().lock();
+            try {
+                if (blockFirstRead.compareAndSet(true, false)) {
+                    readStarted.countDown();
+                    if (!releaseRead.await(30, TimeUnit.SECONDS)) {
+                        throw new AssertionError("backend read was not released");
+                    }
+                }
+                return realDb.get(invocation.getArgument(0, byte[].class));
+            } finally {
+                backendLock.readLock().unlock();
+            }
+        }).when(nativeStyleDb).get(Mockito.any(byte[].class));
+        Mockito.doAnswer(invocation -> {
+            backendLock.writeLock().lock();
+            try {
+                realDb.close();
+                backendClosed.countDown();
+                return null;
+            } finally {
+                backendLock.writeLock().unlock();
+            }
+        }).when(nativeStyleDb).close();
+        dbField.set(this.provider, nativeStyleDb);
+
+        Thread reader = new Thread(() -> this.provider.readChunkOffThread(19, 23), "blocked-leveldb-reader");
+        Thread closer = new Thread(this.provider::close, "bounded-leveldb-close");
+        reader.start();
+        Assertions.assertTrue(readStarted.await(5, TimeUnit.SECONDS), "backend read should start");
+
+        this.provider.databaseCloseTimeoutMillis = 100;
+        closer.start();
+        try {
+            closer.join(3_000);
+            Assertions.assertFalse(closer.isAlive(), "close must return after its bounded read-drain timeout");
+        } finally {
+            releaseRead.countDown();
+            reader.join(5_000);
+            closer.join(5_000);
+        }
+
+        Assertions.assertTrue(backendClosed.await(5, TimeUnit.SECONDS),
+                "deferred cleanup should close the backend after the read finishes");
+    }
+
+    @Test
+    public void closeReturnsWhenBackendCloseDoesNotFinish() throws Exception {
+        Field dbField = LevelDBProvider.class.getDeclaredField("db");
+        dbField.setAccessible(true);
+        DB realDb = (DB) dbField.get(this.provider);
+        CountDownLatch closeStarted = new CountDownLatch(1);
+        CountDownLatch releaseClose = new CountDownLatch(1);
+        CountDownLatch backendClosed = new CountDownLatch(1);
+        DB slowCloseDb = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        Mockito.doAnswer(invocation -> {
+            closeStarted.countDown();
+            if (!releaseClose.await(30, TimeUnit.SECONDS)) {
+                throw new AssertionError("backend close was not released");
+            }
+            realDb.close();
+            backendClosed.countDown();
+            return null;
+        }).when(slowCloseDb).close();
+        dbField.set(this.provider, slowCloseDb);
+
+        this.provider.databaseCloseTimeoutMillis = 100;
+        Thread closer = new Thread(this.provider::close, "slow-backend-leveldb-close");
+        closer.start();
+        Assertions.assertTrue(closeStarted.await(5, TimeUnit.SECONDS), "backend close should start");
+        try {
+            closer.join(3_000);
+            Assertions.assertFalse(closer.isAlive(), "provider close must not inherit an unbounded backend close");
+        } finally {
+            releaseClose.countDown();
+            closer.join(5_000);
+        }
+
+        Assertions.assertTrue(backendClosed.await(5, TimeUnit.SECONDS),
+                "deferred backend close should finish after the blocking operation is released");
     }
 
     @SuppressWarnings("unchecked")
