@@ -38,15 +38,16 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
             try {
                 ZippedBehaviourPack resourcePack = null;
                 String fileExt = Files.getFileExtension(pack.getName());
+                ResourcePack.SupportType packType = detectSupportType(pack.getName());
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null)
-                        resourcePack = new ZippedBehaviourPack(file, this.supportType);
+                        resourcePack = new ZippedBehaviourPack(file, packType);
                 } else if (!fileExt.equals("key")) {
                     switch (fileExt) {
                         case "zip":
                         case "mcpack":
-                            resourcePack = new ZippedBehaviourPack(pack, this.supportType);
+                            resourcePack = new ZippedBehaviourPack(pack, packType);
                             break;
                         default:
                             log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));

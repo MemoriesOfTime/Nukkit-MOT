@@ -1,16 +1,22 @@
 package cn.nukkit.resourcepacks;
 
 import cn.nukkit.GameVersion;
+import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
+import cn.nukkit.utils.Config;
+import cn.nukkit.utils.ConfigSection;
+import cn.nukkit.utils.Utils;
 import com.google.common.collect.Sets;
 import com.google.gson.JsonArray;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.util.*;
 
@@ -25,13 +31,19 @@ public class ResourcePackManager {
     private final Map<UUID, ResourcePack> behaviorPacksById = new Object2ObjectLinkedOpenHashMap<>();
     private final Set<ResourcePack> behaviorPacks = new LinkedHashSet<>();
     private final Set<ResourcePackLoader> loaders;
+    private File packConfigFile;
 
     public ResourcePackManager(ResourcePackLoader... loaders) {
         this(Sets.newHashSet(loaders));
     }
 
     public ResourcePackManager(Set<ResourcePackLoader> loaders) {
+        this(loaders, new File(Nukkit.DATA_PATH, "resource_packs" + File.separator + "packs.yml"));
+    }
+
+    public ResourcePackManager(Set<ResourcePackLoader> loaders, File packConfigFile) {
         this.loaders = loaders;
+        this.packConfigFile = packConfigFile;
         reloadPacks();
     }
 
@@ -87,7 +99,75 @@ public class ResourcePackManager {
 
         });
 
+        this.applyPackConfig();
+
         log.info(Server.getInstance().getLanguage().translateString("nukkit.resources.success", String.valueOf(this.resourcePacks.size())));
+    }
+
+    /**
+     * 读取并应用 packs.yml 配置（如 CDN URL）
+     * <p>
+     * Load and apply packs.yml configuration (e.g. CDN URLs)
+     */
+    private void applyPackConfig() {
+        if (this.packConfigFile == null) {
+            return;
+        }
+        if (!this.packConfigFile.exists()) {
+            File parent = this.packConfigFile.getParentFile();
+            if (parent != null) {
+                parent.mkdirs();
+            }
+            try (InputStream in = Server.class.getClassLoader().getResourceAsStream("packs.yml")) {
+                if (in != null) {
+                    Utils.writeFile(this.packConfigFile, in);
+                }
+            } catch (IOException e) {
+                log.warn("Failed to create default packs.yml", e);
+                return;
+            }
+        }
+        Config config;
+        try {
+            config = new Config(this.packConfigFile, Config.YAML);
+        } catch (RuntimeException e) {
+            log.warn("Failed to load packs.yml; pack-specific configuration was ignored", e);
+            return;
+        }
+        if (!hasValidPackConfigStructure(config)) {
+            log.warn("Invalid packs.yml structure: every top-level entry must be a pack section");
+            return;
+        }
+        for (String packId : config.getSections("").keySet()) {
+            ResourcePack pack;
+            try {
+                pack = this.getPackById(UUID.fromString(packId));
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid UUID in packs.yml: {}", packId);
+                continue;
+            }
+            if (pack == null) {
+                log.warn("Pack in packs.yml not found on disk: {}", packId);
+                continue;
+            }
+            String cdn = config.getString(packId + ".cdn");
+            if (!cdn.isEmpty()) {
+                pack.setCDNUrl(cdn);
+            }
+            String key = config.getString(packId + ".key");
+            if (!key.isEmpty()) {
+                pack.setEncryptionKey(key);
+            }
+        }
+    }
+
+    private static boolean hasValidPackConfigStructure(Config config) {
+        for (Object value : config.getRootSection().values()) {
+            if (!(value instanceof ConfigSection)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     protected static class ProtocolConverter {
