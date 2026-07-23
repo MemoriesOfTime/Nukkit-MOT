@@ -849,6 +849,8 @@ public class Server {
         this.network.setSubName(this.getSubMotd());
         this.network.registerInterface(new RakNetInterface(this));
 
+        EntityProperty.init();
+
         this.pluginManager.loadInternalPlugin();
         if (loadPlugins) {
             this.pluginManager.loadPlugins(this.pluginPath);
@@ -948,7 +950,6 @@ public class Server {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
 
-        EntityProperty.init();
         EntityProperty.buildPacket();
         EntityProperty.buildPlayerProperty();
 
