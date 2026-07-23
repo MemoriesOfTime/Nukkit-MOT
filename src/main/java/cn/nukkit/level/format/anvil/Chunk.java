@@ -8,6 +8,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.anvil.palette.BiomePalette;
 import cn.nukkit.level.format.generic.BaseChunk;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
@@ -23,10 +24,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author MagicDroidX
@@ -142,6 +140,9 @@ public class Chunk extends BaseChunk {
         ListTag<CompoundTag> updateEntries = nbt.getList("TileTicks", CompoundTag.class);
 
         if (updateEntries != null && updateEntries.size() > 0 && updateEntries.size() < 10000) {
+            // 解析 TileTicks 收集为延迟条目,避免在(可能异步的)解码阶段直接 scheduleUpdate 触碰 Level;实际调度由主线程 initChunk 回放
+            // Parse TileTicks into deferred entries; scheduling happens on the main thread in initChunk to avoid touching Level during (potentially off-thread) decode
+            List<BaseFullChunk.PendingBlockUpdate> ticking = null;
             for (CompoundTag entryNBT : updateEntries.getAll()) {
                 Block block = null;
 
@@ -165,13 +166,12 @@ public class Chunk extends BaseChunk {
                     continue;
                 }
 
-                block.x = entryNBT.getInt("x");
-                block.y = entryNBT.getInt("y");
-                block.z = entryNBT.getInt("z");
-                block.layer = 0;
-
-                this.provider.getLevel().scheduleUpdate(block, block, entryNBT.getInt("t"), entryNBT.getInt("p"), false);
+                if (ticking == null) {
+                    ticking = new ArrayList<>();
+                }
+                ticking.add(new BaseFullChunk.PendingBlockUpdate(block, entryNBT.getInt("x"), entryNBT.getInt("y"), entryNBT.getInt("z"), 0, entryNBT.getInt("t"), entryNBT.getInt("p")));
             }
+            this.pendingBlockUpdates = ticking;
         }
 
         this.inhabitedTime = nbt.getLong("InhabitedTime");
@@ -345,25 +345,7 @@ public class Chunk extends BaseChunk {
         tileListTag.setAll(tiles);
         nbt.putList(tileListTag);
 
-        Set<BlockUpdateEntry> entries = this.provider.getLevel().getPendingBlockUpdates(this);
-
-        if (entries != null) {
-            ListTag<CompoundTag> tileTickTag = new ListTag<>("TileTicks");
-            long totalTime = this.provider.getLevel().getCurrentTick();
-
-            for (BlockUpdateEntry entry : entries) {
-                CompoundTag entryNBT = new CompoundTag()
-                        .putString("i", entry.block.getSaveId())
-                        .putInt("x", entry.pos.getFloorX())
-                        .putInt("y", entry.pos.getFloorY())
-                        .putInt("z", entry.pos.getFloorZ())
-                        .putInt("t", (int) (entry.delay - totalTime))
-                        .putInt("p", entry.priority);
-                tileTickTag.add(entryNBT);
-            }
-
-            nbt.putList(tileTickTag);
-        }
+        this.writeTileTicks(nbt);
 
         Map<Integer, Integer> extraDataArray = this.getBlockExtraDataArray();
         BinaryStream extraData = new BinaryStream(4 + extraDataArray.size() * 6);
@@ -437,25 +419,7 @@ public class Chunk extends BaseChunk {
         tileListTag.setAll(tiles);
         nbt.putList(tileListTag);
 
-        Set<BlockUpdateEntry> entries = this.provider.getLevel().getPendingBlockUpdates(this);
-
-        if (entries != null) {
-            ListTag<CompoundTag> tileTickTag = new ListTag<>("TileTicks");
-            long totalTime = this.provider.getLevel().getCurrentTick();
-
-            for (BlockUpdateEntry entry : entries) {
-                CompoundTag entryNBT = new CompoundTag()
-                        .putString("i", entry.block.getSaveId())
-                        .putInt("x", entry.pos.getFloorX())
-                        .putInt("y", entry.pos.getFloorY())
-                        .putInt("z", entry.pos.getFloorZ())
-                        .putInt("t", (int) (entry.delay - totalTime))
-                        .putInt("p", entry.priority);
-                tileTickTag.add(entryNBT);
-            }
-
-            nbt.putList(tileTickTag);
-        }
+        this.writeTileTicks(nbt);
 
         Map<Integer, Integer> extraDataArray = this.getBlockExtraDataArray();
         BinaryStream extraData = new BinaryStream(4 + extraDataArray.size() * 6);
@@ -475,6 +439,42 @@ public class Chunk extends BaseChunk {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * 同时保存已调度更新和尚未主线程回放的延迟更新。
+     * <p>
+     * Saves both scheduled updates and deferred updates not yet replayed on the main thread.
+     */
+    private void writeTileTicks(CompoundTag nbt) {
+        ListTag<CompoundTag> tileTickTag = new ListTag<>("TileTicks");
+        Set<BlockUpdateEntry> entries = this.provider.getLevel().getPendingBlockUpdates(this);
+        if (entries != null) {
+            long totalTime = this.provider.getLevel().getCurrentTick();
+            for (BlockUpdateEntry entry : entries) {
+                tileTickTag.add(new CompoundTag()
+                        .putString("i", entry.block.getSaveId())
+                        .putInt("x", entry.pos.getFloorX())
+                        .putInt("y", entry.pos.getFloorY())
+                        .putInt("z", entry.pos.getFloorZ())
+                        .putInt("t", (int) (entry.delay - totalTime))
+                        .putInt("p", entry.priority));
+            }
+        }
+
+        List<BaseFullChunk.PendingBlockUpdate> deferred = this.getDeferredBlockUpdates();
+        if (deferred != null) {
+            for (BaseFullChunk.PendingBlockUpdate entry : deferred) {
+                tileTickTag.add(new CompoundTag()
+                        .putString("i", entry.getBlock().getSaveId())
+                        .putInt("x", entry.getX())
+                        .putInt("y", entry.getY())
+                        .putInt("z", entry.getZ())
+                        .putInt("t", entry.getDelay())
+                        .putInt("p", entry.getPriority()));
+            }
+        }
+        nbt.putList(tileTickTag);
     }
 
     @Override

@@ -1151,6 +1151,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!loadQueue.isEmpty()) {
             int count = 0;
+            boolean asyncLoad = this.level.isAsyncChunkLoadEnabled();
             LongIterator iter = loadQueue.longIterator();
             while (iter.hasNext()) {
                 if (count >= server.chunksPerTick) {
@@ -1166,6 +1167,43 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 try {
                     this.usedChunks.put(index, false);
                     this.level.registerChunkLoader(this, chunkX, chunkZ, false);
+
+                    // 异步区块加载:读取+解码在异步线程完成,区块由主线程 doTick 挂载后下一 tick 再发送,避免主线程同步读取磁盘
+                    // Async chunk loading: read+decode off-thread; the chunk is mounted in doTick and sent next tick, avoiding a sync disk read on the main thread
+                    if (asyncLoad) {
+                        BaseFullChunk loadedChunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
+                        if (loadedChunk == null) {
+                            if (this.level.requestChunkLoadAsync(chunkX, chunkZ)) {
+                                continue;
+                            }
+                            // 受理失败(executor 关闭等)→ 落到下方原同步路径 / rejected → fall through to the sync path below
+                        } else if (!loadedChunk.isPopulated()) {
+                            boolean neighboursCached = true;
+                            boolean queueRejected = false;
+                            for (int dx = -1; dx <= 1; ++dx) {
+                                for (int dz = -1; dz <= 1; ++dz) {
+                                    if ((dx | dz) == 0) {
+                                        continue;
+                                    }
+                                    if (this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz) == null) {
+                                        // 受理失败(队列已满/executor 关)→ 放弃异步预载,落到下方同步 populateChunk 保证推进,避免队列持续满时该区块永久悬挂
+                                        // Rejected (queue full / executor down) → abandon async preload and fall through to sync populateChunk to guarantee progress, so a saturated queue can't leave this chunk hanging forever
+                                        if (!this.level.requestChunkLoadAsync(chunkX + dx, chunkZ + dz)) {
+                                            queueRejected = true;
+                                            break;
+                                        }
+                                        neighboursCached = false;
+                                    }
+                                }
+                                if (queueRejected) {
+                                    break;
+                                }
+                            }
+                            if (!queueRejected && !neighboursCached) {
+                                continue;
+                            }
+                        }
+                    }
 
                     if (!this.level.populateChunk(chunkX, chunkZ)) {
                         if (this.spawned && this.teleportPosition == null) {

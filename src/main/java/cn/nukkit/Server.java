@@ -511,9 +511,17 @@ public class Server {
      */
     public boolean enableExperimentMode;
     /**
-     * Asynchronous chunk sending (Experiment)
+     * Asynchronous chunk sending, loading and saving (Experiment)
+     * <p>
+     * 异步区块发送、加载与保存(实验性)
      */
     public boolean asyncChunkSending;
+    /**
+     * 每世界挂起区块写上限,超限暂停卸载(背压)
+     * <p>
+     * Max pending chunk writes per world before unloading pauses (backpressure)
+     */
+    public int maxPendingChunkWrites = 128;
     /**
      * Show a console message when a plugin uses deprecated API methods
      */
@@ -3443,6 +3451,7 @@ public class Server {
         this.lightUpdates = config.chunkSettings().lightUpdates();
         this.cacheChunks = config.chunkSettings().cacheChunks();
         this.asyncChunkSending = config.chunkSettings().asyncChunks();
+        this.maxPendingChunkWrites = Math.max(1, config.chunkSettings().maxPendingChunkWrites());
 
         // Entity
         this.spawnEggsEnabled = config.entitySettings().spawnEggs();
