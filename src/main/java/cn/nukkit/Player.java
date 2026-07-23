@@ -1178,9 +1178,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             // 受理失败(executor 关闭等)→ 落到下方原同步路径 / rejected → fall through to the sync path below
                         } else if (!loadedChunk.isPopulated()) {
-                            // 预载齐 3×3 邻居,避免 PopulationTask 构造器在主线程同步读取 8 个邻居区块
-                            // Preload the 3x3 neighbourhood so PopulationTask's constructor won't sync-read 8 neighbours on the main thread
-                            boolean neighboursReady = true;
+                            boolean neighboursCached = true;
                             boolean queueRejected = false;
                             for (int dx = -1; dx <= 1; ++dx) {
                                 for (int dz = -1; dz <= 1; ++dz) {
@@ -1194,14 +1192,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                             queueRejected = true;
                                             break;
                                         }
-                                        neighboursReady = false;
+                                        neighboursCached = false;
                                     }
                                 }
                                 if (queueRejected) {
                                     break;
                                 }
                             }
-                            if (!queueRejected && !neighboursReady) {
+                            if (!queueRejected && !neighboursCached) {
                                 continue;
                             }
                         }
