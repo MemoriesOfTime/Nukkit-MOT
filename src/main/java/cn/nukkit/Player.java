@@ -4780,7 +4780,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.needSendInventory = true;
             return;
         }
-        if (!this.isInventoryServerAuthoritative() || requests.isEmpty()) {
+        if (requests.isEmpty()) {
             return;
         }
 
