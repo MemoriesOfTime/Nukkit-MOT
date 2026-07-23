@@ -203,8 +203,10 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
                     .putBoolean("isMovable", this.isMovable())
                     .putBoolean("Findable", false)
                     .putInt("pairx", this.namedTag.getInt("pairx"))
-                    .putInt("pairz", this.namedTag.getInt("pairz"))
-                    .putBoolean("pairlead", this.namedTag.getBoolean("pairlead", false));
+                    .putInt("pairz", this.namedTag.getInt("pairz"));
+            if (this.namedTag.contains("pairlead")) {
+                c.putBoolean("pairlead", this.namedTag.getBoolean("pairlead"));
+            }
         } else {
             c = new CompoundTag()
                     .putString("id", BlockEntity.CHEST)
