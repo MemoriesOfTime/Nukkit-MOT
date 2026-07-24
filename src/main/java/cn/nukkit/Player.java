@@ -5174,7 +5174,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             transactionSwitch:
             switch (transactionPacket.transactionType) {
                 case InventoryTransactionPacket.TYPE_NORMAL:
-                    if (this.isInventoryServerAuthoritative()) {
+                    if (this.isInventorySAIGateActive()) {
                         this.server.getLogger().debug(this.username + ": dropping legacy InventoryTransaction TYPE_NORMAL while SAI is enabled");
                         this.needSendInventory = true;
                         break;
@@ -5601,7 +5601,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private boolean shouldRejectLegacyInventoryUiTransaction(InventoryTransactionPacket packet) {
-        return this.isInventoryServerAuthoritative()
+        return this.isInventorySAIGateActive()
                 && (packet.transactionType == InventoryTransactionPacket.TYPE_NORMAL
                 || packet.isCraftingPart
                 || packet.isEnchantingPart
@@ -8586,6 +8586,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public boolean isInventoryServerAuthoritative() {
         return this.server.serverAuthoritativeInventory && this.protocol >= ProtocolInfo.v1_16_100;
+    }
+
+    /**
+     * 后端 SAI 丢包门限是否对该玩家生效。WDPE 代理玩家可能被宣告与后端相反的
+     * SAI 标志，故对其禁用门限，按客户端实际包响应。
+     * <p>
+     * Whether the backend's SAI drop-gates apply to this player. WDPE-proxied
+     * players may be advertised the opposite SAI flag, so
+     * bypass the gates and respond to whichever packet path the client uses.
+     */
+    public boolean isInventorySAIGateActive() {
+        if (this.server.useWaterdog && this.loginChainData != null
+                && this.loginChainData.getWaterdogXUID() != null) {
+            return false;
+        }
+        return this.isInventoryServerAuthoritative();
     }
 
     public boolean isEnableNetworkEncryption() {
