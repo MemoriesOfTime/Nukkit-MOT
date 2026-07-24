@@ -216,8 +216,10 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             return;
         }
 
-        if (packet.protocol != this.player.protocol) {
-            log.warn("Wrong protocol used for {}! expected {} got{}", packet.getClass().getSimpleName(), this.player.protocol, packet.protocol);
+        if (packet.protocol != this.player.protocol || packet.gameVersion != this.player.getGameVersion()) {
+            log.warn("Wrong protocol used for {}! expected protocol={} gameVersion={} got protocol={} gameVersion={}",
+                    packet.getClass().getSimpleName(), this.player.protocol, this.player.getGameVersion(),
+                    packet.protocol, packet.gameVersion, new Throwable());
         }
 
         this.outbound.offer(packet);
@@ -244,6 +246,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             }
             case DIRECT_WRITE -> this.channel.eventLoop().execute(() -> {
                 try {
+                    if (packet.protocol != this.player.protocol || packet.gameVersion != this.player.getGameVersion()) {
+                        log.warn("Wrong protocol used for {}! expected protocol={} gameVersion={} got protocol={} gameVersion={}",
+                                packet.getClass().getSimpleName(), this.player.protocol, this.player.getGameVersion(),
+                                packet.protocol, packet.gameVersion, new Throwable());
+                    }
                     packet.tryEncode();
                     ChannelFuture future = this.sendSinglePacketNow(packet);
                     future.addListener(result -> {
