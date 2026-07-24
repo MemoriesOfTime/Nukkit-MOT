@@ -1141,6 +1141,9 @@ public class Level implements ChunkManager, Metadatable {
 
     @SuppressWarnings("unchecked")
     public void doTick(int currentTick) {
+        if (this.provider != null) {
+            this.provider.finalizeMigrationIfDone();
+        }
         updateBlockLight(lightQueue);
         this.checkTime();
 

@@ -83,12 +83,19 @@ public class LevelDBProvider implements LevelProvider {
     private final ReadWriteLock dbReadCloseLock = new ReentrantReadWriteLock();
     private final ExecutorService executor;
 
+    // 异步迁移任务；完成值 true 表示至少迁移一个 chunk，需主线程收尾 levelData。null 表示无需迁移或已收尾。
+    // / Async migration; completed value true means ≥1 chunk migrated and main thread must finalize levelData. null = none/finalized.
+    private volatile CompletableFuture<Boolean> migrationFuture;
+
     // 每区块单写槽：新 batch 覆盖旧 batch，读取前先落盘。
     // One slot per chunk: newest batch wins and commits before reads.
     private final ConcurrentHashMap<Long, PendingWrite> pendingWrites = new ConcurrentHashMap<>();
     private volatile boolean pendingWriteBacklogWarned;
 
     private static final int MAX_PENDING_WRITE_RETRIES = 3;
+
+    // 主线程收尾等待迁移的最大时长；超时则下个 tick 再试。/ Max wait on finalization; on timeout retry next tick.
+    private static final long MIGRATION_AWAIT_TIMEOUT_MILLIS = TimeUnit.SECONDS.toMillis(5);
 
     // 关闭超时参数；包内可变以便测试注入。/ Mutable close timeouts for tests.
     long closeDrainTimeoutMillis = TimeUnit.MINUTES.toMillis(10);
@@ -174,7 +181,6 @@ public class LevelDBProvider implements LevelProvider {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        this.migrateLegacyNukkitFinalizationStates();
 
         this.gcLock = new ReentrantLock();
 
@@ -182,6 +188,9 @@ public class LevelDBProvider implements LevelProvider {
         builder.setNameFormat("LevelDB Executor for " + this.getName());
         builder.setUncaughtExceptionHandler((thread, ex) -> Server.getInstance().getLogger().error("Exception in " + thread.getName(), ex));
         this.executor = Executors.newSingleThreadExecutor(builder.build());
+
+        // 迁移丢给 executor 异步执行，避免动态加载世界时阻塞主线程。/ Off-thread to avoid blocking on dynamic world load.
+        this.migrationFuture = this.migrateLegacyNukkitFinalizationStatesAsync();
 
         if (level.isAutoCompaction()) {
             int delay = level.getServer().getAutoCompactionTicks();
@@ -265,16 +274,32 @@ public class LevelDBProvider implements LevelProvider {
         return Server.getInstance().useNativeLevelDB ? LevelDB.PROVIDER.open(dir, options) : JAVA_LDB_PROVIDER.open(dir, options);
     }
 
-    private void migrateLegacyNukkitFinalizationStates() {
+    /**
+     * 构造期做廉价短路检查，未命中则把昂贵的全表扫描与 DB 写入异步交给 executor；executor 绝不触碰 levelData。
+     * <p>
+     * Cheap short-circuit at construction; otherwise schedules the full-table scan + DB write on the
+     * executor, which never touches levelData.
+     */
+    private CompletableFuture<Boolean> migrateLegacyNukkitFinalizationStatesAsync() {
         byte[] encodingMarker = this.db.get(FINALIZATION_STATE_ENCODING_KEY);
         if (Arrays.equals(encodingMarker, FINALIZATION_STATE_ENCODING_BEDROCK)) {
-            return;
+            return null;
         }
         int storageVersion = this.levelData.getInt("StorageVersion");
         if (storageVersion <= 0 || storageVersion >= CURRENT_STORAGE_VERSION) {
-            return;
+            return null;
         }
 
+        return CompletableFuture.supplyAsync(this::doMigrateLegacyNukkitFinalizationStates, this.executor);
+    }
+
+    /**
+     * 迁移工作体，在 executor 线程仅操作 DB；返回 true 触发主线程写 StorageVersion + saveLevelData。
+     * <p>
+     * Migration body; runs on the executor touching the DB only and returns true to trigger the main
+     * thread to write StorageVersion + saveLevelData.
+     */
+    private boolean doMigrateLegacyNukkitFinalizationStates() {
         Set<ByteBuffer> legacyNukkitChunks = findLegacyNukkitChunkMarkers(this.db, this.path);
         int migrated = 0;
         try (DBIterator iterator = this.db.iterator(); WriteBatch writeBatch = this.db.createWriteBatch()) {
@@ -301,7 +326,7 @@ public class LevelDBProvider implements LevelProvider {
             }
 
             if (migrated == 0) {
-                return;
+                return false;
             }
 
             writeBatch.put(FINALIZATION_STATE_ENCODING_KEY, FINALIZATION_STATE_ENCODING_BEDROCK);
@@ -310,9 +335,68 @@ public class LevelDBProvider implements LevelProvider {
             throw new RuntimeException("Unable to migrate legacy Nukkit LevelDB finalization states for " + this.path, e);
         }
 
-        this.levelData.putInt("StorageVersion", CURRENT_STORAGE_VERSION);
-        this.saveLevelData();
-        log.info("Migrated {} legacy Nukkit LevelDB finalization states for {}", migrated, this.getName());
+        // 用 path 而非 getName()：executor 线程上 getName() 会读非线程安全的 levelData。/ path avoids levelData read off-thread.
+        log.info("Migrated {} legacy Nukkit LevelDB finalization states for {}", migrated, this.path);
+        return true;
+    }
+
+    /**
+     * 阻塞至异步迁移结束（或未启动时立即返回）；仅作 DB 屏障，绝不触碰 levelData，任意线程可调用。
+     * <p>
+     * Blocks until the async migration finishes (or returns at once if never started); a pure DB
+     * barrier that never touches levelData, safe from any thread.
+     */
+    private void awaitMigration() {
+        CompletableFuture<Boolean> future = this.migrationFuture;
+        if (future == null) {
+            return;
+        }
+        try {
+            future.join();
+        } catch (CompletionException e) {
+            // 迁移失败不阻塞读路径，降级为旧值。/ Failure must not block reads; fall back to legacy values.
+            log.error("Legacy Nukkit finalization state migration failed for {}; reads will use legacy values", this.path, e.getCause());
+            this.migrationFuture = null;
+        }
+        // 不置 null：join 仅做屏障，收尾交给主线程。/ Barrier only; finalization is the main thread's job.
+    }
+
+    /**
+     * 主线程独占收尾：迁移成功且未收尾时写 StorageVersion 并持久化 level.dat。
+     * 仅由主线程调用（{@link Level#doTick} 起始处与 {@link #close} 兜底）；异步读线程改用 {@link #awaitMigration()}。
+     * <p>
+     * Main-thread-exclusive finalization: writes StorageVersion and persists level.dat when the
+     * migration succeeded and has not been finalized. Main thread only (head of {@link Level#doTick}
+     * and {@link #close}); async readers use {@link #awaitMigration()}.
+     */
+    @Override
+    public void finalizeMigrationIfDone() {
+        CompletableFuture<Boolean> future = this.migrationFuture;
+        if (future == null) {
+            return;
+        }
+        Boolean migrated;
+        try {
+            migrated = future.get(MIGRATION_AWAIT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            // 卡住的迁移不无限阻塞主线程，记日志后下个 tick 再试。/ Don't block the main thread; retry next tick.
+            log.warn("Legacy Nukkit finalization state migration still running after {}ms for {}; deferring finalization", MIGRATION_AWAIT_TIMEOUT_MILLIS, this.path);
+            return;
+        } catch (ExecutionException e) {
+            log.error("Legacy Nukkit finalization state migration failed for {}; reads will use legacy values", this.path, e.getCause());
+            this.migrationFuture = null;
+            return;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted while waiting for migration finalization for {}", this.path);
+            return;
+        }
+        this.migrationFuture = null;
+
+        if (Boolean.TRUE.equals(migrated)) {
+            this.levelData.putInt("StorageVersion", CURRENT_STORAGE_VERSION);
+            this.saveLevelData();
+        }
     }
 
     static boolean hasLegacyNukkitFinalizationState(DB db, String path) {
@@ -712,6 +796,8 @@ public class LevelDBProvider implements LevelProvider {
      * Serializes and replaces the staged batch; {@code keepChunkRef} controls chunk retention.
      */
     private void stagePendingWrite(long hash, int chunkX, int chunkZ, LevelDBChunk chunk, boolean keepChunkRef) {
+        // 写前等待迁移完成，避免与其 DB 写入并发。/ Await migration before writing to avoid racing its writes.
+        this.awaitMigration();
         long snapshot = chunk.getChanges();
         WriteBatch batch = this.save0(chunkX, chunkZ, chunk);
         this.pendingWrites.compute(hash, (h, pw) -> {
@@ -1071,6 +1157,8 @@ public class LevelDBProvider implements LevelProvider {
             if (levelSnapshot == null) {
                 return null;
             }
+            // 读前等待迁移完成，避免与其 DB 写入并发。/ Await migration before reading to avoid racing its writes.
+            this.awaitMigration();
             // 读取前提交挂起写。/ Commit pending data before reading.
             this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
             // 仅解码；缓存挂载与 ticking 留给主线程。/ Decode only; mount and ticking stay on the main thread.
@@ -1206,6 +1294,8 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private synchronized LevelDBChunk readOrCreateChunk(int chunkX, int chunkZ, boolean create) {
+        // 读前等待迁移完成，避免与其 DB 写入并发。/ Await migration before reading to avoid racing its writes.
+        this.awaitMigration();
         // 读取前提交挂起写。/ Commit pending data before reading.
         this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
         LevelDBChunk chunk = null;
@@ -1239,6 +1329,10 @@ public class LevelDBProvider implements LevelProvider {
 
             gcLock.lock();
 
+            // 关闭前等待迁移，确保其 DB 写入在卸载与 executor 终止前完成。/ Await migration before unload + executor shutdown.
+            this.awaitMigration();
+            // 关服兜底：迁移可能恰在 doTick 跑到前完成，此处理顺 levelData。/ Close fallback when migration finishes before doTick runs.
+            this.finalizeMigrationIfDone();
             try {
                 this.unloadChunksUnsafe(true);
             } catch (Exception e) {
@@ -1692,6 +1786,8 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     public void forEachChunks(Function<FullChunk, Boolean> action, boolean skipCorrupted) {
+        // 遍历前等待迁移，避免与其 iterator/write 并发。/ Await migration before iterating to avoid racing its iterator/write.
+        this.awaitMigration();
         try (DBIterator iter = db.iterator()) {
             Set<Long> seenChunks = new HashSet<>();
             while (iter.hasNext()) {

@@ -54,6 +54,15 @@ public interface LevelProvider {
     }
 
     /**
+     * 主线程幂等收尾异步迁移副作用（如持久化 levelData）；由 {@link Level#doTick} 起始处调用。
+     * <p>
+     * Idempotent main-thread finalization of async-migration side effects (e.g. persisting levelData);
+     * called at the head of {@link Level#doTick}. Default is a no-op.
+     */
+    default void finalizeMigrationIfDone() {
+    }
+
+    /**
      * 在非主线程读取并解码区块;返回 null 表示磁盘不存在;必须支持并发调用
      * <p>
      * Read and decode a chunk off the main thread; null means absent on disk; must be safe for concurrent calls
