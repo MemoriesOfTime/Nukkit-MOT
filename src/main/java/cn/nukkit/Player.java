@@ -303,10 +303,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
 
     /**
-     * 记录已向本观察者发送过 PlayerList(ADD) 的玩家 UUID，避免重复下发导致网易客户端隐形。
+     * 记录已向本观察者注册 PlayerList(ADD) 的玩家型实体 UUID，避免重复 ADD 导致网易客户端隐形。
      * <p>
-     * Tracks player UUIDs whose PlayerList ADD has already been sent to this viewer,
-     * avoiding duplicate sends that hide the entity on NetEase clients.
+     * Tracks player-like entity UUIDs registered through PlayerList ADD for this viewer,
+     * avoiding duplicate ADD packets that hide entities on NetEase clients.
      */
     public final Set<UUID> sentSkins = ConcurrentHashMap.newKeySet();
 

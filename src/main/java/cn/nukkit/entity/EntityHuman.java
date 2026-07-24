@@ -11,10 +11,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
-import cn.nukkit.network.protocol.AddPlayerPacket;
-import cn.nukkit.network.protocol.PlayerListPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.SetEntityLinkPacket;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.utils.*;
 
 import java.nio.charset.StandardCharsets;
@@ -325,6 +322,8 @@ public class EntityHuman extends EntityHumanType {
                 throw new IllegalStateException(this.getClass().getSimpleName() + " must have a valid skin set");
             }
 
+            boolean retainNpcListEntry = !(this instanceof Player)
+                    && PlayerEntitySkinSender.requiresRetainedEntry(player);
             if (this instanceof Player) {
                 // 仅在该观察者尚未收到本玩家列表项时下发 ADD，避免重复下发导致网易客户端隐形。
                 // Send the PlayerList ADD only when this viewer hasn't received it yet;
@@ -333,6 +332,12 @@ public class EntityHuman extends EntityHumanType {
                     this.server.updatePlayerListData(
                             new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
                             new Player[]{player});
+                }
+            } else if (retainNpcListEntry) {
+                if (!PlayerEntitySkinSender.sendInitialSkinIfAbsent(
+                        player, this.uuid, this.getId(), this.getName(), this.getSkin(), "")) {
+                    this.hasSpawned.remove(player.getLoaderId());
+                    return;
                 }
             } else {
                 this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.getSkin(), new Player[]{player});
@@ -376,9 +381,20 @@ public class EntityHuman extends EntityHumanType {
                 player.dataPacket(pkk);
             }
 
-            if (!(this instanceof Player)) {
+            if (!(this instanceof Player) && !retainNpcListEntry) {
                 this.server.removePlayerListData(this.uuid, player);
             }
+        }
+    }
+
+    @Override
+    public void despawnFrom(Player player) {
+        boolean removeRetainedNpcEntry = !(this instanceof Player)
+                && PlayerEntitySkinSender.requiresRetainedEntry(player)
+                && this.hasSpawned.containsKey(player.getLoaderId());
+        super.despawnFrom(player);
+        if (removeRetainedNpcEntry) {
+            PlayerEntitySkinSender.sendRemoveAndClear(player, this.uuid);
         }
     }
 
