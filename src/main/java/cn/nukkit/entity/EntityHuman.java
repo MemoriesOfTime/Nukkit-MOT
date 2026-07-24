@@ -326,9 +326,14 @@ public class EntityHuman extends EntityHumanType {
             }
 
             if (this instanceof Player) {
-                this.server.updatePlayerListData(
-                        new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
-                        new Player[]{player});
+                // 仅在该观察者尚未收到本玩家列表项时下发 ADD，避免重复下发导致网易客户端隐形。
+                // Send the PlayerList ADD only when this viewer hasn't received it yet;
+                // resending ADD hides the entity on NetEase clients.
+                if (player.sentSkins.add(this.uuid)) {
+                    this.server.updatePlayerListData(
+                            new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
+                            new Player[]{player});
+                }
             } else {
                 this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.getSkin(), new Player[]{player});
             }

@@ -128,6 +128,7 @@ import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -300,6 +301,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int nextChunkOrderRun = 1;
 
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
+
+    /**
+     * 记录已向本观察者发送过 PlayerList(ADD) 的玩家 UUID，避免重复下发导致网易客户端隐形。
+     * <p>
+     * Tracks player UUIDs whose PlayerList ADD has already been sent to this viewer,
+     * avoiding duplicate sends that hide the entity on NetEase clients.
+     */
+    public final Set<UUID> sentSkins = ConcurrentHashMap.newKeySet();
 
     protected Vector3 newPosition = null;
 
@@ -670,6 +679,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
         this.hiddenPlayers.put(player.getUniqueId(), player);
+        // 同步清理记录，使 showPlayer 能重新走 ADD 流程。
+        // Drop the record so showPlayer re-sends the ADD entry.
+        this.sentSkins.remove(player.getUniqueId());
         player.despawnFrom(this);
     }
 
@@ -945,9 +957,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     void updatePlayerListData(boolean onlyWhenSpawned) {
         if (this.spawned || !onlyWhenSpawned) {
-            this.server.updatePlayerListData(
-                    new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, this.getSkin(), this.loginChainData.getXUID(), this.getLocatorBarColor()),
-                    this.server.playerList.values().toArray(new Player[0]));
+            // 仅推送给已收到过本玩家列表项的观察者，避免重复下发导致网易客户端隐形。
+            // Only push to viewers that already received this player's list entry;
+            // resending ADD hides the entity on NetEase clients.
+            Player[] viewers = this.server.playerList.values().stream()
+                    .filter(p -> p.sentSkins.contains(this.getUniqueId()))
+                    .toArray(Player[]::new);
+            if (viewers.length > 0) {
+                this.server.updatePlayerListData(
+                        new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, this.getSkin(), this.loginChainData.getXUID(), this.getLocatorBarColor()),
+                        viewers);
+            }
         }
     }
 
@@ -6301,6 +6321,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (this.loggedIn) {
                     this.server.removeOnlinePlayer(this);
+                    // 从曾收到过本玩家皮肤的其他观察者处清理记录（REMOVE 已由 removeOnlinePlayer 广播）。
+                    // Clear this player's UUID from viewers that previously received its list entry;
+                    // the REMOVE itself is broadcast by removeOnlinePlayer.
+                    this.server.getOnlinePlayers().values().stream()
+                            .filter(p -> p != this)
+                            .forEach(p -> p.sentSkins.remove(this.getUniqueId()));
                     this.loggedIn = false;
                 }
             }
