@@ -128,6 +128,7 @@ import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -300,6 +301,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int nextChunkOrderRun = 1;
 
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
+
+    /**
+     * 已向本观察者下发 PlayerList(ADD) 的玩家型实体 UUID，用于去重防网易客户端隐形；
+     * 玩家型 NPC 条目在握手后延迟移除（见 {@code PlayerEntitySkinSender}）。
+     * <p>
+     * Player-like entity UUIDs registered via PlayerList ADD for this viewer, deduplicating to avoid
+     * the NetEase invisibility bug; NPC entries are removed shortly after the handshake.
+     */
+    public final Set<UUID> sentSkins = ConcurrentHashMap.newKeySet();
 
     protected Vector3 newPosition = null;
 
@@ -670,6 +680,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
         this.hiddenPlayers.put(player.getUniqueId(), player);
+        // 不清 sentSkins：despawn 只发 RemoveEntityPacket，不下发 PlayerList(REMOVE)，
+        // 清掉会让随后的 showPlayer 重发 ADD，触发网易 V860 玩家隐形。保留记录则 spawnTo
+        // 的 ADD 守卫会去重，实体仅由 AddPlayerPacket 重新生成。Tab 条目不受影响。
+        // <p>
+        // Don't clear sentSkins: despawn only sends RemoveEntityPacket, not PlayerList(REMOVE),
+        // so clearing would make showPlayer resend ADD and trigger NetEase V860 invisibility.
+        // Keeping the record lets the spawnTo ADD guard deduplicate; the entity is respawned via
+        // AddPlayerPacket and the Tab entry is untouched.
         player.despawnFrom(this);
     }
 
@@ -926,8 +944,34 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void setSkin(Skin skin) {
+        Skin previousSkin = this.getSkin();
         super.setSkin(skin);
-        updatePlayerListData(true);
+        if (!this.spawned) {
+            return;
+        }
+
+        Player[] playerListViewers = this.server.playerList.values().stream()
+                .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                .filter(viewer -> viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE)
+                .toArray(Player[]::new);
+        if (playerListViewers.length > 0) {
+            this.server.updatePlayerListData(
+                    new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, skin, this.loginChainData.getXUID(), this.getLocatorBarColor()),
+                    playerListViewers);
+        }
+
+        for (Player viewer : this.server.playerList.values()) {
+            if (viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE
+                    || !viewer.sentSkins.contains(this.getUniqueId())) {
+                continue;
+            }
+            PlayerSkinPacket packet = new PlayerSkinPacket();
+            packet.uuid = this.getUniqueId();
+            packet.skin = skin;
+            packet.newSkinName = skin.getSkinId();
+            packet.oldSkinName = previousSkin != null ? previousSkin.getSkinId() : "";
+            viewer.dataPacket(packet);
+        }
     }
 
     public Color getLocatorBarColor() {
@@ -945,9 +989,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     void updatePlayerListData(boolean onlyWhenSpawned) {
         if (this.spawned || !onlyWhenSpawned) {
-            this.server.updatePlayerListData(
-                    new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, this.getSkin(), this.loginChainData.getXUID(), this.getLocatorBarColor()),
-                    this.server.playerList.values().toArray(new Player[0]));
+            PlayerListPacket.Entry entry = new PlayerListPacket.Entry(
+                    this.getUniqueId(), this.getId(), this.displayName, this.getSkin(),
+                    this.loginChainData.getXUID(), this.getLocatorBarColor());
+            Player[] standardViewers = this.server.playerList.values().stream()
+                    .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                    .filter(viewer -> !PlayerEntitySkinSender.requiresRetainedEntry(viewer))
+                    .toArray(Player[]::new);
+            if (standardViewers.length > 0) {
+                this.server.updatePlayerListData(entry, standardViewers);
+            }
+
+            this.server.playerList.values().stream()
+                    .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                    .filter(PlayerEntitySkinSender::requiresRetainedEntry)
+                    .forEach(viewer -> PlayerEntitySkinSender.replacePlayerListEntry(viewer, entry));
         }
     }
 
@@ -5154,7 +5210,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             transactionSwitch:
             switch (transactionPacket.transactionType) {
                 case InventoryTransactionPacket.TYPE_NORMAL:
-                    if (this.isInventoryServerAuthoritative()) {
+                    if (this.isInventorySAIGateActive()) {
                         this.server.getLogger().debug(this.username + ": dropping legacy InventoryTransaction TYPE_NORMAL while SAI is enabled");
                         this.needSendInventory = true;
                         break;
@@ -5581,7 +5637,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private boolean shouldRejectLegacyInventoryUiTransaction(InventoryTransactionPacket packet) {
-        return this.isInventoryServerAuthoritative()
+        return this.isInventorySAIGateActive()
                 && (packet.transactionType == InventoryTransactionPacket.TYPE_NORMAL
                 || packet.isCraftingPart
                 || packet.isEnchantingPart
@@ -6301,6 +6357,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (this.loggedIn) {
                     this.server.removeOnlinePlayer(this);
+                    // 从曾收到过本玩家皮肤的其他观察者处清理记录（REMOVE 已由 removeOnlinePlayer 广播）。
+                    // Clear this player's UUID from viewers that previously received its list entry;
+                    // the REMOVE itself is broadcast by removeOnlinePlayer.
+                    this.server.getOnlinePlayers().values().stream()
+                            .filter(p -> p != this)
+                            .forEach(p -> p.sentSkins.remove(this.getUniqueId()));
                     this.loggedIn = false;
                 }
             }
@@ -8560,6 +8622,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public boolean isInventoryServerAuthoritative() {
         return this.server.serverAuthoritativeInventory && this.protocol >= ProtocolInfo.v1_16_100;
+    }
+
+    /**
+     * 后端 SAI 丢包门限是否对该玩家生效。WDPE 代理玩家可能被宣告与后端相反的
+     * SAI 标志，故对其禁用门限，按客户端实际包响应。
+     * <p>
+     * Whether the backend's SAI drop-gates apply to this player. WDPE-proxied
+     * players may be advertised the opposite SAI flag, so
+     * bypass the gates and respond to whichever packet path the client uses.
+     */
+    public boolean isInventorySAIGateActive() {
+        if (this.server.useWaterdog && this.loginChainData != null
+                && this.loginChainData.getWaterdogXUID() != null) {
+            return false;
+        }
+        return this.isInventoryServerAuthoritative();
     }
 
     public boolean isEnableNetworkEncryption() {

@@ -62,7 +62,7 @@ public class PlayerSkinPacket extends DataPacket {
                 putBoolean(premium);
             }
         } else {
-            putSkin(protocol, skin);
+            putSkin(this.gameVersion, skin);
             putString(newSkinName);
             putString(oldSkinName);
             if (protocol >= ProtocolInfo.v1_14_60) {
