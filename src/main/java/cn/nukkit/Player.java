@@ -680,9 +680,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
         this.hiddenPlayers.put(player.getUniqueId(), player);
-        // 同步清理记录，使 showPlayer 能重新走 ADD 流程。
-        // Drop the record so showPlayer re-sends the ADD entry.
-        this.sentSkins.remove(player.getUniqueId());
+        // 不清 sentSkins：despawn 只发 RemoveEntityPacket，不下发 PlayerList(REMOVE)，
+        // 清掉会让随后的 showPlayer 重发 ADD，触发网易 V860 玩家隐形。保留记录则 spawnTo
+        // 的 ADD 守卫会去重，实体仅由 AddPlayerPacket 重新生成。Tab 条目不受影响。
+        // <p>
+        // Don't clear sentSkins: despawn only sends RemoveEntityPacket, not PlayerList(REMOVE),
+        // so clearing would make showPlayer resend ADD and trigger NetEase V860 invisibility.
+        // Keeping the record lets the spawnTo ADD guard deduplicate; the entity is respawned via
+        // AddPlayerPacket and the Tab entry is untouched.
         player.despawnFrom(this);
     }
 

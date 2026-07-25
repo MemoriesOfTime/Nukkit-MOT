@@ -1388,9 +1388,6 @@ public class Server {
 
     public void addOnlinePlayer(Player player) {
         this.playerList.put(player.getUniqueId(), player);
-        // 新玩家首次广播给全服（绕过 sentSkins 守卫），并登记每个接收者，否则后续 setSkin 等
-        // 更新会因 sentSkins 守卫被过滤掉。Broadcast the newcomer to everyone (bypassing the
-        // sentSkins guard) and register it on each viewer so later skin/name updates still reach them.
         PlayerListPacket.Entry entry = new PlayerListPacket.Entry(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin(), player.getLoginChainData().getXUID(), player.getLocatorBarColor());
         Player[] viewers = this.playerList.values().toArray(Player.EMPTY_ARRAY);
         this.updatePlayerListData(entry, viewers);
@@ -1435,6 +1432,15 @@ public class Server {
     }
 
     public void updatePlayerListData(PlayerListPacket.Entry playerListEntry, Player[] players) {
+        for (Player viewer : players) {
+            if (viewer.getGameVersion().isNetEase() && viewer.sentSkins.contains(playerListEntry.uuid)) {
+                PlayerListPacket remove = new PlayerListPacket();
+                remove.type = PlayerListPacket.TYPE_REMOVE;
+                remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(playerListEntry.uuid)};
+                viewer.dataPacket(remove);
+            }
+        }
+
         PlayerListPacket pk = new PlayerListPacket();
         pk.type = PlayerListPacket.TYPE_ADD;
         pk.entries = new PlayerListPacket.Entry[]{playerListEntry};
