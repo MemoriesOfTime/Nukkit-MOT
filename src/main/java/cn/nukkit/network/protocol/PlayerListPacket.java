@@ -43,14 +43,14 @@ public class PlayerListPacket extends DataPacket {
                         this.putVarInt(0);
                     }
                     if (protocol < ProtocolInfo.v1_13_0) {
-                        this.putSkin(protocol, entry.skin);
+                        this.putSkin(this.gameVersion, entry.skin);
                     }
                     this.putString(entry.xboxUserId);
                     if (protocol >= ProtocolInfo.v1_2_13) {
                         this.putString(entry.platformChatId);
                         if (protocol >= 388) {
                             this.putLInt(entry.buildPlatform);
-                            this.putSkin(protocol, entry.skin);
+                            this.putSkin(this.gameVersion, entry.skin);
                             this.putBoolean(entry.isTeacher);
                             this.putBoolean(entry.isHost);
                             if (protocol >= ProtocolInfo.v1_20_60) {
