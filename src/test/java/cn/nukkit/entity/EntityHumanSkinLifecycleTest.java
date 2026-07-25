@@ -50,6 +50,7 @@ class EntityHumanSkinLifecycleTest {
         doCallRealMethod().when(this.server).updatePlayerListData(
                 any(PlayerListPacket.Entry.class), any(Player[].class));
         doCallRealMethod().when(this.server).removePlayerListData(any(UUID.class), any(Player.class));
+        doCallRealMethod().when(this.server).removePlayerListData(any(UUID.class), any(Player[].class));
 
         // 捕获式 fake scheduler：默认不执行延迟任务，runPendingDelayedTasks() 可手动触发。
         // Capturing fake: delayed tasks don't run until runPendingDelayedTasks() flushes them.

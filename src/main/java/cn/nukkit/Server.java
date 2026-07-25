@@ -1457,6 +1457,7 @@ public class Server {
         pk.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(uuid)};
         for (Player player : players) {
             player.dataPacket(pk);
+            player.sentSkins.remove(uuid);
         }
     }
 
@@ -1465,10 +1466,7 @@ public class Server {
     }
 
     public void removePlayerListData(UUID uuid, Player player) {
-        PlayerListPacket pk = new PlayerListPacket();
-        pk.type = PlayerListPacket.TYPE_REMOVE;
-        pk.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(uuid)};
-        player.dataPacket(pk);
+        this.removePlayerListData(uuid, new Player[]{player});
     }
 
     public void sendFullPlayerListData(Player player) {

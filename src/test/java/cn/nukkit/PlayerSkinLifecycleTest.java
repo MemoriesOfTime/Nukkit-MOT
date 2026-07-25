@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.entity.data.Skin;
+import cn.nukkit.inventory.PlayerOffhandInventory;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.PlayerListPacket;
@@ -13,20 +14,11 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doCallRealMethod;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class PlayerSkinLifecycleTest {
 
@@ -40,6 +32,10 @@ class PlayerSkinLifecycleTest {
         this.playerList = installPlayerList(this.server);
         doCallRealMethod().when(this.server).updatePlayerListData(
                 any(PlayerListPacket.Entry.class), any(Player[].class));
+        doCallRealMethod().when(this.server).removePlayerListData(
+                any(UUID.class), any(Player.class));
+        doCallRealMethod().when(this.server).removePlayerListData(
+                any(UUID.class), any(Player[].class));
     }
 
     @Test
@@ -137,6 +133,45 @@ class PlayerSkinLifecycleTest {
         // sentSkins must be retained so the spawnTo ADD guard deduplicates on re-show.
         assertTrue(viewer.sentSkins.contains(subject.getUniqueId()),
                 "hidePlayer must retain the sentSkins entry to suppress a duplicate ADD on re-show");
+    }
+
+    /**
+     * 回归：插件通过 removePlayerListData 摘除 Tab 条目（如 vanish）后，sentSkins 必须同步清理；
+     * 否则玩家重进视野时 spawnTo 的 ADD 守卫基于过期登记去重，客户端因缺列表项无法渲染实体。
+     * <p>
+     * Regression: after a plugin removes a tab entry via removePlayerListData (e.g. vanish),
+     * sentSkins must be cleared in sync; otherwise the spawnTo ADD guard deduplicates against a
+     * stale registration and the client cannot render the entity without a list entry.
+     */
+    @Test
+    void removePlayerListDataClearsSentSkinsSoRespawnResendsAdd() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124, "subject-skin");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124, "viewer-skin");
+        registerViewer(subject, viewer);
+
+        this.server.removePlayerListData(subject.getUniqueId(), viewer);
+
+        List<PlayerListPacket> removals = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertEquals(1, removals.size());
+        assertEquals(PlayerListPacket.TYPE_REMOVE, removals.get(0).type);
+        assertFalse(viewer.sentSkins.contains(subject.getUniqueId()),
+                "removePlayerListData must clear the sentSkins registration");
+
+        viewer.sentPackets.clear();
+        subject.spawnTo(viewer);
+
+        List<PlayerListPacket> adds = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertEquals(1, adds.size());
+        assertEquals(PlayerListPacket.TYPE_ADD, adds.get(0).type);
+        assertEquals(subject.getUniqueId(), adds.get(0).entries[0].uuid);
+        assertTrue(viewer.sentSkins.contains(subject.getUniqueId()),
+                "respawn must re-register the entry after resending ADD");
     }
 
     /**
@@ -246,6 +281,9 @@ class PlayerSkinLifecycleTest {
             this.displayName = "Original Name";
             this.loginChainData = mock(LoginChainData.class);
             when(this.loginChainData.getXUID()).thenReturn("");
+            // 网络构造路径不会执行 initEntity，spawnTo 需要的副手背包在此补齐。
+            // The network constructor skips initEntity; spawnTo needs the offhand inventory.
+            this.offhandInventory = new PlayerOffhandInventory(this);
             super.setSkin(skin);
             this.spawned = true;
         }
