@@ -1388,7 +1388,12 @@ public class Server {
 
     public void addOnlinePlayer(Player player) {
         this.playerList.put(player.getUniqueId(), player);
-        player.updatePlayerListData(false);
+        PlayerListPacket.Entry entry = new PlayerListPacket.Entry(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin(), player.getLoginChainData().getXUID(), player.getLocatorBarColor());
+        Player[] viewers = this.playerList.values().toArray(Player.EMPTY_ARRAY);
+        this.updatePlayerListData(entry, viewers);
+        for (Player viewer : viewers) {
+            viewer.sentSkins.add(player.getUniqueId());
+        }
     }
 
     public void removeOnlinePlayer(Player player) {
@@ -1427,6 +1432,15 @@ public class Server {
     }
 
     public void updatePlayerListData(PlayerListPacket.Entry playerListEntry, Player[] players) {
+        for (Player viewer : players) {
+            if (viewer.getGameVersion().isNetEase() && viewer.sentSkins.contains(playerListEntry.uuid)) {
+                PlayerListPacket remove = new PlayerListPacket();
+                remove.type = PlayerListPacket.TYPE_REMOVE;
+                remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(playerListEntry.uuid)};
+                viewer.dataPacket(remove);
+            }
+        }
+
         PlayerListPacket pk = new PlayerListPacket();
         pk.type = PlayerListPacket.TYPE_ADD;
         pk.entries = new PlayerListPacket.Entry[]{playerListEntry};
@@ -1443,6 +1457,7 @@ public class Server {
         pk.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(uuid)};
         for (Player player : players) {
             player.dataPacket(pk);
+            player.sentSkins.remove(uuid);
         }
     }
 
@@ -1451,10 +1466,7 @@ public class Server {
     }
 
     public void removePlayerListData(UUID uuid, Player player) {
-        PlayerListPacket pk = new PlayerListPacket();
-        pk.type = PlayerListPacket.TYPE_REMOVE;
-        pk.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(uuid)};
-        player.dataPacket(pk);
+        this.removePlayerListData(uuid, new Player[]{player});
     }
 
     public void sendFullPlayerListData(Player player) {
@@ -1474,6 +1486,12 @@ public class Server {
                 pk.type = PlayerListPacket.TYPE_ADD;
                 pk.entries = (PlayerListPacket.Entry[]) a;
                 player.dataPacket(pk);
+            }
+            // 接收者已收到这些玩家的列表项，登记以便后续 skin 变更只推给已发送的观察者。
+            // Register that this viewer has received these players' list entries so subsequent
+            // skin updates are only pushed to viewers that already hold the entry.
+            for (Player target : this.playerList.values()) {
+                player.sentSkins.add(target.getUniqueId());
             }
         }
     }
