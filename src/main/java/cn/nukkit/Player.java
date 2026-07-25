@@ -303,10 +303,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
 
     /**
-     * 记录已向本观察者注册 PlayerList(ADD) 的玩家型实体 UUID，避免重复 ADD 导致网易客户端隐形。
+     * 已向本观察者下发 PlayerList(ADD) 的玩家型实体 UUID，用于去重防网易客户端隐形；
+     * 玩家型 NPC 条目在握手后延迟移除（见 {@code PlayerEntitySkinSender}）。
      * <p>
-     * Tracks player-like entity UUIDs registered through PlayerList ADD for this viewer,
-     * avoiding duplicate ADD packets that hide entities on NetEase clients.
+     * Player-like entity UUIDs registered via PlayerList ADD for this viewer, deduplicating to avoid
+     * the NetEase invisibility bug; NPC entries are removed shortly after the handshake.
      */
     public final Set<UUID> sentSkins = ConcurrentHashMap.newKeySet();
 
@@ -938,8 +939,34 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void setSkin(Skin skin) {
+        Skin previousSkin = this.getSkin();
         super.setSkin(skin);
-        updatePlayerListData(true);
+        if (!this.spawned) {
+            return;
+        }
+
+        Player[] playerListViewers = this.server.playerList.values().stream()
+                .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                .filter(viewer -> viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE)
+                .toArray(Player[]::new);
+        if (playerListViewers.length > 0) {
+            this.server.updatePlayerListData(
+                    new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, skin, this.loginChainData.getXUID(), this.getLocatorBarColor()),
+                    playerListViewers);
+        }
+
+        for (Player viewer : this.server.playerList.values()) {
+            if (viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE
+                    || !viewer.sentSkins.contains(this.getUniqueId())) {
+                continue;
+            }
+            PlayerSkinPacket packet = new PlayerSkinPacket();
+            packet.uuid = this.getUniqueId();
+            packet.skin = skin;
+            packet.newSkinName = skin.getSkinId();
+            packet.oldSkinName = previousSkin != null ? previousSkin.getSkinId() : "";
+            viewer.dataPacket(packet);
+        }
     }
 
     public Color getLocatorBarColor() {
@@ -957,17 +984,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     void updatePlayerListData(boolean onlyWhenSpawned) {
         if (this.spawned || !onlyWhenSpawned) {
-            // 仅推送给已收到过本玩家列表项的观察者，避免重复下发导致网易客户端隐形。
-            // Only push to viewers that already received this player's list entry;
-            // resending ADD hides the entity on NetEase clients.
-            Player[] viewers = this.server.playerList.values().stream()
-                    .filter(p -> p.sentSkins.contains(this.getUniqueId()))
+            PlayerListPacket.Entry entry = new PlayerListPacket.Entry(
+                    this.getUniqueId(), this.getId(), this.displayName, this.getSkin(),
+                    this.loginChainData.getXUID(), this.getLocatorBarColor());
+            Player[] standardViewers = this.server.playerList.values().stream()
+                    .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                    .filter(viewer -> !PlayerEntitySkinSender.requiresRetainedEntry(viewer))
                     .toArray(Player[]::new);
-            if (viewers.length > 0) {
-                this.server.updatePlayerListData(
-                        new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, this.getSkin(), this.loginChainData.getXUID(), this.getLocatorBarColor()),
-                        viewers);
+            if (standardViewers.length > 0) {
+                this.server.updatePlayerListData(entry, standardViewers);
             }
+
+            this.server.playerList.values().stream()
+                    .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                    .filter(PlayerEntitySkinSender::requiresRetainedEntry)
+                    .forEach(viewer -> PlayerEntitySkinSender.replacePlayerListEntry(viewer, entry));
         }
     }
 

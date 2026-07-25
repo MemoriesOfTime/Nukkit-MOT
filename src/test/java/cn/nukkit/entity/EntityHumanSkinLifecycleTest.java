@@ -13,6 +13,9 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.session.NetworkPlayerSession;
+import cn.nukkit.plugin.InternalPlugin;
+import cn.nukkit.scheduler.ServerScheduler;
+import cn.nukkit.scheduler.TaskHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -30,12 +33,14 @@ class EntityHumanSkinLifecycleTest {
 
     private Server server;
     private Level level;
+    private final List<Runnable> pendingDelayedTasks = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
         MockServer.reset();
         this.server = MockServer.get();
         this.level = this.server.getDefaultLevel();
+        this.pendingDelayedTasks.clear();
 
         lenient().when(this.level.getServer()).thenReturn(this.server);
         lenient().when(this.server.getViewDistance()).thenReturn(2);
@@ -45,15 +50,38 @@ class EntityHumanSkinLifecycleTest {
         doCallRealMethod().when(this.server).updatePlayerListData(
                 any(PlayerListPacket.Entry.class), any(Player[].class));
         doCallRealMethod().when(this.server).removePlayerListData(any(UUID.class), any(Player.class));
+
+        // 捕获式 fake scheduler：默认不执行延迟任务，runPendingDelayedTasks() 可手动触发。
+        // Capturing fake: delayed tasks don't run until runPendingDelayedTasks() flushes them.
+        ServerScheduler fakeScheduler = mock(ServerScheduler.class);
+        lenient().when(this.server.getScheduler()).thenReturn(fakeScheduler);
+        lenient().when(fakeScheduler.scheduleDelayedTask(eq(InternalPlugin.INSTANCE), any(Runnable.class), anyInt()))
+                .thenAnswer(invocation -> {
+                    this.pendingDelayedTasks.add(invocation.getArgument(1));
+                    return mock(TaskHandler.class);
+                });
+    }
+
+    /**
+     * 执行所有已注册的延迟任务，模拟延迟到期。
+     * <p>
+     * Runs all registered delayed tasks, simulating the delay elapsing.
+     */
+    private void runPendingDelayedTasks() {
+        for (Runnable task : new ArrayList<>(this.pendingDelayedTasks)) {
+            task.run();
+        }
+        this.pendingDelayedTasks.clear();
     }
 
     @Test
-    void v860NpcKeepsPlayerListRegistrationUntilDespawn() {
+    void v860NpcSendsSkinHandshakeBeforeDelayedRemove() {
         TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
         RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);
 
         npc.spawnTo(viewer);
 
+        // 延迟 REMOVE 未触发，仅见握手三件套（ADD → 皮肤包 → AddPlayer）。
         List<DataPacket> lifecyclePackets = viewer.sentPackets.stream()
                 .filter(packet -> packet instanceof PlayerListPacket
                         || packet instanceof PlayerSkinPacket
@@ -67,6 +95,26 @@ class EntityHumanSkinLifecycleTest {
         assertEquals(npc.getSkin().getSkinId(), update.skin.getSkinId());
         assertInstanceOf(AddPlayerPacket.class, lifecyclePackets.get(2));
         assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+    }
+
+    @Test
+    void v860NpcRemovesPlayerListEntryAfterDelayedRemove() {
+        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
+        RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);
+        npc.spawnTo(viewer);
+        viewer.sentPackets.clear();
+
+        // 触发延迟 REMOVE，清理 Tab 条目。
+        runPendingDelayedTasks();
+
+        List<PlayerListPacket> removes = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertEquals(1, removes.size());
+        assertEquals(PlayerListPacket.TYPE_REMOVE, removes.get(0).type);
+        assertEquals(npc.getUniqueId(), removes.get(0).entries[0].uuid);
+        assertFalse(viewer.sentSkins.contains(npc.getUniqueId()));
     }
 
     @Test
@@ -199,6 +247,25 @@ class EntityHumanSkinLifecycleTest {
     }
 
     @Test
+    void v860NpcRemovesPlayerListRegistrationOnClose() {
+        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
+        RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);
+        npc.spawnTo(viewer);
+        viewer.sentPackets.clear();
+
+        npc.close();
+
+        List<DataPacket> lifecyclePackets = viewer.sentPackets.stream()
+                .filter(packet -> packet instanceof RemoveEntityPacket || packet instanceof PlayerListPacket)
+                .toList();
+        assertEquals(2, lifecyclePackets.size());
+        assertInstanceOf(RemoveEntityPacket.class, lifecyclePackets.get(0));
+        PlayerListPacket remove = assertInstanceOf(PlayerListPacket.class, lifecyclePackets.get(1));
+        assertEquals(PlayerListPacket.TYPE_REMOVE, remove.type);
+        assertFalse(viewer.sentSkins.contains(npc.getUniqueId()));
+    }
+
+    @Test
     void v860NpcRegistersSkinAgainAfterDespawn() {
         TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
         RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);
@@ -219,6 +286,31 @@ class EntityHumanSkinLifecycleTest {
         assertInstanceOf(PlayerSkinPacket.class, lifecyclePackets.get(1));
         assertInstanceOf(AddPlayerPacket.class, lifecyclePackets.get(2));
         assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+    }
+
+    @Test
+    void v860NpcDelayedRemoveFromPriorSpawnDoesNotClobberReRegistration() {
+        // 回归：despawn → re-spawn 后，首次 spawn 的旧延迟任务不得误删二次注册的条目。
+        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
+        RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);
+        npc.spawnTo(viewer);
+        npc.despawnFrom(viewer);
+        viewer.sentPackets.clear();
+        npc.spawnTo(viewer);
+        viewer.sentPackets.clear();
+        assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+
+        // 触发所有延迟任务（含首次 spawn 的旧任务），二次注册条目应恰好被移除一次。
+        runPendingDelayedTasks();
+
+        List<PlayerListPacket> removes = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .filter(packet -> packet.type == PlayerListPacket.TYPE_REMOVE)
+                .toList();
+        assertEquals(1, removes.size());
+        assertEquals(npc.getUniqueId(), removes.get(0).entries[0].uuid);
+        assertFalse(viewer.sentSkins.contains(npc.getUniqueId()));
     }
 
     private RecordingPlayer newViewer(GameVersion gameVersion) {

@@ -381,6 +381,7 @@ public class EntityHuman extends EntityHumanType {
                 player.dataPacket(pkk);
             }
 
+            // V860 分支由 PlayerEntitySkinSender 延迟移除，其余非 Player 实体立即移除。
             if (!(this instanceof Player) && !retainNpcListEntry) {
                 this.server.removePlayerListData(this.uuid, player);
             }
