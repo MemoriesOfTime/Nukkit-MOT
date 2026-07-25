@@ -1360,10 +1360,10 @@ public class LevelSoundEventPacket extends DataPacket {
             case SOUND_SCULK_SENSOR_POWER_OFF -> "power.off.sculk_sensor";
             case SOUND_BUCKET_FILL_POWDER_SNOW -> "bucket.fill.powder_snow";
             case SOUND_BUCKET_EMPTY_POWDER_SNOW -> "bucket.empty.powder_snow";
-            case SOUND_POINTED_DRIPSTONE_CAULDRON_DRIP_WATER -> "cauldron_drip.lava.pointed_dripstone";
-            case SOUND_POINTED_DRIPSTONE_CAULDRON_DRIP_LAVA -> "cauldron_drip.water.pointed_dripstone";
-            case SOUND_POINTED_DRIPSTONE_DRIP_WATER -> "drip.lava.pointed_dripstone";
-            case SOUND_POINTED_DRIPSTONE_DRIP_LAVA -> "drip.water.pointed_dripstone";
+            case SOUND_POINTED_DRIPSTONE_CAULDRON_DRIP_WATER -> "cauldron_drip.water.pointed_dripstone";
+            case SOUND_POINTED_DRIPSTONE_CAULDRON_DRIP_LAVA -> "cauldron_drip.lava.pointed_dripstone";
+            case SOUND_POINTED_DRIPSTONE_DRIP_WATER -> "drip.water.pointed_dripstone";
+            case SOUND_POINTED_DRIPSTONE_DRIP_LAVA -> "drip.lava.pointed_dripstone";
             case SOUND_CAVE_VINES_PICK_BERRIES -> "pick_berries.cave_vines";
             case SOUND_BIG_DRIPLEAF_TILT_DOWN -> "tilt_down.big_dripleaf";
             case SOUND_BIG_DRIPLEAF_TILT_UP -> "tilt_up.big_dripleaf";

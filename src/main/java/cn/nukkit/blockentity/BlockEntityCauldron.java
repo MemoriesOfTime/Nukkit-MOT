@@ -127,7 +127,8 @@ public class BlockEntityCauldron extends BlockEntitySpawnable {
 
     @Override
     public boolean isBlockEntityValid() {
-        return getBlock().getId() == Block.CAULDRON_BLOCK;
+        int id = getBlock().getId();
+        return id == Block.CAULDRON_BLOCK || id == Block.LAVA_CAULDRON;
     }
 
     @Override
