@@ -212,6 +212,7 @@ public class ConfigMigration {
         migrated |= migrateBoolean("temp-ip-ban-failed-xbox-auth", serverConfig.gameFeatureSettings()::tempIpBanFailedXboxAuth);
         migrated |= migrateBoolean("strong-ip-bans", serverConfig.gameFeatureSettings()::strongIpBans);
         migrated |= migrateBoolean("check-op-movement", serverConfig.gameFeatureSettings()::checkOpMovement);
+        migrated |= migrateBoolean("vanilla-armor-reduction", serverConfig.gameFeatureSettings()::vanillaArmorReduction);
 
         // NetEase settings
         migrated |= migrateBoolean("netease-client-support", serverConfig.neteaseSettings()::clientSupport);

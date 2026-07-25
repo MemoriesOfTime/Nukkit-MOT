@@ -1,5 +1,6 @@
 package cn.nukkit.item.enchantment.protection;
 
+import cn.nukkit.Server;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -33,7 +34,9 @@ public class EnchantmentProtectionAll extends EnchantmentProtection {
     public float getProtectionFactor(EntityDamageEvent e) {
         DamageCause cause = e.getCause();
 
-        if (level <= 0 || cause == DamageCause.VOID || cause == DamageCause.CUSTOM || cause == DamageCause.HUNGER) {
+        // legacy 额外排除 MAGIC(保护附魔不减免魔法)
+        if (level <= 0 || cause == DamageCause.VOID || cause == DamageCause.CUSTOM || cause == DamageCause.HUNGER
+                || (!Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction() && cause == DamageCause.MAGIC)) {
             return 0;
         }
 
