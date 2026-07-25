@@ -5373,8 +5373,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 inventory.equipItem(useItemData.hotbarSlot);
                             }
 
+                            // 旁观者模式检查：如果启用了客户端旁观模式，则完全阻止交互（不触发事件）
+                            // 如果未启用，则允许触发事件但不允许实际破坏方块（假旁观模式，类似创造模式）
+                            // Spectator mode check: If client spectator mode is enabled, completely block interaction (no event trigger)
+                            // If not enabled, allow event trigger but prevent actual block breaking (fake spectator mode, similar to creative mode)
+                            if (this.isSpectator() && this.server.useClientSpectator) {
+                                return;
+                            }
+
                             item = this.inventory.getItemInHand();
-                            if (item instanceof ItemCrossbow && !item.onClickAir(this, directionVector)) {
+                            if (item instanceof ItemCrossbow && (this.isSpectator() || !item.onClickAir(this, directionVector))) {
                                 return;
                             }
 
@@ -5384,6 +5392,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             PlayerInteractEvent interactEvent = new PlayerInteractEvent(this, item, directionVector, face, Action.RIGHT_CLICK_AIR);
+                            if (this.isSpectator()) {
+                                interactEvent.setCancelled();
+                            }
                             this.server.getPluginManager().callEvent(interactEvent);
 
                             if (interactEvent.isCancelled()) {
