@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,8 +18,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Covers {@link LibraryLoader}'s offline-parseable logic (coordinate parsing, pom parsing, scope filtering,
- * cycle handling). Network downloads are not exercised here.
+ * Covers {@link LibraryLoader}'s coordinate parsing, pom parsing, scope filtering, cycle handling,
+ * path-traversal rejection, XXE rejection, and nearest-wins transitive conflict resolution.
+ * The nearest-wins test spins up a local HTTP server; other tests stay offline.
  */
 public class LibraryLoaderTest {
 
@@ -40,6 +43,29 @@ public class LibraryLoaderTest {
         assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse(":missing:groups"));
         assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse(""));
         assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse(null));
+    }
+
+    /**
+     * 回归：路径穿越防护。{@code libraries/} 之外的目标必须被拒。
+     * / Regression: path traversal — targets outside {@code libraries/} must be rejected.
+     */
+    @Test
+    public void rejectsPathTraversalInCoordinates() {
+        // 各类典型穿越 payload / typical traversal payloads
+        assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse("..:lib:1.0"), "纯点段 groupId");
+        assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse("com.example:..:1.0"), "纯点段 artifactId");
+        assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse("a:b:c:d"), "多余段（已覆盖）");
+        assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse("../evil:lib:1.0"), "groupId 含路径分隔");
+        assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse("com.example:lib/../../evil:1.0"), "artifactId 含 /");
+        assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse("a:b:c/../../evil"), "version 含 /");
+        assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse("a\\b:lib:1.0"), "groupId 含反斜杠");
+        assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse(".hidden:lib:1.0"), "groupId 首字符为点");
+        assertThrows(LibraryLoadException.class, () -> LibraryLoader.parse("com.example:lib:1.0."), "version 尾字符为点");
+        // 合法坐标应仍然通过 / legitimate coordinates must still pass
+        LibraryLoader.Coordinate ok = LibraryLoader.parse("com.squareup.okhttp3:okhttp:4.12.0");
+        assertEquals("com.squareup.okhttp3:okhttp:4.12.0", ok.key());
+        LibraryLoader.Coordinate dotted = LibraryLoader.parse("org.apache.commons:commons-lang3:3.12.0");
+        assertEquals("org/apache/commons/commons-lang3/3.12.0", dotted.repositoryPath());
     }
 
     @Test
@@ -194,6 +220,173 @@ public class LibraryLoaderTest {
         Files.writeString(pom, "not xml at all", StandardCharsets.UTF_8);
 
         assertThrows(LibraryLoadException.class, () -> LibraryLoader.parsePom(pom.toFile()));
+    }
+
+    /**
+     * 回归：XXE 防护。POM 声明外部实体指向本地敏感文件时，敏感内容不得泄漏进任何解析出的坐标。
+     * <br>设计要点：sentinel 用纯字母数字（能通过 {@code validateComponent} 的 {@code [A-Za-z0-9.\-_]} 校验），
+     * 这样一旦 XXE 防护失效，泄漏的内容会作为合法坐标出现在结果列表里，测试即可捕获。
+     * 若 sentinel 含 {@code _} 之外的非法字符，{@code parse()} 会因路径穿越校验丢弃该坐标，
+     * 反而掩盖 XXE 泄漏（测试假阴性）。
+     * <br>双层断言：
+     * <ol>
+     *   <li>JDK 自带 Xerces 上 {@code disallow-doctype-decl} 直接拒 DOCTYPE → 解析抛异常（通过）。</li>
+     *   <li>若 parser 不支持 {@code disallow-doctype-decl} 而 DOCTYPE 通过，{@code external-general-entities=false}
+     *       + {@code FEATURE_SECURE_PROCESSING} 应阻断实体展开——坐标字段不得含 sentinel。</li>
+     * </ol>
+     * / Regression: XXE protection. When a POM declares an external entity pointing at a local file,
+     * the file's content must not leak into any parsed coordinate. The sentinel is alphanumeric so
+     * it passes {@code validateComponent}'s charset — if XXE protection regresses, the leaked content
+     * shows up as a valid coordinate and the test catches it.
+     */
+    @Test
+    public void parsePomRejectsDoctypeAndExternalEntities(@TempDir Path tempDir) throws Exception {
+        // 全字母数字 sentinel：能通过 parse() 的字符集校验，确保泄漏不会被 validateComponent 顺手拦截。
+        // / Alphanumeric sentinel: passes parse()'s charset check so a leak isn't masked by
+        // validateComponent's path-traversal validation.
+        final String SENTINEL = "XXELEAK7c3f9a";
+        Path sensitive = tempDir.resolve("secret.txt");
+        Files.writeString(sensitive, SENTINEL, StandardCharsets.UTF_8);
+
+        Path pom = tempDir.resolve("xxe.pom");
+        Files.writeString(pom, ""
+                + "<!DOCTYPE project [\n"
+                + "  <!ENTITY xxe SYSTEM \"file:" + sensitive.toUri().getRawPath() + "\">\n"
+                + "]>\n"
+                + "<project>\n"
+                + "  <groupId>com.example</groupId>\n"
+                + "  <artifactId>xxe-test</artifactId>\n"
+                + "  <version>1.0.0</version>\n"
+                + "  <dependencies>\n"
+                + "    <dependency>\n"
+                + "      <groupId>&xxe;</groupId>\n"
+                + "      <artifactId>a</artifactId>\n"
+                + "      <version>1.0</version>\n"
+                + "    </dependency>\n"
+                + "  </dependencies>\n"
+                + "</project>\n", StandardCharsets.UTF_8);
+
+        List<LibraryLoader.Coordinate> deps;
+        try {
+            deps = LibraryLoader.parsePom(pom.toFile());
+        } catch (LibraryLoadException e) {
+            // 主断言：DOCTYPE 被拒是期望行为（JDK 自带 Xerces 路径），通过。
+            // / Primary assertion: DOCTYPE rejection is the expected (Xerces) path — pass.
+            return;
+        }
+        // 兜底断言：解析侥幸通过时，外部文件内容绝不能出现在任何坐标字段。
+        // / Defense-in-depth: if parsing somehow succeeded, external content must not appear.
+        for (LibraryLoader.Coordinate c : deps) {
+            assertFalse(c.groupId().contains(SENTINEL), "XXE 泄漏到 groupId / leak into groupId: " + c.groupId());
+            assertFalse(c.artifactId().contains(SENTINEL), "XXE 泄漏到 artifactId / leak into artifactId: " + c.artifactId());
+            assertFalse(c.version().contains(SENTINEL), "XXE 泄漏到 version / leak into version: " + c.version());
+        }
+    }
+
+    /**
+     * 回归：nearest-wins 语义。直接声明胜过传递依赖：A 传递依赖 X:1.0，同时直接声明 X:2.0 时，
+     * 最终下载列表中 X 应为 2.0（路径上包含 {@code /x/2.0/}），而非 1.0。
+     * / Regression: nearest-wins. Direct declaration of X:2.0 must override the transitive X:1.0
+     * pulled in by another coordinate.
+     */
+    @Test
+    public void directDependencyWinsOverTransitiveConflict(@TempDir Path tempDir) throws Exception {
+        // 确保 Server.getInstance() 可用（getBaseFolder 依赖它）。/ Ensure a Server instance exists.
+        cn.nukkit.MockServer.init();
+        // 将 libraries 根目录重定向到本测试的 @TempDir，避免污染共享 tmpdir。
+        // / Redirect the libraries root to this test's @TempDir to avoid polluting the shared tmpdir.
+        cn.nukkit.Server server = cn.nukkit.Server.getInstance();
+        // 通过 Mockito 临时把 dataPath 指向 @TempDir，让 getBaseFolder() 返回 tempDir/libraries。
+        // / Use Mockito to point dataPath at @TempDir so getBaseFolder() returns tempDir/libraries.
+        org.mockito.Mockito.when(server.getDataPath()).thenReturn(tempDir.toString());
+
+        // 准备本地 HTTP 仓库，提供 A、X 两个 jar 与对应 POM / Set up a local HTTP repo serving A and X
+        byte[] jarBytes = minimalJarBytes();
+        com.sun.net.httpserver.HttpServer httpServer = com.sun.net.httpserver.HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        httpServer.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            byte[] body;
+            if (path.endsWith(".jar")) {
+                body = jarBytes;
+            } else if (path.endsWith(".pom")) {
+                body = pomForPath(path).getBytes(StandardCharsets.UTF_8);
+            } else {
+                exchange.sendResponseHeaders(404, -1);
+                exchange.close();
+                return;
+            }
+            exchange.sendResponseHeaders(200, body.length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(body);
+            }
+        });
+        httpServer.start();
+        try {
+            int port = httpServer.getAddress().getPort();
+            String repo = "http://127.0.0.1:" + port + "/";
+
+            // 直接声明 A 与 X:2.0。A 的 POM 声明对 X:1.0 的传递依赖。
+            // 旧实现（深度优先 + 入口即 visited）会把 X:1.0 写进 resolved，X:2.0 直接被吞掉。
+            // 修复后 Pass 1 先注册 X:2.0，Pass 2 处理 A 的传递依赖时遇到 X 已注册 → 跳过。
+            // / Declare A and X:2.0 directly. A's POM declares a transitive dep on X:1.0.
+            // The old DFS-with-early-visited impl would let X:1.0 claim X, silently dropping X:2.0.
+            // After the fix, Pass 1 registers X:2.0 first; Pass 2 sees X already registered and skips.
+            List<String> coords = Arrays.asList("com.example:a:1.0", "com.example:x:2.0");
+            URL[] urls = LibraryLoader.resolve(coords, Arrays.asList(repo), MainLogger.getLogger());
+
+            // 找到 X 的 URL，必须是 2.0 版本 / find X's URL; it must be the 2.0 version
+            URL xUrl = null;
+            for (URL u : urls) {
+                if (u.getPath().contains("/x/")) {
+                    xUrl = u;
+                    break;
+                }
+            }
+            assertNotNull(xUrl, "resolved URL 列表中应包含 X");
+            assertTrue(xUrl.getPath().contains("/x/2.0/"),
+                    "nearest-wins: 直接声明的 X:2.0 应胜出，实际为 " + xUrl);
+        } finally {
+            httpServer.stop(0);
+            // 恢复 MockServer 默认 dataPath（避免影响后续测试）。/ Restore default dataPath.
+            org.mockito.Mockito.when(server.getDataPath()).thenReturn(System.getProperty("java.io.tmpdir"));
+        }
+    }
+
+    /** 构造一个最小的合法 jar 字节序列（仅含 manifest）。 / Minimal valid jar bytes (manifest only). */
+    private static byte[] minimalJarBytes() throws IOException {
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        try (java.util.jar.JarOutputStream jos = new java.util.jar.JarOutputStream(baos)) {
+            jos.putNextEntry(new java.util.jar.JarEntry("META-INF/MANIFEST.MF"));
+            jos.write("Manifest-Version: 1.0\n".getBytes(StandardCharsets.UTF_8));
+            jos.closeEntry();
+        }
+        return baos.toByteArray();
+    }
+
+    /** 为 HTTP 仓库路径生成对应 POM 内容（仅 A 声明对 X:1.0 的传递依赖；其他返回空 POM）。 / Generates POM content for a given repo path. */
+    private static String pomForPath(String path) {
+        if (path.contains("/a/")) {
+            return "<project>\n"
+                    + "  <groupId>com.example</groupId>\n"
+                    + "  <artifactId>a</artifactId>\n"
+                    + "  <version>1.0</version>\n"
+                    + "  <dependencies>\n"
+                    + "    <dependency>\n"
+                    + "      <groupId>com.example</groupId>\n"
+                    + "      <artifactId>x</artifactId>\n"
+                    + "      <version>1.0</version>\n"
+                    + "    </dependency>\n"
+                    + "  </dependencies>\n"
+                    + "</project>\n";
+        }
+        // X 的 POM：version 由 URL 路径决定（X:1.0 与 X:2.0 共用同一模板）。
+        // / X's POM: version comes from the URL path (both X:1.0 and X:2.0 use this template).
+        String version = path.contains("/x/2.0/") ? "2.0" : "1.0";
+        return "<project>\n"
+                + "  <groupId>com.example</groupId>\n"
+                + "  <artifactId>x</artifactId>\n"
+                + "  <version>" + version + "</version>\n"
+                + "</project>\n";
     }
 
     @Test

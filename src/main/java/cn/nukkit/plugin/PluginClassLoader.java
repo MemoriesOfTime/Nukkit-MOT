@@ -23,8 +23,9 @@ public class PluginClassLoader extends URLClassLoader {
 
     /**
      * 在主 jar 之外追加库 jar URL（通常是 plugin.yml {@code libraries} 声明、服务端下载好的外部库）。
-     * 各插件库彼此隔离。 / Adds extra library URLs beyond the main jar (typically downloaded from plugin.yml libraries).
-     * Each plugin's libraries stay isolated.
+     * 隔离语义（版本优先，非访问控制）见 {@link #findClass(String, boolean)} 与 {@link LibraryLoader#resolve}。
+     * / Adds extra library URLs beyond the main jar (typically downloaded from plugin.yml libraries).
+     * Isolation semantics (version-preference, not access control) are documented in {@link #findClass(String, boolean)} and {@link LibraryLoader#resolve}.
      */
     public PluginClassLoader(JavaPluginLoader loader, ClassLoader parent, File file, URL[] extraUrls) throws MalformedURLException {
         super(buildUrls(file, extraUrls), parent);

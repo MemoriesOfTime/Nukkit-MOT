@@ -7,6 +7,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
@@ -17,6 +18,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,20 +34,40 @@ public class LibraryLoader {
     private static final String JAR_SUFFIX = ".jar";
     private static final String POM_SUFFIX = ".pom";
 
+    /** Maven 坐标段允许的字符集（字母、数字、点、连字符、下划线），排除 {@code /} {@code \} 以杜绝路径穿越。 / Allowed charset for a Maven coordinate segment (alphanumeric, dot, hyphen, underscore); excludes {@code /} {@code \} to prevent path traversal. */
+    private static final java.util.regex.Pattern COMPONENT_FORBIDDEN_PATTERN =
+            java.util.regex.Pattern.compile("[^A-Za-z0-9.\\-_]");
+
     /** 坐标 → jar URL 的进程级缓存，跨插件复用解析结果。 / coordinate → jar URL, cached process-wide across plugins. */
     private static final Map<String, URL> RESOLVED_URL_CACHE = new ConcurrentHashMap<>();
 
     private static final DocumentBuilderFactory DOCUMENT_BUILDER_FACTORY;
 
     static {
+        // XXE 防护分层：标准 JAXP/SAX 特性 fail-closed（失败即中止类初始化），Apache 专有特性 best-effort。
+        // / XXE hardening, layered: standard JAXP/SAX features are fail-closed; Apache-specific ones best-effort.
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         try {
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
             factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
             factory.setNamespaceAware(false);
+            // 纵深防御；部分 parser 不识别这两个属性，忽略即可。 / Defense-in-depth; some parsers reject these.
+            try {
+                factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+                factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+            } catch (IllegalArgumentException ignored) {
+            }
+            // Apache Xerces 专有；非 Xerces parser 可能不支持，跳过即可。 / Apache Xerces-specific; skip on non-Xerces.
+            try {
+                factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+                factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            } catch (Exception ignored) {
+            }
         } catch (Exception e) {
-            // 极端情况下回退到默认（无 XXE 防护），不影响主流程 / Fallback to defaults if hardening fails.
+            throw new ExceptionInInitializerError("Failed to harden DocumentBuilderFactory against XXE: " + e);
         }
         DOCUMENT_BUILDER_FACTORY = factory;
     }
@@ -54,13 +76,17 @@ public class LibraryLoader {
     }
 
     /**
-     * 解析 Maven 坐标列表，下载 jar（含传递依赖）到 {@code libraries/} 文件夹，返回所有 jar 的 URL。<br>
-     * Resolves Maven coordinates, downloading jars (incl. transitive deps) into {@code libraries/}, returns all jar URLs.
-     *
-     * <p>仓库尝试顺序：用户仓库在前，服务端兜底仓库其次，同 URL 仅尝试一次。返回的 URL[] 应交给
-     * {@link PluginClassLoader} 注入对应插件，库按插件隔离。<br>Repository trial order: user-declared first,
-     * then server fallbacks; each URL is tried at most once. The returned URL[] should be injected into the
-     * plugin's {@link PluginClassLoader}; libraries stay per-plugin isolated.
+     * 解析 Maven 坐标，下载 jar（含传递依赖）到 {@code libraries/}，返回所有 jar URL。仓库尝试顺序：用户仓库在前，
+     * 兜底仓库其次。隔离语义见 {@link PluginClassLoader}（版本优先，非访问控制）。
+     * <p>
+     * <b>限制</b>：仅处理根 {@code <dependencies>} 中字面量 version、scope ∈ {compile, runtime}、非 optional 的条目；
+     * 不支持 parent 继承、dependencyManagement、BOM、exclusions、relocation、version range、classifier。
+     * / Resolves Maven coordinates, downloading jars (incl. transitive deps) into {@code libraries/}, returning all jar URLs.
+     * Repository trial order: user-declared first, fallbacks second. Isolation semantics: see {@link PluginClassLoader}
+     * (version-preference, not access control).
+     * <p>
+     * <b>Limitations</b>: handles only root {@code <dependencies>} with literal versions, scope ∈ {compile, runtime},
+     * optional != true; no parent inheritance, dependencyManagement, BOM, exclusions, relocation, version ranges, classifiers.
      *
      * @param coordinates      形如 {@code "groupId:artifactId:version"} 的坐标列表 / coordinates like {@code "groupId:artifactId:version"}
      * @param userRepositories 用户声明的额外仓库（null/空 → 只用默认仓库） / extra repositories (null/empty → defaults only)
@@ -76,22 +102,38 @@ public class LibraryLoader {
         if (!baseFolder.isDirectory() && !baseFolder.mkdirs()) {
             throw new LibraryLoadException("Could not create libraries folder: " + baseFolder.getAbsolutePath());
         }
+        Path basePath = baseFolder.getAbsoluteFile().toPath().normalize();
 
         List<String> repositories = mergeRepositories(userRepositories);
 
-        // 按 groupId:artifactId 去重（同 g:a 不同 v → first wins），保留首次出现顺序。
+        // nearest-wins：Pass 1 先注册直接声明，Pass 2 处理传递依赖时跳过已注册的 g:a。
+        // / nearest-wins: Pass 1 registers direct deps first; Pass 2 skips any g:a already registered.
         Map<String, Coordinate> resolved = new LinkedHashMap<>();
-        Set<String> visited = new HashSet<>();
+        Set<String> directGAKeys = new LinkedHashSet<>();
 
+        List<Coordinate> directCoords = new ArrayList<>(coordinates.size());
         for (String raw : coordinates) {
             Coordinate root = parse(raw);
-            resolveTransitive(root, baseFolder, repositories, logger, resolved, visited);
+            String gaKey = root.groupId() + ":" + root.artifactId();
+            if (directGAKeys.add(gaKey)) {
+                directCoords.add(root);
+                ensureArtifactDownloaded(root, basePath, repositories, logger, resolved);
+            } else {
+                Coordinate first = resolved.get(gaKey);
+                if (first != null && !first.version().equals(root.version())) {
+                    logger.warning("[LibraryLoader] Duplicate direct declaration for " + gaKey
+                            + ": keeping " + first.key() + ", ignoring " + root.key());
+                }
+            }
+        }
+
+        Set<String> visited = new HashSet<>(directGAKeys);
+        for (Coordinate root : directCoords) {
+            resolveTransitive(root, basePath, repositories, logger, resolved, visited);
         }
 
         List<URL> urls = new ArrayList<>(resolved.size());
         for (Coordinate c : resolved.values()) {
-            // resolveTransitive 必然已把每个坐标的 URL 填进缓存；防御性跳过任何意外缺失。
-            // resolveTransitive always populates the cache; defensively skip any unexpected miss.
             URL cached = RESOLVED_URL_CACHE.get(c.key());
             if (cached != null) {
                 urls.add(cached);
@@ -127,25 +169,27 @@ public class LibraryLoader {
         return trimmed.endsWith("/") ? trimmed : trimmed + "/";
     }
 
-    /**
-     * 递归解析一个坐标及其传递依赖。<br>
-     * Recursively resolves a coordinate together with its transitive dependencies.
-     */
-    private static void resolveTransitive(Coordinate coord, File baseFolder, List<String> repositories,
-                                          cn.nukkit.utils.MainLogger logger,
-                                          Map<String, Coordinate> resolved, Set<String> visited) {
+    /** 下载并缓存一个坐标的 jar（含路径穿越校验），不解析 POM。 / Downloads and caches a coordinate's jar (with path-traversal validation); does not parse the POM. */
+    private static void ensureArtifactDownloaded(Coordinate coord, Path basePath, List<String> repositories,
+                                                 cn.nukkit.utils.MainLogger logger, Map<String, Coordinate> resolved) {
         String gaKey = coord.groupId() + ":" + coord.artifactId();
-        if (!visited.add(gaKey)) {
-            return; // 防止循环依赖 / cycle guard
+        if (resolved.containsKey(gaKey)) {
+            return;
         }
 
         URL jarUrl = RESOLVED_URL_CACHE.get(coord.key());
         if (jarUrl == null) {
-            jarUrl = downloadArtifact(coord, "jar", baseFolder, repositories, logger);
+            jarUrl = downloadArtifact(coord, "jar", basePath, repositories, logger);
             RESOLVED_URL_CACHE.putIfAbsent(coord.key(), jarUrl);
         }
+        resolved.put(gaKey, coord);
+    }
 
-        File pomFile = downloadArtifactFile(coord, "pom", baseFolder, repositories, logger);
+    /** 递归解析传递依赖；调用方须保证 coord 的 jar 已在 {@code resolved} 中。 / Recursively resolves transitive deps; caller must ensure coord's jar is already in {@code resolved}. */
+    private static void resolveTransitive(Coordinate coord, Path basePath, List<String> repositories,
+                                          cn.nukkit.utils.MainLogger logger,
+                                          Map<String, Coordinate> resolved, Set<String> visited) {
+        File pomFile = downloadArtifactFile(coord, "pom", basePath, repositories, logger);
         List<Coordinate> transitive = Collections.emptyList();
         try {
             transitive = parsePom(pomFile);
@@ -154,27 +198,34 @@ public class LibraryLoader {
             logger.warning("[LibraryLoader] Failed to parse pom of " + coord.key() + ": " + e.getMessage());
         }
 
-        resolved.put(gaKey, coord);
-
         for (Coordinate child : transitive) {
-            resolveTransitive(child, baseFolder, repositories, logger, resolved, visited);
+            String gaKey = child.groupId() + ":" + child.artifactId();
+            if (!visited.add(gaKey)) {
+                continue;
+            }
+            // nearest-wins：已被注册（直接声明或先到传递依赖）则跳过。 / nearest-wins: skip if already registered.
+            if (resolved.containsKey(gaKey)) {
+                continue;
+            }
+            ensureArtifactDownloaded(child, basePath, repositories, logger, resolved);
+            resolveTransitive(child, basePath, repositories, logger, resolved, visited);
         }
     }
 
     /** 下载 artifact 到 {@code .tmp} 临时文件再原子落盘，避免半成品文件。 / Downloads to {@code .tmp} then atomically moves into place to avoid partial files. */
-    private static URL downloadArtifact(Coordinate coord, String type, File baseFolder, List<String> repositories, cn.nukkit.utils.MainLogger logger) {
+    private static URL downloadArtifact(Coordinate coord, String type, Path basePath, List<String> repositories, cn.nukkit.utils.MainLogger logger) {
         try {
-            return downloadArtifactFile(coord, type, baseFolder, repositories, logger).toURI().toURL();
+            return downloadArtifactFile(coord, type, basePath, repositories, logger).toURI().toURL();
         } catch (java.net.MalformedURLException e) {
-            // 不应发生（本地文件 URI），转成 LibraryLoadException 让上层 fail-fast
+            // 本地文件 URI 不应抛此异常；转 fail-fast。 / Should not happen for local file URIs; fail fast.
             throw new LibraryLoadException("Invalid URL for " + coord.key() + ": " + e.getMessage());
         }
     }
 
     /** 下载 artifact（jar 或 pom），按 Maven 布局放到 {@code libraries/<group>/<artifact>/<version>/}；已存在则复用。 / Downloads by Maven layout; reuses an existing file. */
-    private static File downloadArtifactFile(Coordinate coord, String type, File baseFolder, List<String> repositories, cn.nukkit.utils.MainLogger logger) {
+    private static File downloadArtifactFile(Coordinate coord, String type, Path basePath, List<String> repositories, cn.nukkit.utils.MainLogger logger) {
         String suffix = "jar".equals(type) ? JAR_SUFFIX : POM_SUFFIX;
-        File target = artifactFile(coord, suffix, baseFolder);
+        File target = artifactFile(coord, suffix, basePath);
 
         if (!target.isFile()) {
             boolean ok = false;
@@ -200,8 +251,7 @@ public class LibraryLoader {
     /** 下载到 {@code target.tmp} 临时文件，成功后原子移动到 {@code target}。 / Download to {@code target.tmp} then atomically move to {@code target}. */
     static void downloadToTemp(String url, File target, cn.nukkit.utils.MainLogger logger) throws IOException, InterruptedException {
         logger.info("[LibraryLoader] Downloading " + url);
-        // HttpClient.BodyHandlers.ofFile 不创建父目录，必须先建好 <groupPath>/<artifact>/<version>/。
-        // HttpClient.BodyHandlers.ofFile does NOT create parent dirs; create them first.
+        // HttpClient.BodyHandlers.ofFile 不创建父目录。 / HttpClient.BodyHandlers.ofFile does not create parent dirs.
         File parent = target.getParentFile();
         if (!parent.isDirectory() && !parent.mkdirs()) {
             throw new IOException("Could not create directory " + parent.getAbsolutePath());
@@ -215,25 +265,28 @@ public class LibraryLoader {
         Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     }
 
-    /** 按坐标构造目标文件：{@code libraries/<groupPath>/<artifact>/<version>/<artifact>-<version><suffix>}。 / Target file by Maven layout. */
-    private static File artifactFile(Coordinate coord, String suffix, File baseFolder) {
-        return new File(new File(baseFolder, coord.repositoryPath()), coord.fileName(suffix));
+    /**
+     * 按坐标构造目标文件。{@link #parse(String)} 已校验各段字符；此方法再做一层归一化比对，
+     * 确保目标仍在 {@code basePath} 之下（防 {@code ..} 或绝对路径穿越）。
+     * / Builds the target file by Maven layout. {@link #parse(String)} validates each segment; this adds
+     * a second layer ensuring the normalized target stays under {@code basePath}.
+     */
+    private static File artifactFile(Coordinate coord, String suffix, Path basePath) {
+        File target = new File(basePath.toFile(), coord.repositoryPath() + '/' + coord.fileName(suffix));
+        Path normalized = target.toPath().toAbsolutePath().normalize();
+        if (!normalized.startsWith(basePath)) {
+            throw new LibraryLoadException("Coordinate escapes libraries directory: " + coord.key());
+        }
+        return normalized.toFile();
     }
 
-    /**
-     * 解析 pom，提取根 {@code <dependencies>}（不含 {@code <dependencyManagement>}）里 scope ∈ {compile, runtime, 缺省}
-     * 且非 optional 的 {@code <dependency>}。<br>
-     * Parses a pom, extracting {@code <dependency>} entries from the root {@code <dependencies>} (excluding
-     * {@code <dependencyManagement>}) with scope ∈ {compile, runtime, omitted} and optional != true.
-     */
+    /** 解析 pom，提取根 {@code <dependencies>}（不含 {@code <dependencyManagement>}）里 scope ∈ {compile, runtime} 且非 optional 的依赖。 / Parses a pom, extracting root {@code <dependencies>} (not {@code <dependencyManagement>}) with scope ∈ {compile, runtime} and optional != true. */
     static List<Coordinate> parsePom(File pomFile) {
         List<Coordinate> result = new ArrayList<>();
         try {
             DocumentBuilder builder = DOCUMENT_BUILDER_FACTORY.newDocumentBuilder();
             Document doc = builder.parse(pomFile);
             doc.getDocumentElement().normalize();
-            // 只取 project 直接子节点的 <dependencies>，跳过 <dependencyManagement> 内的同名节点。
-            // Take only <dependencies> that are direct children of <project>, skipping those inside <dependencyManagement>.
             Element root = doc.getDocumentElement();
             NodeList rootChildren = root.getChildNodes();
             for (int i = 0; i < rootChildren.getLength(); i++) {
@@ -253,8 +306,6 @@ public class LibraryLoader {
                     if (groupId == null || artifactId == null || version == null) {
                         continue;
                     }
-                    // 仅保留 compile/runtime/缺省；过滤 test/provided/import。
-                    // Keep only compile/runtime/omitted; drop test/provided/import.
                     if (scope != null && !scope.isEmpty()
                             && !scope.equals("compile") && !scope.equals("runtime")) {
                         continue;
@@ -262,12 +313,15 @@ public class LibraryLoader {
                     if ("true".equalsIgnoreCase(optional)) {
                         continue;
                     }
-                    // 所有 ${...} 占位符都无法解析（不展开 properties）→ 跳过。
-                    // Any ${...} placeholder is unresolvable (we don't expand properties) → skip.
-                    if (version.startsWith("${") && version.endsWith("}")) {
+                    // ${...} 占位符无法解析（不展开 properties）。 / ${...} placeholders can't be resolved.
+                    if (version.indexOf('$') >= 0 || version.indexOf('{') >= 0 || version.indexOf('}') >= 0) {
                         continue;
                     }
-                    result.add(new Coordinate(groupId, artifactId, version));
+                    try {
+                        result.add(parse(groupId + ":" + artifactId + ":" + version));
+                    } catch (LibraryLoadException e) {
+                        // 来自 POM 的坐标也过路径校验；非法则跳过而非让整个 POM 失败。 / POM-sourced coords also validated; skip on failure rather than failing the whole POM.
+                    }
                 }
             }
         } catch (Exception e) {
@@ -283,7 +337,12 @@ public class LibraryLoader {
         return text == null ? null : text.trim();
     }
 
-    /** 解析形如 {@code groupId:artifactId:version} 的坐标字符串，各段自动去除首尾空白。 / Parses a {@code groupId:artifactId:version} string, trimming each segment. */
+    /**
+     * 解析 {@code groupId:artifactId:version}。每段经 {@link #validateComponent} 校验，
+     * 配合 {@link Coordinate#repositoryPath()} 杜绝路径穿越。
+     * / Parses {@code groupId:artifactId:version}; each segment is validated by {@link #validateComponent},
+     * and combined with {@link Coordinate#repositoryPath()} prevents path traversal.
+     */
     static Coordinate parse(String coordinate) {
         if (coordinate == null) {
             throw new LibraryLoadException("Invalid Maven coordinate (expected groupId:artifactId:version): null");
@@ -295,10 +354,32 @@ public class LibraryLoader {
         String groupId = parts[0].trim();
         String artifactId = parts[1].trim();
         String version = parts[2].trim();
-        if (groupId.isEmpty() || artifactId.isEmpty() || version.isEmpty()) {
-            throw new LibraryLoadException("Invalid Maven coordinate (expected groupId:artifactId:version): " + coordinate);
-        }
+        validateComponent(groupId, "groupId", coordinate);
+        validateComponent(artifactId, "artifactId", coordinate);
+        validateComponent(version, "version", coordinate);
         return new Coordinate(groupId, artifactId, version);
+    }
+
+    /**
+     * 校验单个 Maven 坐标段：禁止路径分隔符、纯点段、首尾点、控制字符。
+     * / Validates a single Maven coordinate segment: forbids path separators, pure-dot segments,
+     * leading/trailing dots, and control characters.
+     */
+    private static void validateComponent(String value, String which, String original) {
+        if (value.isEmpty()) {
+            throw new LibraryLoadException("Invalid Maven coordinate (empty " + which + "): " + original);
+        }
+        if (value.equals("..") || value.equals(".")) {
+            throw new LibraryLoadException("Invalid Maven coordinate (" + which + " is a dot segment): " + original);
+        }
+        if (value.startsWith(".") || value.endsWith(".")) {
+            // 阻断 ".." 穿越 + 规避 Windows/Unix 解析差异。 / Blocks ".." traversal + platform-specific quirks.
+            throw new LibraryLoadException("Invalid Maven coordinate (" + which + " has leading/trailing dot): " + original);
+        }
+        if (COMPONENT_FORBIDDEN_PATTERN.matcher(value).find()) {
+            // 主要拦截路径分隔符 / \。 / Primarily blocks path separators / \.
+            throw new LibraryLoadException("Invalid Maven coordinate (" + which + " contains illegal character): " + original);
+        }
     }
 
     /** {@code libraries} 文件夹，位于服务端数据目录下。 / The {@code libraries} folder under the server data path. */
