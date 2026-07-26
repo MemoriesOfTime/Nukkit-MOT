@@ -79,7 +79,7 @@ public class EnchantInventory extends FakeBlockUIComponent {
     private void publishOptions(Item input) {
         releasePublishedOptions();
         long seed = System.nanoTime();
-        List<PlayerEnchantOptionsPacket.EnchantOptionData> generated = EnchantmentHelper.generateOptions(input, seed);
+        List<PlayerEnchantOptionsPacket.EnchantOptionData> generated = EnchantmentHelper.generateOptions(this.getHolder(), input, seed);
         if (generated.isEmpty()) {
             sendEmptyOptions();
             return;
