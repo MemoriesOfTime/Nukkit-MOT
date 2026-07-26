@@ -113,6 +113,17 @@ public class PluginDescription {
     private String prefix;
     private PluginLoadOrder order = PluginLoadOrder.POSTWORLD;
 
+    /**
+     * plugin.yml 声明的外部 Maven 库坐标列表（{@code groupId:artifactId:version}）。 / Externally declared Maven coordinates.
+     */
+    private List<String> libraries = new ArrayList<>();
+
+    /**
+     * plugin.yml 声明的额外仓库 URL，解析 libraries 时优先于服务端默认仓库；每个 URL 应以 {@code /} 结尾。
+     * / Extra repositories tried before the server defaults when resolving libraries; each URL should end with {@code /}.
+     */
+    private List<String> repositories = new ArrayList<>();
+
     private List<Permission> permissions = new ArrayList<>();
 
     public PluginDescription(Map<String, Object> yamlMap) {
@@ -195,6 +206,28 @@ public class PluginDescription {
         if (plugin.containsKey("permissions")) {
             this.permissions = Permission.loadPermissions((Map<String, Object>) plugin.get("permissions"));
         }
+
+        if (plugin.get("libraries") instanceof List) {
+            this.libraries = stringList(plugin.get("libraries"), "libraries");
+        }
+
+        if (plugin.get("repositories") instanceof List) {
+            this.repositories = stringList(plugin.get("repositories"), "repositories");
+        }
+    }
+
+    /**
+     * 把 YAML 解析的列表转为纯 {@code List<String>}，过滤掉非 String 元素（如误写的数字）。 / Coerces a YAML list into a plain {@code List<String>}, dropping non-String elements.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<String> stringList(Object value, String field) {
+        List<String> result = new ArrayList<>();
+        for (Object element : (List<Object>) value) {
+            if (element instanceof String) {
+                result.add((String) element);
+            }
+        }
+        return result;
     }
 
     /**
@@ -363,6 +396,26 @@ public class PluginDescription {
      */
     public List<String> getSoftDepend() {
         return softDepend;
+    }
+
+    /**
+     * 返回声明的外部 Maven 库坐标列表（{@code groupId:artifactId:version}），可能为空但不会为 null。<br>
+     * Declared external Maven coordinates; may be empty but never null.
+     *
+     * @return 坐标列表，不为 null / the coordinate list, never null
+     */
+    public List<String> getLibraries() {
+        return libraries;
+    }
+
+    /**
+     * 返回声明的额外仓库 URL 列表，解析 libraries 时优先于服务端默认仓库；可能为空但不会为 null。<br>
+     * Declared extra repositories tried before server defaults when resolving libraries; may be empty but never null.
+     *
+     * @return 仓库 URL 列表，不为 null / the repository URL list, never null
+     */
+    public List<String> getRepositories() {
+        return repositories;
     }
 
     /**
