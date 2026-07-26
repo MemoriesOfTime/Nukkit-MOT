@@ -1389,10 +1389,11 @@ public class Server {
     public void addOnlinePlayer(Player player) {
         this.playerList.put(player.getUniqueId(), player);
         PlayerListPacket.Entry entry = new PlayerListPacket.Entry(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin(), player.getLoginChainData().getXUID(), player.getLocatorBarColor());
-        Player[] viewers = this.playerList.values().toArray(Player.EMPTY_ARRAY);
-        this.updatePlayerListData(entry, viewers);
-        for (Player viewer : viewers) {
-            viewer.sentSkins.add(player.getUniqueId());
+        Player[] viewers = this.playerList.values().stream()
+                .filter(viewer -> !viewer.sentSkins.contains(player.getUniqueId()))
+                .toArray(Player[]::new);
+        if (viewers.length > 0) {
+            this.updatePlayerListData(entry, viewers);
         }
     }
 
@@ -1439,6 +1440,7 @@ public class Server {
                 remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(playerListEntry.uuid)};
                 viewer.dataPacket(remove);
             }
+            viewer.sentSkins.add(playerListEntry.uuid);
         }
 
         PlayerListPacket pk = new PlayerListPacket();
@@ -1471,6 +1473,7 @@ public class Server {
 
     public void sendFullPlayerListData(Player player) {
         PlayerListPacket.Entry[] array = this.playerList.values().stream()
+                .filter(p -> player.sentSkins.add(p.getUniqueId()))
                 .map(p -> new PlayerListPacket.Entry(
                         p.getUniqueId(),
                         p.getId(),
@@ -1486,12 +1489,6 @@ public class Server {
                 pk.type = PlayerListPacket.TYPE_ADD;
                 pk.entries = (PlayerListPacket.Entry[]) a;
                 player.dataPacket(pk);
-            }
-            // 接收者已收到这些玩家的列表项，登记以便后续 skin 变更只推给已发送的观察者。
-            // Register that this viewer has received these players' list entries so subsequent
-            // skin updates are only pushed to viewers that already hold the entry.
-            for (Player target : this.playerList.values()) {
-                player.sentSkins.add(target.getUniqueId());
             }
         }
     }
