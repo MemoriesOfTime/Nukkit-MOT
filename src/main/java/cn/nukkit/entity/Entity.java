@@ -424,6 +424,10 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v975 1.26.20
      */
     public static final int DATA_FLAG_NAMEPLATE_DEPTH_TESTED = 129;
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int DATA_FLAG_NOT_PICKABLE_FROM_INSIDE = 130;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;

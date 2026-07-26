@@ -1123,7 +1123,10 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
 
-        assertEquals(org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.Action.REMOVE, cbPacket.getAction());
+        // v2168 removed the packet-level action byte
+        if (protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.Action.REMOVE, cbPacket.getAction());
+        }
         assertTrue(cbPacket.getInfos().isEmpty());
     }
 
@@ -1894,7 +1897,12 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
                 org.cloudburstmc.protocol.bedrock.packet.ResourcePackClientResponsePacket.class);
 
         assertEquals(4, cbPacket.getStatus().ordinal());
-        assertEquals(1, cbPacket.getPackIds().size());
+        // v2168 only writes pack ids when status == SEND_PACKS; older versions always write them
+        if (protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(1, cbPacket.getPackIds().size());
+        } else {
+            assertTrue(cbPacket.getPackIds().isEmpty());
+        }
     }
 
     // ==================== ClientboundDataStorePacket ====================

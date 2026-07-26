@@ -175,6 +175,9 @@ public class Binary {
 
             entryStream.putUnsignedVarInt(id);
             entryStream.putUnsignedVarInt(type);
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                entryStream.putByte((byte) type);
+            }
 
             if (forceEmptyData) {
                 // forceEmptyData requires type to be DATA_TYPE_INT so that putVarInt(0) matches the declared type

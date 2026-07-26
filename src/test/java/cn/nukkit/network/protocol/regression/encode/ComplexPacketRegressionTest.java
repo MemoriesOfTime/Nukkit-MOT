@@ -930,8 +930,8 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.ClientboundMapItemDataPacket.class);
 
-        assertEquals(1, cbPacket.getUniqueMapId());
-        assertEquals(4, cbPacket.getScale());
+        assertEquals(1L, cbPacket.getUniqueMapId());
+        assertEquals(Byte.valueOf((byte) 4), cbPacket.getScale());
     }
 
     static Stream<Arguments> versionsFrom544() {

@@ -8,6 +8,7 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.UUID;
 
 @ToString
 public class DimensionDataPacket extends DataPacket {
@@ -38,7 +39,9 @@ public class DimensionDataPacket extends DataPacket {
                 // Bedrock dimension definitions use an open upper bound.
                 dimensionData.getMaxHeight() + 1,
                 dimensionData.getMinHeight(),
-                getGeneratorType(dimension)
+                getGeneratorType(dimension),
+                0,
+                new UUID(0, 0)
         );
     }
 
@@ -59,11 +62,18 @@ public class DimensionDataPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        boolean v2168 = this.protocol >= ProtocolInfo.v1_26_40;
         this.putArray(this.definitions, dimensionDefinition -> {
             this.putString(dimensionDefinition.getId());
             this.putVarInt(dimensionDefinition.getMaximumHeight());
             this.putVarInt(dimensionDefinition.getMinimumHeight());
             this.putVarInt(dimensionDefinition.getGeneratorType());
+            if (this.protocol >= ProtocolInfo.v1_26_20) {
+                this.putVarInt(dimensionDefinition.getDimensionType());
+            }
+            if (v2168) {
+                this.putUUID(dimensionDefinition.getPackId());
+            }
         });
     }
 }

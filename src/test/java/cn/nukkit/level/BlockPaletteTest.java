@@ -79,6 +79,22 @@ class BlockPaletteTest {
 
     @Test
     /**
+     * 验证 GlobalBlockPalette 的 floor 查询不会把最新版本降级到上一个调色板版本
+     * Verifies GlobalBlockPalette floor lookup does not down-grade the latest version to the previous palette version
+     */
+    void globalBlockPaletteResolvesLatestVersion() {
+        Assertions.assertEquals(
+                GameVersion.V1_26_40.getProtocol(),
+                GlobalBlockPalette.getPaletteByProtocol(GameVersion.V1_26_40).getProtocol()
+        );
+        Assertions.assertEquals(
+                GameVersion.V1_26_30.getProtocol(),
+                GlobalBlockPalette.getPaletteByProtocol(GameVersion.V1_26_30).getProtocol()
+        );
+    }
+
+    @Test
+    /**
      * Verifies copper lantern ground and hanging states are mapped by the palettes that include them.
      */
     void copperLanternStatesHaveRuntimeMappings() {

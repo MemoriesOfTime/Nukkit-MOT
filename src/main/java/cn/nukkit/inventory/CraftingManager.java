@@ -143,7 +143,10 @@ public class CraftingManager {
         this.registerMultiRecipe(new DecoratedPotRecipe());
 
         Map<String, Object> root = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes.json")).getRootSection();
-        RuntimeItemMapping itemMapping = RuntimeItems.getMapping(GameVersion.getLastVersion());
+        // recipes.json 中的数字 runtime id 基于 1.26.30 调色板 dump，需用对应映射解析；1.26.40 配方数据重新生成后再切换
+        // Numeric runtime ids in recipes.json were dumped against the 1.26.30 palette; parse with that
+        // mapping until the recipe data is regenerated for 1.26.40
+        RuntimeItemMapping itemMapping = RuntimeItems.getMapping(GameVersion.V1_26_30);
         Config furnaceXpConfig = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/furnace_xp.json"));
 
         for (Map recipe : (List<Map>) root.get("recipes")) {

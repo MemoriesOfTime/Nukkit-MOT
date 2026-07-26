@@ -98,27 +98,40 @@ public class PlayerAuthInputPacket extends DataPacket {
         this.motion = new Vector2(this.getLFloat(), this.getLFloat());
         this.headYaw = this.getLFloat();
 
-        long inputData = this.getUnsignedVarLong();
-        int netEaseExtraInputFlags = this.getNetEaseExtraInputFlags();
-        int firstNetEaseOnlyInputOrdinal = AuthInputAction.RECEIVED_SERVER_DATA.ordinal();
-        int firstShiftedInputOrdinal = firstNetEaseOnlyInputOrdinal + netEaseExtraInputFlags;
-        for (int i = 0; i < Math.min(AuthInputAction.size(), Long.SIZE); i++) {
-            int offset = 0;
-            if (netEaseExtraInputFlags > 0 && i >= firstNetEaseOnlyInputOrdinal) {
-                if (i < firstShiftedInputOrdinal) {
-                    continue;
+        boolean v2168 = this.protocol >= ProtocolInfo.v1_26_40;
+        if (v2168) {
+            this.getBoolean(); // 外层 true，丢弃 / outer true, discarded
+            int count = (int) this.getUnsignedVarInt();
+            for (int i = 0; i < Math.min(count, 256); i++) {
+                int ordinal = this.getVarInt();
+                if (ordinal >= 0 && ordinal < AuthInputAction.size()) {
+                    this.inputData.add(AuthInputAction.from(ordinal));
                 }
-                offset = -netEaseExtraInputFlags;
             }
-            if ((inputData & (1L << i)) != 0) {
-                this.inputData.add(AuthInputAction.from(i + offset));
+        } else {
+            long inputData = this.getUnsignedVarLong();
+            int netEaseExtraInputFlags = this.getNetEaseExtraInputFlags();
+            int firstNetEaseOnlyInputOrdinal = AuthInputAction.RECEIVED_SERVER_DATA.ordinal();
+            int firstShiftedInputOrdinal = firstNetEaseOnlyInputOrdinal + netEaseExtraInputFlags;
+            for (int i = 0; i < Math.min(AuthInputAction.size(), Long.SIZE); i++) {
+                int offset = 0;
+                if (netEaseExtraInputFlags > 0 && i >= firstNetEaseOnlyInputOrdinal) {
+                    if (i < firstShiftedInputOrdinal) {
+                        continue;
+                    }
+                    offset = -netEaseExtraInputFlags;
+                }
+                if ((inputData & (1L << i)) != 0) {
+                    this.inputData.add(AuthInputAction.from(i + offset));
+                }
             }
         }
 
         this.inputMode = InputMode.fromOrdinal((int) this.getUnsignedVarInt());
         this.playMode = ClientPlayMode.fromOrdinal((int) this.getUnsignedVarInt());
         if (this.protocol >= ProtocolInfo.v1_19_0_29) {
-            this.interactionModel = AuthInteractionModel.fromOrdinal((int) this.getUnsignedVarInt());
+            // v2168: 改为有符号 VarInt（zigzag）/ v2168 uses signed (zigzag) VarInt
+            this.interactionModel = AuthInteractionModel.fromOrdinal(v2168 ? this.getVarInt() : (int) this.getUnsignedVarInt());
         }
 
         if (protocol >= ProtocolInfo.v1_21_40) {
@@ -136,43 +149,54 @@ public class PlayerAuthInputPacket extends DataPacket {
             this.cameraDeparted = this.getBoolean();
         }
 
-        if (this.inputData.contains(AuthInputAction.PERFORM_ITEM_INTERACTION)) {
-            this.itemUseTransaction = this.readItemUseTransaction();
-        }
-
-        if (this.inputData.contains(AuthInputAction.PERFORM_ITEM_STACK_REQUEST)) {
-            this.itemStackRequest = this.readItemStackRequest(this.gameVersion);
-        }
-
-        if (this.inputData.contains(AuthInputAction.PERFORM_BLOCK_ACTIONS)) {
-            int arraySize = this.getVarInt();
-            if (arraySize > 256) {
-                throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
+        if (v2168) {
+            if (this.getBoolean() && this.getBoolean()) {
+                this.itemUseTransaction = this.readItemUseTransaction();
             }
-            for (int i = 0; i < arraySize; i++) {
-                PlayerActionType type = PlayerActionType.from(this.getVarInt());
-                switch (type) {
-                    case START_DESTROY_BLOCK:
-                    case ABORT_DESTROY_BLOCK:
-                    case CRACK_BLOCK:
-                    case PREDICT_DESTROY_BLOCK:
-                    case CONTINUE_DESTROY_BLOCK:
-                        this.blockActionData.put(type, new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
-                        break;
-                    default:
-                        this.blockActionData.put(type, new PlayerBlockActionData(type, null, -1));
+            if (this.getBoolean() && this.getBoolean()) {
+                this.itemStackRequest = this.readItemStackRequest(this.gameVersion);
+            }
+            if (this.getBoolean() && this.getBoolean()) {
+                int arraySize = this.getVarInt();
+                if (arraySize > 256) {
+                    throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
+                }
+                this.decodeBlockActions(arraySize);
+            }
+            if (this.getBoolean() && this.getBoolean()) {
+                this.vehicleRotation = this.getVector2f();
+            }
+            if (this.getBoolean() && this.getBoolean()) {
+                this.predictedVehicle = this.getVarLong();
+            }
+        } else {
+            if (this.inputData.contains(AuthInputAction.PERFORM_ITEM_INTERACTION)) {
+                this.itemUseTransaction = this.readItemUseTransaction();
+            }
+
+            if (this.inputData.contains(AuthInputAction.PERFORM_ITEM_STACK_REQUEST)) {
+                this.itemStackRequest = this.readItemStackRequest(this.gameVersion);
+            }
+
+            if (this.inputData.contains(AuthInputAction.PERFORM_BLOCK_ACTIONS)) {
+                int arraySize = this.getVarInt();
+                if (arraySize > 256) {
+                    throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
+                }
+                this.decodeBlockActions(arraySize);
+            }
+
+            if (protocol >= ProtocolInfo.v1_19_70_24) {
+                if (protocol >= ProtocolInfo.v1_20_60 && this.inputData.contains(AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE)) {
+                    if (protocol >= ProtocolInfo.v1_20_70) {
+                        this.vehicleRotation = this.getVector2f();
+                    }
+                    this.predictedVehicle = this.getVarLong();
                 }
             }
         }
 
         if (protocol >= ProtocolInfo.v1_19_70_24) {
-            if (protocol >= ProtocolInfo.v1_20_60 && this.inputData.contains(AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE)) {
-                if (protocol >= ProtocolInfo.v1_20_70) {
-                    this.vehicleRotation = this.getVector2f();
-                }
-                this.predictedVehicle = this.getVarLong();
-            }
-
             this.analogMoveVector = this.getVector2f();
 
             if (protocol >= ProtocolInfo.v1_21_40) {
@@ -180,6 +204,23 @@ public class PlayerAuthInputPacket extends DataPacket {
             }
             if (protocol >= ProtocolInfo.v1_21_50) {
                 this.rawMoveVector = this.getVector2f();
+            }
+        }
+    }
+
+    private void decodeBlockActions(int arraySize) {
+        for (int i = 0; i < arraySize; i++) {
+            PlayerActionType type = PlayerActionType.from(this.getVarInt());
+            switch (type) {
+                case START_DESTROY_BLOCK:
+                case ABORT_DESTROY_BLOCK:
+                case CRACK_BLOCK:
+                case PREDICT_DESTROY_BLOCK:
+                case CONTINUE_DESTROY_BLOCK:
+                    this.blockActionData.put(type, new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
+                    break;
+                default:
+                    this.blockActionData.put(type, new PlayerBlockActionData(type, null, -1));
             }
         }
     }

@@ -20,31 +20,50 @@ public class ItemStackResponsePacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        putArray(entries, (r) -> {
-            putByte((byte) r.getResult().ordinal());
-            putVarInt(r.getRequestId());
-            if (r.getResult() != ItemStackResponseStatus.OK) return;
-            putArray(r.getContainers(), (container) -> {
+        this.putArray(entries, (r) -> {
+            this.putByte((byte) r.getResult().ordinal());
+            this.putVarInt(r.getRequestId());
+            if (this.protocol >= ProtocolInfo.v1_26_40) {
+                this.putBoolean(true);
+                if (r.getContainers().isEmpty()) {
+                    this.putBoolean(false);
+                    return;
+                }
+                this.putBoolean(true);
+            } else {
+                if (r.getResult() != ItemStackResponseStatus.OK) return;
+            }
+            this.putArray(r.getContainers(), (container) -> {
                 if (this.protocol >= ProtocolInfo.v1_21_20) {
-                    writeFullContainerName(container.getContainerName() != null
+                    this.writeFullContainerName(container.getContainerName() != null
                             ? container.getContainerName()
                             : new FullContainerName(container.getContainer(), null));
                 } else {
-                    putByte((byte) container.getContainer().getId(this.gameVersion));
+                    this.putByte((byte) container.getContainer().getId(this.gameVersion));
                 }
-                putArray(container.getItems(), (item) -> {
-                    putByte((byte) item.getSlot());
-                    putByte((byte) item.getHotbarSlot());
-                    putByte((byte) item.getCount());
-                    putVarInt(item.getStackNetworkId());
+                this.putArray(container.getItems(), (item) -> {
+                    this.putByte((byte) item.getSlot());
+                    this.putByte((byte) item.getHotbarSlot());
+                    this.putByte((byte) item.getCount());
+                    if (this.protocol >= ProtocolInfo.v1_26_40) {
+                        // v2168 wraps netId in two booleans (has + present); omit when zero
+                        boolean hasStackId = item.getStackNetworkId() != 0;
+                        this.putBoolean(hasStackId);
+                        if (hasStackId) {
+                            this.putBoolean(true);
+                            this.putVarInt(item.getStackNetworkId());
+                        }
+                    } else {
+                        this.putVarInt(item.getStackNetworkId());
+                    }
                     if (this.protocol >= ProtocolInfo.v1_16_200) {
-                        putString(item.getCustomName());
+                        this.putString(item.getCustomName());
                     }
                     if (this.protocol >= ProtocolInfo.v1_21_50) {
-                        putString(item.getFilteredCustomName());
+                        this.putString(item.getFilteredCustomName());
                     }
                     if (this.protocol >= ProtocolInfo.v1_16_210) {
-                        putVarInt(item.getDurabilityCorrection());
+                        this.putVarInt(item.getDurabilityCorrection());
                     }
                 });
             });
@@ -53,7 +72,7 @@ public class ItemStackResponsePacket extends DataPacket {
 
     @Override
     public void decode() {
-        throw new UnsupportedOperationException();//client bound
+        this.decodeUnsupported();
     }
 
     @Override
