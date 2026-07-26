@@ -251,15 +251,12 @@ public class BlockPointedDripstone extends BlockSolidMeta implements BlockProper
 
         BlockCauldron cauldron = (BlockCauldron) target;
         if (!canReceiveDrip(cauldron, liquid)) {
-            cn.nukkit.Server.getInstance().getLogger().info("[DripDebug] water path ABORTED at canReceiveDrip#1" +
-                    " damage=" + cauldron.getDamage() + " full=" + cauldron.isFull() + " liquid=" + liquid);
             return;
         }
 
         CauldronFilledByDrippingLiquidEvent event = new CauldronFilledByDrippingLiquidEvent(cauldron, this, liquid, 1);
         this.getLevel().getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
-            cn.nukkit.Server.getInstance().getLogger().info("[DripDebug] water path ABORTED at event cancel");
             return;
         }
         liquid = event.getLiquid();
@@ -268,13 +265,8 @@ public class BlockPointedDripstone extends BlockSolidMeta implements BlockProper
         // Re-check after the event so a plugin cannot break the "lava only fills an empty
         // cauldron" invariant by swapping the liquid.
         if (!canReceiveDrip(cauldron, liquid)) {
-            cn.nukkit.Server.getInstance().getLogger().info("[DripDebug] water path ABORTED at canReceiveDrip#2" +
-                    " modifiedLiquid=" + liquid);
             return;
         }
-
-        cn.nukkit.Server.getInstance().getLogger().info("[DripDebug] water path entering fill" +
-                " cauldronClass=" + cauldron.getClass().getSimpleName());
 
         if (liquid == CauldronLiquid.LAVA) {
             fillLava(cauldron);
@@ -361,15 +353,9 @@ public class BlockPointedDripstone extends BlockSolidMeta implements BlockProper
     }
 
     private void fillWater(BlockCauldron cauldron, int increment) {
-        int prevLevel = cauldron.getFillLevel();
-        int prevDamage = cauldron.getDamage();
-        int level = Math.min(prevLevel + increment, MAX_FILL_LEVEL);
+        int level = Math.min(cauldron.getFillLevel() + increment, MAX_FILL_LEVEL);
         cauldron.setFillLevel(level);
-        boolean set = this.getLevel().setBlock(cauldron, cauldron, true, true);
-        cn.nukkit.Server.getInstance().getLogger().info("[DripDebug] fillWater called cauldron=" +
-                cauldron.getClass().getSimpleName() + " prevDamage=" + prevDamage +
-                " prevLevel=" + prevLevel + " newLevel=" + level + " newDamage=" + cauldron.getDamage() +
-                " setBlock=" + set);
+        this.getLevel().setBlock(cauldron, cauldron, true, true);
         this.getLevel().updateComparatorOutputLevel(cauldron);
         this.getLevel().addSoundToViewers(cauldron.add(0.5, 0.5, 0.5), Sound.CAULDRON_DRIP_WATER_POINTED_DRIPSTONE);
         this.getLevel().getVibrationManager().callVibrationEvent(
