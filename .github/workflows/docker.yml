@@ -73,6 +73,11 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # 注入 git 元数据，使容器内 JAR 能识别自身分支/提交
+          # Inject git metadata so the in-container JAR can self-identify branch/commit.
+          build-args: |
+            GIT_BRANCH=${{ github.ref_name }}
+            GIT_COMMIT=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

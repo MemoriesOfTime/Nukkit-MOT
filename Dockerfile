@@ -6,6 +6,13 @@
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /build
 
+# 可选注入 git 元数据：本地 docker build 没传时用 unknown 占位，
+# CI 通过 build-args 传入真实分支与提交，让容器内 JAR 能识别自身版本/分支
+# Optional git metadata injection: defaults to "unknown" for local docker build;
+# CI passes real branch/commit via build-args so the in-container JAR can self-identify.
+ARG GIT_BRANCH=unknown
+ARG GIT_COMMIT=unknown
+
 # 注意：不能用 dependency:go-offline 做依赖缓存层，
 # netty native 分类器依赖 os.detected.* 属性，go-offline 会解析失败（普通 package 不受影响）
 # Note: no dependency:go-offline cache layer — it fails to resolve netty native
@@ -13,6 +20,32 @@ WORKDIR /build
 COPY pom.xml .
 COPY src ./src
 RUN mvn -B clean package -DskipTests
+
+# Docker build context 不含 .git（见 .dockerignore），git-commit-id-plugin 无法生成 git.properties。
+# 这里手工写一份 stub 并注入到 shaded JAR 中，格式与插件生成的 properties 文件一致，
+# 让 Nukkit.GIT_INFO 能读到 git.branch / git.commit.id.abbrev 等键。
+# Build context excludes .git (see .dockerignore), so git-commit-id-plugin can't emit
+# git.properties. We write a stub here and inject it into the shaded JAR, matching the
+# plugin's properties format so Nukkit.GIT_INFO can read git.branch / git.commit.id.abbrev.
+#
+# 仅当传入的值是有效 git 标识时才写入对应键：本地 docker build 不传 build-args 时
+# GIT_BRANCH/GIT_COMMIT 为 "unknown"，此时省略该键，Nukkit.getVersion()/getBranch()
+# 会像无 git.properties 一样返回 "git-null" / "null"，行为与未注入时一致、不产生误导。
+# Keys are written only when the arg is a valid git identifier: a local `docker build`
+# without build-args leaves them as "unknown", so the keys are omitted and
+# Nukkit.getVersion()/getBranch() fall back to "git-null"/"null" exactly as if no
+# git.properties existed — no misleading partial state.
+RUN set -eu; \
+    mkdir -p /tmp/gitinfo && cd /tmp/gitinfo; \
+    : > git.properties; \
+    [ "$GIT_BRANCH" != "unknown" ] && printf 'git.branch=%s\n' "$GIT_BRANCH" >> git.properties || true; \
+    abbrev="$(expr "$GIT_COMMIT" : '\([0-9a-fA-F]\{7\}\)')"; \
+    if [ -n "$abbrev" ]; then \
+        printf 'git.commit.id.abbrev=%s\n' "$abbrev" >> git.properties; \
+        printf 'git.commit.id=%s\n' "$GIT_COMMIT" >> git.properties; \
+        printf 'git.commit.id.describe=%s\n' "$GIT_COMMIT" >> git.properties; \
+    fi; \
+    jar -uf /build/target/Nukkit-MOT-SNAPSHOT.jar git.properties
 
 # ---------- Runtime stage ----------
 # 运行阶段：精简 JRE 镜像
