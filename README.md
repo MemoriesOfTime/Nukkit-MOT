@@ -30,6 +30,19 @@ Only interested in newer versions? You might want to try [Lumi](https://github.c
 2. Download the .jar file from the links below
 3. Write a command to run: `java -jar Nukkit-MOT-SNAPSHOT.jar` (change `Nukkit-MOT-SNAPSHOT.jar` to the name of the file you downloaded)
 
+### Run with Docker
+```bash
+docker run -d --name nukkit-mot \
+  -p 19132:19132/udp \
+  -v $(pwd)/data:/data \
+  -e JAVA_OPTS="-Xms2G -Xmx2G" \
+  --restart unless-stopped \
+  memoriesoftime/nukkit-mot:latest
+```
+- `:latest` and `:<short-sha>` are development snapshots built from the master branch.
+- `:1.26.30-R1` style tags are stable releases mirroring Maven Central.
+- All worlds, plugins, players and `server.properties` live under the `/data` volume.
+
 ## Links
 - __🌐 Download: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
 - __💬 Discuss: [Discord](https://discord.gg/pJjQDQC) / [QQ Group](https://jq.qq.com/?_wv=1027&k=5aIuYMH)__

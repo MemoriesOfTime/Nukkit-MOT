@@ -1,0 +1,87 @@
+name: Docker
+
+# Build and publish the multi-arch Docker image to Docker Hub.
+# 构建并推送多架构 Docker 镜像到 Docker Hub。
+#
+# Triggers / 触发条件：
+#   - push to master  -> :latest, :<short-sha>（开发快照）
+#   - push of a release tag (e.g. 1.26.30-R1) -> :<version>（稳定版）
+#
+# Requires GitHub secrets / 所需 GitHub Secrets:
+#   DOCKERHUB_USERNAME  Docker Hub account name
+#   DOCKERHUB_TOKEN     Docker Hub Personal Access Token (read/write/delete)
+
+on:
+  push:
+    branches: [ master ]
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+-R[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-R[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'MemoriesOfTime/Nukkit-MOT'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: memoriesoftime/nukkit-mot
+          # master: latest + short sha（开发快照）
+          # tag:    版本号（1.26.30-R1.2 -> 1.26.30-R1.2，不打 latest）
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+            type=sha,format=short
+          labels: |
+            org.opencontainers.image.title=Nukkit-MOT
+            org.opencontainers.image.description=Minecraft Bedrock Edition server
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Sync README to Docker Hub
+        if: github.ref_type == 'branch' && github.ref_name == 'master'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: memoriesoftime/nukkit-mot
+          readme-filepath: ./README.md
+          short-description: Minecraft Bedrock Edition server (Nukkit-MOT)
