@@ -1,8 +1,18 @@
 # syntax=docker/dockerfile:1
 
+# 运行时 Java 主版本（构建阶段始终用 JDK 17，与 maven.compiler.target 一致）。
+# Runtime Java major version (build stage always uses JDK 17, matching maven.compiler.target).
+# 字节码是 Java 17，可跑在任何 ≥17 的 JRE 上，因此只需切换 runtime 镜像。
+# Bytecode targets Java 17 and runs on any JRE ≥17, so only the runtime image needs to switch.
+ARG JAVA_VERSION=17
+
 # ---------- Build stage ----------
-# 构建阶段：使用 Maven 编译 shaded JAR
-# Build stage: compile the shaded JAR with Maven
+# 构建阶段：固定 JDK 17（pom.xml 中 maven.compiler.target=17）。
+# Build stage: pinned to JDK 17 (pom.xml sets maven.compiler.target=17).
+# 用更高版本 JDK 构建没有收益，反而会引入 annotation processor / shading 的环境差异；
+# A newer build JDK brings no benefit and only adds annotation-processor / shading variance;
+# 统一用 17 构建可保证不同 runtime 变体的 jar 除 git.properties 外逐字节一致。
+# building with 17 keeps the jar byte-identical across runtime variants (modulo git.properties).
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /build
 
@@ -48,9 +58,12 @@ RUN set -eu; \
     jar -uf /build/target/Nukkit-MOT-SNAPSHOT.jar git.properties
 
 # ---------- Runtime stage ----------
-# 运行阶段：精简 JRE 镜像
-# Runtime stage: slim JRE image
-FROM eclipse-temurin:17-jre
+# 运行阶段：精简 JRE 镜像，版本由 ARG JAVA_VERSION 控制（默认 17，可传 25 等）。
+# Runtime stage: slim JRE image; version controlled by ARG JAVA_VERSION (default 17, e.g. 25).
+# ARG 重复声明是因为每个 FROM 开启新阶段，前面的 ARG 不跨阶段保留。
+# ARG is re-declared because each FROM starts a fresh stage and prior ARGs don't carry over.
+ARG JAVA_VERSION=17
+FROM eclipse-temurin:${JAVA_VERSION}-jre
 
 LABEL org.opencontainers.image.title="Nukkit-MOT" \
       org.opencontainers.image.description="Minecraft Bedrock Edition server" \

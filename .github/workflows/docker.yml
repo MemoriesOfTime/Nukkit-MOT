@@ -3,9 +3,24 @@ name: Docker
 # Build and publish the multi-arch Docker image to Docker Hub.
 # 构建并推送多架构 Docker 镜像到 Docker Hub。
 #
+# 构建策略 / Build strategy:
+#   构建阶段固定 JDK 17（pom.xml: maven.compiler.target=17），字节码为 Java 17，
+#   可跑在任何 ≥17 的 JRE 上。因此 Maven 只构建一次，runtime 阶段分发到不同 JRE。
+#   Build stage is pinned to JDK 17 (pom.xml: maven.compiler.target=17); bytecode targets
+#   Java 17 and runs on any JRE ≥17. Maven is built once, runtime stage fans out to JREs.
+#
 # Triggers / 触发条件：
-#   - push to master  -> :latest, :<short-sha>（开发快照）
-#   - push of a release tag (e.g. 1.26.30-R1) -> :<version>（稳定版）
+#   - push to master  -> :latest, :java25, :<short-sha>（开发快照）
+#   - push of a release tag (e.g. 1.26.30-R1) -> :<version>, :<version>-java25（稳定版）
+#
+# Tag 矩阵 / Tag matrix（默认 Java 17 无后缀保持向后兼容；Java 25 加 -java25 后缀）:
+#   Java 17: :latest(仅master), :<sha>, :<version>(仅 tag)
+#   Java 25: :java25(仅master), :java25-<sha>, :<version>-java25(仅 tag)
+#
+# Job 拓扑 / Job topology:
+#   build-17 完整构建 + 推 17 镜像；build-25 依赖它，复用 build 层 cache（不重跑 Maven）。
+#   build-17 does the full build + pushes the 17 image; build-25 depends on it and reuses
+#   the build-stage cache (no second Maven run), only swapping the runtime base image.
 #
 # Requires GitHub secrets / 所需 GitHub Secrets:
 #   DOCKERHUB_USERNAME  Docker Hub account name
@@ -21,16 +36,22 @@ on:
 permissions:
   contents: read
 
+# workflow 级并发：同一 ref 多次 push 时新 run 排队（不取消旧 run，保留原行为）。
+# Workflow-level concurrency: a new push to the same ref queues behind a running run
+# (cancel-in-progress: false preserves the original behavior).
 concurrency:
   group: docker-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Java 17：默认变体（无后缀）。完整 Maven 构建 + runtime JRE 17，产出 :latest / :<sha> / ...
+  # Java 17: default variant (no suffix). Full Maven build + runtime JRE 17 -> :latest / :<sha> / ...
+  # ──────────────────────────────────────────────────────────────────────────
+  build-17:
     if: github.repository == 'MemoriesOfTime/Nukkit-MOT'
     runs-on: ubuntu-latest
     timeout-minutes: 60
-
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -49,22 +70,23 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Docker meta
+      - name: Docker meta (Java 17)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: memoriesoftime/nukkit-mot
-          # master: latest + short sha（开发快照）
-          # tag:    版本号（1.26.30-R1.2 -> 1.26.30-R1.2，不打 latest）
+          # master: :latest + :<sha>（无后缀，保持向后兼容）
+          # tag:    :<version>（不打 latest）
+          flavor: |
+            latest=${{ github.ref_type == 'branch' && github.ref_name == 'master' }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=tag
             type=sha,format=short
+            type=ref,event=tag
           labels: |
             org.opencontainers.image.title=Nukkit-MOT
             org.opencontainers.image.description=Minecraft Bedrock Edition server
 
-      - name: Build and push
+      - name: Build and push (Java 17)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -73,13 +95,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # 注入 git 元数据，使容器内 JAR 能识别自身分支/提交
-          # Inject git metadata so the in-container JAR can self-identify branch/commit.
+          # 默认 JAVA_VERSION=17，显式传一次便于阅读
+          # JAVA_VERSION defaults to 17; pass it explicitly for clarity.
           build-args: |
+            JAVA_VERSION=17
             GIT_BRANCH=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # build 层 cache 写入共享 scope，供 build-25 复用（runtime 层因 JRE 不同各自缓存）
+          # Build-stage cache is written to a shared scope for build-25 to reuse
+          # (runtime layers cache separately since the JRE base differs).
+          cache-from: type=gha,scope=build
+          cache-to: type=gha,mode=max,scope=build
 
       - name: Sync README to Docker Hub
         if: github.ref_type == 'branch' && github.ref_name == 'master'
@@ -90,3 +116,65 @@ jobs:
           repository: memoriesoftime/nukkit-mot
           readme-filepath: ./README.md
           short-description: Minecraft Bedrock Edition server (Nukkit-MOT)
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Java 25：高版本变体。复用 build-17 的 build 层 cache，只换 runtime JRE。
+  # Java 25: newer-Java variant. Reuses build-17's build-stage cache, only swaps the runtime JRE.
+  # ──────────────────────────────────────────────────────────────────────────
+  build-25:
+    if: github.repository == 'MemoriesOfTime/Nukkit-MOT'
+    needs: build-17
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker meta (Java 25)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: memoriesoftime/nukkit-mot
+          # master: :java25 + :java25-<sha>（不打 latest）
+          # tag:    :<version>-java25
+          tags: |
+            type=raw,value=java25,enable=${{ github.ref_type == 'branch' }}
+            type=raw,value=java25-{{sha}},enable=${{ github.ref_type == 'branch' }}
+            type=ref,event=tag,suffix=-java25
+          labels: |
+            org.opencontainers.image.title=Nukkit-MOT
+            org.opencontainers.image.description=Minecraft Bedrock Edition server
+
+      - name: Build and push (Java 25)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            JAVA_VERSION=25
+            GIT_BRANCH=${{ github.ref_name }}
+            GIT_COMMIT=${{ github.sha }}
+          # 复用 build-17 写入的 build 层 cache（同源码 + 同 JDK 17 = 同 build 层），
+          # 本 job 实际只重建 runtime 阶段（换 JRE 25 + 重注入 git.properties）。
+          # Reuses build-17's build-stage cache (same source + same JDK 17 = same build layers);
+          # this job only rebuilds the runtime stage (swap to JRE 25 + re-inject git.properties).
+          cache-from: type=gha,scope=build
+          cache-to: type=gha,mode=max,scope=build
