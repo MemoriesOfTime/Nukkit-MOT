@@ -744,6 +744,7 @@
                     </excludeProperties>
                     <includeOnlyProperties>
                     </includeOnlyProperties>
+                    <useBranchNameFromBuildEnvironment>false</useBranchNameFromBuildEnvironment>
                     <useNativeGit>false</useNativeGit>
                     <abbrevLength>7</abbrevLength>
                     <commitIdGenerationMode>flat</commitIdGenerationMode>
