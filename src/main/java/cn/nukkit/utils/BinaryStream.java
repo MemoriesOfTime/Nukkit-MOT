@@ -32,7 +32,6 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackReq
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
-import io.netty.buffer.AbstractByteBufAllocator;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
@@ -800,7 +799,7 @@ public class BinaryStream {
         }
 
         byte[] bytes = this.getByteArray();
-        ByteBuf buf = AbstractByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
+        ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
         buf.writeBytes(bytes);
 
         byte[] nbt = new byte[0];
@@ -1452,7 +1451,7 @@ public class BinaryStream {
         byte[] bytes = this.getByteArray();
 
         if (bytes.length != 0) {
-            ByteBuf buf = AbstractByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
+            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
             buf.writeBytes(bytes);
 
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {

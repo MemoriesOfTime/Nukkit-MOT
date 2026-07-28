@@ -46,7 +46,7 @@ val mockitoAgent by configurations.creating {
 dependencies {
     api(libs.raknet) {
         exclude("io.netty", "netty-common")
-        exclude("io.netty", "netty-codec")
+        exclude("io.netty", "netty-codec-base")
         exclude("io.netty", "netty-buffer")
         exclude("io.netty", "netty-transport")
         exclude("io.netty", "netty-transport-native-unix-common")
