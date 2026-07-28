@@ -159,6 +159,6 @@ public class Nukkit {
         if (GIT_INFO == null || (branch = GIT_INFO.getProperty("git.branch")) == null) {
             return "null";
         }
-        return branch;
+        return branch.startsWith("origin/") ? branch.substring("origin/".length()) : branch;
     }
 }
