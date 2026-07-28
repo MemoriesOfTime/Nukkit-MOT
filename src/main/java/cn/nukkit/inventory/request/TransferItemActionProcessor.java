@@ -65,13 +65,14 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
                 && srcIsCreatedOutput
                 && Boolean.TRUE.equals(context.get(CraftCreativeActionProcessor.CRAFT_CREATIVE_KEY));
 
-        // Creative item creation writes a server-allocated stackNetworkId into CREATED_OUTPUT
-        // (CraftCreativeActionProcessor returns no response), so the client's source-slot
-        // stackNetworkId for the follow-up PLACE/TAKE is its own prediction and will not match
-        // the server's id. Validating it here would reject every creative take — the items would
-        // appear then vanish as the request is rolled back. Skip the source-id check on the
-        // creative CREATED_OUTPUT transfer path and rely on the count/item checks above.
-        if (!creativeCreatedOutputTransfer
+        // CREATED_OUTPUT (UI slot 50) is always populated server-side — by creative item
+        // creation, crafting, enchanting, anvil, grindstone, etc. — and each write assigns a
+        // fresh server-side stackNetworkId. The client cannot know that id, so the
+        // stackNetworkId it sends on the follow-up PLACE/TAKE is its own prediction and will
+        // never match. Validating it rejects every take of a server-produced item — the items
+        // would appear then vanish as the request is rolled back. Skip the source-id check
+        // for any CREATED_OUTPUT source and rely on the count/item checks above.
+        if (!srcIsCreatedOutput
                 && validateStackNetworkId(sourceItem.getStackNetId(), src.getStackNetworkId())) {
             return context.error();
         }
@@ -176,7 +177,16 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         playBundleSound(player, srcInv, Sound.BUNDLE_REMOVE_ONE);
 
         List<ItemStackResponseContainer> containers = new ArrayList<>();
-        containers.add(buildContainer(srcInv, srcSlot, src));
+        // Mirrors Allay: when the source is CREATED_OUTPUT the client maintains no
+        // prediction for that slot (it is a server-staged output, not an inventory
+        // slot the client tracks). Echoing a CREATED_OUTPUT entry back makes the
+        // NetEase SparseContainerClient look up a prediction that was never created
+        // and assert ("tried to process a prediction that did not exist"). The
+        // standard client merely tolerates the surplus entry. Only echo the
+        // destination slot in that case.
+        if (!srcIsCreatedOutput) {
+            containers.add(buildContainer(srcInv, srcSlot, src));
+        }
         if (!sameNetworkSlot(src, dst)) {
             containers.add(buildContainer(dstInv, dstSlot, dst));
         }

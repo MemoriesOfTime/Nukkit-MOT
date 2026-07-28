@@ -30,6 +30,7 @@ class PlayerSkinLifecycleTest {
         MockServer.reset();
         this.server = MockServer.get();
         this.playerList = installPlayerList(this.server);
+        doCallRealMethod().when(this.server).addOnlinePlayer(any(Player.class));
         doCallRealMethod().when(this.server).updatePlayerListData(
                 any(PlayerListPacket.Entry.class), any(Player[].class));
         doCallRealMethod().when(this.server).removePlayerListData(
@@ -230,6 +231,85 @@ class PlayerSkinLifecycleTest {
         assertEquals(1, packets.size());
         assertEquals(PlayerListPacket.TYPE_ADD, packets.get(0).type);
         assertFalse(viewer.sentPackets.stream().anyMatch(packet -> packet instanceof RemoveEntityPacket));
+    }
+
+    /**
+     * 回归：addOnlinePlayer 对已在线的网易 V860 观察者注册新玩家时，必须只发一条 ADD，
+     * 不得因「先登记 sentSkins 再调用 updatePlayerListData」误判为新条目重发，
+     * 触发守卫里 spurious REMOVE → ADD（旧版本里曾因 addOnlinePlayer 用 sentSkins.add
+     * 预过滤而破坏了 updatePlayerListData:1443 的「新条目」信号）。
+     * <p>
+     * Regression: when addOnlinePlayer registers a brand-new player to an already-online
+     * NetEase V860 viewer, it must send exactly one ADD — never a spurious REMOVE → ADD.
+     * A prior version of addOnlinePlayer pre-registered sentSkins via Set.add before calling
+     * updatePlayerListData, which corrupted the "is this a new entry?" signal at
+     * updatePlayerListData:1443 and caused a phantom REMOVE before every fresh ADD.
+     */
+    @Test
+    void addOnlinePlayerSendsSingleAddToNetEaseViewerForNewEntry() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124, "subject-skin");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124_NETEASE, "viewer-skin");
+        // viewer 已在线并登记进 playerList；subject 尚未注册给 viewer。
+        // Viewer is already online and in the playerList; subject is not yet registered to it.
+        this.playerList.put(viewer.getUniqueId(), viewer);
+
+        this.server.addOnlinePlayer(subject);
+
+        List<PlayerListPacket> packets = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertEquals(1, packets.size(),
+                "A brand-new entry must not be preceded by a spurious REMOVE on NetEase clients");
+        assertEquals(PlayerListPacket.TYPE_ADD, packets.get(0).type);
+        assertEquals(subject.getUniqueId(), packets.get(0).entries[0].uuid);
+        assertTrue(viewer.sentSkins.contains(subject.getUniqueId()));
+    }
+
+    /**
+     * 回归：addOnlinePlayer 不得对已持有条目的旁观者（如已被 spawnTo 发过的玩家）重发 ADD，
+     * 也不得遗漏尚未持有的旁观者（远距离 / 自己），并保留全员广播语义。
+     * <p>
+     * Regression: addOnlinePlayer must not re-send ADD to viewers that already hold the entry
+     * (e.g. those already spawned-to), must still deliver to viewers that don't (remote / self),
+     * and must preserve the broadcast-to-all semantics.
+     */
+    @Test
+    void addOnlinePlayerSkipsHoldersAndBroadcastsToFreshViewersAndSelf() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124, "subject-skin");
+        RecordingPlayer holder = newPlayer(GameVersion.V1_21_124, "holder-skin");
+        RecordingPlayer freshViewer = newPlayer(GameVersion.V1_21_124, "fresh-skin");
+        this.playerList.put(holder.getUniqueId(), holder);
+        this.playerList.put(freshViewer.getUniqueId(), freshViewer);
+        // holder 已通过 spawnTo 收到过 subject 的列表项（sentSkins 已登记）。
+        // Holder already received subject's entry via spawnTo (sentSkins registered).
+        holder.sentSkins.add(subject.getUniqueId());
+
+        this.server.addOnlinePlayer(subject);
+
+        List<PlayerListPacket> holderPackets = holder.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertTrue(holderPackets.isEmpty(),
+                "Holder that already received the entry must not get a duplicate ADD");
+
+        List<PlayerListPacket> freshPackets = freshViewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertEquals(1, freshPackets.size());
+        assertEquals(PlayerListPacket.TYPE_ADD, freshPackets.get(0).type);
+        assertEquals(subject.getUniqueId(), freshPackets.get(0).entries[0].uuid);
+
+        List<PlayerListPacket> selfPackets = subject.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertEquals(1, selfPackets.size(),
+                "Self must still receive its own Tab entry on addOnlinePlayer");
+        assertEquals(subject.getUniqueId(), selfPackets.get(0).entries[0].uuid);
+        assertTrue(subject.sentSkins.contains(subject.getUniqueId()));
     }
 
     private void registerViewer(RecordingPlayer subject, RecordingPlayer viewer) {

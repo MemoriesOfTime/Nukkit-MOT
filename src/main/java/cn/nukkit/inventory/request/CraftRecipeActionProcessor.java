@@ -226,22 +226,20 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (!player.isCreative()) {
             context.onCommit(() -> player.setExperience(player.getExperience(), player.getExperienceLevel() - finalCost));
         }
+        // Write the enchanted output to CREATED_OUTPUT and return without a response
+        // container. Per the Bedrock SAI contract the client drives the output pickup:
+        // it follows the CraftRecipeAction with its own Consume (reagents/book) and
+        // Place (take the result) actions, each carrying its own prediction. Echoing a
+        // CREATED_OUTPUT slot here makes the NetEase SparseContainerClient look up a
+        // prediction that was never created and assert
+        // ("tried to process a prediction that did not exist"); the standard client
+        // merely tolerates the surplus entry. Mirrors Allay / PowerNukkitX, which both
+        // stage the output in CREATED_OUTPUT and return null here.
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, finalOutput, false);
         context.onCommit(() -> enchantInventory.releasePublishedOption(action.getRecipeNetworkId()));
         context.put(ENCH_RECIPE_KEY, true);
 
-        ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
-                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
-                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
-                finalOutput.getCount(), finalOutput.getStackNetId(),
-                finalOutput.hasCustomName() ? finalOutput.getCustomName() : "",
-                finalOutput.getDamage(), ""
-        );
-        return context.success(List.of(new ItemStackResponseContainer(
-                ContainerSlotType.CREATED_OUTPUT,
-                List.of(responseSlot),
-                new FullContainerName(ContainerSlotType.CREATED_OUTPUT, null)
-        )));
+        return null;
     }
 
     private static boolean isApplicableEnchant(Enchantment enchantment, Item input) {
