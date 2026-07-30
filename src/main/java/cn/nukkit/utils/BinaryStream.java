@@ -455,6 +455,7 @@ public class BinaryStream {
         return new SerializedImage(width, height, data);
     }
 
+    @Deprecated
     public Skin getSkin() {
         Server.mvw("BinaryStream#getSkin()");
         return getSkin(ProtocolInfo.CURRENT_PROTOCOL);
@@ -534,6 +535,7 @@ public class BinaryStream {
     private static final String MV_ORIGIN_NAMESPACE = "mv_origin_namespace";
     private static final String MV_ORIGIN_META = "mv_origin_meta";
 
+    @Deprecated
     public Item getSlot() {
         Server.mvw("BinaryStream#getSlot()");
         return this.getSlot(GameVersion.getLastVersion());
@@ -931,6 +933,7 @@ public class BinaryStream {
         return item;
     }
 
+    @Deprecated
     public void putSlot(Item item) {
         Server.mvw("BinaryStream#putSlot(Item)");
         this.putSlot(GameVersion.getLastVersion(), item);
@@ -1814,6 +1817,7 @@ public class BinaryStream {
         this.putByte((byte) (rotation / (360d / 256d)));
     }
 
+    @Deprecated
     public void putGameRules(GameRules gameRules, boolean startGame) {
         Server.mvw("BinaryStream#putGameRules(GameRules, boolean)");
         this.putGameRules(ProtocolInfo.CURRENT_PROTOCOL, gameRules, startGame);

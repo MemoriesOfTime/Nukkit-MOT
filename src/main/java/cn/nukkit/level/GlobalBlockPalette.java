@@ -693,11 +693,13 @@ public class GlobalBlockPalette {
         useHashedBlockNetworkIds = enabled;
     }
 
+    @Deprecated
     public static int getOrCreateRuntimeId(int legacyId) throws NoSuchElementException {
         Server.mvw("GlobalBlockPalette#getOrCreateRuntimeId(int)");
         return getOrCreateRuntimeId(GameVersion.getLastVersion(), legacyId >> 4, legacyId & 0xf);
     }
 
+    @Deprecated
     public static int getLegacyFullId(int runtimeId) {
         Server.mvw("GlobalBlockPalette#getLegacyFullId(int)");
         return getLegacyFullId(GameVersion.getLastVersion(), runtimeId);
