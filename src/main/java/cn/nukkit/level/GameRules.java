@@ -382,6 +382,7 @@ public class GameRules {
             return (Float) value;
         }
 
+        @Deprecated
         public void write(BinaryStream pk, boolean startGame) {
             Server.mvw("GameRules#write(BinaryStream, boolean)");
             write(GameVersion.getLastVersion(), pk, startGame);

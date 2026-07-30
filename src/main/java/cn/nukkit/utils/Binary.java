@@ -107,6 +107,7 @@ public class Binary {
         return appendBytes(writeLLong(uuid.getMostSignificantBits()), writeLLong(uuid.getLeastSignificantBits()));
     }
 
+    @Deprecated
     public static byte[] writeMetadata(EntityMetadata metadata) {
         Server.mvw("Binary#writeMetadata(EntityMetadata)");
         return writeMetadata(GameVersion.getLastVersion(), metadata);

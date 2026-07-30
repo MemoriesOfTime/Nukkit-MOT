@@ -2049,6 +2049,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return RuntimeItems.getMapping(protocolId).toRuntime(this.getId(), this.getDamage());
     }
 
+    @Deprecated
     public final int getNetworkId() {
         Server.mvw("Item#getNetworkId()");
         return this.getNetworkId(GameVersion.getLastVersion());
