@@ -2992,7 +2992,10 @@ public class Level implements ChunkManager, Metadatable {
             }
 
             if (server.mobsFromBlocks) {
-                if (item.getId() == Item.JACK_O_LANTERN || item.getId() == Item.PUMPKIN) {
+                boolean canSpawnGolem = item.getId() == Item.JACK_O_LANTERN
+                        || item.getBlockId() == BlockID.CARVED_PUMPKIN
+                        || (player.protocol < ProtocolInfo.v1_4_0 && item.getId() == Item.PUMPKIN);
+                if (canSpawnGolem) {
                     if (block.getSide(BlockFace.DOWN).getId() == Item.SNOW_BLOCK && block.getSide(BlockFace.DOWN, 2).getId() == Item.SNOW_BLOCK) {
                         block.getLevel().setBlock(target, Block.get(BlockID.AIR));
                         block.getLevel().setBlock(target.add(0, -1, 0), Block.get(BlockID.AIR));
