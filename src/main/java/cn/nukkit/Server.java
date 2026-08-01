@@ -2101,6 +2101,19 @@ public class Server {
         return nbt;
     }
 
+    boolean migratePlayerData(UUID previous, UUID current, boolean xboxAuthed) {
+        if (xboxAuthed) {
+            return false;
+        }
+
+        PlayerDataSerializeEvent previousEvent = new PlayerDataSerializeEvent(previous.toString(), playerDataSerializer);
+        pluginManager.callEvent(previousEvent);
+        PlayerDataSerializeEvent currentEvent = new PlayerDataSerializeEvent(current.toString(), playerDataSerializer);
+        pluginManager.callEvent(currentEvent);
+        return PlayerDataMigrator.migrate(previousEvent.getSerializer(), currentEvent.getSerializer(),
+                previous, current, xboxAuthed);
+    }
+
     public void saveOfflinePlayerData(UUID uuid, CompoundTag tag) {
         this.saveOfflinePlayerData(uuid, tag, false);
     }

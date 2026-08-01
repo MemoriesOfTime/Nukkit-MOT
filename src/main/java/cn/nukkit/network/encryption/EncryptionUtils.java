@@ -41,10 +41,7 @@ import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * <a href="https://github.com/CloudburstMC/Protocol/blob/6b48673067d5c0e60f5e0a5a7e889dbf2aafa1a1/bedrock/bedrock-common/src/main/java/com/nukkitx/protocol/bedrock/util/EncryptionUtils.java">...</a>
@@ -358,6 +355,47 @@ public class EncryptionUtils {
      */
     public static KeyPair createKeyPair() {
         return KEY_PAIR_GEN.generateKeyPair();
+    }
+
+    /**
+     * Derive the identity UUID from the claims of a v1.21.90+ login token.
+     * <p>
+     * Split screen guests carry no XUID, so deriving from it alone would collapse every such
+     * player onto a single UUID and make them evict each other as duplicate logins.
+     *
+     * @param xuid        Xbox user id, absent for guests and unauthenticated clients
+     * @param minecraftId PlayFab id
+     * @param displayName player name reported by the client
+     * @return identity UUID
+     * @throws IllegalStateException if none of the claims identify the client
+     */
+    public static UUID deriveIdentity(String xuid, String minecraftId, String displayName) {
+        if (xuid != null && !xuid.isBlank()) {
+            return UUID.nameUUIDFromBytes(("pocket-auth-1-xuid:" + xuid).getBytes(StandardCharsets.UTF_8));
+        }
+        if (minecraftId != null && !minecraftId.isBlank()) {
+            return UUID.nameUUIDFromBytes(("pocket-auth-1-mid:" + minecraftId).getBytes(StandardCharsets.UTF_8));
+        }
+        return deriveOfflineIdentity(displayName);
+    }
+
+    /**
+     * Derive the identity UUID of a player who is not authenticated with Xbox Live.
+     * <p>
+     * Offline clients supply no trustworthy identifier: the legacy certificate chain carries a
+     * client generated UUID while the v1.21.90+ token carries none at all. Deriving from the
+     * display name is the only value both login formats can agree on, and keeps the identity
+     * stable when a player updates their client or reinstalls the game.
+     *
+     * @param displayName player name reported by the client
+     * @return identity UUID
+     * @throws IllegalStateException if the client reported no usable name
+     */
+    public static UUID deriveOfflineIdentity(String displayName) {
+        if (displayName == null || displayName.isBlank()) {
+            throw new IllegalStateException("Unable to derive an identity: the login carries no XUID, no PlayFab id and no name");
+        }
+        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + displayName).getBytes(StandardCharsets.UTF_8));
     }
 
     public static byte[] verifyClientData(String clientDataJwt, String identityPublicKey)

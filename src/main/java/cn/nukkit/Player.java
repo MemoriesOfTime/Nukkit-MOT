@@ -3085,7 +3085,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         for (Player p : new ArrayList<>(this.server.playerList.values())) {
             if (p != this && p.username != null) {
-                if (p.username.equalsIgnoreCase(this.username) || this.getUniqueId().equals(p.getUniqueId())) {
+                if (p.username.equalsIgnoreCase(this.username)) {
+                    p.close("", "disconnectionScreen.loggedinOtherLocation");
+                    break;
+                }
+                if (this.getUniqueId().equals(p.getUniqueId())) {
+                    this.server.getLogger().warning("Evicting " + p.getName() + " as a duplicate login of "
+                            + this.username + ": both resolved to identity " + this.getUniqueId());
                     p.close("", "disconnectionScreen.loggedinOtherLocation");
                     break;
                 }
@@ -3096,6 +3102,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         File legacyDataFile = new File(server.getDataPath() + "players/" + lowerName + ".dat");
         File dataFile = new File(server.getDataPath() + "players/" + this.uuid.toString() + ".dat");
         if (this.server.savePlayerDataByUuid) {
+            if (!loginChainData.isXboxAuthed() && !dataFile.exists()) {
+                // The identity of unauthenticated players is no longer taken from the client, so
+                // data saved under their previous UUID has to follow them over.
+                this.server.lookupName(lowerName).ifPresent(previous ->
+                        this.server.migratePlayerData(previous, this.uuid, false));
+            }
             boolean dataFound = dataFile.exists();
             if (!dataFound && legacyDataFile.exists()) {
                 nbt = this.server.getOfflinePlayerData(lowerName, false);
@@ -3717,7 +3729,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.randomClientId = loginChainData.getClientId();
 
-                this.uuid = loginChainData.getClientUUID();
+                this.uuid = loginChainData.getClientUUID(verifiedName);
                 this.rawUUID = Binary.writeUUID(this.uuid);
                 this.minecraftId = loginChainData.getMinecraftId();
 
