@@ -135,6 +135,11 @@ public class NPCCommandSender implements CommandSender {
     }
 
     @Override
+    public void clearAttachments(Plugin plugin) {
+        this.perm.clearAttachments(plugin);
+    }
+
+    @Override
     public void recalculatePermissions() {
         this.perm.recalculatePermissions();
     }

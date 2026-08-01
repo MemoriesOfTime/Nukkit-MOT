@@ -140,6 +140,11 @@ public class ExecutorCommandSender implements CommandSender {
     }
 
     @Override
+    public void clearAttachments(Plugin plugin) {
+        executor.clearAttachments(plugin);
+    }
+
+    @Override
     public void recalculatePermissions() {
         executor.recalculatePermissions();
     }

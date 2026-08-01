@@ -8,6 +8,8 @@ import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.lang.CommandOutputContainer;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.plugin.InternalPlugin;
+import cn.nukkit.plugin.Plugin;
+import cn.nukkit.plugin.PluginClassLoader;
 import cn.nukkit.utils.TextFormat;
 import cn.nukkit.utils.Utils;
 import io.netty.util.internal.EmptyArrays;
@@ -168,6 +170,44 @@ public class SimpleCommandMap implements CommandMap {
                 removeCommand(command);
             }
         }
+    }
+
+    @Override
+    public void unregister(Plugin plugin) {
+        if (plugin == null) {
+            return;
+        }
+        // Set 去重收集命令对象（多别名 key 指向同一 Command），避免 List.contains 的 O(n²)
+        Set<Command> owned = new HashSet<>();
+        for (Command command : knownCommands.values()) {
+            if (ownsCommand(command, plugin)) {
+                owned.add(command);
+            }
+        }
+        for (Command command : owned) {
+            command.unregister(this);
+        }
+        if (!owned.isEmpty()) {
+            knownCommands.entrySet().removeIf(entry -> owned.contains(entry.getValue()));
+        }
+    }
+
+    /**
+     * 判断命令是否归属于指定插件。<br>
+     * Determines whether a command belongs to the given plugin.
+     * <p>
+     * 普通命令用 ClassLoader 匹配（普通 Command 子类也会钉住插件 ClassLoader）；仅当插件由
+     * {@link PluginClassLoader} 加载时生效，避免误删服务端加载的原版命令。插件一律用 {@code ==} 比较。
+     * <p>
+     * Plain commands match by ClassLoader (a plain Command subclass pins the loader too); only applies when the
+     * plugin is loaded by a {@link PluginClassLoader}, so vanilla commands are never removed. Plugins use {@code ==}.
+     */
+    private boolean ownsCommand(Command command, Plugin plugin) {
+        if (command instanceof PluginIdentifiableCommand) {
+            return plugin == ((PluginIdentifiableCommand) command).getPlugin();
+        }
+        ClassLoader pluginLoader = plugin.getClass().getClassLoader();
+        return pluginLoader instanceof PluginClassLoader && command.getClass().getClassLoader() == pluginLoader;
     }
 
     private boolean removeCommand(Command command) {

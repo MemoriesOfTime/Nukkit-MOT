@@ -56,11 +56,11 @@ public interface Plugin extends CommandExecutor {
     /**
      * 在一个Nukkit插件被停用时调用的方法。<br>
      * Called when a Nukkit plugin is disabled.
-     * 
+     *
      * 应该填写插件停用时需要作出的动作。例如：关闭数据库，断开资源。<br>
      * Use this to free open things and finish actions,
      * such as disconnecting databases and close resources.
-     * 
+     *
      * 注意到可能存在的插件管理器插件，这个方法在插件多次重启时可能被调用多次。<br>
      * Notes that there may be plugin manager plugins,
      * this method can be called many times when a plugin is restarted many times.

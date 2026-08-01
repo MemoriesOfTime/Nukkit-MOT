@@ -1157,7 +1157,8 @@ public class Server {
             level.save();
         }
 
-        this.pluginManager.clearPlugins();
+        this.pluginManager.unloadPlugins(new ArrayList<>(this.pluginManager.getPlugins().values()), true);
+        this.pluginManager.clearRegistries();
         this.commandMap.clearCommands();
 
         // Reload server.properties

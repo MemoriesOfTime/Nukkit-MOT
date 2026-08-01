@@ -805,6 +805,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     @Override
+    public void clearAttachments(Plugin plugin) {
+        // perm 在 close() 中被置 null，插件卸载遍历实体时可能扫到正在下线的玩家 / perm is nulled in close(), and unload sweeps entities
+        if (this.perm == null) {
+            return;
+        }
+        this.perm.clearAttachments(plugin);
+    }
+
+    @Override
     public void recalculatePermissions() {
         this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
         this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_ADMINISTRATIVE, this);

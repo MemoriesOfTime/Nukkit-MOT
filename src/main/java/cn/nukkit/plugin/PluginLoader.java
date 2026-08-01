@@ -56,13 +56,12 @@ public interface PluginLoader {
     Plugin loadPlugin(File file) throws Exception;
 
     /**
-     * 卸载一个插件，此方法将尝试关闭jar的大部分占用，以便于删除jar文件<br>
-     * Unloads a plugin. This method will try to close most of the jar's resources, so that the jar file can be deleted.
+     * 卸载一个插件，此方法将尝试关闭jar的大部分占用，以便于删除jar文件。默认空实现兼容第三方加载器。<br>
+     * Unloads a plugin, trying to close most of the jar's resources so it can be deleted. Default no-op keeps third-party loaders compatible.
      *
      * @param plugin 要被卸载的插件。<br>The plugin to unload.
      */
     default void unloadPlugin(Plugin plugin) {
-        this.enablePlugin(plugin);
     }
 
     /**

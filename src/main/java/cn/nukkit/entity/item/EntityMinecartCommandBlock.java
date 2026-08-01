@@ -15,7 +15,6 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.lang.CommandOutputContainer;
-import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.GameRule;
@@ -25,10 +24,11 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
+import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.permission.Permission;
 import cn.nukkit.permission.PermissionAttachment;
 import cn.nukkit.permission.PermissionAttachmentInfo;
-import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.MinecartType;
 import org.jetbrains.annotations.NotNull;
@@ -474,6 +474,11 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
     @Override
     public void removeAttachment(PermissionAttachment attachment) {
         this.perm.removeAttachment(attachment);
+    }
+
+    @Override
+    public void clearAttachments(Plugin plugin) {
+        this.perm.clearAttachments(plugin);
     }
 
     @Override

@@ -18,10 +18,10 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
+import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.permission.Permission;
 import cn.nukkit.permission.PermissionAttachment;
 import cn.nukkit.permission.PermissionAttachmentInfo;
-import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
@@ -486,6 +486,11 @@ public class BlockEntityCommandBlock extends BlockEntitySpawnable
     @Override
     public void removeAttachment(PermissionAttachment attachment) {
         this.perm.removeAttachment(attachment);
+    }
+
+    @Override
+    public void clearAttachments(Plugin plugin) {
+        this.perm.clearAttachments(plugin);
     }
 
     @Override

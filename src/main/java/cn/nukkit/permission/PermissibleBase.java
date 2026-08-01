@@ -5,6 +5,7 @@ import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.PluginException;
 import cn.nukkit.utils.ServerException;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -110,6 +111,28 @@ public class PermissibleBase implements Permissible {
             if (ex != null) {
                 ex.attachmentRemoved(attachment);
             }
+            this.recalculatePermissions();
+        }
+    }
+
+    @Override
+    public void clearAttachments(Plugin plugin) {
+        if (plugin == null) {
+            return;
+        }
+        boolean changed = false;
+        for (PermissionAttachment attachment : new ArrayList<>(this.attachments)) {
+            // 身份比较：两端是同一注册实例，不受 Plugin.equals 覆写影响 / identity compare, immune to Plugin.equals override
+            if (plugin == attachment.getPlugin()) {
+                this.attachments.remove(attachment);
+                PermissionRemovedExecutor ex = attachment.getRemovalCallback();
+                if (ex != null) {
+                    ex.attachmentRemoved(attachment);
+                }
+                changed = true;
+            }
+        }
+        if (changed) {
             this.recalculatePermissions();
         }
     }

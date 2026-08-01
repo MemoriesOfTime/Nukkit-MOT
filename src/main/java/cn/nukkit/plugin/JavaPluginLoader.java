@@ -87,7 +87,9 @@ public class JavaPluginLoader implements PluginLoader {
 
     @Override
     public void unloadPlugin(Plugin plugin) {
-        this.disablePlugin(plugin);
+        if (plugin.isEnabled()) {
+            this.disablePlugin(plugin);
+        }
 
         PluginClassLoader loader = this.classLoaders.remove(plugin.getDescription().getName());
         if (loader == null) {
