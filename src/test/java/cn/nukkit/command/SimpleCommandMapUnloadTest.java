@@ -5,14 +5,28 @@ import cn.nukkit.Server;
 import cn.nukkit.command.defaults.SayCommand;
 import cn.nukkit.command.defaults.VanillaCommand;
 import cn.nukkit.command.simple.SimpleCommand;
+import cn.nukkit.plugin.JavaPluginLoader;
 import cn.nukkit.plugin.Plugin;
+import cn.nukkit.plugin.PluginClassLoader;
+import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.scoreboard.manager.IScoreboardManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
+import javax.tools.JavaCompiler;
+import javax.tools.ToolProvider;
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
+import java.util.Map;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -39,6 +53,15 @@ class SimpleCommandMapUnloadTest {
         Mockito.lenient().when(sm.getScoreboards()).thenReturn(Collections.emptyMap());
         Mockito.when(server.getScoreboardManager()).thenReturn(sm);
         map = new SimpleCommandMap(server);
+    }
+
+    @Test
+    void defaultCommandsCanBeConstructedBeforePluginManager() {
+        Mockito.when(server.getPluginManager()).thenReturn(null);
+
+        assertDoesNotThrow(() -> new SimpleCommandMap(server),
+                "SimpleCommandMap 构造不应依赖稍后才初始化的 PluginManager / "
+                        + "construction must not depend on the later-initialized PluginManager");
     }
 
     @Test
@@ -93,6 +116,54 @@ class SimpleCommandMapUnloadTest {
     }
 
     @Test
+    void layeredAliasCollisionRestoresPreviousMappingsOnUnload() {
+        Plugin first = stubPlugin("FirstPlugin");
+        Plugin second = stubPlugin("SecondPlugin");
+        Command vanillaSay = map.getCommand("say");
+
+        Command firstCommand = new PlainCommand("foo", first, "say");
+        map.register("FirstPlugin", firstCommand);
+        assertSame(firstCommand, map.getCommand("say"));
+        assertSame(vanillaSay, map.getCommand("nukkit:say"));
+
+        Command secondCommand = new PlainCommand("say", second);
+        map.register("SecondPlugin", secondCommand);
+        assertSame(secondCommand, map.getCommand("say"));
+        assertNull(map.getCommand("nukkit:say"));
+
+        map.unregister(second);
+        assertSame(firstCommand, map.getCommand("say"),
+                "卸载第二层后应恢复第一层 alias / unloading the second layer must restore the first alias");
+        assertSame(vanillaSay, map.getCommand("nukkit:say"),
+                "被全局清除的原版前缀映射必须恢复 / the globally removed vanilla prefix must be restored");
+
+        map.unregister(first);
+        assertSame(vanillaSay, map.getCommand("say"));
+        assertSame(vanillaSay, map.getCommand("nukkit:say"));
+    }
+
+    @Test
+    void layeredAliasCollisionNeverRestoresAnAlreadyUnloadedPlugin() {
+        Plugin first = stubPlugin("FirstPlugin");
+        Plugin second = stubPlugin("SecondPlugin");
+        Command vanillaSay = map.getCommand("say");
+
+        map.register("FirstPlugin", new PlainCommand("foo", first, "say"));
+        Command secondCommand = new PlainCommand("say", second);
+        map.register("SecondPlugin", secondCommand);
+
+        map.unregister(first);
+        assertSame(secondCommand, map.getCommand("say"));
+        assertNull(map.getCommand("FirstPlugin:foo"));
+        assertNull(map.getCommand("FirstPlugin:say"));
+
+        map.unregister(second);
+        assertSame(vanillaSay, map.getCommand("say"),
+                "逆序卸载不得复活第一层插件命令 / reverse unload must not resurrect the first plugin command");
+        assertSame(vanillaSay, map.getCommand("nukkit:say"));
+    }
+
+    @Test
     void unregisterNeverTouchesCommandsNotOwnedByPlugin() {
         Plugin plugin = stubPlugin("HarmlessPlugin");
         // 不注册任何命令即卸载，所有原版命令必须原封不动
@@ -129,6 +200,36 @@ class SimpleCommandMapUnloadTest {
     }
 
     @Test
+    void simpleCommandHandlerLoadedByPluginClassLoaderIsCleanedUp(@TempDir Path tempDir) throws Exception {
+        File handlerJar = buildSimpleCommandHandlerJar(tempDir);
+        JavaPluginLoader javaPluginLoader = new JavaPluginLoader(null);
+
+        try (PluginClassLoader pluginClassLoader = new PluginClassLoader(
+                javaPluginLoader, getClass().getClassLoader(), handlerJar)) {
+            Object handler = pluginClassLoader.loadClass("fixture.SeparateCommandHandler")
+                    .getDeclaredConstructor().newInstance();
+            Plugin plugin = (Plugin) Proxy.newProxyInstance(
+                    pluginClassLoader, new Class<?>[]{Plugin.class}, (proxy, method, args) -> null);
+            PluginManager pluginManager = server.getPluginManager();
+            Mockito.when(pluginManager.getPlugins()).thenReturn(Map.of("HandlerPlugin", plugin));
+
+            map.registerSimpleCommands(handler);
+
+            Command registered = map.getCommand("handlercmd");
+            assertNotNull(registered);
+            assertInstanceOf(SimpleCommand.class, registered);
+            assertSame(plugin, ((SimpleCommand) registered).getPlugin(),
+                    "独立 handler 应按 PluginClassLoader 归属到插件 / "
+                            + "a separate handler must be attributed by PluginClassLoader");
+
+            map.unregister(plugin);
+
+            assertNull(map.getCommand("handlercmd"));
+            assertNull(map.getCommand("handlercmd:handlercmd"));
+        }
+    }
+
+    @Test
     void clearCommandsWipesDisplacementTracking() {
         Plugin plugin = stubPlugin("WipePlugin");
         map.register("WipePlugin", new PlainCommand("say", plugin));
@@ -154,6 +255,43 @@ class SimpleCommandMapUnloadTest {
         return true;
     }
 
+    private static File buildSimpleCommandHandlerJar(Path tempDir) throws IOException {
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        assertNotNull(compiler, "该回归测试需要 JDK JavaCompiler / this regression test requires a JDK JavaCompiler");
+
+        Path source = tempDir.resolve("fixture/SeparateCommandHandler.java");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, """
+                package fixture;
+
+                import cn.nukkit.command.CommandSender;
+
+                public final class SeparateCommandHandler {
+                    @cn.nukkit.command.simple.Command(name = \"handlercmd\")
+                    public boolean execute(CommandSender sender, String label, String[] args) {
+                        return true;
+                    }
+                }
+                """);
+
+        Path classes = tempDir.resolve("classes");
+        Files.createDirectories(classes);
+        int result = compiler.run(null, null, null,
+                "-proc:none",
+                "-classpath", System.getProperty("java.class.path"),
+                "-d", classes.toString(), source.toString());
+        assertEquals(0, result, "独立命令 handler 编译失败 / separate command handler compilation failed");
+
+        Path classFile = classes.resolve("fixture/SeparateCommandHandler.class");
+        File jar = tempDir.resolve("handler-plugin.jar").toFile();
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar.toPath()))) {
+            output.putNextEntry(new JarEntry("fixture/SeparateCommandHandler.class"));
+            output.write(Files.readAllBytes(classFile));
+            output.closeEntry();
+        }
+        return jar;
+    }
+
     /**
      * 构造一个 mock 插件，并在 mock PluginManager 上登记 name → plugin。<br>
      * Builds a mock plugin and registers name → plugin on the mock PluginManager.
@@ -171,8 +309,8 @@ class SimpleCommandMapUnloadTest {
     private static final class PlainCommand extends Command implements PluginIdentifiableCommand {
         private final Plugin owner;
 
-        PlainCommand(String name, Plugin owner) {
-            super(name);
+        PlainCommand(String name, Plugin owner, String... aliases) {
+            super(name, "", "", aliases);
             this.owner = owner;
         }
 

@@ -1,6 +1,7 @@
 package cn.nukkit.plugin;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -16,6 +17,8 @@ public class PluginClassLoader extends URLClassLoader {
     private final JavaPluginLoader loader;
 
     private final Map<String, Class<?>> classes = new HashMap<>();
+
+    private WeakReference<Plugin> plugin = new WeakReference<>(null);
 
     public PluginClassLoader(JavaPluginLoader loader, ClassLoader parent, File file) throws MalformedURLException {
         this(loader, parent, file, new URL[0]);
@@ -41,6 +44,18 @@ public class PluginClassLoader extends URLClassLoader {
         urls[0] = main;
         System.arraycopy(extraUrls, 0, urls, 1, extraUrls.length);
         return urls;
+    }
+
+    void setPlugin(Plugin plugin) {
+        this.plugin = new WeakReference<>(plugin);
+    }
+
+    /**
+     * 返回该 ClassLoader 正在加载的插件，包括插件注册到 PluginManager 之前的 onLoad 阶段。<br>
+     * Returns the plugin loaded by this ClassLoader, including the onLoad phase before PluginManager registration.
+     */
+    public Plugin getPlugin() {
+        return this.plugin.get();
     }
 
     @Override

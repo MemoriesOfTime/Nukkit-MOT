@@ -64,6 +64,7 @@ public class JavaPluginLoader implements PluginLoader {
                     Class<PluginBase> pluginClass = (Class<PluginBase>) javaClass.asSubclass(PluginBase.class);
 
                     plugin = pluginClass.getDeclaredConstructor().newInstance();
+                    classLoader.setPlugin(plugin);
                     this.initPlugin(plugin, description, dataFolder, file);
 
                     return plugin;
@@ -95,6 +96,7 @@ public class JavaPluginLoader implements PluginLoader {
         if (loader == null) {
             return;
         }
+        loader.setPlugin(null);
         Iterator<Map.Entry<String, Class<?>>> iterator = this.classes.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<String, Class<?>> entry = iterator.next();
