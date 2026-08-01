@@ -622,12 +622,6 @@ public class PluginManager {
                 ordered.add(plugin);
             }
         }
-        // 兜底：注册表中不存在的实例按传入顺序处理 / fallback: unregistered instances keep caller's order
-        for (Plugin plugin : targets) {
-            if (requested.remove(plugin)) {
-                ordered.add(plugin);
-            }
-        }
 
         // 触发 PluginUnloadEvent；非强制模式下监听器可取消单个卸载 / fire event; listener may cancel unless forced
         List<Plugin> accepted = new ArrayList<>(ordered.size());

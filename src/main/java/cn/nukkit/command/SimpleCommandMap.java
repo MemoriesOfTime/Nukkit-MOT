@@ -27,6 +27,16 @@ public class SimpleCommandMap implements CommandMap {
 
     protected final Map<String, Command> knownCommands = new HashMap<>();
 
+    /**
+     * 插件注册命令时被抢占的原版命令快照：插件 → (key → 被踢出的原版命令)。<br>
+     * Snapshot of vanilla commands displaced when a plugin registers a colliding label:
+     * plugin → (key → displaced vanilla command). Replayed on {@link #unregister(Plugin)}.
+     * <p>
+     * 这里的强引用同时避免被抢占的原版命令在恢复前被 GC。<br>
+     * The strong reference also keeps the displaced vanilla command alive until it is restored.
+     */
+    private final Map<Plugin, Map<String, Command>> displacedVanillaByPlugin = new IdentityHashMap<>();
+
     private final Server server;
 
     public SimpleCommandMap(Server server) {
@@ -130,12 +140,22 @@ public class SimpleCommandMap implements CommandMap {
         label = label.trim().toLowerCase(Locale.ROOT);
         fallbackPrefix = fallbackPrefix.trim().toLowerCase(Locale.ROOT);
 
+        Plugin owner = resolveOwner(fallbackPrefix, command);
+        Map<String, Command> displaced = owner == null ? null : new LinkedHashMap<>();
+        if (displaced != null) {
+            captureDisplacedVanilla(label, displaced);
+        }
+
         boolean registered = this.registerAlias(command, false, fallbackPrefix, label);
 
         List<String> aliases = new ArrayList<>(Arrays.asList(command.getAliases()));
 
         for (Iterator<String> iterator = aliases.iterator(); iterator.hasNext(); ) {
             String alias = iterator.next();
+            String aliasKey = alias.trim().toLowerCase(Locale.ROOT);
+            if (displaced != null) {
+                captureDisplacedVanilla(aliasKey, displaced);
+            }
             if (!this.registerAlias(command, true, fallbackPrefix, alias)) {
                 iterator.remove();
             }
@@ -148,7 +168,43 @@ public class SimpleCommandMap implements CommandMap {
 
         command.register(this);
 
+        // 仅当确实有原版命令被抢占时才登记，避免空条目 / track only when something was actually displaced
+        if (displaced != null && !displaced.isEmpty()) {
+            this.displacedVanillaByPlugin.computeIfAbsent(owner, k -> new LinkedHashMap<>()).putAll(displaced);
+        }
+
         return registered;
+    }
+
+    /**
+     * 解析命令的所属插件：优先用 fallbackPrefix 在插件注册表中查找。<br>
+     * Resolves the owning plugin of a command, preferring a registry lookup by fallbackPrefix.
+     */
+    private Plugin resolveOwner(String fallbackPrefix, Command command) {
+        if (command instanceof PluginIdentifiableCommand) {
+            Plugin plugin = ((PluginIdentifiableCommand) command).getPlugin();
+            if (plugin != null) {
+                return plugin;
+            }
+        }
+        return this.server.getPluginManager().getPlugin(fallbackPrefix);
+    }
+
+    /**
+     * 记录被抢占的原版命令及其全部 key（含 {@code prefix:label}），供卸载时整体恢复。<br>
+     * Records a displaced vanilla command together with every key that points at it
+     * (including {@code prefix:label}), so it can be restored wholesale on unload.
+     */
+    private void captureDisplacedVanilla(String key, Map<String, Command> displaced) {
+        Command existing = this.knownCommands.get(key);
+        if (!(existing instanceof VanillaCommand)) {
+            return;
+        }
+        for (Entry<String, Command> entry : this.knownCommands.entrySet()) {
+            if (entry.getValue() == existing) {
+                displaced.putIfAbsent(entry.getKey(), existing);
+            }
+        }
     }
 
     @Override
@@ -190,6 +246,15 @@ public class SimpleCommandMap implements CommandMap {
         if (!owned.isEmpty()) {
             knownCommands.entrySet().removeIf(entry -> owned.contains(entry.getValue()));
         }
+
+        Map<String, Command> displaced = this.displacedVanillaByPlugin.remove(plugin);
+        if (displaced != null) {
+            displaced.forEach((key, cmd) -> {
+                if (!this.knownCommands.containsKey(key)) {
+                    this.knownCommands.put(key, cmd);
+                }
+            });
+        }
     }
 
     /**
@@ -217,10 +282,11 @@ public class SimpleCommandMap implements CommandMap {
 
     @Override
     public void registerSimpleCommands(Object object) {
+        Plugin owner = object instanceof Plugin ? (Plugin) object : null;
         for (Method method : object.getClass().getDeclaredMethods()) {
             cn.nukkit.command.simple.Command def = method.getAnnotation(cn.nukkit.command.simple.Command.class);
             if (def != null) {
-                SimpleCommand sc = new SimpleCommand(object, method, def.name(), def.description(), def.usageMessage(), def.aliases());
+                SimpleCommand sc = new SimpleCommand(object, method, owner, def.name(), def.description(), def.usageMessage(), def.aliases());
 
                 Arguments args = method.getAnnotation(Arguments.class);
                 if (args != null) {
@@ -397,6 +463,7 @@ public class SimpleCommandMap implements CommandMap {
             command.unregister(this);
         }
         this.knownCommands.clear();
+        this.displacedVanillaByPlugin.clear();
         this.setDefaultCommands();
     }
 

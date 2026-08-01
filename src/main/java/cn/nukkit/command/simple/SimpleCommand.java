@@ -4,24 +4,45 @@ import cn.nukkit.Server;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.ConsoleCommandSender;
+import cn.nukkit.command.PluginIdentifiableCommand;
 import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.plugin.Plugin;
 
 import java.lang.reflect.Method;
 
 /**
  * @author Tee7even
  */
-public class SimpleCommand extends Command {
+public class SimpleCommand extends Command implements PluginIdentifiableCommand {
     private Object object;
     private Method method;
+    private final Plugin owningPlugin;
     private boolean forbidConsole;
     private int maxArgs;
     private int minArgs;
 
     public SimpleCommand(Object object, Method method, String name, String description, String usageMessage, String[] aliases) {
+        this(object, method, null, name, description, usageMessage, aliases);
+    }
+
+    /**
+     * 携带所属插件构造 SimpleCommand，使 {@link PluginIdentifiableCommand} 归属判定在卸载时生效。<br>
+     * Builds a SimpleCommand with its owning plugin so unload-time attribution via
+     * {@link PluginIdentifiableCommand} works.
+     *
+     * @param owningPlugin 拥有该命令的插件；当 {@code object} 自身不是插件时可传 null。<br>
+     *                     The plugin owning this command; {@code null} when {@code object} is not itself a plugin.
+     */
+    public SimpleCommand(Object object, Method method, Plugin owningPlugin, String name, String description, String usageMessage, String[] aliases) {
         super(name, description, usageMessage, aliases);
         this.object = object;
         this.method = method;
+        this.owningPlugin = owningPlugin;
+    }
+
+    @Override
+    public Plugin getPlugin() {
+        return this.owningPlugin;
     }
 
     public void setForbidConsole(boolean forbidConsole) {
