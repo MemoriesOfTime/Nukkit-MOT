@@ -229,7 +229,7 @@ public class SimpleCommandMap implements CommandMap {
         // So basically we can't override the main name of a command, but we can override aliases if we're not an alias
 
         // Added the last statement which will allow us to override a VanillaCommand unconditionally
-        if (alreadyRegistered && existingCommand.getLabel() != null && existingCommand.getLabel().equals(label) && existingCommandIsNotVanilla) {
+        if (alreadyRegistered && existingCommandIsNotVanilla && existingCommand.getLabel() != null && existingCommand.getLabel().equals(label)) {
             return false;
         }
 

@@ -37,7 +37,7 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
     protected void initBlockEntity() {
         inventory = new BrewingInventory(this);
 
-        if (!namedTag.contains("Items") || !(namedTag.get("Items") instanceof ListTag)) {
+        if (!(namedTag.get("Items") instanceof ListTag)) {
             namedTag.putList(new ListTag<CompoundTag>("Items"));
         }
 
