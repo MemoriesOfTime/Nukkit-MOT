@@ -3,7 +3,6 @@ package cn.nukkit.utils;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
-import cn.nukkit.plugin.PluginManager;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -44,10 +43,7 @@ public class SparkInstaller {
                     download = true;
                     try {
                         if (spark != null) {
-                            PluginManager pluginManager = server.getPluginManager();
-                            pluginManager.disablePlugin(spark);
-                            pluginManager.getPlugins().remove(spark.getName());
-                            spark.getPluginLoader().unloadPlugin(spark);
+                            server.getPluginManager().unloadPlugin(spark, true);
                         }
                         System.gc();
                         Thread.sleep(100);
