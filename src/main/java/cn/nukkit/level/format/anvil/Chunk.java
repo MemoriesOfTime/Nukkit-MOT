@@ -266,7 +266,7 @@ public class Chunk extends BaseChunk {
         try {
             CompoundTag chunk = NBTIO.read(new ByteArrayInputStream(Zlib.inflate(data)), ByteOrder.BIG_ENDIAN);
 
-            if (!chunk.contains("Level") || !(chunk.get("Level") instanceof CompoundTag)) {
+            if (!(chunk.get("Level") instanceof CompoundTag)) {
                 return null;
             }
 
@@ -285,7 +285,7 @@ public class Chunk extends BaseChunk {
     public static Chunk fromFastBinary(byte[] data, LevelProvider provider) {
         try {
             CompoundTag chunk = NBTIO.read(new DataInputStream(new ByteArrayInputStream(data)), ByteOrder.BIG_ENDIAN);
-            if (!chunk.contains("Level") || !(chunk.get("Level") instanceof CompoundTag)) {
+            if (!(chunk.get("Level") instanceof CompoundTag)) {
                 return null;
             }
 

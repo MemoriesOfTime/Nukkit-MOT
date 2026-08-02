@@ -479,7 +479,7 @@ public class EntityBoat extends EntityVehicle {
         pk.motionY = (float) motionY;
         pk.motionZ = (float) motionZ;
         for (Player player : getViewers().values()) {
-            if (passengers.indexOf(player) == RIDER_INDEX && player.protocol < ProtocolInfo.v1_21_130_28) {
+            if (player.protocol < ProtocolInfo.v1_21_130_28 && passengers.indexOf(player) == RIDER_INDEX) {
                 continue;
             }
             player.dataPacket(pk);

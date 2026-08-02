@@ -120,7 +120,7 @@ public class BlockFlower extends BlockFlowable {
                         Utils.random.nextInt(-1, 2),
                         Utils.random.nextInt(-3, 4));
 
-                if (level.getBlock(vec).getId() == AIR && level.getBlock(vec.down()).getId() == GRASS && vec.getY() >= 0 && vec.getY() < 256) {
+                if (vec.getY() >= 0 && vec.getY() < 256 && level.getBlock(vec).getId() == AIR && level.getBlock(vec.down()).getId() == GRASS) {
                     if (Utils.random.nextInt(10) == 0) {
                         this.level.setBlock(vec, this.getUncommonFlower(), true);
                     } else {

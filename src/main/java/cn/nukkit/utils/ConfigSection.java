@@ -147,7 +147,7 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         String[] subKeys = key.split("\\.", 2);
         if (subKeys.length > 1) {
             ConfigSection childSection = new ConfigSection();
-            if (this.containsKey(subKeys[0]) && super.get(subKeys[0]) instanceof ConfigSection)
+            if (super.get(subKeys[0]) instanceof ConfigSection)
                 childSection = (ConfigSection) super.get(subKeys[0]);
             childSection.set(subKeys[1], value);
             super.put(subKeys[0], childSection);

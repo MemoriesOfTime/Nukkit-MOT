@@ -2517,7 +2517,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             if (this.riding == null && this.inventory != null) {
-                if (this.isFoodEnabled() && this.getServer().getDifficulty() > 0 && distanceSquared >= 0.05) {
+                if (this.isFoodEnabled() && distanceSquared >= 0.05 && this.getServer().getDifficulty() > 0) {
                     double jump = 0;
                     double distance = Math.sqrt(distanceSquared);
                     double swimming = this.isInsideOfWater() ? 0.01 * distance : 0;
@@ -3867,7 +3867,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = this.getLocation();
                 }
 
-                if (this.forceMovement != null && (newPos.distanceSquared(this.forceMovement) > 0.1 || revert)) {
+                if (this.forceMovement != null && (revert || newPos.distanceSquared(this.forceMovement) > 0.1)) {
                     this.sendPosition(this.forceMovement, MovePlayerPacket.MODE_RESET);
                 } else {
 
@@ -4251,7 +4251,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = this.getLocation();
                 }
 
-                if (this.forceMovement != null && (clientPosition.distanceSquared(this.forceMovement) > 0.1 || revertMotion)) {
+                if (this.forceMovement != null && (revertMotion || clientPosition.distanceSquared(this.forceMovement) > 0.1)) {
                     this.sendPosition(this.forceMovement, MovePlayerPacket.MODE_RESET);
                 } else {
                     float yaw = authPacket.getYaw() % 360;
@@ -5258,8 +5258,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             lastRightClickPos = blockVector;
                             lastRightClickTime = System.currentTimeMillis();
 
-                            if (spamming && (this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR
-                                    || (this.isSpectator() && !this.server.useClientSpectator))) {
+                            if (spamming && ((this.isSpectator() && !this.server.useClientSpectator)
+                                    || this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR)) {
                                 return;
                             }
 
@@ -5765,7 +5765,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         // HACK: Client spams multiple left clicks so we need to skip them.
-        if ((this.lastBreakPosition.equals(blockPos) && (currentBreak - this.lastBreak) < 10) || pos.distanceSquared(this) > 100) {
+        if (((currentBreak - this.lastBreak) < 10 && this.lastBreakPosition.equals(blockPos)) || pos.distanceSquared(this) > 100) {
             return;
         }
 
@@ -5907,7 +5907,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         int maxMsgLength = this.protocol >= ProtocolInfo.v1_18_0 ? 512 : 255;
 
         for (String msg : message.split("\n")) {
-            if (!msg.trim().isEmpty() && msg.length() <= maxMsgLength) {
+            if (msg.length() <= maxMsgLength && !msg.trim().isEmpty()) {
                 PlayerChatEvent chatEvent = new PlayerChatEvent(this, msg);
                 this.server.getPluginManager().callEvent(chatEvent);
                 if (!chatEvent.isCancelled()) {
@@ -6378,7 +6378,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            if (ev != null && !Objects.equals(this.username, "") && this.spawned && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
                 this.server.broadcastMessage(ev.getQuitMessage());
             }
 
@@ -8232,7 +8232,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
         Player other = (Player) obj;
-        return Objects.equals(this.getUniqueId(), other.getUniqueId()) && this.getId() == other.getId();
+        return this.getId() == other.getId() && Objects.equals(this.getUniqueId(), other.getUniqueId());
     }
 
     public boolean isBreakingBlock() {

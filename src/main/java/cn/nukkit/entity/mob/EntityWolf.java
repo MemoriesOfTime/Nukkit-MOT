@@ -417,8 +417,8 @@ public class EntityWolf extends EntityTameableMob implements InventoryHolder {
     @Override
     public void attackEntity(Entity entity) {
         if (entity instanceof Player && (
-            !this.isAngry() && this.isBeggingItem(((Player) entity).getInventory().getItemInHandFast()) ||
-                this.hasOwner() && entity.equals(this.getOwner())
+            this.hasOwner() && entity.equals(this.getOwner()) ||
+                !this.isAngry() && this.isBeggingItem(((Player) entity).getInventory().getItemInHandFast())
         )) return;
 
         if (this.attackDelay > 23 && this.distanceSquared(entity) < 1.5) {

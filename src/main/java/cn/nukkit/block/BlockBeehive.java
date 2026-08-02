@@ -123,7 +123,7 @@ public class BlockBeehive extends BlockSolidMeta implements Faceable, BlockEntit
     }
 
     public void honeyCollected(Player player) {
-        honeyCollected(player, level.getServer().getDifficulty() > 0 && !player.isCreative());
+        honeyCollected(player, !player.isCreative() && level.getServer().getDifficulty() > 0);
     }
 
     public void honeyCollected(Player player, boolean angerBees) {

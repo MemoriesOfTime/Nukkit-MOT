@@ -73,7 +73,7 @@ public class BlockSmokerLit extends BlockFurnaceBurning {
                 return false;
             }
 
-            if (smoker.namedTag.contains("Lock") && smoker.namedTag.get("Lock") instanceof StringTag) {
+            if (smoker.namedTag.get("Lock") instanceof StringTag) {
                 if (!smoker.namedTag.getString("Lock").equals(item.getCustomName())) {
                     return true;
                 }

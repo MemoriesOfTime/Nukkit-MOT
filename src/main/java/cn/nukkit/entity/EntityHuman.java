@@ -124,7 +124,7 @@ public class EntityHuman extends EntityHumanType {
                 this.setNameTag(this.namedTag.getString("NameTag"));
             }
 
-            if (this.namedTag.contains("Skin") && this.namedTag.get("Skin") instanceof CompoundTag) {
+            if (this.namedTag.get("Skin") instanceof CompoundTag) {
                 CompoundTag skinTag = this.namedTag.getCompound("Skin");
                 if (!skinTag.contains("Transparent")) {
                     skinTag.putBoolean("Transparent", false);

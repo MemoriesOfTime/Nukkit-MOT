@@ -128,7 +128,7 @@ public class BlockEnchantingTable extends BlockTransparent implements BlockEntit
                 enchantTable = (BlockEntityEnchantTable) BlockEntity.createBlockEntity(BlockEntity.ENCHANT_TABLE, this.getChunk(), nbt);
             }
 
-            if (enchantTable.namedTag.contains("Lock") && enchantTable.namedTag.get("Lock") instanceof StringTag) {
+            if (enchantTable.namedTag.get("Lock") instanceof StringTag) {
                 if (!enchantTable.namedTag.getString("Lock").equals(item.getCustomName())) {
                     return true;
                 }
