@@ -173,8 +173,14 @@ public class SimpleCommandMap implements CommandMap {
     }
 
     /**
-     * 解析命令所属插件：优先使用命令自带 owner，插件管理器已初始化时再按 fallbackPrefix 查找。<br>
-     * Resolves command ownership from the command first, then by fallbackPrefix once PluginManager is available.
+     * 解析命令所属插件：命令自带 owner → fallbackPrefix 匹配插件名 → 命令类的 ClassLoader 反查。<br>
+     * Resolves ownership from the command, then by fallbackPrefix, then by the command class's ClassLoader.
+     * <p>
+     * {@link #register(String, Command, String)} 已将 fallbackPrefix 小写化，而插件名保留原始大小写，
+     * 故精确匹配失败后需忽略大小写重试；prefix 与插件名无关时（自定义 prefix）再退回 ClassLoader 反查。
+     * <p>
+     * {@link #register(String, Command, String)} lowercases fallbackPrefix while plugin names keep their
+     * original case, so an exact miss retries case-insensitively; an unrelated prefix falls back to the ClassLoader.
      */
     private Plugin resolveOwner(String fallbackPrefix, Command command) {
         if (command instanceof PluginIdentifiableCommand) {
@@ -184,7 +190,18 @@ public class SimpleCommandMap implements CommandMap {
             }
         }
         var pluginManager = this.server.getPluginManager();
-        return pluginManager == null ? null : pluginManager.getPlugin(fallbackPrefix);
+        if (pluginManager != null) {
+            Plugin plugin = pluginManager.getPlugin(fallbackPrefix);
+            if (plugin != null) {
+                return plugin;
+            }
+            for (Entry<String, Plugin> entry : pluginManager.getPlugins().entrySet()) {
+                if (entry.getKey().equalsIgnoreCase(fallbackPrefix)) {
+                    return entry.getValue();
+                }
+            }
+        }
+        return resolveOwnerByClassLoader(command.getClass().getClassLoader());
     }
 
     @Override
@@ -330,7 +347,15 @@ public class SimpleCommandMap implements CommandMap {
         if (object instanceof Plugin plugin) {
             return plugin;
         }
-        ClassLoader classLoader = object.getClass().getClassLoader();
+        return resolveOwnerByClassLoader(object.getClass().getClassLoader());
+    }
+
+    /**
+     * 按 ClassLoader 反查插件：先问 ClassLoader 自己（覆盖尚未注册的 onLoad 阶段），再遍历已注册插件。<br>
+     * Resolves a plugin from its ClassLoader: ask the loader first (covers the unregistered onLoad phase),
+     * then scan registered plugins.
+     */
+    private Plugin resolveOwnerByClassLoader(ClassLoader classLoader) {
         if (!(classLoader instanceof PluginClassLoader pluginClassLoader)) {
             return null;
         }

@@ -229,6 +229,68 @@ class SimpleCommandMapUnloadTest {
         }
     }
 
+    /**
+     * 归属回退路径回归：普通 Command + 驼峰插件名。<br>
+     * Regression for the fallback attribution path: a plain Command from a camel-case plugin.
+     * <p>
+     * {@code register} 会把 fallbackPrefix 小写化，而 PluginManager 按插件名原始大小写存 key，
+     * 归属解析必须忽略大小写，否则被抢占的原版命令在卸载后无法恢复。<br>
+     * {@code register} lowercases the fallbackPrefix while PluginManager keys by the plugin's original
+     * case, so resolution must ignore case or the displaced vanilla command is never restored on unload.
+     */
+    @Test
+    void plainCommandFromCamelCasePluginRestoresVanillaOnUnload(@TempDir Path tempDir) throws Exception {
+        File commandJar = buildFixtureJar(tempDir, "SeparatePlainCommand", "plain-command-plugin.jar", """
+                package fixture;
+
+                import cn.nukkit.command.Command;
+                import cn.nukkit.command.CommandSender;
+
+                public final class SeparatePlainCommand extends Command {
+                    public SeparatePlainCommand() {
+                        super("say", "", "", new String[0]);
+                    }
+
+                    @Override
+                    public boolean execute(CommandSender sender, String label, String[] args) {
+                        return true;
+                    }
+                }
+                """);
+
+        Command vanillaSay = map.getCommand("say");
+        assertNotNull(vanillaSay);
+        assertInstanceOf(VanillaCommand.class, vanillaSay);
+
+        JavaPluginLoader javaPluginLoader = new JavaPluginLoader(null);
+        try (PluginClassLoader pluginClassLoader = new PluginClassLoader(
+                javaPluginLoader, getClass().getClassLoader(), commandJar)) {
+            Plugin plugin = (Plugin) Proxy.newProxyInstance(
+                    pluginClassLoader, new Class<?>[]{Plugin.class}, (proxy, method, args) -> null);
+            PluginManager pluginManager = server.getPluginManager();
+            // 只登记原始大小写的 key，模拟真实 PluginManager；getPlugin("camelcaseplugin") 必然 miss
+            // Only the original-case key is present, as in the real PluginManager; getPlugin("camelcaseplugin") misses
+            Mockito.when(pluginManager.getPlugins()).thenReturn(Map.of("CamelCasePlugin", plugin));
+
+            Command pluginCmd = (Command) pluginClassLoader.loadClass("fixture.SeparatePlainCommand")
+                    .getDeclaredConstructor().newInstance();
+            assertFalse(pluginCmd instanceof PluginIdentifiableCommand,
+                    "fixture 必须是普通 Command，才能覆盖 fallbackPrefix 归属解析 / "
+                            + "the fixture must be a plain Command to exercise fallbackPrefix resolution");
+
+            map.register("CamelCasePlugin", pluginCmd);
+            assertSame(pluginCmd, map.getCommand("say"), "插件命令应覆盖原版 / plugin command should win");
+
+            map.unregister(plugin);
+
+            assertSame(vanillaSay, map.getCommand("say"),
+                    "驼峰插件名注册的普通命令卸载后必须恢复原版 / "
+                            + "vanilla must be restored after unloading a plain command from a camel-case plugin");
+            assertNull(map.getCommand("camelcaseplugin:say"),
+                    "插件前缀 key 应被移除 / the plugin-prefixed key should be removed");
+        }
+    }
+
     @Test
     void clearCommandsWipesDisplacementTracking() {
         Plugin plugin = stubPlugin("WipePlugin");
@@ -256,12 +318,7 @@ class SimpleCommandMapUnloadTest {
     }
 
     private static File buildSimpleCommandHandlerJar(Path tempDir) throws IOException {
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        assertNotNull(compiler, "该回归测试需要 JDK JavaCompiler / this regression test requires a JDK JavaCompiler");
-
-        Path source = tempDir.resolve("fixture/SeparateCommandHandler.java");
-        Files.createDirectories(source.getParent());
-        Files.writeString(source, """
+        return buildFixtureJar(tempDir, "SeparateCommandHandler", "handler-plugin.jar", """
                 package fixture;
 
                 import cn.nukkit.command.CommandSender;
@@ -273,19 +330,32 @@ class SimpleCommandMapUnloadTest {
                     }
                 }
                 """);
+    }
+
+    /**
+     * 把一段 fixture 源码编译进一个独立 jar，供 PluginClassLoader 加载。<br>
+     * Compiles fixture source into a standalone jar so a PluginClassLoader can load it.
+     */
+    private static File buildFixtureJar(Path tempDir, String className, String jarName, String source) throws IOException {
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        assertNotNull(compiler, "该回归测试需要 JDK JavaCompiler / this regression test requires a JDK JavaCompiler");
+
+        Path sourceFile = tempDir.resolve("fixture/" + className + ".java");
+        Files.createDirectories(sourceFile.getParent());
+        Files.writeString(sourceFile, source);
 
         Path classes = tempDir.resolve("classes");
         Files.createDirectories(classes);
         int result = compiler.run(null, null, null,
                 "-proc:none",
                 "-classpath", System.getProperty("java.class.path"),
-                "-d", classes.toString(), source.toString());
-        assertEquals(0, result, "独立命令 handler 编译失败 / separate command handler compilation failed");
+                "-d", classes.toString(), sourceFile.toString());
+        assertEquals(0, result, "fixture 编译失败 / fixture compilation failed: " + className);
 
-        Path classFile = classes.resolve("fixture/SeparateCommandHandler.class");
-        File jar = tempDir.resolve("handler-plugin.jar").toFile();
+        Path classFile = classes.resolve("fixture/" + className + ".class");
+        File jar = tempDir.resolve(jarName).toFile();
         try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar.toPath()))) {
-            output.putNextEntry(new JarEntry("fixture/SeparateCommandHandler.class"));
+            output.putNextEntry(new JarEntry("fixture/" + className + ".class"));
             output.write(Files.readAllBytes(classFile));
             output.closeEntry();
         }
@@ -296,8 +366,10 @@ class SimpleCommandMapUnloadTest {
      * 构造一个 mock 插件，并在 mock PluginManager 上登记 name → plugin。<br>
      * Builds a mock plugin and registers name → plugin on the mock PluginManager.
      * <p>
-     * {@code SimpleCommandMap.register} 解析归属时调用 {@code server.getPluginManager().getPlugin(fallbackPrefix)}，
-     * 因此必须 stub 该方法才能让 displaced 跟踪生效。
+     * 本类的 {@link PlainCommand} 自带 owner，归属直接由 {@link PluginIdentifiableCommand} 给出；
+     * 该 stub 只服务于绕开这条路径的用例。<br>
+     * {@link PlainCommand} carries its own owner, so attribution comes straight from
+     * {@link PluginIdentifiableCommand}; this stub only serves cases that bypass that path.
      */
     private Plugin stubPlugin(String name) {
         Plugin plugin = Mockito.mock(Plugin.class);

@@ -101,7 +101,10 @@ public class JavaPluginLoader implements PluginLoader {
         while (iterator.hasNext()) {
             Map.Entry<String, Class<?>> entry = iterator.next();
             try {
-                Class<?> aClass = loader.findClass(entry.getKey());
+                // 必须 checkGlobal=false：否则其他插件的类会经全局缓存原样返回并被误判为本插件所有，
+                // 导致整个缓存被清空 / must be false, else the global cache returns other plugins'
+                // classes verbatim, they compare equal, and the whole cache gets wiped
+                Class<?> aClass = loader.findClass(entry.getKey(), false);
                 if (aClass == entry.getValue()) {
                     iterator.remove();
                 }
