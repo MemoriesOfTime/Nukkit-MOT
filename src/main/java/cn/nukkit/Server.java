@@ -995,7 +995,7 @@ public class Server {
                 content.close();
 
                 boolean isMaster = Nukkit.getBranch().equals("master");
-                if (!this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null") && isMaster) {
+                if (isMaster && !this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null")) {
                     this.getLogger().info("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + this.getNukkitVersion() + " Latest: " + latest);
                     this.getLogger().info("§c[Nukkit-MOT][Update] §eYou can download the latest build from https://github.com/MemoriesOfTime/Nukkit-MOT/");
                 } else if (!isMaster) {

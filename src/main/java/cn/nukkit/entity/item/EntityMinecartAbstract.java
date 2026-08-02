@@ -189,7 +189,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         // Collisions
         if (this instanceof InventoryHolder) {
             for (cn.nukkit.entity.Entity entity : level.getNearbyEntities(boundingBox.grow(0.2D, 0, 0.2D), this)) {
-                if (!passengers.contains(entity) && entity instanceof EntityMinecartAbstract) {
+                if (entity instanceof EntityMinecartAbstract && !passengers.contains(entity)) {
                     entity.applyEntityCollision(this);
                 }
             }

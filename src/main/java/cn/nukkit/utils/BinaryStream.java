@@ -1083,9 +1083,9 @@ public class BinaryStream {
             return;
         }
 
-        if (item.hasCompoundTag()
-                || (isDurable && protocolId >= ProtocolInfo.v1_12_0)
-                || saveOriginalID) {
+        if ((isDurable && protocolId >= ProtocolInfo.v1_12_0)
+                || saveOriginalID
+                || item.hasCompoundTag()) {
             if (protocolId < ProtocolInfo.v1_12_0) {
                 if (saveOriginalID) {
                     try {

@@ -83,7 +83,7 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
         this.setDamage(new int[] { 0, 2, 3, 4 });
 
-        if (this.namedTag.contains("Armor") && this.namedTag.get("Armor") instanceof ListTag) {
+        if (this.namedTag.get("Armor") instanceof ListTag) {
             ListTag<CompoundTag> listTag = this.namedTag.getList("Armor", CompoundTag.class);
             Item[] loadedArmor = new Item[4];
             int count = 0;

@@ -3102,7 +3102,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Entity getEntity(long entityId) {
-        return this.entities.containsKey(entityId) ? this.entities.get(entityId) : null;
+        return this.entities.get(entityId);
     }
 
     public Entity[] getEntities() {
@@ -3205,7 +3205,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public BlockEntity getBlockEntityById(long blockEntityId) {
-        return this.blockEntities.containsKey(blockEntityId) ? this.blockEntities.get(blockEntityId) : null;
+        return this.blockEntities.get(blockEntityId);
     }
 
     @NonComputationAtomic

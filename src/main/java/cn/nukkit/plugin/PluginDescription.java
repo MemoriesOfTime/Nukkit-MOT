@@ -158,7 +158,7 @@ public class PluginDescription {
             throw new PluginException("Invalid PluginDescription main, cannot start within the cn.nukkit. package");
         }
 
-        if (plugin.containsKey("commands") && plugin.get("commands") instanceof Map) {
+        if (plugin.get("commands") instanceof Map) {
             this.commands = (Map<String, Object>) plugin.get("commands");
         }
 
