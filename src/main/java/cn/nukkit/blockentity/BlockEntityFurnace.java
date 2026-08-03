@@ -54,7 +54,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
             this.inventory = new FurnaceInventory(this);
         }
 
-        if (!this.namedTag.contains("Items") || !(this.namedTag.get("Items") instanceof ListTag)) {
+        if (!(this.namedTag.get("Items") instanceof ListTag)) {
             this.namedTag.putList(new ListTag<CompoundTag>("Items"));
         }
 
@@ -62,22 +62,26 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
             this.inventory.setItem(i, this.getItem(i));
         }
 
-        if (!this.namedTag.contains("BurnTime") || this.namedTag.getShort("BurnTime") < 0) {
+        int burnTimeTag = this.namedTag.getShort("BurnTime");
+        int cookTimeTag = this.namedTag.getShort("CookTime");
+        int burnDurationTag = this.namedTag.getShort("BurnDuration");
+
+        if (!this.namedTag.contains("BurnTime") || burnTimeTag < 0) {
             burnTime = 0;
         } else {
-            burnTime = this.namedTag.getShort("BurnTime");
+            burnTime = burnTimeTag;
         }
 
-        if (!this.namedTag.contains("CookTime") || this.namedTag.getShort("CookTime") < 0 || (this.namedTag.getShort("BurnTime") == 0 && this.namedTag.getShort("CookTime") > 0)) {
+        if (!this.namedTag.contains("CookTime") || cookTimeTag < 0 || (burnTimeTag == 0 && cookTimeTag > 0)) {
             cookTime = 0;
         } else {
-            cookTime = this.namedTag.getShort("CookTime");
+            cookTime = cookTimeTag;
         }
 
-        if (!this.namedTag.contains("BurnDuration") || this.namedTag.getShort("BurnDuration") < 0) {
+        if (!this.namedTag.contains("BurnDuration") || burnDurationTag < 0) {
             burnDuration = 0;
         } else {
-            burnDuration = this.namedTag.getShort("BurnDuration");
+            burnDuration = burnDurationTag;
         }
 
         if (!this.namedTag.contains("MaxTime")) {

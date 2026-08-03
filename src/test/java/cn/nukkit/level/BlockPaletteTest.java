@@ -113,6 +113,79 @@ class BlockPaletteTest {
 
     @Test
     /**
+     * 岩浆炼药锅经 LevelDB 调色板往返的回归测试。
+     * <p>
+     * Regression test for lava cauldron round-trip via the LevelDB block-state palette.
+     * 验证 cauldron+lava 状态反查返回 LAVA_CAULDRON(465) 而非被 CAULDRON_BLOCK(118) 遮蔽。
+     * <p>
+     * Verifies that the cauldron+lava state reverse-maps to LAVA_CAULDRON(465) instead of
+     * being shadowed by CAULDRON_BLOCK(118), so bucket interactions remain correct.
+     */
+    void lavaCauldronRoundTripPreservesLegacyId() {
+        cn.nukkit.block.Block lavaCauldron = cn.nukkit.block.Block.get(cn.nukkit.block.BlockID.LAVA_CAULDRON, 14);
+        Assertions.assertTrue(lavaCauldron instanceof cn.nukkit.block.BlockCauldronLava,
+                "Block.get(LAVA_CAULDRON, 14) must return BlockCauldronLava");
+
+        // Simulate the LevelDB save path: legacy (465, 14) -> BlockStateSnapshot
+        cn.nukkit.level.format.leveldb.BlockStateMapping mapping = cn.nukkit.level.format.leveldb.BlockStateMapping.get();
+        cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot saved = mapping.getBlockStateFromFullId(lavaCauldron.getFullId());
+        Assertions.assertNotNull(saved, "Missing BlockStateSnapshot for lava cauldron");
+
+        // The reverse lookup must return LAVA_CAULDRON (465), not CAULDRON_BLOCK (118)
+        Assertions.assertEquals(cn.nukkit.block.BlockID.LAVA_CAULDRON, saved.getLegacyId(),
+                "cauldron+lava state must reverse-map to LAVA_CAULDRON(465), not CAULDRON_BLOCK(118)");
+
+        // And the reconstructed block must be a BlockCauldronLava
+        cn.nukkit.block.Block reconstructed = saved.getBlock();
+        Assertions.assertTrue(reconstructed instanceof cn.nukkit.block.BlockCauldronLava,
+                "Reconstructed block must be BlockCauldronLava, got " + reconstructed.getClass().getSimpleName());
+    }
+
+    @Test
+    /**
+     * 验证岩浆炼药锅经 LevelDB 磁盘读取路径正确加载。
+     * <p>
+     * Verifies lava cauldron reloads correctly via the actual LevelDB disk-read path.
+     * 磁盘存储的 NbtMap 不含 version 字段，经升级后命中 paletteMap，确认预设 legacyId=465 生效。
+     * <p>
+     * Disk NbtMaps lack the version field; after upgrade they hit paletteMap, confirming the
+     * preset legacyId=465 takes effect for disk-loaded chunks, not just forward-constructed states.
+     */
+    void lavaCauldronDiskReadPathReturnsBlockCauldronLava() {
+        // Simulate the exact NbtMap stored on disk: {name, states} without version
+        org.cloudburstmc.nbt.NbtMap diskState = org.cloudburstmc.nbt.NbtMap.builder()
+                .putString("name", "minecraft:cauldron")
+                .putCompound("states", org.cloudburstmc.nbt.NbtMap.builder()
+                        .putString("cauldron_liquid", "lava")
+                        .putInt("fill_level", 6)
+                        .build())
+                .build();
+
+        cn.nukkit.level.format.leveldb.BlockStateMapping mapping = cn.nukkit.level.format.leveldb.BlockStateMapping.get();
+        // This is the exact call sequence from StateBlockStorage.readFromStorage
+        cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot snapshot = mapping.getStateUnsafe(diskState);
+        if (snapshot == null) {
+            // Disk states without version go through the upgrade + custom-cache path
+            snapshot = mapping.getUpdatedOrCustom(diskState);
+        }
+
+        Assertions.assertFalse(snapshot.isCustom(),
+                "cauldron+lava disk state should map to a known palette state, not a custom one. " +
+                        "If this fails, the paletteMap key mismatch (version field) prevents lookup.");
+        Assertions.assertEquals(cn.nukkit.block.BlockID.LAVA_CAULDRON, snapshot.getLegacyId(),
+                "Disk-loaded cauldron+lava must reverse-map to LAVA_CAULDRON(465)");
+        int legacyData = snapshot.getLegacyData();
+        cn.nukkit.block.Block block = snapshot.getBlock();
+        Assertions.assertTrue(block instanceof cn.nukkit.block.BlockCauldronLava,
+                "Disk-loaded cauldron+lava must reconstruct as BlockCauldronLava, got " + block.getClass().getSimpleName());
+        Assertions.assertEquals(14, legacyData,
+                "cauldron+lava fill_level=6 must map to legacyData=14 (full lava, bit3 set), got " + legacyData);
+        Assertions.assertTrue(((cn.nukkit.block.BlockCauldronLava) block).isFull(),
+                "Reconstructed lava cauldron must be full (damage=14) so bucket extraction works");
+    }
+
+    @Test
+    /**
      * Verifies item frame vertical states use dedicated legacy data so wall map states remain separate.
      */
     void itemFrameVerticalStatesHaveRuntimeMappings() {

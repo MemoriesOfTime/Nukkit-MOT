@@ -181,6 +181,7 @@ public abstract class Particle extends Vector3 {
         super(x, y, z);
     }
 
+    @Deprecated
     public DataPacket[] encode() {
         Server.mvw("Particle#encode()");
         return this.mvEncode(GameVersion.getLastVersion());

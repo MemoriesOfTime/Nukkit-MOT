@@ -3669,7 +3669,7 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if(Objects.equals(property.getIdentifier(), identifier) && property instanceof EnumEntityProperty enumEntityProperty) {
+            if(property instanceof EnumEntityProperty enumEntityProperty && Objects.equals(property.getIdentifier(), identifier)) {
                 int index = enumEntityProperty.findIndex(value);
 
                 if(index >= 0) {
@@ -3686,8 +3686,8 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if (!identifier.equals(property.getIdentifier()) ||
-                    !(property instanceof EnumEntityProperty enumProperty)) {
+            if (!(property instanceof EnumEntityProperty enumProperty) ||
+                    !identifier.equals(property.getIdentifier())) {
                 continue;
             }
             String[] values = enumProperty.getEnums();

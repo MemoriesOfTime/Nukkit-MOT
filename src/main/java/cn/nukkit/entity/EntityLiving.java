@@ -73,7 +73,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             this.namedTag.remove("HealF");
         }
 
-        if (!this.namedTag.contains("Health") || !(this.namedTag.get("Health") instanceof FloatTag)) {
+        if (!(this.namedTag.get("Health") instanceof FloatTag)) {
             this.namedTag.putFloat("Health", this.getMaxHealth());
         }
 

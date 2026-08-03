@@ -1246,7 +1246,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         CompoundTag tag = this.getNamedTag();
-        return tag.contains("BlockEntityTag") && tag.get("BlockEntityTag") instanceof CompoundTag;
+        return tag.get("BlockEntityTag") instanceof CompoundTag;
 
     }
 
@@ -1256,7 +1256,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
         CompoundTag tag = this.getNamedTag();
 
-        if (tag.contains("BlockEntityTag") && tag.get("BlockEntityTag") instanceof CompoundTag) {
+        if (tag.get("BlockEntityTag") instanceof CompoundTag) {
             tag.remove("BlockEntityTag");
             this.setNamedTag(tag);
         }
@@ -1426,7 +1426,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CompoundTag tag = this.getNamedTag();
         if (tag.contains("display")) {
             Tag tag1 = tag.get("display");
-            return tag1 instanceof CompoundTag && ((CompoundTag) tag1).contains("Name") && ((CompoundTag) tag1).get("Name") instanceof StringTag;
+            return tag1 instanceof CompoundTag && ((CompoundTag) tag1).get("Name") instanceof StringTag;
         }
 
         return false;
@@ -1440,7 +1440,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CompoundTag tag = this.getNamedTag();
         if (tag.contains("display")) {
             Tag tag1 = tag.get("display");
-            if (tag1 instanceof CompoundTag && ((CompoundTag) tag1).contains("Name") && ((CompoundTag) tag1).get("Name") instanceof StringTag) {
+            if (tag1 instanceof CompoundTag && ((CompoundTag) tag1).get("Name") instanceof StringTag) {
                 return ((CompoundTag) tag1).getString("Name");
             }
         }
@@ -1464,7 +1464,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         } else {
             tag = this.getNamedTag();
         }
-        if (tag.contains("display") && tag.get("display") instanceof CompoundTag) {
+        if (tag.get("display") instanceof CompoundTag) {
             tag.getCompound("display").putString("Name", name);
         } else {
             tag.putCompound("display", new CompoundTag("display")
@@ -1482,7 +1482,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
         CompoundTag tag = this.getNamedTag();
 
-        if (tag.contains("display") && tag.get("display") instanceof CompoundTag) {
+        if (tag.get("display") instanceof CompoundTag) {
             tag.getCompound("display").remove("Name");
             if (tag.getCompound("display").isEmpty()) {
                 tag.remove("display");
@@ -1538,7 +1538,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     public Tag getNamedTagEntry(String name) {
         CompoundTag tag = this.getNamedTag();
         if (tag != null) {
-            return tag.contains(name) ? tag.get(name) : null;
+            return tag.get(name);
         }
 
         return null;
@@ -2049,6 +2049,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return RuntimeItems.getMapping(protocolId).toRuntime(this.getId(), this.getDamage());
     }
 
+    @Deprecated
     public final int getNetworkId() {
         Server.mvw("Item#getNetworkId()");
         return this.getNetworkId(GameVersion.getLastVersion());

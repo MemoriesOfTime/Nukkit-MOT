@@ -55,7 +55,7 @@ public abstract class ScatteredStructurePiece {
             for (int z = boundingBox.getMin().z; z <= boundingBox.getMax().z; z++) {
                 int y = level.getChunk(x >> 4, z >> 4).getHighestBlockAt(x & 0xf, z & 0xf);
                 int id = level.getBlockIdAt(x, y - 1, z);
-                while (PLANTS.contains(id) && y > 1) {
+                while (y > 1 && PLANTS.contains(id)) {
                     y--;
                     id = level.getBlockIdAt(x, y - 1, z);
                 }

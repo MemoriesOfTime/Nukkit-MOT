@@ -131,9 +131,6 @@ public class Utils {
         if (content == null) {
             throw new IllegalArgumentException("content must not be null");
         }
-        if (!file.exists()) {
-            file.createNewFile();
-        }
         try (FileOutputStream stream = new FileOutputStream(file)) {
             byte[] buffer = new byte[1024];
             int length;

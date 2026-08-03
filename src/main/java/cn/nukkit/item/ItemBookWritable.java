@@ -31,7 +31,7 @@ public abstract class ItemBookWritable extends Item {
         Preconditions.checkArgument(pageId >= 0 && pageId < 50, "Page number " + pageId + " is out of range");
         if (this.hasCompoundTag()) {
             CompoundTag tag = this.getNamedTag();
-            if (tag.contains("pages") && tag.get("pages") instanceof ListTag) {
+            if (tag.get("pages") instanceof ListTag) {
                 return tag.getList("pages", CompoundTag.class).size() > pageId;
             }
         }
@@ -45,7 +45,7 @@ public abstract class ItemBookWritable extends Item {
         Preconditions.checkArgument(pageId >= 0 && pageId < 50, "Page number " + pageId + " is out of range");
         if (this.hasCompoundTag()) {
             CompoundTag tag = this.getNamedTag();
-            if (tag.contains("pages") && tag.get("pages") instanceof ListTag) {
+            if (tag.get("pages") instanceof ListTag) {
                 ListTag<CompoundTag> pages = tag.getList("pages", CompoundTag.class);
                 if (pages.size() > pageId) {
                     return pages.get(pageId).getString("text");
@@ -70,7 +70,7 @@ public abstract class ItemBookWritable extends Item {
             tag = new CompoundTag();
         }
         ListTag<CompoundTag> pages;
-        if (!tag.contains("pages") || !(tag.get("pages") instanceof ListTag)) {
+        if (!(tag.get("pages") instanceof ListTag)) {
             pages = new ListTag<>("pages");
             tag.putList(pages);
         } else {
@@ -96,7 +96,7 @@ public abstract class ItemBookWritable extends Item {
         Preconditions.checkArgument(pageId >= 0 && pageId < 50, "Page number " + pageId + " is out of range");
         CompoundTag tag = this.hasCompoundTag() ? this.getNamedTag() : new CompoundTag();
         ListTag<CompoundTag> pages;
-        if (!tag.contains("pages") || !(tag.get("pages") instanceof ListTag)) {
+        if (!(tag.get("pages") instanceof ListTag)) {
             pages = new ListTag<>("pages");
             tag.putList(pages);
         } else {
@@ -118,7 +118,7 @@ public abstract class ItemBookWritable extends Item {
         Preconditions.checkArgument(pageId >= 0 && pageId < 50, "Page number " + pageId + " is out of range");
         if (this.hasCompoundTag()) {
             CompoundTag tag = this.getNamedTag();
-            if (tag.contains("pages") && tag.get("pages") instanceof ListTag) {
+            if (tag.get("pages") instanceof ListTag) {
                 ListTag<CompoundTag> pages = tag.getList("pages", CompoundTag.class);
                 if (pages.size() > pageId) {
                     pages.remove(pageId);
@@ -145,7 +145,7 @@ public abstract class ItemBookWritable extends Item {
         Preconditions.checkArgument(pageId >= 0 && pageId < 50, "Page number " + pageId + " is out of range");
         CompoundTag tag = this.hasCompoundTag() ? this.getNamedTag() : new CompoundTag();
         ListTag<CompoundTag> pages;
-        if (!tag.contains("pages") || !(tag.get("pages") instanceof ListTag)) {
+        if (!(tag.get("pages") instanceof ListTag)) {
             pages = new ListTag<>("pages");
             tag.putList(pages);
         } else {
@@ -173,7 +173,7 @@ public abstract class ItemBookWritable extends Item {
         Preconditions.checkArgument(pageId2 >= 0 && pageId2 < 50, "Page number " + pageId2 + " is out of range");
         if (this.hasCompoundTag()) {
             CompoundTag tag = this.getNamedTag();
-            if (tag.contains("pages") && tag.get("pages") instanceof ListTag) {
+            if (tag.get("pages") instanceof ListTag) {
                 ListTag<CompoundTag> pages = tag.getList("pages", CompoundTag.class);
                 if (pages.size() > pageId1 && pages.size() > pageId2) {
                     String pageContents1 = pages.get(pageId1).getString("text");
@@ -193,7 +193,7 @@ public abstract class ItemBookWritable extends Item {
     public List getPages() {
         CompoundTag tag = this.hasCompoundTag() ? this.getNamedTag() : new CompoundTag();
         ListTag<CompoundTag> pages;
-        if (!tag.contains("pages") || !(tag.get("pages") instanceof ListTag)) {
+        if (!(tag.get("pages") instanceof ListTag)) {
             pages = new ListTag<>("pages");
             tag.putList(pages);
         } else {

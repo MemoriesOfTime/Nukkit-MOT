@@ -91,7 +91,7 @@ public class Skin {
 
     private boolean isValidSkin(boolean doNotLimitSkinGeometry) {
         String geometryData = this.getGeometryData();
-        return skinId != null && !skinId.trim().isEmpty() && skinId.length() < 100 && //skinId
+        return skinId != null && skinId.length() < 100 && !skinId.trim().isEmpty() && //skinId
                 skinData != null && skinData.width >= 64 && skinData.height >= 32 &&
                 skinData.data.length >= SINGLE_SKIN_SIZE && (doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE) && //skinData
                 ((geometryData != null && !geometryData.isEmpty()) &&
