@@ -2,10 +2,7 @@ package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
 import cn.nukkit.event.inventory.CraftItemEvent;
-import cn.nukkit.inventory.CraftingRecipe;
-import cn.nukkit.inventory.MultiRecipe;
-import cn.nukkit.inventory.PlayerUIComponent;
-import cn.nukkit.inventory.Recipe;
+import cn.nukkit.inventory.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
@@ -82,6 +79,7 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         }
 
         if (recipe instanceof MultiRecipe multiRecipe) {
+            context.put(CraftRecipeActionProcessor.TIMES_CRAFTED_KEY, Math.max(1, action.getTimesCrafted()));
             CraftResultsDeprecatedAction resultsAction = findCraftResultsAction(
                     context.getItemStackRequest().getActions(), context.getCurrentActionIndex() + 1);
             if (resultsAction == null || resultsAction.getResultItems() == null || resultsAction.getResultItems().length == 0) {
@@ -106,6 +104,9 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         }
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
+        if (recipe instanceof UserDataShapelessRecipe) {
+            CraftRecipeActionProcessor.applyInputNbt(output, consumedItems);
+        }
         output.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
 

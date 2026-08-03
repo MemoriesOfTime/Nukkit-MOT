@@ -90,4 +90,8 @@ public class GameFeatureSettings extends OkaeriConfig {
     @Comment("Check operator movement for cheating")
     @CustomKey("check-op-movement")
     private boolean checkOpMovement = false;
+
+    @Comment("Use vanilla armor damage reduction formula (non-linear with toughness/breach, deterministic EPF). Set false for legacy linear formula")
+    @CustomKey("vanilla-armor-reduction")
+    private boolean vanillaArmorReduction = true;
 }

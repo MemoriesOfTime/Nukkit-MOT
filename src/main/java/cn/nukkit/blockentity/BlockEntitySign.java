@@ -233,7 +233,8 @@ public class BlockEntitySign extends BlockEntitySpawnable {
 
     @Override
     public boolean updateCompoundTag(CompoundTag nbt, Player player) {
-        if (!nbt.getString("id").equals(BlockEntity.SIGN)) {
+        String id = nbt.getString("id");
+        if (!id.equals(BlockEntity.SIGN) && !id.equals(BlockEntity.HANGING_SIGN)) {
             return false;
         }
         String[] lines = new String[4];

@@ -43,8 +43,8 @@ public class JarPluginResourcePack extends AbstractResourcePack {
         }
         if (manifest == null) {
             manifest = jar.stream()
-                    .filter(e -> (e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") || e.getName().toLowerCase(Locale.ROOT).endsWith("pack_manifest.json"))
-                            && !e.isDirectory())
+                    .filter(e -> !e.isDirectory() &&
+                            (e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") || e.getName().toLowerCase(Locale.ROOT).endsWith("pack_manifest.json")))
                     .filter(e -> {
                         File fe = new File(e.getName());
                         if (!fe.getName().equalsIgnoreCase("manifest.json") && !fe.getName().equalsIgnoreCase("pack_manifest.json")) {
@@ -87,7 +87,7 @@ public class JarPluginResourcePack extends AbstractResourcePack {
             }
 
             jar.stream().forEach(entry -> {
-                if (entry.getName().startsWith(RESOURCE_PACK_PATH) && !entry.isDirectory() && !entry.getName().equals(RESOURCE_PACK_PATH + "encryption.key")) {
+                if (!entry.isDirectory() && entry.getName().startsWith(RESOURCE_PACK_PATH) && !entry.getName().equals(RESOURCE_PACK_PATH + "encryption.key")) {
                     try {
                         zipOutputStream.putNextEntry(new ZipEntry(entry.getName().substring(RESOURCE_PACK_PATH.length())));
                         zipOutputStream.write(jar.getInputStream(entry).readAllBytes());

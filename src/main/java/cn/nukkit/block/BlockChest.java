@@ -203,7 +203,7 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
                 chest = (BlockEntityChest) BlockEntity.createBlockEntity(BlockEntity.CHEST, this.getChunk(), nbt);
             }
 
-            if (chest.namedTag.contains("Lock") && chest.namedTag.get("Lock") instanceof StringTag) {
+            if (chest.namedTag.get("Lock") instanceof StringTag) {
                 if (!chest.namedTag.getString("Lock").equals(item.getCustomName())) {
                     return true;
                 }

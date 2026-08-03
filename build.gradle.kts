@@ -1,7 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
 
-@Suppress("DSL_SCOPE_VIOLATION") // https://youtrack.jetbrains.com/issue/IDEA-262280
-
 plugins {
     id("java-library")
     id("maven-publish")
@@ -48,7 +46,7 @@ val mockitoAgent by configurations.creating {
 dependencies {
     api(libs.raknet) {
         exclude("io.netty", "netty-common")
-        exclude("io.netty", "netty-codec")
+        exclude("io.netty", "netty-codec-base")
         exclude("io.netty", "netty-buffer")
         exclude("io.netty", "netty-transport")
         exclude("io.netty", "netty-transport-native-unix-common")
@@ -109,7 +107,7 @@ dependencies {
         exclude("io.netty", "netty-buffer")
     }
     testImplementation(libs.cloudburst.math)
-    testImplementation(libs.allay.protocol.extension)
+    testImplementation(libs.netease.protocol.extension)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.bundles.mockito)

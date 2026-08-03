@@ -54,7 +54,7 @@ public abstract class Tag {
             return false;
         }
         Tag o = (Tag) obj;
-        return getId() == o.getId() && !(name == null && o.name != null || name != null && o.name == null) && !(name != null && !name.equals(o.name));
+        return getId() == o.getId() && Objects.equals(name, o.name);
     }
 
     @Override

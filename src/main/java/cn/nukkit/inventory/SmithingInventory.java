@@ -173,6 +173,14 @@ public class SmithingInventory extends FakeBlockUIComponent {
             return true;
         }
 
+        // Diamond horse armor and nautilus armor are not ItemTool; allow them
+        // into the equipment slot explicitly for the netherite upgrade.
+        String namespaceId = item.getNamespaceId();
+        if ("minecraft:diamond_horse_armor".equals(namespaceId)
+                || Item.DIAMOND_NAUTILUS_ARMOR.equals(namespaceId)) {
+            return true;
+        }
+
         if (resolveTrimMaterial(item) != null) {
             return true;
         }

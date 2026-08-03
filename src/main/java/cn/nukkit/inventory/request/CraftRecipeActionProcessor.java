@@ -43,6 +43,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
 
     public static final String RECIPE_NET_ID_KEY = "recipeNetId";
     public static final String ENCH_RECIPE_KEY = "enchRecipe";
+    public static final String TIMES_CRAFTED_KEY = "timesCrafted";
 
     @Override
     public ItemStackRequestActionType getType() {
@@ -89,6 +90,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
 
         if (recipe instanceof MultiRecipe multiRecipe) {
+            int times = Math.max(1, action.getNumberOfRequestedCrafts());
+            context.put(TIMES_CRAFTED_KEY, times);
             CraftResultsDeprecatedAction resultsAction = findCraftResultsAction(
                     context.getItemStackRequest().getActions(),
                     context.getCurrentActionIndex() + 1
@@ -131,6 +134,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         }
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
+        if (recipe instanceof UserDataShapelessRecipe) {
+            applyInputNbt(output, collectCraftingInputList(player));
+        }
         output.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
 
@@ -220,22 +226,20 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (!player.isCreative()) {
             context.onCommit(() -> player.setExperience(player.getExperience(), player.getExperienceLevel() - finalCost));
         }
+        // Write the enchanted output to CREATED_OUTPUT and return without a response
+        // container. Per the Bedrock SAI contract the client drives the output pickup:
+        // it follows the CraftRecipeAction with its own Consume (reagents/book) and
+        // Place (take the result) actions, each carrying its own prediction. Echoing a
+        // CREATED_OUTPUT slot here makes the NetEase SparseContainerClient look up a
+        // prediction that was never created and assert
+        // ("tried to process a prediction that did not exist"); the standard client
+        // merely tolerates the surplus entry. Mirrors Allay / PowerNukkitX, which both
+        // stage the output in CREATED_OUTPUT and return null here.
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, finalOutput, false);
         context.onCommit(() -> enchantInventory.releasePublishedOption(action.getRecipeNetworkId()));
         context.put(ENCH_RECIPE_KEY, true);
 
-        ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
-                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
-                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
-                finalOutput.getCount(), finalOutput.getStackNetId(),
-                finalOutput.hasCustomName() ? finalOutput.getCustomName() : "",
-                finalOutput.getDamage(), ""
-        );
-        return context.success(List.of(new ItemStackResponseContainer(
-                ContainerSlotType.CREATED_OUTPUT,
-                List.of(responseSlot),
-                new FullContainerName(ContainerSlotType.CREATED_OUTPUT, null)
-        )));
+        return null;
     }
 
     private static boolean isApplicableEnchant(Enchantment enchantment, Item input) {
@@ -377,6 +381,18 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             }
         }
         return items;
+    }
+
+    /**
+     * Copies the NBT of the first NBT-carrying input onto the output, so {@link UserDataShapelessRecipe} dyeing keeps container contents.
+     */
+    static void applyInputNbt(Item output, List<Item> inputs) {
+        for (Item inputItem : inputs) {
+            if (inputItem != null && !inputItem.isNull() && inputItem.hasCompoundTag()) {
+                output.setCompoundTag(inputItem.getCompoundTag());
+                return;
+            }
+        }
     }
 
     private static CraftingGrid getActiveCraftingGrid(Player player) {

@@ -47,8 +47,8 @@ public class ZippedResourcePack extends AbstractResourcePack {
             }
             if (entry == null) {
                 entry = zip.stream()
-                        .filter(e-> (e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") || e.getName().toLowerCase(Locale.ROOT).endsWith("pack_manifest.json"))
-                                && !e.isDirectory())
+                        .filter(e-> !e.isDirectory() &&
+                                (e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") || e.getName().toLowerCase(Locale.ROOT).endsWith("pack_manifest.json")))
                         .filter(e-> {
                             File fe = new File(e.getName());
                             if (!fe.getName().equalsIgnoreCase("manifest.json") && !fe.getName().equalsIgnoreCase("pack_manifest.json")) {

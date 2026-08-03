@@ -7,10 +7,11 @@ import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.regression.PacketBridgeUtil;
+import dev.mot.protocol.extension.codec.v630.Bedrock_v630_NetEase;
+import dev.mot.protocol.extension.codec.v686.Bedrock_v686_NetEase;
+import dev.mot.protocol.extension.codec.v766.Bedrock_v766_NetEase;
+import dev.mot.protocol.extension.codec.v860.Bedrock_v860_NetEase;
 import io.netty.buffer.ByteBuf;
-import org.allaymc.protocol.extension.codec.v630.Bedrock_v630_NetEase;
-import org.allaymc.protocol.extension.codec.v686.Bedrock_v686_NetEase;
-import org.allaymc.protocol.extension.codec.v766.Bedrock_v766_NetEase;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockPacketDefinition;
@@ -33,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Cross-decode regression tests for NetEase-specific packets and encoding branches.
- * Uses ProtocolExtension NetEase codecs (v630, v686, v766) to decode packets encoded by Nukkit-MOT.
+ * Uses ProtocolExtension NetEase codecs (v630, v686, v766, v860) to decode packets encoded by Nukkit-MOT.
  */
 public class NetEasePacketRegressionTest {
 
@@ -47,11 +48,13 @@ public class NetEasePacketRegressionTest {
         NETEASE_CODECS.put(630, Bedrock_v630_NetEase.CODEC);
         NETEASE_CODECS.put(686, Bedrock_v686_NetEase.CODEC);
         NETEASE_CODECS.put(766, Bedrock_v766_NetEase.CODEC);
+        NETEASE_CODECS.put(860, Bedrock_v860_NetEase.CODEC);
 
         NETEASE_GAME_VERSIONS = new LinkedHashMap<>();
         NETEASE_GAME_VERSIONS.put(630, GameVersion.V1_20_50_NETEASE);
         NETEASE_GAME_VERSIONS.put(686, GameVersion.V1_21_2_NETEASE);
         NETEASE_GAME_VERSIONS.put(766, GameVersion.V1_21_50_NETEASE);
+        NETEASE_GAME_VERSIONS.put(860, GameVersion.V1_21_124_NETEASE);
     }
 
     @BeforeAll
@@ -69,7 +72,8 @@ public class NetEasePacketRegressionTest {
                 GameVersion.V1_20_50_NETEASE,
                 GameVersion.V1_21_2_NETEASE,
                 GameVersion.V1_21_50_NETEASE,
-                GameVersion.V1_21_93_NETEASE
+                GameVersion.V1_21_93_NETEASE,
+                GameVersion.V1_21_124_NETEASE
         ).map(Arguments::of);
     }
 
@@ -79,6 +83,7 @@ public class NetEasePacketRegressionTest {
                 GameVersion.V1_21_2,
                 GameVersion.V1_21_50,
                 GameVersion.V1_21_93,
+                GameVersion.V1_21_124,
                 GameVersion.getLastVersion()
         ).map(Arguments::of);
     }
@@ -115,7 +120,7 @@ public class NetEasePacketRegressionTest {
     }
 
     private cn.nukkit.network.protocol.netease.PyRpcPacket decodePyRpcPacket(byte[] data, long msgId, int protocolVersion) {
-        var cbPacket = new org.allaymc.protocol.extension.packet.PyRpcPacket();
+        var cbPacket = new dev.mot.protocol.extension.packet.PyRpcPacket();
         cbPacket.setData(data);
         cbPacket.setMsgId(msgId);
 
@@ -184,7 +189,7 @@ public class NetEasePacketRegressionTest {
         nukkitPacket.encode();
 
         var cbPacket = crossDecodeNetEase(nukkitPacket,
-                org.allaymc.protocol.extension.packet.ConfirmSkinPacket.class);
+                dev.mot.protocol.extension.packet.ConfirmSkinPacket.class);
 
         assertTrue(cbPacket.getEntries().isEmpty());
     }
@@ -202,7 +207,7 @@ public class NetEasePacketRegressionTest {
         nukkitPacket.encode();
 
         var cbPacket = crossDecodeNetEase(nukkitPacket,
-                org.allaymc.protocol.extension.packet.ConfirmSkinPacket.class);
+                dev.mot.protocol.extension.packet.ConfirmSkinPacket.class);
 
         assertEquals(1, cbPacket.getEntries().size());
         var entry = cbPacket.getEntries().get(0);
@@ -225,7 +230,7 @@ public class NetEasePacketRegressionTest {
         nukkitPacket.encode();
 
         var cbPacket = crossDecodeNetEase(nukkitPacket,
-                org.allaymc.protocol.extension.packet.ConfirmSkinPacket.class);
+                dev.mot.protocol.extension.packet.ConfirmSkinPacket.class);
 
         assertEquals(1, cbPacket.getEntries().size());
         var entry = cbPacket.getEntries().get(0);
@@ -247,7 +252,7 @@ public class NetEasePacketRegressionTest {
         nukkitPacket.encode();
 
         var cbPacket = crossDecodeNetEase(nukkitPacket,
-                org.allaymc.protocol.extension.packet.ConfirmSkinPacket.class);
+                dev.mot.protocol.extension.packet.ConfirmSkinPacket.class);
 
         assertEquals(1, cbPacket.getEntries().size());
         var entry = cbPacket.getEntries().get(0);
@@ -271,7 +276,7 @@ public class NetEasePacketRegressionTest {
         nukkitPacket.encode();
 
         var cbPacket = crossDecodeNetEase(nukkitPacket,
-                org.allaymc.protocol.extension.packet.PyRpcPacket.class);
+                dev.mot.protocol.extension.packet.PyRpcPacket.class);
 
         assertArrayEquals(data, cbPacket.getData());
         assertEquals(0xfedcba98L, cbPacket.getMsgId());
@@ -301,7 +306,7 @@ public class NetEasePacketRegressionTest {
         nukkitPacket.encode();
 
         var cbPacket = crossDecodeNetEase(nukkitPacket,
-                org.allaymc.protocol.extension.packet.PyRpcPacket.class);
+                dev.mot.protocol.extension.packet.PyRpcPacket.class);
 
         assertArrayEquals(expected, cbPacket.getData());
         assertEquals(cn.nukkit.network.protocol.netease.PyRpcPacket.DEFAULT_MSG_ID, cbPacket.getMsgId());
@@ -328,7 +333,7 @@ public class NetEasePacketRegressionTest {
         nukkitPacket.encode();
 
         var cbPacket = crossDecodeNetEase(nukkitPacket,
-                org.allaymc.protocol.extension.packet.PyRpcPacket.class);
+                dev.mot.protocol.extension.packet.PyRpcPacket.class);
 
         assertArrayEquals(expected, cbPacket.getData());
         assertEquals(cn.nukkit.network.protocol.netease.PyRpcPacket.DEFAULT_MSG_ID, cbPacket.getMsgId());
@@ -338,7 +343,7 @@ public class NetEasePacketRegressionTest {
     @MethodSource("allNetEaseVersions")
     void testPyRpcPacketDecode(int protocolVersion) {
         byte[] data = new byte[]{(byte) 0x92, (byte) 0xa4, 't', 'e', 's', 't', 42};
-        var cbPacket = new org.allaymc.protocol.extension.packet.PyRpcPacket();
+        var cbPacket = new dev.mot.protocol.extension.packet.PyRpcPacket();
         cbPacket.setData(data);
         cbPacket.setMsgId(0x87654321L);
 
@@ -610,7 +615,7 @@ public class NetEasePacketRegressionTest {
         nukkitPacket.encode();
 
         var cbPacket = crossDecodeNetEase(nukkitPacket,
-                org.allaymc.protocol.extension.packet.PyRpcPacket.class);
+                dev.mot.protocol.extension.packet.PyRpcPacket.class);
 
         assertEquals(0x12345678L, cbPacket.getMsgId());
         assertArrayEquals(msgpackArray(
@@ -641,7 +646,7 @@ public class NetEasePacketRegressionTest {
         encodedPacket.encode();
 
         var cbPacket = crossDecodeNetEase(encodedPacket,
-                org.allaymc.protocol.extension.packet.PyRpcPacket.class);
+                dev.mot.protocol.extension.packet.PyRpcPacket.class);
 
         assertArrayEquals(msgpackArray(
                 msgpackBinary(RegisteredCustomSubPacket.METHOD),

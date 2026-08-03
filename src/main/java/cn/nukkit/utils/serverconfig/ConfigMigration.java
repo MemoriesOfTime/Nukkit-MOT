@@ -61,6 +61,22 @@ public class ConfigMigration {
                 }
             }
 
+            // Migrate chunk-settings.async-chunk-loading -> chunk-settings.async-chunks
+            // (the two toggles were merged into a single async-chunks switch)
+            Object chunkObj = root.get("chunk-settings");
+            if (chunkObj instanceof Map<?, ?> chunkMap) {
+                Map<String, Object> chunk = (Map<String, Object>) chunkMap;
+                if (chunk.containsKey("async-chunk-loading")) {
+                    Object oldValue = chunk.remove("async-chunk-loading");
+                    // async-chunks takes precedence if already present; otherwise adopt the migrated value
+                    if (!chunk.containsKey("async-chunks")) {
+                        chunk.put("async-chunks", oldValue);
+                    }
+                    changed = true;
+                    log.info("Migrated 'chunk-settings.async-chunk-loading' into 'chunk-settings.async-chunks' in nukkit-mot.yml");
+                }
+            }
+
             if (changed) {
                 DumperOptions options = new DumperOptions();
                 options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
@@ -196,6 +212,7 @@ public class ConfigMigration {
         migrated |= migrateBoolean("temp-ip-ban-failed-xbox-auth", serverConfig.gameFeatureSettings()::tempIpBanFailedXboxAuth);
         migrated |= migrateBoolean("strong-ip-bans", serverConfig.gameFeatureSettings()::strongIpBans);
         migrated |= migrateBoolean("check-op-movement", serverConfig.gameFeatureSettings()::checkOpMovement);
+        migrated |= migrateBoolean("vanilla-armor-reduction", serverConfig.gameFeatureSettings()::vanillaArmorReduction);
 
         // NetEase settings
         migrated |= migrateBoolean("netease-client-support", serverConfig.neteaseSettings()::clientSupport);

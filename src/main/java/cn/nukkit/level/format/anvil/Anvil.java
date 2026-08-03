@@ -195,6 +195,25 @@ public class Anvil extends BaseLevelProvider {
     }
 
     @Override
+    public boolean isOffThreadChunkReadSupported() {
+        return this.level != null;
+    }
+
+    @Override
+    public synchronized BaseFullChunk readChunkOffThread(int chunkX, int chunkZ) {
+        // synchronized 于 provider:region 共享 RandomAccessFile(seek+read 非原子),须与主线程 loadChunk/saveChunk/GC 串行
+        // synchronized on the provider: regions share a RandomAccessFile (seek+read is not atomic), so reads must serialize with main-thread loadChunk/saveChunk/GC
+        int regionX = getRegionIndexX(chunkX);
+        int regionZ = getRegionIndexZ(chunkZ);
+        BaseRegionLoader region = this.loadRegion(regionX, regionZ);
+        try {
+            return region.readChunk(chunkX - (regionX << 5), chunkZ - (regionZ << 5));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public synchronized void saveChunk(int X, int Z) {
         BaseFullChunk chunk = this.getChunk(X, Z);
         if (chunk != null) {

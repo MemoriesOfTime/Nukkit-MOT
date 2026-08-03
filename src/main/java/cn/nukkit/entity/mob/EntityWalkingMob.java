@@ -201,8 +201,8 @@ public abstract class EntityWalkingMob extends EntityWalking implements EntityMo
 
     @Override
     public boolean isMeetAttackConditions(Vector3 target) {
-        return this.getServer().getMobAiEnabled() &&
-                target instanceof EntityCreature &&
+        return target instanceof EntityCreature &&
+                this.getServer().getMobAiEnabled() &&
                 (!this.isFriendly() || !(target instanceof Player) || ((Entity) target).getId() == this.isAngryTo);
     }
 }

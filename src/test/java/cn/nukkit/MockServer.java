@@ -173,6 +173,9 @@ public final class MockServer {
         mock.minimumProtocol = 0;
         mock.maximumProtocol = Integer.MAX_VALUE;
         mock.onlyNetEaseMode = false;
+        // Mockito 不执行字段初始化器,须显式给默认值,否则 0 会被判为「写积压」
+        // Mockito skips field initializers; set defaults explicitly or 0 reads as "write backlogged"
+        mock.maxPendingChunkWrites = 128;
 
         Mockito.lenient().when(mock.getPluginManager())
                 .thenReturn(Mockito.mock(PluginManager.class));

@@ -30,6 +30,19 @@ Only interested in newer versions? You might want to try [Lumi](https://github.c
 2. Download the .jar file from the links below
 3. Write a command to run: `java -jar Nukkit-MOT-SNAPSHOT.jar` (change `Nukkit-MOT-SNAPSHOT.jar` to the name of the file you downloaded)
 
+### Run with Docker
+```bash
+docker run -d --name nukkit-mot \
+  -p 19132:19132/udp \
+  -v $(pwd)/data:/data \
+  -e JAVA_OPTS="-Xms2G -Xmx2G" \
+  --restart unless-stopped \
+  memoriesoftime/nukkit-mot:latest
+```
+- `:latest` and `:<short-sha>` are development snapshots built from the master branch.
+- `:1.26.30-R1` style tags are stable releases mirroring Maven Central.
+- All worlds, plugins, players and `server.properties` live under the `/data` volume.
+
 ## Links
 - __🌐 Download: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
 - __💬 Discuss: [Discord](https://discord.gg/pJjQDQC) / [QQ Group](https://jq.qq.com/?_wv=1027&k=5aIuYMH)__
@@ -152,15 +165,23 @@ dependencies {
   </tr>
 </table>
 
+## Contributors
+
+Thanks to everyone who has contributed to this project!
+
+<a href="https://github.com/MemoriesOfTime/Nukkit-MOT/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=MemoriesOfTime/Nukkit-MOT" />
+</a>
+
 ## Star History
 
 If you like this project, please give us a Star ⭐
 
 <a href="https://www.star-history.com/?repos=MemoriesOfTime%2FNukkit-MOT&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=MemoriesOfTime/Nukkit-MOT&type=date&theme=dark&legend=top-left&sealed_token=rpkJyH7BITcbbVSkLa1y4EhTnURtpmFGTNdSAJUCoXYyj21eOQuti54RMaTfE84DhzWCFg2ZIoJ7cFrvaqRfjhQSvwb5R3kmbth69h6JIOfMgmBr3t0npwoXC8VwBdctTg7Pilu2w6R-GPn-qr3NP3wbSylfcGmGUo13Xqo-NqxUdBFIgVhPXiINQR09" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left&sealed_token=rpkJyH7BITcbbVSkLa1y4EhTnURtpmFGTNdSAJUCoXYyj21eOQuti54RMaTfE84DhzWCFg2ZIoJ7cFrvaqRfjhQSvwb5R3kmbth69h6JIOfMgmBr3t0npwoXC8VwBdctTg7Pilu2w6R-GPn-qr3NP3wbSylfcGmGUo13Xqo-NqxUdBFIgVhPXiINQR09" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left&sealed_token=rpkJyH7BITcbbVSkLa1y4EhTnURtpmFGTNdSAJUCoXYyj21eOQuti54RMaTfE84DhzWCFg2ZIoJ7cFrvaqRfjhQSvwb5R3kmbth69h6JIOfMgmBr3t0npwoXC8VwBdctTg7Pilu2w6R-GPn-qr3NP3wbSylfcGmGUo13Xqo-NqxUdBFIgVhPXiINQR09" />
  </picture>
 </a>
 

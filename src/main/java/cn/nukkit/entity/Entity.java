@@ -1726,7 +1726,11 @@ public abstract class Entity extends Location implements Metadatable {
                 && !source.isApplicable(EntityDamageEvent.DamageModifier.CRITICAL)
                 && damageByEntityEvent.getDamager() instanceof Player damager
                 && canCriticalHit(damager)) {
-            source.setDamage(getDamageBeforeTargetReductions(source) * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
+            // vanilla: 暴击基数取护甲前伤害(护甲同时减免暴击);legacy: 取护甲后伤害(5306387d1^ 之前行为)
+            float base = Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction()
+                    ? getDamageBeforeTargetReductions(source)
+                    : source.getFinalDamage();
+            source.setDamage(base * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
         }
     }
 
@@ -1758,7 +1762,8 @@ public abstract class Entity extends Location implements Metadatable {
             return false;
         }
 
-        if (!(this instanceof EntityHumanType)) {
+        // legacy 不重算抗性(保持 ctor 预算值)
+        if (!(this instanceof EntityHumanType) && Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction()) {
             this.recalculateResistanceDamage(source);
         }
 
@@ -3660,7 +3665,7 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if(Objects.equals(property.getIdentifier(), identifier) && property instanceof EnumEntityProperty enumEntityProperty) {
+            if(property instanceof EnumEntityProperty enumEntityProperty && Objects.equals(property.getIdentifier(), identifier)) {
                 int index = enumEntityProperty.findIndex(value);
 
                 if(index >= 0) {
@@ -3677,11 +3682,16 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if (!identifier.equals(property.getIdentifier()) ||
-                    !(property instanceof EnumEntityProperty enumProperty)) {
+            if (!(property instanceof EnumEntityProperty enumProperty) ||
+                    !identifier.equals(property.getIdentifier())) {
                 continue;
             }
-            return enumProperty.getEnums()[intProperties.get(identifier)];
+            String[] values = enumProperty.getEnums();
+            Integer index = intProperties.get(identifier);
+            if (index == null || index < 0 || index >= values.length) {
+                return enumProperty.getDefaultValue();
+            }
+            return values[index];
         }
         return null;
     }

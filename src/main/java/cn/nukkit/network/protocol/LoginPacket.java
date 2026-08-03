@@ -83,7 +83,7 @@ public class LoginPacket extends DataPacket {
             authType = AuthType.values()[authTypeOrdinal + 1];
         }
 
-        if (map.containsKey("Token") && map.get("Token") instanceof String token && !((String) map.get("Token")).isBlank()) {
+        if (map.get("Token") instanceof String token && !token.isBlank()) {
             return new TokenPayload(token, authType);
         } else {
             String certificate = (String) map.get("Certificate");

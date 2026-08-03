@@ -32,7 +32,6 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackReq
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
-import io.netty.buffer.AbstractByteBufAllocator;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
@@ -323,14 +322,29 @@ public class BinaryStream {
         return Binary.readUUID(this.get(16));
     }
 
+    /**
+     * @deprecated use {@link #putSkin(GameVersion, Skin)} so the NetEase {@code fullSkinId}
+     * workaround is applied correctly.
+     */
+    @Deprecated
     public void putSkin(Skin skin) {
         Server.mvw("BinaryStream#putSkin(Skin)");
-        this.putSkin(ProtocolInfo.CURRENT_PROTOCOL, skin);
+        this.putSkin(GameVersion.getLastVersion(), skin);
+    }
+
+    /**
+     * @deprecated use {@link #putSkin(GameVersion, Skin)} so the NetEase {@code fullSkinId}
+     * workaround is applied correctly.
+     */
+    @Deprecated
+    public void putSkin(int protocol, Skin skin) {
+        this.putSkin(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), skin);
     }
 
     private static byte[] steveSkinDecoded;
 
-    public void putSkin(int protocol, Skin skin) {
+    public void putSkin(GameVersion gameVersion, Skin skin) {
+        int protocol = gameVersion.getProtocol();
         this.putString(skin.getSkinId());
 
         if (protocol < ProtocolInfo.v1_13_0) {
@@ -379,7 +393,10 @@ public class BinaryStream {
                 this.putBoolean(skin.isCapeOnClassic());
             }
             this.putString(skin.getCapeId());
-            this.putString(skin.getFullSkinId());
+            String fullSkinId = gameVersion == GameVersion.V1_21_124_NETEASE
+                    ? skin.getFullSkinId() + UUID.randomUUID().toString().substring(0, 8)
+                    : skin.getFullSkinId();
+            this.putString(fullSkinId);
             if (protocol >= ProtocolInfo.v1_14_60) {
                 this.putString(skin.getArmSize());
                 this.putString(skin.getSkinColor());
@@ -438,6 +455,7 @@ public class BinaryStream {
         return new SerializedImage(width, height, data);
     }
 
+    @Deprecated
     public Skin getSkin() {
         Server.mvw("BinaryStream#getSkin()");
         return getSkin(ProtocolInfo.CURRENT_PROTOCOL);
@@ -517,6 +535,7 @@ public class BinaryStream {
     private static final String MV_ORIGIN_NAMESPACE = "mv_origin_namespace";
     private static final String MV_ORIGIN_META = "mv_origin_meta";
 
+    @Deprecated
     public Item getSlot() {
         Server.mvw("BinaryStream#getSlot()");
         return this.getSlot(GameVersion.getLastVersion());
@@ -782,7 +801,7 @@ public class BinaryStream {
         }
 
         byte[] bytes = this.getByteArray();
-        ByteBuf buf = AbstractByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
+        ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
         buf.writeBytes(bytes);
 
         byte[] nbt = new byte[0];
@@ -914,6 +933,7 @@ public class BinaryStream {
         return item;
     }
 
+    @Deprecated
     public void putSlot(Item item) {
         Server.mvw("BinaryStream#putSlot(Item)");
         this.putSlot(GameVersion.getLastVersion(), item);
@@ -1063,9 +1083,9 @@ public class BinaryStream {
             return;
         }
 
-        if (item.hasCompoundTag()
-                || (isDurable && protocolId >= ProtocolInfo.v1_12_0)
-                || saveOriginalID) {
+        if ((isDurable && protocolId >= ProtocolInfo.v1_12_0)
+                || saveOriginalID
+                || item.hasCompoundTag()) {
             if (protocolId < ProtocolInfo.v1_12_0) {
                 if (saveOriginalID) {
                     try {
@@ -1434,7 +1454,7 @@ public class BinaryStream {
         byte[] bytes = this.getByteArray();
 
         if (bytes.length != 0) {
-            ByteBuf buf = AbstractByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
+            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
             buf.writeBytes(bytes);
 
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
@@ -1797,6 +1817,7 @@ public class BinaryStream {
         this.putByte((byte) (rotation / (360d / 256d)));
     }
 
+    @Deprecated
     public void putGameRules(GameRules gameRules, boolean startGame) {
         Server.mvw("BinaryStream#putGameRules(GameRules, boolean)");
         this.putGameRules(ProtocolInfo.CURRENT_PROTOCOL, gameRules, startGame);

@@ -128,6 +128,7 @@ import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -195,7 +196,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int PERMISSION_MEMBER = 1;
     public static final int PERMISSION_VISITOR = 0;
 
-    public static final int RESOURCE_PACK_CHUNK_SIZE = 8 * 1024; // 8KB
+    public static final int RESOURCE_PACK_CHUNK_SIZE = 100 * 1024; // 100 KB
 
     protected final SourceInterface interfaz;
     protected final NetworkPlayerSession networkSession;
@@ -301,6 +302,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
 
+    /**
+     * 已向本观察者下发 PlayerList(ADD) 的玩家型实体 UUID，用于去重防网易客户端隐形；
+     * 玩家型 NPC 条目在握手后延迟移除（见 {@code PlayerEntitySkinSender}）。
+     * <p>
+     * Player-like entity UUIDs registered via PlayerList ADD for this viewer, deduplicating to avoid
+     * the NetEase invisibility bug; NPC entries are removed shortly after the handshake.
+     */
+    public final Set<UUID> sentSkins = ConcurrentHashMap.newKeySet();
+
     protected Vector3 newPosition = null;
 
     protected int chunkRadius;
@@ -387,6 +397,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
+    private final LinkedHashMap<UUID, PendingResourcePack> pendingResourcePacks = new LinkedHashMap<>();
+    private boolean resourcePackChunkSendScheduled;
 
     private int lastEmote;
     private int lastEnderPearl = 20;
@@ -668,6 +680,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
         this.hiddenPlayers.put(player.getUniqueId(), player);
+        // 不清 sentSkins：despawn 只发 RemoveEntityPacket，不下发 PlayerList(REMOVE)，
+        // 清掉会让随后的 showPlayer 重发 ADD，触发网易 V860 玩家隐形。保留记录则 spawnTo
+        // 的 ADD 守卫会去重，实体仅由 AddPlayerPacket 重新生成。Tab 条目不受影响。
+        // <p>
+        // Don't clear sentSkins: despawn only sends RemoveEntityPacket, not PlayerList(REMOVE),
+        // so clearing would make showPlayer resend ADD and trigger NetEase V860 invisibility.
+        // Keeping the record lets the spawnTo ADD guard deduplicate; the entity is respawned via
+        // AddPlayerPacket and the Tab entry is untouched.
         player.despawnFrom(this);
     }
 
@@ -924,8 +944,34 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void setSkin(Skin skin) {
+        Skin previousSkin = this.getSkin();
         super.setSkin(skin);
-        updatePlayerListData(true);
+        if (!this.spawned) {
+            return;
+        }
+
+        Player[] playerListViewers = this.server.playerList.values().stream()
+                .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                .filter(viewer -> viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE)
+                .toArray(Player[]::new);
+        if (playerListViewers.length > 0) {
+            this.server.updatePlayerListData(
+                    new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, skin, this.loginChainData.getXUID(), this.getLocatorBarColor()),
+                    playerListViewers);
+        }
+
+        for (Player viewer : this.server.playerList.values()) {
+            if (viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE
+                    || !viewer.sentSkins.contains(this.getUniqueId())) {
+                continue;
+            }
+            PlayerSkinPacket packet = new PlayerSkinPacket();
+            packet.uuid = this.getUniqueId();
+            packet.skin = skin;
+            packet.newSkinName = skin.getSkinId();
+            packet.oldSkinName = previousSkin != null ? previousSkin.getSkinId() : "";
+            viewer.dataPacket(packet);
+        }
     }
 
     public Color getLocatorBarColor() {
@@ -943,9 +989,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     void updatePlayerListData(boolean onlyWhenSpawned) {
         if (this.spawned || !onlyWhenSpawned) {
-            this.server.updatePlayerListData(
-                    new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, this.getSkin(), this.loginChainData.getXUID(), this.getLocatorBarColor()),
-                    this.server.playerList.values().toArray(new Player[0]));
+            PlayerListPacket.Entry entry = new PlayerListPacket.Entry(
+                    this.getUniqueId(), this.getId(), this.displayName, this.getSkin(),
+                    this.loginChainData.getXUID(), this.getLocatorBarColor());
+            Player[] standardViewers = this.server.playerList.values().stream()
+                    .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                    .filter(viewer -> !PlayerEntitySkinSender.requiresRetainedEntry(viewer))
+                    .toArray(Player[]::new);
+            if (standardViewers.length > 0) {
+                this.server.updatePlayerListData(entry, standardViewers);
+            }
+
+            this.server.playerList.values().stream()
+                    .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                    .filter(PlayerEntitySkinSender::requiresRetainedEntry)
+                    .forEach(viewer -> PlayerEntitySkinSender.replacePlayerListEntry(viewer, entry));
         }
     }
 
@@ -1149,6 +1207,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!loadQueue.isEmpty()) {
             int count = 0;
+            boolean asyncLoad = this.level.isAsyncChunkLoadEnabled();
             LongIterator iter = loadQueue.longIterator();
             while (iter.hasNext()) {
                 if (count >= server.chunksPerTick) {
@@ -1164,6 +1223,43 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 try {
                     this.usedChunks.put(index, false);
                     this.level.registerChunkLoader(this, chunkX, chunkZ, false);
+
+                    // 异步区块加载:读取+解码在异步线程完成,区块由主线程 doTick 挂载后下一 tick 再发送,避免主线程同步读取磁盘
+                    // Async chunk loading: read+decode off-thread; the chunk is mounted in doTick and sent next tick, avoiding a sync disk read on the main thread
+                    if (asyncLoad) {
+                        BaseFullChunk loadedChunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
+                        if (loadedChunk == null) {
+                            if (this.level.requestChunkLoadAsync(chunkX, chunkZ)) {
+                                continue;
+                            }
+                            // 受理失败(executor 关闭等)→ 落到下方原同步路径 / rejected → fall through to the sync path below
+                        } else if (!loadedChunk.isPopulated()) {
+                            boolean neighboursCached = true;
+                            boolean queueRejected = false;
+                            for (int dx = -1; dx <= 1; ++dx) {
+                                for (int dz = -1; dz <= 1; ++dz) {
+                                    if ((dx | dz) == 0) {
+                                        continue;
+                                    }
+                                    if (this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz) == null) {
+                                        // 受理失败(队列已满/executor 关)→ 放弃异步预载,落到下方同步 populateChunk 保证推进,避免队列持续满时该区块永久悬挂
+                                        // Rejected (queue full / executor down) → abandon async preload and fall through to sync populateChunk to guarantee progress, so a saturated queue can't leave this chunk hanging forever
+                                        if (!this.level.requestChunkLoadAsync(chunkX + dx, chunkZ + dz)) {
+                                            queueRejected = true;
+                                            break;
+                                        }
+                                        neighboursCached = false;
+                                    }
+                                }
+                                if (queueRejected) {
+                                    break;
+                                }
+                            }
+                            if (!queueRejected && !neighboursCached) {
+                                continue;
+                            }
+                        }
+                    }
 
                     if (!this.level.populateChunk(chunkX, chunkZ)) {
                         if (this.spawned && this.teleportPosition == null) {
@@ -2421,7 +2517,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             if (this.riding == null && this.inventory != null) {
-                if (this.isFoodEnabled() && this.getServer().getDifficulty() > 0 && distanceSquared >= 0.05) {
+                if (this.isFoodEnabled() && distanceSquared >= 0.05 && this.getServer().getDifficulty() > 0) {
                     double jump = 0;
                     double distance = Math.sqrt(distanceSquared);
                     double swimming = this.isInsideOfWater() ? 0.01 * distance : 0;
@@ -3476,6 +3572,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             log.trace("Inbound {}: {}", this.getName(), packet);
         }
 
+        if (pid == ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET) {
+            if (this.networkSession != null && this.networkSession.getState() != null) {
+                this.networkSession.getState().getLogin().touchActivity();
+            }
+            return;
+        }
+
         if (DataPacketManager.canProcess(packet.protocol, packet.getClass())) {
             DataPacketManager.processPacket(this.playerHandle, packet);
             return;
@@ -3696,6 +3799,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.close("", "disconnectionScreen.noReason");
                         break;
                     case ResourcePackClientResponsePacket.STATUS_SEND_PACKS:
+                        this.pendingResourcePacks.clear();
                         for (ResourcePackClientResponsePacket.Entry entry : responsePacket.packEntries) {
                             ResourcePack resourcePack = this.server.getResourcePackManager().getPackById(entry.uuid);
                             if (resourcePack == null) {
@@ -3705,6 +3809,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             ResourcePackDataInfoPacket dataInfoPacket = new ResourcePackDataInfoPacket();
                             dataInfoPacket.packId = resourcePack.getPackId();
+                            dataInfoPacket.packVersion = resourcePack.getPackVersion();
                             dataInfoPacket.maxChunkSize = RESOURCE_PACK_CHUNK_SIZE;
                             dataInfoPacket.chunkCount = MathHelper.ceil(resourcePack.getPackSize() / (float) RESOURCE_PACK_CHUNK_SIZE);
                             dataInfoPacket.compressedPackSize = resourcePack.getPackSize();
@@ -3762,7 +3867,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = this.getLocation();
                 }
 
-                if (this.forceMovement != null && (newPos.distanceSquared(this.forceMovement) > 0.1 || revert)) {
+                if (this.forceMovement != null && (revert || newPos.distanceSquared(this.forceMovement) > 0.1)) {
                     this.sendPosition(this.forceMovement, MovePlayerPacket.MODE_RESET);
                 } else {
 
@@ -4146,7 +4251,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = this.getLocation();
                 }
 
-                if (this.forceMovement != null && (clientPosition.distanceSquared(this.forceMovement) > 0.1 || revertMotion)) {
+                if (this.forceMovement != null && (revertMotion || clientPosition.distanceSquared(this.forceMovement) > 0.1)) {
                     this.sendPosition(this.forceMovement, MovePlayerPacket.MODE_RESET);
                 } else {
                     float yaw = authPacket.getYaw() % 360;
@@ -4731,7 +4836,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.needSendInventory = true;
             return;
         }
-        if (!this.isInventoryServerAuthoritative() || requests.isEmpty()) {
+        if (requests.isEmpty()) {
             return;
         }
 
@@ -5105,7 +5210,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             transactionSwitch:
             switch (transactionPacket.transactionType) {
                 case InventoryTransactionPacket.TYPE_NORMAL:
-                    if (this.isInventoryServerAuthoritative()) {
+                    if (this.isInventorySAIGateActive()) {
                         this.server.getLogger().debug(this.username + ": dropping legacy InventoryTransaction TYPE_NORMAL while SAI is enabled");
                         this.needSendInventory = true;
                         break;
@@ -5153,8 +5258,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             lastRightClickPos = blockVector;
                             lastRightClickTime = System.currentTimeMillis();
 
-                            if (spamming && (this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR
-                                    || (this.isSpectator() && !this.server.useClientSpectator))) {
+                            if (spamming && ((this.isSpectator() && !this.server.useClientSpectator)
+                                    || this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR)) {
                                 return;
                             }
 
@@ -5268,8 +5373,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 inventory.equipItem(useItemData.hotbarSlot);
                             }
 
+                            // 旁观者模式检查：如果启用了客户端旁观模式，则完全阻止交互（不触发事件）
+                            // 如果未启用，则允许触发事件但不允许实际破坏方块（假旁观模式，类似创造模式）
+                            // Spectator mode check: If client spectator mode is enabled, completely block interaction (no event trigger)
+                            // If not enabled, allow event trigger but prevent actual block breaking (fake spectator mode, similar to creative mode)
+                            if (this.isSpectator() && this.server.useClientSpectator) {
+                                return;
+                            }
+
                             item = this.inventory.getItemInHand();
-                            if (item instanceof ItemCrossbow && !item.onClickAir(this, directionVector)) {
+                            if (item instanceof ItemCrossbow && (this.isSpectator() || !item.onClickAir(this, directionVector))) {
                                 return;
                             }
 
@@ -5279,6 +5392,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             PlayerInteractEvent interactEvent = new PlayerInteractEvent(this, item, directionVector, face, Action.RIGHT_CLICK_AIR);
+                            if (this.isSpectator()) {
+                                interactEvent.setCancelled();
+                            }
                             this.server.getPluginManager().callEvent(interactEvent);
 
                             if (interactEvent.isCancelled()) {
@@ -5532,7 +5648,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private boolean shouldRejectLegacyInventoryUiTransaction(InventoryTransactionPacket packet) {
-        return this.isInventoryServerAuthoritative()
+        return this.isInventorySAIGateActive()
                 && (packet.transactionType == InventoryTransactionPacket.TYPE_NORMAL
                 || packet.isCraftingPart
                 || packet.isEnchantingPart
@@ -5649,7 +5765,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         // HACK: Client spams multiple left clicks so we need to skip them.
-        if ((this.lastBreakPosition.equals(blockPos) && (currentBreak - this.lastBreak) < 10) || pos.distanceSquared(this) > 100) {
+        if (((currentBreak - this.lastBreak) < 10 && this.lastBreakPosition.equals(blockPos)) || pos.distanceSquared(this) > 100) {
             return;
         }
 
@@ -5791,7 +5907,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         int maxMsgLength = this.protocol >= ProtocolInfo.v1_18_0 ? 512 : 255;
 
         for (String msg : message.split("\n")) {
-            if (!msg.trim().isEmpty() && msg.length() <= maxMsgLength) {
+            if (msg.length() <= maxMsgLength && !msg.trim().isEmpty()) {
                 PlayerChatEvent chatEvent = new PlayerChatEvent(this, msg);
                 this.server.getPluginManager().callEvent(chatEvent);
                 if (!chatEvent.isCancelled()) {
@@ -6252,11 +6368,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (this.loggedIn) {
                     this.server.removeOnlinePlayer(this);
+                    // 从曾收到过本玩家皮肤的其他观察者处清理记录（REMOVE 已由 removeOnlinePlayer 广播）。
+                    // Clear this player's UUID from viewers that previously received its list entry;
+                    // the REMOVE itself is broadcast by removeOnlinePlayer.
+                    this.server.getOnlinePlayers().values().stream()
+                            .filter(p -> p != this)
+                            .forEach(p -> p.sentSkins.remove(this.getUniqueId()));
                     this.loggedIn = false;
                 }
             }
 
-            if (ev != null && !Objects.equals(this.username, "") && this.spawned && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
                 this.server.broadcastMessage(ev.getQuitMessage());
             }
 
@@ -8110,7 +8232,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
         Player other = (Player) obj;
-        return Objects.equals(this.getUniqueId(), other.getUniqueId()) && this.getId() == other.getId();
+        return this.getId() == other.getId() && Objects.equals(this.getUniqueId(), other.getUniqueId());
     }
 
     public boolean isBreakingBlock() {
@@ -8232,6 +8354,93 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.networkSession;
     }
 
+    void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {
+        PendingResourcePack pending = this.pendingResourcePacks.computeIfAbsent(resourcePack.getPackId(),
+                ignored -> new PendingResourcePack(resourcePack));
+        pending.request(chunkIndex);
+        this.scheduleNextResourcePackChunk();
+    }
+
+    private void scheduleNextResourcePackChunk() {
+        if (this.resourcePackChunkSendScheduled || this.pendingResourcePacks.isEmpty()) {
+            return;
+        }
+        this.resourcePackChunkSendScheduled = true;
+        this.server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, this::sendNextResourcePackChunk);
+    }
+
+    private void sendNextResourcePackChunk() {
+        this.resourcePackChunkSendScheduled = false;
+        if (!this.connected) {
+            this.pendingResourcePacks.clear();
+            return;
+        }
+
+        Iterator<PendingResourcePack> iterator = this.pendingResourcePacks.values().iterator();
+        PendingResourcePack pending = null;
+        int chunkIndex = -1;
+        while (iterator.hasNext()) {
+            PendingResourcePack candidate = iterator.next();
+            chunkIndex = candidate.pollChunkIndex();
+            if (candidate.isEmpty()) {
+                iterator.remove();
+            }
+            if (chunkIndex >= 0) {
+                pending = candidate;
+                break;
+            }
+        }
+        if (pending == null) {
+            return;
+        }
+
+        ResourcePackChunkDataPacket dataPacket = new ResourcePackChunkDataPacket();
+        dataPacket.packId = pending.resourcePack.getPackId();
+        dataPacket.packVersion = pending.resourcePack.getPackVersion();
+        dataPacket.chunkIndex = chunkIndex;
+        dataPacket.progress = (long) RESOURCE_PACK_CHUNK_SIZE * chunkIndex;
+        dataPacket.data = pending.resourcePack.getPackChunk(RESOURCE_PACK_CHUNK_SIZE * chunkIndex, RESOURCE_PACK_CHUNK_SIZE);
+        this.dataPacket(dataPacket);
+        if (this.networkSession != null && this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().touchActivity();
+        }
+
+        if (!this.pendingResourcePacks.isEmpty()) {
+            this.resourcePackChunkSendScheduled = true;
+            this.server.getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, this::sendNextResourcePackChunk, 1);
+        }
+    }
+
+    /**
+     * Tracks pending chunks per pack to avoid overwhelming clients with burst delivery.
+     * <p>
+     * Adapted from PowerNukkitX (<a href="https://github.com/PowerNukkitX/PowerNukkitX">PowerNukkitX</a>)
+     */
+    static final class PendingResourcePack {
+        private final ResourcePack resourcePack;
+        private final BitSet requestedChunks = new BitSet();
+
+        PendingResourcePack(ResourcePack resourcePack) {
+            this.resourcePack = resourcePack;
+        }
+
+        void request(int chunkIndex) {
+            this.requestedChunks.set(chunkIndex);
+        }
+
+        int pollChunkIndex() {
+            int chunkIndex = this.requestedChunks.nextSetBit(0);
+            if (chunkIndex >= 0) {
+                this.requestedChunks.clear(chunkIndex);
+            }
+            return chunkIndex;
+        }
+
+        boolean isEmpty() {
+            return this.requestedChunks.isEmpty();
+        }
+    }
+
     protected void processPreLogin() {
         this.syncLoginVerified(true);
         this.syncLoginPhase(SessionLoginPhase.PRE_LOGIN);
@@ -8277,6 +8486,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
             case ENCRYPTION_RESPONSE_RECEIVED, PRE_LOGIN, RESOURCE_PACK, READY_TO_LOGIN -> packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET)
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET)
+                    || packetId == ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
             case LOGGED_IN, DISCONNECTED -> false;
         };
@@ -8423,6 +8633,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public boolean isInventoryServerAuthoritative() {
         return this.server.serverAuthoritativeInventory && this.protocol >= ProtocolInfo.v1_16_100;
+    }
+
+    /**
+     * 后端 SAI 丢包门限是否对该玩家生效。WDPE 代理玩家可能被宣告与后端相反的
+     * SAI 标志，故对其禁用门限，按客户端实际包响应。
+     * <p>
+     * Whether the backend's SAI drop-gates apply to this player. WDPE-proxied
+     * players may be advertised the opposite SAI flag, so
+     * bypass the gates and respond to whichever packet path the client uses.
+     */
+    public boolean isInventorySAIGateActive() {
+        if (this.server.useWaterdog && this.loginChainData != null
+                && this.loginChainData.getWaterdogXUID() != null) {
+            return false;
+        }
+        return this.isInventoryServerAuthoritative();
     }
 
     public boolean isEnableNetworkEncryption() {
