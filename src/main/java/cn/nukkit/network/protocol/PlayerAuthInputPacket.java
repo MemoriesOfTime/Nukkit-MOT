@@ -2,6 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.inventory.transaction.data.UseItemData;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
@@ -157,7 +158,7 @@ public class PlayerAuthInputPacket extends DataPacket {
                 this.itemStackRequest = this.readItemStackRequest(this.gameVersion);
             }
             if (this.getBoolean() && this.getBoolean()) {
-                int arraySize = this.getVarInt();
+                int arraySize = (int) this.getUnsignedVarInt();
                 if (arraySize > 256) {
                     throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
                 }
@@ -210,7 +211,10 @@ public class PlayerAuthInputPacket extends DataPacket {
 
     private void decodeBlockActions(int arraySize) {
         for (int i = 0; i < arraySize; i++) {
-            PlayerActionType type = PlayerActionType.from(this.getVarInt());
+            PlayerActionType type = PlayerActionType.fromOrNull(this.getVarInt());
+            if (type == null) {
+                continue;
+            }
             switch (type) {
                 case START_DESTROY_BLOCK:
                 case ABORT_DESTROY_BLOCK:
@@ -233,14 +237,24 @@ public class PlayerAuthInputPacket extends DataPacket {
         packet.setBuffer(this.getBufferUnsafe());
         packet.setCount(this.getCount());
         packet.setOffset(this.getOffset());
-        packet.legacyRequestId = packet.getVarInt();
 
-        if (packet.legacyRequestId < -1 && (packet.legacyRequestId & 1) == 0) {
+        boolean v2168Shape = packet.protocol >= ProtocolInfo.v1_26_40;
+        packet.legacyRequestId = packet.getVarInt();
+        boolean hasLegacySlots = v2168Shape
+                ? packet.getBoolean() && packet.legacyRequestId < -1 && (packet.legacyRequestId & 1) == 0
+                : packet.legacyRequestId < -1 && (packet.legacyRequestId & 1) == 0;
+        if (hasLegacySlots) {
             int legacySlotsCount = Math.min((int) packet.getUnsignedVarInt(), 256);
             for (int i = 0; i < legacySlotsCount; i++) {
                 packet.getByte();
                 int slotCount = (int) packet.getUnsignedVarInt();
                 packet.get(slotCount);
+            }
+        }
+
+        if (v2168Shape) {
+            if (!(packet.getBoolean() && packet.getBoolean())) {
+                throw new IllegalStateException("Expected InventoryActionData");
             }
         }
 
@@ -250,24 +264,24 @@ public class PlayerAuthInputPacket extends DataPacket {
         int actionCount = Math.min((int) packet.getUnsignedVarInt(), 4096);
         packet.actions = new NetworkInventoryAction[actionCount];
         for (int i = 0; i < packet.actions.length; i++) {
-            packet.actions[i] = new NetworkInventoryAction().read(packet, false);
+            packet.actions[i] = new NetworkInventoryAction().read(packet, v2168Shape);
         }
 
         UseItemData itemData = new UseItemData();
-        itemData.actionType = (int) packet.getUnsignedVarInt();
+        itemData.actionType = v2168Shape ? packet.getVarInt() : (int) packet.getUnsignedVarInt();
         if (packet.protocol >= ProtocolInfo.v1_21_20) {
-            itemData.triggerType = (int) packet.getUnsignedVarInt();
+            itemData.triggerType = v2168Shape ? packet.getByte() & 0xff : (int) packet.getUnsignedVarInt();
         }
         itemData.blockPos = packet.getBlockVector3();
-        itemData.face = packet.getBlockFace();
+        itemData.face = v2168Shape ? BlockFace.fromIndex(packet.getByte() & 0xff) : packet.getBlockFace();
         itemData.hotbarSlot = packet.getVarInt();
-        itemData.itemInHand = packet.getSlot(packet.gameVersion);
+        itemData.itemInHand = v2168Shape ? packet.getNetworkItemStackDescriptor(packet.gameVersion) : packet.getSlot(packet.gameVersion);
         itemData.playerPos = packet.getVector3f().asVector3();
         itemData.clickPos = packet.getVector3f();
         if (packet.protocol >= ProtocolInfo.v1_16_210) {
             itemData.blockRuntimeId = (int) packet.getUnsignedVarInt();
             if (packet.protocol >= ProtocolInfo.v1_21_20) {
-                itemData.clientInteractPrediction = (int) packet.getUnsignedVarInt();
+                itemData.clientInteractPrediction = v2168Shape ? packet.getByte() & 0xff : (int) packet.getUnsignedVarInt();
             }
         }
         if (packet.protocol >= ProtocolInfo.v1_26_10) {

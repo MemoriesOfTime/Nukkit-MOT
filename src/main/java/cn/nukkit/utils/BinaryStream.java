@@ -2757,22 +2757,17 @@ public class BinaryStream {
             int count = (int) getVarInt();
             return new ItemDescriptorWithCount(new DefaultDescriptor(toLegacyItemId(mapping, runtimeId), auxValue), count);
         }
-        // v2168: descriptor 重写为 VarUInt type + serializeName string + identifier string / VarUInt type + serializeName string + identifier string
         if (protocol >= ProtocolInfo.v1_26_40) {
             int descriptorType = (int) getUnsignedVarInt();
+            getByte(); // 重复 type byte，丢弃 / duplicate type byte, discarded
             ItemDescriptor descriptor;
-            if (descriptorType != 0) { // 非 INVALID：先读 serializeName 字符串并丢弃 / non-INVALID: read serializeName string and discard
-                getString();
-            }
             switch (descriptorType) {
-                case 0: // INVALID
-                    getVarInt(); // aux(=32767), 丢弃 / aux(=32767), discarded
+                case 0: // INVALID —— 无 serializeName、无 aux / no serializeName, no aux
                     descriptor = InvalidDescriptor.INSTANCE;
                     break;
                 case 1: // DEFAULT
                     String idName = getString();
                     int auxValue = getVarInt();
-                    // 通过 namespaced id 解析为 legacy itemId / Resolve namespaced id to legacy itemId
                     int itemId = cn.nukkit.item.Item.fromString(idName).getId();
                     descriptor = new DefaultDescriptor(itemId, auxValue);
                     break;
@@ -2781,15 +2776,14 @@ public class BinaryStream {
                     int version = getLShort();
                     descriptor = new MolangDescriptor(expression, version);
                     break;
-                case 3: // ITEM_TAG
+                case 3: // ITEM_TAG —— 无 aux / no aux
                     String tag = getString();
-                    getVarInt(); // aux(=32767), 丢弃 / aux(=32767), discarded
                     descriptor = new ItemTagDescriptor(tag);
                     break;
                 default:
                     throw new UnsupportedOperationException("Unhandled v2168 item descriptor type: " + descriptorType);
             }
-            int count = (int) getVarInt();
+            int count = getLShort() & 0xFFFF;
             return new ItemDescriptorWithCount(descriptor, count);
         }
         int descriptorType = getByte() & 0xFF;

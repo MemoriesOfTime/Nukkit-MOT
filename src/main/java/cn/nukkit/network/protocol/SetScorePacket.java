@@ -58,17 +58,26 @@ public class SetScorePacket extends DataPacket {
                 this.putUnsignedVarInt(typeOrdinal);
                 this.putString(V2168_TYPE_NAMES[typeOrdinal]);
                 this.putVarLong(info.scoreboardId);
-                this.putString(info.objectiveId);
                 switch (typeOrdinal) {
+                    case 0 -> { // REMOVE / INVALID
+                        String objectiveId = info.objectiveId;
+                        boolean present = objectiveId != null && !objectiveId.isEmpty();
+                        this.putBoolean(present);
+                        if (present) {
+                            this.putString(objectiveId);
+                        }
+                    }
                     case 1, 2 -> { // CHANGE_PLAYER / CHANGE_ENTITY
+                        this.putString(info.objectiveId == null || info.objectiveId.isEmpty() ? " " : info.objectiveId);
                         this.putLInt(info.score);
                         this.putVarLong(info.entityId);
                     }
                     case 3 -> {    // CHANGE_FAKE_PLAYER
+                        this.putString(info.objectiveId == null || info.objectiveId.isEmpty() ? " " : info.objectiveId);
                         this.putLInt(info.score);
-                        this.putString(info.name);
+                        this.putString(info.name == null || info.name.isEmpty() ? " " : info.name);
                     }
-                    default -> {   // REMOVE: no extra fields, score defaults to 0
+                    default -> {
                     }
                 }
             }

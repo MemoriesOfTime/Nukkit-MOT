@@ -584,6 +584,59 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
+    /**
+     * v2168 SetScorePacket 空串 sanitize：REMOVE 的空 objectiveId 编码为 optional(present=false)，
+     * PLAYER 的空 objectiveId sanitize 为 " "，FAKE 的空 name sanitize 为 " "。
+     * <p>
+     * v2168 SetScorePacket empty-string sanitize: REMOVE empty objectiveId encoded as optional(present=false),
+     * PLAYER empty objectiveId sanitized to " ", FAKE empty name sanitized to " ".
+     */
+    @ParameterizedTest(name = "SetScorePacket v2168 empty strings v{0}")
+    @MethodSource("versionsAt2168")
+    void testSetScorePacketV2168EmptyStrings(int protocolVersion) {
+        // REMOVE + 空 objectiveId → INVALID optional(present=false)，cb 解码 objectiveId 为 ""
+        var removePacket = new cn.nukkit.network.protocol.SetScorePacket();
+        removePacket.protocol = protocolVersion;
+        removePacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        removePacket.action = cn.nukkit.network.protocol.SetScorePacket.Action.REMOVE;
+        removePacket.infos.add(new cn.nukkit.network.protocol.SetScorePacket.ScoreInfo(7L, "", 0));
+        removePacket.encode();
+        var cbRemove = crossDecode(removePacket, org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
+        assertEquals(1, cbRemove.getInfos().size());
+        var cbRemoveInfo = cbRemove.getInfos().get(0);
+        assertEquals(7L, cbRemoveInfo.getScoreboardId());
+        assertEquals("", cbRemoveInfo.getObjectiveId()); // 空 optional → cb 读为 ""
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.ScoreInfo.ScorerType.INVALID, cbRemoveInfo.getType());
+
+        // PLAYER + 空 objectiveId → sanitize 为 " "
+        var playerPacket = new cn.nukkit.network.protocol.SetScorePacket();
+        playerPacket.protocol = protocolVersion;
+        playerPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        playerPacket.action = cn.nukkit.network.protocol.SetScorePacket.Action.SET;
+        playerPacket.infos.add(new cn.nukkit.network.protocol.SetScorePacket.ScoreInfo(
+                8L, "", 99, cn.nukkit.network.protocol.types.ScorerType.PLAYER, 42L));
+        playerPacket.encode();
+        var cbPlayer = crossDecode(playerPacket, org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
+        assertEquals(1, cbPlayer.getInfos().size());
+        var cbPlayerInfo = cbPlayer.getInfos().get(0);
+        assertEquals(" ", cbPlayerInfo.getObjectiveId()); // 空串 sanitize → " "
+        assertEquals(99, cbPlayerInfo.getScore());
+        assertEquals(42L, cbPlayerInfo.getEntityId());
+
+        // FAKE + 空 name → sanitize 为 " "
+        var fakePacket = new cn.nukkit.network.protocol.SetScorePacket();
+        fakePacket.protocol = protocolVersion;
+        fakePacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        fakePacket.action = cn.nukkit.network.protocol.SetScorePacket.Action.SET;
+        fakePacket.infos.add(new cn.nukkit.network.protocol.SetScorePacket.ScoreInfo(9L, "obj", 50, ""));
+        fakePacket.encode();
+        var cbFake = crossDecode(fakePacket, org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
+        assertEquals(1, cbFake.getInfos().size());
+        var cbFakeInfo = cbFake.getInfos().get(0);
+        assertEquals(" ", cbFakeInfo.getName()); // 空串 sanitize → " "
+        assertEquals("obj", cbFakeInfo.getObjectiveId());
+    }
+
     // --- Version Sources for HurtArmorPacket ---
 
     static Stream<Arguments> versionsPre428() {
