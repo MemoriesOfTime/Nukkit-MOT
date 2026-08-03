@@ -685,27 +685,24 @@ public abstract class BaseInventory implements Inventory {
     }
 
     private void sendSlotTo(int index, Player player) {
+        int id = player.getWindowId(this);
+        if (id == -1) {
+            this.close(player);
+            return;
+        }
+
+        Item item = this.getItem(index);
         if (player.protocol >= ProtocolInfo.v1_2_0) {
             InventorySlotPacket pk = new InventorySlotPacket();
             pk.slot = index;
-            pk.item = this.getItem(index).clone();
-            int id = player.getWindowId(this);
-            if (id == -1) {
-                this.close(player);
-                return;
-            }
+            pk.item = item;
             pk.inventoryId = id;
             pk.containerNameData = this.resolveFullContainerName(index);
             player.dataPacket(pk);
         } else {
             ContainerSetSlotPacket_v113 pk = new ContainerSetSlotPacket_v113();
             pk.slot = index;
-            pk.item = this.getItem(index).clone();
-            int id = player.getWindowId(this);
-            if (id == -1) {
-                this.close(player);
-                return;
-            }
+            pk.item = item;
             pk.windowid = (byte) id;
             player.dataPacket(pk);
         }
@@ -713,13 +710,14 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public void sendSlot(int index, Player... players) {
+        Item item = this.getItem(index);
+
         InventorySlotPacket pk = new InventorySlotPacket();
         pk.slot = index;
-        pk.item = this.getItem(index).clone();
+        pk.item = item;
+        pk.containerNameData = this.resolveFullContainerName(index);
 
-        ContainerSetSlotPacket_v113 pk2 = new ContainerSetSlotPacket_v113();
-        pk2.slot = index;
-        pk2.item = pk.item.clone();
+        ContainerSetSlotPacket_v113 pk2 = null;
 
         for (Player player : players) {
             int id = player.getWindowId(this);
@@ -727,12 +725,16 @@ public abstract class BaseInventory implements Inventory {
                 this.close(player);
                 continue;
             }
-            pk.inventoryId = id;
-            pk2.windowid = id;
             if (player.protocol >= ProtocolInfo.v1_2_0) {
-                pk.containerNameData = this.resolveFullContainerName(index);
+                pk.inventoryId = id;
                 player.dataPacket(pk);
             } else {
+                if (pk2 == null) {
+                    pk2 = new ContainerSetSlotPacket_v113();
+                    pk2.slot = index;
+                    pk2.item = item.clone();
+                }
+                pk2.windowid = id;
                 player.dataPacket(pk2);
             }
         }
