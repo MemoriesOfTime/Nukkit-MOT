@@ -4768,6 +4768,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         ContainerClosePacket pk = new ContainerClosePacket();
                         pk.windowId = -1;
                         pk.wasServerInitiated = false;
+                        pk.type = containerClosePacket.type;
                         this.dataPacket(pk);
                     }
                     //TODO Find out why the correct id is not returned
@@ -4786,6 +4787,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     ContainerClosePacket pk = new ContainerClosePacket();
                     pk.windowId = containerClosePacket.windowId;
                     pk.wasServerInitiated = false;
+                    pk.type = containerClosePacket.type;
                     this.dataPacket(pk);
 
 //                    for (Inventory open : new ArrayList<>(this.windows.keySet())) {
