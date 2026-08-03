@@ -1046,14 +1046,17 @@ public class Server {
         return this.broadcastTitle(title, subtitle, BROADCAST_CHANNEL_USERS);
     }
 
-    public int broadcastTitle(String title, String subtitle, String permission) {
-        Collection<CommandSender> recipients = new ArrayList<>();
-        for (Permissible permissible : getPluginManager().getPermissionSubscriptions(permission)) {
-            if (permissible instanceof CommandSender sender) {
-                recipients.add(sender);
+    public int broadcastTitle(String title, String subtitle, String permissions) {
+        Set<CommandSender> recipients = new HashSet<>();
+        for (String permission : permissions.split(";")) {
+            for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
+                if (permissible instanceof CommandSender sender
+                    && permissible.hasPermission(permission)) {
+                    recipients.add(sender);
+                }
             }
         }
-        return broadcastTitle(title, subtitle, recipients);
+        return this.broadcastTitle(title, subtitle, recipients);
     }
 
     public int broadcastTitle(String title, String subtitle, Collection<? extends CommandSender> recipients) {
@@ -1071,12 +1074,14 @@ public class Server {
         return this.broadcastTip(message, BROADCAST_CHANNEL_USERS);
     }
 
-    public int broadcastTip(String message, String permission) {
-        Collection<CommandSender> recipients = new ArrayList<>();
-
-        for (Permissible permissible : getPluginManager().getPermissionSubscriptions(permission)) {
-            if (permissible instanceof CommandSender sender) {
-                recipients.add(sender);
+    public int broadcastTip(String message, String permissions) {
+        Set<CommandSender> recipients = new HashSet<>();
+        for (String permission : permissions.split(";")) {
+            for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
+                if (permissible instanceof CommandSender sender
+                    && permissible.hasPermission(permission)) {
+                    recipients.add(sender);
+                }
             }
         }
         return this.broadcastTip(message, recipients);
@@ -1097,11 +1102,14 @@ public class Server {
         return this.broadcastActionBar(message, BROADCAST_CHANNEL_USERS);
     }
 
-    public int broadcastActionBar(String message, String permission) {
-        Collection<CommandSender> recipients = new ArrayList<>();
-        for (Permissible permissible : getPluginManager().getPermissionSubscriptions(permission)) {
-            if (permissible instanceof CommandSender sender) {
-                recipients.add(sender);
+    public int broadcastActionBar(String message, String permissions) {
+        Set<CommandSender> recipients = new HashSet<>();
+        for (String permission : permissions.split(";")) {
+            for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
+                if (permissible instanceof CommandSender sender
+                    && permissible.hasPermission(permission)) {
+                    recipients.add(sender);
+                }
             }
         }
         return this.broadcastActionBar(message, recipients);
@@ -1122,11 +1130,14 @@ public class Server {
         return this.broadcastActionBar(message, fadeIn, duration, fadeOut, BROADCAST_CHANNEL_USERS);
     }
 
-    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, String permission) {
-        Collection<CommandSender> recipients = new ArrayList<>();
-        for (Permissible permissible : getPluginManager().getPermissionSubscriptions(permission)) {
-            if (permissible instanceof CommandSender sender) {
-                recipients.add(sender);
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, String permissions) {
+        Set<CommandSender> recipients = new HashSet<>();
+        for (String permission : permissions.split(";")) {
+            for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
+                if (permissible instanceof CommandSender sender
+                    && permissible.hasPermission(permission)) {
+                    recipients.add(sender);
+                }
             }
         }
         return this.broadcastActionBar(message, fadeIn, duration, fadeOut, recipients);
