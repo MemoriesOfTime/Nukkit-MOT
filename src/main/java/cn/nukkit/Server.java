@@ -1042,6 +1042,107 @@ public class Server {
         return recipients.size();
     }
 
+    public int broadcastTitle(String title, String subtitle) {
+        return this.broadcastTitle(title, subtitle, BROADCAST_CHANNEL_USERS);
+    }
+
+    public int broadcastTitle(String title, String subtitle, String permission) {
+        Collection<CommandSender> recipients = new ArrayList<>();
+        for (Permissible permissible : getPluginManager().getPermissionSubscriptions(permission)) {
+            if (permissible instanceof CommandSender sender) {
+                recipients.add(sender);
+            }
+        }
+        return broadcastTitle(title, subtitle, recipients);
+    }
+
+    public int broadcastTitle(String title, String subtitle, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendTitle(title, subtitle);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int broadcastTip(String message) {
+        return this.broadcastTip(message, BROADCAST_CHANNEL_USERS);
+    }
+
+    public int broadcastTip(String message, String permission) {
+        Collection<CommandSender> recipients = new ArrayList<>();
+
+        for (Permissible permissible : getPluginManager().getPermissionSubscriptions(permission)) {
+            if (permissible instanceof CommandSender sender) {
+                recipients.add(sender);
+            }
+        }
+        return this.broadcastTip(message, recipients);
+    }
+
+    public int broadcastTip(String message, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendTip(message);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int broadcastActionBar(String message) {
+        return this.broadcastActionBar(message, BROADCAST_CHANNEL_USERS);
+    }
+
+    public int broadcastActionBar(String message, String permission) {
+        Collection<CommandSender> recipients = new ArrayList<>();
+        for (Permissible permissible : getPluginManager().getPermissionSubscriptions(permission)) {
+            if (permissible instanceof CommandSender sender) {
+                recipients.add(sender);
+            }
+        }
+        return this.broadcastActionBar(message, recipients);
+    }
+
+    public int broadcastActionBar(String message, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendActionBar(message);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut) {
+        return this.broadcastActionBar(message, fadeIn, duration, fadeOut, BROADCAST_CHANNEL_USERS);
+    }
+
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, String permission) {
+        Collection<CommandSender> recipients = new ArrayList<>();
+        for (Permissible permissible : getPluginManager().getPermissionSubscriptions(permission)) {
+            if (permissible instanceof CommandSender sender) {
+                recipients.add(sender);
+            }
+        }
+        return this.broadcastActionBar(message, fadeIn, duration, fadeOut, recipients);
+    }
+
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendActionBar(message, fadeIn, duration, fadeOut);
+                count++;
+            }
+        }
+        return count;
+    }
+
     public int broadcast(String message, String permissions) {
         Set<CommandSender> recipients = new HashSet<>();
 
