@@ -1042,39 +1042,213 @@ public class Server {
         return recipients.size();
     }
 
-    public int broadcast(String message, String permissions) {
+    /**
+     * 收集订阅了任一指定权限频道的去重 {@link CommandSender} 集合。
+     * <p>
+     * Collect the de-duplicated {@link CommandSender}s subscribed to at least one given permission channel.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 a {@code ;}-separated permission channel list
+     */
+    private Set<CommandSender> getBroadcastRecipients(String permissions) {
         Set<CommandSender> recipients = new HashSet<>();
-
         for (String permission : permissions.split(";")) {
             for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
-                if (permissible instanceof CommandSender && permissible.hasPermission(permission)) {
-                    recipients.add((CommandSender) permissible);
+                if (permissible instanceof CommandSender sender && permissible.hasPermission(permission)) {
+                    recipients.add(sender);
                 }
             }
         }
+        return recipients;
+    }
 
+    /**
+     * 向全体用户频道广播标题（默认淡入/停留/淡出 20/20/5）。
+     * <p>
+     * Broadcast a title with subtitle to the default user channel (default timings 20/20/5).
+     *
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle) {
+        return this.broadcastTitle(title, subtitle, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播标题。Broadcast a title to the subscribers of the given permission channels.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 {@code ;}-separated permission channels
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle, String permissions) {
+        return this.broadcastTitle(title, subtitle, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播标题（默认淡入/停留/淡出 20/20/5）。
+     * <p>
+     * Broadcast a title to the given recipients with default timings; only {@link Player} recipients display it.
+     *
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle, Collection<? extends CommandSender> recipients) {
+        return this.broadcastTitle(title, subtitle, 20, 20, 5, recipients);
+    }
+
+    /**
+     * 向全体用户频道广播标题，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast a title with custom fade-in/stay/fade-out (in ticks) to the default user channel.
+     */
+    public int broadcastTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        return this.broadcastTitle(title, subtitle, fadeIn, stay, fadeOut, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播标题，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast a title with custom timings to the subscribers of the given permission channels.
+     */
+    public int broadcastTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut, String permissions) {
+        return this.broadcastTitle(title, subtitle, fadeIn, stay, fadeOut, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播标题，可自定义淡入/停留/淡出（tick）；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast a title with custom timings to the given recipients; only {@link Player} recipients display it.
+     *
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 向全体用户频道广播 Tip 消息。
+     * <p>
+     * Broadcast a tip to the default user channel; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Tip 的玩家数 number of players that displayed the tip
+     */
+    public int broadcastTip(String message) {
+        return this.broadcastTip(message, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播 Tip 消息。Broadcast a tip to the subscribers of the given permission channels.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 {@code ;}-separated permission channels
+     * @return 实际显示 Tip 的玩家数 number of players that displayed the tip
+     */
+    public int broadcastTip(String message, String permissions) {
+        return this.broadcastTip(message, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播 Tip 消息；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast a tip to the given recipients; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Tip 的玩家数 number of players that displayed the tip
+     */
+    public int broadcastTip(String message, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendTip(message);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 向全体用户频道广播 Action Bar 消息（默认淡入/停留/淡出 1/0/1）。
+     * <p>
+     * Broadcast an action bar to the default user channel (default timings 1/0/1).
+     *
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message) {
+        return this.broadcastActionBar(message, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播 Action Bar 消息。Broadcast an action bar to the subscribers of the given permission channels.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 {@code ;}-separated permission channels
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message, String permissions) {
+        return this.broadcastActionBar(message, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播 Action Bar 消息（默认淡入/停留/淡出 1/0/1）；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast an action bar to the given recipients with default timings; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message, Collection<? extends CommandSender> recipients) {
+        return this.broadcastActionBar(message, 1, 0, 1, recipients);
+    }
+
+    /**
+     * 向全体用户频道广播 Action Bar 消息，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast an action bar with custom fade-in/duration/fade-out (in ticks) to the default user channel.
+     */
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut) {
+        return this.broadcastActionBar(message, fadeIn, duration, fadeOut, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播 Action Bar 消息，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast an action bar with custom timings to the subscribers of the given permission channels.
+     */
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, String permissions) {
+        return this.broadcastActionBar(message, fadeIn, duration, fadeOut, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播 Action Bar 消息，可自定义淡入/停留/淡出（tick）；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast an action bar with custom timings to the given recipients; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendActionBar(message, fadeIn, duration, fadeOut);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int broadcast(String message, String permissions) {
+        Set<CommandSender> recipients = getBroadcastRecipients(permissions);
         for (CommandSender recipient : recipients) {
             recipient.sendMessage(message);
         }
-
         return recipients.size();
     }
 
     public int broadcast(TextContainer message, String permissions) {
-        Set<CommandSender> recipients = new HashSet<>();
-
-        for (String permission : permissions.split(";")) {
-            for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
-                if (permissible instanceof CommandSender && permissible.hasPermission(permission)) {
-                    recipients.add((CommandSender) permissible);
-                }
-            }
-        }
-
+        Set<CommandSender> recipients = getBroadcastRecipients(permissions);
         for (CommandSender recipient : recipients) {
             recipient.sendMessage(message);
         }
-
         return recipients.size();
     }
 
