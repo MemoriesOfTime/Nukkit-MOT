@@ -51,6 +51,8 @@ public class Config {
      */
     public static final Map<String, Integer> format = new TreeMap<>();
 
+    private static final Pattern PROPERTY_LINE_PATTERN = Pattern.compile("[a-zA-Z0-9\\-_.]*+=+[^\\r\\n]*");
+
     static {
         format.put("properties", Config.PROPERTIES);
         format.put("con", Config.PROPERTIES);
@@ -631,7 +633,7 @@ public class Config {
 
     private void parseProperties(String content) {
         for (final String line : content.split("\n")) {
-            if (Pattern.compile("[a-zA-Z0-9\\-_.]*+=+[^\\r\\n]*").matcher(line).matches()) {
+            if (PROPERTY_LINE_PATTERN.matcher(line).matches()) {
                 final int splitIndex = line.indexOf('=');
                 if (splitIndex == -1) {
                     continue;
