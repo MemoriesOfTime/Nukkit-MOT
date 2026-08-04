@@ -35,10 +35,10 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * 区块挂起写槽位协议测试:卸载异步落盘、读取认领、批次替换全序、失败重试、close 排空与背压
+ * 区块挂起写槽位协议测试:卸载异步落盘、读取认领、批次替换全序、失败重试、失败槽位清扫与保留上限、close 排空与背压
  * <p>
  * Pending-write slot protocol tests: async unload persistence, claim-on-load, batch supersession ordering,
- * write retry, close-time drain and backpressure
+ * write retry, failed-slot retry sweep and retention cap, close-time drain and backpressure
  *
  * @author LT_Name
  */
@@ -643,5 +643,207 @@ public class LevelDBPendingWriteTest {
         Field field = LevelDBProvider.class.getDeclaredField("pendingWrites");
         field.setAccessible(true);
         return (ConcurrentHashMap<Long, LevelDBProvider.PendingWrite>) field.get(this.provider);
+    }
+
+    private Field dbField() throws Exception {
+        Field dbField = LevelDBProvider.class.getDeclaredField("db");
+        dbField.setAccessible(true);
+        return dbField;
+    }
+
+    /**
+     * 装上一个受开关控制的故障 DB:failuresLeft 用尽前每次写都抛错
+     * <p>
+     * Installs a switchable faulty DB: every write throws until failuresLeft runs out
+     */
+    private DB installFlakyDb(DB realDb, AtomicInteger failuresLeft) throws Exception {
+        DB flakyDb = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        Mockito.doAnswer(invocation -> {
+            if (failuresLeft.getAndDecrement() > 0) {
+                throw new RuntimeException("injected write failure");
+            }
+            realDb.write(invocation.getArgument(0, WriteBatch.class));
+            return null;
+        }).when(flakyDb).write(Mockito.any(WriteBatch.class));
+        this.dbField().set(this.provider, flakyDb);
+        return flakyDb;
+    }
+
+    private void awaitFailedWriteCount(int expected) throws Exception {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (this.provider.getFailedWriteCount() != expected && System.currentTimeMillis() < deadline) {
+            this.drainExecutor();
+        }
+        Assertions.assertEquals(expected, this.provider.getFailedWriteCount());
+    }
+
+    @Test
+    public void retrySweepLandsWriteAfterRetriesWereExhausted() throws Exception {
+        DB realDb = (DB) this.dbField().get(this.provider);
+        AtomicInteger failuresLeft = new AtomicInteger(Integer.MAX_VALUE);
+        this.installFlakyDb(realDb, failuresLeft);
+
+        try {
+            this.newDirtyChunk(20, 20, BLOCK_A);
+            Assertions.assertTrue(this.provider.unloadChunk(20, 20, false));
+            this.awaitFailedWriteCount(1);
+            Assertions.assertEquals(1, this.provider.getPendingWriteCount(),
+                    "the failed batch is the only copy of this chunk and must stay pending");
+
+            // 故障恢复后,清扫必须重投失败槽位:区块已卸载,没有其他调用方会再驱动它
+            // Once the fault clears the sweep must re-drive the failed slot: the chunk is unloaded, so nothing else would
+            failuresLeft.set(0);
+            this.provider.failedWriteRetryIntervalMillis = 0;
+            this.provider.doGarbageCollection();
+            long deadline = System.currentTimeMillis() + 10_000;
+            while (this.provider.getPendingWriteCount() > 0 && System.currentTimeMillis() < deadline) {
+                this.drainExecutor();
+            }
+
+            Assertions.assertEquals(0, this.provider.getFailedWriteCount());
+            Assertions.assertEquals(0, this.provider.getPendingWriteCount());
+            Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(20, 20));
+        } finally {
+            this.dbField().set(this.provider, realDb);
+        }
+    }
+
+    @Test
+    public void failedWriteDoesNotStarveChunkUnloading() throws Exception {
+        DB realDb = (DB) this.dbField().get(this.provider);
+        AtomicInteger failuresLeft = new AtomicInteger(Integer.MAX_VALUE);
+        this.installFlakyDb(realDb, failuresLeft);
+
+        try {
+            Server.getInstance().maxPendingChunkWrites = 1;
+            this.newDirtyChunk(21, 21, BLOCK_A);
+            Assertions.assertTrue(this.provider.unloadChunk(21, 21, false));
+            this.awaitFailedWriteCount(1);
+
+            // 失败槽位由清扫驱动,不参与背压;否则积累到上限后区块卸载会被永久拒绝
+            // Failed slots are driven by the sweep and stay out of backpressure; otherwise chunk unloading stalls forever once they hit the limit
+            Assertions.assertEquals(1, this.provider.getPendingWriteCount());
+            Assertions.assertFalse(this.provider.isChunkSaveBacklogged(),
+                    "a retry-exhausted slot must not hold the unload gate shut");
+        } finally {
+            this.dbField().set(this.provider, realDb);
+        }
+    }
+
+    @Test
+    public void failedWriteRetentionIsCapped() throws Exception {
+        DB realDb = (DB) this.dbField().get(this.provider);
+        AtomicInteger failuresLeft = new AtomicInteger(Integer.MAX_VALUE);
+        this.installFlakyDb(realDb, failuresLeft);
+
+        try {
+            this.provider.maxRetainedFailedWrites = 1;
+            this.newDirtyChunk(22, 22, BLOCK_A);
+            Assertions.assertTrue(this.provider.unloadChunk(22, 22, false));
+            this.awaitFailedWriteCount(1);
+
+            // 持续故障下保留必须有上限,否则每个卸载区块都钉住一个批次直至 OOM
+            // Retention must be capped under a sustained fault, or every unloaded chunk pins a batch until OOM
+            this.newDirtyChunk(23, 23, BLOCK_B);
+            Assertions.assertTrue(this.provider.unloadChunk(23, 23, false));
+            this.drainExecutor();
+
+            Assertions.assertEquals(1, this.provider.getFailedWriteCount());
+            Assertions.assertEquals(1, this.provider.getPendingWriteCount(),
+                    "the batch over the cap must be discarded instead of retained");
+        } finally {
+            this.dbField().set(this.provider, realDb);
+        }
+    }
+
+    @Test
+    public void closeFlushesRemainingSlotsAfterOneSlotFails() throws Exception {
+        DB realDb = (DB) this.dbField().get(this.provider);
+        AtomicInteger failuresLeft = new AtomicInteger(Integer.MAX_VALUE);
+        this.installFlakyDb(realDb, failuresLeft);
+
+        this.newDirtyChunk(24, 24, BLOCK_A);
+        this.newDirtyChunk(25, 25, BLOCK_B);
+        Assertions.assertTrue(this.provider.unloadChunk(24, 24, false));
+        Assertions.assertTrue(this.provider.unloadChunk(25, 25, false));
+        this.awaitFailedWriteCount(2);
+
+        // 关闭排空时,单个槽位再次写失败不得中断其余槽位的落盘
+        // During the close-time drain, one slot failing again must not abort the flush of the remaining slots
+        failuresLeft.set(1);
+        this.provider.close();
+        Assertions.assertEquals(1, this.provider.getPendingWriteCount(),
+                "only the slot that failed again may remain");
+
+        this.provider = new LevelDBProvider(this.level, this.tempDir.toString());
+        boolean firstLanded = this.provider.readChunk(24, 24) != null;
+        boolean secondLanded = this.provider.readChunk(25, 25) != null;
+        Assertions.assertNotEquals(firstLanded, secondLanded,
+                "exactly one chunk must have landed: the other failed its final write");
+    }
+
+    @Test
+    public void closeStopsFlushingRemainingSlotsWhenBudgetIsExhausted() throws Exception {
+        DB realDb = (DB) this.dbField().get(this.provider);
+        AtomicInteger failuresLeft = new AtomicInteger(Integer.MAX_VALUE);
+        this.installFlakyDb(realDb, failuresLeft);
+
+        this.newDirtyChunk(26, 26, BLOCK_A);
+        this.newDirtyChunk(27, 27, BLOCK_B);
+        Assertions.assertTrue(this.provider.unloadChunk(26, 26, false));
+        Assertions.assertTrue(this.provider.unloadChunk(27, 27, false));
+        this.awaitFailedWriteCount(2);
+
+        // 正常排空路径同样受预算约束:故障期间每槽写入可能耗时数秒,逐个重试上千个失败槽会让关服阻塞数十分钟
+        // The normal drain path is budgeted too: a fault costs seconds per slot, so retrying a thousand of them would stall shutdown for tens of minutes
+        failuresLeft.set(0);
+        this.provider.closeSweepBudgetMillis = 0;
+        this.provider.close();
+        Assertions.assertEquals(2, this.provider.getPendingWriteCount(),
+                "an exhausted budget must stop the drained-path flush, not just the timeout path");
+
+        this.provider = new LevelDBProvider(this.level, this.tempDir.toString());
+        Assertions.assertNull(this.provider.readChunk(26, 26), "budget was exhausted before any flush ran");
+        Assertions.assertNull(this.provider.readChunk(27, 27), "budget was exhausted before any flush ran");
+    }
+
+    @Test
+    public void retrySweepQueuesAtMostOneTaskPerFailedSlot() throws Exception {
+        DB realDb = (DB) this.dbField().get(this.provider);
+        AtomicInteger writeAttempts = new AtomicInteger();
+        DB flakyDb = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        Mockito.doAnswer(invocation -> {
+            writeAttempts.incrementAndGet();
+            throw new RuntimeException("injected write failure");
+        }).when(flakyDb).write(Mockito.any(WriteBatch.class));
+        this.dbField().set(this.provider, flakyDb);
+
+        try {
+            this.newDirtyChunk(28, 28, BLOCK_A);
+            Assertions.assertTrue(this.provider.unloadChunk(28, 28, false));
+            this.awaitFailedWriteCount(1);
+
+            // executor 被慢写或 AutoCompaction 占住时,反复清扫不得为同一槽位重复排队
+            // While a slow write or AutoCompaction occupies the executor, repeated sweeps must not queue the same slot again
+            CountDownLatch release = this.pauseExecutor();
+            int queuedBefore;
+            try {
+                this.provider.failedWriteRetryIntervalMillis = 0;
+                for (int i = 0; i < 20; i++) {
+                    this.provider.doGarbageCollection();
+                }
+                queuedBefore = writeAttempts.get();
+            } finally {
+                release.countDown();
+            }
+            this.drainExecutor();
+
+            // 否则无界队列会堆满重复任务,恢复后一次性打成重投风暴
+            // Otherwise the unbounded queue fills with duplicates that burst into a re-drive storm on recovery
+            Assertions.assertEquals(1, writeAttempts.get() - queuedBefore,
+                    "20 sweeps of one failed slot must leave a single queued retry");
+        } finally {
+            this.dbField().set(this.provider, realDb);
+        }
     }
 }
