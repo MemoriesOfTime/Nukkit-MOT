@@ -942,6 +942,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet2168 = null;
         packet1001 = null;
         packet975 = null;
         packet944 = null;

@@ -82,7 +82,7 @@ public class CreativeContentPacket extends DataPacket {
             this.putLInt(group.getCategory().ordinal());
         }
         this.putString(group.getName());
-        this.putSlot(gameVersion, group.getIcon(), true); // ItemInstance format since v1_26_40 (auto-routed)
+        this.putSlot(gameVersion, group.getIcon(), true);
     }
 
 }

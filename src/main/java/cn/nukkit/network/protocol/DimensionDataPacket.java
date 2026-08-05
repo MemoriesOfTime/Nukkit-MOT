@@ -62,7 +62,6 @@ public class DimensionDataPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        boolean v2168 = this.protocol >= ProtocolInfo.v1_26_40;
         this.putArray(this.definitions, dimensionDefinition -> {
             this.putString(dimensionDefinition.getId());
             this.putVarInt(dimensionDefinition.getMaximumHeight());
@@ -70,9 +69,9 @@ public class DimensionDataPacket extends DataPacket {
             this.putVarInt(dimensionDefinition.getGeneratorType());
             if (this.protocol >= ProtocolInfo.v1_26_20) {
                 this.putVarInt(dimensionDefinition.getDimensionType());
-            }
-            if (v2168) {
-                this.putUUID(dimensionDefinition.getPackId());
+                if (this.protocol >= ProtocolInfo.v1_26_40) {
+                    this.putUUID(dimensionDefinition.getPackId());
+                }
             }
         });
     }
