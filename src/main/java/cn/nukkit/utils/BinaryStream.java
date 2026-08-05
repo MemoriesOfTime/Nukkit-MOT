@@ -1733,6 +1733,9 @@ public class BinaryStream {
             for (String s : canDestroy) {
                 stream.writeUTF(s);
             }
+            if (item.getId() == ItemID.SHIELD) {
+                stream.writeLong(0);
+            }
             putByteArray(Utils.convertByteBuf2Array(userDataBuf));
         } catch (IOException e) {
             throw new IllegalStateException("Unable to write item instance user data", e);
