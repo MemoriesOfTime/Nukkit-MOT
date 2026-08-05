@@ -823,7 +823,7 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.spawnX = 0;
         nukkitPacket.spawnY = 64;
         nukkitPacket.spawnZ = 0;
-        nukkitPacket.gameRules = new GameRules();
+        nukkitPacket.gameRules = GameRules.getDefault();
         nukkitPacket.levelId = "level-1";
         nukkitPacket.worldName = "TestWorld";
         nukkitPacket.premiumWorldTemplateId = "";
@@ -859,6 +859,15 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertFalse(cbPacket.isInventoriesServerAuthoritative());
         assertEquals(1, cbPacket.getEduEditionOffers());
         assertEquals(1, cbPacket.getDefaultPlayerPermission().ordinal());
+        assertEquals(38, cbPacket.getGamerules().size());
+        for (var rule : cbPacket.getGamerules()) {
+            if ("randomtickspeed".equals(rule.getName())) {
+                assertEquals(3, rule.getValue());
+            }
+            if ("dodaylightcycle".equals(rule.getName())) {
+                assertEquals(true, rule.getValue());
+            }
+        }
     }
 
     @ParameterizedTest(name = "StartGamePacket v{0} (legacy minimal)")
