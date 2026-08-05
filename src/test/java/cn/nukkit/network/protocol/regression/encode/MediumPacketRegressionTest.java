@@ -541,7 +541,10 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
 
-        assertEquals(0, cbPacket.getAction().ordinal());
+        // v2168 removed the packet-level action byte; only per-entry info is encoded
+        if (protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(0, cbPacket.getAction().ordinal());
+        }
         assertEquals(1, cbPacket.getInfos().size());
         var cbInfo = cbPacket.getInfos().get(0);
         assertEquals(1L, cbInfo.getScoreboardId());
@@ -567,12 +570,71 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
 
-        assertEquals(1, cbPacket.getAction().ordinal());
+        // v2168 removed the packet-level action byte; only per-entry info is encoded
+        if (protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(1, cbPacket.getAction().ordinal());
+        }
         assertEquals(1, cbPacket.getInfos().size());
         var cbInfo = cbPacket.getInfos().get(0);
         assertEquals(1L, cbInfo.getScoreboardId());
         assertEquals("objective1", cbInfo.getObjectiveId());
-        assertEquals(50, cbInfo.getScore());
+        // v2168 REMOVE entries do not carry a score on the wire
+        if (protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(50, cbInfo.getScore());
+        }
+    }
+
+    /**
+     * v2168 SetScorePacket 空串 sanitize：REMOVE 的空 objectiveId 编码为 optional(present=false)，
+     * PLAYER 的空 objectiveId sanitize 为 " "，FAKE 的空 name sanitize 为 " "。
+     * <p>
+     * v2168 SetScorePacket empty-string sanitize: REMOVE empty objectiveId encoded as optional(present=false),
+     * PLAYER empty objectiveId sanitized to " ", FAKE empty name sanitized to " ".
+     */
+    @ParameterizedTest(name = "SetScorePacket v2168 empty strings v{0}")
+    @MethodSource("versionsAt2168")
+    void testSetScorePacketV2168EmptyStrings(int protocolVersion) {
+        // REMOVE + 空 objectiveId → INVALID optional(present=false)，cb 解码 objectiveId 为 ""
+        var removePacket = new cn.nukkit.network.protocol.SetScorePacket();
+        removePacket.protocol = protocolVersion;
+        removePacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        removePacket.action = cn.nukkit.network.protocol.SetScorePacket.Action.REMOVE;
+        removePacket.infos.add(new cn.nukkit.network.protocol.SetScorePacket.ScoreInfo(7L, "", 0));
+        removePacket.encode();
+        var cbRemove = crossDecode(removePacket, org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
+        assertEquals(1, cbRemove.getInfos().size());
+        var cbRemoveInfo = cbRemove.getInfos().get(0);
+        assertEquals(7L, cbRemoveInfo.getScoreboardId());
+        assertEquals("", cbRemoveInfo.getObjectiveId()); // 空 optional → cb 读为 ""
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.ScoreInfo.ScorerType.INVALID, cbRemoveInfo.getType());
+
+        // PLAYER + 空 objectiveId → sanitize 为 " "
+        var playerPacket = new cn.nukkit.network.protocol.SetScorePacket();
+        playerPacket.protocol = protocolVersion;
+        playerPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        playerPacket.action = cn.nukkit.network.protocol.SetScorePacket.Action.SET;
+        playerPacket.infos.add(new cn.nukkit.network.protocol.SetScorePacket.ScoreInfo(
+                8L, "", 99, cn.nukkit.network.protocol.types.ScorerType.PLAYER, 42L));
+        playerPacket.encode();
+        var cbPlayer = crossDecode(playerPacket, org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
+        assertEquals(1, cbPlayer.getInfos().size());
+        var cbPlayerInfo = cbPlayer.getInfos().get(0);
+        assertEquals(" ", cbPlayerInfo.getObjectiveId()); // 空串 sanitize → " "
+        assertEquals(99, cbPlayerInfo.getScore());
+        assertEquals(42L, cbPlayerInfo.getEntityId());
+
+        // FAKE + 空 name → sanitize 为 " "
+        var fakePacket = new cn.nukkit.network.protocol.SetScorePacket();
+        fakePacket.protocol = protocolVersion;
+        fakePacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        fakePacket.action = cn.nukkit.network.protocol.SetScorePacket.Action.SET;
+        fakePacket.infos.add(new cn.nukkit.network.protocol.SetScorePacket.ScoreInfo(9L, "obj", 50, ""));
+        fakePacket.encode();
+        var cbFake = crossDecode(fakePacket, org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
+        assertEquals(1, cbFake.getInfos().size());
+        var cbFakeInfo = cbFake.getInfos().get(0);
+        assertEquals(" ", cbFakeInfo.getName()); // 空串 sanitize → " "
+        assertEquals("obj", cbFakeInfo.getObjectiveId());
     }
 
     // --- Version Sources for HurtArmorPacket ---
@@ -1058,5 +1120,169 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(2, cbPacket.getBlobIds().size());
         assertEquals(111L, cbPacket.getBlobIds().getLong(0));
         assertEquals(222L, cbPacket.getBlobIds().getLong(1));
+    }
+
+    // ==================== DimensionDataPacket ====================
+
+    static Stream<Arguments> versionsFrom503() {
+        return filteredVersions(ProtocolInfo.v1_18_30);
+    }
+
+    @ParameterizedTest(name = "DimensionDataPacket v{0}")
+    @MethodSource("versionsFrom503")
+    void testDimensionDataPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.DimensionDataPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        var packId = new java.util.UUID(1234L, 5678L);
+        nukkitPacket.definitions.add(new cn.nukkit.network.protocol.types.DimensionDefinition(
+                "minecraft:overworld", 320, -64, 1, 2, packId));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.DimensionDataPacket.class);
+
+        assertEquals(1, cbPacket.getDefinitions().size());
+        var definition = cbPacket.getDefinitions().get(0);
+        assertEquals("minecraft:overworld", definition.getId());
+        assertEquals(320, definition.getMaximumHeight());
+        assertEquals(-64, definition.getMinimumHeight());
+        assertEquals(1, definition.getGeneratorType());
+        if (protocolVersion >= ProtocolInfo.v1_26_20) {
+            assertEquals(2, definition.getDimensionType());
+        }
+        if (protocolVersion >= ProtocolInfo.v1_26_40) {
+            assertEquals(packId, definition.getPackId());
+        }
+    }
+
+    // ==================== ScriptMessagePacket ====================
+
+    static Stream<Arguments> versionsFrom486() {
+        return filteredVersions(ProtocolInfo.v1_18_10);
+    }
+
+    @ParameterizedTest(name = "ScriptMessagePacket v{0}")
+    @MethodSource("versionsFrom486")
+    void testScriptMessagePacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ScriptMessagePacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.channel = "test:channel";
+        nukkitPacket.message = "{\"value\":42}";
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ScriptMessagePacket.class);
+
+        assertEquals("test:channel", cbPacket.getChannel());
+        assertEquals("{\"value\":42}", cbPacket.getMessage());
+    }
+
+    // ==================== SubChunkPacket ====================
+
+    @ParameterizedTest(name = "SubChunkPacket v{0}")
+    @MethodSource("versionsFrom486")
+    void testSubChunkPacket(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.SubChunkPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.cacheEnabled = false;
+        nukkitPacket.dimension = 1;
+        nukkitPacket.centerPosition = new BlockVector3(100, 4, -200);
+
+        var subChunk = new cn.nukkit.network.protocol.SubChunkPacket.SubChunkData();
+        subChunk.offset = new BlockVector3(0, -4, 1);
+        subChunk.result = cn.nukkit.network.protocol.types.SubChunkRequestResult.SUCCESS;
+        subChunk.data = new byte[]{1, 2, 3, 4};
+        subChunk.heightMapType = cn.nukkit.network.protocol.SubChunkPacket.HeightMapDataType.HAS_DATA;
+        byte[] heightMap = new byte[256];
+        heightMap[0] = 7;
+        heightMap[255] = (byte) 200;
+        subChunk.heightMapData = heightMap;
+        nukkitPacket.subChunks.add(subChunk);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.SubChunkPacket.class);
+
+        assertFalse(cbPacket.isCacheEnabled());
+        assertEquals(1, cbPacket.getDimension());
+        assertEquals(100, cbPacket.getCenterPosition().getX());
+        assertEquals(4, cbPacket.getCenterPosition().getY());
+        assertEquals(-200, cbPacket.getCenterPosition().getZ());
+        assertEquals(1, cbPacket.getSubChunks().size());
+        var cbSubChunk = cbPacket.getSubChunks().get(0);
+        assertEquals(0, cbSubChunk.getPosition().getX());
+        assertEquals(-4, cbSubChunk.getPosition().getY());
+        assertEquals(1, cbSubChunk.getPosition().getZ());
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.SubChunkRequestResult.SUCCESS, cbSubChunk.getResult());
+        var dataBuf = cbSubChunk.getData();
+        byte[] data = new byte[dataBuf.readableBytes()];
+        dataBuf.getBytes(dataBuf.readerIndex(), data);
+        assertArrayEquals(new byte[]{1, 2, 3, 4}, data);
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.HeightMapDataType.HAS_DATA, cbSubChunk.getHeightMapType());
+        assertEquals(256, cbSubChunk.getHeightMapData().readableBytes());
+        assertEquals(7, cbSubChunk.getHeightMapData().getByte(cbSubChunk.getHeightMapData().readerIndex()));
+        if (protocolVersion >= ProtocolInfo.v1_21_90) {
+            assertEquals(org.cloudburstmc.protocol.bedrock.data.HeightMapDataType.NO_DATA, cbSubChunk.getRenderHeightMapType());
+        }
+    }
+
+    static Stream<Arguments> versionsAt2168() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_26_40));
+    }
+
+    @ParameterizedTest(name = "SubChunkPacket v{0} v2168 blobId and render height map")
+    @MethodSource("versionsAt2168")
+    void testSubChunkPacketV2168(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.SubChunkPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.cacheEnabled = true;
+        nukkitPacket.dimension = -1;
+        // 大坐标值用于验证 v2168 centerPosition 的 LInt 编码 / large values verify v2168 LInt centerPosition
+        nukkitPacket.centerPosition = new BlockVector3(30000000, -2000000, -30000000);
+
+        var subChunk = new cn.nukkit.network.protocol.SubChunkPacket.SubChunkData();
+        subChunk.offset = new BlockVector3(2, 5, -3);
+        subChunk.result = cn.nukkit.network.protocol.types.SubChunkRequestResult.SUCCESS;
+        subChunk.data = new byte[]{9, 8};
+        subChunk.heightMapType = cn.nukkit.network.protocol.SubChunkPacket.HeightMapDataType.HAS_DATA;
+        byte[] heightMap = new byte[256];
+        heightMap[0] = 42;
+        subChunk.heightMapData = heightMap;
+        subChunk.renderHeightMapType = cn.nukkit.network.protocol.SubChunkPacket.HeightMapDataType.HAS_DATA;
+        byte[] renderHeightMap = new byte[256];
+        renderHeightMap[0] = 24;
+        subChunk.renderHeightMapData = renderHeightMap;
+        subChunk.hasBlobId = true;
+        subChunk.blobId = 0x1122334455667788L;
+        nukkitPacket.subChunks.add(subChunk);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.SubChunkPacket.class);
+
+        assertTrue(cbPacket.isCacheEnabled());
+        assertEquals(-1, cbPacket.getDimension());
+        assertEquals(30000000, cbPacket.getCenterPosition().getX());
+        assertEquals(-2000000, cbPacket.getCenterPosition().getY());
+        assertEquals(-30000000, cbPacket.getCenterPosition().getZ());
+        assertEquals(1, cbPacket.getSubChunks().size());
+        var cbSubChunk = cbPacket.getSubChunks().get(0);
+        assertEquals(2, cbSubChunk.getPosition().getX());
+        assertEquals(5, cbSubChunk.getPosition().getY());
+        assertEquals(-3, cbSubChunk.getPosition().getZ());
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.SubChunkRequestResult.SUCCESS, cbSubChunk.getResult());
+        var dataBuf = cbSubChunk.getData();
+        byte[] data = new byte[dataBuf.readableBytes()];
+        dataBuf.getBytes(dataBuf.readerIndex(), data);
+        assertArrayEquals(new byte[]{9, 8}, data);
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.HeightMapDataType.HAS_DATA, cbSubChunk.getHeightMapType());
+        assertEquals(42, cbSubChunk.getHeightMapData().getByte(cbSubChunk.getHeightMapData().readerIndex()));
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.HeightMapDataType.HAS_DATA, cbSubChunk.getRenderHeightMapType());
+        assertEquals(24, cbSubChunk.getRenderHeightMapData().getByte(cbSubChunk.getRenderHeightMapData().readerIndex()));
+        assertEquals(0x1122334455667788L, cbSubChunk.getBlobId());
     }
 }

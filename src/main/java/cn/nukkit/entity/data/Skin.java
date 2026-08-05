@@ -75,6 +75,7 @@ public class Skin {
     private boolean trusted = true;
     private String geometryDataEngineVersion = "0.0.0";
     private boolean overridingPlayerAppearance = true;
+    private String profileHash = "";
 
     public boolean isValid() {
         return isValid(Server.getInstance().doNotLimitSkinGeometry);
@@ -311,6 +312,14 @@ public class Skin {
 
     public void setTrusted(boolean trusted) {
         this.trusted = trusted;
+    }
+
+    public String getProfileHash() {
+        return profileHash;
+    }
+
+    public void setProfileHash(String profileHash) {
+        this.profileHash = profileHash == null ? "" : profileHash;
     }
 
     public String getSkinColor() {

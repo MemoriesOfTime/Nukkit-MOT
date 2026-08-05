@@ -75,6 +75,7 @@ public class CraftingManager {
     private static BatchPacket packet944;
     private static BatchPacket packet975;
     private static BatchPacket packet1001;
+    private static BatchPacket packet2168;
 
     private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
@@ -143,7 +144,7 @@ public class CraftingManager {
         this.registerMultiRecipe(new DecoratedPotRecipe());
 
         Map<String, Object> root = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes.json")).getRootSection();
-        RuntimeItemMapping itemMapping = RuntimeItems.getMapping(GameVersion.getLastVersion());
+        RuntimeItemMapping itemMapping = selectRecipeItemMapping(root);
         Config furnaceXpConfig = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/furnace_xp.json"));
 
         for (Map recipe : (List<Map>) root.get("recipes")) {
@@ -263,6 +264,20 @@ public class CraftingManager {
 
         this.rebuildPacket();
         MainLogger.getLogger().debug("Loaded " + this.recipes.size() + " recipes, " + this.stonecutterRecipes.size() + " stonecutter recipes");
+    }
+
+    /**
+     * 根据 recipes.json 的 version 字段（dump 时的协议号）选择调色板映射
+     * Picks the runtime item mapping from the protocol version recorded in recipes.json
+     *
+     * @param root recipes.json 根节点 / recipes.json root section
+     * @return 匹配的映射 / the matched mapping
+     */
+    private static RuntimeItemMapping selectRecipeItemMapping(Map<String, Object> root) {
+        if (root.get("version") instanceof Number version && version.intValue() >= 0) {
+            return RuntimeItems.getMapping(GameVersion.byProtocol(version.intValue(), false));
+        }
+        return RuntimeItems.getMapping(GameVersion.getLastVersion());
     }
 
     @SuppressWarnings("unchecked")
@@ -927,6 +942,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet2168 = null;
         packet1001 = null;
         packet975 = null;
         packet944 = null;
@@ -1032,7 +1048,12 @@ public class CraftingManager {
             }
         }
 
-        if (protocol >= GameVersion.V1_26_30.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_40.getProtocol()) {
+            if (packet2168 == null) {
+                packet2168 = packetFor(GameVersion.V1_26_40);
+            }
+            return packet2168;
+        } else if (protocol >= GameVersion.V1_26_30.getProtocol()) {
             if (packet1001 == null) {
                 packet1001 = packetFor(GameVersion.V1_26_30);
             }

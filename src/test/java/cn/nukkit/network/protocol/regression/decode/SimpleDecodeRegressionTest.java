@@ -103,7 +103,10 @@ public class SimpleDecodeRegressionTest extends AbstractPacketRegressionTest {
 
         AnvilDamagePacket nk = crossEncode(cb, AnvilDamagePacket::new, protocol);
 
-        assertEquals(3, nk.damage);
+        // v2168 dropped the leading damage byte; Nukkit-MOT defaults to 0
+        if (protocol < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(3, nk.damage);
+        }
         assertEquals(10, nk.x);
         assertEquals(64, nk.y);
         assertEquals(-5, nk.z);

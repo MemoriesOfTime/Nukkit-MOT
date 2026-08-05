@@ -1123,7 +1123,10 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.class);
 
-        assertEquals(org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.Action.REMOVE, cbPacket.getAction());
+        // v2168 removed the packet-level action byte
+        if (protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.Action.REMOVE, cbPacket.getAction());
+        }
         assertTrue(cbPacket.getInfos().isEmpty());
     }
 
@@ -1517,6 +1520,40 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
+    @ParameterizedTest(name = "ItemStackResponsePacket v{0} zero net id")
+    @MethodSource("versionsFrom419")
+    void testItemStackResponsePacketZeroNetId(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ItemStackResponsePacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        var responseSlot = new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot(
+                3,
+                0,
+                1,
+                0,
+                "",
+                0,
+                ""
+        );
+        nukkitPacket.entries.add(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse(
+                cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus.OK,
+                1,
+                java.util.List.of(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer(
+                        cn.nukkit.network.protocol.types.inventory.ContainerSlotType.HOTBAR,
+                        java.util.List.of(responseSlot),
+                        null
+                ))
+        ));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket.class);
+
+        var item = cbPacket.getEntries().get(0).getContainers().get(0).getItems().get(0);
+        assertEquals(3, item.getSlot());
+        assertEquals(0, item.getStackNetworkId());
+    }
+
     @ParameterizedTest(name = "ItemStackResponsePacket v{0} should preserve full container name")
     @MethodSource("versionsAt712")
     void testItemStackResponsePacketV712ContainerName(int protocolVersion) {
@@ -1894,7 +1931,12 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
                 org.cloudburstmc.protocol.bedrock.packet.ResourcePackClientResponsePacket.class);
 
         assertEquals(4, cbPacket.getStatus().ordinal());
-        assertEquals(1, cbPacket.getPackIds().size());
+        // v2168 only writes pack ids when status == SEND_PACKS; older versions always write them
+        if (protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(1, cbPacket.getPackIds().size());
+        } else {
+            assertTrue(cbPacket.getPackIds().isEmpty());
+        }
     }
 
     // ==================== ClientboundDataStorePacket ====================

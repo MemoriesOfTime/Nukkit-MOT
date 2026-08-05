@@ -823,7 +823,7 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.spawnX = 0;
         nukkitPacket.spawnY = 64;
         nukkitPacket.spawnZ = 0;
-        nukkitPacket.gameRules = new GameRules();
+        nukkitPacket.gameRules = GameRules.getDefault();
         nukkitPacket.levelId = "level-1";
         nukkitPacket.worldName = "TestWorld";
         nukkitPacket.premiumWorldTemplateId = "";
@@ -840,6 +840,8 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.worldId = "world-1";
         nukkitPacket.scenarioId = "scenario-1";
         nukkitPacket.ownerIdentifier = "owner-1";
+        nukkitPacket.eduEditionOffer = 1;
+        nukkitPacket.permissionLevel = 1;
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -855,6 +857,17 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals("scenario-1", cbPacket.getScenarioId());
         assertEquals("owner-1", cbPacket.getOwnerId());
         assertFalse(cbPacket.isInventoriesServerAuthoritative());
+        assertEquals(1, cbPacket.getEduEditionOffers());
+        assertEquals(1, cbPacket.getDefaultPlayerPermission().ordinal());
+        assertEquals(38, cbPacket.getGamerules().size());
+        for (var rule : cbPacket.getGamerules()) {
+            if ("randomtickspeed".equals(rule.getName())) {
+                assertEquals(3, rule.getValue());
+            }
+            if ("dodaylightcycle".equals(rule.getName())) {
+                assertEquals(true, rule.getValue());
+            }
+        }
     }
 
     @ParameterizedTest(name = "StartGamePacket v{0} (legacy minimal)")
@@ -930,8 +943,8 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.ClientboundMapItemDataPacket.class);
 
-        assertEquals(1, cbPacket.getUniqueMapId());
-        assertEquals(4, cbPacket.getScale());
+        assertEquals(1L, cbPacket.getUniqueMapId());
+        assertEquals(Byte.valueOf((byte) 4), cbPacket.getScale());
     }
 
     static Stream<Arguments> versionsFrom544() {
@@ -974,6 +987,92 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
 
         assertEquals(2, cbPacket.getUniqueMapId());
         assertTrue(cbPacket.isLocked());
+    }
+
+    @Test
+    void testClientboundMapItemDataPacketImageV2168() {
+        var nukkitPacket = new ClientboundMapItemDataPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
+        nukkitPacket.mapId = 3;
+        nukkitPacket.dimensionId = 0;
+        nukkitPacket.scale = 0;
+        nukkitPacket.width = 2;
+        nukkitPacket.height = 2;
+        nukkitPacket.image = new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ClientboundMapItemDataPacket.class);
+
+        assertEquals(2, cbPacket.getWidth().intValue());
+        assertEquals(2, cbPacket.getHeight().intValue());
+        assertEquals(4, cbPacket.getColors().length, "image pixels must be sent as colors on v2168");
+    }
+
+    // ==================== CraftingDataPacket v2168 (real data) ====================
+
+    @Test
+    void testCraftingDataPacketV2168RealData() {
+        var nukkitPacket = new cn.nukkit.network.protocol.CraftingDataPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
+
+        // shaped with an empty slot (INVALID ingredient path)
+        var shaped = new cn.nukkit.inventory.ShapedRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.STICK),
+                new String[]{"A", " "}, java.util.Map.of('A', cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL)),
+                java.util.Collections.emptyList());
+        shaped.setId(UUID.randomUUID());
+        nukkitPacket.addShapedRecipe(shaped);
+
+        // shapeless with a normal ingredient (DEFAULT descriptor path)
+        var shapeless = new cn.nukkit.inventory.ShapelessRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.STICK),
+                java.util.List.of(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL)));
+        shapeless.setId(UUID.randomUUID());
+        nukkitPacket.addShapelessRecipe(shapeless);
+
+        // furnace + blast furnace (no longer crash: FurnaceRecipe must not be cast to ShapelessRecipe)
+        var furnace = new cn.nukkit.inventory.FurnaceRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL));
+        furnace.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(furnace);
+        var blast = new cn.nukkit.inventory.BlastFurnaceRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL));
+        blast.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(blast);
+
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.CraftingDataPacket.class,
+                helperWithItemDefinitions());
+
+        assertEquals(1, cbPacket.getShapedData().size());
+        assertEquals(3, cbPacket.getShapelessData().size(), "shapeless + 2 furnace recipes");
+        assertEquals("furnace", cbPacket.getShapelessData().get(1).getTag());
+        assertEquals("blast_furnace", cbPacket.getShapelessData().get(2).getTag());
+        assertEquals(1, cbPacket.getShapelessData().get(1).getIngredients().size(), "furnace ingredient");
+        assertEquals(2, cbPacket.getShapedData().get(0).getIngredients().size(),
+                "shaped ingredients must match width*height incl. the empty slot");
+    }
+
+    private static java.util.function.Consumer<org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper> helperWithItemDefinitions() {
+        var gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
+        return helper -> {
+            var itemDefinitions = org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                    .<org.cloudburstmc.protocol.bedrock.data.definitions.ItemDefinition>builder();
+            var seen = new java.util.HashSet<Integer>();
+            for (var entry : cn.nukkit.item.RuntimeItems.getMapping(gameVersion).getItemPaletteEntries()) {
+                if (!seen.add(entry.getRuntimeId())) {
+                    continue;
+                }
+                itemDefinitions.add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleItemDefinition(
+                        entry.getIdentifier(), entry.getRuntimeId(), false));
+            }
+            helper.setItemDefinitions(itemDefinitions.build());
+            helper.setBlockDefinitions(org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                    .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder().build());
+        };
     }
 
     // ==================== CameraInstructionPacket ====================
