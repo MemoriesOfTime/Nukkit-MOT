@@ -144,10 +144,7 @@ public class CraftingManager {
         this.registerMultiRecipe(new DecoratedPotRecipe());
 
         Map<String, Object> root = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes.json")).getRootSection();
-        // recipes.json 中的数字 runtime id 基于 1.26.30 调色板 dump，需用对应映射解析；1.26.40 配方数据重新生成后再切换
-        // Numeric runtime ids in recipes.json were dumped against the 1.26.30 palette; parse with that
-        // mapping until the recipe data is regenerated for 1.26.40
-        RuntimeItemMapping itemMapping = RuntimeItems.getMapping(GameVersion.V1_26_30);
+        RuntimeItemMapping itemMapping = selectRecipeItemMapping(root);
         Config furnaceXpConfig = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/furnace_xp.json"));
 
         for (Map recipe : (List<Map>) root.get("recipes")) {
@@ -267,6 +264,20 @@ public class CraftingManager {
 
         this.rebuildPacket();
         MainLogger.getLogger().debug("Loaded " + this.recipes.size() + " recipes, " + this.stonecutterRecipes.size() + " stonecutter recipes");
+    }
+
+    /**
+     * 根据 recipes.json 的 version 字段（dump 时的协议号）选择调色板映射
+     * Picks the runtime item mapping from the protocol version recorded in recipes.json
+     *
+     * @param root recipes.json 根节点 / recipes.json root section
+     * @return 匹配的映射 / the matched mapping
+     */
+    private static RuntimeItemMapping selectRecipeItemMapping(Map<String, Object> root) {
+        if (root.get("version") instanceof Number version && version.intValue() >= 0) {
+            return RuntimeItems.getMapping(GameVersion.byProtocol(version.intValue(), false));
+        }
+        return RuntimeItems.getMapping(GameVersion.getLastVersion());
     }
 
     @SuppressWarnings("unchecked")
