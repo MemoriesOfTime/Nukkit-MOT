@@ -46,11 +46,11 @@ public class ItemStackResponsePacket extends DataPacket {
                     this.putByte((byte) item.getHotbarSlot());
                     this.putByte((byte) item.getCount());
                     if (this.protocol >= ProtocolInfo.v1_26_40) {
-                        // v2168 wraps netId in two booleans (has + present); omit when zero
-                        boolean hasStackId = item.getStackNetworkId() != 0;
-                        this.putBoolean(hasStackId);
-                        if (hasStackId) {
-                            this.putBoolean(true);
+                        // v2168 wraps netId in two booleans (has-entry + present); always write both
+                        this.putBoolean(true);
+                        boolean present = item.getStackNetworkId() != 0;
+                        this.putBoolean(present);
+                        if (present) {
                             this.putVarInt(item.getStackNetworkId());
                         }
                     } else {

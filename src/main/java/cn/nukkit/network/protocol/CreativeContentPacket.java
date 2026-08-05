@@ -61,12 +61,7 @@ public class CreativeContentPacket extends DataPacket {
             int creativeNetId = 1; // 0 is not indexed by client
             for (Map.Entry<Item, CreativeItemGroup> entry : contents.entrySet()) {
                 this.putUnsignedVarInt(creativeNetId++);
-                if (this.protocol >= ProtocolInfo.v1_26_40) {
-                    // v2168 CreativeContent items use the ItemInstance wire format
-                    this.putItemInstanceV2168(gameVersion, entry.getKey());
-                } else {
-                    this.putSlot(gameVersion, entry.getKey(), true);
-                }
+                this.putSlot(gameVersion, entry.getKey(), true);
                 this.putUnsignedVarInt(entry.getValue() != null ? groupIdMap.getOrDefault(entry.getValue(), 0) : 0);
             }
         } else {
@@ -87,12 +82,7 @@ public class CreativeContentPacket extends DataPacket {
             this.putLInt(group.getCategory().ordinal());
         }
         this.putString(group.getName());
-        if (this.protocol >= ProtocolInfo.v1_26_40) {
-            // v2168 CreativeContentSerializer.readCreativeGroup expects an ItemInstance (not NSD)
-            this.putItemInstanceV2168(gameVersion, group.getIcon());
-        } else {
-            this.putSlot(gameVersion, group.getIcon(), true);
-        }
+        this.putSlot(gameVersion, group.getIcon(), true); // ItemInstance format since v1_26_40 (auto-routed)
     }
 
 }

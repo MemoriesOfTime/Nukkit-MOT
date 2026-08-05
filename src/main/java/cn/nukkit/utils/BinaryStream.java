@@ -1518,6 +1518,10 @@ public class BinaryStream {
 
     private void putSlotNew(GameVersion gameVersion, Item item, boolean instanceItem) {
         boolean isV2168 = gameVersion.getProtocol() >= ProtocolInfo.v1_26_40;
+        if (isV2168 && instanceItem) {
+            this.putItemInstanceV2168(gameVersion, item);
+            return;
+        }
         if (!isV2168 && (item == null || item.getId() == Item.AIR)) {
             this.putByte((byte) 0);
             return;
@@ -1660,7 +1664,9 @@ public class BinaryStream {
      * v2168 ItemInstance format, mirroring {@code BedrockCodecHelper_v2168.writeItemInstance}:
      * VarInt runtimeId + shortLE count + VarUInt damage + VarInt blockRuntimeId
      * + VarUInt userData length + userData bytes. No netId field.
-     * Used by CreativeContent group icons and other ItemInstance-only slots in v2168.
+     * Used by CreativeContent group icons and CraftingData recipe results.
+     * <p>
+     * v2168 ItemInstance 线格式，无 netId 字段；由 putSlotNew 在 instanceItem 时自动路由调用。
      */
     public void putItemInstanceV2168(GameVersion gameVersion, Item item) {
         if (item == null || item.getId() == Item.AIR) {
@@ -2059,12 +2065,13 @@ public class BinaryStream {
         int protocolId = gameVersion.getProtocol();
         if (item == null || item.getId() == 0) {
             if (protocolId >= ProtocolInfo.v1_26_40) {
-                // v2168 ingredient: VarUInt(type ordinal); INVALID needs no serializeName
-                this.putUnsignedVarInt(0); //ItemDescriptorType.INVALID ordinal
+                // v2168 ingredient: VarUInt(type ordinal) + VarInt(aux=32767) + VarInt(count)
+                this.putUnsignedVarInt(0); // ItemDescriptorType.INVALID ordinal
+                this.putVarInt(Short.MAX_VALUE);
             } else if (protocolId >= ProtocolInfo.v1_19_30_23) {
                 this.putByte((byte) 0); //ItemDescriptorType.INVALID
             }
-            this.putVarInt(0); // item == null ? 0 : item.getCount()
+            this.putVarInt(item == null ? 0 : item.getCount());
             return;
         }
 
@@ -2088,9 +2095,9 @@ public class BinaryStream {
         }
 
         if (protocolId >= ProtocolInfo.v1_26_40) {
-            // v2168 ingredient format: VarUInt(type ordinal) + string(serializeName) + type-specific fields
-            this.putUnsignedVarInt(1); //ItemDescriptorType.DEFAULT ordinal
-            this.putString("item"); // serializeName for DEFAULT
+            // v2168 ingredient: VarUInt(min(ordinal,1)) + serializeName + namespacedId + aux(damage)
+            this.putUnsignedVarInt(1); // ItemDescriptorType.DEFAULT ordinal
+            this.putString("name");
             this.putString(mapping.getNamespacedIdByNetworkId(runtimeId));
             this.putVarInt(damage);
         } else if (protocolId >= ProtocolInfo.v1_19_30_23) {
@@ -2110,13 +2117,11 @@ public class BinaryStream {
             throw new UnsupportedOperationException("This method is only supported on protocol 553+");
         }
         if (protocolId >= ProtocolInfo.v1_26_40) {
-            // v2168 ingredient format: VarUInt(type ordinal) + string(serializeName) + tag-specific fields + outer count
-            this.putUnsignedVarInt(3); //ItemDescriptorType.ITEM_TAG ordinal
-            this.putString("item_tag"); // serializeName for ITEM_TAG
+            // v2168 ingredient: VarUInt(min(ordinal,1)) + serializeName + tag + aux(32767, unused)
+            this.putUnsignedVarInt(1); // ItemDescriptorType.ITEM_TAG ordinal
+            this.putString("item_tag");
             this.putString(itemTag);
-            // ItemTagDescriptor reads an extra VarInt internally (unused by the descriptor itself,
-            // but consumed on the wire to match the v2168 codec)
-            this.putVarInt(count);
+            this.putVarInt(Short.MAX_VALUE);
         } else {
             this.putByte((byte) 3);
             this.putString(itemTag);

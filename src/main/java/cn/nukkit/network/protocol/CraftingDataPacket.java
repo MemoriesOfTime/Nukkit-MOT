@@ -388,9 +388,14 @@ public class CraftingDataPacket extends DataPacket {
         // shapelessData (also stonecutter / furnace encoded as shapeless since v1_26_20_26)
         this.putUnsignedVarInt(shapelessData.size() + stonecutterEntries.size());
         for (Recipe recipe : shapelessData) {
-            ShapelessRecipe shapeless = (ShapelessRecipe) recipe;
-            boolean isShulker = shapeless.getType() == RecipeType.SHULKER_BOX;
-            this.writeShapelessRecipeV2168(shapeless, isShulker, CRAFTING_TAG_CRAFTING_TABLE);
+            if (recipe instanceof ShapelessRecipe shapeless) {
+                boolean isShulker = shapeless.getType() == RecipeType.SHULKER_BOX;
+                this.writeShapelessRecipeV2168(shapeless, isShulker, CRAFTING_TAG_CRAFTING_TABLE);
+            } else if (recipe instanceof FurnaceRecipe furnace) {
+                this.writeFurnaceRecipeV2168(furnace);
+            } else {
+                throw new IllegalArgumentException("Unexpected recipe type in shapeless bucket: " + recipe.getType());
+            }
         }
         for (StonecutterRecipe recipe : stonecutterEntries) {
             this.putString(recipe.getRecipeId());
@@ -537,6 +542,24 @@ public class CraftingDataPacket extends DataPacket {
             this.writeRequirementV2168(shapeless);
         }
         this.putUnsignedVarInt(shapeless.getNetworkId());
+    }
+
+    /**
+     * v2168 熔炉配方写入 (与 shapeless 同线格式, tag 区分炉型).
+     *
+     * v2168 furnace writer (shapeless wire layout, tag distinguishes furnace type).
+     */
+    private void writeFurnaceRecipeV2168(FurnaceRecipe furnace) {
+        this.putString(furnace.getRecipeId());
+        this.putUnsignedVarInt(1); // Ingredients length
+        this.putRecipeIngredient(gameVersion, furnace.getInput());
+        this.putUnsignedVarInt(1); // Results length
+        this.putSlot(gameVersion, furnace.getResult(), true);
+        this.putUUID(furnace.getId());
+        this.putString(furnace instanceof BlastFurnaceRecipe ? CRAFTING_TAG_BLAST_FURNACE : CRAFTING_TAG_FURNACE);
+        this.putVarInt(0); // priority
+        this.putBoolean(false); // requirementPresent (furnace has no unlock requirement)
+        this.putUnsignedVarInt(furnace.getNetworkId());
     }
 
     private int writeEntryLegacy(GameVersion gameVersion, Object entry, BinaryStream stream) {

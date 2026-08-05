@@ -258,7 +258,11 @@ public class StartGamePacket extends DataPacket {
         }
         this.putVarInt(this.dayCycleStopTime);
         if (protocol >= 388) {
-            this.putVarInt(this.eduEditionOffer);
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                this.putUnsignedVarInt(this.eduEditionOffer);
+            } else {
+                this.putVarInt(this.eduEditionOffer);
+            }
         } else {
             this.putBoolean(this.eduMode);
         }
@@ -307,7 +311,11 @@ public class StartGamePacket extends DataPacket {
             if (protocol < 332) {
                 this.putBoolean(this.trustPlayers);
             }
-            this.putVarInt(this.permissionLevel);
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                this.putByte((byte) this.permissionLevel);
+            } else {
+                this.putVarInt(this.permissionLevel);
+            }
             if (protocol < 332) {
                 this.putVarInt(this.gamePublish);
             }

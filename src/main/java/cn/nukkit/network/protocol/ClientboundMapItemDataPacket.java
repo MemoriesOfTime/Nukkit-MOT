@@ -118,12 +118,22 @@ public class ClientboundMapItemDataPacket extends DataPacket {
             if (hasTexture) {
                 this.putVarInt(this.offsetZ);
             }
-            boolean hasColors = this.colors.length > 0;
+            boolean hasColors = this.colors.length > 0 || this.image != null;
             this.putBoolean(hasColors);
             if (hasColors) {
-                this.putUnsignedVarInt(this.colors.length);
-                for (int color : this.colors) {
-                    this.putLInt(color);
+                if (this.colors.length > 0) {
+                    this.putUnsignedVarInt(this.colors.length);
+                    for (int color : this.colors) {
+                        this.putLInt(color);
+                    }
+                } else {
+                    this.putUnsignedVarInt((long) this.width * this.height);
+                    for (int y = 0; y < this.height; y++) {
+                        for (int x = 0; x < this.width; x++) {
+                            this.putLInt((int) Utils.toABGR(this.image.getRGB(x, y)));
+                        }
+                    }
+                    this.image.flush();
                 }
             }
         } else {
