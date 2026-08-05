@@ -75,6 +75,7 @@ public class CraftingManager {
     private static BatchPacket packet944;
     private static BatchPacket packet975;
     private static BatchPacket packet1001;
+    private static BatchPacket packet2168;
 
     private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
@@ -1035,7 +1036,12 @@ public class CraftingManager {
             }
         }
 
-        if (protocol >= GameVersion.V1_26_30.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_40.getProtocol()) {
+            if (packet2168 == null) {
+                packet2168 = packetFor(GameVersion.V1_26_40);
+            }
+            return packet2168;
+        } else if (protocol >= GameVersion.V1_26_30.getProtocol()) {
             if (packet1001 == null) {
                 packet1001 = packetFor(GameVersion.V1_26_30);
             }
