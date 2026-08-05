@@ -956,69 +956,73 @@ public class BinaryStream {
         byte[] bytes = this.getByteArray();
         ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
         buf.writeBytes(bytes);
-
-        byte[] nbt = new byte[0];
-        String[] canPlace = new String[0];
-        String[] canDestroy = new String[0];
-        if (bytes.length > 0) {
-            try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
-                int nbtSize = stream.readShort();
-                CompoundTag compoundTag = null;
-                if (nbtSize > 0) {
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
-                } else if (nbtSize == -1) {
-                    int tagCount = stream.readUnsignedByte();
-                    if (tagCount != 1) throw new IllegalArgumentException("Expected 1 tag but got " + tagCount);
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
-                }
-                if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {
-                    if (compoundTag.contains("Damage")) {
-                        compoundTag.remove("Damage");
+        try {
+            byte[] nbt = new byte[0];
+            String[] canPlace;
+            String[] canDestroy;
+            if (bytes.length > 0) {
+                try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
+                    int nbtSize = stream.readShort();
+                    CompoundTag compoundTag = null;
+                    if (nbtSize > 0) {
+                        compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                    } else if (nbtSize == -1) {
+                        int tagCount = stream.readUnsignedByte();
+                        if (tagCount != 1) throw new IllegalArgumentException("Expected 1 tag but got " + tagCount);
+                        compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
                     }
-                    if (!compoundTag.isEmpty()) {
-                        nbt = NBTIO.write(compoundTag, ByteOrder.LITTLE_ENDIAN);
+                    if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {
+                        if (compoundTag.contains("Damage")) {
+                            compoundTag.remove("Damage");
+                        }
+                        if (!compoundTag.isEmpty()) {
+                            nbt = NBTIO.write(compoundTag, ByteOrder.LITTLE_ENDIAN);
+                        }
                     }
-                }
-                int canPlaceOnCount = stream.readInt();
-                if (canPlaceOnCount > 0) {
+                    int canPlaceOnCount = stream.readInt();
+                    if (canPlaceOnCount < 0 || canPlaceOnCount > 4096) {
+                        throw new RuntimeException("Too many CanPlaceOn blocks: " + canPlaceOnCount);
+                    }
                     canPlace = new String[canPlaceOnCount];
                     for (int i = 0; i < canPlaceOnCount; i++) {
                         canPlace[i] = stream.readUTF();
                     }
-                }
-                int canDestroyCount = stream.readInt();
-                if (canDestroyCount > 0) {
+                    int canDestroyCount = stream.readInt();
+                    if (canDestroyCount < 0 || canDestroyCount > 4096) {
+                        throw new RuntimeException("Too many CanDestroy blocks: " + canDestroyCount);
+                    }
                     canDestroy = new String[canDestroyCount];
                     for (int i = 0; i < canDestroyCount; i++) {
                         canDestroy[i] = stream.readUTF();
                     }
+                } catch (IOException e) {
+                    throw new IllegalStateException("Unable to read item user data", e);
                 }
-            } catch (IOException e) {
-                throw new IllegalStateException("Unable to read item user data", e);
             }
-        }
 
-        Item item;
-        if (id != null) {
-            item = Item.get(id, damage, cnt);
-        } else {
-            item = Item.fromString(stringId);
-            if (item != null) {
-                item.setCount(cnt);
-                item.setDamage(damage);
+            Item item;
+            if (id != null) {
+                item = Item.get(id, damage, cnt);
+            } else {
+                item = Item.fromString(stringId);
+                if (item != null) {
+                    item.setCount(cnt);
+                    item.setDamage(damage);
+                }
             }
+            if (item == null) {
+                return Item.get(Item.AIR, 0, 0);
+            }
+            if (nbt.length > 0) {
+                item.setCompoundTag(nbt);
+            }
+            if (stackNetId > 0) {
+                item.setStackNetId(stackNetId);
+            }
+            return item;
+        } finally {
+            buf.release();
         }
-        if (item == null) {
-            return Item.get(Item.AIR, 0, 0);
-        }
-        if (nbt.length > 0) {
-            item.setCompoundTag(nbt);
-        }
-        if (stackNetId > 0) {
-            item.setStackNetId(stackNetId);
-        }
-        buf.release();
-        return item;
     }
 
     /**
