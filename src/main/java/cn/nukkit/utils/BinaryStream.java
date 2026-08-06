@@ -1573,7 +1573,11 @@ public class BinaryStream {
             }
         }
 
-        this.putUnsignedVarInt(getBlockRuntimeId(gameVersion, item));
+        if (instanceItem) {
+            this.putVarInt(getBlockRuntimeId(gameVersion, item));
+        } else {
+            this.putUnsignedVarInt(getBlockRuntimeId(gameVersion, item));
+        }
 
         if (id == Item.AIR) {
             this.putUnsignedVarInt(0);
@@ -1642,7 +1646,12 @@ public class BinaryStream {
 
         Integer id = null;
         String stringId = null;
-        short runtimeId = (short) this.getLShort();
+        int runtimeId;
+        if (instanceItem) {
+            runtimeId = this.getVarInt();
+        } else {
+            runtimeId = (short) this.getLShort();
+        }
         int count = this.getLShort();
         int damage = (int) this.getUnsignedVarInt();
         int stackNetId = 0;
@@ -1677,7 +1686,7 @@ public class BinaryStream {
             id = 0;
         }
 
-        if (this.getBoolean()) {
+        if (!instanceItem && this.getBoolean()) {
             // v2168: 移除 NetId variant VarUInt（仅保留 boolean + 可选 VarInt netId）
             // v2168: NetId variant VarUInt removed (only boolean + optional VarInt netId)
             if (protocolId < ProtocolInfo.v1_26_40) {
@@ -1689,7 +1698,12 @@ public class BinaryStream {
             }
         }
 
-        int blockRuntimeId = (int) this.getUnsignedVarInt();
+        int blockRuntimeId;
+        if (instanceItem) {
+            blockRuntimeId = this.getVarInt();
+        } else {
+            blockRuntimeId = (int) this.getUnsignedVarInt();
+        }
 
         byte[] nbt = new byte[0];
         String[] canPlace = null;
