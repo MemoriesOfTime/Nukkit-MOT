@@ -615,8 +615,14 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     @Override
     public void writeTo(GameVersion gameVersion, BinaryStream stream, boolean antiXray) {
         synchronized (storage) {
-            stream.putByte((byte) STREAM_STORAGE_VERSION);
-            stream.putByte((byte) storage.size());
+            if (gameVersion.getProtocol() >= ProtocolInfo.v1_19_80) {
+                stream.putByte((byte) 9);
+                stream.putByte((byte) storage.size());
+                stream.putByte((byte) this.y);
+            } else {
+                stream.putByte((byte) STREAM_STORAGE_VERSION);
+                stream.putByte((byte) storage.size());
+            }
             for (BlockStorage blockStorage : storage) {
                 if (blockStorage == null) {
                     blockStorage = new BlockStorage();

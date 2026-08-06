@@ -34,7 +34,8 @@ public class NetworkChunkSerializer {
 
     private static final int EXTENDED_NEGATIVE_SUB_CHUNKS = 4;
 
-    private static final byte[] negativeSubChunks;
+    private static final byte[] negativeSubChunksV8;
+    private static final byte[] negativeSubChunksV9;
 
     static {
         // Build up 4 SubChunks for the extended negative height
@@ -43,7 +44,15 @@ public class NetworkChunkSerializer {
             stream.putByte((byte) 8); // SubChunk version
             stream.putByte((byte) 0); // 0 layers
         }
-        negativeSubChunks = stream.getBuffer();
+        negativeSubChunksV8 = stream.getBuffer();
+
+        stream = new BinaryStream();
+        for (int i = 0; i < EXTENDED_NEGATIVE_SUB_CHUNKS; i++) {
+            stream.putByte((byte) 9); // SubChunk version
+            stream.putByte((byte) 0); // 0 layers
+            stream.putByte((byte) (-4 + i)); // section y
+        }
+        negativeSubChunksV9 = stream.getBuffer();
     }
 
     @Deprecated
@@ -134,7 +143,7 @@ public class NetworkChunkSerializer {
         // Overworld has negative coordinates, But the anvil world does not support it
         int writtenSections = subChunkCount;
         if (dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD && chunk.getSectionOffset() == 0) {
-            stream.put(negativeSubChunks);
+            stream.put(chunkData.getGameVersion().getProtocol() >= ProtocolInfo.v1_19_80 ? negativeSubChunksV9 : negativeSubChunksV8);
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 
@@ -159,7 +168,7 @@ public class NetworkChunkSerializer {
         // Overworld has negative coordinates, But the anvil world does not support it
         int writtenSections = subChunkCount;
         if (dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD && chunk.getSectionOffset() == 0) {
-            stream.put(negativeSubChunks);
+            stream.put(negativeSubChunksV8);
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 
