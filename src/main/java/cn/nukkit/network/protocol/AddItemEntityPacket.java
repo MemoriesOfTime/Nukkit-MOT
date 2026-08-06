@@ -16,6 +16,11 @@ public class AddItemEntityPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 
@@ -37,9 +42,44 @@ public class AddItemEntityPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putEntityUniqueId(this.entityUniqueId);
+                this.putEntityUniqueId(this.entityRuntimeId);
+                this.putSlot(this.protocol, this.item);
+                this.putVector3f(this.x, this.y, this.z);
+                this.putVector3f(this.speedX, this.speedY, this.speedZ);
+            }else {
+                if(this.protocol <= ProtocolInfo.v_0_10_0){
+                    this.putInt((int) this.entityRuntimeId);
+                }else{
+                    this.putLong(this.entityRuntimeId);
+                }
+                this.putSlot_old(this.protocol, this.item);
+                this.putFloat(this.x);
+                this.putFloat(this.y);
+                this.putFloat(this.z);
+                if(this.protocol > ProtocolInfo.v_0_10_0){
+                    this.putFloat(this.speedX);
+                    this.putFloat(this.speedY);
+                    this.putFloat(this.speedZ);
+                }else{
+                    this.putByte((byte) this.speedX);
+                    this.putByte((byte) this.speedY);
+                    this.putByte((byte) this.speedZ);
+                }
+            }
+
+            return;
+        }
         this.reset();
         this.putEntityUniqueId(this.entityUniqueId);
-        this.putEntityRuntimeId(this.entityRuntimeId);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.entityRuntimeId);
+        }else{
+            this.putEntityUniqueId(this.entityRuntimeId);
+        }
         this.putSlot(protocol, this.item);
         this.putVector3f(this.x, this.y, this.z);
         this.putVector3f(this.speedX, this.speedY, this.speedZ);

@@ -17,9 +17,15 @@ public class ResourcePackClientResponsePacket extends DataPacket {
     public byte responseStatus;
     public Entry[] packEntries;
 
+    public short unknownShort; //Unknown data 0.16
+
     @Override
     public void decode() {
         this.responseStatus = (byte) this.getByte();
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.unknownShort = (short) this.getShort();
+            return;
+        }
         this.packEntries = new Entry[Math.min(this.getLShort(), 1024)];
         for (int i = 0; i < this.packEntries.length; i++) {
             String[] entry = this.getString().split("_", 3);
@@ -43,6 +49,11 @@ public class ResourcePackClientResponsePacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if (this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 

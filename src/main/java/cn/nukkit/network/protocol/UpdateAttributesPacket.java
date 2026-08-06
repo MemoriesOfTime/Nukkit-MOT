@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.entity.Attribute;
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -17,6 +18,11 @@ public class UpdateAttributesPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).getOrDefault(this.getClass(),(byte)0x1f);
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.UPDATE_ATTRIBUTES_PACKET;
+        }
         return NETWORK_ID;
     }
 
@@ -26,10 +32,46 @@ public class UpdateAttributesPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putVarLong(this.entityId);
+
+                if (this.entries == null) {
+                    this.putUnsignedVarInt(0);
+                } else {
+                    this.putUnsignedVarInt(this.entries.length);
+                    for (Attribute entry : this.entries) {
+                        this.putLFloat(entry.getMinValue());
+                        this.putLFloat(entry.getMaxValue());
+                        this.putLFloat(entry.getValue());
+                        this.putLFloat(entry.getDefaultValue());
+                        this.putString(entry.getName());
+                    }
+                }
+                return;
+            }
+            this.putLong(this.entityId);
+            if (this.entries == null) {
+                this.putShort(0);
+            } else {
+                this.putShort(this.entries.length);
+                for (Attribute entry : this.entries) {
+                    this.putFloat(entry.getMinValue());
+                    this.putFloat(entry.getMaxValue());
+                    this.putFloat(entry.getValue());
+                    this.putString_old(entry.getOldName());
+                }
+            }
+            return;
+        }
+
         this.reset();
-
-        this.putEntityRuntimeId(this.entityId);
-
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.entityId);
+        }else{
+            this.putEntityUniqueId(this.entityId);
+        }
         if (this.entries == null) {
             this.putUnsignedVarInt(0);
         } else {

@@ -6,9 +6,12 @@ import cn.nukkit.Server;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.v113.*;
-import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.utils.Utils;
-import cn.nukkit.utils.VarInt;
+import cn.nukkit.network.protocol.v20.AddMobPacket;
+import cn.nukkit.network.protocol.v20.MoveEntityPosRotPacket;
+import cn.nukkit.network.protocol.v20.RotateHeadPacket;
+import cn.nukkit.network.protocol.v20.UnloadChunkPacket;
+import cn.nukkit.network.protocol.v70.*;
+import cn.nukkit.utils.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -43,6 +46,11 @@ public class Network {
     public static final byte CHANNEL_TEXT = 7; //Chat and other text stuff
     public static final byte CHANNEL_END = 31;
 
+    private PacketPool packetPool18;// 0.9.5 0.10.5
+    private PacketPool packetPool27;// 0.11
+    private PacketPool packetPool70;// 0.12 0.13 0.14
+    private PacketPool packetPool84;// 0.15
+    private PacketPool packetPool90;// 0.16
     private PacketPool packetPool113;
     private PacketPool packetPoolCurrent;
 
@@ -219,6 +227,12 @@ public class Network {
         }
         byte[] data;
         try {
+            // log.info("0x" + Integer.toHexString(compression.getPrefix() & 0xff));
+//            if(compression.getPrefix() == (byte) 0x00){
+//                log.info(compression == CompressionProvider.ZLIB_RAW ?  "ZLIB_RAW" : "ZLIB");
+//            }else if(compression.getPrefix() == (byte) 0xff){
+//                log.info("NONE");
+//            }
             data = compression.decompress(payload, maxSize);
         } catch (Exception e) {
             log.debug("Exception while inflating batch packet", e);
@@ -287,6 +301,181 @@ public class Network {
     }
 
     /**
+     * 处理0.12 - 1.0.0的batchpacket
+     * @param packet
+     * @param player
+     */
+    public List<DataPacket> processBatch(BatchPacket packet, Player player){
+        byte[] data;
+        try {
+            data = Zlib.inflate(packet.payload, 64 * 1024 * 1024);
+        } catch (Exception e) {
+            Server.getInstance().getLogger().logException(e);
+            return null;
+        }
+
+        if(packet.protocol <= ProtocolInfo.v_0_15_10){
+            int len = data.length;
+            int offset = 0;
+            try {
+                List<DataPacket> packets = new ArrayList<>();
+                List<Byte> filter = new ArrayList<>();
+                while (offset < len) {
+
+                    DataPacket pk;
+
+                    if(ProtocolInfo.v_0_13_2 < packet.protocol && packet.protocol <= ProtocolInfo.v_0_14_3){//0.14
+
+                        int pkLen = Binary.readInt(Binary.subBytes(data, offset, 4));
+                        offset += 4;
+
+                        byte[] buf = Binary.subBytes(data, offset, pkLen);
+                        offset += pkLen;
+
+                        if ((pk = this.getPacket(buf[1], packet.protocol)) != null) {
+                            pk.protocol = packet.protocol;
+
+                            if (pk.pid() == ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(BatchPacket.class)) {
+                                throw new IllegalStateException("Invalid BatchPacket inside BatchPacket");
+                            }
+
+                            pk.setBuffer(buf, 2);
+                            pk.decode();
+
+                            if(pk.pid() == ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(UseItemPacket.class)){
+                                if (!filter.contains(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(UseItemPacket.class))) {
+                                    player.handleDataPacket(packet);
+                                    filter.add(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(UseItemPacket.class));
+                                }
+                            }else{
+                                player.handleDataPacket(pk);
+                            }
+
+                            if (pk.getOffset() <= 0) {
+                                return null;
+                            }
+                        }
+                    }else if(packet.protocol > ProtocolInfo.v_0_14_3){ // 0.15
+
+                        int pkLen = Binary.readInt(Binary.subBytes(data, offset, 4));
+                        offset += 4;
+
+                        byte[] buf = Binary.subBytes(data, offset, pkLen);
+                        offset += pkLen;
+
+                        if ((pk = this.getPacket(buf[0], packet.protocol)) != null) {
+                            pk.protocol = packet.protocol;
+
+                            if (pk.protocol > ProtocolInfo.v_0_14_3 && pk.pid() == ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(BatchPacket.class)) {
+                                throw new IllegalStateException("Invalid BatchPacket inside BatchPacket");
+                            }
+
+                            pk.setBuffer(buf, 1);
+                            pk.decode();
+                            packets.add(pk);
+
+                            if (pk.getOffset() <= 0) {
+                                return null;
+                            }
+                        }
+                    }else if(ProtocolInfo.v_0_11_0 < packet.protocol && packet.protocol <= ProtocolInfo.v_0_13_2){ // 0.12-0.13
+
+                        int pkLen = Binary.readInt(Binary.subBytes(data, offset, 4));
+                        offset += 4;
+
+                        byte[] buf = Binary.subBytes(data, offset, pkLen);
+                        offset += pkLen;
+
+                        if((pk = this.getPacket(buf[0], packet.protocol)) != null){
+                            pk.protocol = packet.protocol;
+
+                            if (pk.pid() == ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(BatchPacket.class)) {
+                                throw new IllegalStateException("Invalid BatchPacket inside BatchPacket");
+                            }
+
+                            pk.setBuffer(buf, 1);
+                            pk.decode();
+                            player.handleDataPacket(pk);
+
+                            if (pk.getOffset() <= 0) {
+                                return null;
+                            }
+                        }
+                    }else {
+
+                        if((pk = this.getPacket(data[offset++], packet.protocol)) != null){
+                            pk.protocol = packet.protocol;
+
+                            if (pk.pid() == ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(BatchPacket.class)) {
+                                throw new IllegalStateException("Invalid BatchPacket inside BatchPacket");
+                            }
+
+                            pk.setBuffer(data, offset);
+                            pk.decode();
+                            player.handleDataPacket(pk);
+                            offset += pk.getOffset();
+
+                            if (pk.getOffset() <= 0) {
+                                return null;
+                            }
+                        }
+                    }
+                }
+
+                if(player == null){
+                    return packets;
+                }else{
+                    for(DataPacket pk: packets){
+                        player.handleDataPacket(pk);
+                    }
+                    return null;
+                }
+            } catch (Exception e) {
+                if (Nukkit.DEBUG > 0) {
+                    this.server.getLogger().debug("BatchPacket 0x" + Binary.bytesToHexString(packet.payload));
+                    this.server.getLogger().logException(e);
+                }
+            }
+
+        }else {// 0.16以其以上的操作
+            int len = data.length;
+            BinaryStream stream = new BinaryStream(data);
+            try {
+                List<DataPacket> packets = new ArrayList<>();
+                while (stream.offset < len) {
+                    byte[] buf = stream.getByteArray();
+
+                    DataPacket pk;
+
+                    if ((pk = this.getPacket(buf[0], packet.protocol)) != null) {
+
+                        pk.protocol = packet.protocol;
+
+                        if (pk.pid() == ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(BatchPacket.class)) {
+                            throw new IllegalStateException("Invalid BatchPacket inside BatchPacket");
+                        }
+
+                        pk.setBuffer(buf, 1);
+
+                        pk.decode();
+
+                        packets.add(pk);
+                    }
+                }
+
+                processPackets(player, packets);
+
+            } catch (Exception e) {
+                if (Nukkit.DEBUG > 0) {
+                    this.server.getLogger().debug("BatchPacket 0x" + Binary.bytesToHexString(packet.payload));
+                    this.server.getLogger().logException(e);
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * Process packets obtained from batch packets
      * Required to perform additional analyses and filter unnecessary packets
      *
@@ -310,12 +499,22 @@ public class Network {
     }
 
     public DataPacket getPacket(int id, int protocol) {
-        return getPacketPool(protocol).getPacket(id);
+        return getPacketPool(protocol).getPacket(id & 0xff);
     }
 
     public PacketPool getPacketPool(int protocol) {
         if (protocol > ProtocolInfo.v1_1_0) {
             return this.packetPoolCurrent;
+        }else if(protocol <= ProtocolInfo.v_0_10_0){// 0.11
+            return this.packetPool18;
+        }else if(protocol <= ProtocolInfo.v_0_11_0){// 0.11
+            return this.packetPool27;
+        } else if(protocol <= ProtocolInfo.v_0_14_3){// 0.14
+            return this.packetPool70;
+        }else if(protocol <= ProtocolInfo.v_0_15_10){// 0.15
+            return this.packetPool84;
+        }else if(protocol < ProtocolInfo.v1_1_0){// 0.16
+            return this.packetPool90;
         }
         return this.packetPool113;
     }
@@ -323,6 +522,16 @@ public class Network {
     public void setPacketPool(int protocol, PacketPool packetPool) {
         if (protocol > ProtocolInfo.v1_1_0) {
             this.packetPoolCurrent = packetPool;
+        } else if(protocol <= ProtocolInfo.v_0_10_0){// 0.11
+            this.packetPool18 = packetPool;
+        } else if(protocol <= ProtocolInfo.v_0_11_0){// 0.11
+             this.packetPool27 = packetPool;
+        } else if(protocol <= ProtocolInfo.v_0_14_3){// 0.14
+            this.packetPool70 = packetPool;
+        }else if(protocol <= ProtocolInfo.v_0_15_10){// 0.15
+            this.packetPool84 = packetPool;
+        }else if(protocol < ProtocolInfo.v1_1_0){// 0.16
+            this.packetPool90 = packetPool;
         } else {
             this.packetPool113 = packetPool;
         }
@@ -353,6 +562,306 @@ public class Network {
     }
 
     private void registerPackets() {
+        /**
+         * 0.9.0 - 0.10.5
+         */
+        this.packetPool18 = PacketPool.builder()
+                .protocolVersion(ProtocolInfo.v_0_9_5)
+                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v_0_9_5))
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(LoginPacket.class), LoginPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(PlayStatusPacket.class), PlayStatusPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(DisconnectPacket.class), DisconnectPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(TextPacket.class), TextPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(SetTimePacket.class), SetTimePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(StartGamePacket.class), StartGamePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(AddPlayerPacket.class), AddPlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(RemovePlayerPacket.class), RemovePlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(AddEntityPacket.class), AddEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(RemoveEntityPacket.class), RemoveEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(AddItemEntityPacket.class), AddItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(TakeItemEntityPacket.class), TakeItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(MoveEntityAbsolutePacket.class), MoveEntityAbsolutePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(MovePlayerPacket.class), MovePlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(RemoveBlockPacket.class), RemoveBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(UpdateBlockPacket.class), UpdateBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(AddPaintingPacket.class), AddPaintingPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(ExplodePacket.class), ExplodePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(LevelEventPacket.class), LevelEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(BlockEventPacket.class), BlockEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(EntityEventPacket.class), EntityEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(MobEquipmentPacket.class), MobEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(MobArmorEquipmentPacket.class), MobArmorEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(InteractPacket.class), InteractPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(UseItemPacket.class), UseItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(PlayerActionPacket.class), PlayerActionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(HurtArmorPacket.class), HurtArmorPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(SetEntityDataPacket.class), SetEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(SetEntityMotionPacket.class), SetEntityMotionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(SetEntityLinkPacket.class), SetEntityLinkPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(SetHealthPacket.class), SetHealthPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(SetSpawnPositionPacket.class), SetSpawnPositionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(AnimatePacket.class), AnimatePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(RespawnPacket.class), RespawnPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(DropItemPacket.class), DropItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(ContainerOpenPacket.class), ContainerOpenPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(ContainerClosePacket.class), ContainerClosePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(ContainerSetSlotPacket.class), ContainerSetSlotPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(ContainerSetDataPacket.class), ContainerSetDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(ContainerSetContentPacket.class), ContainerSetContentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(AdventureSettingsPacket.class), AdventureSettingsPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(BlockEntityDataPacket.class), BlockEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(PlayerInputPacket.class), PlayerInputPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(LevelChunkPacket.class), LevelChunkPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(UnloadChunkPacket.class), UnloadChunkPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(MoveEntityPosRotPacket.class), MoveEntityPosRotPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(RotateHeadPacket.class), RotateHeadPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(AddMobPacket.class), AddMobPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_9_5).get(SetDifficultyPacket.class), SetDifficultyPacket.class)
+                .build();
+        /**
+         * 0.11.0 - 0.11.1
+         */
+        this.packetPool27 = PacketPool.builder()
+                .protocolVersion(ProtocolInfo.v_0_11_0)
+                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v_0_11_0))
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(LoginPacket.class), LoginPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(PlayStatusPacket.class), PlayStatusPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(DisconnectPacket.class), DisconnectPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(BatchPacket.class), BatchPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(TextPacket.class), TextPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(SetTimePacket.class), SetTimePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(StartGamePacket.class), StartGamePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(AddPlayerPacket.class), AddPlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(AddEntityPacket.class), AddEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(RemoveEntityPacket.class), RemoveEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(AddItemEntityPacket.class), AddItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(TakeItemEntityPacket.class), TakeItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(MoveEntityAbsolutePacket.class), MoveEntityAbsolutePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(MovePlayerPacket.class), MovePlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(RemoveBlockPacket.class), RemoveBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(UpdateBlockPacket.class), UpdateBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(AddPaintingPacket.class), AddPaintingPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(ExplodePacket.class), ExplodePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(LevelEventPacket.class), LevelEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(BlockEventPacket.class), BlockEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(EntityEventPacket.class), EntityEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(MobEffectPacket.class), EntityEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(MobEquipmentPacket.class), MobEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(MobArmorEquipmentPacket.class), MobArmorEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(InteractPacket.class), InteractPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(UseItemPacket.class), UseItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(PlayerActionPacket.class), PlayerActionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(HurtArmorPacket.class), HurtArmorPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(SetEntityDataPacket.class), SetEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(SetEntityMotionPacket.class), SetEntityMotionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(SetEntityLinkPacket.class), SetEntityLinkPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(SetHealthPacket.class), SetHealthPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(SetSpawnPositionPacket.class), SetSpawnPositionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(AnimatePacket.class), AnimatePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(RespawnPacket.class), RespawnPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(DropItemPacket.class), DropItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(ContainerOpenPacket.class), ContainerOpenPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(ContainerClosePacket.class), ContainerClosePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(ContainerSetSlotPacket.class), ContainerSetSlotPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(ContainerSetDataPacket.class), ContainerSetDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(ContainerSetContentPacket.class), ContainerSetContentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(AdventureSettingsPacket.class), AdventureSettingsPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(BlockEntityDataPacket.class), BlockEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(PlayerInputPacket.class), PlayerInputPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(LevelChunkPacket.class), LevelChunkPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(SetDifficultyPacket.class), SetDifficultyPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_11_0).get(TransferPacket.class), TransferPacket.class)
+                .build();
+
+        /**
+         * 0.14.1 - 0.14.3
+         */
+        this.packetPool70 = PacketPool.builder()
+                .protocolVersion(ProtocolInfo.v_0_14_3)
+                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v_0_14_3))
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(LoginPacket.class), LoginPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(PlayStatusPacket.class), PlayStatusPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(DisconnectPacket.class), DisconnectPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(BatchPacket.class), BatchPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(TextPacket.class), TextPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(SetTimePacket.class), SetTimePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(StartGamePacket.class), StartGamePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(AddPlayerPacket.class), AddPlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(AddEntityPacket.class), AddEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(RemoveEntityPacket.class), RemoveEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(AddItemEntityPacket.class), AddItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(TakeItemEntityPacket.class), TakeItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(MoveEntityAbsolutePacket.class), MoveEntityAbsolutePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(MovePlayerPacket.class), MovePlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(RemoveBlockPacket.class), RemoveBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(UpdateBlockPacket.class), UpdateBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(AddPaintingPacket.class), AddPaintingPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(ExplodePacket.class), ExplodePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(LevelEventPacket.class), LevelEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(BlockEventPacket.class), BlockEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(EntityEventPacket.class), EntityEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(MobEquipmentPacket.class), MobEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(MobArmorEquipmentPacket.class), MobArmorEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(InteractPacket.class), InteractPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(UseItemPacket.class), UseItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(PlayerActionPacket.class), PlayerActionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(HurtArmorPacket.class), HurtArmorPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(SetEntityDataPacket.class), SetEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(SetEntityMotionPacket.class), SetEntityMotionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(SetEntityLinkPacket.class), SetEntityLinkPacket.class)
+                //.registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(SetHealthPacket.class.class), SetHealthPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(SetSpawnPositionPacket.class), SetSpawnPositionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(AnimatePacket.class), AnimatePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(RespawnPacket.class), RespawnPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(DropItemPacket.class), DropItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(ContainerOpenPacket.class), ContainerOpenPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(ContainerClosePacket.class), ContainerClosePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(ContainerSetSlotPacket.class), ContainerSetSlotPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(ContainerSetDataPacket.class), ContainerSetDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(ContainerSetContentPacket.class), ContainerSetContentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(CraftingDataPacket.class), CraftingDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(CraftingEventPacket.class), CraftingEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(AdventureSettingsPacket.class), AdventureSettingsPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(BlockEntityDataPacket.class), BlockEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(PlayerInputPacket.class), PlayerInputPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(LevelChunkPacket.class), LevelChunkPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(SetDifficultyPacket.class), SetDifficultyPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(ChangeDimensionPacket.class), ChangeDimensionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(SetPlayerGameTypePacket.class), SetPlayerGameTypePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(PlayerListPacket.class), PlayerListPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(TelemetryEventPacket.class), TelemetryEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(RequestChunkRadiusPacket.class), RequestChunkRadiusPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(ReplaceSelectedItemPacket.class), ReplaceSelectedItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(ItemFrameDropItemPacket.class), ItemFrameDropItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(RemovePlayerPacket.class), RemovePlayerPacket.class)
+                .build();
+
+        /**
+         * 0.15.0 - 0.15.10
+         */
+        this.packetPool84 = PacketPool.builder()
+                .protocolVersion(ProtocolInfo.v_0_15_10)
+                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v_0_15_10))
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(LoginPacket.class), LoginPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(PlayStatusPacket.class), PlayStatusPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(DisconnectPacket.class), DisconnectPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(BatchPacket.class), BatchPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(TextPacket.class), TextPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(SetTimePacket.class), SetTimePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(StartGamePacket.class), StartGamePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(AddPlayerPacket.class), AddPlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(AddEntityPacket.class), AddEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(RemoveEntityPacket.class), RemoveEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(AddItemEntityPacket.class), AddItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(TakeItemEntityPacket.class), TakeItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(MoveEntityAbsolutePacket.class), MoveEntityAbsolutePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(MovePlayerPacket.class), MovePlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(RemoveBlockPacket.class), RemoveBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(UpdateBlockPacket.class), UpdateBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(AddPaintingPacket.class), AddPaintingPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(ExplodePacket.class), ExplodePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(LevelEventPacket.class), LevelEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(BlockEventPacket.class), BlockEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(EntityEventPacket.class), EntityEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(MobEquipmentPacket.class), MobEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(MobArmorEquipmentPacket.class), MobArmorEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(InteractPacket.class), InteractPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(UseItemPacket.class), UseItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(PlayerActionPacket.class), PlayerActionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(HurtArmorPacket.class), HurtArmorPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(SetEntityDataPacket.class), SetEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(SetEntityMotionPacket.class), SetEntityMotionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(SetEntityLinkPacket.class), SetEntityLinkPacket.class)
+                //.registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(SetHealthPacket.class), SetHealthPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(SetSpawnPositionPacket.class), SetSpawnPositionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(AnimatePacket.class), AnimatePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(RespawnPacket.class), RespawnPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(DropItemPacket.class), DropItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(ContainerOpenPacket.class), ContainerOpenPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(ContainerClosePacket.class), ContainerClosePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(ContainerSetSlotPacket.class), ContainerSetSlotPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(ContainerSetDataPacket.class), ContainerSetDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(ContainerSetContentPacket.class), ContainerSetContentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(CraftingDataPacket.class), CraftingDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(CraftingEventPacket.class), CraftingEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(AdventureSettingsPacket.class), AdventureSettingsPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(BlockEntityDataPacket.class), BlockEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(PlayerInputPacket.class), PlayerInputPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(LevelChunkPacket.class), LevelChunkPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(SetDifficultyPacket.class), SetDifficultyPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(ChangeDimensionPacket.class), ChangeDimensionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(SetPlayerGameTypePacket.class), SetPlayerGameTypePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(PlayerListPacket.class), PlayerListPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(TelemetryEventPacket.class), TelemetryEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(RequestChunkRadiusPacket.class), RequestChunkRadiusPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(ReplaceSelectedItemPacket.class), ReplaceSelectedItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(ItemFrameDropItemPacket.class), ItemFrameDropItemPacket.class)
+                //.registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(RemovePlayerPacket.class), RemovePlayerPacket.class)
+                .build();
+
+        /**
+         * 0.16
+         */
+        this.packetPool90 = PacketPool.builder()
+                .protocolVersion(ProtocolInfo.v_0_16_0)
+                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v_0_16_0))
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(LoginPacket.class), LoginPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(PlayStatusPacket.class), PlayStatusPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(DisconnectPacket.class), DisconnectPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(BatchPacket.class), BatchPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(TextPacket.class), TextPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(SetTimePacket.class), SetTimePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(StartGamePacket.class), StartGamePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(AddPlayerPacket.class), AddPlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(AddEntityPacket.class), AddEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(RemoveEntityPacket.class), RemoveEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(AddItemEntityPacket.class), AddItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(TakeItemEntityPacket.class), TakeItemEntityPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(MoveEntityAbsolutePacket.class), MoveEntityAbsolutePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(MovePlayerPacket.class), MovePlayerPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(RemoveBlockPacket.class), RemoveBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(UpdateBlockPacket.class), UpdateBlockPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(AddPaintingPacket.class), AddPaintingPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ExplodePacket.class), ExplodePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(LevelEventPacket.class), LevelEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(BlockEventPacket.class), BlockEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(EntityEventPacket.class), EntityEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(MobEquipmentPacket.class), MobEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(MobArmorEquipmentPacket.class), MobArmorEquipmentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(InteractPacket.class), InteractPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(UseItemPacket.class), UseItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(PlayerActionPacket.class), PlayerActionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(HurtArmorPacket.class), HurtArmorPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(SetEntityDataPacket.class), SetEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(SetEntityMotionPacket.class), SetEntityMotionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(SetEntityLinkPacket.class), SetEntityLinkPacket.class)
+                //.registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(SetHealthPacket.class), SetHealthPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(SetSpawnPositionPacket.class), SetSpawnPositionPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(AnimatePacket.class), AnimatePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(RespawnPacket.class), RespawnPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(DropItemPacket.class), DropItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ContainerOpenPacket.class), ContainerOpenPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ContainerClosePacket.class), ContainerClosePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ContainerSetSlotPacket.class), ContainerSetSlotPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ContainerSetDataPacket.class), ContainerSetDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ContainerSetContentPacket.class), ContainerSetContentPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(CraftingDataPacket.class), CraftingDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(CraftingEventPacket.class), CraftingEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(AdventureSettingsPacket.class), AdventureSettingsPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(BlockEntityDataPacket.class), BlockEntityDataPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(PlayerInputPacket.class), PlayerInputPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(LevelChunkPacket.class), LevelChunkPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(SetDifficultyPacket.class), SetDifficultyPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ChangeDimensionPacket.class), ChangeDimensionPacket.class)
+                //.registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(SetPlayerGameTypePacket.class), SetPlayerGameTypePacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(PlayerListPacket.class), PlayerListPacket.class)
+                //.registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(TelemetryEventPacket.class), TelemetryEventPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(RequestChunkRadiusPacket.class), RequestChunkRadiusPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ReplaceSelectedItemPacket.class), ReplaceSelectedItemPacket.class)
+                .registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ItemFrameDropItemPacket.class), ItemFrameDropItemPacket.class)
+                //.registerPacket(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(RemovePlayerPacket.class), RemovePlayerPacket.class)
+                .build();
+
         this.packetPool113 = PacketPool.builder()
                 .protocolVersion(ProtocolInfo.v1_1_0)
                 .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v1_1_0))

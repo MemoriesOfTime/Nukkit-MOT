@@ -14,6 +14,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -97,7 +98,7 @@ public class EntityArrow extends EntitySlenderProjectile {
         }
 
         this.auxValue = this.namedTag.getByte("auxValue");
-        this.getDataProperties().putByte(DATA_ARROW_AUX_VALUE, this.auxValue);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putByte(DATA_ARROW_AUX_VALUE, this.auxValue);
     }
 
     public void setCritical() {

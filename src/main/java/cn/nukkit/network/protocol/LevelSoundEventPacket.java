@@ -650,6 +650,15 @@ public class LevelSoundEventPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol <= ProtocolInfo.v_0_15_10){
+            this.tryReset();
+            this.putShort(this.sound);
+            this.putFloat(this.x);
+            this.putFloat(this.y);
+            this.putFloat(this.z);
+            this.putInt(this.extraData);
+            return;
+        }
         this.reset();
         this.putUnsignedVarInt(this.sound);
         this.putVector3f(this.x, this.y, this.z);
@@ -661,6 +670,11 @@ public class LevelSoundEventPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(LevelEventPacket.class);
+        }
         return NETWORK_ID;
     }
 }

@@ -124,7 +124,7 @@ public class EntityFallingBlock extends Entity {
             } else {
                 runtimeId = this.blockId | this.damage << 8;
             }
-            addEntity.metadata = this.dataProperties.clone().put(new IntEntityData(DATA_VARIANT, runtimeId));
+            addEntity.metadata = this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).clone().put(new IntEntityData(DATA_VARIANT, runtimeId));
             player.dataPacket(addEntity);
             this.hasSpawned.put(player.getLoaderId(), player);
         }

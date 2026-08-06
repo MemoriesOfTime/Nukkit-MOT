@@ -29,17 +29,55 @@ public class MovePlayerPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.eid = this.getEntityRuntimeId();
+        if(this.protocol <= ProtocolInfo.v_0_15_10){
+            if(this.protocol > ProtocolInfo.v_0_10_0){
+                this.eid = getLong();
+            }else{
+                this.eid = getInt();
+            }
+            this.x = getFloat();
+            this.y = getFloat();
+            this.z = getFloat();
+            this.yaw = getFloat();
+            if(this.protocol <= ProtocolInfo.v_0_10_0){
+                this.pitch = getFloat();
+                this.headYaw = getFloat();
+                this.mode = MODE_NORMAL;
+                return;
+            }
+            this.headYaw = getFloat();
+            this.pitch = getFloat();
+            this.mode = (byte) getByte();
+            this.onGround = getByte() > 0;
+            return;
+        }
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.eid = this.getEntityRuntimeId();
+        }else{
+            this.eid = this.getEntityUniqueId();
+        }
         Vector3f v = this.getVector3f();
         this.x = v.x;
         this.y = v.y;
         this.z = v.z;
         this.pitch = this.getLFloat();
-        this.yaw = this.getLFloat();
-        this.headYaw = this.getLFloat();
-        this.mode = this.getByte();
+        if(this.protocol >= ProtocolInfo.v1_2_0) {
+            this.yaw = this.getLFloat();
+            this.headYaw = this.getLFloat();
+        }else{
+            this.headYaw = this.getLFloat();
+            this.yaw = this.getLFloat();
+        }
+        this.mode = (byte) this.getByte();
         this.onGround = this.getBoolean();
-        this.ridingEid = this.getEntityRuntimeId();
+        if(this.protocol <= ProtocolInfo.v_1_0_0){
+            return;
+        }
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.ridingEid = this.getEntityRuntimeId();
+        }else{
+            this.ridingEid = this.getEntityUniqueId();
+        }
         if (this.mode == MODE_TELEPORT) {
             this.teleportCause = this.getLInt();
             this.teleportItem = this.getLInt();
@@ -51,15 +89,59 @@ public class MovePlayerPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol <= ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putEntityRuntimeId(this.eid);
+                this.putVector3f(this.x, this.y, this.z);
+                this.putLFloat(this.pitch);
+                this.putLFloat(this.yaw);
+                this.putLFloat(this.headYaw);
+                this.putByte((byte) this.mode);
+                this.putBoolean(this.onGround);
+                return;
+            }
+            if(this.protocol > ProtocolInfo.v_0_10_0){
+                this.putLong(this.eid);
+            }else{
+                this.putInt((int) this.eid);
+            }
+            this.putFloat(x);
+            this.putFloat(y);
+            this.putFloat(z);
+            if(this.protocol <= ProtocolInfo.v_0_10_0){
+                this.putFloat(yaw);
+                this.putFloat(pitch);
+                this.putFloat(headYaw);
+                this.putByte((byte) 0x00);
+                return;
+            }
+            this.putFloat(yaw);
+            this.putFloat(headYaw);
+            this.putFloat(pitch);
+            this.putByte((byte) (mode & 0xff));
+            if(this.protocol >= ProtocolInfo.v_0_10_0){
+                this.putByte(onGround ? (byte) 1 : 0);
+            }
+            return;
+        }
         this.reset();
-        this.putEntityRuntimeId(this.eid);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.eid);
+        }else{
+            this.putEntityUniqueId(this.eid);
+        }
         this.putVector3f(this.x, this.y, this.z);
         this.putLFloat(this.pitch);
         this.putLFloat(this.yaw);
         this.putLFloat(this.headYaw);
         this.putByte((byte) this.mode);
         this.putBoolean(this.onGround);
-        this.putEntityRuntimeId(this.ridingEid);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.ridingEid);
+        }else{
+            this.putEntityUniqueId(this.ridingEid);
+        }
         if (this.mode == MODE_TELEPORT) {
             this.putLInt(this.teleportCause);
             this.putLInt(this.teleportItem);
@@ -71,6 +153,11 @@ public class MovePlayerPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 }

@@ -45,7 +45,9 @@ public abstract class BlockEntitySpawnable extends BlockEntity {
         pk.z = (int) this.z;
 
         try {
-            pk.namedTag = NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN, true);
+            pk.namedTag = protocol <= ProtocolInfo.v_0_14_3 ?
+                    NBTIO.write_old(tag, ByteOrder.LITTLE_ENDIAN) :
+                    NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN, true);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

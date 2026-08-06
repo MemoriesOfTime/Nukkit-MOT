@@ -13,6 +13,7 @@ import cn.nukkit.event.entity.EntityEffectUpdateEvent;
 import cn.nukkit.event.entity.EntityRegainHealthEvent;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.MobEffectPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -311,6 +312,7 @@ public class Effect implements Cloneable {
 
         if (this.id == Effect.INVISIBILITY) {
             entity.setDataFlag(Entity.DATA_FLAGS, Entity.DATA_FLAG_INVISIBLE, true);
+
             entity.setNameTagVisible(false);
         }
 
@@ -361,6 +363,7 @@ public class Effect implements Cloneable {
 
         if (this.id == Effect.INVISIBILITY) {
             entity.setDataFlag(Entity.DATA_FLAGS, Entity.DATA_FLAG_INVISIBLE, false);
+
             entity.setNameTagVisible(true);
         }
 

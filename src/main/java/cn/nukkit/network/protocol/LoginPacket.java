@@ -2,10 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
 import cn.nukkit.entity.data.Skin;
-import cn.nukkit.utils.PersonaPiece;
-import cn.nukkit.utils.PersonaPieceTint;
-import cn.nukkit.utils.SerializedImage;
-import cn.nukkit.utils.SkinAnimation;
+import cn.nukkit.utils.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -26,18 +23,116 @@ public class LoginPacket extends DataPacket {
     private int protocol_;
     public UUID clientUUID;
     public long clientId;
+    public String logindata;
     public Skin skin;
+
+    public String serverAddress;
+    public String identityPublicKey;
 
     private static final Gson GSON = new Gson();
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 
     @Override
     public void decode() {
-        this.protocol_ = this.getInt();
+        if(this.protocol <= ProtocolInfo.v_0_14_3){
+            this.username = this.getString_old();
+            this.protocol_ = this.getInt();
+            int protocol2 = this.getInt();
+            if(this.protocol <= ProtocolInfo.v_0_11_0){
+                this.clientId = this.getInt();
+                if(this.protocol <= ProtocolInfo.v_0_10_0){
+                    this.logindata = this.getString_old();
+                    this.protocol = this.protocol_;
+                    return;
+                }
+                this.protocol = this.protocol_;
+                //获取Skin
+                boolean slim = this.getByte() > 0;
+                byte[] data = this.get(getShort());
+                if(data.length != Skin.SINGLE_SKIN_SIZE && data.length != Skin.DOUBLE_SKIN_SIZE){ //非法皮肤
+                    data = new byte[Skin.SINGLE_SKIN_SIZE];
+                }
+                this.skin = new Skin();
+                this.skin.setGeometryData(Skin.STEVE_GEOMETRY);
+                this.skin.setGeometryName("geometry.humanoid.custom");
+                // this.skin.setSkinId("Standard_Custom");
+                // skin.setSkinData(Base64.getDecoder().decode(Skin.STEVE_SKIN));
+                this.skin.setSkinData(data);
+                this.skin.setSkinId(slim ? Skin.MODEL_ALEX : Skin.MODEL_STEVE);
+                this.skin.setSkinBytes(data);
+                return;
+            }
+            this.clientId = this.getLong();
+            this.clientUUID = this.getUUID();
+            this.serverAddress = this.getString_old();
+            this.identityPublicKey = this.getString_old();
+
+            // 获取Skin
+            this.protocol = this.protocol_;
+            if(this.protocol <= ProtocolInfo.v_0_12_1){// 0.12
+                boolean slim = this.getByte() > 0;
+                byte[] data = this.get(getShort());
+                if(data.length != Skin.SINGLE_SKIN_SIZE && data.length != Skin.DOUBLE_SKIN_SIZE){ //非法皮肤
+                    data = new byte[Skin.SINGLE_SKIN_SIZE];
+                }
+                this.skin = new Skin();
+                this.skin.setGeometryData(Skin.STEVE_GEOMETRY);
+                this.skin.setGeometryName("geometry.humanoid.custom");
+                // this.skin.setSkinId("Standard_Custom");
+                // skin.setSkinData(Base64.getDecoder().decode(Skin.STEVE_SKIN));
+                this.skin.setSkinData(data);
+                this.skin.setSkinId(slim ? Skin.MODEL_ALEX : Skin.MODEL_STEVE);
+                this.skin.setSkinBytes(data);
+
+            }else{
+                String modelId = this.getString_old();
+                byte[] skinData = this.get(this.getShort());
+                this.skin = new Skin();
+                this.skin.setGeometryData(Skin.STEVE_GEOMETRY);
+                this.skin.setGeometryName("geometry.humanoid.custom");
+                // this.skin.setSkinId("Standard_Custom");
+                // skin.setSkinData(Base64.getDecoder().decode(Skin.STEVE_SKIN));
+                this.skin.setSkinData(skinData);
+                this.skin.setSkinId(modelId);
+                this.skin.setSkinBytes(skinData);
+            }
+
+            return;
+        }
+
+        this.protocol = this.protocol_ = this.getInt();
+
+        if(this.protocol < ProtocolInfo.v1_2_0){
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                byte gameEdition = (byte) this.getByte();
+            }
+            byte[] str;
+            try {
+                if(this.protocol < ProtocolInfo.v_0_16_0) {
+                    str = Zlib.inflate(this.get(this.getInt()), 64*1024*1024);//0.15
+                } else if(this.protocol < ProtocolInfo.v_1_0_0){
+                    str = Zlib.inflate(this.get((int) this.getUnsignedVarInt()));//0.16
+                } else {
+                    str = this.getByteArray();// 1.1.5
+                }
+            } catch (Exception e) {
+                return;
+            }
+            this.setBuffer(str, 0);
+            decodeChainData_old();
+            decodeSkinData_old();
+            return;
+        }
+
         if (this.protocol_ > ProtocolInfo.CURRENT_PROTOCOL + 1000) {
             int ofs = this.getOffset();
             this.setOffset(1);
@@ -68,6 +163,72 @@ public class LoginPacket extends DataPacket {
 
     public int getProtocol() {
         return protocol_;
+    }
+
+    private void decodeChainData_old() {
+        if (this.protocol < ProtocolInfo.v_0_16_0) {
+            Map<String, List<String>> map = new Gson().fromJson(new String(this.get(getLInt()), StandardCharsets.UTF_8),
+                    new TypeToken<Map<String, List<String>>>() {
+                    }.getType());
+            if (map.isEmpty() || !map.containsKey("chain") || map.get("chain").isEmpty()) return;
+            List<String> chains = map.get("chain");
+            for (String c : chains) {
+                JsonObject chainMap = decodeToken(c);
+                if (chainMap == null) continue;
+                if (chainMap.has("extraData")) {
+                    JsonObject extra = chainMap.get("extraData").getAsJsonObject();
+                    if (extra.has("displayName")) this.username = extra.get("displayName").getAsString();
+                    if (extra.has("identity")) this.clientUUID = UUID.fromString(extra.get("identity").getAsString());
+                }
+                if (chainMap.has("identityPublicKey"))
+                    this.identityPublicKey = chainMap.get("identityPublicKey").getAsString();
+            }
+        } else {
+            Map<String, List<String>> map = new Gson().fromJson(new String(this.get(getLInt()), StandardCharsets.UTF_8),
+                    new TypeToken<Map<String, List<String>>>() {
+                    }.getType());
+            if (map.isEmpty() || !map.containsKey("chain") || map.get("chain").isEmpty()) return;
+            List<String> chains = map.get("chain");
+            for (String c : chains) {
+                JsonObject chainMap = decodeToken(c);
+                if (chainMap == null) continue;
+                if (chainMap.has("extraData")) {
+                    JsonObject extra = chainMap.get("extraData").getAsJsonObject();
+                    if (extra.has("displayName")) this.username = extra.get("displayName").getAsString();
+                    if (extra.has("identity")) this.clientUUID = UUID.fromString(extra.get("identity").getAsString());
+                }
+                if (chainMap.has("identityPublicKey"))
+                    this.identityPublicKey = chainMap.get("identityPublicKey").getAsString();
+            }
+        }
+    }
+
+    private void decodeSkinData_old() {
+        int size = this.getLInt();
+        if(size > 3000000){
+            throw new IllegalArgumentException("The skin data is too big: " + size);
+        }
+        JsonObject skinToken = decodeToken_old(new String(this.get(size)));
+        if(skinToken == null) return;
+        String skinId = null;
+        if (skinToken.has("ClientRandomId")) this.clientId = skinToken.get("ClientRandomId").getAsLong();
+        if (skinToken.has("ServerAddress")) this.serverAddress = skinToken.get("ServerAddress").getAsString();
+        if (skinToken.has("SkinId")) skinId = skinToken.get("SkinId").getAsString();
+        if (skinToken.has("SkinData")) {
+            byte[] data = Base64.getDecoder().decode(skinToken.get("SkinData").getAsString());
+            this.skin = new Skin();
+            this.skin.setGeometryData(Skin.STEVE_GEOMETRY);
+            this.skin.setGeometryName("geometry.humanoid.custom");
+            this.skin.setSkinData(data);
+            this.skin.setSkinBytes(data);
+            this.skin.setSkinId(skinId);
+        }
+    }
+
+    private JsonObject decodeToken_old(String token) {
+        String[] base = token.split("\\.");
+        if (base.length < 2) return null;
+        return new Gson().fromJson(new String(Base64.getDecoder().decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
     }
 
     private void decodeChainData() {

@@ -482,6 +482,15 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
     }
 
+    private static final List<Item> creative20 = new ArrayList<>();
+    private static final List<Item> creative27 = new ArrayList<>();
+    private static final List<Item> creative34 = new ArrayList<>();
+    private static final List<Item> creative38 = new ArrayList<>();
+
+    private static final List<Item> creative70 = new ArrayList<>();
+    private static final List<Item> creative84 = new ArrayList<>();
+    private static final List<Item> creative90 = new ArrayList<>();
+
     private static final List<Item> creative113 = new ObjectArrayList<>();
     private static final List<Item> creative137 = new ObjectArrayList<>();
     private static final List<Item> creative274 = new ObjectArrayList<>();
@@ -525,6 +534,12 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
 
         // Creative inventory for oldest versions
+        registerCreativeItems(v_0_11_0);
+        registerCreativeItems(v_0_12_1);
+        registerCreativeItems(v_0_13_0);
+        registerCreativeItems(v_0_14_3);
+        registerCreativeItems(v_0_15_10);
+        registerCreativeItems(v_0_16_0);
         registerCreativeItems(v1_1_0);
         registerCreativeItems(v1_2_0);
         registerCreativeItems(v1_5_0);
@@ -604,6 +619,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void clearCreativeItems() {
+        Item.creative20.clear();
+        Item.creative27.clear();
+        Item.creative34.clear();
+        Item.creative38.clear();
+        Item.creative70.clear();
+        Item.creative84.clear();
+        Item.creative90.clear();
         Item.creative113.clear();
         Item.creative137.clear();
         Item.creative274.clear();
@@ -651,6 +673,26 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static ArrayList<Item> getCreativeItems(int protocol) {
         switch (protocol) {
+            case v_0_9_0:
+            case v_0_10_0:
+                return new ArrayList<>(Item.creative20);
+            case v_0_11_0:
+                return new ArrayList<>(Item.creative27);
+            case v_0_12_1:
+                return new ArrayList<>(Item.creative34);
+            case v_0_13_0:
+            case v_0_13_2:
+                return new ArrayList<>(Item.creative38);
+            case v_0_14_0:
+            case v_0_14_1:
+            case v_0_14_3:
+                return new ArrayList<>(Item.creative70);
+            case v_0_15_10:
+                return new ArrayList<>(Item.creative84);
+                //return new ArrayList<>(Item.creative84);
+            case v_0_16_0:
+            case v_0_16_1:
+                return new ArrayList<>(Item.creative90);
             case v1_1_0:
                 return new ArrayList<>(Item.creative113);
             case v1_2_0:
@@ -780,6 +822,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static void addCreativeItem(int protocol, Item item) {
         switch (protocol) { // NOTE: Not all versions are supposed to be here
+            case v_0_10_0 -> Item.creative20.add(item.clone());
+            case v_0_11_0 -> Item.creative27.add(item.clone());
+            case v_0_12_1 -> Item.creative34.add(item.clone());
+            case v_0_13_0 -> Item.creative38.add(item.clone());
+            case v_0_14_3 -> Item.creative70.add(item.clone());
+            case v_0_15_10 -> Item.creative84.add(item.clone());
+            case v_0_16_0 -> Item.creative90.add(item.clone());
             case v1_1_0 -> Item.creative113.add(item.clone());
             case v1_2_0 -> Item.creative137.add(item.clone());
             case v1_5_0 -> Item.creative274.add(item.clone());

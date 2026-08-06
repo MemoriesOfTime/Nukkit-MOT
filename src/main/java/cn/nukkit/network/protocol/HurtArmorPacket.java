@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -20,6 +21,12 @@ public class HurtArmorPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol <= ProtocolInfo.v_0_15_10){
+            this.tryReset();
+            this.putByte((byte) (damage & 0xff));
+            return;
+        }
+
         this.reset();
         if (protocol >= ProtocolInfo.v1_16_0) {
             this.putVarInt(this.cause);
@@ -32,6 +39,13 @@ public class HurtArmorPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.HURT_ARMOR_PACKET;
+        }
         return NETWORK_ID;
     }
 }

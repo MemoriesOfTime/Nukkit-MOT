@@ -9,6 +9,7 @@ import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 
@@ -77,7 +78,7 @@ public class EntityPufferfish extends EntityFish {
     @Override
     public boolean entityBaseTick(int tickDiff) {
         if (puffed == 0) {
-            if (this.getDataPropertyByte(DATA_PUFFERFISH_SIZE) == 2) {
+            if (this.getDataPropertyByte(ProtocolInfo.CURRENT_PROTOCOL,DATA_PUFFERFISH_SIZE) == 2) {
                 this.setDataProperty(new ByteEntityData(DATA_PUFFERFISH_SIZE, 0));
             }
         }

@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -13,6 +14,13 @@ public class MobEffectPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.MOB_EFFECT_PACKET;
+        }
         return NETWORK_ID;
     }
 
@@ -37,8 +45,22 @@ public class MobEffectPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol <= ProtocolInfo.v_0_15_10){
+            this.tryReset();
+            this.putLong(this.eid);
+            this.putByte((byte) this.eventId);
+            this.putByte((byte) this.effectId);
+            this.putByte((byte) this.amplifier);
+            this.putBoolean(particles);
+            this.putInt(this.duration);
+            return;
+        }
         this.reset();
-        this.putEntityRuntimeId(this.eid);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.eid);
+        }else{
+            this.putEntityUniqueId(this.eid);
+        }
         this.putByte((byte) this.eventId);
         this.putVarInt(this.effectId);
         this.putVarInt(this.amplifier);

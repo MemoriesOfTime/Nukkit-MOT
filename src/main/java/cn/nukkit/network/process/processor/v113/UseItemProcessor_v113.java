@@ -44,6 +44,7 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacketV113
             BlockFace face = BlockFace.fromIndex(useItemPacket.face);
             player.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, false);
 
+
             if (!player.canInteract(blockVector.add(0.5, 0.5, 0.5), player.isCreative() ? 13 : 7)) {
             } else if (player.isCreative()) {
                 Item i = player.getInventory().getItemInHand();

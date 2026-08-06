@@ -2,6 +2,7 @@ package cn.nukkit.network.protocol.v113;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * author: MagicDroidX
@@ -12,6 +13,9 @@ public class ContainerSetContentPacketV113 extends DataPacket_v113 {
 
     @Override
     public byte pid() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 
@@ -35,6 +39,22 @@ public class ContainerSetContentPacketV113 extends DataPacket_v113 {
 
     @Override
     public void decode() {
+        if(this.protocol <= ProtocolInfo.v_0_15_10){
+            this.windowid = this.getByte();
+            int count = this.getShort();
+            this.slots = new Item[count];
+            for (int s = 0; s < count && !this.feof(); ++s) {
+                this.slots[s] = this.getSlot_old(this.protocol);
+            }
+            if (this.windowid == SPECIAL_INVENTORY) {
+                count = this.getShort();
+                this.hotbar = new int[count];
+                for (int s = 0; s < count && !this.feof(); ++s) {
+                    this.hotbar[s] = this.getInt();
+                }
+            }
+            return;
+        }
         this.windowid = (int) this.getUnsignedVarInt();
         this.eid = this.getVarLong();
         int count = (int) this.getUnsignedVarInt();
@@ -53,6 +73,23 @@ public class ContainerSetContentPacketV113 extends DataPacket_v113 {
 
     @Override
     public void encode() {
+        if(this.protocol <= ProtocolInfo.v_0_15_10){
+            this.tryReset();
+            this.putByte((byte) this.windowid);
+            this.putShort(this.slots.length);
+            for (Item slot : this.slots) {
+                this.putSlot_old(this.protocol, slot);
+            }
+            if (this.windowid == SPECIAL_INVENTORY && this.hotbar.length > 0) {
+                this.putShort(this.hotbar.length);
+                for (int slot : this.hotbar) {
+                    this.putInt(slot);
+                }
+            } else {
+                this.putShort(0);
+            }
+            return;
+        }
         this.reset();
         this.putUnsignedVarInt(this.windowid);
         this.putVarLong(this.eid);

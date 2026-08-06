@@ -16,6 +16,7 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.AddItemEntityPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -331,7 +332,7 @@ public class EntityItem extends Entity {
     }
 
     @Override
-    public DataPacket createAddEntityPacket() {
+    public DataPacket createAddEntityPacket(int protocol) {
         AddItemEntityPacket addEntity = new AddItemEntityPacket();
         addEntity.entityUniqueId = this.getId();
         addEntity.entityRuntimeId = this.getId();
@@ -341,7 +342,7 @@ public class EntityItem extends Entity {
         addEntity.speedX = (float) this.motionX;
         addEntity.speedY = (float) this.motionY;
         addEntity.speedZ = (float) this.motionZ;
-        addEntity.metadata = this.dataProperties.clone();
+        addEntity.metadata = this.dataPropertiesController.getDataProperties(protocol).clone();
         addEntity.item = this.item;
         return addEntity;
     }
@@ -382,6 +383,7 @@ public class EntityItem extends Entity {
                 this.extinguish();
             } else if (!this.fireProof) {
                 this.setDataFlag(DATA_FLAGS, DATA_FLAG_ONFIRE, true);
+
                 hasUpdate = true;
             }
         }

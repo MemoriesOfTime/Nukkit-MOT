@@ -217,6 +217,38 @@ public class NBTIO {
         }
     }
 
+    public static byte[] write_old(CompoundTag tag) throws IOException {
+        return write(tag, ByteOrder.BIG_ENDIAN);
+    }
+
+    public static byte[] write_old(CompoundTag tag, ByteOrder endianness) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        NBTOutputStream stream = new NBTOutputStream(baos, endianness);
+        try {
+            Tag.writeNamedTag(tag, stream);
+            return baos.toByteArray();
+        } finally {
+            stream.close();
+        }
+    }
+
+    public static byte[] write_old(Collection<CompoundTag> tags) throws IOException {
+        return write(tags, ByteOrder.BIG_ENDIAN);
+    }
+
+    public static byte[] write_old(Collection<CompoundTag> tags, ByteOrder endianness) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        NBTOutputStream stream = new NBTOutputStream(baos, endianness);
+        try {
+            for (CompoundTag tag : tags) {
+                Tag.writeNamedTag(tag, stream);
+            }
+            return baos.toByteArray();
+        } finally {
+            stream.close();
+        }
+    }
+
     public static void write(CompoundTag tag, File file) throws IOException {
         write(tag, file, ByteOrder.BIG_ENDIAN);
     }

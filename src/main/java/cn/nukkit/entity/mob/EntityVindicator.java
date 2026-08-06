@@ -9,6 +9,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 
 import java.util.HashMap;
@@ -95,16 +96,18 @@ public class EntityVindicator extends EntityWalkingMob {
                     this.angry = true;
                     this.setDataFlag(DATA_FLAGS, DATA_FLAG_ANGRY, true); // show the axe
                 }
-                if (this.getDataPropertyLong(DATA_TARGET_EID) != this.followTarget.getId()) {
-                    this.setDataProperty(new LongEntityData(DATA_TARGET_EID, this.followTarget.getId())); // raise the axe
+                if (this.getDataPropertyLong(ProtocolInfo.CURRENT_PROTOCOL, DATA_TARGET_EID) != this.followTarget.getId()) {
+                    this.setDataProperty( new LongEntityData(DATA_TARGET_EID, this.followTarget.getId())); // raise the axe
                 }
             } else {
                 if (this.angry) {
                     this.angry = false;
                     this.setDataFlag(DATA_FLAGS, DATA_FLAG_ANGRY, false);
+                    // 0.14.3是否存在angry?
+
                 }
-                if (this.getDataPropertyLong(DATA_TARGET_EID) != 0) {
-                    this.setDataProperty(new LongEntityData(DATA_TARGET_EID, 0));
+                if (this.getDataPropertyLong(ProtocolInfo.CURRENT_PROTOCOL, DATA_TARGET_EID) != 0) {
+                    this.setDataProperty( new LongEntityData(DATA_TARGET_EID, 0));
                 }
             }
         }

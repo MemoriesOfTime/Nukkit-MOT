@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol.v113;
 
 import cn.nukkit.command.data.CommandArgs;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.gson.Gson;
 
 /**
@@ -35,6 +36,9 @@ public class CommandStepPacketV113 extends DataPacket_v113 {
 
     @Override
     public byte pid() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 
@@ -45,6 +49,9 @@ public class CommandStepPacketV113 extends DataPacket_v113 {
         this.uvarint1 = this.getUnsignedVarInt();
         this.currentStep = this.getUnsignedVarInt();
         this.done = this.getBoolean();
+//        if(this.protocol < ProtocolInfo.v_1_0_0) {
+//            this.uvarint64 = this.getUnsignedVarLong();
+//        }
         this.clientId = this.getVarLong();
         String argsString = this.getString();
         this.args = new Gson().fromJson(argsString, CommandArgs.class);

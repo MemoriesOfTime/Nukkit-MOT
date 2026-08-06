@@ -6,6 +6,7 @@ import cn.nukkit.entity.data.LongEntityData;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 public abstract class EntityTameableMob extends EntityWalkingMob implements EntityTameable {
 
@@ -73,7 +74,7 @@ public abstract class EntityTameableMob extends EntityWalkingMob implements Enti
     @Override
     public void setOwner(Player player) {
         this.owner = player;
-        this.setDataProperty(new LongEntityData(DATA_OWNER_EID, player.getId()));
+        this.setDataProperty( new LongEntityData(DATA_OWNER_EID, player.getId()));
         this.setTamed(true);
     }
 

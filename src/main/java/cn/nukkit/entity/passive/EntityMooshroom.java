@@ -10,6 +10,7 @@ import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
@@ -127,7 +128,7 @@ public class EntityMooshroom extends EntityWalkingAnimal {
     }
 
     public boolean isBrown() {
-        return this.getDataPropertyInt(DATA_VARIANT) == 1;
+        return this.getDataPropertyInt(ProtocolInfo.CURRENT_PROTOCOL,DATA_VARIANT) == 1;
     }
 
     public void setBrown(boolean brown) {

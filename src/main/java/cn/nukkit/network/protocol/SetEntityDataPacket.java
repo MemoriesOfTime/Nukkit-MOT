@@ -2,6 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.entity.data.EntityMetadata;
 import cn.nukkit.network.protocol.types.PropertySyncData;
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import cn.nukkit.utils.Binary;
 import lombok.ToString;
 
@@ -16,6 +17,13 @@ public class SetEntityDataPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.SET_ENTITY_DATA_PACKET;
+        }
         return NETWORK_ID;
     }
 
@@ -33,8 +41,31 @@ public class SetEntityDataPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putVarLong(this.eid);
+                this.put(Binary.writeMetadata_016(this.metadata));
+                return;
+            }
+            if(this.protocol > ProtocolInfo.v_0_10_0){
+                this.putLong(this.eid);
+            }else{
+                this.putInt((int) this.eid);
+            }
+
+            // 测试, 只发送默认metadata
+            // this.metadata = EntityMetadataController.getDefaultEntityMetadata(this.protocol);
+
+            this.put(Binary.writeMetadata_old(this.metadata));
+            return;
+        }
         this.reset();
-        this.putEntityRuntimeId(this.eid);
+        if (this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.eid);
+        }else{
+            this.putEntityUniqueId(this.eid);
+        }
         this.put(Binary.writeMetadata(protocol, this.metadata));
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (protocol >= ProtocolInfo.v1_19_40) {

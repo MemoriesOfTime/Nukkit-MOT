@@ -138,16 +138,39 @@ public class AdventureSettings implements Cloneable {
             player.dataPacket(adventurePacket);
         }else {
             AdventureSettingsPacket pk = new AdventureSettingsPacket();
-            for (Type t : Type.values()) {
-                if (t.getId() <= 0) {
-                    continue;
+            if(this.player.protocol < ProtocolInfo.v_1_0_0){
+                int flags = 0;
+                flags |= 0x02; // No PvP (Remove hit markers client-side).
+                flags |= 0x04; // No PvM (Remove hit markers client-side).
+                flags |= 0x08; // No PvE (Remove hit markers client-side).
+                if (!values.get(Type.BUILD)) {
+                    flags |= 0x01;
                 }
-                pk.setFlag(t.getId(), get(t));
-            }
+                if (values.get(Type.AUTO_JUMP)) {
+                    flags |= 0x40;
+                }
+                if (values.get(Type.ALLOW_FLIGHT)) {
+                    flags |= 0x80;
+                }
+                if (values.get(Type.NO_CLIP)) {
+                    flags |= 0x100;
+                }
+                pk.flags = flags;
+                pk.commandPermission = 0x2;
+                pk.playerPermission = 0x2;
+            }else{
+                for (Type t : Type.values()) {
+                    if (t.getId() <= 0) {
+                        continue;
+                    }
+                    pk.setFlag(t.getId(), get(t));
+                }
 
-            pk.commandPermission = (player.isOp() && player.showAdmin() ? AdventureSettingsPacket.PERMISSION_OPERATOR : AdventureSettingsPacket.PERMISSION_NORMAL);
-            pk.playerPermission = (player.isOp() && player.showAdmin() && !player.isSpectator() ? Player.PERMISSION_OPERATOR : Player.PERMISSION_MEMBER);
-            pk.entityUniqueId = player.getId();
+                pk.commandPermission = (player.isOp() && player.showAdmin() ? AdventureSettingsPacket.PERMISSION_OPERATOR : AdventureSettingsPacket.PERMISSION_NORMAL);
+                pk.userPermission = (player.isOp() ? PERMISSION_OPERATOR : PERMISSION_NORMAL);
+                pk.playerPermission = (player.isOp() && player.showAdmin() && !player.isSpectator() ? Player.PERMISSION_OPERATOR : Player.PERMISSION_MEMBER);
+                pk.entityUniqueId = player.getId();
+            }
 
             //Server.broadcastPacket(player.getViewers().values(), pk);
             player.dataPacket(pk);

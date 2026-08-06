@@ -68,9 +68,9 @@ public class EntityBoat extends EntityVehicle {
         if (this.namedTag.contains("Variant")) {
             this.woodID = this.namedTag.getInt("Variant");
         }
-        this.dataProperties.putInt(DATA_VARIANT, this.woodID);
-        this.dataProperties.putBoolean(DATA_IS_BUOYANT, true);
-        this.dataProperties.putString(DATA_BUOYANCY_DATA, "{\"apply_gravity\":true,\"base_buoyancy\":1.0,\"big_wave_probability\":0.02999999932944775,\"big_wave_speed\":10.0,\"drag_down_on_buoyancy_removed\":0.0,\"liquid_blocks\":[\"minecraft:water\",\"minecraft:flowing_water\"],\"simulate_waves\":true}");
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putInt(DATA_VARIANT, this.woodID);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putBoolean(DATA_IS_BUOYANT, true);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putString(DATA_BUOYANCY_DATA, "{\"apply_gravity\":true,\"base_buoyancy\":1.0,\"big_wave_probability\":0.02999999932944775,\"big_wave_speed\":10.0,\"drag_down_on_buoyancy_removed\":0.0,\"liquid_blocks\":[\"minecraft:water\",\"minecraft:flowing_water\"],\"simulate_waves\":true}");
     }
 
     @Override
@@ -340,12 +340,12 @@ public class EntityBoat extends EntityVehicle {
         if (entity.riding != null) {
             updatePassengers(true);
 
-            entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 1), !entity.isPlayer);
+            entity.setDataProperty( new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 1), !entity.isPlayer);
             if (entity.isPlayer) {
-                entity.setDataProperty(new FloatEntityData(DATA_RIDER_MAX_ROTATION, 90), false);
-                entity.setDataProperty(new FloatEntityData(DATA_RIDER_MIN_ROTATION, 1), false);
+                entity.setDataProperty( new FloatEntityData(DATA_RIDER_MAX_ROTATION, 90), false);
+                entity.setDataProperty( new FloatEntityData(DATA_RIDER_MIN_ROTATION, 1), false);
                 if (((Player) entity).protocol >= ProtocolInfo.v1_16_210) {
-                    entity.setDataProperty(new FloatEntityData(DATA_RIDER_ROTATION_OFFSET, -90), false);
+                    entity.setDataProperty( new FloatEntityData(DATA_RIDER_ROTATION_OFFSET, -90), false);
                 }
                 entity.sendData(((Player) entity));
             }
@@ -366,9 +366,9 @@ public class EntityBoat extends EntityVehicle {
         if (r) {
             updatePassengers();
             if (entity.isPlayer) {
-                entity.setDataPropertyAndSendOnlyToSelf(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 0));
+                entity.setDataPropertyAndSendOnlyToSelf(ProtocolInfo.CURRENT_PROTOCOL, new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 0));
             } else {
-                entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 0), true);
+                entity.setDataProperty( new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 0), true);
             }
         }
         return r;
@@ -397,8 +397,8 @@ public class EntityBoat extends EntityVehicle {
     public void onPaddle(AnimatePacket.Action animation, float value) {
         int propertyId = animation == AnimatePacket.Action.ROW_RIGHT ? DATA_PADDLE_TIME_RIGHT : DATA_PADDLE_TIME_LEFT;
 
-        if (getDataPropertyFloat(propertyId) != value) {
-            this.setDataProperty(new FloatEntityData(propertyId, value));
+        if (getDataPropertyFloat(ProtocolInfo.CURRENT_PROTOCOL, propertyId) != value) {
+            this.setDataProperty( new FloatEntityData(propertyId, value));
         }
     }
 
@@ -478,7 +478,7 @@ public class EntityBoat extends EntityVehicle {
 
     public void setVariant(int variant) {
         this.woodID = variant;
-        this.dataProperties.putInt(DATA_VARIANT, variant);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putInt(DATA_VARIANT, variant);
     }
 
     public void onInput(double x, double y, double z, double yaw) {

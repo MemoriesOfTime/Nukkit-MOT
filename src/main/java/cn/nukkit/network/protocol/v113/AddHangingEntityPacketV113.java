@@ -1,12 +1,16 @@
 package cn.nukkit.network.protocol.v113;
 
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class AddHangingEntityPacketV113 extends DataPacket_v113 {
     public static final byte NETWORK_ID = ProtocolInfoV113.ADD_HANGING_ENTITY_PACKET;
 
     @Override
     public byte pid() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 

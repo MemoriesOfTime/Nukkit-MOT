@@ -13,6 +13,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
@@ -78,8 +79,11 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
             this.broadcastLinkPacket(entity, TYPE_RIDE);
 
             entity.riding = this;
+
             entity.setDataFlag(DATA_FLAGS, DATA_FLAG_RIDING, true);
-            entity.setDataProperty(new Vector3fEntityData(DATA_RIDER_SEAT_POSITION, new Vector3f(0, this instanceof EntityDonkey ? 2.1f : 2.3f, 0)));
+
+            entity.setDataProperty( new Vector3fEntityData(DATA_RIDER_SEAT_POSITION, new Vector3f(0, this instanceof EntityDonkey ? 2.1f : 2.3f, 0)));
+
             this.passengers.add(entity);
         }
 

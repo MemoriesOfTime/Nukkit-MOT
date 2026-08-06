@@ -47,6 +47,23 @@ public class ResourcePacksInfoPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if (this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            this.putBoolean(this.mustAccept);
+            this.putShort(this.behaviourPackEntries.length);
+            for (ResourcePack entry : this.behaviourPackEntries) {
+                this.putString(entry.getPackId().toString());// 不保证奏效，0.16 版本 需要进行更改
+                this.putString(entry.getPackVersion());
+                this.putLong(entry.getPackSize());
+            }
+            this.putShort(this.resourcePackEntries.length);
+            for (ResourcePack entry : this.resourcePackEntries) {
+                this.putString(entry.getPackId().toString());// 不保证奏效，0.16 版本 需要进行更改
+                this.putString(entry.getPackVersion());
+                this.putLong(entry.getPackSize());
+            }
+            return;
+        }
         this.reset();
         this.putBoolean(this.mustAccept);
         if (this.protocol >= ProtocolInfo.v1_20_70) {
@@ -90,9 +107,11 @@ public class ResourcePacksInfoPacket extends DataPacket {
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
             this.putString(entry.getEncryptionKey());
-            this.putString(entry.getSubPackName());
-            this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
-            this.putBoolean(entry.usesScripting());
+            if(this.protocol >= ProtocolInfo.v1_2_0){
+                this.putString(entry.getSubPackName());
+                this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
+                this.putBoolean(entry.usesScripting());
+            }
         }
     }
 
@@ -130,6 +149,11 @@ public class ResourcePacksInfoPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_16_0).get(ResourcePacksInfoPacket.class);
+        }
         return NETWORK_ID;
     }
 

@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.generic.serializer;
 
+import cn.nukkit.Server;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntitySpawnable;
 import cn.nukkit.level.DimensionData;
@@ -8,19 +9,21 @@ import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.utils.ThreadCache;
+import cn.nukkit.utils.*;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -42,8 +45,15 @@ public class NetworkChunkSerializer {
         negativeSubChunks = stream.getBuffer();
     }
 
-    public static void serialize(IntSet protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback, boolean antiXray, DimensionData dimensionData) {
+    public static void serialize(IntSet protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback,
+            boolean antiXray, DimensionData dimensionData) {
         for (int protocolId : protocols) {
+            // 0.11 ~ 1.0.0
+            if (protocolId <= ProtocolInfo.v_1_0_0) {
+                serialize_011___100(protocolId, chunk, callback, antiXray, dimensionData);
+                continue;
+            }
+
             byte[] blockEntities;
             if (chunk.getBlockEntities().isEmpty()) {
                 blockEntities = new byte[0];
@@ -52,6 +62,7 @@ public class NetworkChunkSerializer {
             }
 
             int subChunkCount = 0;
+            // 如果某一高度的区块存在, 那么它下面的所有区块都一定存在
             ChunkSection[] sections = chunk.getSections();
             for (int i = sections.length - 1; i >= 0; i--) {
                 if (!sections[i].isEmpty()) {
@@ -61,7 +72,8 @@ public class NetworkChunkSerializer {
             }
 
             BinaryStream stream = ThreadCache.binaryStream.get().reset();
-            NetworkChunkData networkChunkData = new NetworkChunkData(protocolId, subChunkCount, antiXray, dimensionData);
+            NetworkChunkData networkChunkData = new NetworkChunkData(protocolId, subChunkCount, antiXray,
+                    dimensionData);
             if (protocolId >= ProtocolInfo.v1_18_30) {
                 serialize1_18_30(stream, chunk, sections, networkChunkData);
             } else if (protocolId >= ProtocolInfo.v1_18_0) {
@@ -102,11 +114,177 @@ public class NetworkChunkSerializer {
             }
             stream.put(blockEntities);
 
-            callback.accept(new NetworkChunkSerializerCallback(protocolId, stream, networkChunkData.getChunkSections()));
+            callback.accept(
+                    new NetworkChunkSerializerCallback(protocolId, stream, networkChunkData.getChunkSections()));
         }
     }
 
-    private static void serialize1_18_30(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData) {
+    public static void serialize_011___100(int protocolId, BaseChunk chunk,
+            Consumer<NetworkChunkSerializerCallback> callback, boolean antiXray, DimensionData dimensionData) {
+        if (chunk == null) {
+            throw new ChunkException("Invalid Chunk sent");
+        }
+
+        byte[] blockEntities;
+        if (chunk.getBlockEntities().isEmpty()) {
+            blockEntities = new byte[0];
+        } else {
+            blockEntities = serializeEntities(chunk, protocolId);
+        }
+
+        int subChunkCount = 0;
+        ChunkSection[] sections = chunk.getSections();
+        for (int i = sections.length - 1; i >= 0; i--) {
+            if (!sections[i].isEmpty()) {
+                subChunkCount = i + 1;
+                break;
+            }
+        }
+
+        NetworkChunkData networkChunkData = new NetworkChunkData(protocolId, subChunkCount, antiXray, dimensionData);
+        subChunkCount = Math.max(1, subChunkCount - chunk.getSectionOffset());
+        networkChunkData.setChunkSections(subChunkCount);
+
+        BinaryStream stream = ThreadCache.binaryStream.get().reset();
+
+        int SECTION_COUNT_014 = 8;
+        ByteBuffer blockIdArray = ByteBuffer.allocate(4096 * SECTION_COUNT_014);
+        ByteBuffer blockDataArray = ByteBuffer.allocate(2048 * SECTION_COUNT_014);
+        ByteBuffer blockSkyLightArray = ByteBuffer.allocate(2048 * SECTION_COUNT_014);
+        ByteBuffer blockLightArray = ByteBuffer.allocate(2048 * SECTION_COUNT_014);
+
+        int offset = chunk.getSectionOffset();
+        byte[] orderBlockIds = new byte[4096];
+        byte[] orderBlockData = new byte[2048];
+        byte[] orderBlockSkyLight = new byte[2048];
+        byte[] orderBlockLight = new byte[2048];
+
+        Arrays.fill(orderBlockLight, (byte) 0xff);
+
+        // leveldb 转为 anvil
+        LevelDBChunkSection section;
+        for (int i = offset; i < subChunkCount + offset; ++i) {
+            section = (LevelDBChunkSection) sections[i];
+            byte[] dbBlockIds = section.getSectionBlockIds();
+            byte[] dbBlockData = section.getSectionBlockData();
+            byte[] dbBlockSkyLight = section.getSkyLightArray();
+            byte[] dbBlockLight = section.getLightArray();
+
+            // 转换leveldb的 xzy 为 anvil的 yzx
+            for (int posY = 0; posY < 16; ++posY) {
+                for (int posX = 0; posX < 16; ++posX) {
+                    for (int posZ = 0; posZ < 16; ++posZ) {
+                        if (dbBlockIds[(posX << 8) | (posZ << 4) | posY] > 200 && protocolId >= ProtocolInfo.v_0_14_3) {
+                            orderBlockIds[(posY << 8) + (posZ << 4) + posX] = 0;
+                        } else {
+                            orderBlockIds[(posY << 8) + (posZ << 4) + posX] = dbBlockIds[(posX << 8) | (posZ << 4)
+                                    | posY];
+                        }
+                        
+                        int anvilIndex = (posY << 7) + (posZ << 3) + (posX >> 1);
+                        int dbsl = dbBlockSkyLight[anvilIndex] & 0xff;
+                        int dbl = dbBlockLight[anvilIndex] & 0xff;
+                        if ((posX & 1) == 0) {
+                            dbsl = dbsl & 0x0f;
+                            dbl = dbl & 0x0f;
+                        } else {
+                            dbsl = dbsl >> 4;
+                            dbl = dbl >> 4;
+                        }
+                        orderBlockData[anvilIndex] = dbBlockData[((posX << 8) | (posZ << 4) | posY) >> 1];
+                        orderBlockSkyLight[anvilIndex] = (byte) (dbsl & 0xff);
+                        // orderBlockLight[anvilIndex] = (byte) (dbl & 0xff);
+                    }
+                }
+            }
+            blockIdArray.put(orderBlockIds);
+            blockDataArray.put(orderBlockData);
+            blockSkyLightArray.put(orderBlockSkyLight);
+            blockLightArray.put(orderBlockLight);
+        }
+
+        byte[] targetBlockIds ,targetBlockData, targetBlockSkyLight,targetBlockLight;
+        // 0.11 将mca转为mcr
+        if (protocolId <= ProtocolInfo.v_0_11_0) {
+            targetBlockIds = mca_to_mcr_blockIds(blockIdArray.array());
+            targetBlockData = mca_to_mcr_blockData(blockDataArray.array());
+            targetBlockSkyLight = mca_to_mcr_blockData(blockDataArray.array());
+            targetBlockLight = mca_to_mcr_blockData(blockDataArray.array());
+        }else{
+            targetBlockIds = blockIdArray.array();
+            targetBlockData = blockDataArray.array();
+            targetBlockSkyLight = blockSkyLightArray.array();
+            targetBlockLight = blockLightArray.array();
+        }
+
+        if(protocolId <= ProtocolInfo.v_0_10_0){
+            stream.put(Binary.writeLInt(chunk.getX()));
+            stream.put(Binary.writeLInt(chunk.getZ()));
+        }
+
+        stream.put(targetBlockIds);
+        stream.put(targetBlockData);
+        stream.put(targetBlockSkyLight);
+        stream.put(targetBlockLight);
+
+        // 三种颜色
+        // 0x6a7039 swamp (正常?)
+        // 0x000000 normal (黑色)
+        // -3394765 hell (红色)
+        // biome color
+        int[] biomeColors = new int[256];
+        Arrays.fill(biomeColors, Binary.readInt(new byte[] { (byte) 0xff, (byte) 0x00, (byte) 0x00, (byte) 0x00 }));
+        final int _color_ = 0x6a7039;
+        for (int x = 0; x < 16; ++x) {
+            for (int z = 0; z < 16; ++z) {
+                int R = (_color_ >> 16);
+                int G = (_color_ >> 8) & 0xff;
+                int B = (_color_ & 0xff);
+                biomeColors[(z << 4) + x] = (biomeColors[(z << 4) + x] & 0xFF000000) | ((R & 0xFF) << 16)
+                        | ((G & 0xFF) << 8) | (B & 0XFF);
+            }
+        }
+
+        if(protocolId >= ProtocolInfo.v_0_11_0){
+            // height map
+            for (byte height : chunk.getHeightMapArray()) {
+                stream.putByte(height);
+            }
+        }else{
+            // biome id
+            byte[] biomeid = new byte[2048];
+            for (int i = 0; i < biomeColors.length; i++) {
+                int d = biomeColors[i];
+                biomeid[i] = (byte) ((d & 0xFF000000) >> 24);
+            }
+            stream.put(biomeid);
+        }
+
+        for (int color : biomeColors) {
+            stream.put(Binary.writeInt(color));
+        }
+
+        // There is no extra data anymore but idk when it was removed
+        if (protocolId > ProtocolInfo.v_0_11_0) {
+            stream.putInt(0);// 0.11没有
+        }
+
+        stream.put(blockEntities);
+
+        if(protocolId <= ProtocolInfo.v_0_10_0){
+            try {
+                stream.setBuffer(Zlib.deflate(stream.getBuffer(), Server.getInstance().networkCompressionLevel));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        callback.accept(new NetworkChunkSerializerCallback(protocolId, stream, networkChunkData.getChunkSections()));
+        return;
+    }
+
+    private static void serialize1_18_30(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections,
+            NetworkChunkData chunkData) {
         DimensionData dimensionData = chunkData.getDimensionData();
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
@@ -131,7 +309,8 @@ public class NetworkChunkSerializer {
         chunkData.setChunkSections(writtenSections);
     }
 
-    private static void serialize1_18_0(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData) {
+    private static void serialize1_18_0(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections,
+            NetworkChunkData chunkData) {
         DimensionData dimensionData = chunkData.getDimensionData();
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
@@ -181,6 +360,9 @@ public class NetworkChunkSerializer {
         }
 
         try {
+            if (protocol <= ProtocolInfo.v_0_14_3) {
+                return NBTIO.write_old(tagList, ByteOrder.LITTLE_ENDIAN);
+            }
             return NBTIO.write(tagList, ByteOrder.LITTLE_ENDIAN, true);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -188,7 +370,8 @@ public class NetworkChunkSerializer {
     }
 
     private static byte[] convert2DBiomesTo3D(int protocolId, BaseFullChunk chunk, int sections) {
-        PalettedBlockStorage palette = PalettedBlockStorage.createWithDefaultState(Biome.getBiomeIdOrCorrect(protocolId, chunk.getBiomeId(0, 0)));
+        PalettedBlockStorage palette = PalettedBlockStorage
+                .createWithDefaultState(Biome.getBiomeIdOrCorrect(protocolId, chunk.getBiomeId(0, 0)));
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = 0; y < 16; y++) {
@@ -225,5 +408,59 @@ public class NetworkChunkSerializer {
         private int z;
         private int subChunkCount;
         private byte[] payload;
+    }
+
+    /**
+     * @param anvilBlockIds
+     * @return
+     */
+    public static byte[] mca_to_mcr_blockIds(byte[] anvilBlockIds){
+        // anvil划分子区块，子区块与子区块之间堆叠起来，由于旧版y最大为128，因此划分为8个子区块
+        // mcr不会划分子区块
+        byte[] mcrBlockIds = new byte[16 * 16 * 128];
+        for(int y = 0;y<128;++y){
+            // 这里最好优化一下
+            byte[] section_y = Binary.subBytes(anvilBlockIds, (y >> 4) * 4096, 4096);
+            for(int x=0;x<16;++x){
+                for(int z=0;z<16;++z){
+                    // mcr采用 (x << 11) | (z << 7) | y， 而anvil采用 (y << 8) + (z << 4) + x
+                    mcrBlockIds[(x << 11) | (z << 7) | y] = (byte) (section_y[((y % 16) << 8) + (z << 4) + x] & 0xff);
+                }
+            }
+        }
+
+        return mcrBlockIds;
+    }
+
+    /**
+     * @param anvilBlockData
+     * @return
+     */
+    public static byte[] mca_to_mcr_blockData(byte[] anvilBlockData) {
+        // anvil划分子区块，子区块与子区块之间堆叠起来，由于旧版y最大为128，因此划分为8个子区块
+        // mcr不会划分子区块
+        byte[] mcrBlockIds = new byte[16 * 16 * 64];
+        for(int x=0;x<16;x++){
+            if ((x & 1) == 0) {
+                for(int y = 0;y<128;y+=2){
+                    // 这里最好优化一下
+                    byte[] section_y = Binary.subBytes(anvilBlockData, (y >> 4) * 2048, 2048);
+                    for(int z=0;z<16;z++){
+                        // mcr采用 (x << 11) | (z << 7) | y， 而anvil采用 (y << 8) + (z << 4) + x
+                        mcrBlockIds[((x << 10) | (z << 6) | (y << 1))/2] = (byte) ((section_y[((y % 16) << 7) + (z << 3) + (x >> 1)] & 0xff ) & 0x0f);
+                    }
+                }
+            } else {
+                for(int y = 0;y<128;y+=2){
+                    // 这里最好优化一下
+                    byte[] section_y = Binary.subBytes(anvilBlockData, (y >> 4) * 2048, 2048);
+                    for(int z=0;z<16;z++){
+                        // mcr采用 (x << 11) | (z << 7) | y， 而anvil采用 (y << 8) + (z << 4) + x
+                        mcrBlockIds[((x << 10) | (z << 6) | (y << 1))/2] = (byte) ((((section_y[((y % 16) << 7) + (z << 3) + (x >> 1)] & 0xff) & 0xf0) & 0xff) >> 4);
+                    }
+                }
+            }
+        }
+        return mcrBlockIds;
     }
 }

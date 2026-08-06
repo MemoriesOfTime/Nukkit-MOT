@@ -443,6 +443,16 @@ public class Utils {
      */
     public static String getVersionByProtocol(int protocol) {
         return switch (protocol) {
+            case ProtocolInfo.v_0_9_0 -> "0.9.0";
+            case ProtocolInfo.v_0_9_5 -> "0.9.5";
+            case ProtocolInfo.v_0_10_0 -> "0.10.0";
+            case ProtocolInfo.v_0_11_0 -> "0.11.0";
+            case ProtocolInfo.v_0_12_1 -> "0.12.1";
+            case ProtocolInfo.v_0_13_0 -> "0.13.0";
+            case ProtocolInfo.v_0_13_2 -> "0.13.2";
+            case ProtocolInfo.v_0_14_3 -> "0.14.3";
+            case ProtocolInfo.v_0_15_10 -> "0.15.10";
+            case ProtocolInfo.v_0_16_0 -> "0.16.0";
             case ProtocolInfo.v1_1_0 -> "1.1.0";
             case ProtocolInfo.v1_2_0 -> "1.2.0";
             case ProtocolInfo.v1_2_5_11, ProtocolInfo.v1_2_5 -> "1.2.5";

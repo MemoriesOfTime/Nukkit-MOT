@@ -26,6 +26,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 
 import java.util.Collection;
@@ -275,7 +276,7 @@ public class EntityFishingHook extends EntitySlenderProjectile {
     }
 
     @Override
-    protected DataPacket createAddEntityPacket() {
+    protected DataPacket createAddEntityPacket(int protocol) {
         AddEntityPacket pk = new AddEntityPacket();
         pk.entityRuntimeId = this.getId();
         pk.entityUniqueId = this.getId();
@@ -293,7 +294,7 @@ public class EntityFishingHook extends EntitySlenderProjectile {
         if (this.shootingEntity != null) {
             ownerId = this.shootingEntity.getId();
         }
-        pk.metadata = this.dataProperties.putLong(DATA_OWNER_EID, ownerId).clone();
+        pk.metadata = this.dataPropertiesController.getDataProperties(protocol).putLong(DATA_OWNER_EID, ownerId).clone();
         return pk;
     }
 

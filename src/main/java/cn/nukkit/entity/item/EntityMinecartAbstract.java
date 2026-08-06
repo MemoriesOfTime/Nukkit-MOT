@@ -23,6 +23,7 @@ import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.MinecartType;
 import cn.nukkit.utils.Rail;
 import cn.nukkit.utils.Rail.Orientation;
@@ -748,26 +749,26 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             if (namedTag.getBoolean("CustomDisplayTile")) {
                 int display = namedTag.getInt("DisplayTile");
                 int offSet = namedTag.getInt("DisplayOffset");
-                setDataProperty(new ByteEntityData(DATA_HAS_DISPLAY, 1));
-                setDataProperty(new IntEntityData(DATA_DISPLAY_ITEM, display));
-                setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, offSet));
+                setDataProperty( new ByteEntityData(DATA_HAS_DISPLAY, 1));
+                setDataProperty( new IntEntityData(DATA_DISPLAY_ITEM, display));
+                setDataProperty( new IntEntityData(DATA_DISPLAY_OFFSET, offSet));
             }
         } else {
             int display = blockInside == null ? 0
                     : blockInside.getId()
                     | blockInside.getDamage() << 16;
             if (display == 0) {
-                setDataProperty(new ByteEntityData(DATA_HAS_DISPLAY, 0));
+                setDataProperty( new ByteEntityData(DATA_HAS_DISPLAY, 0));
                 return;
             }
-            setDataProperty(new ByteEntityData(DATA_HAS_DISPLAY, 1));
-            setDataProperty(new IntEntityData(DATA_DISPLAY_ITEM, display));
-            setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, 6));
+            setDataProperty( new ByteEntityData(DATA_HAS_DISPLAY, 1));
+            setDataProperty( new IntEntityData(DATA_DISPLAY_ITEM, display));
+            setDataProperty( new IntEntityData(DATA_DISPLAY_OFFSET, 6));
         }
     }
 
     private void saveEntityData() {
-        boolean hasDisplay = super.getDataPropertyByte(DATA_HAS_DISPLAY) == 1
+        boolean hasDisplay = super.getDataPropertyByte(ProtocolInfo.CURRENT_PROTOCOL, DATA_HAS_DISPLAY) == 1
                 || blockInside != null;
         int display;
         int offSet;
@@ -775,7 +776,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         if (hasDisplay) {
             display = blockInside.getId()
                     | blockInside.getDamage() << 16;
-            offSet = getDataPropertyInt(DATA_DISPLAY_OFFSET);
+            offSet = getDataPropertyInt(ProtocolInfo.CURRENT_PROTOCOL, DATA_DISPLAY_OFFSET);
             namedTag.putInt("DisplayTile", display);
             namedTag.putInt("DisplayOffset", offSet);
         }
@@ -841,7 +842,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @param offset The offset
      */
     public void setDisplayBlockOffset(int offset) {
-        setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, offset));
+        setDataProperty( new IntEntityData(DATA_DISPLAY_OFFSET, offset));
     }
 
     /**
@@ -850,7 +851,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @return integer
      */
     public int getDisplayBlockOffset() {
-        return super.getDataPropertyInt(DATA_DISPLAY_OFFSET);
+        return super.getDataPropertyInt(ProtocolInfo.CURRENT_PROTOCOL, DATA_DISPLAY_OFFSET);
     }
 
     /**

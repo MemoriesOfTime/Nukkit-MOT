@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -19,11 +20,30 @@ public class BlockEntityDataPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.BLOCK_ENTITY_DATA_PACKET;
+        }
         return NETWORK_ID;
     }
 
     @Override
     public void decode() {
+        if(this.protocol <= ProtocolInfo.v_0_15_10){
+            this.x = this.getInt();
+            if(this.protocol <= ProtocolInfo.v_0_11_0){
+                this.y = this.getByte();
+            }else{
+                this.y = this.getInt();
+            }
+            this.z = this.getInt();
+            this.namedTag = this.get();
+            return;
+        }
+
         BlockVector3 v = this.getBlockVector3();
         this.x = v.x;
         this.y = v.y;
@@ -33,6 +53,23 @@ public class BlockEntityDataPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putBlockVector3(this.x, this.y, this.z);
+                this.put(this.namedTag);
+                return;
+            }
+            this.putInt(this.x);
+            if(this.protocol <= ProtocolInfo.v_0_11_0){
+                this.putByte((byte)(this.y & 0xff));
+            }else{
+                this.putInt(this.y);
+            }
+            this.putInt(this.z);
+            this.put(this.namedTag);
+            return;
+        }
         this.reset();
         this.putBlockVector3(this.x, this.y, this.z);
         this.put(this.namedTag);

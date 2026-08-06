@@ -11,6 +11,7 @@ import cn.nukkit.event.vehicle.VehicleDamageEvent;
 import cn.nukkit.event.vehicle.VehicleDestroyEvent;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * @author MagicDroidX
@@ -32,7 +33,7 @@ public abstract class EntityVehicle extends Entity implements EntityRideable, En
 
     public void setRollingAmplitude(int time) {
         this.hurtTime = time;
-        this.setDataProperty(new IntEntityData(DATA_HURT_TIME, time));
+        this.setDataProperty( new IntEntityData(DATA_HURT_TIME, time));
     }
 
     public int getRollingDirection() {
@@ -41,7 +42,7 @@ public abstract class EntityVehicle extends Entity implements EntityRideable, En
 
     public void setRollingDirection(int direction) {
         this.hurtDirection = direction;
-        this.setDataProperty(new IntEntityData(DATA_HURT_DIRECTION, direction));
+        this.setDataProperty( new IntEntityData(DATA_HURT_DIRECTION, direction));
     }
 
     public int getDamage() {
@@ -50,7 +51,7 @@ public abstract class EntityVehicle extends Entity implements EntityRideable, En
 
     public void setDamage(int damage) {
         this.damage = damage;
-        this.setDataProperty(new IntEntityData(DATA_HEALTH, damage)); // false data name (should be DATA_DAMAGE_TAKEN)
+        this.setDataProperty( new IntEntityData(DATA_HEALTH, damage)); // false data name (should be DATA_DAMAGE_TAKEN)
     }
 
     @Override

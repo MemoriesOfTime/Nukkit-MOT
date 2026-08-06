@@ -14,6 +14,7 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
@@ -105,7 +106,7 @@ public class EntityFirework extends Entity {
 
         if (this.isAlive()) {
 
-            Vector3f dir = getDataPropertyVector3f(DATA_FIREWORK_DIRECTION);
+            Vector3f dir = getDataPropertyVector3f(ProtocolInfo.CURRENT_PROTOCOL,DATA_FIREWORK_DIRECTION);
             this.motionX = this.motionX * 1.05 + dir.x * 0.03;
             this.motionY = this.motionY * 1.05 + dir.y * 0.03;
             this.motionZ = this.motionZ * 1.05 + dir.z * 0.03;
@@ -152,7 +153,7 @@ public class EntityFirework extends Entity {
 
     public void setFirework(Item item) {
         this.firework = item;
-        this.setDataProperty(new NBTEntityData(Entity.DATA_DISPLAY_ITEM, firework));
+        this.setDataProperty( new NBTEntityData(Entity.DATA_DISPLAY_ITEM, firework));
         int flight = Math.max(1, this.firework instanceof ItemFirework ? ((ItemFirework) this.firework).getFlight() : 1);
         ThreadLocalRandom threadLocalRandom = ThreadLocalRandom.current();
         this.lifetime = 10 * (flight + 1) + threadLocalRandom.nextInt(5) + threadLocalRandom.nextInt(6);

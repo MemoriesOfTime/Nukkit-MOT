@@ -9,6 +9,11 @@ public class PlayStatusPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 
@@ -31,6 +36,11 @@ public class PlayStatusPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol <= ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            this.putInt(this.status);
+            return;
+        }
         this.reset();
         this.putInt(this.status);
     }

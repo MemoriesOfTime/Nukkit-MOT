@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
@@ -40,6 +41,20 @@ public class ChangeDimensionPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putVarInt(this.dimension);
+                this.putVector3f(this.x, this.y, this.z);
+                this.putBoolean(this.respawn);
+                return;
+            }
+            this.putByte((byte) (dimension & 0xff));
+            this.putFloat(x);
+            this.putFloat(y);
+            this.putFloat(z);
+            this.putByte((byte) 0);
+            return;
+        }
         this.reset();
         this.putVarInt(this.dimension);
         this.putVector3f(this.x, this.y, this.z);
@@ -51,6 +66,13 @@ public class ChangeDimensionPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.CHANGE_DIMENSION_PACKET;
+        }
         return NETWORK_ID;
     }
 }

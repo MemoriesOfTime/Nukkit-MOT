@@ -795,6 +795,7 @@ public class Server {
             Level level = entry.getValue();
             this.getLogger().debug("Preparing spawn region for level " + level.getName());
             Position spawn = level.getSpawnLocation();
+            // 填充区块
             level.populateChunk(spawn.getChunkX(), spawn.getChunkZ(), true);
         }
 
@@ -1230,7 +1231,7 @@ public class Server {
 
     public void onPlayerCompleteLoginSequence(Player player) {
         this.playerList.put(player.getUniqueId(), player);
-        this.updatePlayerListData(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin(), player.getLoginChainData().getXUID());
+        this.updatePlayerListData(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin(), player.protocol <= ProtocolInfo.v_1_0_0 ? "" :  player.getLoginChainData().getXUID());
     }
 
     public void addPlayer(InetSocketAddress socketAddress, Player player) {
@@ -1239,7 +1240,12 @@ public class Server {
 
     public void addOnlinePlayer(Player player) {
         this.playerList.put(player.getUniqueId(), player);
-        this.updatePlayerListData(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin(), player.getLoginChainData().getXUID());
+        this.updatePlayerListData(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin(), player.protocol <= ProtocolInfo.v_1_0_0 ? "" : player.getLoginChainData().getXUID());
+    }
+
+    public void addOnlinePlayer_old(Player player) {
+        this.playerList.put(player.getUniqueId(), player);
+        this.updatePlayerListData(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin());
     }
 
     public void removeOnlinePlayer(Player player) {
@@ -1305,14 +1311,28 @@ public class Server {
     }
 
     public void sendFullPlayerListData(Player player) {
-        PlayerListPacket.Entry[] array = this.playerList.values().stream()
+        PlayerListPacket.Entry[] array = this.playerList
+                .values()
+                .stream()
                 .map(p -> new PlayerListPacket.Entry(
                         p.getUniqueId(),
                         p.getId(),
                         p.getDisplayName(),
                         p.getSkin(),
-                        p.getLoginChainData().getXUID()))
+                        p.protocol <= ProtocolInfo.v_1_0_0 ? "" : p.getLoginChainData().getXUID()))
                 .toArray(PlayerListPacket.Entry[]::new);
+
+        if(player.protocol <= ProtocolInfo.v_1_0_0){
+            if(player.protocol <= ProtocolInfo.v_0_11_0) {
+                return;
+            }
+            PlayerListPacket pk = new PlayerListPacket();
+            pk.type = PlayerListPacket.TYPE_ADD;
+            pk.entries = array;
+            player.dataPacket(pk);
+            return;
+        }
+
         Object[][] splitArray = Utils.splitArray(array, 50);
         if (splitArray != null) {
             for (Object[] a : splitArray) {
@@ -3109,7 +3129,7 @@ public class Server {
             }
         }
 
-        this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
+        this.xboxAuth = this.getPropertyBoolean("xbox-auth", false);
         this.bedSpawnpoints = this.getPropertyBoolean("bed-spawnpoints", true);
         this.achievementsEnabled = this.getPropertyBoolean("achievements", true);
         this.banXBAuthFailed = this.getPropertyBoolean("temp-ip-ban-failed-xbox-auth", false);

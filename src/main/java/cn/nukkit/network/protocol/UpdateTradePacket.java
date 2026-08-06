@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 @ToString
@@ -22,6 +23,9 @@ public class UpdateTradePacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.UPDATE_TRADE_PACKET;
+        }
         return NETWORK_ID;
     }
 
@@ -31,7 +35,9 @@ public class UpdateTradePacket extends DataPacket {
 
     @Override
     public void encode() {
-        this.reset();
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.reset();
+        }
         this.putByte(windowId);
         this.putByte(windowType);
         this.putVarInt(size);
@@ -44,8 +50,13 @@ public class UpdateTradePacket extends DataPacket {
         } else {
             this.putVarInt(tradeTier);
         }
-        this.putEntityUniqueId(traderUniqueEntityId);
-        this.putEntityUniqueId(playerUniqueEntityId);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityUniqueId(traderUniqueEntityId);
+            this.putEntityUniqueId(playerUniqueEntityId);
+        }else{
+            this.putEntityUniqueId(playerUniqueEntityId);
+            this.putEntityUniqueId(traderUniqueEntityId);
+        }
         this.putString(displayName);
         if (protocol >= 354) {
             this.putBoolean(newTradingUi);

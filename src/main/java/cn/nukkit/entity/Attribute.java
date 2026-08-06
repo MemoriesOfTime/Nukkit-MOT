@@ -39,12 +39,14 @@ public class Attribute implements Cloneable {
     protected float defaultValue;
     protected float currentValue;
     protected String name;
+    protected String oldName;// 0.14.3 之前的名称
     protected boolean shouldSend;
     private int id;
 
-    private Attribute(int id, String name, float minValue, float maxValue, float defaultValue, boolean shouldSend) {
+    private Attribute(int id, String name, String oldName, float minValue, float maxValue, float defaultValue, boolean shouldSend) {
         this.id = id;
         this.name = name;
+        this.oldName = oldName;
         this.minValue = minValue;
         this.maxValue = maxValue;
         this.defaultValue = defaultValue;
@@ -53,35 +55,35 @@ public class Attribute implements Cloneable {
     }
 
     public static void init() {
-        addAttribute(ABSORPTION, "minecraft:absorption", 0.00f, 340282346638528859811704183484516925440.00f, 0.00f);
-        addAttribute(SATURATION, "minecraft:player.saturation", 0.00f, 20.00f, 5.00f);
-        addAttribute(EXHAUSTION, "minecraft:player.exhaustion", 0.00f, 5.00f, 0.00f, false);
-        addAttribute(KNOCKBACK_RESISTANCE, "minecraft:knockback_resistance", 0.00f, 1.00f, 0.00f);
-        addAttribute(MAX_HEALTH, "minecraft:health", 0.00f, 20.00f, 20.00f);
-        addAttribute(MOVEMENT_SPEED, "minecraft:movement", 0.00f, 340282346638528859811704183484516925440.00f, 0.10f);
-        addAttribute(FOLLOW_RANGE, "minecraft:follow_range", 0.00f, 2048.00f, 16.00f, false);
-        addAttribute(MAX_HUNGER, "minecraft:player.hunger", 0.00f, 20.00f, 20.00f);
-        addAttribute(ATTACK_DAMAGE, "minecraft:attack_damage", 0.00f, 340282346638528859811704183484516925440.00f, 1.00f, false);
-        addAttribute(EXPERIENCE_LEVEL, "minecraft:player.level", 0.00f, 24791.00f, 0.00f);
-        addAttribute(EXPERIENCE, "minecraft:player.experience", 0.00f, 1.00f, 0.00f);
-        addAttribute(UNDERWATER_MOVEMENT, "minecraft:underwater_movement", 0.0f, 340282346638528859811704183484516925440.0f, 0.02f);
-        addAttribute(LUCK, "minecraft:luck", -1024.0f, 1024.0f, 0.0f);
-        addAttribute(FALL_DAMAGE, "minecraft:fall_damage", 0.0f, 340282346638528859811704183484516925440.0f, 1.0f);
-        addAttribute(HORSE_JUMP_STRENGTH, "minecraft:horse.jump_strength", 0.0f, 2.0f, 0.7f);
-        addAttribute(ZOMBIE_SPAWN_REINFORCEMENTS, "minecraft:zombie.spawn_reinforcements", 0.0f, 1.0f, 0.0f);
-        addAttribute(LAVA_MOVEMENT, "minecraft:lava_movement", 0.00f, 340282346638528859811704183484516925440.00f, 0.02f);
+        addAttribute(ABSORPTION, "minecraft:absorption", "generic.absorption", 0.00f, 340282346638528859811704183484516925440.00f, 0.00f);
+        addAttribute(SATURATION, "minecraft:player.saturation", "player.saturation", 0.00f, 20.00f, 5.00f);
+        addAttribute(EXHAUSTION, "minecraft:player.exhaustion", "player.exhaustion",0.00f, 5.00f, 0.00f, false);
+        addAttribute(KNOCKBACK_RESISTANCE, "minecraft:knockback_resistance", "generic.knockbackResistance", 0.00f, 1.00f, 0.00f);
+        addAttribute(MAX_HEALTH, "minecraft:health", "generic.health",0.00f, 20.00f, 20.00f);
+        addAttribute(MOVEMENT_SPEED, "minecraft:movement","generic.movementSpeed", 0.00f, 340282346638528859811704183484516925440.00f, 0.10f);
+        addAttribute(FOLLOW_RANGE, "minecraft:follow_range", "generic.followRange",0.00f, 2048.00f, 16.00f, false);
+        addAttribute(MAX_HUNGER, "minecraft:player.hunger", "player.hunger",0.00f, 20.00f, 20.00f);
+        addAttribute(ATTACK_DAMAGE, "minecraft:attack_damage", "generic.attackDamage", 0.00f, 340282346638528859811704183484516925440.00f, 1.00f, false);
+        addAttribute(EXPERIENCE_LEVEL, "minecraft:player.level", "player.level", 0.00f, 24791.00f, 0.00f);
+        addAttribute(EXPERIENCE, "minecraft:player.experience", "player.experience", 0.00f, 1.00f, 0.00f);
+        addAttribute(UNDERWATER_MOVEMENT, "minecraft:underwater_movement", "minecraft:underwater_movement",0.0f, 340282346638528859811704183484516925440.0f, 0.02f);
+        addAttribute(LUCK, "minecraft:luck", "minecraft:luck", -1024.0f, 1024.0f, 0.0f);
+        addAttribute(FALL_DAMAGE, "minecraft:fall_damage", "minecraft:fall_damage", 0.0f, 340282346638528859811704183484516925440.0f, 1.0f);
+        addAttribute(HORSE_JUMP_STRENGTH, "minecraft:horse.jump_strength", "minecraft:horse.jump_strength",0.0f, 2.0f, 0.7f);
+        addAttribute(ZOMBIE_SPAWN_REINFORCEMENTS, "minecraft:zombie.spawn_reinforcements", "minecraft:zombie.spawn_reinforcements",0.0f, 1.0f, 0.0f);
+        addAttribute(LAVA_MOVEMENT, "minecraft:lava_movement","minecraft:lava_movement", 0.00f, 340282346638528859811704183484516925440.00f, 0.02f);
     }
 
-    public static Attribute addAttribute(int id, String name, float minValue, float maxValue, float defaultValue) {
-        return addAttribute(id, name, minValue, maxValue, defaultValue, true);
+    public static Attribute addAttribute(int id, String name, String oldName, float minValue, float maxValue, float defaultValue) {
+        return addAttribute(id, name, oldName, minValue, maxValue, defaultValue, true);
     }
 
-    public static Attribute addAttribute(int id, String name, float minValue, float maxValue, float defaultValue, boolean shouldSend) {
+    public static Attribute addAttribute(int id, String name, String oldName, float minValue, float maxValue, float defaultValue, boolean shouldSend) {
         if (minValue > maxValue || defaultValue > maxValue || defaultValue < minValue) {
             throw new IllegalArgumentException("Invalid ranges: min value: " + minValue + ", max value: " + maxValue + ", defaultValue: " + defaultValue);
         }
 
-        return attributes.put(id, new Attribute(id, name, minValue, maxValue, defaultValue, shouldSend));
+        return attributes.put(id, new Attribute(id, name, oldName, minValue, maxValue, defaultValue, shouldSend));
     }
 
     public static Attribute getAttribute(int id) {
@@ -161,6 +163,10 @@ public class Attribute implements Cloneable {
 
     public String getName() {
         return this.name;
+    }
+
+    public String getOldName() {
+        return oldName;
     }
 
     public int getId() {

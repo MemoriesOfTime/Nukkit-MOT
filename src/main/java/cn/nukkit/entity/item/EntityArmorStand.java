@@ -20,6 +20,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 import java.util.Collection;
 
@@ -223,7 +224,7 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
 
     public void setPose(int pose) {
         this.pose = pose;
-        this.dataProperties.putInt(Entity.DATA_ARMOR_STAND_POSE_INDEX, pose);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putInt(Entity.DATA_ARMOR_STAND_POSE_INDEX, pose);
     }
 
     @Override
@@ -347,7 +348,8 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
     public void setNameTag(String name) {
         this.nameTag = name;
         if (this.namedTag.contains("CustomNameVisible") || this.namedTag.contains("CustomNameAlwaysVisible")) { // Hack: Vanilla: Disable client side name tag while keeping custom name in nbt
-            this.setDataProperty(new StringEntityData(DATA_NAMETAG, name));
+            this.setDataProperty( new StringEntityData(DATA_NAMETAG, name));
+
         }
     }
 

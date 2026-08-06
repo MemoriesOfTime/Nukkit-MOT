@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -29,8 +30,17 @@ public class UpdateBlockPacket extends DataPacket {
     public int flags;
     public int dataLayer = 0;
 
+    public Entry[] records = new Entry[0];// 0.14.3
+
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.UPDATE_BLOCK_PACKET;
+        }
         return NETWORK_ID;
     }
 
@@ -40,6 +50,33 @@ public class UpdateBlockPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putBlockVector3(x, y, z);
+                this.putUnsignedVarInt(blockId);
+                this.putUnsignedVarInt((0xb << 4) | blockData & 0xf);
+                return;
+            }
+            if(this.protocol <= ProtocolInfo.v_0_14_3 && this.protocol > ProtocolInfo.v_0_10_0){
+                this.putInt(this.records.length);
+                //this.putInt(1);
+            }
+            this.putInt(x);
+            this.putInt(z);
+            this.putByte((byte) y);
+            this.putByte((byte) blockId);
+            this.putByte((byte) ((flags << 4) | blockData));
+//            this.putInt(this.records.length);
+//            for (Entry entry : this.records) {
+//                this.putInt(entry.x);
+//                this.putInt(entry.z);
+//                this.putByte((byte) entry.y);
+//                this.putByte((byte) entry.blockId);
+//                this.putByte((byte) ((entry.flags << 4) | entry.blockData));
+//            }
+            return;
+        }
         this.reset();
         this.putBlockVector3(x, y, z);
         if (protocol > ProtocolInfo.v1_2_10) {

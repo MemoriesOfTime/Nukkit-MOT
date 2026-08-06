@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.EntityMetadata;
+import cn.nukkit.entity.data.EntityMetadataController;
 import cn.nukkit.entity.mob.EntityCreeper;
 import cn.nukkit.network.protocol.*;
 
@@ -173,14 +174,15 @@ public class DummyBossBar {
         pkAdd.speedX = 0;
         pkAdd.speedY = 0;
         pkAdd.speedZ = 0;
-        pkAdd.metadata = new EntityMetadata()
-                // Default Metadata tags
-                .putLong(Entity.DATA_FLAGS, 0)
-                .putShort(Entity.DATA_AIR, 400)
-                .putShort(Entity.DATA_MAX_AIR, 400)
-                .putLong(Entity.DATA_LEAD_HOLDER_EID, -1)
-                .putString(Entity.DATA_NAMETAG, text) // Set the entity name
-                .putFloat(Entity.DATA_SCALE, 0); // And make it invisible
+//        pkAdd.metadata = new EntityMetadata()
+//                // Default Metadata tags
+//                .putLong(Entity.DATA_FLAGS, 0)
+//                .putShort(Entity.DATA_AIR, 400)
+//                .putShort(Entity.DATA_MAX_AIR, 400)
+//                .putLong(Entity.DATA_LEAD_HOLDER_EID, -1)
+//                .putString(Entity.DATA_NAMETAG, text) // Set the entity name
+//                .putFloat(Entity.DATA_SCALE, 0); // And make it invisible
+        pkAdd.metadata = EntityMetadataController.getDefaultEntityMetadata(player.protocol);
         player.dataPacket(pkAdd);
     }
 

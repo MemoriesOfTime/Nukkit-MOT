@@ -34,6 +34,18 @@ public class EntityHuman extends EntityHumanType {
     public static final int DATA_PLAYER_FLAGS = 26;
     public static final int DATA_PLAYER_BUTTON_TEXT = 40;
 
+    /**
+     * 0.14
+     */
+    public static final int DATA_PLAYER_FLAGS_014 = 16;
+    public static final int DATA_PLAYER_BED_POSITION_014 = 17;
+
+    /**
+     * 0.16
+     */
+    public static final int DATA_PLAYER_FLAGS_016 = 27;
+    public static final int DATA_PLAYER_BED_POSITION_016 = 17;
+
     protected UUID uuid;
     protected byte[] rawUUID;
 
@@ -114,8 +126,12 @@ public class EntityHuman extends EntityHumanType {
     @Override
     protected void initEntity() {
         this.setDataFlag(DATA_PLAYER_FLAGS, DATA_PLAYER_FLAG_SLEEP, false, false);
+
+
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_GRAVITY, true, false);
-        this.setDataProperty(new IntPositionEntityData(DATA_PLAYER_BED_POSITION, 0, 0, 0), false);
+
+        this.setDataProperty( new IntPositionEntityData(DATA_PLAYER_BED_POSITION, 0, 0, 0), false);
+
 
         if (!(this instanceof Player)) {
             if (this.namedTag.contains("NameTag")) {
@@ -311,17 +327,30 @@ public class EntityHuman extends EntityHumanType {
         this.level.addPlayerMovement(this, x, y, z, yaw, pitch, headYaw);
     }
 
+    /**
+     * 高版本玩家死亡复活调用该方法导致0.14玩家闪退
+     * @param player
+     */
     @Override
     public void spawnTo(Player player) {
         if (this != player && !this.hasSpawned.containsKey(player.getLoaderId())) {
             this.hasSpawned.put(player.getLoaderId(), player);
 
-            if (!this.skin.isValid()) {
+            if (!this.skin.isValid(player.protocol)) {
                 throw new IllegalStateException(this.getClass().getSimpleName() + " must have a valid skin set");
             }
 
-            if (this.isPlayer) {
-                this.server.updatePlayerListData(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.skin, ((Player) this).getLoginChainData().getXUID(), new Player[]{player});
+            // 发送给 player 玩家
+            if (this.isPlayer && player.protocol > ProtocolInfo.v_0_14_3) {
+                String xboxUserId = ((Player) this).protocol <= ProtocolInfo.v_1_0_0 ? "" : ((Player) this).getLoginChainData().getXUID();
+                this.server.updatePlayerListData(
+                        this.uuid,
+                        this.getId(),
+                        ((Player) this).getDisplayName(),
+                        this.skin,
+                        xboxUserId,
+                        new Player[]{player}
+                );
             } else {
                 this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.skin, new Player[]{player});
             }
@@ -342,7 +371,9 @@ public class EntityHuman extends EntityHumanType {
             pk.yaw = (float) this.yaw;
             pk.pitch = (float) this.pitch;
             pk.item = playerInventory.getItemInHand();
-            pk.metadata = this.dataProperties.clone();
+            pk.slim = Skin.MODEL_ALEX.equals(this.skin.getSkinId());
+            pk.skin = this.skin;
+            pk.metadata = this.dataPropertiesController.getDataProperties(player.protocol).clone();
             player.dataPacket(pk);
 
             if (this.isPlayer) {
@@ -350,7 +381,10 @@ public class EntityHuman extends EntityHumanType {
             } else {
                 playerInventory.sendArmorContentsIfNotAr(player);
             }
-            this.offhandInventory.sendContents(player);
+
+            if(player.protocol >= ProtocolInfo.v_0_15_10){
+                this.offhandInventory.sendContents(player);
+            }
 
             if (this.riding != null) {
                 SetEntityLinkPacket pkk = new SetEntityLinkPacket();

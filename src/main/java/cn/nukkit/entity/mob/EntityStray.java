@@ -19,6 +19,7 @@ import cn.nukkit.math.Vector2;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;

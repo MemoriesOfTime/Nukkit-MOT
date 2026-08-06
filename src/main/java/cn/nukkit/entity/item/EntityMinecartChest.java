@@ -12,6 +12,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.MinecartType;
 
 /**
@@ -94,7 +95,7 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
             }
         }
 
-        this.dataProperties
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL)
                 .putByte(DATA_CONTAINER_TYPE, 10)
                 .putInt(DATA_CONTAINER_BASE_SIZE, this.inventory.getSize())
                 .putInt(DATA_CONTAINER_EXTRA_SLOTS_PER_STRENGTH, 0);

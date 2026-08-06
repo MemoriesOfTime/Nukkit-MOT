@@ -24,6 +24,7 @@ import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.IntTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -176,7 +177,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
     }
 
     public boolean isCritical() {
-        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_CRITICAL);
+        return this.getDataFlag(ProtocolInfo.CURRENT_PROTOCOL, DATA_FLAGS, DATA_FLAG_CRITICAL);
     }
 
     public void setCritical(boolean value) {
@@ -408,7 +409,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
     }
 
     public boolean getTridentRope() {
-        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_SHOW_TRIDENT_ROPE);
+        return this.getDataFlag(ProtocolInfo.CURRENT_PROTOCOL, DATA_FLAGS, DATA_FLAG_SHOW_TRIDENT_ROPE);
     }
 
     public void setRope(boolean tridentRope) { //兼容PM1E

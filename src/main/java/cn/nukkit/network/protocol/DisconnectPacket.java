@@ -18,11 +18,19 @@ public class DisconnectPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 
     @Override
     public void decode() {
+        if(this.protocol <= ProtocolInfo.v_0_15_10){
+            this.message = this.getString_old();
+            return;
+        }
+
         if (protocol >= ProtocolInfo.v1_20_40) {
             this.reason = DisconnectFailReason.values()[this.getVarInt()];
         }
@@ -37,6 +45,17 @@ public class DisconnectPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putBoolean(this.hideDisconnectionScreen);
+                this.putString(this.message);
+                return;
+            }
+            this.putString_old(this.message);
+            return;
+        }
+
         this.reset();
         if (protocol >= ProtocolInfo.v1_20_40) {
             this.putVarInt(this.reason.ordinal());

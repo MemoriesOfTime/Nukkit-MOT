@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 @ToString
@@ -14,6 +15,9 @@ public class SimpleEventPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.SIMPLE_EVENT_PACKET;
+        }
         return NETWORK_ID;
     }
 

@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -16,6 +17,13 @@ public class ContainerOpenPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.CONTAINER_OPEN_PACKET;
+        }
         return NETWORK_ID;
     }
 
@@ -25,6 +33,7 @@ public class ContainerOpenPacket extends DataPacket {
     public int y;
     public int z;
     public long entityId = -1;
+    public int slots;// 0.14.3
 
     @Override
     public void decode() {
@@ -39,6 +48,31 @@ public class ContainerOpenPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.tryReset();
+                this.putByte((byte) (this.windowId & 0xff));
+                this.putByte((byte)(this.type & 0xff));
+                this.putVarInt(this.slots);
+                this.putBlockVector3(this.x, this.y, this.z);
+                this.putVarLong(this.entityId);
+                return;
+            }
+            if(this.protocol <= ProtocolInfo.v_0_10_0){
+                this.tryReset();
+            }
+            this.putByte((byte) (this.windowId & 0xff));
+            this.putByte((byte)(this.type & 0xff));
+            this.putShort(this.slots);
+            this.putInt(this.x);
+            this.putInt(this.y);
+            this.putInt(this.z);
+            if(this.protocol <= ProtocolInfo.v_0_13_2){
+                return;
+            }
+            this.putLong(this.entityId);
+            return;
+        }
         this.reset();
         this.putByte((byte) this.windowId);
         this.putByte((byte) this.type);

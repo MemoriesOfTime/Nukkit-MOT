@@ -118,7 +118,7 @@ public interface CompressionProvider {
                 }
             }
             case 0x01 -> {
-                return SNAPPY;
+                return SNAPPY;// 一般不采用
             }
             case (byte) 0xff -> {
                 return NONE;

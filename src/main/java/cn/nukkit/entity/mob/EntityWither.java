@@ -22,6 +22,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
 import cn.nukkit.network.protocol.BossEventPacket;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
@@ -69,7 +70,7 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         this.fireProof = true;
         this.setDamage(new int[]{0, 2, 4, 6});
         if (this.age == 0) {
-            this.setDataProperty(new IntEntityData(DATA_WITHER_INVULNERABLE_TICKS, 200));
+            this.setDataProperty( new IntEntityData(DATA_WITHER_INVULNERABLE_TICKS, 200));
 
             this.stayTime = 220;
         }
@@ -137,7 +138,7 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     }
 
     @Override
-    protected DataPacket createAddEntityPacket() {
+    protected DataPacket createAddEntityPacket(int protocol) {
         AddEntityPacket addEntity = new AddEntityPacket();
         addEntity.type = NETWORK_ID;
         addEntity.entityUniqueId = this.getId();
@@ -151,7 +152,7 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         addEntity.speedX = (float) this.motionX;
         addEntity.speedY = (float) this.motionY;
         addEntity.speedZ = (float) this.motionZ;
-        addEntity.metadata = this.dataProperties.clone();
+        addEntity.metadata = this.dataPropertiesController.getDataProperties(protocol).clone();
         addEntity.attributes = new Attribute[]{Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(witherMaxHealth()).setValue(witherMaxHealth())};
         return addEntity;
     }

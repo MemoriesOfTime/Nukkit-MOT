@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 @ToString
@@ -15,6 +16,9 @@ public class ShowCreditsPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.SHOW_CREDITS_PACKET;
+        }
         return NETWORK_ID;
     }
 
@@ -26,8 +30,12 @@ public class ShowCreditsPacket extends DataPacket {
 
     @Override
     public void encode() {
-        this.reset();
-        this.putEntityRuntimeId(this.eid);
+        if (this.protocol >= ProtocolInfo.v1_2_0){
+            this.reset();
+            this.putEntityRuntimeId(this.eid);
+        }else{
+            this.putEntityUniqueId(this.eid);
+        }
         this.putVarInt(this.status);
     }
 }

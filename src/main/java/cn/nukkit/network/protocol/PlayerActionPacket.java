@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -82,12 +83,33 @@ public class PlayerActionPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.entityId = this.getEntityRuntimeId();
+        if(this.protocol <= ProtocolInfo.v_0_15_10){
+            if(this.protocol >= ProtocolInfo.v_0_10_0){
+                this.entityId = getLong();
+            }
+            this.action = getInt();
+            this.x = getInt();
+            this.y = getInt();
+            this.z = getInt();
+            this.face = getInt();
+            if(this.protocol < ProtocolInfo.v_0_10_0){
+                int eid = this.getInt();
+            }
+            return;
+        }
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.entityId = this.getEntityRuntimeId();
+        }else{
+            this.entityId = this.getEntityUniqueId();
+        }
         this.action = this.getVarInt();
         BlockVector3 v = this.getBlockVector3();
         this.x = v.x;
         this.y = v.y;
         this.z = v.z;
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            return;
+        }
         if (protocol >= ProtocolInfo.v1_19_0_29) {
             this.resultPosition = this.getBlockVector3();
         }
@@ -96,8 +118,29 @@ public class PlayerActionPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putVarLong(this.entityId);
+                this.putVarInt(this.action);
+                this.putBlockVector3(this.x, this.y, this.z);
+                this.putVarInt(this.face);
+                return;
+            }
+            this.putLong(entityId);
+            this.putInt(action);
+            this.putInt(x);
+            this.putInt(y);
+            this.putInt(z);
+            this.putInt(face);
+            return;
+        }
         this.reset();
-        this.putEntityRuntimeId(this.entityId);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.entityId);
+        }else{
+            this.putEntityUniqueId(this.entityId);
+        }
         this.putVarInt(this.action);
         this.putBlockVector3(this.x, this.y, this.z);
         if (protocol >= ProtocolInfo.v1_19_0_29) {
@@ -108,6 +151,13 @@ public class PlayerActionPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.PLAYER_ACTION_PACKET;
+        }
         return NETWORK_ID;
     }
 }

@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -24,9 +25,35 @@ public class AddPaintingPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putEntityUniqueId(this.entityUniqueId);
+                this.putEntityUniqueId(this.entityRuntimeId);
+                this.putBlockVector3((int) this.x, (int) this.y, (int) this.z);
+                this.putVarInt(this.direction);
+                this.putString(this.title);
+                return;
+            }
+            if(this.protocol > ProtocolInfo.v_0_10_0){
+                this.putLong(entityRuntimeId);
+            }else{
+                this.putInt((int) entityRuntimeId);
+            }
+            this.putInt((int) x);
+            this.putInt((int) y);
+            this.putInt((int) z);
+            this.putInt(direction);
+            this.putString_old(title);
+            return;
+        }
         this.reset();
         this.putEntityUniqueId(this.entityUniqueId);
-        this.putEntityRuntimeId(this.entityRuntimeId);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.entityRuntimeId);
+        }else{
+            this.putEntityUniqueId(this.entityRuntimeId);
+        }
         if (protocol < 361) {
             this.putBlockVector3((int) this.x, (int) this.y, (int) this.z);
         } else {
@@ -38,6 +65,13 @@ public class AddPaintingPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.ADD_PAINTING_PACKET;
+        }
         return NETWORK_ID;
     }
 }

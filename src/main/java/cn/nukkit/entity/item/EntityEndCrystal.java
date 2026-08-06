@@ -9,6 +9,7 @@ import cn.nukkit.level.Explosion;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * Created by PetteriM1
@@ -82,7 +83,7 @@ public class EntityEndCrystal extends Entity implements EntityExplosive {
     }
 
     public boolean showBase() {
-        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_SHOWBASE);
+        return this.getDataFlag(ProtocolInfo.CURRENT_PROTOCOL, DATA_FLAGS, DATA_FLAG_SHOWBASE);
     }
 
     public void setShowBase(boolean value) {

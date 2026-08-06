@@ -3,6 +3,7 @@ package cn.nukkit.entity.passive;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 
 public class EntityTropicalFish extends EntityFish {
@@ -29,7 +30,7 @@ public class EntityTropicalFish extends EntityFish {
             this.variantA = Utils.rand(0, 5);
 
         }
-        this.dataProperties.putInt(DATA_VARIANT, this.variantA);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putInt(DATA_VARIANT, this.variantA);
 
         if (this.namedTag.contains("VariantB")) {
             this.variantB = this.namedTag.getInt("VariantB");
@@ -37,7 +38,7 @@ public class EntityTropicalFish extends EntityFish {
             this.variantB = Utils.rand(0, 5);
 
         }
-        this.dataProperties.putInt(DATA_MARK_VARIANT, this.variantB);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putInt(DATA_MARK_VARIANT, this.variantB);
 
         if (this.namedTag.contains("Color")) {
             this.color = this.namedTag.getInt("Color");
@@ -45,7 +46,7 @@ public class EntityTropicalFish extends EntityFish {
             this.color = Utils.rand(0, 15);
 
         }
-        this.dataProperties.putByte(DATA_COLOR, this.color);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putByte(DATA_COLOR, this.color);
     }
 
     @Override

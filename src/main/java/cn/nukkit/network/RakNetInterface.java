@@ -70,7 +70,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .channelFactory(RakChannelFactory.server(transport.datagramChannel))
                 .group(group)
                 .option(RakChannelOption.RAK_GUID, this.serverId)
-                .option(RakChannelOption.RAK_SUPPORTED_PROTOCOLS, new int[]{8, 9, 10, 11})
+                .option(RakChannelOption.RAK_SUPPORTED_PROTOCOLS, new int[]{5, 6, 7 , 8, 9, 10, 11}) // 新加入支持5,6,7版本
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)
                 .option(RakChannelOption.RAK_SEND_COOKIE, true)
                 .option(RakChannelOption.RAK_PACKET_LIMIT, this.server.rakPacketLimit)
@@ -110,6 +110,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
     public boolean process() {
         RakNetPlayerSession session;
         while ((session = this.sessionCreationQueue.poll()) != null) {
+            log.info("Create player!");
             InetSocketAddress address = session.getChannel().remoteAddress();
             try {
                 PlayerCreationEvent event = new PlayerCreationEvent(this, Player.class, Player.class, null, address);
@@ -134,6 +135,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
             RakNetPlayerSession nukkitSession = iterator.next();
             Player player = nukkitSession.getPlayer();
             if (nukkitSession.getDisconnectReason() != null) {
+                log.info("RakNetInterface#process: " + nukkitSession.getDisconnectReason());
                 try {
                     player.close(player.getLeaveMessage(), nukkitSession.getDisconnectReason(), false);
                 } catch (Exception e) {

@@ -2,6 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.Player;
 import cn.nukkit.api.API;
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 import static cn.nukkit.api.API.Definition.UNIVERSAL;
@@ -59,6 +60,8 @@ public class AdventureSettingsPacket extends DataPacket {
 
     public long playerPermission = Player.PERMISSION_MEMBER;
 
+    public int userPermission; // MCPE 0.16
+
     public long customFlags;
 
     public long entityUniqueId; //This is a little-endian long, NOT a var-long. (WTF Mojang)
@@ -66,6 +69,20 @@ public class AdventureSettingsPacket extends DataPacket {
     @Override
     public void decode() {
         this.flags = getUnsignedVarInt();
+        if(this.protocol < ProtocolInfo.v_1_0_0 && this.protocol >= ProtocolInfo.v_0_16_0){
+            this.userPermission = (int) this.getUnsignedVarInt();
+//            this.userPermission = (int) this.getUnsignedVarInt();
+//            this.worldImmutable = (this.flags & 1) != 0;
+//            this.noPvp = (this.flags & (1 << 1)) != 0;
+//            this.noPvm = (this.flags & (1 << 2)) != 0;
+//            this.noMvp = (this.flags & (1 << 3)) != 0;
+//
+//            this.autoJump = (this.flags & (1 << 5)) != 0;
+//            this.allowFlight = (this.flags & (1 << 6)) != 0;
+//            this.noClip = (this.flags & (1 << 7)) != 0;
+//            this.isFlying = (this.flags & (1 << 9)) != 0;
+            return;
+        }
         this.commandPermission = getUnsignedVarInt();
         if (protocol >= ProtocolInfo.v1_2_0) {
             this.flags2 = getUnsignedVarInt();
@@ -77,6 +94,21 @@ public class AdventureSettingsPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putUnsignedVarInt(this.flags);
+                this.putUnsignedVarInt(this.userPermission);
+                return;
+            }
+            this.putInt((int) flags);
+            if(this.protocol <= ProtocolInfo.v_0_13_2){
+                return;
+            }
+            this.putInt((int) commandPermission);
+            this.putInt((int) playerPermission);
+            return;
+        }
         this.reset();
         this.putUnsignedVarInt(this.flags);
         this.putUnsignedVarInt(this.commandPermission);
@@ -119,6 +151,13 @@ public class AdventureSettingsPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.ADVENTURE_SETTINGS_PACKET;
+        }
         return NETWORK_ID;
     }
 }

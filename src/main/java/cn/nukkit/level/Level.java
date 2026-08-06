@@ -1111,6 +1111,7 @@ public class Level implements ChunkManager, Metadatable {
             this.checkSleep();
         }
 
+        // 给区块内的玩家发送该区块中相关的数据包
         for (Map.Entry<Long, Deque<DataPacket>> entry : this.chunkPackets.entrySet()) {
             Long index = entry.getKey();
             int chunkX = Level.getHashX(index);
@@ -3720,6 +3721,39 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void chunkRequestCallback(int protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
+        if(protocol <= ProtocolInfo.v_1_0_0){
+            Long index = Level.chunkHash(x, z);
+
+//            if (this.chunkSendTasks.containsKey(index)) {
+//                for (Player player : this.chunkSendQueue.get(index).values()) {
+//                    if (player.isConnected() && player.usedChunks.containsKey(index)) {
+//                        player.sendChunk(x, z, payload, ordering);
+//                    }
+//                }
+//
+//                this.chunkSendQueue.remove(index);
+//                this.chunkSendTasks.remove(index);
+//            }
+            LongSet tasks = this.getChunkSendTasks(protocol);
+            if (tasks.contains(index)) {
+                ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
+
+                if (queue.containsKey(index)) {
+                    for (Player player : queue.get(index).values()) {
+                        if (player.isConnected() && player.usedChunks.containsKey(index)) {
+                            if (matchMVChunkProtocol(protocol, player.protocol)) {
+                                player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
+                            }
+                        }
+                    }
+                }
+
+                queue.remove(index);
+                tasks.remove(index);
+            }
+            return;
+        }
+
         long index = Level.chunkHash(x, z);
 
         if (server.cacheChunks) {
@@ -5049,6 +5083,22 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
+        if(protocol <= ProtocolInfo.v_0_9_0){
+            return ProtocolInfo.v_0_9_0;
+        } else if(protocol <= ProtocolInfo.v_0_10_0){
+            return ProtocolInfo.v_0_10_0;
+        } else if(protocol <= ProtocolInfo.v_0_11_0){
+            return ProtocolInfo.v_0_11_0;
+        } else if(protocol <= ProtocolInfo.v_0_14_3){
+            return ProtocolInfo.v_0_14_3;
+        } else if (protocol <= ProtocolInfo.v_0_15_10){
+            return ProtocolInfo.v_0_15_10;
+        } else if (protocol <= ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.v_0_16_0;
+        } else if (protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfo.v1_1_0;
+        }
+
         if (protocol >= ProtocolInfo.v1_21_50_26) {
             return ProtocolInfo.v1_21_50;
         } else if (protocol >= ProtocolInfo.v1_21_40) {
@@ -5123,6 +5173,21 @@ public class Level implements ChunkManager, Metadatable {
 
     private static boolean matchMVChunkProtocol(int chunk, int player) {
         if (chunk == 0) if (player < ProtocolInfo.v1_2_0) return true;
+
+        if(chunk == ProtocolInfo.v_0_10_0) if(player <= ProtocolInfo.v_0_10_0) return true;
+
+        if(chunk == ProtocolInfo.v_0_11_0) if(player <= ProtocolInfo.v_0_11_0) return true;
+
+        if(chunk == ProtocolInfo.v_0_14_3) if(player <= ProtocolInfo.v_0_14_3) return true;
+
+        if(chunk == ProtocolInfo.v_0_14_3) if(player <= ProtocolInfo.v_0_14_3) return true;
+
+        if(chunk == ProtocolInfo.v_0_15_10) if(player <= ProtocolInfo.v_0_15_10) return true;
+
+        if(chunk == ProtocolInfo.v_0_16_0) if(player < ProtocolInfo.v_1_0_0) return true;
+
+        if(chunk == ProtocolInfo.v1_1_0) if(player < ProtocolInfo.v1_2_0) return true;
+
         if (chunk == ProtocolInfo.v1_2_0)
             if (player >= ProtocolInfo.v1_2_0) if (player < ProtocolInfo.v1_12_0) return true;
         if (chunk == ProtocolInfo.v1_12_0) if (player == ProtocolInfo.v1_12_0) return true;

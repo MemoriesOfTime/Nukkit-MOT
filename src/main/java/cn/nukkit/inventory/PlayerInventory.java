@@ -18,6 +18,7 @@ import cn.nukkit.network.protocol.types.ContainerIds;
 import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
+import cn.nukkit.network.protocol.v70.ContainerSetContentPacket;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -480,6 +481,7 @@ public class PlayerInventory extends BaseInventory {
     @Override
     public void sendContents(Player[] players) {
         InventoryContentPacket pk = new InventoryContentPacket();
+
         pk.slots = new Item[this.getSize()];
         for (int i = 0; i < this.getSize(); ++i) {
             pk.slots[i] = this.getItem(i);
@@ -491,6 +493,7 @@ public class PlayerInventory extends BaseInventory {
             for(int i = this.getSize(); i < this.getSize() + 9; ++i){
                 pk2.slots[i] = new ItemBlock(new BlockAir());
             }
+
             for (Player player : players) {
                 if (player.protocol > ProtocolInfo.v1_1_0) {
                     continue;

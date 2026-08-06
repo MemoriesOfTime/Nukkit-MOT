@@ -35,6 +35,11 @@ public class TransferPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol <= ProtocolInfo.v_0_12_1){
+            return ProtocolInfo.oldProtocolInfo.get((byte) this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 }

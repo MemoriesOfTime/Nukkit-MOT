@@ -154,7 +154,7 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
 
             for (Item armor : inventory.getArmorContents()) {
                 armorPoints += armor.getArmorPoints();
-                epf += calculateEnchantmentProtectionFactor(armor, source);
+                epf += (int) calculateEnchantmentProtectionFactor(armor, source);
             }
 
             //float originalDamage = source.getDamage();

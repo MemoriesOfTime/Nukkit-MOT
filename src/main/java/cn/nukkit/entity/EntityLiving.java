@@ -24,10 +24,7 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.FloatTag;
-import cn.nukkit.network.protocol.AnimatePacket;
-import cn.nukkit.network.protocol.EntityEventPacket;
-import cn.nukkit.network.protocol.LevelSoundEventPacket;
-import cn.nukkit.network.protocol.TextPacket;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockIterator;
 
@@ -308,12 +305,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             // HACK!
             if (p.protocol <= 282) {
                 if (p.protocol <= 201) {
-                    this.setDataFlagSelfOnly(DATA_FLAGS, 33, isBreathing);
+                    this.setDataFlagSelfOnly(ProtocolInfo.CURRENT_PROTOCOL, DATA_FLAGS, 33, isBreathing);
                 } else {
-                    this.setDataFlagSelfOnly(DATA_FLAGS, 34, isBreathing);
+                    this.setDataFlagSelfOnly(ProtocolInfo.CURRENT_PROTOCOL, DATA_FLAGS, 34, isBreathing);
                 }
             } else {
-                this.setDataFlagSelfOnly(DATA_FLAGS, DATA_FLAG_BREATHING, isBreathing);
+                this.setDataFlagSelfOnly(ProtocolInfo.CURRENT_PROTOCOL, DATA_FLAGS, DATA_FLAG_BREATHING, isBreathing);
             }
         }
 
@@ -516,7 +513,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public boolean isSpinAttack() {
-        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_SPIN_ATTACK);
+        return this.getDataFlag(ProtocolInfo.CURRENT_PROTOCOL, DATA_FLAGS, DATA_FLAG_SPIN_ATTACK);
     }
 
     public void setSpinAttack(boolean value) {

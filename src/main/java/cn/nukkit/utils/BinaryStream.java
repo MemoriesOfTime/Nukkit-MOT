@@ -44,6 +44,7 @@ import java.lang.reflect.Array;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.List;
 import java.util.function.*;
 
 import static org.cloudburstmc.protocol.common.util.Preconditions.checkArgument;
@@ -323,6 +324,65 @@ public class BinaryStream {
     private static byte[] steveSkinDecoded;
 
     public void putSkin(int protocol, Skin skin) {
+        if(protocol <= ProtocolInfo.v_0_15_10){
+            String modelId = skin.getSkinId();
+            Server.getInstance().getLogger().info("skinId: " + modelId);
+            switch(modelId){
+                case "Standard_Steve":
+                case "Standard_Alex":
+                case "Standard_Custom":
+                    this.putString_old(modelId);
+                    break;
+                default:
+                    this.putString_old("Standard_Custom");
+                    break;
+            }
+            if(skin.skinBytes == null){
+                byte[] skinData = skin.getSkinData().data;
+                if(skinData.length != Skin.SINGLE_SKIN_SIZE && skinData.length != Skin.DOUBLE_SKIN_SIZE){
+                    skin.skinBytes = new byte[Skin.SINGLE_SKIN_SIZE];
+                    for(int i =0;i < skin.skinBytes.length;++i){
+                        skin.skinBytes[i] = (byte) (Utils.random.nextInt(255) & 0xff);
+                    }
+                }else{
+                    skin.skinBytes = skinData;
+                }
+            }
+
+            this.putShort(skin.skinBytes.length);
+            this.put(skin.skinBytes);
+            return;
+        }
+
+        if(protocol <= ProtocolInfo.v_1_0_0){
+            String modelId = skin.getSkinId();
+            Server.getInstance().getLogger().info("skinId: " + modelId);
+            switch(modelId){
+                case "Standard_Steve":
+                case "Standard_Alex":
+                case "Standard_Custom":
+                    this.putString(modelId);
+                    break;
+                default:
+                    this.putString("Standard_Custom");
+                    break;
+            }
+            if(skin.skinBytes == null){
+                byte[] skinData = skin.getSkinData().data;
+                if(skinData.length != Skin.SINGLE_SKIN_SIZE && skinData.length != Skin.DOUBLE_SKIN_SIZE){
+                    skin.skinBytes = new byte[Skin.SINGLE_SKIN_SIZE];
+                    for(int i =0;i < skin.skinBytes.length;++i){
+                        skin.skinBytes[i] = (byte) (Utils.random.nextInt(255) & 0xff);
+                    }
+                }else{
+                    skin.skinBytes = skinData;
+                }
+            }
+
+            this.putByteArray(skin.skinBytes);
+            return;
+        }
+
         this.putString(skin.getSkinId());
 
         if (protocol < ProtocolInfo.v1_13_0) {
@@ -504,6 +564,13 @@ public class BinaryStream {
         return skin;
     }
 
+    public Skin getSkin_old() {
+        Skin skin = new Skin();
+        skin.setSkinId(this.getString_old());
+        skin.setSkinBytes(this.get(this.getShort()));
+        return skin;
+    }
+
     private static final String MV_ORIGIN_NBT = "mv_origin_nbt";
     private static final String MV_ORIGIN_ID = "mv_origin_id";
     private static final String MV_ORIGIN_NAMESPACE = "mv_origin_namespace";
@@ -515,7 +582,9 @@ public class BinaryStream {
     }
 
     public Item getSlot(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_16_220) {
+        if (protocolId >= ProtocolInfo.v_0_16_0 && protocolId < ProtocolInfo.v1_2_0) {
+            return this.getSlotV113(protocolId);
+        }else if (protocolId >= ProtocolInfo.v1_16_220) {
             return this.getSlotNew(protocolId);
         }
 
@@ -840,6 +909,104 @@ public class BinaryStream {
         return item;
     }
 
+    public short getSignedShort() {
+        return Binary.readSignedShort(this.get(2));
+    }
+    public Item getSlot_old(int protocolId){
+        if (protocolId >= ProtocolInfo.v_0_16_0) {
+            return this.getSlotV113(protocolId);
+        }
+
+        short id = this.getSignedShort();
+
+        if (id <= 0) {
+            return Item.get(0, 0, 0);
+        }
+        int cnt = this.getByte();
+
+        int data = this.getShort();
+
+        if(protocolId <= ProtocolInfo.v_0_11_0) {
+            int nbtLen = 0; //011 didnt exist Enchantment , Customname
+
+            byte[] nbt = new byte[0];
+            if (nbtLen > 0) {
+                nbt = this.get(nbtLen);
+            }
+
+            return Item.get(
+                    id, data, cnt, nbt
+            );
+        }if(protocolId <= ProtocolInfo.v_0_13_2){
+            int nbtLen = this.getShort();
+            byte[] nbt = new byte[0];
+            if (nbtLen > 0) {
+                nbt = this.get(nbtLen);
+            }
+
+            return Item.get(
+                    id, data, cnt, nbt
+            );
+        }else{
+            int nbtLen = this.getLShort();
+            byte[] nbt = new byte[0];
+            if (nbtLen > 0) {
+                nbt = this.get(nbtLen);
+            }
+
+            return Item.get(
+                    id, data, cnt, nbt
+            );
+        }
+    }
+
+    public Item getSlotV113(int protocolId){
+        int id = this.getVarInt();
+
+        if (id <= 0) {
+            return Item.get(0, 0, 0);
+        }
+        int auxValue = this.getVarInt();
+        int data = auxValue >> 8;
+        int cnt = auxValue & 0xff;
+
+        int nbtLen = this.getLShort();
+        byte[] nbt = new byte[0];
+        if (nbtLen > 0) {
+            nbt = this.get(nbtLen);
+        }
+
+        return Item.get(
+                id, data, cnt, nbt
+        );
+    }
+
+    public void putSlot_old(int protocolId, Item item){
+        if (item == null || item.getId() == 0) {
+            if(protocolId > ProtocolInfo.v_0_10_0){
+                this.putShort(0);
+                return;
+            }
+        }
+
+        this.putShort(item.getId());
+        this.putByte((byte) (item.getCount() & 0xff));
+        if(protocolId <= ProtocolInfo.v_0_11_0){
+            this.putShort(item.getDamage());
+            return;
+        }else{
+            this.putShort(!item.hasMeta() ? -1 : item.getDamage());
+        }
+
+        byte[] nbt = item.getCompoundTag();
+        if(protocolId <= ProtocolInfo.v_0_13_2){
+            this.putShort(nbt.length);
+        }else{
+            this.putLShort(nbt.length); // Maybe 0.16 didnt like this
+        }
+        this.put(nbt);
+    }
+
     public void putSlot(Item item) {
         Server.mvw("BinaryStream#putSlot(Item)");
         this.putSlot(ProtocolInfo.CURRENT_PROTOCOL, item);
@@ -852,6 +1019,11 @@ public class BinaryStream {
     public void putSlot(int protocolId, Item item, boolean crafting) {
         if (protocolId >= ProtocolInfo.v1_16_220) {
             this.putSlotNew(protocolId, item, crafting);
+            return;
+        }
+
+        if(protocolId < ProtocolInfo.v_1_0_0){
+            this.putSlotV90(item);
             return;
         }
 
@@ -1055,6 +1227,20 @@ public class BinaryStream {
         if (item.getId() == ItemID.SHIELD && protocolId >= ProtocolInfo.v1_11_0) {
             this.putVarLong(0); //"blocking tick" (ffs mojang)
         }
+    }
+
+    private void putSlotV90(Item item) {
+        if (item == null || item.getId() == Item.AIR) {
+            this.putVarInt(0);
+            return;
+        }
+
+        this.putVarInt(item.getId());
+        int auxValue = ((item.hasMeta() ? item.getDamage() : -1) << 8) | item.getCount();
+        this.putVarInt(auxValue);
+        byte[] nbt = item.getCompoundTag();
+        this.putLShort(nbt.length);
+        this.put(nbt);
     }
 
     private void putSlotV113(Item item) {
@@ -1306,6 +1492,16 @@ public class BinaryStream {
 
     public String getString() {
         return new String(this.getByteArray(), StandardCharsets.UTF_8);
+    }
+
+    public String getString_old(){
+        return new String(this.get(this.getShort()), StandardCharsets.UTF_8);
+    }
+
+    public void putString_old(String str){
+        byte[] b =str.getBytes(StandardCharsets.UTF_8);
+        this.putShort(b.length);
+        this.put(b);
     }
 
     public void putString(String string) {

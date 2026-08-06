@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 import java.util.UUID;
@@ -27,6 +28,11 @@ public class ResourcePackChunkRequestPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.RESOURCE_PACK_CHUNK_REQUEST_PACKET;
+        }
         return NETWORK_ID;
     }
 }

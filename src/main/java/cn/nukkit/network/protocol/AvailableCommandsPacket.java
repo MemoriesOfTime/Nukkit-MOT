@@ -2,6 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.command.data.*;
 import cn.nukkit.network.protocol.types.CommandParam;
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.SequencedHashSet;
 import com.google.gson.Gson;
@@ -257,6 +258,11 @@ public class AvailableCommandsPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.AVAILABLE_COMMANDS_PACKET;
+        }
         return NETWORK_ID;
     }
 
@@ -376,7 +382,11 @@ public class AvailableCommandsPacket extends DataPacket {
 
     @Override
     public void encode() {
-        this.reset();
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+        }else {
+            this.reset();
+        }
 
         if (this.protocol < ProtocolInfo.v1_2_0) {
             this.putString(new Gson().toJson(this.commands));

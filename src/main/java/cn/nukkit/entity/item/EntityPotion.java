@@ -10,6 +10,7 @@ import cn.nukkit.level.particle.SpellParticle;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
 
@@ -36,7 +37,7 @@ public class EntityPotion extends EntityProjectile {
 
         potionId = this.namedTag.getShort("PotionId");
 
-        this.dataProperties.putShort(DATA_POTION_AUX_VALUE, this.potionId);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putShort(DATA_POTION_AUX_VALUE, this.potionId);
 
         Effect effect = Potion.getEffect(potionId, true);
 
@@ -50,6 +51,7 @@ public class EntityPotion extends EntityProjectile {
             int b = ((c[2] * (effect.getAmplifier() + 1)) / count) & 0xff;
 
             this.setDataProperty(new IntEntityData(Entity.DATA_POTION_COLOR, (r << 16) + (g << 8) + b));
+
         }
     }
 

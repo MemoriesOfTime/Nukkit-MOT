@@ -28,7 +28,7 @@ public class PlayerSkinProcessor extends DataPacketProcessor<PlayerSkinPacket> {
         Skin skin = pk.skin;
         Player player = playerHandle.player;
 
-        if (!skin.isValid()) {
+        if (!skin.isValid(player.protocol)) {
             player.getServer().getLogger().warning(playerHandle.getUsername() + ": PlayerSkinPacket with invalid skin");
             player.close("", "disconnectionScreen.invalidSkin");
             return;

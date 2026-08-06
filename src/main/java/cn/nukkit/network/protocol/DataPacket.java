@@ -20,6 +20,10 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     public volatile boolean isEncoded = false;
     private int channel = Network.CHANNEL_NONE;
 
+    public String getName(){
+        return this.getClass().getSimpleName();
+    }
+
     public int packetId() {
         return ProtocolInfo.toNewProtocolID(this.pid());
     }
@@ -35,6 +39,11 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
             this.isEncoded = true;
             this.encode();
         }
+    }
+
+    public final void tryReset(){
+        super.reset();
+        this.putByte(this.pid());
     }
 
     @Override

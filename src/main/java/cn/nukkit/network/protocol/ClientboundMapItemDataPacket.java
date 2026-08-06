@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import cn.nukkit.utils.Utils;
 import lombok.ToString;
 
@@ -42,6 +43,13 @@ public class ClientboundMapItemDataPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.CLIENTBOUND_MAP_ITEM_DATA_PACKET;
+        }
         return NETWORK_ID;
     }
 
@@ -68,7 +76,9 @@ public class ClientboundMapItemDataPacket extends DataPacket {
         }
 
         this.putUnsignedVarInt(update);
-        this.putByte(this.dimensionId);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putByte(this.dimensionId);
+        }
         if (protocol >= 354) {
             this.putBoolean(this.isLocked);
         }
@@ -79,7 +89,11 @@ public class ClientboundMapItemDataPacket extends DataPacket {
         if ((update & ENTITIES_UPDATE) != 0) {
             this.putUnsignedVarInt(eids.length);
             for (long eid : eids) {
-                this.putEntityUniqueId(eid);
+                if(this.protocol >= ProtocolInfo.v1_2_0){
+                    this.putEntityUniqueId(eid);
+                }else {
+                    this.putVarInt((int) eid);
+                }
             }
         }
         if ((update & (ENTITIES_UPDATE | TEXTURE_UPDATE | DECORATIONS_UPDATE)) != 0) {
@@ -87,26 +101,38 @@ public class ClientboundMapItemDataPacket extends DataPacket {
         }
 
         if ((update & DECORATIONS_UPDATE) != 0) {
-            this.putUnsignedVarInt(trackedEntities.length);
-            for (MapTrackedObject object : trackedEntities) {
-                this.putLInt(object.type);
-                if (object.type == MapTrackedObject.TYPE_BLOCK) {
-                    this.putBlockVector3(object.x, object.y, object.z);
-                } else if (object.type == MapTrackedObject.TYPE_ENTITY) {
-                    this.putEntityUniqueId(object.entityUniqueId);
-                } else {
-                    throw new IllegalArgumentException("Unknown map object type " + object.type);
+            if(this.protocol >= ProtocolInfo.v1_2_0) {
+
+                this.putUnsignedVarInt(trackedEntities.length);
+                for (MapTrackedObject object : trackedEntities) {
+                    this.putLInt(object.type);
+                    if (object.type == MapTrackedObject.TYPE_BLOCK) {
+                        this.putBlockVector3(object.x, object.y, object.z);
+                    } else if (object.type == MapTrackedObject.TYPE_ENTITY) {
+                        this.putEntityUniqueId(object.entityUniqueId);
+                    } else {
+                        throw new IllegalArgumentException("Unknown map object type " + object.type);
+                    }
                 }
+
             }
 
             this.putUnsignedVarInt(decorators.length);
             for (MapDecorator decorator : decorators) {
-                this.putByte(decorator.icon);
-                this.putByte(decorator.rotation);
+                if(this.protocol >= ProtocolInfo.v1_2_0){
+                    this.putByte(decorator.icon);
+                    this.putByte(decorator.rotation);
+                }else {
+                    this.putVarInt((decorator.rotation & 0x0f) | (decorator.icon << 4));
+                }
                 this.putByte(decorator.offsetX);
                 this.putByte(decorator.offsetZ);
                 this.putString(decorator.label);
-                this.putUnsignedVarInt(decorator.color.getRGB());
+                if(this.protocol >= ProtocolInfo.v1_2_0){
+                    this.putUnsignedVarInt(decorator.color.getRGB());
+                }else{
+                    this.putLInt(decorator.color.getRGB());
+                }
             }
         }
 
@@ -116,7 +142,9 @@ public class ClientboundMapItemDataPacket extends DataPacket {
             this.putVarInt(offsetX);
             this.putVarInt(offsetZ);
 
-            this.putUnsignedVarInt((long) width * height);
+            if(this.protocol >= ProtocolInfo.v1_2_0){
+                this.putUnsignedVarInt((long) width * height);
+            }
 
             if (image != null) {
                 for (int y = 0; y < width; y++) {

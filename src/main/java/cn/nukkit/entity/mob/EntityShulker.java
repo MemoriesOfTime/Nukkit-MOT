@@ -12,6 +12,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.sound.EndermanTeleportSound;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
@@ -54,9 +55,9 @@ public class EntityShulker extends EntityWalkingMob {
         this.setDamage(Utils.getEmptyDamageArray());
 
         if (this.namedTag.contains("Color")) {
-            this.dataProperties.putInt(DATA_VARIANT, this.namedTag.getByte("Color"));
+            this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putInt(DATA_VARIANT, this.namedTag.getByte("Color"));
         } else {
-            this.dataProperties.putInt(DATA_VARIANT, 16);
+            this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putInt(DATA_VARIANT, 16);
         }
     }
 

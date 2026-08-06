@@ -13,6 +13,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
@@ -89,8 +90,10 @@ public class EntityStrider extends EntityWalkingAnimal implements EntityRideable
 
             entity.riding = this;
             entity.setDataFlag(DATA_FLAGS, DATA_FLAG_RIDING, true);
-            entity.setDataProperty(new Vector3fEntityData(DATA_RIDER_SEAT_POSITION, new Vector3f(0, 2.8f, 0)));
-            entity.setDataProperty(new FloatEntityData(DATA_RIDER_MAX_ROTATION, 181));
+
+
+            entity.setDataProperty( new Vector3fEntityData(DATA_RIDER_SEAT_POSITION, new Vector3f(0, 2.8f, 0)));
+            entity.setDataProperty( new FloatEntityData(DATA_RIDER_MAX_ROTATION, 181));
             passengers.add(entity);
         }
 

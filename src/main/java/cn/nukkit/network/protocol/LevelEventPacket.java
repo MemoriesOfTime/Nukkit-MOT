@@ -185,11 +185,24 @@ public class LevelEventPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol <= ProtocolInfo.v_0_14_3){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 
     @Override
     public void decode() {
+        if(this.protocol <= ProtocolInfo.v_0_14_3){
+            this.evid = this.getShort();
+            this.x = this.getFloat();
+            this.y = this.getFloat();
+            this.z = this.getFloat();
+            this.data = this.getInt();
+            return;
+        }
         this.evid = this.getVarInt();
         Vector3f v = this.getVector3f();
         this.x = v.x;
@@ -200,6 +213,21 @@ public class LevelEventPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol <= ProtocolInfo.v_0_14_3){
+            this.tryReset();
+            this.putShort(this.evid);
+            if(this.protocol > ProtocolInfo.v_0_10_0){
+                this.putFloat(this.x);
+                this.putFloat(this.y);
+                this.putFloat(this.z);
+            }else{
+                this.putShort((int) this.x);
+                this.putShort((int) this.y);
+                this.putShort((int) this.z);
+            }
+            this.putInt(this.data);
+            return;
+        }
         this.reset();
         this.putVarInt(this.evid);
         this.putVector3f(this.x, this.y, this.z);

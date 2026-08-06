@@ -6,6 +6,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 import java.util.List;
@@ -122,7 +123,7 @@ public class EntityXPOrb extends Entity {
             this.exp = 1;
         }
 
-        this.dataProperties.putInt(DATA_EXPERIENCE_VALUE, this.exp);
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putInt(DATA_EXPERIENCE_VALUE, this.exp);
     }
 
     @Override

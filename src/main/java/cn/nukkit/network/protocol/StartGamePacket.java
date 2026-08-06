@@ -36,6 +36,11 @@ public class StartGamePacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 
@@ -99,6 +104,7 @@ public class StartGamePacket extends DataPacket {
     public boolean isWorldTemplateOptionLocked = false;
     public boolean isOnlySpawningV1Villagers = false;
     public String vanillaVersion = Utils.getVersionByProtocol(ProtocolInfo.CURRENT_PROTOCOL);
+    public GameRules[] ruleDatas = new GameRules[0];
     public String levelId = "";
     public String worldName;
     public String premiumWorldTemplateId = "";
@@ -162,11 +168,74 @@ public class StartGamePacket extends DataPacket {
     public void decode() {
     }
 
+    public boolean b1, b2 , b3;// 0.14.3
+    public String unknownstr;// 0.14.3
+
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putEntityUniqueId(this.entityUniqueId);
+                this.putEntityUniqueId(this.entityRuntimeId);
+                this.putVector3f(this.x, this.y, this.z);
+                this.putLFloat(0);
+                this.putLFloat(0);
+                this.putVarInt(this.seed);
+                this.putVarInt(this.dimension);
+                this.putVarInt(this.generator);
+                this.putVarInt(this.playerGamemode);
+                this.putVarInt(this.difficulty);
+                this.putBlockVector3(this.spawnX, this.spawnY, this.spawnZ);
+                this.putBoolean(this.hasAchievementsDisabled);
+                this.putVarInt(this.dayCycleStopTime);
+                this.putBoolean(this.eduMode);
+                this.putLFloat(this.rainLevel);
+                this.putLFloat(this.lightningLevel);
+                this.putBoolean(this.commandsEnabled);
+                this.putBoolean(this.isTexturePacksRequired);
+                this.putString(this.levelId);
+                this.putString(this.worldName);
+                return;
+            }
+            this.putInt(seed);
+            if(this.protocol > ProtocolInfo.v_0_11_0){
+                this.putByte(dimension);
+            }
+            this.putInt(1);
+            this.putInt(playerGamemode);// playerGamemode
+            if(this.protocol > ProtocolInfo.v_0_11_0){
+                this.putLong(this.entityRuntimeId);// entityRuntimeId
+            }else{
+                this.putInt((int) this.entityRuntimeId);
+            }
+            this.putInt(spawnX);
+            this.putInt(spawnY);
+            this.putInt(spawnZ);
+            this.putFloat(x);
+            this.putFloat(y);
+            this.putFloat(z);
+            if(this.protocol <= ProtocolInfo.v_0_11_0){
+                return;
+            }
+            if(this.protocol <= ProtocolInfo.v_0_13_2){// 0.12-0.13
+                this.putByte( (byte) 0);
+                return;
+            }
+            this.putBoolean(b1);
+            this.putBoolean(b2);
+            this.putBoolean(b3);
+            this.putString_old(unknownstr);
+            return;
+        }
+
         this.reset();
         this.putEntityUniqueId(this.entityUniqueId);
-        this.putEntityRuntimeId(this.entityRuntimeId);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.entityRuntimeId);
+        }else{
+            this.putEntityUniqueId(this.entityRuntimeId);
+        }
         this.putVarInt(this.playerGamemode);
         this.putVector3f(this.x, this.y, this.z);
         this.putLFloat(this.yaw);
@@ -227,7 +296,16 @@ public class StartGamePacket extends DataPacket {
         }
         this.putBoolean(this.commandsEnabled);
         this.putBoolean(this.isTexturePacksRequired);
-        this.putGameRules(protocol, gameRules);
+        if (this.protocol >= ProtocolInfo.v1_2_0){
+            this.putGameRules(protocol, gameRules);
+        }else{
+            this.putUnsignedVarInt(this.ruleDatas.length);// TODO :: Fix this
+            for (GameRules rule : this.ruleDatas) {
+                this.putString(rule.toString());
+                this.putBoolean(false); //unknown1
+                this.putBoolean(false); //unknown2
+            }
+        }
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (Server.getInstance().enableExperimentMode && !this.experiments.isEmpty()) {
                 this.putLInt(this.experiments.size()); // Experiment count

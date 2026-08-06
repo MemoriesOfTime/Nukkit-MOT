@@ -3,6 +3,7 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.data.RecipeUnlockingRequirement;
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
@@ -68,6 +69,27 @@ public class CraftingDataPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            this.putUnsignedVarInt(entries.size());
+
+            BinaryStream writer = new BinaryStream();
+
+            for (Object entry : entries) {
+                int entryType = writeEntryLegacy(entry, writer);
+                if (entryType >= 0) {
+                    this.putVarInt(entryType);
+                    this.put(writer.getBuffer());
+                } else {
+                    this.putVarInt(-1);
+                }
+
+                writer.reset();
+            }
+
+            this.putBoolean(cleanRecipes);
+            return;
+        }
         this.reset();
         this.putUnsignedVarInt(protocol >= ProtocolInfo.v1_20_0_23 ? entries.size() + 1 : entries.size());//1.20.0+ 有额外的smithing_trim
 
@@ -237,6 +259,13 @@ public class CraftingDataPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }else if(this.protocol < ProtocolInfo.v1_2_0){
+            return ProtocolInfoV113.CRAFTING_DATA_PACKET;
+        }
         return NETWORK_ID;
     }
 

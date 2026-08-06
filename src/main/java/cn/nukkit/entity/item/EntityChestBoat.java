@@ -13,6 +13,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.EntityLink;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_PASSENGER;
@@ -57,7 +58,7 @@ public class EntityChestBoat extends EntityBoat implements InventoryHolder {
     }
 
     @Override
-    protected DataPacket createAddEntityPacket() {
+    protected DataPacket createAddEntityPacket(int protocol) {
         AddEntityPacket addEntity = new AddEntityPacket();
         addEntity.type = 0;
         addEntity.id = "minecraft:chest_boat";
@@ -72,7 +73,7 @@ public class EntityChestBoat extends EntityBoat implements InventoryHolder {
         addEntity.speedX = (float) this.motionX;
         addEntity.speedY = (float) this.motionY;
         addEntity.speedZ = (float) this.motionZ;
-        addEntity.metadata = this.dataProperties;
+        addEntity.metadata = this.dataPropertiesController.getDataProperties(protocol);
 
         addEntity.links = new EntityLink[this.passengers.size()];
         for (int i = 0; i < addEntity.links.length; i++) {
@@ -102,7 +103,7 @@ public class EntityChestBoat extends EntityBoat implements InventoryHolder {
             }
         }
 
-        this.dataProperties
+        this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL)
                 .putByte(DATA_CONTAINER_TYPE, InventoryType.CHEST_BOAT.getNetworkType())
                 .putInt(DATA_CONTAINER_BASE_SIZE, this.inventory.getSize())
                 .putInt(DATA_CONTAINER_EXTRA_SLOTS_PER_STRENGTH, 0);

@@ -5,6 +5,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.data.EntityMetadata;
+import cn.nukkit.entity.data.EntityMetadataController;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.entity.passive.*;
@@ -131,6 +132,21 @@ public class AddEntityPacket extends DataPacket {
         mapping.put(EntityZombieVillagerV2.NETWORK_ID, "minecraft:zombie_villager_v2");
 
         // Correct new entities for older protocols
+//        if (protocolId <= ProtocolInfo.v_0_14_3 && protocolId >= ProtocolInfo.v_0_14_0) {
+//            mapping.put(524372, "minecraft:minecart");
+//            mapping.put(524384, "minecraft:hopper_minecart");
+//            mapping.put(524385, "minecraft:tnt_minecart");
+//            mapping.put(524386, "minecraft:chest_minecart");
+//            mapping.put(10001, mapping.get(EntitySquid.NETWORK_ID));
+        //199456 199468
+//        } else {
+//            mapping.put(EntityMinecartEmpty.NETWORK_ID, "minecraft:minecart");
+//            mapping.put(EntityMinecartHopper.NETWORK_ID, "minecraft:hopper_minecart");
+//            mapping.put(EntityMinecartTNT.NETWORK_ID, "minecraft:tnt_minecart");
+//            mapping.put(EntityMinecartChest.NETWORK_ID, "minecraft:chest_minecart");
+//            mapping.put(EntityGlowSquid.NETWORK_ID, mapping.get(EntitySquid.NETWORK_ID));
+//        }
+
         if (protocolId < ProtocolInfo.v1_13_0) {
             mapping.put(EntityFox.NETWORK_ID, mapping.get(EntityWolf.NETWORK_ID));
         } else {
@@ -206,6 +222,11 @@ public class AddEntityPacket extends DataPacket {
 
     @Override
     public byte pid() {
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            return NETWORK_ID;
+        }else if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
         return NETWORK_ID;
     }
 
@@ -220,13 +241,21 @@ public class AddEntityPacket extends DataPacket {
     public float speedX = 0f;
     public float speedY = 0f;
     public float speedZ = 0f;
+    public int did;
     public float yaw;
     public float pitch;
     public float headYaw;
     public float bodyYaw = -1;
+
     public EntityMetadata metadata = new EntityMetadata();
     public Attribute[] attributes = new Attribute[0];
     public EntityLink[] links = new EntityLink[0];
+
+    /**
+     * 0.12 - 0.14.3 - 0.15.10
+     */
+    public int modifiers = 0;
+    public final Object[][] links_old = new Object[0][3];// 0.14.3
 
     @Override
     public void decode() {
@@ -235,9 +264,73 @@ public class AddEntityPacket extends DataPacket {
 
     @Override
     public void encode() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            this.tryReset();
+            if(this.protocol >= ProtocolInfo.v_0_16_0){
+                this.putEntityUniqueId(this.entityUniqueId);
+                this.putEntityUniqueId(this.entityRuntimeId);
+                this.putUnsignedVarInt(this.type);
+                this.putVector3f(this.x, this.y, this.z);
+                this.putVector3f(this.speedX, this.speedY, this.speedZ);
+                this.putLFloat(this.yaw * (256f / 360f));
+                this.putLFloat(this.pitch * (256f / 360f));
+                this.putUnsignedVarInt(this.modifiers);
+                this.put(Binary.writeMetadata_016(this.metadata));
+                this.putUnsignedVarInt(this.links_old.length);
+                for (Object[] link : this.links_old) {
+                    this.putVarLong((long) link[0]);
+                    this.putVarLong((long) link[1]);
+                    this.putByte((byte) link[2]);
+                }
+                return;
+            }else{
+                if(this.protocol <= ProtocolInfo.v_0_10_0){
+                    this.putInt((int) this.entityRuntimeId);
+                }else{
+                    this.putLong(this.entityRuntimeId);
+                }
+                this.putInt(this.type);
+                this.putFloat(this.x);
+                this.putFloat(this.y);
+                this.putFloat(this.z);
+                if (this.protocol <= ProtocolInfo.v_0_10_0){
+                    this.putInt(this.did);
+                    if(this.did > 0){
+                        this.putShort((short) this.speedX);
+                        this.putShort((short) this.speedY);
+                        this.putShort((short) this.speedZ);
+                        return;
+                    }
+                }
+                this.putFloat(this.speedX);
+                this.putFloat(this.speedY);
+                this.putFloat(this.speedZ);
+                this.putFloat(this.yaw * 0.71f);
+                this.putFloat(this.pitch * 0.71f);
+                if(this.protocol > ProtocolInfo.v_0_14_3) {
+                    this.putInt(modifiers);//0.14.3没有modifiers
+                }
+            }
+
+            // 测试, 只发送默认metadata
+            // this.metadata = EntityMetadataController.getDefaultEntityMetadata(this.protocol);
+
+            this.put(Binary.writeMetadata_old(this.metadata));
+            this.putShort(this.links_old.length);
+            for (Object[] link : links_old) {
+                this.putLong((long) link[0]);
+                this.putLong((long) link[1]);
+                this.putByte((byte) link[2]);
+            }
+            return;
+        }
         this.reset();
         this.putEntityUniqueId(this.entityUniqueId);
-        this.putEntityRuntimeId(this.entityRuntimeId);
+        if(this.protocol >= ProtocolInfo.v1_2_0){
+            this.putEntityRuntimeId(this.entityRuntimeId);
+        }else{
+            this.putEntityUniqueId(this.entityUniqueId);
+        }
         if (this.protocol < ProtocolInfo.v1_8_0) {
             this.putUnsignedVarInt(this.type);
         }else {

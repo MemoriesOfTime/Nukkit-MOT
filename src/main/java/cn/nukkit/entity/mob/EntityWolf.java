@@ -21,6 +21,7 @@ import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Utils;
 
@@ -81,7 +82,7 @@ public class EntityWolf extends EntityTameableMob {
                 this.collarColor = DyeColor.RED;
             }
 
-            this.setDataProperty(new ByteEntityData(DATA_COLOUR, collarColor.getWoolData()));
+            this.setDataProperty( new ByteEntityData(DATA_COLOUR, collarColor.getWoolData()));
         }
 
         this.setDamage(new int[]{0, 3, 4, 6});
