@@ -430,11 +430,11 @@ public class BinaryStream {
                 for (PersonaPiece piece : pieces) {
                     this.putString(piece.id);
                     if (v2168) {
-                        this.putLInt(personaPieceTypeToOrdinal(piece.type));
-                        this.putUUID(parsePackIdUUID(piece.packId));
+                        this.putLInt(piece.type.ordinal());
+                        this.putUUID(piece.packId);
                     } else {
-                        this.putString(piece.type);
-                        this.putString(piece.packId);
+                        this.putString(piece.type.getSerializeName());
+                        this.putString(piece.packId.toString());
                     }
                     this.putBoolean(piece.isDefault);
                     this.putString(piece.productId);
@@ -447,7 +447,7 @@ public class BinaryStream {
                     this.putLInt(tints.size());
                 }
                 for (PersonaPieceTint tint : tints) {
-                    this.putString(tint.pieceType);
+                    this.putString(tint.pieceType.getSerializeName());
                     if (v2168) {
                         for (int i = 0; i < 4; i++) {
                             this.putLInt(i < tint.colors.size() ? skinColorToInt(tint.colors.get(i)) : 0);
@@ -510,71 +510,6 @@ public class BinaryStream {
 
     private static String intToSkinColor(int argb) {
         return String.format("#%08X", argb);
-    }
-
-    // PersonaPieceType 序数（与参考库 v2168 枚举顺序对齐 / aligned with reference PersonaPieceType enum order）
-    // 参考枚举：0=UNKNOWN, 1=SKELETON(persona_skeleton), 2=BODY, 3=SKIN, 4=BOTTOM, 5=FEET, 6=DRESS,
-    // 7=TOP, 8=HIGH_PANTS, 9=HANDS(persona_hand), 10=OUTERWEAR, 11=FACIAL_HAIR, 12=MOUTH, 13=EYES,
-    // 14=HAIR, 15=HOOD, 16=BACK, 17=FACE_ACCESSORY, 18=HEAD, 19=LEGS, 20=LEFT_LEG, 21=RIGHT_LEG,
-    // 22=ARMS, 23=LEFT_ARM, 24=RIGHT_ARM, 25=CAPES, 26=CLASSIC_SKIN, 27=EMOTE, 28=UNSUPPORTED
-    private static int personaPieceTypeToOrdinal(String type) {
-        if (type == null) return 0;
-        switch (type) {
-            case "persona_skeleton": return 1;
-            case "persona_body": return 2;
-            case "persona_skin": return 3;
-            case "persona_bottom": return 4;
-            case "persona_feet": return 5;
-            case "persona_dress": return 6;
-            case "persona_top": return 7;
-            case "persona_high_pants": return 8;
-            case "persona_hand": return 9;
-            case "persona_outerwear": return 10;
-            case "persona_facial_hair": return 11;
-            case "persona_mouth": return 12;
-            case "persona_eyes": return 13;
-            case "persona_hair": return 14;
-            case "persona_hood": return 15;
-            case "persona_back": return 16;
-            case "persona_face_accessory": return 17;
-            case "persona_head": return 18;
-            case "persona_legs": return 19;
-            case "persona_left_leg": return 20;
-            case "persona_right_leg": return 21;
-            case "persona_arms": return 22;
-            case "persona_left_arm": return 23;
-            case "persona_right_arm": return 24;
-            case "persona_capes": return 25;
-            case "persona_classic_skin": return 26;
-            case "persona_emote": return 27;
-            case "unsupported": return 28;
-            default: return 0; // UNKNOWN
-        }
-    }
-
-    private static String ordinalToPersonaPieceType(int ordinal) {
-        // 返回参考枚举的 type 字符串（参考 fromName 同时接受 serializeName 与 type）
-        // Returns the reference enum's type string (fromName accepts both serializeName and type)
-        String[] types = {
-                "unknown", "persona_skeleton", "persona_body", "persona_skin", "persona_bottom",
-                "persona_feet", "persona_dress", "persona_top", "persona_high_pants", "persona_hand",
-                "persona_outerwear", "persona_facial_hair", "persona_mouth", "persona_eyes",
-                "persona_hair", "persona_hood", "persona_back", "persona_face_accessory",
-                "persona_head", "persona_legs", "persona_left_leg", "persona_right_leg",
-                "persona_arms", "persona_left_arm", "persona_right_arm", "persona_capes",
-                "persona_classic_skin", "persona_emote", "unsupported"
-        };
-        if (ordinal < 0 || ordinal >= types.length) return "unknown";
-        return types[ordinal];
-    }
-
-    private static UUID parsePackIdUUID(String packId) {
-        if (packId == null || packId.isEmpty()) return new UUID(0, 0);
-        try {
-            return UUID.fromString(packId);
-        } catch (IllegalArgumentException ignored) {
-            return new UUID(0, 0);
-        }
     }
 
     public SerializedImage getImage() {
@@ -653,7 +588,7 @@ public class BinaryStream {
                 String pieceType;
                 String packId;
                 if (v2168) {
-                    pieceType = ordinalToPersonaPieceType(this.getLInt());
+                    pieceType = PersonaPieceType.fromOrdinal(this.getLInt()).getSerializeName();
                     packId = this.getUUID().toString();
                 } else {
                     pieceType = this.getString();
