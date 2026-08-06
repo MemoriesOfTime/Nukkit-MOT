@@ -354,12 +354,16 @@ public class BinaryStream {
             }
             if (useSteve) {
                 this.putByteArray(steveSkinDecoded != null ? steveSkinDecoded : (steveSkinDecoded = Base64.getDecoder().decode(Skin.STEVE_SKIN)));
-                this.putByteArray(skin.getCapeData().data);
+                if (protocol >= ProtocolInfo.v1_2_13) {
+                    this.putByteArray(skin.getCapeData().data);
+                }
                 this.putString("geometry.humanoid.custom");
                 this.putString(Skin.STEVE_GEOMETRY_OLD);
             } else {
                 this.putByteArray(skin.getSkinData().data);
-                this.putByteArray(skin.getCapeData().data);
+                if (protocol >= ProtocolInfo.v1_2_13) {
+                    this.putByteArray(skin.getCapeData().data);
+                }
                 this.putString(skin.isLegacySlim ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom");
                 this.putString(skin.getGeometryData());
             }
@@ -378,10 +382,16 @@ public class BinaryStream {
             }
             for (SkinAnimation animation : animations) {
                 this.putImage(animation.image);
-                this.putLInt(animation.type);
-                this.putLFloat(animation.frames);
-                if (protocol >= ProtocolInfo.v1_16_100) {
-                    this.putLInt(animation.expression);
+                if (protocol >= ProtocolInfo.v1_26_40) {
+                    this.putUnsignedVarInt(animation.type);
+                    this.putLFloat(animation.frames);
+                    this.putUnsignedVarInt(animation.expression);
+                } else {
+                    this.putLInt(animation.type);
+                    this.putLFloat(animation.frames);
+                    if (protocol >= ProtocolInfo.v1_16_100) {
+                        this.putLInt(animation.expression);
+                    }
                 }
             }
 
@@ -599,9 +609,18 @@ public class BinaryStream {
         int animationCount = protocol >= ProtocolInfo.v1_26_40 ? (int) this.getUnsignedVarInt() : this.getLInt();
         for (int i = 0; i < Math.min(animationCount, 1024); i++) {
             SerializedImage image = this.getImage(Skin.SKIN_128_128_SIZE);
-            int type = this.getLInt();
-            float frames = this.getLFloat();
-            int expression = protocol >= ProtocolInfo.v1_16_100 ? this.getLInt() : 0;
+            int type;
+            float frames;
+            int expression;
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                type = (int) this.getUnsignedVarInt();
+                frames = this.getLFloat();
+                expression = (int) this.getUnsignedVarInt();
+            } else {
+                type = this.getLInt();
+                frames = this.getLFloat();
+                expression = protocol >= ProtocolInfo.v1_16_100 ? this.getLInt() : 0;
+            }
             skin.getAnimations().add(new SkinAnimation(image, type, frames, expression));
         }
 
