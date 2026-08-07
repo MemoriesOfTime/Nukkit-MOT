@@ -15,6 +15,7 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTurtleShell;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Sound;
@@ -270,13 +271,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     @Override
     public boolean entityBaseTick(int tickDiff) {
         boolean inWater = this.isSubmerged();
+        int respirationTick = 1;
 
         if (this instanceof Player && !this.closed) {
             Player p = (Player) this;
             boolean isBreathing = !inWater;
 
             PlayerInventory inv = p.getInventory();
-            if (isBreathing && inv != null && inv.getHelmetFast() instanceof ItemTurtleShell) {
+            Item helmet = inv == null ? null : inv.getHelmetFast();
+
+            if (helmet != null && helmet.isHelmet()) {
+                respirationTick = helmet.getEnchantmentLevel(Enchantment.ID_WATER_BREATHING) + 1;
+            }
+
+            if (isBreathing && helmet instanceof ItemTurtleShell) {
                 turtleTicks = 200;
             } else if (turtleTicks > 0) {
                 isBreathing = true;
@@ -343,7 +351,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 if (this instanceof EntitySwimming || this.isDrowned || this instanceof EntitySkeletonHorse || this instanceof EntityIronGolem || this instanceof Player player && (player.isCreative() || player.isSpectator())) {
                     this.setAirTicks(400);
                 } else {
-                    if (turtleTicks == 0) {
+                    if (turtleTicks <= 0 && level.getCurrentTick() % respirationTick == 0) {
                         hasUpdate = true;
                         int airTicks = this.getAirTicks() - tickDiff;
 
