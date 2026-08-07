@@ -3,6 +3,7 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
@@ -162,7 +163,7 @@ public class PlayerAuthInputPacket extends DataPacket {
                 if (arraySize > 256) {
                     throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
                 }
-                this.decodeBlockActions(arraySize);
+                this.decodeBlockActions(arraySize, true);
             }
             if (this.getBoolean() && this.getBoolean()) {
                 this.vehicleRotation = this.getVector2f();
@@ -184,7 +185,7 @@ public class PlayerAuthInputPacket extends DataPacket {
                 if (arraySize > 256) {
                     throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
                 }
-                this.decodeBlockActions(arraySize);
+                this.decodeBlockActions(arraySize, false);
             }
 
             if (protocol >= ProtocolInfo.v1_19_70_24) {
@@ -209,22 +210,40 @@ public class PlayerAuthInputPacket extends DataPacket {
         }
     }
 
-    private void decodeBlockActions(int arraySize) {
+    /**
+     * v2168 起每条 block action 固定为 action+position+face（与类型无关）；pre-v2168 仅 5 种动作带 position+face。
+     * <p>
+     * From v2168 every block action is action+position+face unconditionally; pre-v2168 only 5 action types carry them.
+     *
+     * @param unconditional v2168+ 传 true，每条动作都读取 position+face / true for v2168+: read position+face per action
+     */
+    private void decodeBlockActions(int arraySize, boolean unconditional) {
         for (int i = 0; i < arraySize; i++) {
             PlayerActionType type = PlayerActionType.fromOrNull(this.getVarInt());
-            if (type == null) {
-                continue;
-            }
-            switch (type) {
-                case START_DESTROY_BLOCK:
-                case ABORT_DESTROY_BLOCK:
-                case CRACK_BLOCK:
-                case PREDICT_DESTROY_BLOCK:
-                case CONTINUE_DESTROY_BLOCK:
-                    this.blockActionData.put(type, new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
-                    break;
-                default:
-                    this.blockActionData.put(type, new PlayerBlockActionData(type, null, -1));
+            if (unconditional) {
+                // v2168+: position+face 总是存在 / always present
+                BlockVector3 position = this.getSignedBlockPosition();
+                int facing = this.getVarInt();
+                if (type == null) {
+                    continue;
+                }
+                this.blockActionData.put(type, new PlayerBlockActionData(type, position, facing));
+            } else {
+                // pre-v2168: 仅 5 种动作携带 position+face / only 5 action types carry position+face
+                if (type == null) {
+                    continue;
+                }
+                switch (type) {
+                    case START_DESTROY_BLOCK:
+                    case ABORT_DESTROY_BLOCK:
+                    case CRACK_BLOCK:
+                    case PREDICT_DESTROY_BLOCK:
+                    case CONTINUE_DESTROY_BLOCK:
+                        this.blockActionData.put(type, new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
+                        break;
+                    default:
+                        this.blockActionData.put(type, new PlayerBlockActionData(type, null, -1));
+                }
             }
         }
     }

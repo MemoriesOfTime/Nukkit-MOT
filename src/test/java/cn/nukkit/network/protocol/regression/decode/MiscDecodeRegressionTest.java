@@ -2906,6 +2906,103 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
     }
 
+    /**
+     * 回归（v2168）：default 分支动作（如 STOP_DESTROY_BLOCK）此前不消费 position+face，导致后续字段错位。
+     * <p>
+     * Regression (v2168): default-branch actions (e.g. STOP_DESTROY_BLOCK) previously skipped position+face and desynced later fields.
+     */
+    @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with default-branch block actions")
+    @MethodSource("versionsAt2168")
+    void playerAuthInputWithDefaultBranchBlockActions(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket();
+        cb.setRotation(Vector3f.from(10.5f, 20.5f, 30.5f));
+        cb.setPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        cb.setMotion(org.cloudburstmc.math.vector.Vector2f.from(0.25f, -0.5f));
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.UP);
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.PERFORM_BLOCK_ACTIONS);
+        cb.setInputMode(org.cloudburstmc.protocol.bedrock.data.InputMode.TOUCH);
+        cb.setPlayMode(org.cloudburstmc.protocol.bedrock.data.ClientPlayMode.NORMAL);
+        cb.setInputInteractionModel(org.cloudburstmc.protocol.bedrock.data.InputInteractionModel.CROSSHAIR);
+        cb.setTick(456L);
+        cb.setDelta(Vector3f.from(0.5f, 0.6f, 0.7f));
+        if (protocol >= ProtocolInfo.v1_19_70) {
+            cb.setAnalogMoveVector(org.cloudburstmc.math.vector.Vector2f.from(0.33f, -0.66f));
+        }
+        if (protocol >= ProtocolInfo.v1_21_40) {
+            cb.setInteractRotation(org.cloudburstmc.math.vector.Vector2f.from(7.0f, 8.0f));
+            cb.setCameraOrientation(Vector3f.from(0.0f, 2.0f, 0.0f));
+        }
+        if (protocol >= ProtocolInfo.v1_21_50) {
+            cb.setRawMoveVector(org.cloudburstmc.math.vector.Vector2f.from(-0.5f, 0.25f));
+        }
+
+        // 显式 case：START_DESTROY_BLOCK（Nukkit 走 switch 内分支，原本就正确）
+        var startBreak = new org.cloudburstmc.protocol.bedrock.data.PlayerBlockActionData();
+        startBreak.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.START_BREAK);
+        startBreak.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(10, 64, -2));
+        startBreak.setFace(1);
+        cb.getPlayerActions().add(startBreak);
+
+        // default 分支：STOP_DESTROY_BLOCK（Nukkit 序号 2，不在显式 case 中，此前会漏读 position+face）
+        var stopBreak = new org.cloudburstmc.protocol.bedrock.data.PlayerBlockActionData();
+        stopBreak.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.STOP_BREAK);
+        stopBreak.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(11, 65, -3));
+        stopBreak.setFace(2);
+        cb.getPlayerActions().add(stopBreak);
+
+        // default 分支：BLOCK_INTERACT（Nukkit INTERACT_WITH_BLOCK，序号 25）
+        var blockInteract = new org.cloudburstmc.protocol.bedrock.data.PlayerBlockActionData();
+        blockInteract.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.BLOCK_INTERACT);
+        blockInteract.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(12, 66, -4));
+        blockInteract.setFace(3);
+        cb.getPlayerActions().add(blockInteract);
+
+        PlayerAuthInputPacket nk = crossEncode(cb, PlayerAuthInputPacket::new, protocol);
+
+        var actions = nk.getBlockActionData();
+        assertEquals(3, actions.size(), "all three block actions should be decoded");
+
+        var start = actions.get(cn.nukkit.network.protocol.types.PlayerActionType.START_DESTROY_BLOCK);
+        assertNotNull(start, "START_DESTROY_BLOCK must be present");
+        assertEquals(10, start.getPosition().x);
+        assertEquals(64, start.getPosition().y);
+        assertEquals(-2, start.getPosition().z);
+        assertEquals(1, start.getFacing());
+
+        // default 分支动作现在必须携带正确的 position+face（此前为 null/-1）
+        var stop = actions.get(cn.nukkit.network.protocol.types.PlayerActionType.STOP_DESTROY_BLOCK);
+        assertNotNull(stop, "STOP_DESTROY_BLOCK must be present");
+        assertEquals(11, stop.getPosition().x);
+        assertEquals(65, stop.getPosition().y);
+        assertEquals(-3, stop.getPosition().z);
+        assertEquals(2, stop.getFacing());
+
+        var interact = actions.get(cn.nukkit.network.protocol.types.PlayerActionType.INTERACT_WITH_BLOCK);
+        assertNotNull(interact, "INTERACT_WITH_BLOCK must be present");
+        assertEquals(12, interact.getPosition().x);
+        assertEquals(66, interact.getPosition().y);
+        assertEquals(-4, interact.getPosition().z);
+        assertEquals(3, interact.getFacing());
+
+        // 若 position+face 未被消费，后续这些字段会错位并导致断言失败。
+        // <p>Without consuming position+face, these later fields would read garbage and fail.
+        if (protocol >= ProtocolInfo.v1_19_70) {
+            assertNotNull(nk.getAnalogMoveVector());
+            assertEquals(0.33f, nk.getAnalogMoveVector().x, 0.001f);
+            assertEquals(-0.66f, nk.getAnalogMoveVector().y, 0.001f);
+        }
+        if (protocol >= ProtocolInfo.v1_21_40) {
+            assertNotNull(nk.getCameraOrientation());
+            assertEquals(2.0f, nk.getCameraOrientation().y, 0.001f);
+        }
+        if (protocol >= ProtocolInfo.v1_21_50) {
+            assertNotNull(nk.getRawMoveVector());
+            assertEquals(-0.5f, nk.getRawMoveVector().x, 0.001f);
+            assertEquals(0.25f, nk.getRawMoveVector().y, 0.001f);
+        }
+        assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
+    }
+
     @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with item interaction triggerType and clientInteractPrediction")
     @MethodSource("versionsV712ToV748")
     void playerAuthInputWithItemInteractionV712(int protocol) {
