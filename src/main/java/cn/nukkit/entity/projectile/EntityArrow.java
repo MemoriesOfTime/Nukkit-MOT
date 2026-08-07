@@ -140,7 +140,7 @@ public class EntityArrow extends EntitySlenderProjectile {
         addEntity.speedX = (float) this.motionX;
         addEntity.speedY = (float) this.motionY;
         addEntity.speedZ = (float) this.motionZ;
-        addEntity.metadata = this.dataProperties.clone().putByte(DATA_ARROW_AUX_VALUE, 0);
+        addEntity.metadata = this.dataPropertiesController.getDataProperties(player.protocol).clone().putByte(DATA_ARROW_AUX_VALUE, 0);
         addEntity.properties = this.propertySyncData();
 
         player.dataPacket(addEntity);

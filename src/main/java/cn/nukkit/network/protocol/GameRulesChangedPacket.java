@@ -2,7 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
+import cn.nukkit.network.protocol.v113.ProtocolInfo_v113;
 import lombok.ToString;
 
 import java.util.Map;
@@ -19,7 +19,7 @@ public class GameRulesChangedPacket extends DataPacket {
     @Override
     public byte pid() {
         if(this.protocol < ProtocolInfo.v1_2_0 && this.protocol >= ProtocolInfo.v_1_0_0){
-            return ProtocolInfoV113.GAME_RULES_CHANGED_PACKET;
+            return ProtocolInfo_v113.GAME_RULES_CHANGED_PACKET;
         }
         return NETWORK_ID;
     }

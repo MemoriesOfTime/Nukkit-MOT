@@ -1,5 +1,6 @@
 package cn.nukkit.entity.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
@@ -76,9 +77,6 @@ public class EntityBoat extends EntityVehicle {
         if (this.namedTag.contains("Variant")) {
             this.woodID = this.namedTag.getInt("Variant");
         }
-        this.dataProperties.putInt(DATA_VARIANT, this.woodID);
-        this.dataProperties.putBoolean(DATA_IS_BUOYANT, true);
-        this.dataProperties.putString(DATA_BUOYANCY_DATA, "{\"apply_gravity\":true,\"base_buoyancy\":1.0,\"big_wave_probability\":0.02999999932944775,\"big_wave_speed\":10.0,\"drag_down_on_buoyancy_removed\":0.0,\"liquid_blocks\":[\"minecraft:water\",\"minecraft:flowing_water\"],\"simulate_waves\":true}");
         this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_COLLIDABLE, true);
         this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putInt(DATA_VARIANT, this.woodID);
         this.dataPropertiesController.getDataProperties(ProtocolInfo.CURRENT_PROTOCOL).putBoolean(DATA_IS_BUOYANT, true);
@@ -152,7 +150,7 @@ public class EntityBoat extends EntityVehicle {
             this.rotateVehicle();
         }
 
-        boolean simulateWaves = (!(getPassenger() instanceof Player) || isPlayerOfNewerVersion) && !getDataFlag(DATA_FLAGS, DATA_FLAG_OUT_OF_CONTROL);
+        boolean simulateWaves = (!(getPassenger() instanceof Player) || isPlayerOfNewerVersion) && !getDataFlag(GameVersion.getLastVersion().getProtocol(), DATA_FLAGS, DATA_FLAG_OUT_OF_CONTROL);
 
         if (simulateWaves) {
             if (waterDiff > SINKING_DEPTH && !this.sinking) {

@@ -2309,7 +2309,12 @@ public class BinaryStream {
         });
     }
 
-    public void putGameRulesMap(int protocol, Map<GameRule, GameRules.Value> allGameRules) {
+    @Deprecated
+    public void putGameRulesMap(int protocol, Map<GameRule, GameRules.Value> allGameRules, boolean startGame) {
+        this.putGameRulesMap(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), allGameRules, startGame);
+    }
+
+    public void putGameRulesMap(GameVersion gameVersion, Map<GameRule, GameRules.Value> allGameRules, boolean startGame) {
         Map<GameRule, GameRules.Value> rulesToSend = new HashMap<>();
         allGameRules.forEach((gameRule, value) -> {
             int protocol = gameVersion.getProtocol();

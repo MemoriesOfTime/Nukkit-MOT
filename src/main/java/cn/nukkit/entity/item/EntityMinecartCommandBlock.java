@@ -1,5 +1,6 @@
 package cn.nukkit.entity.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -215,7 +216,7 @@ public class EntityMinecartCommandBlock extends EntityMinecartAbstract
 
         this.inventory = new CommandBlockMinecartInventory(this);
 
-        this.dataProperties
+        this.dataPropertiesController.getDataProperties(GameVersion.getLastVersion().getProtocol())
                 .putByte(Entity.DATA_CONTAINER_TYPE, ContainerType.COMMAND_BLOCK.getId())
                 .putInt(Entity.DATA_CONTAINER_BASE_SIZE, 1)
                 .putInt(Entity.DATA_CONTAINER_EXTRA_SLOTS_PER_STRENGTH, 0);

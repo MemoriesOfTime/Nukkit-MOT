@@ -19,6 +19,8 @@ import org.jose4j.jwt.consumer.JwtContext;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static cn.nukkit.utils.ClientChainData.decodeToken;
+
 @ToString
 public class LoginPacket extends DataPacket {
 
@@ -294,7 +296,7 @@ public class LoginPacket extends DataPacket {
                 }
 
                 for (String c : chain) {
-                    JsonObject chainMap = ClientChainData.decodeToken(c);
+                    JsonObject chainMap = decodeToken(c);
                     if (chainMap == null) continue;
                     if (chainMap.has("extraData")) {
                         JsonObject extra = chainMap.get("extraData").getAsJsonObject();
@@ -329,7 +331,7 @@ public class LoginPacket extends DataPacket {
             return; // Get disconnected due to "invalid skin"
         }
 
-        JsonObject skinToken = ClientChainData.decodeToken(new String(this.get(size), StandardCharsets.UTF_8));
+        JsonObject skinToken = decodeToken(new String(this.get(size), StandardCharsets.UTF_8));
         if (skinToken == null) throw new RuntimeException("Invalid null skin token");
 
         // 将1.19.62按1.19.63版本处理 修复1.19.62皮肤修改问题

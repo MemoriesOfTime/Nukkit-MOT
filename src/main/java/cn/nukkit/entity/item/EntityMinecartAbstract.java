@@ -1,5 +1,6 @@
 package cn.nukkit.entity.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockRail;
@@ -778,13 +779,13 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
     }
 
     private void saveEntityData() {
-        if (blockInside == null && super.getDataPropertyByte((ProtocolInfo.CURRENT_PROTOCOL, DATA_HAS_DISPLAY) == 1) {
-            int display = getDataPropertyInt(DATA_DISPLAY_ITEM);
+        if (blockInside == null && super.getDataPropertyByte(GameVersion.getLastVersion().getProtocol(), DATA_HAS_DISPLAY) == 1) {
+            int display = getDataPropertyInt(GameVersion.getLastVersion().getProtocol(), DATA_DISPLAY_ITEM);
             if (display != 0) {
                 blockInside = Block.get(display & 0xFFFF, (display >> 16) & 0xFFFF);
             }
         }
-        boolean hasDisplay = super.getDataPropertyByte(DATA_HAS_DISPLAY) == 1
+        boolean hasDisplay = super.getDataPropertyByte(GameVersion.getLastVersion().getProtocol(), DATA_HAS_DISPLAY) == 1
                 || blockInside != null;
         int display;
         int offSet;
@@ -793,7 +794,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             display = blockInside == null ? 0
                     : blockInside.getId()
                     | blockInside.getDamage() << 16;
-            offSet = getDataPropertyInt(ProtocolInfo.CURRENT_PROTOCOL, DATA_DISPLAY_OFFSET);
+            offSet = getDataPropertyInt(GameVersion.getLastVersion().getProtocol(), DATA_DISPLAY_OFFSET);
             namedTag.putInt("DisplayTile", display);
             namedTag.putInt("DisplayOffset", offSet);
         }
@@ -868,7 +869,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @return integer
      */
     public int getDisplayBlockOffset() {
-        return super.getDataPropertyInt(ProtocolInfo.CURRENT_PROTOCOL, DATA_DISPLAY_OFFSET);
+        return super.getDataPropertyInt(GameVersion.getLastVersion().getProtocol(), DATA_DISPLAY_OFFSET);
     }
 
     /**

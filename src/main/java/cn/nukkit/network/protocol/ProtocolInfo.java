@@ -764,7 +764,7 @@ public interface ProtocolInfo {
         .put(ChunkRadiusUpdatedPacket.class, (byte) 0x3e)
         .put(ItemFrameDropItemPacket.class, (byte) 0x3f)
         .put(ReplaceSelectedItemPacket.class, (byte) 0x40)
-        .put(AddItemPacketV113.class, (byte) 0x41)
+        .put(AddItemPacket_v113.class, (byte) 0x41)
         .build();
 
     ImmutableMap<Class<? extends DataPacket>, Byte> ProtocolInfo90 = ImmutableMap.<Class<? extends DataPacket>, Byte>builder()
@@ -784,7 +784,7 @@ public interface ProtocolInfo {
         .put(AddEntityPacket.class, (byte) 0x0e)
         .put(RemoveEntityPacket.class, (byte) 0x0f)
         .put(AddItemEntityPacket.class, (byte) 0x10)
-        .put(AddHangingEntityPacketV113.class, (byte) 0x11)
+        .put(AddHangingEntityPacket_v113.class, (byte) 0x11)
         .put(TakeItemEntityPacket.class, (byte) 0x12)
         .put(MoveEntityAbsolutePacket.class, (byte) 0x13)
         .put(MovePlayerPacket.class, (byte) 0x14)
@@ -813,7 +813,7 @@ public interface ProtocolInfo {
         .put(AnimatePacket.class, (byte) 0x2b)
         .put(RespawnPacket.class, (byte) 0x2c)
         .put(DropItemPacket.class, (byte) 0x2d)
-        .put(InventoryActionPacketV113.class, (byte) 0x2e)
+        .put(InventoryActionPacket_v113.class, (byte) 0x2e)
         .put(ContainerOpenPacket.class, (byte) 0x2f)
         .put(ContainerClosePacket.class, (byte) 0x30)
         .put(ContainerSetSlotPacket.class, (byte) 0x31)
@@ -840,10 +840,10 @@ public interface ProtocolInfo {
         .put(ReplaceSelectedItemPacket.class, (byte) 0x46)
         .put(GameRulesChangedPacket.class, (byte) 0x47)
         .put(CameraPacket.class, (byte) 0x48)
-        .put(AddItemPacketV113.class, (byte) 0x49)
+        .put(AddItemPacket_v113.class, (byte) 0x49)
         .put(BossEventPacket.class, (byte) 0x4a)
         .put(AvailableCommandsPacket.class, (byte) 0x4b)
-        .put(CommandStepPacketV113.class, (byte) 0x4c)
+        .put(CommandStepPacket_v113.class, (byte) 0x4c)
         .put(ResourcePackDataInfoPacket.class, (byte) 0x4d)
         .put(ResourcePackChunkDataPacket.class, (byte) 0x4e)
         .put(ResourcePackChunkRequestPacket.class, (byte) 0x4f)
@@ -861,6 +861,5 @@ public interface ProtocolInfo {
         .put(v_0_15_10, ProtocolInfo.ProtocolInfo84)
         .put(v_0_16_0, ProtocolInfo.ProtocolInfo90)
         .put(v_0_16_1, ProtocolInfo.ProtocolInfo90)
-        //.put(v1_1_0, ProtocolInfoV113)
         .build();
 }

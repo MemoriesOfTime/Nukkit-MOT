@@ -4055,7 +4055,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
-        if(protocol <= ProtocolInfo.v_1_0_0){
+        if(protocol.getProtocol() <= ProtocolInfo.v_1_0_0){
             Long index = Level.chunkHash(x, z);
 
 //            if (this.chunkSendTasks.containsKey(index)) {
@@ -4075,7 +4075,7 @@ public class Level implements ChunkManager, Metadatable {
                 if (queue.containsKey(index)) {
                     for (Player player : queue.get(index).values()) {
                         if (player.isConnected() && player.usedChunks.containsKey(index)) {
-                            if (matchMVChunkProtocol(protocol, player.protocol)) {
+                            if (matchMVChunkProtocol(protocol, player.getGameVersion())) {
                                 player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                             }
                         }
@@ -5686,19 +5686,17 @@ public class Level implements ChunkManager, Metadatable {
         } else if (protocol == ProtocolInfo.v1_1_0) {
             return GameVersion.V1_1_0;
         } else if(protocol <= ProtocolInfo.v_0_9_0){
-            return ProtocolInfo.v_0_9_0;
+            return GameVersion.V0_9_5;
         } else if(protocol <= ProtocolInfo.v_0_10_0){
-            return ProtocolInfo.v_0_10_0;
+            return GameVersion.V0_10_5;
         } else if(protocol <= ProtocolInfo.v_0_11_0){
-            return ProtocolInfo.v_0_11_0;
+            return GameVersion.V0_11_1;
         } else if(protocol <= ProtocolInfo.v_0_14_3){
-            return ProtocolInfo.v_0_14_3;
+            return GameVersion.V0_12_3;
         } else if (protocol <= ProtocolInfo.v_0_15_10){
-            return ProtocolInfo.v_0_15_10;
+            return GameVersion.V0_15_10;
         } else if (protocol <= ProtocolInfo.v_1_0_0){
-            return ProtocolInfo.v_0_16_0;
-        } else if (protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfo.v1_1_0;
+            return GameVersion.V0_16_0;
         }
         throw new IllegalArgumentException("Invalid chunk protocol: " + protocol);
     }
@@ -5706,10 +5704,10 @@ public class Level implements ChunkManager, Metadatable {
     private static boolean matchMVChunkProtocol(GameVersion chunkVersion, GameVersion playerVersion) {
         if (chunkVersion == playerVersion) return true;
         if (chunkVersion.isNetEase() != playerVersion.isNetEase()) return false;
-        if (chunk == 0) if (player < ProtocolInfo.v1_2_0) return true;
 
         int chunk = chunkVersion.getProtocol();
         int player = playerVersion.getProtocol();
+        if (chunk == 0) if (player < ProtocolInfo.v1_2_0) return true;
 
         if(chunk == ProtocolInfo.v_0_10_0) if(player <= ProtocolInfo.v_0_10_0) return true;
         if(chunk == ProtocolInfo.v_0_11_0) if(player <= ProtocolInfo.v_0_11_0) return true;

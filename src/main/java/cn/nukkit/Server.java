@@ -1657,7 +1657,7 @@ public class Server {
                         p.getId(),
                         p.getDisplayName(),
                         p.getSkin(),
-                        p.protocol <= ProtocolInfo.v_1_0_0 ? "" : p.getLoginChainData().getXUID()),
+                        p.protocol <= ProtocolInfo.v_1_0_0 ? "" : p.getLoginChainData().getXUID(),
                         p.getLocatorBarColor()))
                 .toArray(PlayerListPacket.Entry[]::new);
 

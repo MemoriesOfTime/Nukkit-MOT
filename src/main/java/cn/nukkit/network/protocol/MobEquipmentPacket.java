@@ -18,8 +18,6 @@ public class MobEquipmentPacket extends DataPacket {
             return NETWORK_ID;
         }else if(this.protocol < ProtocolInfo.v_1_0_0){
             return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
-        }else if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.MOB_EQUIPMENT_PACKET;
         }
         return NETWORK_ID;
     }

@@ -2,6 +2,7 @@ package cn.nukkit.entity.data;
 
 import cn.nukkit.Server;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
 import com.google.gson.Gson;

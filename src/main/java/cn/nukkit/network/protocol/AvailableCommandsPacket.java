@@ -2,7 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.command.data.*;
 import cn.nukkit.network.protocol.types.CommandParam;
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
+import cn.nukkit.network.protocol.v113.ProtocolInfo_v113;
 import cn.nukkit.utils.BinaryStream;
 import com.google.gson.Gson;
 import lombok.ToString;
@@ -266,7 +266,7 @@ public class AvailableCommandsPacket extends DataPacket {
         if(this.protocol >= ProtocolInfo.v1_2_0){
             return NETWORK_ID;
         }else if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.AVAILABLE_COMMANDS_PACKET;
+            return ProtocolInfo_v113.AVAILABLE_COMMANDS_PACKET;
         }
         return NETWORK_ID;
     }

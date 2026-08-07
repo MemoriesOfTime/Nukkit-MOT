@@ -183,7 +183,7 @@ public final class PlayerEntitySkinSender {
         skin.setSkinId(EMPTY_SKIN_ID);
         skin.setSkinData(new byte[Skin.SINGLE_SKIN_SIZE]);
         skin.setGeometryName("geometry.humanoid.custom");
-        if (!skin.isValid()) {
+        if (!skin.isValid(GameVersion.getLastVersion().getProtocol())) {
             throw new IllegalStateException("Empty player list skin must be valid");
         }
         return skin;

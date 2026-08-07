@@ -3,7 +3,6 @@ package cn.nukkit.network.protocol.v20;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 
 public class UnloadChunkPacket  extends DataPacket {
 

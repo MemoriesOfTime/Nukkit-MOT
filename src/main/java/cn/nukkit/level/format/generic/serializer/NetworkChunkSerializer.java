@@ -10,13 +10,12 @@ import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.utils.ThreadCache;
-import cn.nukkit.utils.Utils;
+import cn.nukkit.utils.*;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
@@ -24,7 +23,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -151,7 +152,7 @@ public class NetworkChunkSerializer {
             }
         }
 
-        NetworkChunkData networkChunkData = new NetworkChunkData(protocolId, subChunkCount, antiXray, dimensionData);
+        NetworkChunkData networkChunkData = new NetworkChunkData(GameVersion.byProtocol(protocolId, false), subChunkCount, antiXray, dimensionData);
         subChunkCount = Math.max(1, subChunkCount - chunk.getSectionOffset());
         networkChunkData.setChunkSections(subChunkCount);
 
@@ -257,8 +258,9 @@ public class NetworkChunkSerializer {
 
         if(protocolId >= ProtocolInfo.v_0_11_0){
             // height map
-            for (byte height : chunk.getHeightMapArray()) {
-                stream.putByte(height);
+            for (short height : chunk.getHeightMapArray()) {
+                byte heightByte = (byte)height;
+                stream.putByte(heightByte);
             }
         }else{
             // biome id
@@ -289,7 +291,7 @@ public class NetworkChunkSerializer {
             }
         }
 
-        callback.accept(new NetworkChunkSerializerCallback(protocolId, stream, networkChunkData.getChunkSections()));
+        callback.accept(new NetworkChunkSerializerCallback(GameVersion.byProtocol(protocolId, false), stream, networkChunkData.getChunkSections()));
         return;
     }
 

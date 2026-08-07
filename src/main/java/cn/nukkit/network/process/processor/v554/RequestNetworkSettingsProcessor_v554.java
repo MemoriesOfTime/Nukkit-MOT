@@ -32,7 +32,6 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
         Player player = playerHandle.player;
 
         // 判断用户的 raknet 版本
-        if (player.raknetProtocol < 11) {
         if (player.raknetProtocol < 11
                 && (player.raknetProtocol != 8 && !Server.getInstance().netEaseMode)) {
             return;

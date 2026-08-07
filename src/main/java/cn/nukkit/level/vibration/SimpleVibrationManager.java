@@ -1,5 +1,6 @@
 package cn.nukkit.level.vibration;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -90,7 +91,7 @@ public class SimpleVibrationManager implements VibrationManager {
     protected boolean isValidVibration(VibrationEvent event) {
         Object initiator = event.initiator();
         if (initiator instanceof Entity entity) {
-            if (entity.getDataFlag(Entity.DATA_FLAGS, Entity.DATA_FLAG_SILENT)) {
+            if (entity.getDataFlag(GameVersion.getLastVersion().getProtocol(), Entity.DATA_FLAGS, Entity.DATA_FLAG_SILENT)) {
                 return false;
             }
             if (entity instanceof Player player && player.getGamemode() == Player.SPECTATOR) {

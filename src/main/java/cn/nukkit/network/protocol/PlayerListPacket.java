@@ -150,8 +150,6 @@ public class PlayerListPacket extends DataPacket {
             return NETWORK_ID;
         }else if(this.protocol < ProtocolInfo.v_1_0_0){
             return ProtocolInfo.oldProtocolInfo.get(this.protocol).getOrDefault(this.getClass(),(byte) 0xc3);
-        }else if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.PLAYER_LIST_PACKET;
         }
         return NETWORK_ID;
     }

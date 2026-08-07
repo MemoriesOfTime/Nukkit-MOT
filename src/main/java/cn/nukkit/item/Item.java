@@ -606,12 +606,12 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
 
         // Creative inventory for oldest versions
-        registerCreativeItems(v_0_11_0);
-        registerCreativeItems(v_0_12_1);
-        registerCreativeItems(v_0_13_0);
-        registerCreativeItems(v_0_14_3);
-        registerCreativeItems(v_0_15_10);
-        registerCreativeItems(v_0_16_0);
+//        registerCreativeItems(v_0_11_0);
+//        registerCreativeItems(v_0_12_1);
+//        registerCreativeItems(v_0_13_0);
+//        registerCreativeItems(v_0_14_3);
+//        registerCreativeItems(v_0_15_10);
+//        registerCreativeItems(v_0_16_0);
 
         // Only load the latest version; runtime filtering via isSupportedOn per protocol
         registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_111, CREATIVE_ITEMS);
@@ -708,28 +708,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static ArrayList<Item> getCreativeItems(GameVersion gameVersion) {
-        switch (gameVersion) {
-            case v_0_9_0:
-            case v_0_10_0:
-                return new ArrayList<>(Item.creative20);
-            case v_0_11_0:
-                return new ArrayList<>(Item.creative27);
-            case v_0_12_1:
-                return new ArrayList<>(Item.creative34);
-            case v_0_13_0:
-            case v_0_13_2:
-                return new ArrayList<>(Item.creative38);
-            case v_0_14_0:
-            case v_0_14_1:
-            case v_0_14_3:
-                return new ArrayList<>(Item.creative70);
-            case v_0_15_10:
-                return new ArrayList<>(Item.creative84);
-            //return new ArrayList<>(Item.creative84);
-            case v_0_16_0:
-            case v_0_16_1:
-                return new ArrayList<>(Item.creative90);
-        }
         return new ArrayList<>(getCreativeItemsAndGroups().getItems(gameVersion));
     }
 

@@ -86,7 +86,7 @@ public class CraftingDataPacket extends DataPacket {
             BinaryStream writer = new BinaryStream();
 
             for (Object entry : entries) {
-                int entryType = writeEntryLegacy(entry, writer);
+                int entryType = writeEntryLegacy(GameVersion.byProtocol(this.protocol, false), entry, writer);
                 if (entryType >= 0) {
                     this.putVarInt(entryType);
                     this.put(writer.getBuffer());
@@ -344,8 +344,6 @@ public class CraftingDataPacket extends DataPacket {
             return NETWORK_ID;
         }else if(this.protocol < ProtocolInfo.v_1_0_0){
             return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
-        }else if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.CRAFTING_DATA_PACKET;
         }
         return NETWORK_ID;
     }

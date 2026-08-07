@@ -1,6 +1,5 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -47,8 +46,6 @@ public class PlayerInputPacket extends DataPacket {
             return NETWORK_ID;
         }else if(this.protocol < ProtocolInfo.v_1_0_0){
             return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
-        }else if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.PLAYER_INPUT_PACKET;
         }
         return NETWORK_ID;
     }

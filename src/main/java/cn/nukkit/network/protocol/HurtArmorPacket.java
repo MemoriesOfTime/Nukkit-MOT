@@ -1,6 +1,6 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
+import cn.nukkit.network.protocol.v113.ProtocolInfo_v113;
 import lombok.ToString;
 
 /**
@@ -45,7 +45,7 @@ public class HurtArmorPacket extends DataPacket {
         }else if(this.protocol < ProtocolInfo.v_1_0_0){
             return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
         }else if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.HURT_ARMOR_PACKET;
+            return ProtocolInfo_v113.HURT_ARMOR_PACKET;
         }
         return NETWORK_ID;
     }

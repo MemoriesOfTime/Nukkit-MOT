@@ -12,6 +12,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.sound.EndermanTeleportSound;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
@@ -37,7 +38,7 @@ public class EntityShulker extends EntityWalkingMob {
     public float getHeight() {
         return 1f;
     }
-    
+
     @Override
     public double getSpeed() {
         return 0;

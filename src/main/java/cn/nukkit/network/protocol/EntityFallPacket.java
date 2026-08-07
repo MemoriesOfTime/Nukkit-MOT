@@ -1,6 +1,5 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 @ToString
@@ -30,9 +29,6 @@ public class EntityFallPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.ENTITY_FALL_PACKET;
-        }
         return NETWORK_ID;
     }
 }

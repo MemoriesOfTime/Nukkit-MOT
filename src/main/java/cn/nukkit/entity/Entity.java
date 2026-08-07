@@ -3436,19 +3436,19 @@ public abstract class Entity extends Location implements Metadatable {
             }
             return false;
         }else{
-            if (Objects.equals(data, this.dataProperties.get(data.getId()))) {
+            if (Objects.equals(data, dataProperties.get(data.getId()))) {
                 return false;
             }
 
-            this.dataProperties.put(data);
+            dataProperties.put(data);
             if (this.chunk != null && !(this instanceof Player)) {
                 this.chunk.setChanged();
             }
             if (send) {
                 EntityMetadata metadata = new EntityMetadata();
-                metadata.put(this.dataProperties.get(data.getId()));
+                metadata.put(dataProperties.get(data.getId()));
                 if (data.getId() == DATA_FLAGS2) {
-                    metadata.put(this.dataProperties.get(DATA_FLAGS));
+                    metadata.put(dataProperties.get(DATA_FLAGS));
                 }
                 this.sendData(this.hasSpawned.values().toArray(Player.EMPTY_ARRAY), metadata);
             }
@@ -3467,13 +3467,13 @@ public abstract class Entity extends Location implements Metadatable {
             return true;
         }
 
-        if (!Objects.equals(data, this.dataProperties.get(data.getId()))) {
-            this.dataProperties.put(data);
+        if (!Objects.equals(data, dataProperties.get(data.getId()))) {
+            dataProperties.put(data);
             if (this instanceof Player player) {
-                EntityMetadata d = new EntityMetadata().put(this.dataProperties.get(data.getId()));
+                EntityMetadata d = new EntityMetadata().put(dataProperties.get(data.getId()));
                 SetEntityDataPacket pk = new SetEntityDataPacket();
                 pk.eid = this.id;
-                pk.metadata = d == null ? this.dataProperties.clone() : d;
+                pk.metadata = d == null ? dataProperties.clone() : d;
                 player.dataPacket(pk);
             }
             return true;

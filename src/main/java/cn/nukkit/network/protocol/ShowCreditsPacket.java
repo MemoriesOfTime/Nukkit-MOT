@@ -1,6 +1,5 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 @ToString
@@ -16,9 +15,6 @@ public class ShowCreditsPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.SHOW_CREDITS_PACKET;
-        }
         return NETWORK_ID;
     }
 

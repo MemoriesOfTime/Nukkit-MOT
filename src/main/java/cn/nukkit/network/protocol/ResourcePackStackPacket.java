@@ -1,7 +1,6 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.ExperimentData;
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import cn.nukkit.resourcepacks.ResourcePack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
@@ -81,9 +80,6 @@ public class ResourcePackStackPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.RESOURCE_PACK_STACK_PACKET;
-        }
         return NETWORK_ID;
     }
 }

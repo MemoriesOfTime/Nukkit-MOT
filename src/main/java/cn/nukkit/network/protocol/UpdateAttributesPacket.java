@@ -19,8 +19,6 @@ public class UpdateAttributesPacket extends DataPacket {
     public byte pid() {
         if(this.protocol < ProtocolInfo.v_1_0_0){
             return ProtocolInfo.oldProtocolInfo.get(this.protocol).getOrDefault(this.getClass(),(byte)0x1f);
-        }else if(this.protocol < ProtocolInfo.v1_2_0){
-            return ProtocolInfoV113.UPDATE_ATTRIBUTES_PACKET;
         }
         return NETWORK_ID;
     }

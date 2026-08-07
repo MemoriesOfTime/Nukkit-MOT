@@ -99,7 +99,7 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
                 break;
 
             case ACTION_RELEASE_ITEM_V113:
-                if (playerHandle.getStartAction() > -1 && player.getDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION)) {
+                if (playerHandle.getStartAction() > -1 && player.getDataFlag(player.protocol,Player.DATA_FLAGS, Player.DATA_FLAG_ACTION)) {
                     if (player.getInventory().getItemInHand().getId() == Item.BOW) {
                         Item bow = player.getInventory().getItemInHand();
                         ItemArrow itemArrow = new ItemArrow();

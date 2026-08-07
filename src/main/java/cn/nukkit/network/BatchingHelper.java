@@ -104,6 +104,7 @@ public class BatchingHelper {
             ObjectList<Player> finalTargets = targets.get(gameVersion);
 
             BinaryStream batched = new BinaryStream();
+            int protocolId = gameVersion.getProtocol();
             for (DataPacket packet : packetList) {
                 if (packet instanceof BatchPacket) {
                     throw new RuntimeException("Cannot batch BatchPacket");
