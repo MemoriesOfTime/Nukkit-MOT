@@ -3,24 +3,38 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.MainLogger;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.ToString;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 
 @ToString
 public class ItemComponentPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.ITEM_COMPONENT_PACKET;
 
-    public Entry[] entries = Entry.EMPTY_ARRAY;
+    public List<ItemDefinition> entries = new ArrayList<>();
 
-    public void setEntries(Entry[] entries) {
-        this.entries = entries == null? null : entries.length == 0? Entry.EMPTY_ARRAY : entries.clone();
+    private static final byte[] EMPTY_COMPOUND_TAG;
+
+    static {
+        try {
+            EMPTY_COMPOUND_TAG = NBTIO.writeNetwork(new CompoundTag(""));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public Entry[] getEntries() {
-        return entries == null? null : entries.length == 0? Entry.EMPTY_ARRAY : entries.clone();
+    public void setEntries(List<ItemDefinition> entries) {
+        this.entries = entries;
+    }
+
+    public List<ItemDefinition> getEntries() {
+        return entries;
     }
 
     @Override
@@ -30,42 +44,57 @@ public class ItemComponentPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(this.entries.length);
+        this.putUnsignedVarInt(this.entries.size());
         try {
-            for (Entry entry : this.entries) {
-                this.putString(entry.getName());
-                this.put(NBTIO.write(entry.getData(), ByteOrder.LITTLE_ENDIAN, true));
+            if (this.protocol >= ProtocolInfo.v1_21_60) {
+                for (ItemDefinition itemDefinition : this.entries) {
+                    this.putString(itemDefinition.getIdentifier());
+                    this.putLShort(itemDefinition.getRuntimeId());
+                    this.putBoolean(itemDefinition.isComponentBased());
+                    this.putVarInt(itemDefinition.getVersion());
+
+                    if (itemDefinition.getNetworkData() != null) {
+                        this.put(NBTIO.write(itemDefinition.getNetworkData(), ByteOrder.LITTLE_ENDIAN, true));
+                    } else {
+                        this.put(EMPTY_COMPOUND_TAG);
+                    }
+                }
+            } else {
+                for (ItemDefinition itemDefinition : this.entries) {
+                    this.putString(itemDefinition.getIdentifier());
+                    this.put(NBTIO.write(itemDefinition.getNetworkData(), ByteOrder.LITTLE_ENDIAN, true));
+                }
             }
         } catch (IOException e) {
             MainLogger.getLogger().error("Error while encoding NBT data of ItemComponentPacket", e);
         }
     }
 
+    @AllArgsConstructor
+    @Getter
     @ToString
-    public static class Entry {
+    public static class ItemDefinition {
 
-        public static final Entry[] EMPTY_ARRAY = new Entry[0];
-
-        private final String name;
-        private final CompoundTag data;
-
-        public Entry(String name, CompoundTag data) {
-            this.name = name;
-            this.data = data;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public CompoundTag getData() {
-            return data;
-        }
+        private final String identifier;
+        /**
+         * @since v776 1.21.60
+         */
+        private final int runtimeId;
+        /**
+         * @since v776 1.21.60
+         */
+        private final boolean componentBased;
+        /**
+         * @since v776 1.21.60
+         */
+        private final int version;
+        private final CompoundTag networkData;
 
     }
 

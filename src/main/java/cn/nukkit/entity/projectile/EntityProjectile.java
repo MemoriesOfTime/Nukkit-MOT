@@ -12,10 +12,13 @@ import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import lombok.Getter;
 import org.apache.commons.math3.util.FastMath;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -24,6 +27,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * @author MagicDroidX
  * Nukkit Project
  */
+@Getter
 public abstract class EntityProjectile extends Entity {
 
     public static final int DATA_SHOOTER_ID = 17;
@@ -33,10 +37,12 @@ public abstract class EntityProjectile extends Entity {
     public static final int PICKUP_CREATIVE = 2;
 
     public Entity shootingEntity;
-
     public boolean hadCollision = false;
-
+    private boolean shootVibrationSent = false;
     public int piercing;
+
+    @Getter
+    protected int collidedTick;
 
     public EntityProjectile(FullChunk chunk, CompoundTag nbt) {
         this(chunk, nbt, null);
@@ -152,7 +158,7 @@ public abstract class EntityProjectile extends Entity {
             Entity nearEntity = null;
 
             for (Entity entity : list) {
-                if (/*!entity.canCollideWith(this) || */(entity == this.shootingEntity && this.age < 5) || (entity.isPlayer && ((Player) entity).getGamemode() == Player.SPECTATOR)) {
+                if (/*!entity.canCollideWith(this) || */(entity == this.shootingEntity && this.age < 5) || (entity instanceof Player player && player.getGamemode() == Player.SPECTATOR)) {
                     continue;
                 }
 
@@ -191,6 +197,9 @@ public abstract class EntityProjectile extends Entity {
                 if (!hitEvent.isCancelled()) {
                     this.hadCollision = true;
 
+                    this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this.shootingEntity, new Vector3(this.x, this.y, this.z), VibrationType.PROJECTILE_LAND));
+                    this.shootVibrationSent = true;
+
                     this.motionX = 0;
                     this.motionY = 0;
                     this.motionZ = 0;
@@ -202,6 +211,13 @@ public abstract class EntityProjectile extends Entity {
                 }
             } else if (!this.isCollided && this.hadCollision) {
                 this.hadCollision = false;
+            } else if (!this.isCollided && !this.hadCollision && this.shootingEntity != null && !this.shootVibrationSent) {
+                this.shootVibrationSent = true;
+                Entity shooter = this.shootingEntity;
+                Vector3 origin = shooter != null
+                        ? new Vector3(shooter.x, shooter.y + shooter.getEyeHeight(), shooter.z)
+                        : new Vector3(this.x, this.y, this.z);
+                this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(shooter, origin, VibrationType.PROJECTILE_SHOOT));
             }
 
             if (!this.hadCollision || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001) {
@@ -244,6 +260,7 @@ public abstract class EntityProjectile extends Entity {
     }
 
     protected void onHitGround(Vector3 vector3) {
+        this.collidedTick = this.level.getServer().getTick();
         Block block = this.level.getBlock(this.chunk, vector3.getFloorX(), vector3.getFloorY(), vector3.getFloorZ(), 0, false);
         if (block.hasEntityCollision()) {
             block.onEntityCollide(this);

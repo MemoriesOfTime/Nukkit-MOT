@@ -58,7 +58,7 @@ public class FormWindowModal extends FormWindow {
     }
 
     @Override
-    public void setResponse(String data) {
+    public void setResponse(int protocol, String data) {
         if (data.equals("null")) {
             closed = true;
             return;

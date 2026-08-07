@@ -39,7 +39,7 @@ public class BlockEntityBlastFurnace extends BlockEntityFurnace {
     }
 
     @Override
-    protected SmeltingRecipe matchRecipe(int protocol, Item raw) {
+    protected SmeltingRecipe matchRecipe(Item raw) {
         return this.server.getCraftingManager().matchBlastFurnaceRecipe(raw);
     }
 

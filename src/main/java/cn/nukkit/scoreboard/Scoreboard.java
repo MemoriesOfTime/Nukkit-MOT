@@ -115,7 +115,7 @@ public class Scoreboard {
     /**
      * Queued score updates when holdUpdates is true
      */
-    private final List<QueuedScoreUpdate> queuedUpdates = new ArrayList<>(0);
+    private final List<QueuedScoreUpdate> queuedUpdates = new ArrayList<>();
 
     /**
      * Update score for given scorer.
@@ -315,7 +315,7 @@ public class Scoreboard {
      */
     private void sendShowPacket(Player player) {
         SetDisplayObjectivePacket objectivePacket = new SetDisplayObjectivePacket();
-        objectivePacket.displaySlot = cn.nukkit.network.protocol.types.DisplaySlot.valueOf(this.displaySlot.name().toUpperCase());
+        objectivePacket.displaySlot = cn.nukkit.network.protocol.types.DisplaySlot.valueOf(this.displaySlot.name().toUpperCase(Locale.ROOT));
         objectivePacket.objectiveId = this.objectiveId;
         objectivePacket.displayName = this.title;
         objectivePacket.criteria = "dummy";

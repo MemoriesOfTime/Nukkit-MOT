@@ -3,8 +3,11 @@ package cn.nukkit.level;
 import cn.nukkit.Server;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.utils.serverconfig.category.WorldEntry;
 
-import java.util.StringTokenizer;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Default dimensions and their Levels
@@ -38,15 +41,26 @@ public enum EnumLevel {
                 server.loadLevel("nether");
             }
             NETHER.level = server.getLevelByName("nether");
-            String list = server.getPropertyString("multi-nether-worlds");
-            if (!list.trim().isEmpty()) {
-                StringTokenizer tokenizer = new StringTokenizer(list, ", ");
-                while (tokenizer.hasMoreTokens()) {
-                    String world = tokenizer.nextToken();
+            List<String> multiNetherList = server.getServerConfig().worldSettings().multiNetherWorlds();
+            if (!multiNetherList.isEmpty()) {
+                Map<String, WorldEntry> worlds = server.getServerConfig().worldSettings().worlds();
+                for (String world : multiNetherList) {
                     Server.multiNetherWorlds.add(world);
                     String nether = world + "-nether";
                     if (server.getLevelByName(nether) == null) {
-                        server.generateLevel(nether, System.currentTimeMillis(), Generator.getGenerator(Generator.TYPE_NETHER));
+                        WorldEntry entry = worlds != null ? worlds.get(nether) : null;
+                        if (entry != null) {
+                            long seed = entry.seed() != 0 ? entry.seed() : System.currentTimeMillis();
+                            Class<? extends Generator> gen = Generator.getGenerator(entry.generator());
+                            Map<String, Object> options = new HashMap<>();
+                            String settings = entry.generatorSettings();
+                            if (settings != null && !settings.isEmpty()) {
+                                options.put("preset", settings);
+                            }
+                            server.generateLevel(nether, seed, gen, options);
+                        } else {
+                            server.generateLevel(nether, System.currentTimeMillis(), Generator.getGenerator(Generator.TYPE_NETHER));
+                        }
                         server.loadLevel(nether);
                     }
                 }

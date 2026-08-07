@@ -58,17 +58,17 @@ public class CloneCommand extends VanillaCommand {
             case "default" -> {
                 if (list.hasResult(3)) {
                     String str = list.getResult(3);
-                    maskMode = MaskMode.valueOf(str.toUpperCase(Locale.ENGLISH));
+                    maskMode = MaskMode.valueOf(str.toUpperCase(Locale.ROOT));
                 }
                 if (list.hasResult(4)) {
                     String str = list.getResult(4);
-                    cloneMode = CloneMode.valueOf(str.toUpperCase(Locale.ENGLISH));
+                    cloneMode = CloneMode.valueOf(str.toUpperCase(Locale.ROOT));
                 }
             }
             case "filtered" -> {
                 maskMode = MaskMode.FILTERED;
                 String str = list.getResult(4);
-                cloneMode = CloneMode.valueOf(str.toUpperCase(Locale.ENGLISH));
+                cloneMode = CloneMode.valueOf(str.toUpperCase(Locale.ROOT));
                 tileId = list.getResult(5);
                 tileData = list.getResult(6);
             }

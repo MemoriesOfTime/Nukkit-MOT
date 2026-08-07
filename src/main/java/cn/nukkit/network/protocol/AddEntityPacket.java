@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
 import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.custom.EntityDefinition;
@@ -12,6 +13,7 @@ import cn.nukkit.entity.passive.*;
 import cn.nukkit.entity.projectile.*;
 import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.network.protocol.types.EntityLink;
+import cn.nukkit.network.protocol.types.PropertySyncData;
 import cn.nukkit.utils.Binary;
 import lombok.ToString;
 
@@ -26,7 +28,12 @@ public class AddEntityPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.ADD_ENTITY_PACKET;
 
+    @Deprecated(forRemoval = true)
     public static void setupLegacyIdentifiers(Map<Integer, String> mapping, int protocolId) {
+        setupLegacyIdentifiers(mapping);
+    }
+
+    public static void setupLegacyIdentifiers(Map<Integer, String> mapping) {
         mapping.put(51, "minecraft:npc");
         mapping.put(63, "minecraft:player");
         mapping.put(EntityWitherSkeleton.NETWORK_ID, "minecraft:wither_skeleton");
@@ -130,7 +137,6 @@ public class AddEntityPacket extends DataPacket {
         mapping.put(EntityRavager.NETWORK_ID, "minecraft:ravager");
         mapping.put(EntityVillagerV2.NETWORK_ID, "minecraft:villager_v2");
         mapping.put(EntityZombieVillagerV2.NETWORK_ID, "minecraft:zombie_villager_v2");
-
         // Correct new entities for older protocols
 //        if (protocolId <= ProtocolInfo.v_0_14_3 && protocolId >= ProtocolInfo.v_0_14_0) {
 //            mapping.put(524372, "minecraft:minecart");
@@ -147,77 +153,43 @@ public class AddEntityPacket extends DataPacket {
 //            mapping.put(EntityGlowSquid.NETWORK_ID, mapping.get(EntitySquid.NETWORK_ID));
 //        }
 
-        if (protocolId < ProtocolInfo.v1_13_0) {
-            mapping.put(EntityFox.NETWORK_ID, mapping.get(EntityWolf.NETWORK_ID));
-        } else {
-            mapping.put(EntityFox.NETWORK_ID, "minecraft:fox");
-        }
-
-        if (protocolId < ProtocolInfo.v1_14_0) {
-            mapping.put(EntityBee.NETWORK_ID, mapping.get(EntityBat.NETWORK_ID));
-        } else {
-            mapping.put(EntityBee.NETWORK_ID, "minecraft:bee");
-        }
-
-        if (protocolId < ProtocolInfo.v1_16_0) {
-            mapping.put(EntityPiglin.NETWORK_ID, mapping.get(EntityZombiePigman.NETWORK_ID));
-            mapping.put(EntityHoglin.NETWORK_ID, mapping.get(EntityPig.NETWORK_ID));
-            mapping.put(EntityStrider.NETWORK_ID, mapping.get(EntityPig.NETWORK_ID));
-            mapping.put(EntityZoglin.NETWORK_ID, mapping.get(EntityPig.NETWORK_ID));
-            mapping.put(EntityPiglinBrute.NETWORK_ID, mapping.get(EntityZombiePigman.NETWORK_ID));
-            mapping.put(EntityNPCEntity.NETWORK_ID, mapping.get(EntityVillager.NETWORK_ID));
-        } else {
-            mapping.put(EntityPiglin.NETWORK_ID, "minecraft:piglin");
-            mapping.put(EntityHoglin.NETWORK_ID, "minecraft:hoglin");
-            mapping.put(EntityStrider.NETWORK_ID, "minecraft:strider");
-            mapping.put(EntityZoglin.NETWORK_ID, "minecraft:zoglin");
-            mapping.put(EntityPiglinBrute.NETWORK_ID, "minecraft:piglin_brute");
-            mapping.put(EntityNPCEntity.NETWORK_ID, "minecraft:npc");
-        }
-
-        if (protocolId < ProtocolInfo.v1_17_0 ) {
-            mapping.put(EntityGoat.NETWORK_ID, mapping.get(EntitySheep.NETWORK_ID));
-            mapping.put(EntityGlowSquid.NETWORK_ID, mapping.get(EntitySquid.NETWORK_ID));
-            mapping.put(EntityAxolotl.NETWORK_ID, mapping.get(EntityTropicalFish.NETWORK_ID));
-        } else {
-            mapping.put(EntityGoat.NETWORK_ID, "minecraft:goat");
-            mapping.put(EntityGlowSquid.NETWORK_ID, "minecraft:glow_squid");
-            mapping.put(EntityAxolotl.NETWORK_ID, "minecraft:axolotl");
-        }
-
-        if (protocolId < ProtocolInfo.v1_19_0) {
-            mapping.put(EntityAllay.NETWORK_ID, mapping.get(EntityParrot.NETWORK_ID));
-            mapping.put(EntityWarden.NETWORK_ID, mapping.get(EntityWither.NETWORK_ID));
-            mapping.put(EntityFrog.NETWORK_ID, mapping.get(EntityRabbit.NETWORK_ID));
-            mapping.put(EntityTadpole.NETWORK_ID, mapping.get(EntitySalmon.NETWORK_ID));
-            mapping.put(EntityChestBoat.NETWORK_ID, mapping.get(EntityBoat.NETWORK_ID));
-        } else {
-            mapping.put(EntityAllay.NETWORK_ID, "minecraft:allay");
-            mapping.put(EntityWarden.NETWORK_ID, "minecraft:warden");
-            mapping.put(EntityFrog.NETWORK_ID, "minecraft:frog");
-            mapping.put(EntityTadpole.NETWORK_ID, "minecraft:tadpole");
-            mapping.put(EntityChestBoat.NETWORK_ID, "minecraft:chest_boat");
-        }
-
-        if (protocolId < ProtocolInfo.v1_20_0_23) {
-            mapping.put(EntityCamel.NETWORK_ID, mapping.get(EntityHorse.NETWORK_ID));
-        } else {
-            mapping.put(EntityCamel.NETWORK_ID, "minecraft:camel");
-        }
-
-        //TODO 多版本
-        //1.20.0
+        // v1_13_0
+        mapping.put(EntityFox.NETWORK_ID, "minecraft:fox");
+        // v1_14_0
+        mapping.put(EntityBee.NETWORK_ID, "minecraft:bee");
+        // v1_16_0
+        mapping.put(EntityPiglin.NETWORK_ID, "minecraft:piglin");
+        mapping.put(EntityHoglin.NETWORK_ID, "minecraft:hoglin");
+        mapping.put(EntityStrider.NETWORK_ID, "minecraft:strider");
+        mapping.put(EntityZoglin.NETWORK_ID, "minecraft:zoglin");
+        mapping.put(EntityPiglinBrute.NETWORK_ID, "minecraft:piglin_brute");
+        // v1_17_0
+        mapping.put(EntityGoat.NETWORK_ID, "minecraft:goat");
+        mapping.put(EntityGlowSquid.NETWORK_ID, "minecraft:glow_squid");
+        mapping.put(EntityAxolotl.NETWORK_ID, "minecraft:axolotl");
+        // v1_19_0
+        mapping.put(EntityAllay.NETWORK_ID, "minecraft:allay");
+        mapping.put(EntityWarden.NETWORK_ID, "minecraft:warden");
+        mapping.put(EntityFrog.NETWORK_ID, "minecraft:frog");
+        mapping.put(EntityTadpole.NETWORK_ID, "minecraft:tadpole");
+        mapping.put(EntityChestBoat.NETWORK_ID, "minecraft:chest_boat");
+        // v1_20_0
+        mapping.put(EntityCamel.NETWORK_ID, "minecraft:camel");
         mapping.put(139, "minecraft:sniffer");
-        //1.21.0
-        mapping.put(140, "minecraft:breeze");
-        //1.21.0
-        mapping.put(141, "minecraft:breeze_wind_charge_projectile");
-        //1.20.80
+        // v1_20_80
         mapping.put(142, "minecraft:armadillo");
-        //1.21.0
+        // v1_21_0
+        mapping.put(140, "minecraft:breeze");
+        mapping.put(141, "minecraft:breeze_wind_charge_projectile");
         mapping.put(143, "minecraft:wind_charge_projectile");
-        //1.21.0
         mapping.put(144, "minecraft:bogged");
+        // v1_21_60
+        mapping.put(145, "minecraft:ominous_item_spawner");
+        mapping.put(EntityCreaking.NETWORK_ID, "minecraft:creaking");
+        // v1_21_90
+        mapping.put(EntityHappyGhast.NETWORK_ID, "minecraft:happy_ghast");
+        // v1_21_100
+        mapping.put(EntityCopperGolem.NETWORK_ID, "minecraft:copper_golem");
     }
 
     @Override
@@ -250,6 +222,10 @@ public class AddEntityPacket extends DataPacket {
     public EntityMetadata metadata = new EntityMetadata();
     public Attribute[] attributes = new Attribute[0];
     public EntityLink[] links = new EntityLink[0];
+    /**
+     * @since v557
+     */
+    public PropertySyncData properties = new PropertySyncData(new int[]{}, new float[]{});
 
     /**
      * 0.12 - 0.14.3 - 0.15.10
@@ -259,7 +235,7 @@ public class AddEntityPacket extends DataPacket {
 
     @Override
     public void decode() {
-
+        this.decodeUnsupported();
     }
 
     @Override
@@ -325,12 +301,33 @@ public class AddEntityPacket extends DataPacket {
             return;
         }
         this.reset();
-        this.putEntityUniqueId(this.entityUniqueId);
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.entityRuntimeId);
-        }else{
+        if (this.protocol < ProtocolInfo.v1_2_0) {
             this.putEntityUniqueId(this.entityUniqueId);
+            this.putEntityUniqueId(this.entityRuntimeId);
+            this.putUnsignedVarInt(this.type);
+            this.putVector3f(this.x, this.y, this.z);
+            this.putVector3f(this.speedX, this.speedY, this.speedZ);
+            this.putLFloat(this.pitch * (256f / 360f));
+            this.putLFloat(this.yaw * (256f / 360f));
+            this.putUnsignedVarInt(this.attributes.length);
+            for (Attribute attribute : this.attributes) {
+                this.putString(attribute.getName());
+                this.putLFloat(attribute.getMinValue());
+                this.putLFloat(attribute.getValue());
+                this.putLFloat(attribute.getMaxValue());
+            }
+            this.put(Binary.writeMetadata(gameVersion, this.metadata));
+            this.putUnsignedVarInt(this.links.length);
+            for (EntityLink link : links) {
+                this.putEntityUniqueId(link.fromEntityUniquieId);
+                this.putEntityUniqueId(link.toEntityUniquieId);
+                this.putByte(link.type);
+            }
+            return;
         }
+
+        this.putEntityUniqueId(this.entityUniqueId);
+        this.putEntityRuntimeId(this.entityRuntimeId);
         if (this.protocol < ProtocolInfo.v1_8_0) {
             this.putUnsignedVarInt(this.type);
         }else {
@@ -347,10 +344,20 @@ public class AddEntityPacket extends DataPacket {
             }
         }
         this.putAttributeList(this.attributes);
-        this.put(Binary.writeMetadata(protocol, this.metadata));
+        this.put(Binary.writeMetadata(gameVersion, this.metadata));
         if (protocol >= ProtocolInfo.v1_19_40) {
-            this.putUnsignedVarInt(0); // Entity properties int
-            this.putUnsignedVarInt(0); // Entity properties float
+            int[] intProperties = this.properties.intProperties();
+            this.putUnsignedVarInt(intProperties.length);
+            for (int i = 0, len = intProperties.length; i < len; ++i) {
+                this.putUnsignedVarInt(i);
+                this.putVarInt(intProperties[i]);
+            }
+            float[] floats = this.properties.floatProperties();
+            this.putUnsignedVarInt(floats.length);
+            for (int i = 0, len = floats.length; i < len; ++i) {
+                this.putUnsignedVarInt(i);
+                this.putLFloat(floats[i]);
+            }
         }
         this.putUnsignedVarInt(this.links.length);
         for (EntityLink link : links) {
@@ -363,55 +370,56 @@ public class AddEntityPacket extends DataPacket {
             return this.id;
         }
 
+        // 版本回退：从新到旧，对旧版本客户端不认识的实体替换为已有实体
+        if (this.protocol < ProtocolInfo.v1_21_100) {
+            if (this.type == EntityCopperGolem.NETWORK_ID) return "minecraft:iron_golem";
+        }
+        if (this.protocol < ProtocolInfo.v1_21_90) {
+            if (this.type == EntityHappyGhast.NETWORK_ID) return "minecraft:ghast";
+        }
+        if (this.protocol < ProtocolInfo.v1_21_50) {
+            if (this.type == EntityCreaking.NETWORK_ID) return "minecraft:enderman";
+            if (this.type == 145) return "minecraft:lingering_potion";
+        }
+        if (this.protocol < ProtocolInfo.v1_21_0) {
+            if (this.type == EntityBogged.NETWORK_ID) return "minecraft:skeleton";
+            if (this.type == EntityBreeze.NETWORK_ID) return "minecraft:blaze";
+            if (this.type == EntityWindCharge.NETWORK_ID || this.type == EntityBreezeWindCharge.NETWORK_ID) return "minecraft:snowball";
+        }
+        if (this.protocol < ProtocolInfo.v1_20_80) {
+            if (this.type == EntityArmadillo.NETWORK_ID) return "minecraft:pig";
+        }
         if (this.protocol < ProtocolInfo.v1_20_0_23) {
-            if (this.type == EntityCamel.NETWORK_ID) {
-                return "minecraft:horse";
-            }
-
-            if (this.protocol < ProtocolInfo.v1_19_0) {
-                if (this.type == EntityChestBoat.NETWORK_ID) {
-                    return "minecraft:boat";
-                } else if (this.type == EntityAllay.NETWORK_ID) {
-                    return "minecraft:bat";
-                } else if (this.type == EntityWarden.NETWORK_ID) {
-                    return "minecraft:iron_golem";
-                } else if (this.type == EntityTadpole.NETWORK_ID) {
-                    return "minecraft:salmon";
-                } else if (this.type == EntityFrog.NETWORK_ID) {
-                    return "minecraft:rabbit";
-                }
-
-                if (this.protocol < ProtocolInfo.v1_17_0) {
-                    if (this.type == EntityGoat.NETWORK_ID) {
-                        return "minecraft:sheep";
-                    }
-                    if (this.type == EntityAxolotl.NETWORK_ID) {
-                        return "minecraft:tropicalfish";
-                    }
-                    if (this.type == EntityGlowSquid.NETWORK_ID) {
-                        return "minecraft:squid";
-                    }
-
-                    if (this.protocol < ProtocolInfo.v1_16_0) {
-                        if (this.type == EntityPiglin.NETWORK_ID || this.type == EntityPiglinBrute.NETWORK_ID) {
-                            return "minecraft:zombie_pigman";
-                        } else if (this.type == EntityHoglin.NETWORK_ID || this.type == EntityStrider.NETWORK_ID || this.type == EntityZoglin.NETWORK_ID) {
-                            return "minecraft:pig";
-                        }
-
-                        if (this.protocol < ProtocolInfo.v1_14_0 && this.type == EntityBee.NETWORK_ID) {
-                            return "minecraft:bat";
-                        }
-                        if (this.protocol < ProtocolInfo.v1_13_0 && this.type == EntityFox.NETWORK_ID) {
-                            return "minecraft:wolf";
-                        }
-                    }
-                }
-            }
+            if (this.type == EntitySniffer.NETWORK_ID) return "minecraft:pig";
+            if (this.type == EntityCamel.NETWORK_ID) return "minecraft:horse";
+        }
+        if (this.protocol < ProtocolInfo.v1_19_0) {
+            if (this.type == EntityChestBoat.NETWORK_ID) return "minecraft:boat";
+            if (this.type == EntityAllay.NETWORK_ID) return "minecraft:bat";
+            if (this.type == EntityWarden.NETWORK_ID) return "minecraft:iron_golem";
+            if (this.type == EntityTadpole.NETWORK_ID) return "minecraft:salmon";
+            if (this.type == EntityFrog.NETWORK_ID) return "minecraft:rabbit";
+        }
+        if (this.protocol < ProtocolInfo.v1_17_0) {
+            if (this.type == EntityGoat.NETWORK_ID) return "minecraft:sheep";
+            if (this.type == EntityAxolotl.NETWORK_ID) return "minecraft:tropicalfish";
+            if (this.type == EntityGlowSquid.NETWORK_ID) return "minecraft:squid";
+        }
+        if (this.protocol < ProtocolInfo.v1_16_0) {
+            if (this.type == EntityPiglin.NETWORK_ID || this.type == EntityPiglinBrute.NETWORK_ID) return "minecraft:zombie_pigman";
+            if (this.type == EntityHoglin.NETWORK_ID || this.type == EntityStrider.NETWORK_ID || this.type == EntityZoglin.NETWORK_ID) return "minecraft:pig";
+            if (this.type == EntityNPCEntity.NETWORK_ID) return "minecraft:villager";
+        }
+        if (this.protocol < ProtocolInfo.v1_14_0) {
+            if (this.type == EntityBee.NETWORK_ID) return "minecraft:bat";
+        }
+        if (this.protocol < ProtocolInfo.v1_13_0) {
+            if (this.type == EntityFox.NETWORK_ID) return "minecraft:wolf";
         }
 
+        // 从映射表查询最新标识符
         if (this.mapping == null) {
-            this.mapping = Entity.getEntityRuntimeMapping(this.protocol);
+            this.mapping = Entity.getEntityRuntimeMapping();
         }
 
         String identifier = this.mapping.get(type);
@@ -420,7 +428,11 @@ public class AddEntityPacket extends DataPacket {
             if (entityDefinition != null) {
                 return entityDefinition.getIdentifier();
             }
-            throw new IllegalStateException("Unknown entity with network id " + this.type + " protocol " + this.protocol);
+            // 无法解析实体标识符：返回安全回退标识符，避免单个未知实体阻塞整个发包批次（issue #800）
+            // Unresolvable entity identifier: return a safe fallback so one bad entity does not break the whole packet batch
+            Server.getInstance().getLogger().warning("Unknown entity network id " + this.type
+                    + " (protocol " + this.protocol + "); falling back to minecraft:item");
+            return "minecraft:item";
         }
         return identifier;
     }

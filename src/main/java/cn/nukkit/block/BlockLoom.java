@@ -7,6 +7,7 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockLoom extends BlockSolidMeta {
 
@@ -69,7 +70,7 @@ public class BlockLoom extends BlockSolidMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(FACES[player != null ? player.getDirection().getHorizontalIndex() : 0]);
         return this.getLevel().setBlock(this, this, true, true);
     }

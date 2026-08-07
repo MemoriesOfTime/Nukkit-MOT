@@ -58,7 +58,7 @@ public class TimeCommand extends VanillaCommand {
                         level.startTime();
                         level.checkTime();
                     }
-                    log.addSuccess("Restarted the time").output(true);
+                    log.addSuccess("commands.time.started").output(true);
                 } else if ("stop".equals(mode)) {
                     if (!sender.hasPermission("nukkit.command.time.stop")) {
                         log.addMessage("nukkit.command.generic.permission").output();
@@ -69,7 +69,7 @@ public class TimeCommand extends VanillaCommand {
                         level.stopTime();
                         level.checkTime();
                     }
-                    log.addSuccess("Stopped the time").output(true);
+                    log.addSuccess("commands.time.stopped").output(true);
                 } else if ("query".equals(mode)) {
                     if (!sender.hasPermission("nukkit.command.time.query")) {
                         log.addMessage("nukkit.command.generic.permission").output();

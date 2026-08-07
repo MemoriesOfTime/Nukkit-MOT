@@ -7,6 +7,7 @@ import com.google.common.base.Preconditions;
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.util.function.Consumer;
 
 public abstract class BlockProperty<T extends Serializable> implements Serializable {
     @Serial
@@ -332,4 +333,6 @@ public abstract class BlockProperty<T extends Serializable> implements Serializa
                 ", persistenceName='" + persistenceName + '\'' +
                 '}';
     }
+
+    public abstract void forEach(Consumer<Serializable> func);
 }

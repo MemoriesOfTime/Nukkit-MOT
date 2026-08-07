@@ -2,11 +2,12 @@ package cn.nukkit.entity;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockCactus;
-import cn.nukkit.block.BlockMagma;
+import cn.nukkit.block.*;
+import cn.nukkit.entity.data.EntityMovementSpeedModifier;
 import cn.nukkit.entity.mob.EntityDrowned;
 import cn.nukkit.entity.mob.EntityWolf;
+import cn.nukkit.entity.passive.EntityIronGolem;
+import cn.nukkit.entity.passive.EntitySkeletonHorse;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.weather.EntityWeather;
 import cn.nukkit.event.entity.*;
@@ -18,20 +19,17 @@ import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.particle.BubbleParticle;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.FloatTag;
-import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.EntityEventPacket;
+import cn.nukkit.network.protocol.TextPacket;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockIterator;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author MagicDroidX
@@ -64,6 +62,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     protected final boolean isDrowned = this instanceof EntityDrowned;
 
+    private final Map<String, EntityMovementSpeedModifier> movementSpeedModifiers = new HashMap<>();
+
     @Override
     protected void initEntity() {
         super.initEntity();
@@ -73,7 +73,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             this.namedTag.remove("HealF");
         }
 
-        if (!this.namedTag.contains("Health") || !(this.namedTag.get("Health") instanceof FloatTag)) {
+        if (!(this.namedTag.get("Health") instanceof FloatTag)) {
             this.namedTag.putFloat("Health", this.getMaxHealth());
         }
 
@@ -127,23 +127,13 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             return false;
         }
 
+        this.applyCriticalHitModifier(source);
+
         if (super.attack(source)) {
             if (source instanceof EntityDamageByEntityEvent) {
                 Entity damager = ((EntityDamageByEntityEvent) source).getDamager();
                 if (source instanceof EntityDamageByChildEntityEvent) {
                     damager = ((EntityDamageByChildEntityEvent) source).getChild();
-                }
-
-                // Critical hit
-                if (damager instanceof Player && !damager.onGround) {
-                    AnimatePacket animate = new AnimatePacket();
-                    animate.action = AnimatePacket.Action.CRITICAL_HIT;
-                    animate.eid = getId();
-
-                    this.getLevel().addChunkPacket(damager.getChunkX(), damager.getChunkZ(), animate);
-                    this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ATTACK_STRONG);
-
-                    source.setDamage(source.getDamage() * 1.5f);
                 }
 
                 if (damager.isOnFire() && !(damager instanceof Player)) {
@@ -183,7 +173,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         Vector3 normalizedVector = this.getPosition().subtract(entityPos).normalize();
         boolean blocked = (normalizedVector.x * direction.x) + (normalizedVector.z * direction.z) < 0.0;
         boolean knockBack = !(damager instanceof EntityProjectile);
-        EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, source, knockBack, true);
+        EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, damager, source, knockBack, true);
         if (!blocked || !source.canBeReducedByArmor() || damager instanceof EntityProjectile && ((EntityProjectile) damager).piercing > 0) {
             event.setCancelled();
         }
@@ -197,7 +187,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             double deltaX = damager.getX() - this.getX();
             double deltaZ = damager.getZ() - this.getZ();
             ((EntityLiving) damager).attackTime = source.getAttackCooldown();
-            ((EntityLiving) damager).knockBack(this, 0, deltaX, deltaZ);
+            ((EntityLiving) damager).knockBack(this, 0, deltaX, deltaZ, 0.25);
         }
 
         onBlock(damager, source, event.getAnimation());
@@ -278,11 +268,6 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     @Override
-    public boolean entityBaseTick() {
-        return this.entityBaseTick(1);
-    }
-
-    @Override
     public boolean entityBaseTick(int tickDiff) {
         boolean inWater = this.isSubmerged();
 
@@ -326,8 +311,36 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 this.resetFallDistance();
             }
 
-            if (inWater && !this.hasEffect(Effect.WATER_BREATHING)) {
-                if (this instanceof EntitySwimming || this.isDrowned || (this instanceof Player && (((Player) this).isCreative() || ((Player) this).isSpectator()))) {
+            if (this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE) && !this.hasEffect(Effect.FIRE_RESISTANCE)) {
+                if (this.isInsideOfLava()) {
+                    this.inLavaTicks++;
+                    if ((this.inLavaTicks % 10) == 0) {
+                        Block lavaBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+                        if (!(lavaBlock instanceof BlockLava)) {
+                            lavaBlock = lavaBlock.getLevelBlockAtLayer(1);
+                        }
+                        this.attack(new EntityDamageByBlockEvent(lavaBlock, this, DamageCause.LAVA, 4));
+                        this.inLavaTicks = 0;
+                    }
+                }
+
+                if (this.isInsideOfFire()) {
+                    this.inFireTicks++;
+                    if ((this.inFireTicks % 10) == 0) {
+                        Block fireBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+                        int fireDamage = 1;
+                        if (fireBlock instanceof BlockSoulFire) {
+                            fireDamage = 2;
+                        }
+                        this.attack(new EntityDamageByBlockEvent(fireBlock, this, DamageCause.FIRE, fireDamage));
+                        this.inFireTicks = 0;
+                    }
+                }
+            }
+
+            boolean inBubbleColumn = this.isInsideBubbleColumn();
+            if (inWater && !inBubbleColumn && !this.hasEffect(Effect.WATER_BREATHING) && !this.hasEffect(Effect.CONDUIT_POWER)) {
+                if (this instanceof EntitySwimming || this.isDrowned || this instanceof EntitySkeletonHorse || this instanceof EntityIronGolem || this instanceof Player player && (player.isCreative() || player.isSpectator())) {
                     this.setAirTicks(400);
                 } else {
                     if (turtleTicks == 0) {
@@ -364,21 +377,15 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             // Check collisions with blocks
-            if (this instanceof Player) {
-                if (this.age % 5 == 0) {
-                    Block block = this.level.getBlock(getFloorX(), NukkitMath.floorDouble(this.y - 0.25), getFloorZ());
+            if ((this instanceof Player || this instanceof BaseEntity) && this.riding == null && this.age % (this instanceof Player ? 2 : 10) == 0) {
+                int floorY = NukkitMath.floorDouble(this.y - 0.25);
+                if (floorY != getFloorY()) {
+                    Block block = this.level.getBlock(this.chunk, getFloorX(), floorY, getFloorZ(), false);
                     if (block instanceof BlockCactus) {
                         block.onEntityCollide(this);
                     } else if (block instanceof BlockMagma) {
                         block.onEntityCollide(this);
-                        if (this.isInsideOfWater()) {
-                            this.level.addParticle(new BubbleParticle(this));
-                            this.setMotion(this.getMotion().add(0, -0.3, 0));
-                        }
-                    } /*else if (block == Block.SOUL_SAND && this.isInsideOfWater()) {
-                        this.level.addParticle(new BubbleParticle(this));
-                        this.setMotion(this.getMotion().add(0, 0.3, 0));
-                    }*/
+                    }
                 }
             }
 
@@ -391,10 +398,10 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 this.knockBackTime -= tickDiff;
             }
 
-            if (this.riding == null) {
-                Entity[] e = level.getNearbyEntities(this.boundingBox.grow(0.20000000298023224, 0.0D, 0.20000000298023224), this);
+            if (this.riding == null && this.age % 2 == 1 && !this.closed && this.isAlive()) {
+                Entity[] e = level.getNearbyEntities(this.boundingBox.grow(0.20000000298023224, 0.0D, 0.20000000298023224), this, false, true);
                 for (Entity entity : e) {
-                    if (entity instanceof EntityRideable) {
+                    if (entity instanceof EntityRideable && !entity.closed && entity.isAlive()) {
                         this.collidingWith(entity);
                     }
                 }
@@ -413,23 +420,34 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public Block[] getLineOfSight(int maxDistance, int maxLength) {
-        return this.getLineOfSight(maxDistance, maxLength, new Integer[]{});
+        return this.getLineOfSight(maxDistance, maxLength, (Set<Integer>) null);
     }
 
     public Block[] getLineOfSight(int maxDistance, int maxLength, Map<Integer, Object> transparent) {
-        return this.getLineOfSight(maxDistance, maxLength, transparent.keySet().toArray(new Integer[0]));
+        return this.getLineOfSight(maxDistance, maxLength, transparent.keySet());
     }
 
     public Block[] getLineOfSight(int maxDistance, int maxLength, Integer[] transparent) {
+        return this.getLineOfSight(maxDistance, maxLength, new HashSet<>(Arrays.asList(transparent)));
+    }
+
+    /**
+     * 获取实体视线范围内的方块数组。
+     * Get an array of blocks within the entity's line of sight.
+     *
+     * @param maxDistance 视线的最大距离，超过 120 会被限制为 120 / The maximum distance of the line of sight. If it exceeds 120, it will be limited to 120.
+     * @param maxLength  返回的方块列表的最大长度，若不为 0，列表长度超过该值时会移除最早添加的方块 / The maximum length of the returned block list. If it is not 0, the earliest added block will be removed when the list length exceeds this value.
+     * @param transparent 透明方块 ID 的集合，若方块 ID 在该集合中，会停止遍历 / A set of transparent block IDs. If a block ID is in this set, the traversal will stop.
+     * @return 视线范围内的方块数组 / An array of blocks within the line of sight.
+     */
+    public Block[] getLineOfSight(int maxDistance, int maxLength, Set<Integer> transparent) {
         if (maxDistance > 120) {
             maxDistance = 120;
         }
 
-        if (transparent != null && transparent.length == 0) {
-            transparent = null;
-        }
+        boolean useTransparent = transparent != null && !transparent.isEmpty();
 
-        List<Block> blocks = new ArrayList<>();
+        LinkedList<Block> blocks = new LinkedList<>();
 
         BlockIterator itr = new BlockIterator(this.level, this.getPosition(), this.getDirectionVector(), this.getEyeHeight(), maxDistance);
 
@@ -438,27 +456,21 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             blocks.add(block);
 
             if (maxLength != 0 && blocks.size() > maxLength) {
-                blocks.remove(0);
+                blocks.pollFirst();
             }
 
             int id = block.getId();
 
-            if (transparent == null) {
-                if (id != 0) {
-                    break;
-                }
-            } else {
-                if (Arrays.binarySearch(transparent, id) < 0) {
-                    break;
-                }
+            if (useTransparent ? !transparent.contains(id) : (id != 0)) {
+                break;
             }
         }
 
-        return blocks.toArray(new Block[0]);
+        return blocks.toArray(Block.EMPTY_ARRAY);
     }
 
     public Block getTargetBlock(int maxDistance) {
-        return getTargetBlock(maxDistance, new Integer[]{});
+        return getTargetBlock(maxDistance, new Integer[0]);
     }
 
     public Block getTargetBlock(int maxDistance, Map<Integer, Object> transparent) {
@@ -466,12 +478,23 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public Block getTargetBlock(int maxDistance, Integer[] transparent) {
+        return getTargetBlock(maxDistance, new HashSet<>(Arrays.asList(transparent)));
+    }
+
+    /**
+     * 获取实体视线范围内的第一个非透明方块。
+     * Get the first non-transparent block within the entity's line of sight.
+     *
+     * @param maxDistance 视线的最大距离，超过 120 会被限制为 120 / The maximum distance of the line of sight. If it exceeds 120, it will be limited to 120.
+     * @param transparent 透明方块 ID 的集合，若方块 ID 在该集合中，会停止遍历 / A set of transparent block IDs. If a block ID is in this set, the traversal will stop.
+     */
+    public Block getTargetBlock(int maxDistance, Set<Integer> transparent) {
         try {
             Block[] blocks = this.getLineOfSight(maxDistance, 1, transparent);
             Block block = blocks[0];
             if (block != null) {
-                if (transparent != null && transparent.length != 0) {
-                    if (Arrays.binarySearch(transparent, block.getId()) < 0) {
+                if (transparent != null && !transparent.isEmpty()) {
+                    if (transparent.contains(block.getId())) {
                         return block;
                     }
                 } else {
@@ -589,4 +612,44 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         return human;
     }
 
+    public Map<String, EntityMovementSpeedModifier> getMovementSpeedModifiers() {
+        return movementSpeedModifiers;
+    }
+
+    public void addMovementSpeedModifier(EntityMovementSpeedModifier modifier) {
+        this.movementSpeedModifiers.put(modifier.getIdentifier(), modifier);
+        this.recalculateMovementSpeed();
+    }
+
+    public void removeMovementSpeedModifier(EntityMovementSpeedModifier modifier) {
+        this.removeMovementSpeedModifier(modifier.getIdentifier());
+    }
+
+    public boolean removeMovementSpeedModifier(String identifier) {
+        Object result = this.movementSpeedModifiers.remove(identifier);
+
+        if (result != null) {
+            this.recalculateMovementSpeed();
+            return true;
+        }
+
+        return false;
+    }
+
+    public void recalculateMovementSpeed() {
+        float newMovementSpeed = Player.DEFAULT_SPEED;
+        for (EntityMovementSpeedModifier modifier : this.movementSpeedModifiers.values()) {
+            float value = modifier.getValue();
+            if (modifier.isSend()) {
+                if (modifier.getOperation() == EntityMovementSpeedModifier.Operation.MULTIPLY) {
+                    if (value != 0) {
+                        newMovementSpeed *= value;
+                    }
+                } else {
+                    newMovementSpeed += value;
+                }
+            }
+        }
+        this.setMovementSpeed(newMovementSpeed);
+    }
 }

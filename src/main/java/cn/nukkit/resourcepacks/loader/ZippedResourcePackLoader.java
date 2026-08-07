@@ -11,10 +11,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -25,6 +22,31 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
     //资源包文件存放地址
     protected final File path;
 
+    protected ResourcePack.SupportType supportType = ResourcePack.SupportType.UNIVERSAL;
+
+    /**
+     * 根据文件名后缀检测资源包类型
+     * <p>
+     * Detect the resource pack support type by filename suffix.
+     * 文件名含 {@code .netease.} 或以 {@code .netease} 结尾时视为网易版。
+     * <p>
+     * Names containing {@code .netease.} or ending with {@code .netease} are treated as NetEase packs.
+     *
+     * @param fileName the pack file/directory name
+     * @return detected {@link ResourcePack.SupportType}
+     */
+    protected ResourcePack.SupportType detectSupportType(String fileName) {
+        String normalizedName = fileName.toLowerCase(Locale.ROOT);
+        if (normalizedName.endsWith(".netease") || normalizedName.contains(".netease.")) {
+            return ResourcePack.SupportType.NETEASE;
+        }
+        return this.supportType;
+    }
+
+    protected boolean shouldIgnoreFile(String fileName) {
+        return fileName.equalsIgnoreCase("packs.yml");
+    }
+
     public ZippedResourcePackLoader(File path) {
         this.path = path;
         if (!path.exists()) {
@@ -34,22 +56,39 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         }
     }
 
+    public ZippedResourcePackLoader(File path, ResourcePack.SupportType supportType) {
+        this(path);
+        this.supportType = supportType;
+    }
+
+    /**
+     * @deprecated Use {@link #ZippedResourcePackLoader(File, ResourcePack.SupportType)} instead
+     */
+    @Deprecated
+    public ZippedResourcePackLoader(File path, boolean isNetEase) {
+        this(path, isNetEase ? ResourcePack.SupportType.NETEASE : ResourcePack.SupportType.UNIVERSAL);
+    }
+
     @Override
     public List<ResourcePack> loadPacks() {
         var baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
         for (File pack : path.listFiles()) {
+            if (shouldIgnoreFile(pack.getName())) {
+                continue;
+            }
             try {
                 ResourcePack resourcePack = null;
                 String fileExt = Files.getFileExtension(pack.getName());
+                ResourcePack.SupportType packType = detectSupportType(pack.getName());
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null) {
-                        resourcePack = new ZippedResourcePack(file);
+                        resourcePack = new ZippedResourcePack(file, packType);
                     }
-                } else if (!fileExt.equals("key")) { //directory resource packs temporarily unsupported
+                } else {
                     switch (fileExt) {
-                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack);
+                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack, packType);
                         default -> log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
                     }
                 }
@@ -64,10 +103,13 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         return loadedResourcePacks;
     }
 
-    private static File loadDirectoryPack(File directory) {
+    protected static File loadDirectoryPack(File directory) {
         File manifestFile = new File(directory, "manifest.json");
         if (!manifestFile.exists() || !manifestFile.isFile()) {
-            return null;
+            manifestFile = new File(directory, "pack_manifest.json");
+            if (!manifestFile.exists() || !manifestFile.isFile()) {
+                return null;
+            }
         }
 
         File tempFile;
@@ -82,7 +124,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
                 for (File file : files) {
                     if (file.isDirectory()) {
                         for (File directoryFile : getDirectoryFiles(file)) {
-                            ZipEntry entry = new ZipEntry(file.toPath().relativize(directoryFile.toPath()).toString())
+                            ZipEntry entry = new ZipEntry(directory.toPath().relativize(directoryFile.toPath()).toString())
                                     .setCreationTime(time)
                                     .setLastModifiedTime(time)
                                     .setLastAccessTime(time);
@@ -115,7 +157,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         }
         for (File file : getFiles) {
             if (file.isDirectory()) {
-                return getDirectoryFiles(file);
+                files.addAll(getDirectoryFiles(file));
             } else {
                 files.add(file);
             }

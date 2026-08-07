@@ -1,8 +1,10 @@
 package cn.nukkit.blockentity;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockChest;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
@@ -28,6 +30,7 @@ public class BlockEntityMovingBlock extends BlockEntitySpawnable {
             this.block = Block.get(blockData.getInt("id"), blockData.getInt("meta"));
         } else {
             this.close();
+            return;
         }
 
         if (namedTag.contains("pistonPosX") && namedTag.contains("pistonPosY") && namedTag.contains("pistonPosZ")) {
@@ -37,6 +40,74 @@ public class BlockEntityMovingBlock extends BlockEntitySpawnable {
         }
 
         super.initBlockEntity();
+
+        // Must use the block entity update queue, not the block update queue — MOVING_BLOCK's
+        // registered block class has no onUpdate, so block updates would never invoke this.
+        this.scheduleUpdate();
+    }
+
+    @Override
+    public boolean onUpdate() {
+        // Verify the piston still exists and is properly moving this block.
+        if (this.level != null) {
+            if (!this.level.isChunkLoaded(this.piston.x >> 4, this.piston.z >> 4)) {
+                this.restoreBlock();
+                return false;
+            }
+
+            BlockEntity pistonEntity = this.level.getBlockEntity(this.piston);
+            if (!(pistonEntity instanceof BlockEntityPistonArm)) {
+                this.restoreBlock();
+                return false;
+            }
+
+            BlockEntityPistonArm piston = (BlockEntityPistonArm) pistonEntity;
+            boolean isAttached = false;
+            BlockFace pushDir = piston.extending ? piston.facing : piston.facing.getOpposite();
+            BlockVector3 thisPos = new BlockVector3(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+            for (BlockVector3 attachedPos : piston.attachedBlocks) {
+                if (attachedPos.getSide(pushDir).equals(thisPos)) {
+                    isAttached = true;
+                    break;
+                }
+            }
+
+            if (!isAttached) {
+                this.restoreBlock();
+                return false;
+            }
+        }
+
+        return super.onUpdate();
+    }
+
+    Block restoreBlock() {
+        Level level = this.level;
+        Block movedBlock = this.block;
+        CompoundTag blockEntityNbt = this.getBlockEntity();
+        int blockX = this.getFloorX();
+        int blockY = this.getFloorY();
+        int blockZ = this.getFloorZ();
+
+        this.close();
+        if (level == null || movedBlock == null) {
+            return movedBlock;
+        }
+
+        level.setBlock(blockX, blockY, blockZ, movedBlock, true, true);
+        if (blockEntityNbt != null) {
+            blockEntityNbt.putInt("x", blockX);
+            blockEntityNbt.putInt("y", blockY);
+            blockEntityNbt.putInt("z", blockZ);
+            BlockEntity blockEntity = BlockEntity.createBlockEntity(
+                    blockEntityNbt.getString("id"),
+                    level.getChunk(blockX >> 4, blockZ >> 4),
+                    blockEntityNbt);
+            if (blockEntity != null && blockEntity.getBlock() instanceof BlockChest chest) {
+                chest.tryPair();
+            }
+        }
+        return movedBlock;
     }
 
     public CompoundTag getBlockEntity() {

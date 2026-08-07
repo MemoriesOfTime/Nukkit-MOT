@@ -1,6 +1,8 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
+import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitMath;
@@ -58,12 +60,29 @@ public abstract class ContainerInventory extends BaseInventory {
 
     @Override
     public void onClose(Player who) {
-        ContainerClosePacket pk = new ContainerClosePacket();
-        pk.windowId = who.getWindowId(this);
-        pk.wasServerInitiated = who.getClosingWindowId() != pk.windowId;
-        pk.type = ContainerType.from(this.type.getNetworkType());
-        who.dataPacket(pk);
+        if (who.getClosingWindowId() != Integer.MAX_VALUE) {
+            ContainerClosePacket pk = new ContainerClosePacket();
+            pk.windowId = who.getWindowId(this);
+            pk.wasServerInitiated = who.getClosingWindowId() != pk.windowId;
+            pk.type = ContainerType.from(this.type.getNetworkType());
+            who.dataPacket(pk);
+        }
+
         super.onClose(who);
+    }
+
+    @Override
+    public void onSlotChange(int index, Item before, boolean send) {
+        super.onSlotChange(index, before, send);
+        // Notify adjacent sleeping hoppers about inventory change
+        InventoryHolder holder = this.getHolder();
+        if (holder instanceof BlockEntity be && !be.closed && be.getLevel() != null) {
+            be.setDirty();
+            BlockEntityHopper.wakeupHoppersAround(be.getLevel(), be.getFloorX(), be.getFloorY(), be.getFloorZ());
+            be.getLevel().updateComparatorOutputLevel(be);
+        } else if (holder instanceof Entity entity && entity.chunk != null) {
+            entity.chunk.setChanged();
+        }
     }
 
     public static int calculateRedstone(Inventory inv) {

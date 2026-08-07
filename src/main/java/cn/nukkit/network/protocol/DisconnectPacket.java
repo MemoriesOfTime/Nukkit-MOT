@@ -8,7 +8,7 @@ public class DisconnectPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.DISCONNECT_PACKET;
 
-    public DisconnectFailReason reason = DisconnectFailReason.UNKNOWN;
+    public DisconnectFailReason reason = DisconnectFailReason.DISCONNECTED;
     public boolean hideDisconnectionScreen = false;
     public String message;
     /**
@@ -34,7 +34,11 @@ public class DisconnectPacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_20_40) {
             this.reason = DisconnectFailReason.values()[this.getVarInt()];
         }
-        this.hideDisconnectionScreen = this.getBoolean();
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
+            this.hideDisconnectionScreen = this.getUnsignedVarInt() != 0;
+        } else {
+            this.hideDisconnectionScreen = this.getBoolean();
+        }
         if (!this.hideDisconnectionScreen) {
             this.message = this.getString();
             if (protocol >= ProtocolInfo.v1_21_20) {
@@ -60,7 +64,11 @@ public class DisconnectPacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_20_40) {
             this.putVarInt(this.reason.ordinal());
         }
-        this.putBoolean(this.hideDisconnectionScreen);
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
+            this.putUnsignedVarInt(this.hideDisconnectionScreen ? 1 : 0);
+        } else {
+            this.putBoolean(this.hideDisconnectionScreen);
+        }
         if (!this.hideDisconnectionScreen) {
             this.putString(this.message);
             if (protocol >= ProtocolInfo.v1_21_20) {

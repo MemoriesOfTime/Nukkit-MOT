@@ -5,11 +5,12 @@ import cn.nukkit.block.custom.container.BlockContainer;
 import cn.nukkit.block.custom.container.BlockStorageContainer;
 import cn.nukkit.block.custom.container.data.*;
 import cn.nukkit.block.custom.properties.*;
-import cn.nukkit.item.customitem.data.ItemCreativeCategory;
 import cn.nukkit.item.customitem.data.ItemCreativeGroup;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.*;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemGroup;
 import com.google.common.base.Preconditions;
 import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
@@ -25,7 +26,59 @@ import java.util.function.Consumer;
  * CustomBlockDefinition is used to get the data of the block behavior_pack sent to the client. The methods provided in {@link Builder} control the data sent to the client, if you need to control some of the server-side behavior, please override the methods in {@link Block Block}.
  */
 @Log4j2
-public record CustomBlockDefinition(String identifier, CompoundTag nbt, int legacyId,  Class<? extends BlockContainer> typeOf) {
+public record CustomBlockDefinition(String identifier, CompoundTag nbt, int nukkitId, Class<? extends BlockContainer> typeOf, boolean registerCreativeItem) {
+
+    /**
+     * 兼容旧版本的构造函数，默认注册到创造背包
+     * Compatibility constructor for older versions, defaults to registering in creative inventory
+     */
+    public CustomBlockDefinition(String identifier, CompoundTag nbt, int nukkitId, Class<? extends BlockContainer> typeOf) {
+        this(identifier, nbt, nukkitId, typeOf, true);
+    }
+
+    /**
+     * 获取方块的Nukkit ID（未移位的值）
+     * Get the Nukkit ID of the block (non-shifted value)
+     *
+     * @return 方块的Nukkit ID / Nukkit ID of the block
+     * @deprecated 使用 {@link #nukkitId()} 代替 / Use {@link #nukkitId()} instead
+     */
+    @Deprecated
+    public int legacyId() {
+        return this.nukkitId;
+    }
+
+    /**
+     * 获取方块在创造栏的分类
+     * Get the creative inventory category of the block
+     */
+    public CreativeItemCategory getCreativeCategory() {
+        CompoundTag menuCategory = this.nbt.getCompound("menu_category");
+        if (menuCategory.containsString("category")) {
+            try {
+                return CreativeItemCategory.valueOf(menuCategory.getString("category").toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                return CreativeItemCategory.CONSTRUCTION;
+            }
+        }
+        return CreativeItemCategory.CONSTRUCTION;
+    }
+
+    /**
+     * 获取方块在创造栏的分组
+     * Get the creative inventory group of the block
+     */
+    public String getCreativeGroup() {
+        return this.nbt.getCompound("menu_category").getString("group");
+    }
+
+    /**
+     * 是否应该注册到创造物品栏
+     * Whether this block should be registered in the creative inventory
+     */
+    public boolean shouldRegisterCreativeItem() {
+        return this.registerCreativeItem;
+    }
 
     /**
      * Builder custom block definition.
@@ -40,6 +93,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
     public static class Builder {
         protected final String identifier;
         protected final BlockContainer blockContainer;
+        protected boolean registerCreativeItem = true;
 
         protected CompoundTag nbt = new CompoundTag()
                 .putCompound("components", new CompoundTag());
@@ -77,19 +131,19 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
 
             //设置方块在创造栏的分类
             this.nbt.putCompound("menu_category", new CompoundTag()
-                    .putString("category", ItemCreativeCategory.NATURE.name())
-                    .putString("group", ItemCreativeGroup.NONE.getGroupName()));
+                    .putString("category", CreativeItemCategory.CONSTRUCTION.name().toLowerCase(Locale.ROOT))
+                    .putString("group", "")
+                    .putByte("is_hidden_in_commands", (byte) 0));
             //molang版本
             this.nbt.putInt("molangVersion", 9);
+
+            this.nbt.putCompound("vanilla_block_data", new CompoundTag().putInt("block_id", blockContainer.getNukkitId()));
 
             //设置方块的properties
             var propertiesNBT = getPropertiesNBT();
             if (propertiesNBT != null) {
-                nbt.putList("properties", propertiesNBT);
+                this.nbt.putList("properties", propertiesNBT);
             }
-
-            nbt.putCompound("vanilla_block_data", new CompoundTag().putInt("block_id", blockContainer.getNukkitId())
-                    /*.putString("material", "")*/); //todo Figure what is dirt, maybe that corresponds to https://wiki.bedrock.dev/documentation/materials.html
         }
 
         public Builder texture(String texture) {
@@ -111,22 +165,51 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
             return this;
         }
 
-        public Builder creativeGroupAndCategory(ItemCreativeGroup creativeGroup, ItemCreativeCategory creativeCategory) {
+        public Builder creativeGroupAndCategory(CreativeItemGroup creativeGroup, CreativeItemCategory creativeCategory) {
             this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.name().toLowerCase(Locale.ENGLISH))
-                    .putString("group", creativeGroup.getGroupName());
+                    .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT))
+                    .putString("group", creativeGroup.getName());
             return this;
         }
 
         public Builder creativeCategory(String creativeCategory) {
             this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.toLowerCase(Locale.ENGLISH));
+                    .putString("category", creativeCategory.toLowerCase(Locale.ROOT));
             return this;
         }
 
-        public Builder creativeCategory(ItemCreativeCategory creativeCategory) {
+        public Builder creativeCategory(CreativeItemCategory creativeCategory) {
             this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.name().toLowerCase(Locale.ENGLISH));
+                    .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT));
+            return this;
+        }
+
+        /**
+         * 控制自定义方块在创造栏中的组。
+         * <p>
+         * Control the grouping of custom blocks in the creation inventory.
+         *
+         * @see <a href="https://wiki.bedrock.dev/documentation/creative-categories.html">wiki.bedrock.dev</a>
+         */
+        public Builder creativeGroup(String creativeGroup) {
+            if (creativeGroup.isBlank()) {
+                log.error("creativeGroup has an invalid value!");
+                return this;
+            }
+            this.nbt.getCompound("menu_category").putString("group", creativeGroup.toLowerCase(Locale.ROOT));
+            return this;
+        }
+
+        /**
+         * 控制自定义方块在创造栏中的组。
+         * <p>
+         * Control the grouping of custom blocks in the creation inventory.
+         *
+         * @see <a href="https://wiki.bedrock.dev/documentation/creative-categories.html">wiki.bedrock.dev</a>
+         */
+        @Deprecated
+        public Builder creativeGroup(ItemCreativeGroup creativeGroup) {
+            this.nbt.getCompound("menu_category").putString("group", creativeGroup.getGroupName());
             return this;
         }
 
@@ -147,30 +230,23 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
         }
 
         /**
-         * 控制自定义方块在创造栏中的组。
+         * 控制自定义方块是否在命令自动补全中隐藏。
          * <p>
-         * Control the grouping of custom blocks in the creation inventory.
-         *
-         * @see <a href="https://wiki.bedrock.dev/documentation/creative-categories.html">wiki.bedrock.dev</a>
+         * Control whether the custom block is hidden in command auto-completion.
          */
-        public Builder creativeGroup(String creativeGroup) {
-            if (creativeGroup.isBlank()) {
-                log.error("creativeGroup has an invalid value!");
-                return this;
-            }
-            this.nbt.getCompound("components").getCompound("menu_category").putString("group", creativeGroup.toLowerCase(Locale.ENGLISH));
+        public Builder isHiddenInCommands(boolean hidden) {
+            this.nbt.getCompound("menu_category")
+                    .putByte("is_hidden_in_commands", (byte) (hidden ? 1 : 0));
             return this;
         }
 
         /**
-         * 控制自定义方块在创造栏中的组。
+         * 控制自定义方块是否自动注册到创造物品栏。默认为 true。
          * <p>
-         * Control the grouping of custom blocks in the creation inventory.
-         *
-         * @see <a href="https://wiki.bedrock.dev/documentation/creative-categories.html">wiki.bedrock.dev</a>
+         * Control whether the custom block is automatically registered in the creative inventory. Default is true.
          */
-        public Builder creativeGroup(ItemCreativeGroup creativeGroup) {
-            this.nbt.getCompound("components").getCompound("menu_category").putString("group", creativeGroup.getGroupName());
+        public Builder registerCreativeItem(boolean register) {
+            this.registerCreativeItem = register;
             return this;
         }
 
@@ -216,7 +292,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
             if (components.contains("minecraft:unit_cube")) components.remove("minecraft:unit_cube");
             //设置方块对应的几何模型
             components.putCompound("minecraft:geometry", new CompoundTag()
-                    .putString("identifier", geometry.toLowerCase(Locale.ENGLISH)));
+                    .putString("identifier", geometry.toLowerCase(Locale.ROOT)));
             return this;
         }
 
@@ -317,7 +393,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
             Preconditions.checkArgument(tag.length > 0);
             ListTag<StringTag> stringTagListTag = new ListTag<>();
             for (String s : tag) {
-                stringTagListTag.add(new StringTag(s));
+                stringTagListTag.add(new StringTag("", s));
             }
             this.nbt.putList("blockTags", stringTagListTag);
             return this;
@@ -372,7 +448,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
         }
 
         public CustomBlockDefinition build() {
-            return new CustomBlockDefinition(this.identifier, this.nbt, this.blockContainer.getNukkitId(), this.blockContainer.getClass());
+            return new CustomBlockDefinition(this.identifier, this.nbt, this.blockContainer.getNukkitId(), this.blockContainer.getClass(), this.registerCreativeItem);
         }
     }
 }

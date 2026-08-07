@@ -26,7 +26,7 @@ public class BlockEntityDispenser extends BlockEntitySpawnable implements Invent
     protected void initBlockEntity() {
         this.inventory = new DispenserInventory(this);
 
-        if (!this.namedTag.contains("Items") || !(this.namedTag.get("Items") instanceof ListTag)) {
+        if (!(this.namedTag.get("Items") instanceof ListTag)) {
             this.namedTag.putList(new ListTag<CompoundTag>("Items"));
         }
 

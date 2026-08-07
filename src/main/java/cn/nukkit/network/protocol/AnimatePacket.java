@@ -1,9 +1,11 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import lombok.Getter;
 import lombok.ToString;
+
+import java.util.HashMap;
 
 /**
  * @author Nukkit Project Team
@@ -15,7 +17,12 @@ public class AnimatePacket extends DataPacket {
 
     public long eid;
     public Action action;
+    public float data;
     public float rowingTime;
+    /**
+     * @since v897
+     */
+    public SwingSource swingSource = SwingSource.NONE;
 
     @Override
     public void decode() {
@@ -33,15 +40,23 @@ public class AnimatePacket extends DataPacket {
             }
             return;
         }
-        if(this.protocol >= ProtocolInfo.v1_2_0){
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
+            this.action = Action.fromId(this.getByte());
+        } else {
             this.action = Action.fromId(this.getVarInt());
-            this.eid = getEntityRuntimeId();
-        }else{
-            this.action = Action.fromId((int) this.getUnsignedVarInt());
-            this.eid = getEntityUniqueId();
         }
-        if (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT) {
+        if (this.action == null) {
+            this.action = Action.NO_ACTION;
+        }
+        this.eid = getEntityRuntimeId();
+        if (this.protocol >= ProtocolInfo.v1_21_120) {
+            this.data = this.getLFloat();
+        }
+        if (protocol < ProtocolInfo.v1_21_130_28 && (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT)) {
             this.rowingTime = this.getLFloat();
+        }
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
+            this.swingSource = this.getOptional(SwingSource.NONE, stream -> SwingSource.from(stream.getString()));
         }
     }
 
@@ -64,15 +79,20 @@ public class AnimatePacket extends DataPacket {
         }
 
         this.reset();
-        if(this.protocol >= ProtocolInfo.v1_2_0){
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
+            this.putByte((byte) this.action.getId());
+        } else {
             this.putVarInt(this.action.getId());
-            this.putEntityRuntimeId(this.eid);
-        }else {
-            this.putUnsignedVarInt(this.action.getId());
-            this.putEntityUniqueId(this.eid);
         }
-        if (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT) {
+        this.putEntityRuntimeId(this.eid);
+        if (this.protocol >= ProtocolInfo.v1_21_120) {
+            this.putLFloat(this.data);
+        }
+        if (protocol < ProtocolInfo.v1_21_130_28 && (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT)) {
             this.putLFloat(this.rowingTime);
+        }
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
+            this.putOptional(o -> o != SwingSource.NONE, this.swingSource, o -> this.putString(o.getName()));
         }
     }
 
@@ -117,6 +137,37 @@ public class AnimatePacket extends DataPacket {
 
         public static Action fromId(int id) {
             return ID_LOOKUP.get(id);
+        }
+    }
+
+    public enum SwingSource {
+        NONE("none"),
+        BUILD("build"),
+        MINE("mine"),
+        INTERACT("interact"),
+        ATTACK("attack"),
+        USE_ITEM("useitem"),
+        THROW_ITEM("throwitem"),
+        DROP_ITEM("dropitem"),
+        EVENT("event");
+
+        private static final HashMap<String, SwingSource> BY_NAME = new HashMap<>();
+
+        static {
+            for (SwingSource value : values()) {
+                BY_NAME.put(value.name, value);
+            }
+        }
+
+        @Getter
+        private final String name;
+
+        SwingSource(String name) {
+            this.name = name;
+        }
+
+        public static SwingSource from(String name) {
+            return BY_NAME.get(name);
         }
     }
 }

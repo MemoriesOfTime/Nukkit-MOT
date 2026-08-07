@@ -17,6 +17,7 @@ public class BlockColor  {
     public static final BlockColor CLOTH_BLOCK_COLOR = WOOL_BLOCK_COLOR;
     public static final BlockColor TNT_BLOCK_COLOR = new BlockColor(0xff, 0x00, 0x00);
     public static final BlockColor ICE_BLOCK_COLOR = new BlockColor(0xa0, 0xa0, 0xff);
+    public static final BlockColor METAL_BLOCK_COLOR = new BlockColor(0xa7, 0xa7, 0xa7);
     public static final BlockColor IRON_BLOCK_COLOR = new BlockColor(0xa7, 0xa7, 0xa7);
     public static final BlockColor FOLIAGE_BLOCK_COLOR = new BlockColor(0x00, 0x7c, 0x00);
     public static final BlockColor PLANT_BLOCK_COLOR = FOLIAGE_BLOCK_COLOR;
@@ -87,6 +88,7 @@ public class BlockColor  {
     public static final BlockColor WARPED_HYPHAE_BLOCK_COLOR = new BlockColor(0x56, 0x2C, 0x3E);
     public static final BlockColor WARPED_WART_BLOCK_COLOR = new BlockColor(0x14, 0xB4, 0x85);
     public static final BlockColor DEEPSLATE_BLOCK_COLOR = new BlockColor(0x64, 0x64, 0x64);
+    public static final BlockColor TUFF_BLOCK_COLOR = new BlockColor(0x6D, 0x5B, 0x50);
     public static final BlockColor FIRE_BLOCK_COLOR = TNT_BLOCK_COLOR;
 
     private final int red;

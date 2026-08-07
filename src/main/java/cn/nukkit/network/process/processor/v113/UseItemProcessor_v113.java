@@ -13,18 +13,18 @@ import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.UpdateBlockPacket;
-import cn.nukkit.network.protocol.v113.UseItemPacketV113;
+import cn.nukkit.network.protocol.v113.UseItemPacket_v113;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
-public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacketV113> {
+public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacket_v113> {
 
     public static final UseItemProcessor_v113 INSTANCE = new UseItemProcessor_v113();
 
     @Override
-    public void handle(@NotNull PlayerHandle playerHandle, @NotNull UseItemPacketV113 pk) {
+    public void handle(@NotNull PlayerHandle playerHandle, @NotNull UseItemPacket_v113 pk) {
         //TODO check
         //尝试翻译为InventoryTransactionPacket
 
@@ -33,7 +33,7 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacketV113
             return;
         }
 
-        UseItemPacketV113 useItemPacket = pk;
+        UseItemPacket_v113 useItemPacket = pk;
 
         Vector3 blockVector = new Vector3(useItemPacket.x, useItemPacket.y, useItemPacket.z);
 
@@ -42,7 +42,7 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacketV113
         Item item = null;
         if (useItemPacket.face >= 0 && useItemPacket.face <= 5) {
             BlockFace face = BlockFace.fromIndex(useItemPacket.face);
-            player.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, false);
+            player.setUsingItem(false);
 
 
             if (!player.canInteract(blockVector.add(0.5, 0.5, 0.5), player.isCreative() ? 13 : 7)) {
@@ -116,19 +116,18 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacketV113
                 item.onClickAir(player, aimPos);
             }
 
-            player.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, true);
-            playerHandle.setStartAction(player.getServer().getTick());
+            player.setUsingItem(true);
         }
     }
 
     @Override
     public int getPacketId() {
-        return ProtocolInfo.toNewProtocolID(UseItemPacketV113.NETWORK_ID);
+        return ProtocolInfo.toNewProtocolID(UseItemPacket_v113.NETWORK_ID);
     }
 
     @Override
     public Class<? extends DataPacket> getPacketClass() {
-        return UseItemPacketV113.class;
+        return UseItemPacket_v113.class;
     }
 
     @Override

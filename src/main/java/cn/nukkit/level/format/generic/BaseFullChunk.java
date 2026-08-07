@@ -1,7 +1,11 @@
 package cn.nukkit.level.format.generic;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockEntityHolder;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
 import cn.nukkit.entity.Entity;
@@ -9,6 +13,8 @@ import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.format.leveldb.serializer.EntityNbtAdapter;
+import cn.nukkit.level.format.leveldb.serializer.EntityNbtLoadStatus;
 import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
@@ -19,12 +25,11 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author MagicDroidX
@@ -53,11 +58,34 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected byte[] blockLight;
 
-    protected byte[] heightMap;
+    protected short[] heightMap;
 
     protected List<CompoundTag> NBTtiles;
 
+    /**
+     * Raw NBT of tiles that failed to construct at load time (unregistered/unknown id, or a
+     * constructor that threw). Retained verbatim and round-tripped on save so foreign/modded
+     * tile data is not silently destroyed. Keyed by the same packed local index as {@link #tileList}.
+     */
+    protected Long2ObjectNonBlockingMap<CompoundTag> unknownTiles;
+
     protected List<CompoundTag> NBTentities;
+
+    /**
+     * Raw entity NBT that could not be converted into a live Nukkit entity at load time
+     * (unregistered/unknown id, e.g. residual custom entities from a removed plugin).
+     * <p>
+     * 仅在 {@link #initChunk()} 阶段由 {@code PRESERVE_ONLY} 状态填充；Anvil 等不支持
+     * 独立 actor 存储的格式在 {@code toNBT()} 时将其原样回写，避免存档数据在保存周期丢失（issue #800）。
+     */
+    protected List<CompoundTag> preservedEntityNbt = Collections.emptyList();
+
+    /**
+     * 解码阶段(可能在异步线程)解析出的待调度方块更新;坐标/Level 字段在 {@link #initChunk()}(主线程)才设置并调用 scheduleUpdate,避免异步线程触碰 Level 游戏状态
+     * <p>
+     * Block updates parsed during decode (potentially off-thread); position/Level are filled in {@link #initChunk()} (main thread) before scheduleUpdate, so the off-thread path never touches Level game state
+     */
+    protected List<PendingBlockUpdate> pendingBlockUpdates;
 
     protected Map<Integer, Integer> extraData;
 
@@ -68,11 +96,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     private int z;
     private long hash;
 
-    protected long changes;
+    protected AtomicLong changes = new AtomicLong();
 
     protected boolean isInit;
 
-    protected Map<Integer, BatchPacket> chunkPackets;
+    protected boolean lightPopulated;
+
+    protected Map<GameVersion, BatchPacket> chunkPackets;
 
     @Override
     public BaseFullChunk clone() {
@@ -105,6 +135,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (this.heightMap != null) {
             chunk.heightMap = this.getHeightMapArray().clone();
         }
+        chunk.changes = new AtomicLong(this.changes.get());
         return chunk;
     }
 
@@ -115,6 +146,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         } catch (CloneNotSupportedException e) {
             return null;
         }
+        chunk.changes = new AtomicLong(this.changes.get());
 
         if (this.tiles != null) {
             chunk.tiles = new Long2ObjectNonBlockingMap<>();
@@ -125,21 +157,33 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         chunk.tileList = null;
         chunk.NBTentities = null;
         chunk.NBTtiles = null;
+        chunk.unknownTiles = null;
         chunk.extraData = null;
+        chunk.pendingBlockUpdates = null;
         return chunk;
     }
 
+    @Deprecated
     public void setChunkPacket(int protocol, BatchPacket packet) {
+        this.setChunkPacket(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), packet);
+    }
+
+    public void setChunkPacket(GameVersion protocol, BatchPacket packet) {
         if (packet != null) {
             packet.trim();
             if (this.chunkPackets == null) {
-                this.chunkPackets = new Int2ObjectOpenHashMap<>();
+                this.chunkPackets = new Object2ObjectOpenHashMap<>();
             }
             this.chunkPackets.put(protocol, packet);
         }
     }
 
+    @Deprecated
     public BatchPacket getChunkPacket(int protocol) {
+        return getChunkPacket(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public BatchPacket getChunkPacket(GameVersion protocol) {
         if (this.chunkPackets == null) {
             return null;
         }
@@ -150,18 +194,25 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return pk;
     }
 
-    public void backwardCompatibilityUpdate(Level level) {
-        // Does nothing here
-    }
-
     @Override
     public void initChunk() {
         if (this.getProvider() != null && !this.isInit) {
-            boolean changed = false;
+            boolean changed = this.hasChanged();
             if (this.NBTentities != null) {
                 for (CompoundTag nbt : NBTentities) {
-                    if (!nbt.contains("id")) {
-                        this.setChanged();
+                    // 复用 LevelDB 路径的归一化逻辑：无法识别/无效的实体 NBT 不创建实体
+                    // Reuse the LevelDB normalization: unrecognized/invalid entity NBT does not create a live entity
+                    EntityNbtLoadStatus status = EntityNbtAdapter.normalizeForNukkitLoad(nbt);
+                    if (status != EntityNbtLoadStatus.LOADABLE) {
+                        // PRESERVE_ONLY：保留原始 NBT，让保存周期回写，避免静默丢失存档数据（issue #800）
+                        // PRESERVE_ONLY: retain raw NBT so the save cycle can write it back instead of silently dropping saved data
+                        if (status == EntityNbtLoadStatus.PRESERVE_ONLY) {
+                            if (this.preservedEntityNbt.isEmpty()) {
+                                this.preservedEntityNbt = new ArrayList<>();
+                            }
+                            this.preservedEntityNbt.add(nbt);
+                        }
+                        changed = true;
                         continue;
                     }
                     ListTag<? extends Tag> pos = nbt.getList("Pos");
@@ -190,17 +241,130 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                         }
                         BlockEntity blockEntity = BlockEntity.createBlockEntity(nbt.getString("id").replaceFirst("BlockEntity", ""), this, nbt);
                         if (blockEntity == null) {
-                            changed = true;
+                            // Valid id and coordinates, but the tile type could not be built
+                            // (unregistered/unknown type such as a modded or custom tile, or a
+                            // constructor that threw). Retain the raw NBT so it is round-tripped on
+                            // save instead of being permanently deleted. Do NOT set changed=true:
+                            // force-marking the chunk dirty here is exactly what turned a transient
+                            // load failure into permanent, irreversible data loss.
+                            this.retainUnknownTile(nbt);
                         }
                     }
                 }
                 this.NBTtiles = null;
             }
 
+            this.replayDeferredBlockUpdates();
+
             this.setChanged(changed);
 
             this.isInit = true;
         }
+    }
+
+    /**
+     * 在主线程回放解码阶段暂存的方块更新调度,与 Entity/Tile 的延迟初始化模式对齐
+     * <p>
+     * Replay deferred block-update scheduling on the main thread, mirroring the deferred init pattern used for entities/tiles
+     */
+    public void replayDeferredBlockUpdates() {
+        List<PendingBlockUpdate> updates = this.pendingBlockUpdates;
+        if (updates == null || updates.isEmpty()) {
+            this.pendingBlockUpdates = null;
+            return;
+        }
+        LevelProvider providerTemp = this.provider;
+        Level levelTemp = providerTemp == null ? null : providerTemp.getLevel();
+        if (levelTemp == null) {
+            this.pendingBlockUpdates = null;
+            return;
+        }
+        for (PendingBlockUpdate update : updates) {
+            update.apply(levelTemp);
+        }
+        this.pendingBlockUpdates = null;
+    }
+
+    /**
+     * 供跨包 provider 在解码阶段(可能在异步线程)暂存解析出的方块更新;{@link #initChunk()}(主线程)回放后清空
+     * <p>
+     * Lets a cross-package provider stash parsed block updates at decode time (potentially off-thread); {@link #initChunk()} (main thread) replays and clears them
+     */
+    public void setPendingBlockUpdates(List<PendingBlockUpdate> updates) {
+        this.pendingBlockUpdates = updates;
+    }
+
+    /**
+     * 返回尚未在主线程回放的方块更新。
+     * <p>
+     * Returns block updates that have not yet been replayed on the main thread.
+     */
+    public List<PendingBlockUpdate> getDeferredBlockUpdates() {
+        return this.pendingBlockUpdates;
+    }
+
+    /**
+     * 解码阶段收集的待调度方块更新载体:仅保存方块身份与计时,坐标/Level 字段延迟到主线程回放时设置
+     * <p>
+     * Carrier for a deferred block update captured at decode time: holds only block identity and timing; position/Level are applied during main-thread replay
+     */
+    public static final class PendingBlockUpdate {
+        private final Block block;
+        private final int x;
+        private final int y;
+        private final int z;
+        private final int layer;
+        private final int delay;
+        private final int priority;
+
+        public PendingBlockUpdate(Block block, int x, int y, int z, int delay, int priority) {
+            this(block, x, y, z, 0, delay, priority);
+        }
+
+        public PendingBlockUpdate(Block block, int x, int y, int z, int layer, int delay, int priority) {
+            this.block = block;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.layer = layer;
+            this.delay = delay;
+            this.priority = priority;
+        }
+
+        void apply(Level level) {
+            Block block = this.block;
+            block.x = this.x;
+            block.y = this.y;
+            block.z = this.z;
+            block.layer = this.layer;
+            block.level = level;
+            level.scheduleUpdate(block, block, this.delay, this.priority, false);
+        }
+
+        public Block getBlock() {
+            return this.block;
+        }
+
+        public int getX() {
+            return this.x;
+        }
+
+        public int getY() {
+            return this.y;
+        }
+
+        public int getZ() {
+            return this.z;
+        }
+
+        public int getDelay() {
+            return this.delay;
+        }
+
+        public int getPriority() {
+            return this.priority;
+        }
+
     }
 
     @Override
@@ -265,6 +429,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void setBiomeId(int x, int z, int biomeId) {
         this.biomes[(x << 4) | z] = (byte) biomeId;
+        this.setChanged();
     }
 
     @Override
@@ -278,12 +443,16 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public int getHeightMap(int x, int z) {
-        return this.heightMap[(z << 4) | x] & 0xFF;
+        return this.heightMap[(z << 4) | x] + this.getProvider().getMinBlockY();
     }
 
     @Override
     public void setHeightMap(int x, int z, int value) {
-        this.heightMap[(z << 4) | x] = (byte) value;
+        //基岩版3d-data保存heightMap是以0为索引保存的，所以这里需要减去世界最小值，详情查看
+        //Bedrock Edition 3d-data saves the height map start from index of 0, so need to subtract the world minimum height here, see for details:
+        //https://github.com/bedrock-dev/bedrock-level/blob/main/src/include/data_3d.h#L115
+        this.heightMap[(z << 4) | x] = (short) (value - this.getProvider().getMinBlockY());
+        this.setChanged();
     }
 
     @Override
@@ -297,16 +466,26 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public int recalculateHeightMapColumn(int x, int z) {
-        int max = getHighestBlockAt(x, z, false);
-        int y;
-        for (y = max; y >= 0; --y) {
-            if (Block.lightFilter[getBlockIdAt(x, y, z)] > 1 || Block.diffusesSkyLight[getBlockIdAt(x, y, z)]) {
-                break;
+        int minY = 0;
+        int maxY = 255;
+        LevelProvider providerTemp = this.provider;
+        if (providerTemp != null) {
+            Level levelTemp = providerTemp.getLevel();
+            if (levelTemp != null) {
+                minY = levelTemp.getMinBlockY();
+                maxY = levelTemp.getMaxBlockY();
             }
         }
 
-        setHeightMap(x, z, y + 1);
-        return y + 1;
+        for (int y = maxY; y >= minY; --y) {
+            if (getBlockId(x, y, z) != BlockID.AIR) {
+                setHeightMap(x, z, y + 1);
+                return y;
+            }
+        }
+
+        setHeightMap(x, z, minY);
+        return minY;
     }
 
     @Override
@@ -338,12 +517,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         // basic light calculation
         for (int z = 0; z < 16; ++z) {
             for (int x = 0; x < 16; ++x) { // iterating over all columns in chunk
-                int top = this.getHeightMap(x, z) - 1; // top-most block
+                // heightMap stores y + 1, so top-most block Y = heightMap - 1
+                int top = this.getHeightMap(x, z) - 1;
 
                 int y;
 
                 for (y = this.getProvider().getMaxBlockY(); y > top; --y) {
-                    // all the blocks above & including the top-most block in a column are exposed to sun and
+                    // all the blocks above the top-most block are exposed to sun and
                     // thus have a skylight value of 15
                     this.setBlockSkyLight(x, y, z, 15);
                 }
@@ -351,8 +531,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 int nextLight = 15; // light value that will be applied starting with the next block
                 int nextDecrease = 0; // decrease that that will be applied starting with the next block
 
-                // TODO: remove nextLight & nextDecrease, use only light & decrease variables
-                for (y = top; y >= this.getProvider().getMinBlockY(); --y) { // going under the top-most block
+                // Process from top-most block downward
+                for (y = top; y >= this.getProvider().getMinBlockY(); --y) {
                     nextLight -= nextDecrease;
                     int light = nextLight; // this light value will be applied for this block. The following checks are all about the next blocks
 
@@ -370,14 +550,14 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                     // START of checks for the next block
                     int id = this.getBlockId(x, y, z);
 
-                    if (!Block.transparent[id]) { // if we encounter an opaque block, all the blocks under it will
+                    if (!Block.isBlockTransparentById(id)) { // if we encounter an opaque block, all the blocks under it will
                                            // have a skylight value of 0 (the block itself has a value of 15, if it's a top-most block)
                         nextLight = 0;
-                    } else if (Block.diffusesSkyLight[id]) {
+                    } else if (Block.getBlockDiffusesSkyLight(id)) {
                         nextDecrease += 1; // skylight value decreases by one for each block under a block
                                            // that diffuses skylight. The block itself has a value of 15 (if it's a top-most block)
                     } else {
-                        nextDecrease -= Block.lightFilter[id]; // blocks under a light filtering block will have a skylight value
+                        nextDecrease -= Block.getBlockLightFilter(id); // blocks under a light filtering block will have a skylight value
                                                             // decreased by the lightFilter value of that block. The block itself
                                                             // has a value of 15 (if it's a top-most block)
                     }
@@ -388,27 +568,100 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
+    public void populateBlockLight() {
+        int minY = this.getProvider().getMinBlockY();
+        int maxY = this.getProvider().getMaxBlockY();
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    int blockId = this.getBlockId(x, y, z);
+                    int lightLevel = Block.getBlockLight(blockId);
+                    if (lightLevel > 0) {
+                        this.setBlockLight(x, y, z, lightLevel);
+                    }
+                }
+            }
+        }
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    int currentLight = this.getBlockLight(x, y, z);
+                    if (currentLight > 1) {
+                        // Propagate to neighbors within chunk
+                        propagateBlockLightToNeighbor(x - 1, y, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x + 1, y, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y - 1, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y + 1, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y, z - 1, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y, z + 1, currentLight, minY, maxY);
+                    }
+                }
+            }
+        }
+    }
+
+    private void propagateBlockLightToNeighbor(int x, int y, int z, int sourceLight, int minY, int maxY) {
+        // Check bounds (only within chunk)
+        if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < minY || y > maxY) {
+            return;
+        }
+
+        int blockId = this.getBlockId(x, y, z);
+        int lightFilter = Block.getBlockLightFilter(blockId);
+        int newLight = sourceLight - Math.max(1, lightFilter);
+
+        if (newLight > 0 && newLight > this.getBlockLight(x, y, z)) {
+            this.setBlockLight(x, y, z, newLight);
+        }
+    }
+
+    @Override
     public int getHighestBlockAt(int x, int z) {
         return this.getHighestBlockAt(x, z, true);
     }
 
     @Override
     public int getHighestBlockAt(int x, int z, boolean cache) {
+        int minY = 0;
+        int maxY = 127; // Don't go out of bounds when nether chunk is unloading
+        LevelProvider providerTemp = this.provider;
+        if (providerTemp != null) {
+            Level levelTemp = providerTemp.getLevel();
+            if (levelTemp != null) {
+                minY = levelTemp.getMinBlockY();
+                maxY = levelTemp.getMaxBlockY();
+            } else {
+                cache = false;
+            }
+        } else {
+            cache = false;
+        }
+
         if (cache) {
             int h = this.getHeightMap(x, z);
-            if (h != this.getProvider().getMinBlockY() && h != this.getProvider().getMaxBlockY()) {
-                return h;
+            if (h > minY && h <= maxY + 1) {
+                int highestY = h - 1;
+                // Verify cache is not stale
+                if (getBlockId(x, highestY, z) != BlockID.AIR) {
+                    return highestY;
+                }
             }
         }
-        for (int y = this.getProvider().getMaxBlockY(); y >= this.getProvider().getMinBlockY(); --y) {
-            if (getBlockId(x, y, z) != 0x00) {
+
+        for (int y = maxY; y >= minY; --y) {
+            if (getBlockId(x, y, z) != BlockID.AIR) {
                 if (cache) {
-                    this.setHeightMap(x, z, y);
+                    this.setHeightMap(x, z, y + 1);
                 }
                 return y;
             }
         }
-        return 0;
+        if (cache) {
+            this.setHeightMap(x, z, minY);
+        }
+        return minY;
     }
 
     @Override
@@ -441,13 +694,15 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         this.tiles.put(blockEntity.getId(), blockEntity);
         int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
         int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
-        if (this.tileList.containsKey(index) && !this.tileList.get(index).equals(blockEntity)) {
-            BlockEntity entity = this.tileList.get(index);
-            this.tiles.remove(entity.getId());
-            entity.onReplacedWith(blockEntity);
-            entity.close();
+        if (this.unknownTiles != null) {
+            this.unknownTiles.remove(index); // a real tile now occupies this slot
         }
-        this.tileList.put(index, blockEntity);
+        var existing = this.tileList.put(index, blockEntity);
+        if (existing != null && existing != blockEntity) {
+            this.tiles.remove(existing.getId());
+            existing.onReplacedWith(blockEntity);
+            existing.close();
+        }
         if (this.isInit) {
             this.setChanged();
         }
@@ -459,7 +714,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             this.tiles.remove(blockEntity.getId());
             int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
             int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
-            this.tileList.remove(index);
+            this.tileList.remove(index, blockEntity);
 
             if (!(blockEntity instanceof PersistentDataContainerBlockEntity) && blockEntity.hasPersistentDataContainer()) {
                 this.createPersistentBlockContainer(blockEntity, blockEntity.getPersistentDataContainer().getStorage());
@@ -485,6 +740,68 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public Map<Long, BlockEntity> getBlockEntities() {
         return tiles == null ? Collections.emptyMap() : tiles;
+    }
+
+    /**
+     * Raw NBT of tiles whose type could not be constructed at load time, kept verbatim so the
+     * data survives a load/save round-trip instead of being silently deleted. Consumed by the
+     * disk chunk serializers only; never sent to clients.
+     */
+    public Collection<CompoundTag> getUnknownTiles() {
+        return this.unknownTiles == null ? Collections.emptyList() : this.unknownTiles.values();
+    }
+
+    /**
+     * Returns entity NBT records that could not be turned into live Nukkit entities at load time
+     * (e.g. residual custom entities from a removed plugin). Survives a load/save round-trip on
+     * formats without dedicated actor storage (Anvil) instead of being silently deleted.
+     * <p>
+     * 仅由区块序列化器消费；不会发送给客户端（issue #800）。
+     */
+    public List<CompoundTag> getPreservedEntityNbt() {
+        return this.preservedEntityNbt == null ? Collections.emptyList() : this.preservedEntityNbt;
+    }
+
+    /**
+     * Retain a tile NBT that could not be turned into a {@link BlockEntity} (unknown/unregistered
+     * type or failing constructor) so it is preserved on the next save rather than deleted.
+     */
+    private void retainUnknownTile(CompoundTag nbt) {
+        if (this.getProvider() == null) {
+            return;
+        }
+        int index = ((nbt.getInt("z") & 0x0f) << 16) | ((nbt.getInt("x") & 0x0f) << 12)
+                | (nbt.getInt("y") - this.getProvider().getMinBlockY());
+        if (this.tileList != null && this.tileList.get(index) != null) {
+            return; // a successfully-constructed tile already occupies this slot
+        }
+        if (this.unknownTiles == null) {
+            this.unknownTiles = new Long2ObjectNonBlockingMap<>();
+        }
+        this.unknownTiles.put(index, nbt);
+    }
+
+    /**
+     * Drop a retained unknown-tile NBT (see {@link #retainUnknownTile}) once the block at this
+     * position can no longer host a block entity — e.g. it was broken to air or replaced with a
+     * non-tile block such as stone. Without this, a removed/replaced modded tile would be
+     * resurrected from {@link #unknownTiles} on the next save. Coordinates are chunk-local
+     * (x, z in 0..15; y absolute).
+     */
+    protected void removeInvalidUnknownTile(int x, int y, int z) {
+        if (this.unknownTiles == null || this.getProvider() == null) {
+            return;
+        }
+        int index = ((z & 0x0f) << 16) | ((x & 0x0f) << 12) | (y - this.getProvider().getMinBlockY());
+        if (!this.unknownTiles.containsKey(index)) {
+            return;
+        }
+        // Keep it while the slot can still legitimately hold a block entity: the matching tile may
+        // simply not be constructed yet, and a real tile placed later is deduplicated by
+        // addBlockEntity(). Only drop it when the current block clearly cannot host one.
+        if (!(Block.get(this.getBlockId(x, y, z)) instanceof BlockEntityHolder)) {
+            this.unknownTiles.remove(index);
+        }
     }
 
     @Override
@@ -533,7 +850,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (provider == null) {
             return true;
         }
-        if (save && this.changes != 0) {
+        if (save && this.changes.get() != 0) {
             provider.saveChunk(this.x, this.z);
         }
         if (safe) {
@@ -585,25 +902,26 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void setBiomeIdArray(byte[] biomeIdArray) {
         this.biomes = biomeIdArray;
+        this.setChanged();
     }
 
     @Override
-    public byte[] getHeightMapArray() {
+    public short[] getHeightMapArray() {
         return this.heightMap;
     }
 
     public long getChanges() {
-        return changes;
+        return changes.get();
     }
 
     @Override
     public boolean hasChanged() {
-        return this.changes != 0;
+        return this.changes.get() != 0;
     }
 
     @Override
     public void setChanged() {
-        this.changes++;
+        this.changes.incrementAndGet();
         chunkPackets = null;
     }
 
@@ -612,8 +930,19 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (changed) {
             setChanged();
         } else {
-            changes = 0;
+            changes.set(0);
         }
+    }
+
+    /**
+     * Atomically clear dirty flag only if no new modifications occurred since the snapshot.
+     * Used by async save to avoid clearing changes made during the save window.
+     *
+     * @param snapshot the changes value captured before serialization
+     * @return true if successfully cleared, false if new changes were made
+     */
+    public boolean clearChangesIfUnmodified(long snapshot) {
+        return changes.compareAndSet(snapshot, 0);
     }
 
     @Override
@@ -623,7 +952,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public boolean isLightPopulated() {
-        return true;
+        return this.lightPopulated;
     }
 
     @Override
@@ -633,7 +962,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void setLightPopulated(boolean value) {
-
+        this.lightPopulated = value;
+        this.setChanged();
     }
 
     @Override
@@ -690,7 +1020,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             setBlockId(x & 15, y, z & 15, layer, id);
         }
     }
-    
+
     @Override
     public void setBlockAt(int x, int y, int z, int id, int data) {
         if (x >> 4 == getX() && z >> 4 == getZ()) {
@@ -725,7 +1055,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public BaseFullChunk getChunk(int chunkX, int chunkZ) {
-        if (chunkX == this.x && chunkZ == this.x) return this;
+        if (chunkX == this.x && chunkZ == this.z) return this;
         return null;
     }
 

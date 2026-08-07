@@ -1,7 +1,5 @@
 package cn.nukkit.block;
 
-import cn.nukkit.item.Item;
-
 public class BlockWallBrickBlackstonePolished extends BlockWallBlackstone {
 
     public BlockWallBrickBlackstonePolished() {
@@ -20,5 +18,10 @@ public class BlockWallBrickBlackstonePolished extends BlockWallBlackstone {
     @Override
     public int getId() {
         return POLISHED_BLACKSTONE_BRICK_WALL;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:polished_blackstone_brick_wall";
     }
 }

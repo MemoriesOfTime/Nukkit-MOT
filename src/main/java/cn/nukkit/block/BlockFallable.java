@@ -21,7 +21,7 @@ public abstract class BlockFallable extends BlockSolid {
         }
 
         Block down = this.down();
-        if (down.getId() == AIR || down instanceof BlockLiquid || down instanceof BlockFire) {
+        if (this.canFallInto(down)) {
             BlockFallEvent event = new BlockFallEvent(this);
             this.level.getServer().getPluginManager().callEvent(event);
 
@@ -34,6 +34,13 @@ public abstract class BlockFallable extends BlockSolid {
             fall.spawnToAll();
         }
         return type;
+    }
+
+    protected boolean canFallInto(Block block) {
+        return block.getId() == AIR
+                || block instanceof BlockLiquid
+                || block instanceof BlockFire
+                || block instanceof BlockBubbleColumn && block.getLevelBlockAtLayer(1) instanceof BlockLiquid;
     }
 
     protected EntityFallingBlock createFallingEntity(CompoundTag customNbt) {

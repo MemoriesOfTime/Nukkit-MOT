@@ -10,6 +10,13 @@ public interface ItemNamespaceId {
     String ECHO_SHARD = "minecraft:echo_shard";
     String RECOVERY_COMPASS = "minecraft:recovery_compass";
 
+    String MANGROVE_DOOR = "minecraft:mangrove_door";
+    String BAMBOO_DOOR_NAMESPACE_ID = "minecraft:bamboo_door";
+    String CHERRY_DOOR = "minecraft:cherry_door";
+
+    String CHISELED_BOOKSHELF_NAMESPACE_ID = "minecraft:chiseled_bookshelf";
+    String CRAFTER_NAMESPACE_ID = "minecraft:crafter";
+
     String NETHERITE_UPGRADE_SMITHING_TEMPLATE = "minecraft:netherite_upgrade_smithing_template";
     String SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE = "minecraft:sentry_armor_trim_smithing_template";
     String DUNE_ARMOR_TRIM_SMITHING_TEMPLATE = "minecraft:dune_armor_trim_smithing_template";
@@ -45,4 +52,78 @@ public interface ItemNamespaceId {
 
     String OMINOUS_BOTTLE = "minecraft:ominous_bottle";
 
+    String BREEZE_ROD = "minecraft:breeze_rod";
+
+    String BLUE_EGG = "minecraft:blue_egg";
+    String BROWN_EGG = "minecraft:brown_egg";
+
+    String TORCHFLOWER_SEEDS = "minecraft:torchflower_seeds";
+    String PITCHER_POD = "minecraft:pitcher_pod";
+    String ARMADILLO_SCUTE = "minecraft:armadillo_scute";
+    String WOLF_ARMOR = "minecraft:wolf_armor";
+    String RESIN_BRICK = "minecraft:resin_brick";
+    String COPPER_HORSE_ARMOR = "minecraft:copper_horse_armor";
+    String NETHERITE_HORSE_ARMOR = "minecraft:netherite_horse_armor";
+    String MUSIC_DISC_TEARS = "minecraft:music_disc_tears";
+    String MUSIC_DISC_LAVA_CHICKEN = "minecraft:music_disc_lava_chicken";
+
+    String WOODEN_SPEAR = "minecraft:wooden_spear";
+    String STONE_SPEAR = "minecraft:stone_spear";
+    String IRON_SPEAR = "minecraft:iron_spear";
+    String GOLDEN_SPEAR = "minecraft:golden_spear";
+    String DIAMOND_SPEAR = "minecraft:diamond_spear";
+    String COPPER_SPEAR = "minecraft:copper_spear";
+    String NETHERITE_SPEAR = "minecraft:netherite_spear";
+
+    String COPPER_NAUTILUS_ARMOR = "minecraft:copper_nautilus_armor";
+    String IRON_NAUTILUS_ARMOR = "minecraft:iron_nautilus_armor";
+    String GOLDEN_NAUTILUS_ARMOR = "minecraft:golden_nautilus_armor";
+    String DIAMOND_NAUTILUS_ARMOR = "minecraft:diamond_nautilus_armor";
+    String NETHERITE_NAUTILUS_ARMOR = "minecraft:netherite_nautilus_armor";
+
+    String COPPER_SWORD = "minecraft:copper_sword";
+    String COPPER_AXE = "minecraft:copper_axe";
+    String COPPER_PICKAXE = "minecraft:copper_pickaxe";
+    String COPPER_HOE = "minecraft:copper_hoe";
+    String COPPER_SHOVEL = "minecraft:copper_shovel";
+    String COPPER_HELMET = "minecraft:copper_helmet";
+    String COPPER_CHESTPLATE = "minecraft:copper_chestplate";
+    String COPPER_LEGGINGS = "minecraft:copper_leggings";
+    String COPPER_BOOTS = "minecraft:copper_boots";
+    String COPPER_NUGGET = "minecraft:copper_nugget";
+
+    String WHITE_HARNESS = "minecraft:white_harness";
+    String LIGHT_GRAY_HARNESS = "minecraft:light_gray_harness";
+    String GRAY_HARNESS = "minecraft:gray_harness";
+    String BLACK_HARNESS = "minecraft:black_harness";
+    String BROWN_HARNESS = "minecraft:brown_harness";
+    String RED_HARNESS = "minecraft:red_harness";
+    String ORANGE_HARNESS = "minecraft:orange_harness";
+    String YELLOW_HARNESS = "minecraft:yellow_harness";
+    String LIME_HARNESS = "minecraft:lime_harness";
+    String GREEN_HARNESS = "minecraft:green_harness";
+    String CYAN_HARNESS = "minecraft:cyan_harness";
+    String LIGHT_BLUE_HARNESS = "minecraft:light_blue_harness";
+    String BLUE_HARNESS = "minecraft:blue_harness";
+    String PURPLE_HARNESS = "minecraft:purple_harness";
+    String MAGENTA_HARNESS = "minecraft:magenta_harness";
+    String PINK_HARNESS = "minecraft:pink_harness";
+
+    String BUNDLE = "minecraft:bundle";
+    String WHITE_BUNDLE = "minecraft:white_bundle";
+    String LIGHT_GRAY_BUNDLE = "minecraft:light_gray_bundle";
+    String GRAY_BUNDLE = "minecraft:gray_bundle";
+    String BLACK_BUNDLE = "minecraft:black_bundle";
+    String BROWN_BUNDLE = "minecraft:brown_bundle";
+    String RED_BUNDLE = "minecraft:red_bundle";
+    String ORANGE_BUNDLE = "minecraft:orange_bundle";
+    String YELLOW_BUNDLE = "minecraft:yellow_bundle";
+    String LIME_BUNDLE = "minecraft:lime_bundle";
+    String GREEN_BUNDLE = "minecraft:green_bundle";
+    String CYAN_BUNDLE = "minecraft:cyan_bundle";
+    String LIGHT_BLUE_BUNDLE = "minecraft:light_blue_bundle";
+    String BLUE_BUNDLE = "minecraft:blue_bundle";
+    String PURPLE_BUNDLE = "minecraft:purple_bundle";
+    String MAGENTA_BUNDLE = "minecraft:magenta_bundle";
+    String PINK_BUNDLE = "minecraft:pink_bundle";
 }

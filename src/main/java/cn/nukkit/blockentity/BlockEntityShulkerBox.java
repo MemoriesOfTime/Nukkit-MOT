@@ -27,7 +27,7 @@ public class BlockEntityShulkerBox extends BlockEntitySpawnable implements Inven
     protected void initBlockEntity() {
         this.inventory = new ShulkerBoxInventory(this);
 
-        if (!this.namedTag.contains("Items") || !(this.namedTag.get("Items") instanceof ListTag)) {
+        if (!(this.namedTag.get("Items") instanceof ListTag)) {
             this.namedTag.putList(new ListTag<CompoundTag>("Items"));
         }
 

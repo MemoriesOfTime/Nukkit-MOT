@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -8,6 +9,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
 import java.util.EnumMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -23,7 +25,7 @@ public class GameRules {
     public static GameRules getDefault() {
         GameRules gameRules = new GameRules();
 
-        gameRules.gameRules.put(COMMAND_BLOCKS_ENABLED, new Value<>(Type.BOOLEAN, false, 291)); // Vanilla: default true
+        gameRules.gameRules.put(COMMAND_BLOCKS_ENABLED, new Value<>(Type.BOOLEAN, true, 291)); // Vanilla: default true
         gameRules.gameRules.put(COMMAND_BLOCK_OUTPUT, new Value<>(Type.BOOLEAN, true));
         gameRules.gameRules.put(DO_DAYLIGHT_CYCLE, new Value<>(Type.BOOLEAN, true));
         gameRules.gameRules.put(DO_ENTITY_DROPS, new Value<>(Type.BOOLEAN, true));
@@ -40,6 +42,8 @@ public class GameRules {
         gameRules.gameRules.put(FREEZE_DAMAGE, new Value<>(Type.BOOLEAN, true, 440));
         gameRules.gameRules.put(FUNCTION_COMMAND_LIMIT, new Value<>(Type.INTEGER, 10000, 332));
         gameRules.gameRules.put(KEEP_INVENTORY, new Value<>(Type.BOOLEAN, false));
+        gameRules.gameRules.put(LOCATOR_BAR, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_21_80, ProtocolInfo.v1_26_30));
+        gameRules.gameRules.put(PLAYER_WAYPOINTS, new Value<>(Type.INTEGER, PlayerWaypointsMode.OFF.ordinal(), ProtocolInfo.v1_26_30));
         gameRules.gameRules.put(MAX_COMMAND_CHAIN_LENGTH, new Value<>(Type.INTEGER, 65536));
         gameRules.gameRules.put(MOB_GRIEFING, new Value<>(Type.BOOLEAN, true));
         gameRules.gameRules.put(NATURAL_REGENERATION, new Value<>(Type.BOOLEAN, true));
@@ -47,16 +51,18 @@ public class GameRules {
         gameRules.gameRules.put(RANDOM_TICK_SPEED, new Value<>(Type.INTEGER, 3, 313)); // Vanilla: default 1
         gameRules.gameRules.put(SEND_COMMAND_FEEDBACK, new Value<>(Type.BOOLEAN, true, 361));
         gameRules.gameRules.put(SHOW_COORDINATES, new Value<>(Type.BOOLEAN, false));
+        gameRules.gameRules.put(SHOW_DAYS_PLAYED, new Value<>(Type.BOOLEAN, false, 685));
         gameRules.gameRules.put(SHOW_DEATH_MESSAGES, new Value<>(Type.BOOLEAN, true, 332));
         gameRules.gameRules.put(SHOW_TAGS, new Value<>(Type.BOOLEAN, true, 389));
-        gameRules.gameRules.put(SPAWN_RADIUS, new Value<>(Type.INTEGER, 5, 361));
+        gameRules.gameRules.put(SPAWN_RADIUS, new Value<>(Type.INTEGER, 10, 361));
         gameRules.gameRules.put(TNT_EXPLODES, new Value<>(Type.BOOLEAN, true));
+        gameRules.gameRules.put(TNT_EXPLOSION_DROP_DECAY, new Value<>(Type.BOOLEAN, false, 685));
         gameRules.gameRules.put(SHOW_BORDER_EFFECT, new Value<>(Type.BOOLEAN, true, 618));
         gameRules.gameRules.put(PLAYERS_SLEEPING_PERCENTAGE, new Value<>(Type.INTEGER, 100, 618));
-        gameRules.gameRules.put(RECIPES_UNLOCK, new Value<>(Type.BOOLEAN, false, ProtocolInfo.v1_18_0));
+        gameRules.gameRules.put(RECIPES_UNLOCK, new Value<>(Type.BOOLEAN, false, ProtocolInfo.v1_20_30));
         gameRules.gameRules.put(RESPAWN_BLOCKS_EXPLODE, new Value<>(Type.BOOLEAN, true, 618));
         gameRules.gameRules.put(DO_LIMITED_CRAFTING, new Value<>(Type.BOOLEAN, false, 618));
-        gameRules.gameRules.put(SHOW_RECIPE_MESSAGE, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_20_50));
+        gameRules.gameRules.put(SHOW_RECIPE_MESSAGES, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_20_50));
         gameRules.gameRules.put(PROJECTILES_CAN_BREAK_BLOCKS, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_20_50));
 
         return gameRules;
@@ -249,51 +255,90 @@ public class GameRules {
     public enum Type {
         UNKNOWN {
             @Override
-            void write(BinaryStream pk, Value value) {
+            void write(GameVersion gameVersion, BinaryStream pk, Value value, boolean startGame) {
             }
         },
         BOOLEAN {
             @Override
-            void write(BinaryStream pk, Value value) {
+            void write(GameVersion gameVersion, BinaryStream pk, Value value, boolean startGame) {
                 pk.putBoolean(value.getValueAsBoolean());
             }
         },
         INTEGER {
             @Override
-            void write(BinaryStream pk, Value value) {
-                pk.putUnsignedVarInt(value.getValueAsInteger());
+            void write(GameVersion gameVersion, BinaryStream pk, Value value, boolean startGame) {
+                if (gameVersion.getProtocol() >= GameVersion.V1_26_40.getProtocol()) {
+                    pk.putLInt(value.getValueAsInteger());
+                } else if (gameVersion.getProtocol() >= GameVersion.V1_21_110_26.getProtocol()) {
+                    if (startGame) {
+                        pk.putVarInt(value.getValueAsInteger());
+                    } else {
+                        pk.putLInt(value.getValueAsInteger());
+                    }
+                } else {
+                    pk.putUnsignedVarInt(value.getValueAsInteger());
+                }
             }
         },
         FLOAT {
             @Override
-            void write(BinaryStream pk, Value value) {
+            void write(GameVersion gameVersion, BinaryStream pk, Value value, boolean startGame) {
                 pk.putLFloat(value.getValueAsFloat());
             }
         };
 
-        abstract void write(BinaryStream pk, Value value);
+        abstract void write(GameVersion gameVersion, BinaryStream pk, Value value, boolean startGame);
     }
 
     public static class Value<T> {
         private final Type type;
         private T value;
         private boolean canBeChanged;
+        /**
+         * Inclusive lower bound of the protocol range in which this game rule is sent.
+         * <p>
+         * Semantics: {@code minProtocol} is the protocol version in which the rule was
+         * first introduced (e.g. {@code v1_26_30} for {@code PLAYER_WAYPOINTS}). The rule
+         * is sent to clients whose protocol {@code p} satisfies {@code minProtocol <= p}.
+         */
         private int minProtocol;
+        /**
+         * Exclusive upper bound of the protocol range in which this game rule is sent.
+         * The rule is sent to clients whose protocol {@code p} satisfies {@code p < maxProtocol}.
+         * Defaults to {@link Integer#MAX_VALUE} (sent on all newer versions).
+         * <p>
+         * Overall range is the half-open interval {@code [minProtocol, maxProtocol)}.
+         */
+        private int maxProtocol = Integer.MAX_VALUE;
 
         public Value(Type type, T value) {
             this.type = type;
             this.value = value;
         }
 
+        /**
+         * @param minProtocol inclusive lower bound; the first protocol version that receives this rule
+         */
         public Value(Type type, T value, int minProtocol) {
             this.type = type;
             this.value = value;
             this.minProtocol = minProtocol;
         }
 
+        /**
+         * @param minProtocol inclusive lower bound; the first protocol version that receives this rule
+         * @param maxProtocol exclusive upper bound; the rule is no longer sent at or above this version
+         */
+        public Value(Type type, T value, int minProtocol, int maxProtocol) {
+            this.type = type;
+            this.value = value;
+            this.minProtocol = minProtocol;
+            this.maxProtocol = maxProtocol;
+        }
+
         private void setValue(T value, Type type) {
             if (this.type != type) {
-                throw new UnsupportedOperationException("Rule not of type " + type.name().toLowerCase());
+                throw new UnsupportedOperationException("Rule not of type " + type.name().toLowerCase(Locale.ROOT));
             }
             this.value = value;
         }
@@ -312,6 +357,10 @@ public class GameRules {
 
         public int getMinProtocol() {
             return minProtocol;
+        }
+
+        public int getMaxProtocol() {
+            return maxProtocol;
         }
 
         private boolean getValueAsBoolean() {
@@ -335,17 +384,22 @@ public class GameRules {
             return (Float) value;
         }
 
-        public void write(BinaryStream pk) {
-            Server.mvw("GameRules#write(BinaryStream)");
-            write(ProtocolInfo.CURRENT_PROTOCOL, pk);
+        @Deprecated
+        public void write(BinaryStream pk, boolean startGame) {
+            Server.mvw("GameRules#write(BinaryStream, boolean)");
+            write(GameVersion.getLastVersion(), pk, startGame);
         }
 
-        public void write(int protocol, BinaryStream pk) {
-            if (protocol >= ProtocolInfo.v1_17_0) {
+        public void write(int protocol, BinaryStream pk, boolean startGame) {
+            write(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), pk, startGame);
+        }
+
+        public void write(GameVersion gameVersion, BinaryStream pk, boolean startGame) {
+            if (gameVersion.getProtocol() >= ProtocolInfo.v1_17_0) {
                 pk.putBoolean(this.canBeChanged);
             }
             pk.putUnsignedVarInt(type.ordinal());
-            type.write(pk, this);
+            type.write(gameVersion, pk, this, startGame);
         }
     }
 }

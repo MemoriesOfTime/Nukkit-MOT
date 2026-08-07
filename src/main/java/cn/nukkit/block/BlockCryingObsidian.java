@@ -47,4 +47,9 @@ public class BlockCryingObsidian extends BlockSolid {
     public boolean canHarvestWithHand() {
         return false;
     }
+
+    @Override
+    public int getLightLevel() {
+        return 10;
+    }
 }

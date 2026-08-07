@@ -10,6 +10,7 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author CreeperFace
@@ -49,7 +50,7 @@ public abstract class BlockRedstoneDiode extends BlockFlowable implements Faceab
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (block.getSide(BlockFace.DOWN).isTransparent() && !(this.down() instanceof BlockSlab)) {
             return false;
         }

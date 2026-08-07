@@ -1,5 +1,6 @@
 package cn.nukkit.item.enchantment;
 
+import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
@@ -182,6 +183,10 @@ public abstract class Enchantment implements Cloneable {
 
     public static final String NAME_BREACH = "breach";
 
+    public static final int ID_LUNGE = 41;
+
+    public static final String NAME_LUNGE = "lunge";
+
     public static void init() {
         enchantments = new Enchantment[256];
 
@@ -226,6 +231,7 @@ public abstract class Enchantment implements Cloneable {
         enchantments[ID_WIND_BURST] = new EnchantmentMaceWindBurst();
         enchantments[ID_DENSITY] = new EnchantmentMaceDensity();
         enchantments[ID_BREACH] = new EnchantmentMaceBreach();
+        enchantments[ID_LUNGE] = new EnchantmentLunge();
 
         //custom
         customEnchantments.put(new Identifier("minecraft", NAME_PROTECTION_ALL), enchantments[0]);
@@ -235,8 +241,8 @@ public abstract class Enchantment implements Cloneable {
         customEnchantments.put(new Identifier("minecraft", NAME_PROTECTION_PROJECTILE), enchantments[4]);
         customEnchantments.put(new Identifier("minecraft", NAME_THORNS), enchantments[5]);
         customEnchantments.put(new Identifier("minecraft", NAME_WATER_BREATHING), enchantments[6]);
-        customEnchantments.put(new Identifier("minecraft", NAME_WATER_WORKER), enchantments[7]);
-        customEnchantments.put(new Identifier("minecraft", NAME_WATER_WALKER), enchantments[8]);
+        customEnchantments.put(new Identifier("minecraft", NAME_WATER_WALKER), enchantments[7]);
+        customEnchantments.put(new Identifier("minecraft", NAME_WATER_WORKER), enchantments[8]);
         customEnchantments.put(new Identifier("minecraft", NAME_DAMAGE_ALL), enchantments[9]);
         customEnchantments.put(new Identifier("minecraft", NAME_DAMAGE_SMITE), enchantments[10]);
         customEnchantments.put(new Identifier("minecraft", NAME_DAMAGE_ARTHROPODS), enchantments[11]);
@@ -269,6 +275,7 @@ public abstract class Enchantment implements Cloneable {
         customEnchantments.put(new Identifier("minecraft", NAME_WIND_BURST), enchantments[38]);
         customEnchantments.put(new Identifier("minecraft", NAME_DENSITY), enchantments[39]);
         customEnchantments.put(new Identifier("minecraft", NAME_BREACH), enchantments[40]);
+        customEnchantments.put(new Identifier("minecraft", NAME_LUNGE), enchantments[41]);
     }
 
     public static OK<?> register(Enchantment enchantment, boolean registerItem) {
@@ -428,7 +435,7 @@ public abstract class Enchantment implements Cloneable {
     }
 
     public Enchantment setLevel(int level, boolean safe) {
-        if (!safe) {
+        if (!safe && !Server.getInstance().forcedSafetyEnchant) {
             this.level = level;
             return this;
         }
@@ -517,6 +524,10 @@ public abstract class Enchantment implements Cloneable {
     }
 
     public boolean isTreasure() {
+        return false;
+    }
+
+    public boolean isCurse() {
         return false;
     }
 

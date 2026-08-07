@@ -2,13 +2,13 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemSeedsWheat;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Angelic47
@@ -61,7 +61,7 @@ public class BlockTallGrass extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
         int id = down.getId();
         if (id == Block.GRASS || id == Block.DIRT || id == Block.PODZOL || id == MYCELIUM) {
@@ -123,17 +123,15 @@ public class BlockTallGrass extends BlockFlowable {
 
     @Override
     public Item[] getDrops(Item item) {
-        boolean dropSeeds = Utils.random.nextInt(10) == 0;
         if (item.isShears()) {
-            //todo enchantment
-            return new Item[]{
-                    Item.get(Item.TALL_GRASS, this.getDamage(), 1)
+            return new Item[] {
+                    Item.get(Item.TALL_GRASS, this.getDamage() == 0 ? 1 : this.getDamage(), 1)
             };
         }
 
-        if (dropSeeds) {
-            return new Item[]{
-                    new ItemSeedsWheat()
+        if (Utils.random.nextInt(10) == 0) {
+            return new Item[] {
+                    Item.get(Item.WHEAT_SEEDS)
             };
         } else {
             return Item.EMPTY_ARRAY;

@@ -1,6 +1,9 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
+import cn.nukkit.network.protocol.ProtocolInfo;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by Snake1999 on 2016/2/3.
@@ -62,5 +65,23 @@ public class ItemSkull extends Item {
     @Override
     public boolean canBePutInHelmetSlot() {
         return true;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return this.getDamage() < 6 || protocolId.getProtocol() >= ProtocolInfo.v1_20_0_23;
+    }
+
+    @Override
+    public @NotNull Block getBlock() {
+        return switch (meta) {
+            case WITHER_SKELETON_SKULL -> Block.get(Block.WITHER_SKELETON_SKULL);
+            case ZOMBIE_HEAD -> Block.get(Block.ZOMBIE_HEAD);
+            case HEAD -> Block.get(Block.PLAYER_HEAD);
+            case CREEPER_HEAD -> Block.get(Block.CREEPER_HEAD);
+            case DRAGON_HEAD -> Block.get(Block.DRAGON_HEAD);
+            case PIGLIN_HEAD -> Block.get(Block.PIGLIN_HEAD);
+            default -> super.getBlock();
+        };
     }
 }

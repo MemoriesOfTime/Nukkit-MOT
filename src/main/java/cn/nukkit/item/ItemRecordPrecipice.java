@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemRecordPrecipice extends ItemRecord implements StringItem {
@@ -13,17 +14,22 @@ public class ItemRecordPrecipice extends ItemRecord implements StringItem {
     }
 
     @Override
+    public String getDiscName() {
+        return "Aaron Cherof - Precipice";
+    }
+
+    @Override
     public String getNamespaceId() {
         return "minecraft:music_disc_precipice";
     }
 
     @Override
-    public String getNamespaceId(int protocolId) {
+    public String getNamespaceId(GameVersion protocolId) {
         return MUSIC_DISC_PRECIPICE;
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_21_0;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_21_0;
     }
 }

@@ -2,10 +2,7 @@ package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.entity.Attribute;
-import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.EntityControllable;
-import cn.nukkit.entity.EntityRideable;
+import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.FloatEntityData;
 import cn.nukkit.entity.data.Vector3fEntityData;
 import cn.nukkit.entity.mob.EntityZombiePigman;
@@ -18,7 +15,6 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.UpdateAttributesPacket;
 import cn.nukkit.utils.Utils;
 
@@ -29,7 +25,7 @@ import java.util.Objects;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
 
-public class EntityPig extends EntityWalkingAnimal implements EntityRideable, EntityControllable {
+public class EntityPig extends EntityWalkingAnimal implements EntityRideable, EntityControllable, EntityClimateVariant {
 
     public static final int NETWORK_ID = 12;
 
@@ -63,8 +59,13 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
     @Override
     public void initEntity() {
         this.setMaxHealth(10);
-
         super.initEntity();
+
+        if (namedTag.contains("variant")) {
+            setVariant(Variant.get(namedTag.getString("variant")));
+        } else {
+            setVariant(getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
+        }
 
         if (this.namedTag.contains("Saddle")) {
             this.setSaddled(this.namedTag.getBoolean("Saddle"));
@@ -150,8 +151,6 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
 
             entity.riding = this;
             entity.setDataFlag(DATA_FLAGS, DATA_FLAG_RIDING, true);
-            ;
-
             entity.setDataProperty(new Vector3fEntityData(DATA_RIDER_SEAT_POSITION, new Vector3f(0, 1.85001f, 0)));
             entity.setDataProperty(new FloatEntityData(DATA_RIDER_MAX_ROTATION, 181));
             passengers.add(entity);
@@ -248,7 +247,7 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
     public void onStruckByLightning(Entity entity) {
         Entity ent = Entity.createEntity("ZombiePigman", this);
         if (ent != null) {
-            CreatureSpawnEvent cse = new CreatureSpawnEvent(EntityZombiePigman.NETWORK_ID, this, ent.namedTag, CreatureSpawnEvent.SpawnReason.LIGHTNING);
+            CreatureSpawnEvent cse = new CreatureSpawnEvent(EntityZombiePigman.NETWORK_ID, this, ent.namedTag, CreatureSpawnEvent.SpawnReason.LIGHTNING, this);
             this.getServer().getPluginManager().callEvent(cse);
 
             if (cse.isCancelled()) {

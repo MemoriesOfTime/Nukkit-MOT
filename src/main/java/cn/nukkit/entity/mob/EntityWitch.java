@@ -63,6 +63,11 @@ public class EntityWitch extends EntityWalkingMob {
         if (this.attackDelay > 60 && Utils.rand(1, 3) == 2 && this.distanceSquared(player) <= 60) {
             this.attackDelay = 0;
             if (player.isAlive() && !player.closed) {
+                for (Block block : this.getLineOfSight(7, 7)) {
+                    if (!block.canPassThrough()) {
+                        return;
+                    }
+                }
 
                 double f = 1;
                 double yaw = this.yaw + Utils.rand(-4.0, 4.0);

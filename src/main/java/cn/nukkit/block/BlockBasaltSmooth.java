@@ -44,7 +44,7 @@ public class BlockBasaltSmooth extends BlockSolid {
                     toItem()
             };
         } else {
-            return new Item[0];
+            return Item.EMPTY_ARRAY;
         }
     }
 

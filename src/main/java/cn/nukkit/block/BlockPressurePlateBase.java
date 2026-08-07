@@ -14,6 +14,7 @@ import cn.nukkit.level.sound.ClickSound;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by Snake1999 on 2016/1/11.
@@ -74,7 +75,7 @@ public abstract class BlockPressurePlateBase extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = block.down();
         if (!isSupportValid(this.down())) {
             return false;
@@ -121,7 +122,7 @@ public abstract class BlockPressurePlateBase extends BlockFlowable {
 
         if (oldStrength != strength) {
             this.setRedstonePower(strength);
-            this.level.setBlock(this, this, false, false);
+            this.level.setBlock(this, this, false, true);
 
             this.level.updateAroundRedstone(this, null);
             this.level.updateAroundRedstone(this.getLocation().down(), null);

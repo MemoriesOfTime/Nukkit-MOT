@@ -23,7 +23,7 @@ public class BlockEntityDropper extends BlockEntitySpawnable implements Inventor
 
         this.inventory = new DropperInventory(this);
 
-        if (!this.namedTag.contains("Items") || !(this.namedTag.get("Items") instanceof ListTag)) {
+        if (!(this.namedTag.get("Items") instanceof ListTag)) {
             this.namedTag.putList(new ListTag<CompoundTag>("Items"));
         }
 

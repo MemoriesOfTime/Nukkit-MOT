@@ -3,8 +3,12 @@ package cn.nukkit.command.defaults;
 import cn.nukkit.Player;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.command.data.CommandEnum;
+import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Level;
+
+import java.util.Locale;
 
 /**
  * Created on 2015/11/13 by xtypr.
@@ -16,6 +20,9 @@ public class SaveCommand extends VanillaCommand {
         super(name, "%nukkit.command.save.description", "%commands.save.usage");
         this.setPermission("nukkit.command.save.perform");
         this.commandParameters.clear();
+        this.commandParameters.put("default", new CommandParameter[]{
+                CommandParameter.newEnum("mode", true, new CommandEnum("SaveMode", "on", "off", "hold", "resume"))
+        });
     }
 
     @Override
@@ -25,7 +32,7 @@ public class SaveCommand extends VanillaCommand {
         }
 
         if (args.length > 0) {
-            switch (args[0].toLowerCase()) {
+            switch (args[0].toLowerCase(Locale.ROOT)) {
                 case "on":
                     sender.getServer().setAutoSave(true);
                     Command.broadcastCommandMessage(sender, new TranslationContainer("commands.save.enabled"));

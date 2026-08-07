@@ -1,5 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 /**
  * Created by PetteriM1
  */
@@ -40,5 +43,10 @@ public class ItemTurtleShell extends ItemArmor {
     @Override
     public int getToughness() {
         return 2;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_5_0;
     }
 }

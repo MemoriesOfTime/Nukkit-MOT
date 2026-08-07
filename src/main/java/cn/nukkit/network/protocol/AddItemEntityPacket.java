@@ -38,6 +38,7 @@ public class AddItemEntityPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -75,15 +76,17 @@ public class AddItemEntityPacket extends DataPacket {
         }
         this.reset();
         this.putEntityUniqueId(this.entityUniqueId);
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.entityRuntimeId);
-        }else{
+        if (protocol < ProtocolInfo.v1_2_0) {
             this.putEntityUniqueId(this.entityRuntimeId);
+        } else {
+            this.putEntityRuntimeId(this.entityRuntimeId);
         }
-        this.putSlot(protocol, this.item);
+        this.putSlot(gameVersion, this.item);
         this.putVector3f(this.x, this.y, this.z);
         this.putVector3f(this.speedX, this.speedY, this.speedZ);
-        this.put(Binary.writeMetadata(protocol, metadata));
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.put(Binary.writeMetadata(gameVersion, metadata));
+        }
         if (protocol >= 223) {
             this.putBoolean(this.isFromFishing);
         }

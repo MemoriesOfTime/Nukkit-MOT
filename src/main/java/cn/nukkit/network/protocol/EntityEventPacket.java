@@ -1,6 +1,6 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
+import cn.nukkit.math.Vector3f;
 import lombok.ToString;
 
 /**
@@ -76,10 +76,10 @@ public class EntityEventPacket extends DataPacket {
     public static final int GROW_UP = 76;
     public static final int VIBRATION_DETECTED = 77;
     public static final int DRINK_MILK = 78;
-
-
-
-
+    /**
+     * @since v975
+     */
+    public static final int HURT_WITHOUT_RECEIVING_DAMAGE = 81;
 
     public static final byte HURT_ANIMATION_014 = 2;
     public static final byte DEATH_ANIMATION_014 = 3;
@@ -114,6 +114,10 @@ public class EntityEventPacket extends DataPacket {
     public int event;
     public int event_014;
     public int data = 0;
+    /**
+     * @since v975
+     */
+    public Vector3f fireAtPosition;
 
     public int originProtocol = -1;
 
@@ -128,6 +132,9 @@ public class EntityEventPacket extends DataPacket {
         this.eid = this.getEntityRuntimeId();
         this.event = this.getByte();
         this.data = this.getVarInt();
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
+            this.fireAtPosition = this.getOptional(null, s -> s.getVector3f());
+        }
     }
 
     @Override
@@ -150,11 +157,7 @@ public class EntityEventPacket extends DataPacket {
             return;
         }
         this.reset();
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.eid);
-        }else {
-            this.putEntityUniqueId(this.eid);
-        }
+        this.putEntityRuntimeId(this.eid);
         this.putByte((byte) this.event);
         if (this.event == EATING_ITEM && this.originProtocol > 0 && this.originProtocol != this.protocol) {
             // 1.19.63-=  <=> 1.19.70+= 喝药水声音转换
@@ -184,5 +187,8 @@ public class EntityEventPacket extends DataPacket {
             }
         }
         this.putVarInt(this.data);
+        if (protocol >= ProtocolInfo.v1_26_20_26) {
+            this.putOptionalNull(this.fireAtPosition, this::putVector3f);
+        }
     }
 }

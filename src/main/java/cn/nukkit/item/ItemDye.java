@@ -1,7 +1,9 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 
@@ -87,5 +89,10 @@ public class ItemDye extends Item {
 
     public static String getColorName(int meta) {
         return DyeColor.getByDyeData(meta).getName();
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return this.getDamage() < 20 || protocolId.getProtocol() >= ProtocolInfo.v1_17_0;
     }
 }

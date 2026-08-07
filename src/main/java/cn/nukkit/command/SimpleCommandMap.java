@@ -125,8 +125,8 @@ public class SimpleCommandMap implements CommandMap {
         if (label == null) {
             label = command.getName();
         }
-        label = label.trim().toLowerCase();
-        fallbackPrefix = fallbackPrefix.trim().toLowerCase();
+        label = label.trim().toLowerCase(Locale.ROOT);
+        fallbackPrefix = fallbackPrefix.trim().toLowerCase(Locale.ROOT);
 
         boolean registered = this.registerAlias(command, false, fallbackPrefix, label);
 
@@ -147,6 +147,32 @@ public class SimpleCommandMap implements CommandMap {
         command.register(this);
 
         return registered;
+    }
+
+    @Override
+    public void unregister(String... commands) {
+        for (String name : commands) {
+            Command command = this.getCommand(name);
+            if (command != null) {
+                if (command.unregister(this)) {
+                    removeCommand(command);
+                }
+            }
+        }
+    }
+
+    @Override
+    public void unregister(Command... commands) {
+        for (Command command : commands) {
+            if (command.unregister(this)) {
+                removeCommand(command);
+            }
+        }
+    }
+
+    private boolean removeCommand(Command command) {
+        return knownCommands.entrySet()
+                .removeIf(entry -> entry.getValue().equals(command));
     }
 
     @Override
@@ -191,8 +217,8 @@ public class SimpleCommandMap implements CommandMap {
         this.knownCommands.put(fallbackPrefix + ':' + label, command);
 
         //if you're registering a command alias that is already registered, then return false
-        boolean alreadyRegistered = this.knownCommands.containsKey(label);
         Command existingCommand = this.knownCommands.get(label);
+        boolean alreadyRegistered = existingCommand != null;
         boolean existingCommandIsNotVanilla = alreadyRegistered && !(existingCommand instanceof VanillaCommand);
         //basically, if we're an alias and it's already registered, or we're a vanilla command, then we can't override it
         if ((command instanceof VanillaCommand || isAlias) && alreadyRegistered && existingCommandIsNotVanilla) {
@@ -203,7 +229,7 @@ public class SimpleCommandMap implements CommandMap {
         // So basically we can't override the main name of a command, but we can override aliases if we're not an alias
 
         // Added the last statement which will allow us to override a VanillaCommand unconditionally
-        if (alreadyRegistered && existingCommand.getLabel() != null && existingCommand.getLabel().equals(label) && existingCommandIsNotVanilla) {
+        if (alreadyRegistered && existingCommandIsNotVanilla && existingCommand.getLabel() != null && existingCommand.getLabel().equals(label)) {
             return false;
         }
 
@@ -244,7 +270,7 @@ public class SimpleCommandMap implements CommandMap {
         int start = 0;
 
         for (int i = 0; i < sb.length(); i++) {
-            if ((sb.charAt(i) == '{' && curlyBraceCount >= 1) || (sb.charAt(i) == '{' && sb.charAt(i - 1) == ' ' && curlyBraceCount == 0)) {
+            if ((sb.charAt(i) == '{' && curlyBraceCount >= 1) || (sb.charAt(i) == '{' && (i == 0 || sb.charAt(i - 1) == ' ') && curlyBraceCount == 0)) {
                 curlyBraceCount++;
             } else if (sb.charAt(i) == '}' && curlyBraceCount > 0) {
                 curlyBraceCount--;
@@ -282,7 +308,7 @@ public class SimpleCommandMap implements CommandMap {
             return false;
         }
 
-        String sentCommandLabel = parsed.remove(0).toLowerCase(Locale.ENGLISH);//command name
+        String sentCommandLabel = parsed.remove(0).toLowerCase(Locale.ROOT);//command name
         String[] args = parsed.toArray(EmptyArrays.EMPTY_STRINGS);
         Command target = this.getCommand(sentCommandLabel);
 

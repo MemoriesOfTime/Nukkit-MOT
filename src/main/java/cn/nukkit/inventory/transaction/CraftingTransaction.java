@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.transaction.action.CraftingTakeResultAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -98,26 +99,43 @@ public class CraftingTransaction extends InventoryTransaction {
 
     @Override
     public boolean canExecute() {
-        CraftingManager craftingManager = source.getServer().getCraftingManager();
-        Inventory inventory;
-        if (craftingType == Player.CRAFTING_SMITHING) {
-            inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
-            if (inventory instanceof SmithingInventory smithingInventory) {
-                addInventory(inventory);
-                SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
-                if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment(), smithingInventory.getTemplate()), true, true)) {
-                    setTransactionRecipe(smithingRecipe);
-                }
-            }
-        } else {
-            MultiRecipe multiRecipe = craftingManager.getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
+        Recipe recipe;
+        recipe = source.getServer().getCraftingManager().matchRecipe(this.inputs, this.primaryOutput, this.secondaryOutputs);
+        if (recipe == null) {
+            MultiRecipe multiRecipe = source.getServer().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
             if (multiRecipe != null) {
-                setTransactionRecipe(multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList()));
-            } else {
-                setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
+                recipe = multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList());
+                // Multi-recipe output is rebuilt authoritatively by the server, overriding the client NBT (#798).
+                applyAuthoritativeOutput(recipe.getResult());
             }
         }
+        this.setTransactionRecipe(recipe);
         return this.getTransactionRecipe() != null && super.canExecute();
+    }
+
+    /**
+     * Replaces the client-authored output with the server-rebuilt one, covering primaryOutput,
+     * CraftingTakeResultAction source and the inventory SlotChangeAction target, so that the
+     * authoritative NBT lands in the player's inventory.
+     */
+    void applyAuthoritativeOutput(Item authoritativeOutput) {
+        if (authoritativeOutput == null || authoritativeOutput.equalsExact(this.primaryOutput)) {
+            return;
+        }
+
+        this.primaryOutput = authoritativeOutput.clone();
+
+        for (InventoryAction action : this.actions) {
+            if (action instanceof CraftingTakeResultAction resultAction) {
+                resultAction.setSourceItem(authoritativeOutput.clone());
+            } else if (action instanceof SlotChangeAction slotChangeAction) {
+                if (slotChangeAction.getSourceItem().isNull()
+                        && slotChangeAction.getTargetItem().getId() == authoritativeOutput.getId()
+                        && slotChangeAction.getTargetItem().getCount() > 0) {
+                    slotChangeAction.setTargetItem(authoritativeOutput.clone());
+                }
+            }
+        }
     }
 
     @Override
@@ -142,11 +160,15 @@ public class CraftingTransaction extends InventoryTransaction {
          * So people don't whine about messy desync issues when someone cancels CraftItemEvent, or when a crafting
          * transaction goes wrong.
          */
-        ContainerClosePacket pk = new ContainerClosePacket();
-        pk.windowId = ContainerIds.NONE;
-        pk.wasServerInitiated = true;
-        pk.type = ContainerType.NONE;
-        source.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> source.dataPacket(pk), 20);
+        source.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
+            if (source.isOnline() && source.isAlive()) {
+                ContainerClosePacket pk = new ContainerClosePacket();
+                pk.windowId = ContainerIds.NONE;
+                pk.wasServerInitiated = true;
+                pk.type = ContainerType.NONE;
+                source.dataPacket(pk);
+            }
+        }, 10);
 
         this.source.resetCraftingGridType();
     }
@@ -154,19 +176,17 @@ public class CraftingTransaction extends InventoryTransaction {
     @Override
     public boolean execute() {
         if (super.execute()) {
-            if (Server.getInstance().achievementsEnabled) {
-                switch (this.primaryOutput.getId()) {
-                    case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
-                    case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
-                    case Item.FURNACE -> source.awardAchievement("buildFurnace");
-                    case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
-                    case Item.BREAD -> source.awardAchievement("makeBread");
-                    case Item.CAKE -> source.awardAchievement("bakeCake");
-                    case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
-                        Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
-                    case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
-                    case Item.DIAMOND -> source.awardAchievement("diamond");
-                }
+            switch (this.primaryOutput.getId()) {
+                case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
+                case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
+                case Item.FURNACE -> source.awardAchievement("buildFurnace");
+                case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
+                case Item.BREAD -> source.awardAchievement("makeBread");
+                case Item.CAKE -> source.awardAchievement("bakeCake");
+                case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
+                    Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
+                case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
+                case Item.DIAMOND -> source.awardAchievement("diamond");
             }
 
             return true;
@@ -175,10 +195,10 @@ public class CraftingTransaction extends InventoryTransaction {
         return false;
     }
 
-    public boolean checkForCraftingPart(List<InventoryAction> actions) {
+    @Override
+    public boolean checkForItemPart(List<InventoryAction> actions) {
         for (InventoryAction action : actions) {
-            if (action instanceof SlotChangeAction) {
-                SlotChangeAction slotChangeAction = (SlotChangeAction) action;
+            if (action instanceof SlotChangeAction slotChangeAction) {
                 if (slotChangeAction.getInventory().getType() == InventoryType.UI) {
                     if (slotChangeAction.getSlot() == 50) {
                         if (!slotChangeAction.getSourceItem().equals(slotChangeAction.getTargetItem())) {

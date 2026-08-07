@@ -24,7 +24,7 @@ public class BlockSculkCatalyst extends BlockSolid {
 
     @Override
     public double getHardness() {
-        return 3;
+        return 1;
     }
 
     @Override
@@ -59,7 +59,7 @@ public class BlockSculkCatalyst extends BlockSolid {
                     this.toItem()
             };
         }
-        return new Item[0];
+        return Item.EMPTY_ARRAY;
     }
 
     @Override

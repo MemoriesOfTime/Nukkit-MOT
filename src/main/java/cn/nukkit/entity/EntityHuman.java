@@ -11,14 +11,11 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
-import cn.nukkit.network.protocol.AddPlayerPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.SetEntityLinkPacket;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.utils.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -48,6 +45,11 @@ public class EntityHuman extends EntityHumanType {
 
     protected UUID uuid;
     protected byte[] rawUUID;
+    /**
+     * The player's Minecraft PlayFab ID
+     * @since v818
+     */
+    protected String minecraftId;
 
     protected Skin skin;
 
@@ -126,19 +128,15 @@ public class EntityHuman extends EntityHumanType {
     @Override
     protected void initEntity() {
         this.setDataFlag(DATA_PLAYER_FLAGS, DATA_PLAYER_FLAG_SLEEP, false, false);
-
-
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_GRAVITY, true, false);
-
-        this.setDataProperty( new IntPositionEntityData(DATA_PLAYER_BED_POSITION, 0, 0, 0), false);
-
+        this.setDataProperty(new IntPositionEntityData(DATA_PLAYER_BED_POSITION, 0, 0, 0), false);
 
         if (!(this instanceof Player)) {
             if (this.namedTag.contains("NameTag")) {
                 this.setNameTag(this.namedTag.getString("NameTag"));
             }
 
-            if (this.namedTag.contains("Skin") && this.namedTag.get("Skin") instanceof CompoundTag) {
+            if (this.namedTag.get("Skin") instanceof CompoundTag) {
                 CompoundTag skinTag = this.namedTag.getCompound("Skin");
                 if (!skinTag.contains("Transparent")) {
                     skinTag.putBoolean("Transparent", false);
@@ -231,7 +229,7 @@ public class EntityHuman extends EntityHumanType {
                 this.setSkin(newSkin);
             }
 
-            this.uuid = Utils.dataToUUID(String.valueOf(this.getId()).getBytes(StandardCharsets.UTF_8), this.skin
+            this.uuid = Utils.dataToUUID(String.valueOf(this.getId()).getBytes(StandardCharsets.UTF_8), this.getSkin()
                     .getSkinData().data, this.getNameTag().getBytes(StandardCharsets.UTF_8));
         } else {
             // HACK: Fix gravity on 1.2.11 and lower
@@ -252,18 +250,18 @@ public class EntityHuman extends EntityHumanType {
     public void saveNBT() {
         super.saveNBT();
 
-        if (skin != null) {
+        if (this.getSkin() != null) {
             CompoundTag skinTag = new CompoundTag()
                     .putByteArray("Data", this.getSkin().getSkinData().data)
                     .putInt("SkinImageWidth", this.getSkin().getSkinData().width)
                     .putInt("SkinImageHeight", this.getSkin().getSkinData().height)
-                    .putString("ModelId", this.skin.getSkinId())
+                    .putString("ModelId", this.getSkin().getSkinId())
                     .putString("CapeId", this.getSkin().getCapeId())
                     .putByteArray("CapeData", this.getSkin().getCapeData().data)
                     .putInt("CapeImageWidth", this.getSkin().getCapeData().width)
                     .putInt("CapeImageHeight", this.getSkin().getCapeData().height)
                     .putByteArray("SkinResourcePatch", this.getSkin().getSkinResourcePatch().getBytes(StandardCharsets.UTF_8))
-                    .putByteArray("GeometryData", this.skin.getGeometryData().getBytes(StandardCharsets.UTF_8))
+                    .putByteArray("GeometryData", this.getSkin().getGeometryData().getBytes(StandardCharsets.UTF_8))
                     .putByteArray("SkinAnimationData", this.getSkin().getAnimationData().getBytes(StandardCharsets.UTF_8))
                     .putBoolean("PremiumSkin", this.getSkin().isPremium())
                     .putBoolean("PersonaSkin", this.getSkin().isPersona())
@@ -336,26 +334,33 @@ public class EntityHuman extends EntityHumanType {
         if (this != player && !this.hasSpawned.containsKey(player.getLoaderId())) {
             this.hasSpawned.put(player.getLoaderId(), player);
 
-            if (!this.skin.isValid(player.protocol)) {
+            if (!this.getSkin().isValid(player.protocol)) {
                 throw new IllegalStateException(this.getClass().getSimpleName() + " must have a valid skin set");
             }
 
-            // 发送给 player 玩家
-            if (this.isPlayer && player.protocol > ProtocolInfo.v_0_14_3) {
-                String xboxUserId = ((Player) this).protocol <= ProtocolInfo.v_1_0_0 ? "" : ((Player) this).getLoginChainData().getXUID();
-                this.server.updatePlayerListData(
-                        this.uuid,
-                        this.getId(),
-                        ((Player) this).getDisplayName(),
-                        this.skin,
-                        xboxUserId,
-                        new Player[]{player}
-                );
+            boolean retainNpcListEntry = !(this instanceof Player)
+                    && PlayerEntitySkinSender.requiresRetainedEntry(player);
+            if (this instanceof Player && player.protocol > ProtocolInfo.v_0_12_3) {
+                // 仅在该观察者尚未收到本玩家列表项时下发 ADD，避免重复下发导致网易客户端隐形。
+                // Send the PlayerList ADD only when this viewer hasn't received it yet;
+                // resending ADD hides the entity on NetEase clients.
+                if (player.sentSkins.add(this.uuid)) {
+                    String xboxUserId = ((Player) this).protocol <= ProtocolInfo.v_1_0_0 ? "" : ((Player) this).getLoginChainData().getXUID();
+                    this.server.updatePlayerListData(
+                            new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), xboxUserId, ((Player) this).getLocatorBarColor()),
+                            new Player[]{player});
+                }
+            } else if (retainNpcListEntry) {
+                if (!PlayerEntitySkinSender.sendInitialSkinIfAbsent(
+                        player, this.uuid, this.getId(), this.getName(), this.getSkin(), "")) {
+                    this.hasSpawned.remove(player.getLoaderId());
+                    return;
+                }
             } else {
-                this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.skin, new Player[]{player});
+                this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.getSkin(), new Player[]{player});
             }
 
-            PlayerInventory playerInventory = Objects.requireNonNullElse(this.inventory, BaseEntity.EMPTY_INVENTORY);
+            PlayerInventory playerInventory = this.getInventory();
 
             AddPlayerPacket pk = new AddPlayerPacket();
             pk.uuid = this.uuid;
@@ -369,17 +374,20 @@ public class EntityHuman extends EntityHumanType {
             pk.speedY = (float) this.motionY;
             pk.speedZ = (float) this.motionZ;
             pk.yaw = (float) this.yaw;
+            pk.headYaw = (float) this.headYaw;
             pk.pitch = (float) this.pitch;
-            pk.item = playerInventory.getItemInHand();
+            pk.item = playerInventory != null ? playerInventory.getItemInHand() : Item.AIR_ITEM;
             pk.slim = Skin.MODEL_ALEX.equals(this.skin.getSkinId());
             pk.skin = this.skin;
             pk.metadata = this.dataPropertiesController.getDataProperties(player.protocol).clone();
             player.dataPacket(pk);
 
-            if (this.isPlayer) {
-                playerInventory.sendArmorContents(player);
-            } else {
-                playerInventory.sendArmorContentsIfNotAr(player);
+            if (playerInventory != null) {
+                if (this instanceof Player) {
+                    playerInventory.sendArmorContents(player);
+                } else {
+                    playerInventory.sendArmorContentsIfNotAr(player);
+                }
             }
 
             if(player.protocol >= ProtocolInfo.v_0_15_10){
@@ -395,9 +403,21 @@ public class EntityHuman extends EntityHumanType {
                 player.dataPacket(pkk);
             }
 
-            if (!this.isPlayer) {
+            // V860 分支由 PlayerEntitySkinSender 延迟移除，其余非 Player 实体立即移除。
+            if (!(this instanceof Player) && !retainNpcListEntry) {
                 this.server.removePlayerListData(this.uuid, player);
             }
+        }
+    }
+
+    @Override
+    public void despawnFrom(Player player) {
+        boolean removeRetainedNpcEntry = !(this instanceof Player)
+                && PlayerEntitySkinSender.requiresRetainedEntry(player)
+                && this.hasSpawned.containsKey(player.getLoaderId());
+        super.despawnFrom(player);
+        if (removeRetainedNpcEntry) {
+            PlayerEntitySkinSender.sendRemoveAndClear(player, this.uuid);
         }
     }
 

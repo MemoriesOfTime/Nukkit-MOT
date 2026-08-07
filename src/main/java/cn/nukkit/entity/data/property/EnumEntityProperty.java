@@ -43,7 +43,7 @@ public class EnumEntityProperty extends EntityProperty {
         tag.putInt("type", 3);
         ListTag<StringTag> enumList = new ListTag<>();
         for (String enumValue : getEnums()) {
-            enumList.add(new StringTag(enumValue));
+            enumList.add(new StringTag("", enumValue));
         }
         tag.putList("enum", enumList);
     }

@@ -14,6 +14,14 @@ public interface CommandMap {
 
     boolean register(String fallbackPrefix, Command command, String label);
 
+    void unregister(String... commands);
+
+    void unregister(Command... commands);
+
+    default void unregister(List<? extends Command> commands) {
+        this.unregister(commands.toArray(new Command[0]));
+    }
+
     void registerSimpleCommands(Object object);
 
     boolean dispatch(CommandSender sender, String cmdLine);

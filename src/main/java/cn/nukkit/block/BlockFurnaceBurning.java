@@ -86,7 +86,7 @@ public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, Blo
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(faces[player != null ? player.getDirection().getHorizontalIndex() : 0]);
         this.getLevel().setBlock(block, this, true, true);
         CompoundTag nbt = new CompoundTag().putList(new ListTag<>("Items"));
@@ -117,7 +117,7 @@ public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, Blo
         if (player != null) {
             BlockEntityFurnace furnace = this.getOrCreateBlockEntity();
 
-            if (furnace.namedTag.contains("Lock") && furnace.namedTag.get("Lock") instanceof StringTag) {
+            if (furnace.namedTag.get("Lock") instanceof StringTag) {
                 if (!furnace.namedTag.getString("Lock").equals(item.getCustomName())) {
                     return true;
                 }

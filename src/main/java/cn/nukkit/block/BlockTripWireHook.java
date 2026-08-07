@@ -8,6 +8,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author CreeperFace
@@ -53,7 +54,7 @@ public class BlockTripWireHook extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (face == BlockFace.DOWN || face == BlockFace.UP) {
             return false;
         }
@@ -150,7 +151,7 @@ public class BlockTripWireHook extends BlockFlowable {
             Vector3 vec = v.getSide(facing, distance);
             BlockFace face = facing.getOpposite();
             hook.setFace(face);
-            this.level.setBlock(vec, hook, true, false);
+            this.level.setBlock(vec, hook, true, true);
             this.level.updateAroundRedstone(vec, null);
             this.level.updateAroundRedstone(vec.getSide(face.getOpposite()), null);
             this.addSound(vec, canConnect, nextPowered, attached, powered);
@@ -160,7 +161,7 @@ public class BlockTripWireHook extends BlockFlowable {
 
         if (!onBreak) {
             hook.setFace(facing);
-            this.level.setBlock(v, hook, true, false);
+            this.level.setBlock(v, hook, true, true);
 
             if (updateAround) {
                 this.level.updateAroundRedstone(v, null);
@@ -178,7 +179,7 @@ public class BlockTripWireHook extends BlockFlowable {
                         block.setDamage(block.getDamage() ^ 0x04);
                     }
 
-                    this.level.setBlock(vc, block, true, false);
+                    this.level.setBlock(vc, block, true, true);
                 }
             }
         }

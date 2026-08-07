@@ -25,6 +25,10 @@ public class FakeBlockUIComponent extends PlayerUIComponent {
         return (FakeBlockMenu) this.holder;
     }
 
+    public InventoryType getFakeBlockType() {
+        return this.type;
+    }
+
     @Override
     public boolean open(Player who) {
         InventoryOpenEvent ev = new InventoryOpenEvent(this, who);
@@ -59,11 +63,14 @@ public class FakeBlockUIComponent extends PlayerUIComponent {
 
     @Override
     public void onClose(Player who) {
-        ContainerClosePacket pk = new ContainerClosePacket();
-        pk.windowId = who.getWindowId(this);
-        pk.wasServerInitiated = who.getClosingWindowId() != pk.windowId;
-        pk.type = ContainerType.from(this.type.getNetworkType());
-        who.dataPacket(pk);
+        if (who.getClosingWindowId() != Integer.MAX_VALUE) {
+            ContainerClosePacket pk = new ContainerClosePacket();
+            pk.windowId = who.getWindowId(this);
+            pk.wasServerInitiated = who.getClosingWindowId() != pk.windowId;
+            pk.type = ContainerType.from(this.type.getNetworkType());
+            who.dataPacket(pk);
+        }
+
         super.onClose(who);
     }
 

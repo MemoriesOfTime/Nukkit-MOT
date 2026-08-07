@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -18,10 +19,16 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.utils.*;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemData;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemGroup;
+import cn.nukkit.utils.Binary;
+import cn.nukkit.utils.OK;
+import cn.nukkit.utils.Utils;
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -37,6 +44,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -70,9 +78,18 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     public static final String UNKNOWN_STR = "Unknown";
     public static Class<?>[] list = null;
     public static final Map<String, Supplier<Item>> NAMESPACED_ID_ITEM = new HashMap<>();
+    private static final Set<String> REGISTERED_STRING_ITEM_IDENTIFIERS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> REGISTERED_NON_STRING_ITEM_IDENTIFIERS = ConcurrentHashMap.newKeySet();
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
+    /**
+     * 存储需要在 initCreativeItems 后重新添加的创造物品
+     * Stores creative items that need to be re-added after initCreativeItems
+     */
+    private static final LinkedHashMap<String, PendingCreativeItem> PENDING_CREATIVE_ITEMS = new LinkedHashMap<>();
+    private static volatile boolean creativeItemsInitialized = false;
+    private static volatile boolean isInitializingCreativeItems = false;
 
     protected Block block = null;
     protected final int id;
@@ -82,6 +99,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private CompoundTag cachedNBT = null;
     public int count;
     protected String name;
+    /**
+     * Stack network id used by Server Authoritative Inventory (ItemStackRequest) to
+     * track a specific item instance across client-server round trips. Named
+     * {@code stackNetId} to avoid confusion with block/item runtime ids. 0 means the
+     * stack is not being tracked.
+     */
+    protected int stackNetId = 0;
 
     public Item(int id) {
         this(id, 0, 1, UNKNOWN_STR);
@@ -271,6 +295,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[QUARTZ] = ItemQuartz.class; //406
             list[MINECART_WITH_TNT] = ItemMinecartTNT.class; //407
             list[MINECART_WITH_HOPPER] = ItemMinecartHopper.class; //408
+            list[COMMAND_BLOCK_MINECART] = ItemMinecartCommandBlock.class; //443
             list[PRISMARINE_SHARD] = ItemPrismarineShard.class; //409
             list[HOPPER] = ItemHopper.class;
             list[RAW_RABBIT] = ItemRabbitRaw.class; //411
@@ -352,6 +377,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
             list[BAMBOO_CHEST_RAFT] = ItemChestRaftBamboo.class; //648
             list[CHERRY_CHEST_BOAT] = ItemChestBoatCherry.class; //649
+            list[PALE_OAK_CHEST_BOAT] = ItemChestBoatPaleOak.class; //650
 
             list[GLOW_BERRIES] = ItemGlowBerries.class; //654
             list[RECORD_RELIC] = ItemRecordRelic.class; //701
@@ -359,6 +385,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[SUSPICIOUS_STEW] = ItemSuspiciousStew.class; //734
             list[HONEYCOMB] = ItemHoneycomb.class; //736
             list[HONEY_BOTTLE] = ItemHoneyBottle.class; //737
+            list[LODESTONE_COMPASS] = ItemLodestoneCompass.class; //741
             list[NETHERITE_INGOT] = ItemIngotNetherite.class; //742
             list[NETHERITE_SWORD] = ItemSwordNetherite.class; //743
             list[NETHERITE_SHOVEL] = ItemShovelNetherite.class; //744
@@ -387,6 +414,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
             list[GLOW_ITEM_FRAME] = ItemItemFrameGlow.class; //850
 
+            list[MANGROVE_SIGN] = ItemMangroveSign.class; //1005
+            list[BAMBOO_SIGN] = ItemBambooSign.class; //1006
+            list[CHERRY_SIGN] = ItemCherrySign.class; //1007 //TODO rename to ItemSignCherry
+            list[PALE_OAK_SIGN] = ItemSignPaleOak.class; //1008
+
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {
                     list[i] = Block.list[i];
@@ -400,6 +432,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemCopperIngot.class);
             registerNamespacedIdItem(ItemEchoShard.class);
             registerNamespacedIdItem(ItemRecoveryCompass.class);
+            registerNamespacedIdItem(ItemDoorMangrove.class);
+            registerNamespacedIdItem(ItemDoorBamboo.class);
+            registerNamespacedIdItem(ItemDoorCherry.class);
+            registerNamespacedIdItem(ItemChiseledBookshelf.class);
+            registerNamespacedIdItem(ItemCrafter.class);
             //TODO 修改类名格式为ItemSmithingTemplateXXX
             registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
             registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
@@ -456,11 +493,80 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemBannerPatternFlow.class);
             registerNamespacedIdItem(ItemBannerPatternGuster.class);
             registerNamespacedIdItem(ItemOminousBottle.class);
+            registerNamespacedIdItem(ItemBlueEgg.class);
+            registerNamespacedIdItem(ItemBrownEgg.class);
 
+            registerNamespacedIdItem(ItemTorchflowerSeeds.class);
+            registerNamespacedIdItem(ItemPitcherPod.class);
+            registerNamespacedIdItem(ItemArmadilloScute.class);
+            registerNamespacedIdItem(ItemWolfArmor.class);
+            registerNamespacedIdItem(ItemResinBrick.class);
+            registerNamespacedIdItem(ItemHorseArmorCopper.class);
+            registerNamespacedIdItem(ItemHorseArmorNetherite.class);
+            registerNamespacedIdItem(ItemRecordTears.class);
+            registerNamespacedIdItem(ItemRecordLavaChicken.class);
+            registerNamespacedIdItem(ItemSpearWood.class);
+            registerNamespacedIdItem(ItemSpearStone.class);
+            registerNamespacedIdItem(ItemSpearIron.class);
+            registerNamespacedIdItem(ItemSpearGold.class);
+            registerNamespacedIdItem(ItemSpearDiamond.class);
+            registerNamespacedIdItem(ItemSpearCopper.class);
+            registerNamespacedIdItem(ItemSpearNetherite.class);
+            registerNamespacedIdItem(ItemNautilusArmorCopper.class);
+            registerNamespacedIdItem(ItemNautilusArmorIron.class);
+            registerNamespacedIdItem(ItemNautilusArmorGold.class);
+            registerNamespacedIdItem(ItemNautilusArmorDiamond.class);
+            registerNamespacedIdItem(ItemNautilusArmorNetherite.class);
+
+            registerNamespacedIdItem(ItemSwordCopper.class);
+            registerNamespacedIdItem(ItemAxeCopper.class);
+            registerNamespacedIdItem(ItemPickaxeCopper.class);
+            registerNamespacedIdItem(ItemHoeCopper.class);
+            registerNamespacedIdItem(ItemShovelCopper.class);
+            registerNamespacedIdItem(ItemHelmetCopper.class);
+            registerNamespacedIdItem(ItemChestplateCopper.class);
+            registerNamespacedIdItem(ItemLeggingsCopper.class);
+            registerNamespacedIdItem(ItemBootsCopper.class);
+            registerNamespacedIdItem(ItemNuggetCopper.class);
+
+            registerNamespacedIdItem(ItemHarnessWhite.class);
+            registerNamespacedIdItem(ItemHarnessLightGray.class);
+            registerNamespacedIdItem(ItemHarnessGray.class);
+            registerNamespacedIdItem(ItemHarnessBlack.class);
+            registerNamespacedIdItem(ItemHarnessBrown.class);
+            registerNamespacedIdItem(ItemHarnessRed.class);
+            registerNamespacedIdItem(ItemHarnessOrange.class);
+            registerNamespacedIdItem(ItemHarnessYellow.class);
+            registerNamespacedIdItem(ItemHarnessLime.class);
+            registerNamespacedIdItem(ItemHarnessGreen.class);
+            registerNamespacedIdItem(ItemHarnessCyan.class);
+            registerNamespacedIdItem(ItemHarnessLightBlue.class);
+            registerNamespacedIdItem(ItemHarnessBlue.class);
+            registerNamespacedIdItem(ItemHarnessPurple.class);
+            registerNamespacedIdItem(ItemHarnessMagenta.class);
+            registerNamespacedIdItem(ItemHarnessPink.class);
+
+            registerNamespacedIdItem(ItemBundle.class);
+            registerNamespacedIdItem(ItemBundleWhite.class);
+            registerNamespacedIdItem(ItemBundleLightGray.class);
+            registerNamespacedIdItem(ItemBundleGray.class);
+            registerNamespacedIdItem(ItemBundleBlack.class);
+            registerNamespacedIdItem(ItemBundleBrown.class);
+            registerNamespacedIdItem(ItemBundleRed.class);
+            registerNamespacedIdItem(ItemBundleOrange.class);
+            registerNamespacedIdItem(ItemBundleYellow.class);
+            registerNamespacedIdItem(ItemBundleLime.class);
+            registerNamespacedIdItem(ItemBundleGreen.class);
+            registerNamespacedIdItem(ItemBundleCyan.class);
+            registerNamespacedIdItem(ItemBundleLightBlue.class);
+            registerNamespacedIdItem(ItemBundleBlue.class);
+            registerNamespacedIdItem(ItemBundlePurple.class);
+            registerNamespacedIdItem(ItemBundleMagenta.class);
+            registerNamespacedIdItem(ItemBundlePink.class);
 
             // 添加原版物品到NAMESPACED_ID_ITEM
             // Add vanilla items to NAMESPACED_ID_ITEM
-            RuntimeItemMapping mapping = RuntimeItems.getMapping(ProtocolInfo.CURRENT_PROTOCOL);
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(GameVersion.getLastVersion());
             for (Object2IntMap.Entry<String> entity : mapping.getName2RuntimeId().object2IntEntrySet()) {
                 try {
                     RuntimeItemMapping.LegacyEntry legacyEntry = mapping.fromRuntime(entity.getIntValue());
@@ -472,6 +578,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                     Item item = Item.get(id, damage);
                     if (item.getId() != 0 && !NAMESPACED_ID_ITEM.containsKey(entity.getKey())) {
                         NAMESPACED_ID_ITEM.put(entity.getKey(), () -> item);
+                        markRegisteredStringItemIdentifier(entity.getKey(), false);
                     }
                 } catch (Exception ignored) {
 
@@ -491,46 +598,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private static final List<Item> creative84 = new ArrayList<>();
     private static final List<Item> creative90 = new ArrayList<>();
 
-    private static final List<Item> creative113 = new ObjectArrayList<>();
-    private static final List<Item> creative137 = new ObjectArrayList<>();
-    private static final List<Item> creative274 = new ObjectArrayList<>();
-    private static final List<Item> creative291 = new ObjectArrayList<>();
-    private static final List<Item> creative313 = new ObjectArrayList<>();
-    private static final List<Item> creative332 = new ObjectArrayList<>();
-    private static final List<Item> creative340 = new ObjectArrayList<>();
-    private static final List<Item> creative354 = new ObjectArrayList<>();
-    private static final List<Item> creative389 = new ObjectArrayList<>();
-    private static final List<Item> creative407 = new ObjectArrayList<>();
-    private static final List<Item> creative440 = new ObjectArrayList<>();
-    private static final List<Item> creative448 = new ObjectArrayList<>();
-    private static final List<Item> creative465 = new ObjectArrayList<>();
-    private static final List<Item> creative471 = new ObjectArrayList<>();
-    private static final List<Item> creative475 = new ObjectArrayList<>();
-    private static final List<Item> creative486 = new ObjectArrayList<>();
-    private static final List<Item> creative503 = new ObjectArrayList<>();
-    private static final List<Item> creative527 = new ObjectArrayList<>();
-    private static final List<Item> creative534 = new ObjectArrayList<>();
-    private static final List<Item> creative544 = new ObjectArrayList<>();
-    private static final List<Item> creative560 = new ObjectArrayList<>();
-    private static final List<Item> creative567 = new ObjectArrayList<>();
-    private static final List<Item> creative575 = new ObjectArrayList<>();
-    private static final List<Item> creative582 = new ObjectArrayList<>();
-    private static final List<Item> creative589 = new ObjectArrayList<>();
-    private static final List<Item> creative594 = new ObjectArrayList<>();
-    private static final List<Item> creative618 = new ObjectArrayList<>();
-    private static final List<Item> creative622 = new ObjectArrayList<>();
-    private static final List<Item> creative630 = new ObjectArrayList<>();
-    private static final List<Item> creative649 = new ObjectArrayList<>();
-    private static final List<Item> creative662 = new ObjectArrayList<>();
-    private static final List<Item> creative671 = new ObjectArrayList<>();
-    private static final List<Item> creative685 = new ObjectArrayList<>();
-    private static final List<Item> creative712 = new ObjectArrayList<>();
-    private static final List<Item> creative729 = new ObjectArrayList<>();
-    private static final List<Item> creative748 = new ObjectArrayList<>();
-    private static final List<Item> creative766 = new ObjectArrayList<>();
+    private static final CreativeItems CREATIVE_ITEMS = new CreativeItems();
 
     public static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
+        isInitializingCreativeItems = true;
         clearCreativeItems();
 
         // Creative inventory for oldest versions
@@ -540,81 +612,75 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCreativeItems(v_0_14_3);
         registerCreativeItems(v_0_15_10);
         registerCreativeItems(v_0_16_0);
-        registerCreativeItems(v1_1_0);
-        registerCreativeItems(v1_2_0);
-        registerCreativeItems(v1_5_0);
-        registerCreativeItems(v1_7_0);
-        registerCreativeItems(v1_8_0);
-        registerCreativeItems(v1_9_0);
-        registerCreativeItems(v1_10_0);
-        registerCreativeItems(v1_11_0);
-        registerCreativeItems(v1_14_0);
-        registerCreativeItems(v1_16_0);
 
-        // New creative items mapping
-        registerCreativeItemsNew(ProtocolInfo.v1_17_0, ProtocolInfo.v1_17_0, creative440);
-        registerCreativeItemsNew(ProtocolInfo.v1_17_10, ProtocolInfo.v1_17_10, creative448);
-        registerCreativeItemsNew(ProtocolInfo.v1_17_30, ProtocolInfo.v1_17_30, creative465);
-        registerCreativeItemsNew(ProtocolInfo.v1_17_30, ProtocolInfo.v1_17_40, creative471);
-        registerCreativeItemsNew(ProtocolInfo.v1_18_0, ProtocolInfo.v1_18_0, creative475);
-        registerCreativeItemsNew(ProtocolInfo.v1_18_10, ProtocolInfo.v1_18_10, creative486);
-        registerCreativeItemsNew(ProtocolInfo.v1_18_30, ProtocolInfo.v1_18_30, creative503);
-        registerCreativeItemsNew(ProtocolInfo.v1_19_0, ProtocolInfo.v1_19_0, creative527);
-        registerCreativeItemsNew(ProtocolInfo.v1_19_0, ProtocolInfo.v1_19_10, creative534);
-        registerCreativeItemsNew(ProtocolInfo.v1_19_20, ProtocolInfo.v1_19_20, creative544);
-        registerCreativeItemsNew(ProtocolInfo.v1_19_50, ProtocolInfo.v1_19_50, creative560);
-        registerCreativeItemsNew(ProtocolInfo.v1_19_60, ProtocolInfo.v1_19_60, creative567);
-        registerCreativeItemsNew(ProtocolInfo.v1_19_70, ProtocolInfo.v1_19_70, creative575);
-        registerCreativeItemsNew(ProtocolInfo.v1_19_80, ProtocolInfo.v1_19_80, creative582);
-        registerCreativeItemsNew(ProtocolInfo.v1_20_0, ProtocolInfo.v1_20_0, creative589);
-        registerCreativeItemsNew(ProtocolInfo.v1_20_10, ProtocolInfo.v1_20_10, creative594);
-        registerCreativeItemsNew(ProtocolInfo.v1_20_30, ProtocolInfo.v1_20_30, creative618);
-        registerCreativeItemsNew(ProtocolInfo.v1_20_40, ProtocolInfo.v1_20_40, creative622);
-        registerCreativeItemsNew(ProtocolInfo.v1_20_50, ProtocolInfo.v1_20_50, creative630);
-        registerCreativeItemsNew(ProtocolInfo.v1_20_60, ProtocolInfo.v1_20_60, creative649);
-        registerCreativeItemsNew(ProtocolInfo.v1_20_70, ProtocolInfo.v1_20_70, creative662);
-        registerCreativeItemsNew(ProtocolInfo.v1_20_80, ProtocolInfo.v1_20_80, creative671);
-        registerCreativeItemsNew(ProtocolInfo.v1_21_0, ProtocolInfo.v1_21_0, creative685);
-        registerCreativeItemsNew(ProtocolInfo.v1_21_20, ProtocolInfo.v1_21_20, creative712);
-        registerCreativeItemsNew(ProtocolInfo.v1_21_30, ProtocolInfo.v1_21_30, creative729);
-        registerCreativeItemsNew(ProtocolInfo.v1_21_40, ProtocolInfo.v1_21_40, creative748);
-        registerCreativeItemsNew(ProtocolInfo.v1_21_50, ProtocolInfo.v1_21_50, creative766);
-        //TODO Multiversion 添加新版本支持时修改这里
+        // Only load the latest version; runtime filtering via isSupportedOn per protocol
+        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_111, CREATIVE_ITEMS);
+
+        isInitializingCreativeItems = false;
+        creativeItemsInitialized = true;
     }
 
-    private static void registerCreativeItems(int protocol) {
-        for (Map map : new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("creativeitems" + protocol + ".json")).getMapList("items")) {
-            try {
-                Item item = fromJson(map);
-                if (Utils.hasItemOrBlock(item.getId())) { //只添加nk内部已实现的物品/方块
-                    addCreativeItem(protocol, item);
-                }
-            } catch (Exception e) {
-                MainLogger.getLogger().logException(e);
-            }
-        }
-    }
-
-    private static void registerCreativeItemsNew(int protocol, int blockPaletteProtocol, List<Item> creativeItems) {
+    private static void registerCreativeItemsNew(GameVersion gameVersion, GameVersion blockPaletteVersion, CreativeItems creativeItems) {
+        int protocol = gameVersion.getProtocol();
+        JsonObject root;
         JsonArray itemsArray;
-        String file;
-        if (protocol >= ProtocolInfo.v1_21_0) {
-            file = "CreativeItems/creative_items_" + protocol + ".json";
-        } else {
-            file = "creativeitems" + protocol + ".json";
-        }
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(file)) {
-            itemsArray = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("items");
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("creative_items.json")) {
+            root = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject();
+            itemsArray = root.getAsJsonArray("items");
+            if (itemsArray.isEmpty()) {
+                throw new IllegalStateException("Empty items");
+            }
         } catch (Exception e) {
-            throw new AssertionError("Error loading required block states!", e);
+            throw new AssertionError("Error while loading creative items for protocol " + protocol, e);
+        }
+
+        RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
+        if (protocol >= ProtocolInfo.v1_21_60) {
+            JsonArray groupsArray = root.getAsJsonArray("groups");
+            if (groupsArray.isEmpty()) {
+                throw new IllegalStateException("Empty groups");
+            }
+
+            int creativeGroupId = 0;
+
+            for (JsonElement obj : groupsArray.asList()) {
+                JsonObject groupRoot = obj.getAsJsonObject();
+
+                Item icon = mapping.parseCreativeItem(groupRoot.get("icon").getAsJsonObject(), true, blockPaletteVersion);
+                if (icon == null) {
+                    icon = Item.get(AIR);
+                }
+
+                CreativeItemGroup creativeGroup = new CreativeItemGroup(creativeGroupId++,
+                        CreativeItemCategory.valueOf(groupRoot.get("category").getAsString().toUpperCase(Locale.ROOT)),
+                        groupRoot.get("name").getAsString(),
+                        icon);
+
+                creativeItems.addGroup(creativeGroup);
+            }
         }
 
         for (JsonElement element : itemsArray) {
-            Item item = RuntimeItems.getMapping(protocol).parseCreativeItem(element.getAsJsonObject(), true, blockPaletteProtocol);
+            JsonObject creativeItem = element.getAsJsonObject();
+            Item item = mapping.parseCreativeItem(creativeItem, true, blockPaletteVersion);
             if (item != null && !item.getName().equals(UNKNOWN_STR)) {
                 // Add only implemented items
-                creativeItems.add(item.clone());
+                CreativeItemGroup creativeGroup = null;
+                if (protocol >= ProtocolInfo.v1_21_60) {
+                    creativeGroup = creativeItems.getGroups().get(creativeItem.get("groupId").getAsInt());
+                }
+                creativeItems.add(item, creativeGroup);
             }
+        }
+
+        ArrayList<String> mappingCustomItems = mapping.getCustomItems();
+        for (Map.Entry<String, PendingCreativeItem> entry : PENDING_CREATIVE_ITEMS.entrySet()) {
+            String identifier = entry.getKey();
+            if (identifier.contains(":") && !mappingCustomItems.contains(identifier)) {
+                continue;
+            }
+            PendingCreativeItem pending = entry.getValue();
+            creativeItems.add(pending.item().clone(), pending.category(), pending.group());
         }
     }
 
@@ -626,53 +692,23 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Item.creative70.clear();
         Item.creative84.clear();
         Item.creative90.clear();
-        Item.creative113.clear();
-        Item.creative137.clear();
-        Item.creative274.clear();
-        Item.creative291.clear();
-        Item.creative313.clear();
-        Item.creative332.clear();
-        Item.creative340.clear();
-        Item.creative354.clear();
-        Item.creative389.clear();
-        Item.creative407.clear();
-        Item.creative440.clear();
-        Item.creative448.clear();
-        Item.creative465.clear();
-        Item.creative471.clear();
-        Item.creative475.clear();
-        Item.creative486.clear();
-        Item.creative503.clear();
-        Item.creative527.clear();
-        Item.creative534.clear();
-        Item.creative544.clear();
-        Item.creative560.clear();
-        Item.creative567.clear();
-        Item.creative575.clear();
-        Item.creative582.clear();
-        Item.creative589.clear();
-        Item.creative594.clear();
-        Item.creative618.clear();
-        Item.creative622.clear();
-        Item.creative630.clear();
-        Item.creative649.clear();
-        Item.creative662.clear();
-        Item.creative671.clear();
-        Item.creative685.clear();
-        Item.creative712.clear();
-        Item.creative729.clear();
-        Item.creative748.clear();
-        Item.creative766.clear();
-        //TODO Multiversion 添加新版本支持时修改这里
+        CREATIVE_ITEMS.clear();
     }
 
     public static ArrayList<Item> getCreativeItems() {
-        Server.mvw("Item#getCreativeItems()");
-        return getCreativeItems(CURRENT_PROTOCOL);
+        return new ArrayList<>(getCreativeItemsAndGroups().getItems());
     }
 
+    /**
+     * @deprecated Use {@link #getCreativeItems()} instead
+     */
+    @Deprecated
     public static ArrayList<Item> getCreativeItems(int protocol) {
-        switch (protocol) {
+        return getCreativeItems(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public static ArrayList<Item> getCreativeItems(GameVersion gameVersion) {
+        switch (gameVersion) {
             case v_0_9_0:
             case v_0_10_0:
                 return new ArrayList<>(Item.creative20);
@@ -689,138 +725,59 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 return new ArrayList<>(Item.creative70);
             case v_0_15_10:
                 return new ArrayList<>(Item.creative84);
-                //return new ArrayList<>(Item.creative84);
+            //return new ArrayList<>(Item.creative84);
             case v_0_16_0:
             case v_0_16_1:
                 return new ArrayList<>(Item.creative90);
-            case v1_1_0:
-                return new ArrayList<>(Item.creative113);
-            case v1_2_0:
-            case v1_2_5_11:
-            case v1_2_5:
-            case v1_2_6:
-            case v1_2_7:
-            case v1_2_10:
-            case v1_2_13:
-            case v1_2_13_11:
-            case v1_4_0:
-                return new ArrayList<>(Item.creative137);
-            case v1_5_0:
-                return new ArrayList<>(Item.creative274);
-            case v1_6_0_5:
-            case v1_6_0:
-            case v1_7_0:
-                return new ArrayList<>(Item.creative291);
-            case v1_8_0:
-                return new ArrayList<>(Item.creative313);
-            case v1_9_0:
-                return new ArrayList<>(Item.creative332);
-            case v1_10_0:
-                return new ArrayList<>(Item.creative340);
-            case v1_11_0:
-            case v1_12_0:
-            case v1_13_0:
-                return new ArrayList<>(Item.creative354);
-            case v1_14_0:
-            case v1_14_60:
-                return new ArrayList<>(Item.creative389);
-            case v1_16_0:
-            case v1_16_20:
-            case v1_16_100_0:
-            case v1_16_100_51:
-            case v1_16_100_52:
-            case v1_16_100:
-            case v1_16_200_51:
-            case v1_16_200:
-            case v1_16_210_50:
-            case v1_16_210_53:
-            case v1_16_210:
-            case v1_16_220:
-            case v1_16_230_50:
-            case v1_16_230:
-            case v1_16_230_54:
-                return new ArrayList<>(Item.creative407);
-            case v1_17_0:
-                return new ArrayList<>(Item.creative440);
-            case v1_17_10:
-            case v1_17_20_20:
-                return new ArrayList<>(Item.creative448);
-            case v1_17_30:
-                return new ArrayList<>(Item.creative465);
-            case v1_17_40:
-                return new ArrayList<>(Item.creative471);
-            case v1_18_0:
-                return new ArrayList<>(Item.creative475);
-            case v1_18_10_26:
-            case v1_18_10:
-                return new ArrayList<>(Item.creative486);
-            case v1_18_30:
-                return new ArrayList<>(Item.creative503);
-            case v1_19_0_29:
-            case v1_19_0_31:
-            case v1_19_0:
-                return new ArrayList<>(Item.creative527);
-            case v1_19_10:
-                return new ArrayList<>(Item.creative534);
-            case v1_19_20:
-            case v1_19_21:
-            case v1_19_30_23:
-            case v1_19_30:
-            case v1_19_40:
-                return new ArrayList<>(Item.creative544);
-            case v1_19_50:
-                return new ArrayList<>(Item.creative560);
-            case v1_19_60:
-            case v1_19_63:
-                return new ArrayList<>(Item.creative567);
-            case v1_19_70_24:
-            case v1_19_70:
-                return new ArrayList<>(Item.creative575);
-            case v1_19_80:
-                return new ArrayList<>(Item.creative582);
-            case v1_20_0_23:
-            case v1_20_0:
-                return new ArrayList<>(Item.creative589);
-            case v1_20_10_21:
-            case v1_20_10:
-                return new ArrayList<>(Item.creative594);
-            case v1_20_30_24:
-            case v1_20_30:
-                return new ArrayList<>(Item.creative618);
-            case v1_20_40:
-                return new ArrayList<>(Item.creative622);
-            case v1_20_50:
-                return new ArrayList<>(Item.creative630);
-            case v1_20_60:
-                return new ArrayList<>(Item.creative649);
-            case v1_20_70:
-                return new ArrayList<>(Item.creative662);
-            case v1_20_80:
-                return new ArrayList<>(Item.creative671);
-            case v1_21_0:
-            case v1_21_2:
-                return new ArrayList<>(Item.creative685);
-            case v1_21_20:
-                return new ArrayList<>(Item.creative712);
-            case v1_21_30:
-                return new ArrayList<>(Item.creative729);
-            case v1_21_40:
-                return new ArrayList<>(Item.creative748);
-            case v1_21_50_26:
-            case v1_21_50:
-                return new ArrayList<>(Item.creative766);
-            // TODO Multiversion
-            default:
-                throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
         }
+        return new ArrayList<>(getCreativeItemsAndGroups().getItems(gameVersion));
+    }
+
+    public static CreativeItems getCreativeItemsAndGroups() {
+        return CREATIVE_ITEMS;
+    }
+
+    /**
+     * @deprecated Use {@link #getCreativeItemsAndGroups()} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static CreativeItems getCreativeItemsAndGroups(int protocol) {
+        return getCreativeItemsAndGroups();
+    }
+
+    /**
+     * @deprecated Use {@link #getCreativeItemsAndGroups()} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static CreativeItems getCreativeItemsAndGroups(GameVersion protocol) {
+        return getCreativeItemsAndGroups();
     }
 
     public static void addCreativeItem(Item item) {
-        Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(v1_21_50, item);
+        addCreativeItem(item, CreativeItemCategory.ITEMS, "");
     }
 
+    public static void addCreativeItem(Item item, CreativeItemCategory category, String group) {
+        if (!isInitializingCreativeItems && !creativeItemsInitialized) {
+            PENDING_CREATIVE_ITEMS.put(item.getId() + "_" + item.getDamage(),
+                    new PendingCreativeItem(item.clone(), category, group));
+        }
+        CREATIVE_ITEMS.add(item.clone(), category, group);
+    }
+
+    /**
+     * @deprecated Use {@link #addCreativeItem(Item)} instead, version parameter is no longer used
+     */
+    @Deprecated
     public static void addCreativeItem(int protocol, Item item) {
+        addCreativeItem(item);
+    }
+
+    /**
+     * @deprecated Use {@link #addCreativeItem(Item, CreativeItemCategory, String)} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static void addCreativeItem(int protocol, Item item, CreativeItemCategory category, String group) {
         switch (protocol) { // NOTE: Not all versions are supposed to be here
             case v_0_10_0 -> Item.creative20.add(item.clone());
             case v_0_11_0 -> Item.creative27.add(item.clone());
@@ -829,67 +786,48 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             case v_0_14_3 -> Item.creative70.add(item.clone());
             case v_0_15_10 -> Item.creative84.add(item.clone());
             case v_0_16_0 -> Item.creative90.add(item.clone());
-            case v1_1_0 -> Item.creative113.add(item.clone());
-            case v1_2_0 -> Item.creative137.add(item.clone());
-            case v1_5_0 -> Item.creative274.add(item.clone());
-            case v1_7_0 -> Item.creative291.add(item.clone());
-            case v1_8_0 -> Item.creative313.add(item.clone());
-            case v1_9_0 -> Item.creative332.add(item.clone());
-            case v1_10_0 -> Item.creative340.add(item.clone());
-            case v1_11_0 -> Item.creative354.add(item.clone());
-            case v1_14_0 -> Item.creative389.add(item.clone());
-            case v1_16_0 -> Item.creative407.add(item.clone());
-            case v1_17_0 -> Item.creative440.add(item.clone());
-            case v1_17_10 -> Item.creative448.add(item.clone());
-            case v1_17_30 -> Item.creative465.add(item.clone());
-            case v1_17_40 -> Item.creative471.add(item.clone());
-            case v1_18_10 -> Item.creative486.add(item.clone());
-            case v1_18_0 -> Item.creative475.add(item.clone());
-            case v1_18_30 -> Item.creative503.add(item.clone());
-            case v1_19_0 -> Item.creative527.add(item.clone());
-            case v1_19_10 -> Item.creative534.add(item.clone());
-            case v1_19_20 -> Item.creative544.add(item.clone());
-            case v1_19_50 -> Item.creative560.add(item.clone());
-            case v1_19_60 -> Item.creative567.add(item.clone());
-            case v1_19_70 -> Item.creative575.add(item.clone());
-            case v1_19_80 -> Item.creative582.add(item.clone());
-            case v1_20_0 -> Item.creative589.add(item.clone());
-            case v1_20_10 -> Item.creative594.add(item.clone());
-            case v1_20_30 -> Item.creative618.add(item.clone());
-            case v1_20_40 -> Item.creative622.add(item.clone());
-            case v1_20_50 -> Item.creative630.add(item.clone());
-            case v1_20_60 -> Item.creative649.add(item.clone());
-            case v1_20_70 -> Item.creative662.add(item.clone());
-            case v1_20_80 -> Item.creative671.add(item.clone());
-            case v1_21_0 -> Item.creative685.add(item.clone());
-            case v1_21_20 -> Item.creative712.add(item.clone());
-            case v1_21_30 -> Item.creative729.add(item.clone());
-            case v1_21_40 -> Item.creative748.add(item.clone());
-            case v1_21_50 -> Item.creative766.add(item.clone());
-            // TODO Multiversion
-            default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
+        addCreativeItem(item, category, group);
+    }
+
+    /**
+     * @deprecated Use {@link #addCreativeItem(Item)} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static void addCreativeItem(GameVersion protocol, Item item) {
+        addCreativeItem(item);
+    }
+
+    /**
+     * @deprecated Use {@link #addCreativeItem(Item, CreativeItemCategory, String)} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static void addCreativeItem(GameVersion protocol, Item item, CreativeItemCategory category, String group) {
+        addCreativeItem(item, category, group);
     }
 
     public static void removeCreativeItem(Item item) {
-        Server.mvw("Item#removeCreativeItem(Item)");
-        removeCreativeItem(ProtocolInfo.CURRENT_PROTOCOL, item);
+        CREATIVE_ITEMS.getContents().remove(item);
     }
 
+    /**
+     * @deprecated Use {@link #removeCreativeItem(Item)} instead, version parameter is no longer used
+     */
+    @Deprecated
     public static void removeCreativeItem(int protocol, Item item) {
-        int index = getCreativeItemIndex(protocol, item);
-        if (index != -1) {
-            Item.getCreativeItems(protocol).remove(index);
-        }
+        removeCreativeItem(item);
+    }
+
+    /**
+     * @deprecated Use {@link #removeCreativeItem(Item)} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static void removeCreativeItem(GameVersion protocol, Item item) {
+        removeCreativeItem(item);
     }
 
     public static boolean isCreativeItem(Item item) {
-        Server.mvw("Item#isCreativeItem(Item)");
-        return isCreativeItem(ProtocolInfo.CURRENT_PROTOCOL, item);
-    }
-
-    public static boolean isCreativeItem(int protocol, Item item) {
-        for (Item aCreative : Item.getCreativeItems(protocol)) {
+        for (Item aCreative : Item.getCreativeItemsAndGroups().getItems()) {
             if (item.equals(aCreative, !item.isTool())) {
                 return true;
             }
@@ -897,23 +835,66 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
-    public static Item getCreativeItem(int index) {
-        Server.mvw("Item#getCreativeItemIndex(int)");
-        return Item.getCreativeItem(ProtocolInfo.CURRENT_PROTOCOL, index);
+    public static boolean isCreativeItem(GameVersion gameVersion, Item item) {
+        for (Item aCreative : Item.getCreativeItemsAndGroups().getItems(gameVersion)) {
+            if (item.equals(aCreative, !item.isTool())) {
+                return true;
+            }
+        }
+        return false;
     }
 
+    /**
+     * @deprecated Use {@link #isCreativeItem(Item)} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static boolean isCreativeItem(int protocol, Item item) {
+        return isCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
+    }
+
+    public static Item getCreativeItem(int index) {
+        return getCreativeItem(Item.getCreativeItems(), index);
+    }
+
+    /**
+     * @deprecated Use {@link #getCreativeItem(int)} instead, version parameter is no longer used
+     */
+    @Deprecated
     public static Item getCreativeItem(int protocol, int index) {
-        return (index >= 0 && index < Item.getCreativeItems(protocol).size()) ? Item.getCreativeItems(protocol).get(index) : null;
+        return getCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), index);
+    }
+
+    /**
+     * @deprecated Use {@link #getCreativeItem(int)} instead, version parameter is no longer used
+     */
+    @Deprecated
+    public static Item getCreativeItem(GameVersion gameVersion, int index) {
+        return getCreativeItem(Item.getCreativeItems(gameVersion), index);
     }
 
     public static int getCreativeItemIndex(Item item) {
-        Server.mvw("Item#getCreativeItemIndex(Item)");
-        return getCreativeItemIndex(ProtocolInfo.CURRENT_PROTOCOL, item);
+        return getCreativeItemIndex(Item.getCreativeItems(), item);
     }
 
+    public static int getCreativeItemIndex(GameVersion gameVersion, Item item) {
+        return getCreativeItemIndex(Item.getCreativeItems(gameVersion), item);
+    }
+
+    /**
+     * @deprecated Use {@link #getCreativeItemIndex(Item)} instead, version parameter is no longer used
+     */
+    @Deprecated
     public static int getCreativeItemIndex(int protocol, Item item) {
-        for (int i = 0; i < Item.getCreativeItems(protocol).size(); i++) {
-            if (item.equals(Item.getCreativeItems(protocol).get(i), !item.isTool())) {
+        return getCreativeItemIndex(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
+    }
+
+    private static Item getCreativeItem(ArrayList<Item> items, int index) {
+        return (index >= 0 && index < items.size()) ? items.get(index) : null;
+    }
+
+    private static int getCreativeItemIndex(ArrayList<Item> items, Item item) {
+        for (int i = 0; i < items.size(); i++) {
+            if (item.equals(items.get(i), !item.isTool())) {
                 return i;
             }
         }
@@ -925,18 +906,69 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Constructor<? extends StringItem> declaredConstructor = item.getDeclaredConstructor();
         var Item = declaredConstructor.newInstance();
         registerNamespacedIdItem(Item.getNamespaceId(), stringItemSupplier(declaredConstructor));
+        markRegisteredStringItemIdentifier(Item.getNamespaceId(), true);
     }
 
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Constructor<? extends Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
-        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ENGLISH), itemSupplier(constructor));
+        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ROOT), itemSupplier(constructor));
+        markRegisteredStringItemIdentifier(namespacedId, StringItem.class.isAssignableFrom(constructor.getDeclaringClass()));
     }
 
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Supplier<Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
-        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ENGLISH), constructor);
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        NAMESPACED_ID_ITEM.put(normalizedNamespacedId, constructor);
+        clearRegisteredStringItemIdentifierCache(normalizedNamespacedId);
+    }
+
+    public static boolean isRegisteredStringItemIdentifier(@NotNull String namespacedId) {
+        Preconditions.checkNotNull(namespacedId, "namespacedId is null");
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        if (REGISTERED_STRING_ITEM_IDENTIFIERS.contains(normalizedNamespacedId)) {
+            return true;
+        }
+        if (REGISTERED_NON_STRING_ITEM_IDENTIFIERS.contains(normalizedNamespacedId)) {
+            return false;
+        }
+
+        Supplier<Item> constructor = NAMESPACED_ID_ITEM.get(normalizedNamespacedId);
+        if (constructor == null) {
+            return false;
+        }
+
+        try {
+            boolean isStringItem = constructor.get() instanceof StringItem;
+            markRegisteredStringItemIdentifier(normalizedNamespacedId, isStringItem);
+            return isStringItem;
+        } catch (Exception e) {
+            log.warn("Could not determine whether {} is a StringItem", normalizedNamespacedId, e);
+            markRegisteredStringItemIdentifier(normalizedNamespacedId, false);
+            return false;
+        }
+    }
+
+    private static String normalizeNamespacedItemIdentifier(@NotNull String namespacedId) {
+        return namespacedId.toLowerCase(Locale.ROOT);
+    }
+
+    private static void markRegisteredStringItemIdentifier(@NotNull String namespacedId, boolean stringItem) {
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        if (stringItem) {
+            REGISTERED_NON_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+            REGISTERED_STRING_ITEM_IDENTIFIERS.add(normalizedNamespacedId);
+        } else {
+            REGISTERED_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+            REGISTERED_NON_STRING_ITEM_IDENTIFIERS.add(normalizedNamespacedId);
+        }
+    }
+
+    private static void clearRegisteredStringItemIdentifierCache(@NotNull String namespacedId) {
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        REGISTERED_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+        REGISTERED_NON_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
     }
 
     @NotNull
@@ -1007,6 +1039,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CustomItemDefinition customDef = customItem.getDefinition();
         CUSTOM_ITEM_DEFINITIONS.put(customItem.getNamespaceId(), customDef);
         registerNamespacedIdItem(customItem.getNamespaceId(), supplier);
+        markRegisteredStringItemIdentifier(customItem.getNamespaceId(), true);
 
         // 在服务端注册自定义物品的tag
         if (customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components") instanceof CompoundTag componentTag) {
@@ -1016,85 +1049,40 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             }
         }
 
-        registerCustomItem(customItem, v1_16_100, addCreativeItem, v1_16_0);
-        registerCustomItem(customItem, v1_17_0, addCreativeItem, v1_17_0);
-        registerCustomItem(customItem, v1_17_10, addCreativeItem, v1_17_10, v1_17_30, v1_17_40);
-        registerCustomItem(customItem, v1_18_0, addCreativeItem, v1_18_0);
-        registerCustomItem(customItem, v1_18_10, addCreativeItem, v1_18_10);
-        registerCustomItem(customItem, v1_18_30, addCreativeItem, v1_18_30);
-        registerCustomItem(customItem, v1_19_0, addCreativeItem, v1_19_0);
-        registerCustomItem(customItem, v1_19_10, addCreativeItem, v1_19_10, v1_19_20);
-        registerCustomItem(customItem, v1_19_50, addCreativeItem, v1_19_50);
-        registerCustomItem(customItem, v1_19_60, addCreativeItem, v1_19_60);
-        registerCustomItem(customItem, v1_19_70, addCreativeItem, v1_19_70);
-        registerCustomItem(customItem, v1_19_80, addCreativeItem, v1_19_80);
-        registerCustomItem(customItem, v1_20_0, addCreativeItem, v1_20_0);
-        registerCustomItem(customItem, v1_20_10, addCreativeItem, v1_20_10);
-        registerCustomItem(customItem, v1_20_30, addCreativeItem, v1_20_30);
-        registerCustomItem(customItem, v1_20_40, addCreativeItem, v1_20_40);
-        registerCustomItem(customItem, v1_20_50, addCreativeItem, v1_20_50);
-        registerCustomItem(customItem, v1_20_60, addCreativeItem, v1_20_60);
-        registerCustomItem(customItem, v1_20_70, addCreativeItem, v1_20_70);
-        registerCustomItem(customItem, v1_20_80, addCreativeItem, v1_20_80);
-        registerCustomItem(customItem, v1_21_0, addCreativeItem, v1_21_0);
-        registerCustomItem(customItem, v1_21_20, addCreativeItem, v1_21_20);
-        registerCustomItem(customItem, v1_21_30, addCreativeItem, v1_21_30);
-        registerCustomItem(customItem, v1_21_40, addCreativeItem, v1_21_40);
-        registerCustomItem(customItem, v1_21_50, addCreativeItem, v1_21_50);
-        //TODO Multiversion 添加新版本支持时修改这里
+        // Register custom item in all RuntimeItemMappings
+        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+            mapping.registerCustomItem(customItem);
+        }
+
+        // Only add creative item once; runtime filtering via isSupportedOn per protocol
+        if (addCreativeItem) {
+            CustomItemDefinition definition = customItem.getDefinition();
+            CREATIVE_ITEMS.add(((Item) customItem).clone(), definition.getCreativeCategory(), definition.getCreativeGroup());
+            PENDING_CREATIVE_ITEMS.put(customItem.getNamespaceId(),
+                    new PendingCreativeItem((Item) customItem, definition.getCreativeCategory(), definition.getCreativeGroup()));
+        }
 
         return new OK<Void>(true);
     }
 
-    private static void registerCustomItem(CustomItem item, int protocol,  boolean addCreativeItem, int... creativeProtocols) {
-        if (RuntimeItems.getMapping(protocol).registerCustomItem(item) && addCreativeItem) {
-            for (int creativeProtocol : creativeProtocols) {
-                addCreativeItem(creativeProtocol, (Item) item);
-            }
-        }
-    }
 
     public static void deleteCustomItem(String namespaceId) {
         if (CUSTOM_ITEMS.containsKey(namespaceId)) {
             Item customItem = fromString(namespaceId);
             CUSTOM_ITEMS.remove(namespaceId);
             CUSTOM_ITEM_DEFINITIONS.remove(namespaceId);
+            PENDING_CREATIVE_ITEMS.remove(namespaceId);
 
-            deleteCustomItem(customItem, v1_16_100, v1_16_0);
-            deleteCustomItem(customItem, v1_17_0, v1_17_0);
-            deleteCustomItem(customItem, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
-            deleteCustomItem(customItem, v1_18_0, v1_18_0);
-            deleteCustomItem(customItem, v1_18_10, v1_18_10);
-            deleteCustomItem(customItem, v1_18_30, v1_18_30);
-            deleteCustomItem(customItem, v1_19_0, v1_19_0);
-            deleteCustomItem(customItem, v1_19_10, v1_19_10, v1_19_20);
-            deleteCustomItem(customItem, v1_19_50, v1_19_50);
-            deleteCustomItem(customItem, v1_19_60, v1_19_60);
-            deleteCustomItem(customItem, v1_19_70, v1_19_70);
-            deleteCustomItem(customItem, v1_19_80, v1_19_80);
-            deleteCustomItem(customItem, v1_20_0, v1_20_0);
-            deleteCustomItem(customItem, v1_20_10, v1_20_10);
-            deleteCustomItem(customItem, v1_20_30, v1_20_30);
-            deleteCustomItem(customItem, v1_20_40, v1_20_40);
-            deleteCustomItem(customItem, v1_20_50, v1_20_50);
-            deleteCustomItem(customItem, v1_20_60, v1_20_60);
-            deleteCustomItem(customItem, v1_20_70, v1_20_70);
-            deleteCustomItem(customItem, v1_20_80, v1_20_80);
-            deleteCustomItem(customItem, v1_21_0, v1_21_0);
-            deleteCustomItem(customItem, v1_21_20, v1_21_20);
-            deleteCustomItem(customItem, v1_21_30, v1_21_30);
-            deleteCustomItem(customItem, v1_21_40, v1_21_40);
-            deleteCustomItem(customItem, v1_21_50, v1_21_50);
-            //TODO Multiversion 添加新版本支持时修改这里
+            // Remove from all RuntimeItemMappings
+            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                mapping.deleteCustomItem((CustomItem) customItem);
+            }
+
+            // Remove from creative items
+            removeCreativeItem(customItem);
         }
     }
 
-    private static void deleteCustomItem(Item item, int protocol, int... creativeProtocols) {
-        RuntimeItems.getMapping(protocol).deleteCustomItem((CustomItem) item);
-        for (int creativeProtocol : creativeProtocols) {
-            removeCreativeItem(creativeProtocol, item);
-        }
-    }
 
     public static HashMap<String, Supplier<? extends Item>> getCustomItems() {
         return new HashMap<>(CUSTOM_ITEMS);
@@ -1102,6 +1090,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static HashMap<String, CustomItemDefinition> getCustomItemDefinition() {
         return new HashMap<>(CUSTOM_ITEM_DEFINITIONS);
+    }
+
+    /** Direct lookup without cloning; for hot paths instead of {@link #getCustomItemDefinition()}{@code .get(id)}. */
+    public static CustomItemDefinition getCustomItemDefinition(String namespaceId) {
+        return CUSTOM_ITEM_DEFINITIONS.get(namespaceId);
     }
 
     public static Item get(int id) {
@@ -1118,7 +1111,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static Item get(int id, Integer meta, int count, byte[] tags) {
         try {
-            Class<?> c = null;
+            Class<?> c;
             if (id < 0) {
                 int blockId = 255 - id;
                 if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
@@ -1154,7 +1147,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static Item fromString(String str) {
-        String normalized = str.trim().replace(' ', '_').toLowerCase();
+        String normalized = str.trim().replace(' ', '_').toLowerCase(Locale.ROOT);
         Matcher matcher = ITEM_STRING_PATTERN.matcher(normalized);
         if (!matcher.matches()) {
             return AIR_ITEM.clone();
@@ -1204,9 +1197,17 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
             //common item
             int id = RuntimeItems.getLegacyIdFromLegacyString(namespacedId);
-            if (id > 0) {
+            if (id != -1) { // id == -1 means not found
                 return get(id, meta.orElse(0));
-            } else if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
+            }
+
+            // Flattened identifier lookup (e.g., minecraft:oak_log -> minecraft:log + damage 0)
+            int[] flattenedEntry = RuntimeItems.getLegacyFromFlattenedId(namespacedId);
+            if (flattenedEntry != null) {
+                return get(flattenedEntry[0], meta.orElse(flattenedEntry[1]));
+            }
+
+            if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
                 return Item.AIR_ITEM.clone();
             }
         } else if (numericIdGroup != null) {
@@ -1220,13 +1221,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
         int id = 0;
         try {
-            id = BlockID.class.getField(name.toUpperCase()).getInt(null);
+            id = BlockID.class.getField(name.toUpperCase(Locale.ROOT)).getInt(null);
             if (id > 255) {
                 id = 255 - id;
             }
         } catch (Exception ignore) {
             try {
-                id = ItemID.class.getField(name.toUpperCase()).getInt(null);
+                id = ItemID.class.getField(name.toUpperCase(Locale.ROOT)).getInt(null);
             } catch (Exception ignore1) {
             }
         }
@@ -1300,7 +1301,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         CompoundTag tag = this.getNamedTag();
-        return tag.contains("BlockEntityTag") && tag.get("BlockEntityTag") instanceof CompoundTag;
+        return tag.get("BlockEntityTag") instanceof CompoundTag;
 
     }
 
@@ -1310,7 +1311,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
         CompoundTag tag = this.getNamedTag();
 
-        if (tag.contains("BlockEntityTag") && tag.get("BlockEntityTag") instanceof CompoundTag) {
+        if (tag.get("BlockEntityTag") instanceof CompoundTag) {
             tag.remove("BlockEntityTag");
             this.setNamedTag(tag);
         }
@@ -1393,7 +1394,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             if (entry.getShort("id") == id) {
                 Enchantment e = Enchantment.getEnchantment(entry.getShort("id"));
                 if (e != null) {
-                    e.setLevel(entry.getShort("lvl"));
+                    e.setLevel(entry.getShort("lvl"), Server.getInstance().forcedSafetyEnchant);
                     return e;
                 }
             }
@@ -1455,7 +1456,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         for (CompoundTag entry : ench.getAll()) {
             Enchantment e = Enchantment.getEnchantment(entry.getShort("id"));
             if (e != null) {
-                e.setLevel(entry.getShort("lvl"));
+                e.setLevel(entry.getShort("lvl"), Server.getInstance().forcedSafetyEnchant);
                 enchantments.add(e);
             }
         }
@@ -1480,7 +1481,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CompoundTag tag = this.getNamedTag();
         if (tag.contains("display")) {
             Tag tag1 = tag.get("display");
-            return tag1 instanceof CompoundTag && ((CompoundTag) tag1).contains("Name") && ((CompoundTag) tag1).get("Name") instanceof StringTag;
+            return tag1 instanceof CompoundTag && ((CompoundTag) tag1).get("Name") instanceof StringTag;
         }
 
         return false;
@@ -1494,7 +1495,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CompoundTag tag = this.getNamedTag();
         if (tag.contains("display")) {
             Tag tag1 = tag.get("display");
-            if (tag1 instanceof CompoundTag && ((CompoundTag) tag1).contains("Name") && ((CompoundTag) tag1).get("Name") instanceof StringTag) {
+            if (tag1 instanceof CompoundTag && ((CompoundTag) tag1).get("Name") instanceof StringTag) {
                 return ((CompoundTag) tag1).getString("Name");
             }
         }
@@ -1518,7 +1519,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         } else {
             tag = this.getNamedTag();
         }
-        if (tag.contains("display") && tag.get("display") instanceof CompoundTag) {
+        if (tag.get("display") instanceof CompoundTag) {
             tag.getCompound("display").putString("Name", name);
         } else {
             tag.putCompound("display", new CompoundTag("display")
@@ -1536,7 +1537,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
         CompoundTag tag = this.getNamedTag();
 
-        if (tag.contains("display") && tag.get("display") instanceof CompoundTag) {
+        if (tag.get("display") instanceof CompoundTag) {
             tag.getCompound("display").remove("Name");
             if (tag.getCompound("display").isEmpty()) {
                 tag.remove("display");
@@ -1592,7 +1593,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     public Tag getNamedTagEntry(String name) {
         CompoundTag tag = this.getNamedTag();
         if (tag != null) {
-            return tag.contains(name) ? tag.get(name) : null;
+            return tag.get(name);
         }
 
         return null;
@@ -1715,10 +1716,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     final public Short getFuelTime() {
+        if (this instanceof StringItem stringItem) {
+            return Fuel.getDuration(stringItem.getNamespaceId());
+        }
         if (!Fuel.duration.containsKey(id)) {
             return null;
         }
-        if (this.id != BUCKET || this.meta == 10) {
+        if (this.id != BUCKET || this.meta == ItemBucket.LAVA_BUCKET) {
             return Fuel.duration.get(this.id);
         }
         return null;
@@ -1772,6 +1776,21 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    public boolean isShield() {
+        return false;
+    }
+
+    public boolean canBePutInOffhandSlot() {
+        return this.isShield()
+                || this.id == ARROW
+                || this.id == TOTEM
+                || this.id == MAP
+                || this.id == EMPTY_MAP
+                || this.id == FIREWORKS
+                || this.id == NAUTILUS_SHELL
+                || this.id == SPARKLER;
+    }
+
     public boolean isHelmet() {
         return false;
     }
@@ -1792,8 +1811,24 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    public boolean isMace() {
+        return false;
+    }
+
+    public boolean isSpear() {
+        return false;
+    }
+
+    public boolean isHorseArmor() {
+        return false;
+    }
+
     public int getEnchantAbility() {
         return 0;
+    }
+
+    public int getAttackDamage(Entity entity) {
+        return getAttackDamage();
     }
 
     public int getAttackDamage() {
@@ -1868,10 +1903,27 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    /**
+     * Returns the duration in ticks required to use/consume this item.
+     * Used for server-side auto-completion of consumable items.
+     * Override in subclasses for consumable items (food, potions, etc.).
+     *
+     * @return use duration in ticks, 0 means no auto-completion
+     */
+    public int getUseDuration() {
+        return 0;
+    }
+
+    /**
+     * Returns a new item instance with count decreased by amount or air if new count is less or equal to 0
+     */
     public final Item decrement(int amount) {
         return increment(-amount);
     }
 
+    /**
+     * Returns a new item instance with count increased by amount or air if new count is less or equal to 0
+     */
     public final Item increment(int amount) {
         if (count + amount <= 0) {
             return get(0);
@@ -1983,39 +2035,108 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
     }
 
+    /**
+     * Returns the stack network id assigned to this item instance. Stack network
+     * ids are allocated by Item's internal counter and used by the Server
+     * Authoritative Inventory (ItemStackRequest) flow to identify a specific
+     * stack across client-server round trips. Returns 0 when the stack is not
+     * being tracked (for example, items produced by legacy
+     * {@code InventoryTransactionPacket} paths).
+     *
+     * @return the stack network id, or 0 when unassigned
+     */
+    public int getStackNetId() {
+        return this.stackNetId;
+    }
+
+    /**
+     * Sets the stack network id for this item instance. Used by the
+     * ItemStackRequest handler to echo the client-supplied id back in the
+     * response, or by callers that want to reuse an existing id after cloning.
+     * Pass 0 to mark the stack as untracked.
+     *
+     * @param stackNetId the stack network id to assign (0 to clear)
+     * @return this item for chaining
+     */
+    public Item setStackNetId(int stackNetId) {
+        this.stackNetId = stackNetId;
+        return this;
+    }
+
+    /**
+     * Indicates whether this item instance carries a valid stack network id.
+     * Allocated ids are always positive; 0 means untracked.
+     *
+     * @return {@code true} when {@link #stackNetId} is greater than 0
+     */
+    public boolean isUsingStackNetId() {
+        return this.stackNetId > 0;
+    }
+
+    /**
+     * Allocates a fresh positive stack network id from ItemStackNetManager
+     * and assigns it to this item. Call this whenever a new, distinct stack is
+     * produced server-side (for example, the output of a crafting / enchanting
+     * / grindstone operation) so the client can reference it in subsequent
+     * {@code ItemStackRequest} actions.
+     *
+     * @return this item for chaining
+     */
+    public Item autoAssignStackNetworkId() {
+        this.stackNetId = ItemStackNetManager.allocate();
+        return this;
+    }
+
+    /**
+     * @Deprecated Use {@link #getNetworkId} or {@link #getNamespaceId()} instead
+     */
     @Deprecated
     public final RuntimeEntry getRuntimeEntry() {
         Server.mvw("Item#getRuntimeEntry()");
         return this.getRuntimeEntry(ProtocolInfo.CURRENT_PROTOCOL);
     }
 
+    /**
+     * @Deprecated Use {@link #getNetworkId} or {@link #getNamespaceId()} instead
+     */
     @Deprecated
     public final RuntimeEntry getRuntimeEntry(int protocolId) {
         return RuntimeItems.getMapping(protocolId).toRuntime(this.getId(), this.getDamage());
     }
 
+    @Deprecated
     public final int getNetworkId() {
         Server.mvw("Item#getNetworkId()");
-        return this.getNetworkId(ProtocolInfo.CURRENT_PROTOCOL);
+        return this.getNetworkId(GameVersion.getLastVersion());
     }
 
+    @Deprecated
     public final int getNetworkId(int protocolId) {
-        if (protocolId < ProtocolInfo.v1_16_100) {
+        return this.getNetworkId(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public final int getNetworkId(GameVersion version) {
+        if (version.getProtocol() < ProtocolInfo.v1_16_100) {
             return getId();
         }
-        return RuntimeItems.getMapping(protocolId).getNetworkId(this);
+        return RuntimeItems.getMapping(version).getNetworkId(this);
     }
 
     public String getNamespaceId() {
-        return this.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL);
+        return this.getNamespaceId(GameVersion.getLastVersion());
     }
 
+    @Deprecated
     public String getNamespaceId(int protocolId) {
+        return this.getNamespaceId(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public String getNamespaceId(GameVersion gameVersion) {
         if (this.getId() == 0) {
             return "minecraft:air";
         }
-        RuntimeItemMapping runtimeMapping = RuntimeItems.getMapping(protocolId);
-        return runtimeMapping.getNamespacedIdByNetworkId(this.getNetworkId(protocolId));
+        return RuntimeItems.getMapping(gameVersion)
+                .getNamespacedIdByNetworkId(this.getNetworkId(gameVersion));
     }
 
     /**
@@ -2026,8 +2147,29 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * @param protocolId 协议版本 protocol version
      * @return 是否支持 whether supported
      */
+    @Deprecated
     public boolean isSupportedOn(int protocolId) {
-        return true;
+        return this.isSupportedOn(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
+    }
+
+    /**
+     * 返回物品是否支持指定版本
+     * <p>
+     * Returns whether the item supports the specified version
+     *
+     * @param protocolId 协议版本 protocol version
+     * @return 是否支持 whether supported
+     */
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return this.isSupportedOnMapping(protocolId);
+    }
+
+    private boolean isSupportedOnMapping(GameVersion protocolId) {
+        int itemId = this.getId();
+        if (itemId == AIR) {
+            return true;
+        }
+        return RuntimeItems.getMapping(protocolId).isRegistered(itemId, this.getDamage());
     }
 
     /**
@@ -2064,4 +2206,130 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         LOCK_IN_SLOT,
         LOCK_IN_INVENTORY
     }
+
+    public static class CreativeItems {
+
+        private final List<CreativeItemGroup> groups = new ArrayList<>();
+        private final Map<Item, CreativeItemGroup> contents = new LinkedHashMap<>();
+
+        public void clear() {
+            groups.clear();
+            contents.clear();
+        }
+
+        public void add(Item item) {
+            add(item, CreativeItemCategory.ITEMS, ""); // TODO: vanilla items back to correct categories & groups
+        }
+
+        public void add(Item item, CreativeItemGroup group) {
+//            if (group == null) {
+//                throw new IllegalArgumentException("group == null");
+//            }
+
+            contents.put(item, group);
+        }
+
+        public void add(Item item, CreativeItemCategory category, String group) {
+            CreativeItemGroup creativeGroup = null;
+
+            for (CreativeItemGroup existing : groups) {
+                if (existing.category == category && existing.name.equals(group)) {
+                    creativeGroup = existing;
+                    break;
+                }
+            }
+
+            if (creativeGroup == null) {
+                creativeGroup = new CreativeItemGroup(groups.size(), category, group, item);
+                groups.add(creativeGroup);
+            }
+
+            contents.put(item, creativeGroup);
+        }
+
+        public void addGroup(CreativeItemGroup creativeGroup) {
+            groups.add(creativeGroup);
+        }
+
+        public Collection<Item> getItems() {
+            return contents.keySet();
+        }
+
+        public List<CreativeItemGroup> getGroups() {
+            return groups;
+        }
+
+        /**
+         * Get creative groups referenced by items supported on the specified protocol version.
+         */
+        public List<CreativeItemGroup> getGroups(GameVersion protocol) {
+            if (protocol == GameVersion.getLastVersion()) {
+                return groups;
+            }
+            Set<CreativeItemGroup> referencedGroups = new HashSet<>();
+            for (CreativeItemGroup group : getContents(protocol).values()) {
+                if (group != null) {
+                    referencedGroups.add(group);
+                }
+            }
+            ArrayList<CreativeItemGroup> versionGroups = new ArrayList<>(referencedGroups.size());
+            for (CreativeItemGroup group : groups) {
+                if (referencedGroups.contains(group)) {
+                    versionGroups.add(group);
+                }
+            }
+            return versionGroups;
+        }
+
+        public Map<Item, CreativeItemGroup> getContents() {
+            return contents;
+        }
+
+        public List<CreativeItemData> getCreativeItemDatas() {
+            int creativeNetId = 1; // 0 is not indexed by client
+            ObjectArrayList<CreativeItemData> list = new ObjectArrayList<>(this.getContents().size());
+            for (Map.Entry<Item, CreativeItemGroup> entry : this.getContents().entrySet()) {
+                list.add(new CreativeItemData(entry.getKey(), creativeNetId++, entry.getValue() != null ? entry.getValue().getGroupId() : 0));
+            }
+            return list;
+        }
+
+        /**
+         * Get creative items supported by the specified protocol version
+         */
+        public Collection<Item> getItems(GameVersion protocol) {
+            if (protocol == GameVersion.getLastVersion()) {
+                return contents.keySet();
+            }
+            ArrayList<Item> list = new ArrayList<>();
+            for (Item item : contents.keySet()) {
+                if (item.isSupportedOn(protocol)) {
+                    list.add(item);
+                }
+            }
+            return list;
+        }
+
+        /**
+         * Get item-to-group mapping supported by the specified protocol version
+         */
+        public Map<Item, CreativeItemGroup> getContents(GameVersion protocol) {
+            if (protocol == GameVersion.getLastVersion()) {
+                return contents;
+            }
+            Map<Item, CreativeItemGroup> map = new LinkedHashMap<>();
+            for (Map.Entry<Item, CreativeItemGroup> entry : contents.entrySet()) {
+                if (entry.getKey().isSupportedOn(protocol)) {
+                    map.put(entry.getKey(), entry.getValue());
+                }
+            }
+            return map;
+        }
+    }
+
+    /**
+     * 待添加的创造物品记录
+     * Pending creative item record
+     */
+    public record PendingCreativeItem(Item item, CreativeItemCategory category, String group) {}
 }

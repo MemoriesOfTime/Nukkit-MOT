@@ -1,11 +1,14 @@
 package cn.nukkit.event.entity;
 
 import cn.nukkit.entity.Entity;
-import cn.nukkit.event.Cancellable;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.potion.Effect;
 
-public class EntityEffectRemoveEvent extends EntityEvent implements Cancellable {
+/**
+ * @deprecated use {@link EntityPotionEffectEvent} instead
+ */
+@Deprecated
+public class EntityEffectRemoveEvent extends EntityEvent {
     private static final HandlerList handlers = new HandlerList();
 
     private Effect removeEffect;

@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
@@ -9,8 +10,8 @@ import cn.nukkit.level.Sound;
 import cn.nukkit.level.particle.ExplodeParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.network.protocol.LevelEventPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayDeque;
 import java.util.Queue;
@@ -68,7 +69,7 @@ public class BlockSponge extends BlockSolidMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (this.getDamage() == WET && level.getDimension() == Level.DIMENSION_NETHER) {
             level.setBlock(block, Block.get(BlockID.SPONGE, DRY), true, true);
             level.addSoundToViewers(block.getLocation(), Sound.RANDOM_FIZZ);
@@ -87,7 +88,7 @@ public class BlockSponge extends BlockSolidMeta {
                 packet.x = (float) block.getX() + 0.5f;
                 packet.y = (float) block.getY() + 1f;
                 packet.z = (float) block.getZ() + 0.5f;
-                packet.data = GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, BlockID.WATER, 0);
+                packet.data = GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getLastVersion(), BlockID.WATER, 0);
                 level.addChunkPacket(getChunkX(), getChunkZ(), packet);
             }
 

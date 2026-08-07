@@ -4,8 +4,11 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityTarget;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.projectile.EntityArrow;
+import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntitySmallFireBall;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
@@ -13,18 +16,19 @@ import cn.nukkit.level.Position;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
 import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class BlockTarget extends BlockTransparent implements BlockEntityHolder<BlockEntityTarget> {
+public class BlockTarget extends BlockSolid implements BlockEntityHolder<BlockEntityTarget> {
 
-    
     public BlockTarget() {
-
+        super();
     }
 
     @Override
@@ -37,18 +41,51 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
         return "Target";
     }
 
-
     @NotNull
     @Override
     public Class<? extends BlockEntityTarget> getBlockEntityClass() {
         return BlockEntityTarget.class;
     }
 
-
     @NotNull
     @Override
     public String getBlockEntityType() {
         return BlockEntity.TARGET;
+    }
+
+    @Override
+    public int getToolType() {
+        return ItemTool.TYPE_HOE;
+    }
+
+    @Override
+    public int getBurnChance() {
+        return 5;
+    }
+
+    @Override
+    public int getBurnAbility() {
+        return 15;
+    }
+
+    @Override
+    public double getHardness() {
+        return 0.5;
+    }
+
+    @Override
+    public double getResistance() {
+        return 0.5;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.WHITE_BLOCK_COLOR;
+    }
+
+    @Override
+    public Item[] getDrops(Item item) {
+        return new Item[]{new ItemBlock(Block.get(TARGET))};
     }
 
     @Override
@@ -58,15 +95,19 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
 
     @Override
     public int getWeakPower(BlockFace face) {
-        BlockEntityTarget target = getBlockEntity();
-        return target == null? 0 : target.getActivePower();
+        for (Entity e : level.getCollidingEntities(new SimpleAxisAlignedBB(x - 0.000001, y - 0.000001, z - 0.000001, x + 1.000001, y + 1.000001, z + 1.000001))) {
+            if (e instanceof EntityProjectile && ((level.getServer().getTick() - ((EntityProjectile) e).getCollidedTick()) < ((e instanceof EntityArrow || e instanceof EntityThrownTrident) ? 10 : 4))) {
+                return 10;
+            }
+        }
+
+        return 0;
     }
 
     
     public boolean activatePower(int power) {
         return activatePower(power, 4 * 2);
     }
-
     
     public boolean activatePower(int power, int ticks) {
         Level level = getLevel();
@@ -109,11 +150,17 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
         return 0;
     }
 
+
+    @Override
+    public boolean hasEntityCollision() {
+        return true;
+    }
+
     @Override
     public void onEntityCollide(@NotNull Entity entity) {
-        int ticks = 8;
+        int ticks = 4;
         if (entity instanceof EntityArrow || entity instanceof EntityThrownTrident || entity instanceof EntitySmallFireBall) {
-            ticks = 20;
+            ticks = 10;
         }
         Position position = entity.getPosition();
         Vector3 motion = position.add(new Vector3(entity.lastMotionX, entity.lastMotionY, entity.lastMotionZ));
@@ -147,35 +194,5 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
 
         double scale = (coords[0] + coords[1]) / 2;
         activatePower(NukkitMath.ceilDouble(16 * scale), ticks);
-    }
-
-    @Override
-    public boolean hasEntityCollision() {
-        return true;
-    }
-
-    @Override
-    public int getToolType() {
-        return ItemTool.TYPE_HOE;
-    }
-
-    @Override
-    public double getHardness() {
-        return 0.5;
-    }
-
-    @Override
-    public double getResistance() {
-        return 0.5;
-    }
-
-    @Override
-    public int getBurnAbility() {
-        return 15;
-    }
-
-    @Override
-    public int getBurnChance() {
-        return 0;
     }
 }

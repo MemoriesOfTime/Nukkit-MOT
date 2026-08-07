@@ -3,11 +3,13 @@ package cn.nukkit.command.data;
 
 import cn.nukkit.command.tree.node.IParamNode;
 import com.google.common.collect.Lists;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+@ToString
 public class CommandParameter {
 
     public final static String ARG_TYPE_STRING = "string";

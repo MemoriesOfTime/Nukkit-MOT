@@ -1,5 +1,6 @@
 package cn.nukkit.entity.passive;
 
+import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntitySmite;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
@@ -43,6 +44,11 @@ public class EntityZombieHorse extends EntityHorseBase implements EntitySmite {
         this.setMaxHealth(15);
 
         super.initEntity();
+    }
+
+    @Override
+    public boolean targetOption(EntityCreature creature, double distance) {
+        return false;
     }
 
     @Override

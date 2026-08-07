@@ -45,11 +45,6 @@ public class BlockIcePacked extends BlockIce {
     }
 
     @Override
-    public int getLightLevel() {
-        return 4;
-    }
-
-    @Override
     public boolean canSilkTouch() {
         return true;
     }

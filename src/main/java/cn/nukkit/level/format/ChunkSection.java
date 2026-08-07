@@ -1,5 +1,7 @@
 package cn.nukkit.level.format;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BinaryStream;
@@ -96,8 +98,14 @@ public interface ChunkSection {
 
     boolean hasLayer(int layer);
 
+    @Deprecated
+    default byte[] getBytes(int protocolId) {
+        Server.mvw("ChunkSection#getBytes(int) is deprecated, please use ChunkSection#getBytes(GameVersion) instead.");
+        return getBytes(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
+    }
+
     // for < 1.13 chunk format
-    byte[] getBytes(int protocolId);
+    byte[] getBytes(GameVersion gameVersion);
     
     int getMaximumLayer();
 
@@ -108,8 +116,14 @@ public interface ChunkSection {
         writeTo(protocol, stream, false);
     }
 
+    @Deprecated
+    default void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
+        Server.mvw("ChunkSection#writeTo(int, BinaryStream, boolean) is deprecated, please use ChunkSection#writeTo(GameVersion, BinaryStream, boolean) instead.");
+        writeTo(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), stream, antiXray);
+    }
+
     // for >= 1.13 chunk format
-    void writeTo(int protocol, BinaryStream stream, boolean antiXray);
+    void writeTo(GameVersion gameVersion, BinaryStream stream, boolean antiXray);
 
     ChunkSection copy();
 
@@ -127,5 +141,17 @@ public interface ChunkSection {
 
     default void setDirty() {
 
+    }
+
+    /**
+     * Check if this section may contain light-emitting blocks.
+     * This is a fast check that only looks at the palette, not every block position.
+     * If this returns false, the section definitely has no light sources.
+     * If this returns true, the section may have light sources (needs full scan).
+     *
+     * @return true if light sources may exist, false if definitely none
+     */
+    default boolean maybeHasLightSource() {
+        return true; // Default: assume light sources may exist
     }
 }

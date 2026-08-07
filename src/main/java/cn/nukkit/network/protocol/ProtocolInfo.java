@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.network.protocol.v20.AddMobPacket;
 import cn.nukkit.network.protocol.v20.MoveEntityPosRotPacket;
@@ -114,18 +115,39 @@ public interface ProtocolInfo {
     int v1_21_40 = 748;
     int v1_21_50_26 = 765;
     int v1_21_50 = 766;
+    int v1_21_60 = 776;
+    int v1_21_70_24 = 785; //TODO
+    int v1_21_70 = 786;
+    int v1_21_80 = 800;
+    int v1_21_90 = 818;
+    int v1_21_93 = 819;
+    int v1_21_100 = 827;
+    int v1_21_110_26 = 843;
+    int v1_21_111 = 844;
+    int v1_21_120 = 859;
+    int v1_21_124 = 860;
+    int v1_21_130_28 = 897;
+    int v1_21_130 = 898;
+    int v1_26_0 = 924;
+    int v1_26_10 = 944;
+    int v1_26_20_26 = 974;
+    int v1_26_20 = 975;
+    int v1_26_30 = 1001;
+    int v1_26_40 = 2168;
 
-    int CURRENT_PROTOCOL = Utils.dynamic(v1_21_50);
+    int CURRENT_PROTOCOL = Utils.dynamic(v1_26_40);
 
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
-            v_0_10_0, v_0_11_0, v_0_12_1, v_0_13_2, v_0_14_1, v_0_14_3, v_0_15_10, v_0_16_0,v_0_16_1,v_1_0_0,
-            v1_1_0, v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
-            v1_8_0, v1_9_0, v1_10_0, v1_11_0, v1_12_0, v1_13_0, v1_14_0, v1_14_60, v1_16_0, v1_16_20, v1_16_100_0, v1_16_100_51,
-            v1_16_100_52, v1_16_100, v1_16_200_51, v1_16_200, v1_16_210_50, v1_16_210_53, v1_16_210, v1_16_220, v1_16_230_50, v1_16_230,
-            v1_16_230_54, v1_17_0, v1_17_10, v1_17_20_20, v1_17_30, v1_17_40, v1_18_0, v1_18_10, v1_18_30, v1_19_0_29, v1_19_0_31, v1_19_0,
-            v1_19_10, v1_19_20, v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50_20, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70,
-            v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40, v1_20_50, v1_20_60, v1_20_70, v1_20_80,
-            v1_21_0, v1_21_2, v1_21_20, v1_21_30, v1_21_40, v1_21_50_26, v1_21_50
+        v_0_10_0, v_0_11_0, v_0_12_1, v_0_13_2, v_0_14_1, v_0_14_3, v_0_15_10, v_0_16_0,v_0_16_1,v_1_0_0,
+        v1_1_0, v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
+        v1_8_0, v1_9_0, v1_10_0, v1_11_0, v1_12_0, v1_13_0, v1_14_0, v1_14_60, v1_16_0, v1_16_20, v1_16_100_0, v1_16_100_51,
+        v1_16_100_52, v1_16_100, v1_16_200_51, v1_16_200, v1_16_210_50, v1_16_210_53, v1_16_210, v1_16_220, v1_16_230_50, v1_16_230,
+        v1_16_230_54, v1_17_0, v1_17_10, v1_17_20_20, v1_17_30, v1_17_40, v1_18_0, v1_18_10, v1_18_30, v1_19_0_29, v1_19_0_31, v1_19_0,
+        v1_19_10, v1_19_20, v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50_20, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70,
+        v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40, v1_20_50, v1_20_60, v1_20_70, v1_20_80,
+        v1_21_0, v1_21_2, v1_21_20, v1_21_30, v1_21_40, v1_21_50_26, v1_21_50, v1_21_60, v1_21_70_24, v1_21_70, v1_21_80, v1_21_90, v1_21_93,
+        v1_21_100, v1_21_110_26, v1_21_111, v1_21_120, v1_21_124, v1_21_130_28, v1_21_130, v1_26_0, v1_26_10, v1_26_20_26, v1_26_20, v1_26_30,
+        v1_26_40
     );
 
     String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);
@@ -319,11 +341,17 @@ public interface ProtocolInfo {
     byte UPDATE_ADVENTURE_SETTINGS_PACKET = (byte) 0xbc;
     byte DEATH_INFO_PACKET = (byte) 0xbd;
     byte REQUEST_NETWORK_SETTINGS_PACKET = (byte) 0xc1;
+    byte GAME_TEST_REQUEST_PACKET = (byte) 0xc2;
     byte GAME_TEST_RESULTS_PACKET = (byte) 0xc3;
     byte UPDATE_CLIENT_INPUT_LOCKS = (byte) 0xc4;
     byte CLIENT_CHEAT_ABILITY_PACKET = (byte) 0xc5;
     byte CAMERA_PRESETS_PACKET = (byte) 0xc6;
     byte UNLOCKED_RECIPES_PACKET = (byte) 0xc7;
+
+    @OnlyNetEase
+    int PY_RPC_PACKET = 200;
+    @OnlyNetEase
+    int PACKET_CONFIRM_SKIN = 228;
 
     int CAMERA_INSTRUCTION_PACKET = 300;
     int COMPRESSED_BIOME_DEFINITIONS_LIST_PACKET = 301;
@@ -335,12 +363,170 @@ public interface ProtocolInfo {
     int SET_PLAYER_INVENTORY_OPTIONS_PACKET = 307;
     int SET_HUD_PACKET = 308;
     int AWARD_ACHIEVEMENT_PACKET = 309;
+    /**
+     * @since v686
+     */
     int CLIENTBOUND_CLOSE_FORM_PACKET = 310;
-
+    /**
+     * @since v712
+     */
     int SERVERBOUND_LOADING_SCREEN_PACKET = 312;
+    /**
+     * @since v712
+     */
     int JIGSAW_STRUCTURE_DATA_PACKET = 313;
+    /**
+     * @since v712
+     */
     int CURRENT_STRUCTURE_FEATURE_PACKET = 314;
+    /**
+     * @since v712
+     */
     int SERVERBOUND_DIAGNOSTICS_PACKET = 315;
+    /**
+     * @since v729
+     */
+    int CAMERA_AIM_ASSIST_PACKET = 316;
+    /**
+     * @since v729
+     */
+    int CONTAINER_REGISTRY_CLEANUP_PACKET = 317;
+    /**
+     * @since v748
+     */
+    int MOVEMENT_EFFECT_PACKET = 318;
+    /**
+     * @since v748
+     */
+    int SET_MOVEMENT_AUTHORITY_PACKET = 319;
+    /**
+     * @since v766
+     */
+    int CAMERA_AIM_ASSIST_PRESETS_PACKET = 320;
+    /**
+     * @since v776
+     */
+    int CLIENT_CAMERA_AIM_ASSIST_PACKET = 321;
+    /**
+     * @since v776
+     */
+    int CLIENT_MOVEMENT_PREDICTION_SYNC_PACKET = 322;
+    /**
+     * @since v785
+     */
+    int UPDATE_CLIENT_OPTIONS_PACKET = 323;
+    /**
+     * @since v785
+     */
+    int PLAYER_VIDEO_CAPTURE_PACKET = 324;
+    /**
+     * @since v785
+     */
+    int PLAYER_UPDATE_ENTITY_OVERRIDES_PACKET = 325;
+    /**
+     * @since v800
+     */
+    int PLAYER_LOCATIONS_PACKET = 326;
+    /**
+     * @since v800
+     */
+    int CLIENTBOUND_CONTROL_SCHEME_SET_PACKET = 327;
+    /**
+     * @since v818
+     */
+    int SERVER_SCRIPT_DEBUG_DRAWER_PACKET = 328;
+    /**
+     * @since v818
+     */
+    int DEBUG_DRAWER_PACKET = 328;
+    /**
+     * @since v843
+     */
+    int SERVERBOUND_PACK_SETTING_CHANGE_PACKET = 329;
+    /**
+     * @since v897
+     */
+    int CLIENTBOUND_DATA_STORE_PACKET = 330;
+    /**
+     * @since v859
+     */
+    int GRAPHICS_PARAMETER_OVERRIDE_PACKET = 331;
+    /**
+     * @since v897
+     */
+    int SERVERBOUND_DATA_STORE_PACKET = 332;
+    /**
+     * @since v924
+     */
+    int CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET = 333;
+    /**
+     * @since v924
+     */
+    int CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_SCREEN_PACKET = 334;
+    /**
+     * @since v924
+     */
+    int CLIENTBOUND_DATA_DRIVEN_UI_RELOAD_PACKET = 335;
+    /**
+     * @since v924
+     */
+    int CLIENTBOUND_TEXTURE_SHIFT_PACKET = 336;
+    /**
+     * @since v924
+     */
+    int VOXEL_SHAPES_PACKET = 337;
+    /**
+     * @since v924
+     */
+    int CAMERA_SPLINE_PACKET = 338;
+    /**
+     * @since v924
+     */
+    int CAMERA_AIM_ASSIST_ACTOR_PRIORITY_PACKET = 339;
+    /**
+     * @since v944
+     */
+    int RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET = 340;
+    /**
+     * @since v944
+     */
+    int LOCATOR_BAR_PACKET = 341;
+    /**
+     * @since v944
+     */
+    int PARTY_CHANGED_PACKET = 342;
+    /**
+     * @since v944
+     */
+    int SERVERBOUND_DATA_DRIVEN_SCREEN_CLOSED_PACKET = 343;
+    /**
+     * @since v944
+     */
+    int SYNC_WORLD_CLOCKS_PACKET = 344;
+    /**
+     * @since v944
+     */
+    int CLIENTBOUND_ATTRIBUTE_LAYER_SYNC_PACKET = 345;
+    /**
+     * @since v975
+     */
+    int SERVER_STORE_INFO_PACKET = 346;
+    /**
+     * @since v975
+     */
+    int SERVER_PRESENCE_INFO_PACKET = 347;
+    /**
+     * @since v1001
+     */
+    int CLIENTBOUND_UPDATE_SOUND_DATA_PACKET = 348;
+    /**
+     * @since v1001
+     */
+    int SEND_PARTY_DESTINATION_COOKIE_PACKET = 349;
+    /**
+     * @since v1001
+     */
+    int PARTY_DESTINATION_COOKIE_RESPONSE_PACKET = 350;
 
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;

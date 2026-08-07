@@ -15,7 +15,6 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
@@ -156,7 +155,7 @@ public class EntityLlama extends EntityHorseBase {
                 return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
             }else if (creature instanceof Player player) {
                 return player.spawned && player.isAlive() && !player.closed &&
-                        this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 40;
+                        distance <= 40 && this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast());
             }
         }
 

@@ -35,7 +35,7 @@ public class BlockWoodCherry extends BlockWoodBark {
 
     @Override
     protected int getStrippedDamage() {
-        return this.getDamage() & ~0x3;
+        return this.getDamage() & ~0x7;
     }
 
     @Override

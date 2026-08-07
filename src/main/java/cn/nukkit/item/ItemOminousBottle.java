@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.event.player.PlayerItemConsumeEvent;
 import cn.nukkit.math.Vector3;
@@ -18,7 +19,7 @@ public class ItemOminousBottle extends StringItemBase {
 
     @Override
     public boolean onUse(Player player, int ticksUsed) {
-        if (ticksUsed < 10) return false;
+        if (ticksUsed < getUseDuration() - 2) return false;
         PlayerItemConsumeEvent consumeEvent = new PlayerItemConsumeEvent(player, this);
         player.getServer().getPluginManager().callEvent(consumeEvent);
         if (consumeEvent.isCancelled()) {
@@ -46,7 +47,12 @@ public class ItemOminousBottle extends StringItemBase {
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_21_0;
+    public int getUseDuration() {
+        return 32;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_21_0;
     }
 }

@@ -1,11 +1,15 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.inventory.GrindstoneInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.ItemTool;
+import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockGrindstone extends BlockTransparentMeta implements Faceable {
 
@@ -35,6 +39,16 @@ public class BlockGrindstone extends BlockTransparentMeta implements Faceable {
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+
+    @Override
+    public int getToolType() {
+        return ItemTool.TYPE_PICKAXE;
+    }
+
+    @Override
+    public int getToolTier() {
+        return ItemTool.TIER_WOODEN;
     }
 
     @Override
@@ -76,7 +90,7 @@ public class BlockGrindstone extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (block.getId() != AIR && block.canBeReplaced()) {
             face = BlockFace.UP;
         }
@@ -100,6 +114,17 @@ public class BlockGrindstone extends BlockTransparentMeta implements Faceable {
         }
 
         return super.place(item, block, target, face, fx, fy, fz, player);
+    }
+
+    @Override
+    public int onUpdate(int type) {
+        if (type == Level.BLOCK_UPDATE_NORMAL) {
+            if (!checkSupport()) {
+                this.level.useBreakOn(this, Item.get(Item.DIAMOND_PICKAXE));
+            }
+            return type;
+        }
+        return 0;
     }
 
     public int getAttachmentType() {
@@ -132,5 +157,25 @@ public class BlockGrindstone extends BlockTransparentMeta implements Faceable {
         }
 
         return false;
+    }
+
+    @Override
+    public boolean canBeActivated() {
+        return true;
+    }
+
+    @Override
+    public boolean onActivate(Item item, Player player) {
+        if (player == null) {
+            return false;
+        }
+        if (player.isSneaking()) {
+            Item itemInHand = player.getInventory().getItemInHand();
+            if (!itemInHand.isNull() && !itemInHand.isTool()) {
+                return false;
+            }
+        }
+        player.addWindow(new GrindstoneInventory(player.getUIInventory(), this), Player.GRINDSTONE_WINDOW_ID);
+        return true;
     }
 }

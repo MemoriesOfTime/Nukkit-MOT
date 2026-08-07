@@ -23,6 +23,7 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -42,6 +43,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
     protected CompoundTag levelData;
 
     private Vector3 spawn;
+    private Long cachedSeed;
 
     protected final AtomicReference<BaseRegionLoader> lastRegion = new AtomicReference<>();
 
@@ -93,7 +95,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
         }
 
         if (!this.levelData.contains("generatorName")) {
-            this.levelData.putString("generatorName", Generator.getGenerator("DEFAULT").getSimpleName().toLowerCase());
+            this.levelData.putString("generatorName", Generator.getGenerator("DEFAULT").getSimpleName().toLowerCase(Locale.ROOT));
         }
 
         if (!this.levelData.contains("generatorOptions")) {
@@ -144,6 +146,13 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     public void putChunk(long index, BaseFullChunk chunk) {
         chunks.put(index, chunk);
+    }
+
+    @Override
+    public BaseFullChunk putChunkIfAbsent(int chunkX, int chunkZ, BaseFullChunk chunk) {
+        chunk.setProvider(this);
+        chunk.setPosition(chunkX, chunkZ);
+        return this.chunks.putIfAbsent(Level.chunkHash(chunkX, chunkZ), chunk);
     }
 
     @Override
@@ -247,11 +256,15 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public long getSeed() {
-        return this.levelData.getLong("RandomSeed");
+        if (this.cachedSeed == null) {
+            this.cachedSeed = this.levelData.getLong("RandomSeed");
+        }
+        return this.cachedSeed;
     }
 
     @Override
     public void setSeed(long value) {
+        this.cachedSeed = null;
         this.levelData.putLong("RandomSeed", value);
     }
 
@@ -284,7 +297,9 @@ public abstract class BaseLevelProvider implements LevelProvider {
     }
 
     @Override
-    public void doGarbageCollection() {
+    public synchronized void doGarbageCollection() {
+        // synchronized 于 provider:防止关闭正在被异步区块读取(readChunkOffThread)使用的 region 文件
+        // synchronized on the provider: prevents closing a region file currently used by an off-thread chunk read
         int limit = (int) (System.currentTimeMillis() - 50);
         synchronized (regions) {
             if (regions.isEmpty()) {
@@ -312,8 +327,8 @@ public abstract class BaseLevelProvider implements LevelProvider {
     public void saveChunks() {
         for (BaseFullChunk chunk : this.chunks.values()) {
             if (chunk.getChanges() != 0) {
-                chunk.setChanged(false);
                 this.saveChunk(chunk.getX(), chunk.getZ());
+                chunk.setChanged(false);
             }
         }
     }

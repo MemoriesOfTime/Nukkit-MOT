@@ -123,6 +123,10 @@ public enum TextFormat {
      */
     MATERIAL_RESIN('v', 0x27),
     /**
+     * Represents party blue.
+     */
+    PARTY_BLUE('w', 0x28),
+    /**
      * Makes the text obfuscated.
      */
     OBFUSCATED('k', 0x10, true),
@@ -157,7 +161,7 @@ public enum TextFormat {
      */
     public static final char ESCAPE = '\u00A7';
 
-    private static final Pattern CLEAN_PATTERN = Pattern.compile("(?i)" + ESCAPE + "[0-9A-V]");
+    private static final Pattern CLEAN_PATTERN = Pattern.compile("(?i)" + ESCAPE + "[0-9A-W]");
     private final static Map<Integer, TextFormat> BY_ID = Maps.newTreeMap();
     private final static Map<Character, TextFormat> BY_CHAR = new HashMap<>();
 
@@ -254,7 +258,7 @@ public enum TextFormat {
         char[] b = textToTranslate.toCharArray();
         for (int i = 0; i < b.length - 1; i++) {
             int x = i + 1;
-            if (b[i] == altFormatChar && "0123456789AaBbCcDdEeFfGgKkLlMmNnOoRr".indexOf(b[x]) > -1) {
+            if (b[i] == altFormatChar && "0123456789AaBbCcDdEeFfGgHhIiJjKkLlMmNnPpQqOoRrSsTtUuVv".indexOf(b[x]) > -1) {
                 b[i] = TextFormat.ESCAPE;
                 b[x] = Character.toLowerCase(b[x]);
             }

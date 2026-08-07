@@ -3,7 +3,6 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import cn.nukkit.resourcepacks.ResourcePack;
-import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
 
@@ -30,26 +29,25 @@ public class ResourcePackStackPacket extends DataPacket {
      */
     public boolean hasEditorPacks;
 
-    /**
-     * 兼容NK插件，MOT不使用这个字段
-     */
-    @Deprecated
-    public String gameVersion = Utils.getVersionByProtocol(ProtocolInfo.CURRENT_PROTOCOL);
+    public String gameVersion = "*";
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
     public void encode() {
         this.reset();
         this.putBoolean(this.mustAccept);
-        this.putUnsignedVarInt(this.behaviourPackStack.length);
-        for (ResourcePack entry : this.behaviourPackStack) {
-            this.putString(entry.getPackId().toString());
-            this.putString(entry.getPackVersion());
-            if (this.protocol >= 313) {
-                this.putString("");
+        if (this.protocol < ProtocolInfo.v1_21_130_28) {
+            this.putUnsignedVarInt(this.behaviourPackStack.length);
+            for (ResourcePack entry : this.behaviourPackStack) {
+                this.putString(entry.getPackId().toString());
+                this.putString(entry.getPackVersion());
+                if (this.protocol >= 313) {
+                    this.putString("");
+                }
             }
         }
         this.putUnsignedVarInt(this.resourcePackStack.length);
@@ -65,7 +63,7 @@ public class ResourcePackStackPacket extends DataPacket {
                 this.putBoolean(isExperimental);
             }
             if (protocol >= 388) {
-                this.putString(Utils.getVersionByProtocol(protocol));
+                this.putString(this.gameVersion);
             }
             if (protocol >= ProtocolInfo.v1_16_100) {
                 this.putLInt(this.experiments.size());

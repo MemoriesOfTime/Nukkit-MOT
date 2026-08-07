@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.anvil;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
@@ -10,7 +11,7 @@ import cn.nukkit.level.generator.Generator;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.ChunkException;
-import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -93,12 +94,21 @@ public class Anvil extends BaseLevelProvider {
     }
 
     @Override
+    public String getGenerator() {
+        String generator = super.getGenerator();
+        if ("normal".equalsIgnoreCase(generator)) { // anvil 不支持384世界高度，强制使用旧的生成器
+            generator = "oldnormal";
+        }
+        return generator;
+    }
+
+    @Override
     public Chunk getEmptyChunk(int chunkX, int chunkZ) {
         return Chunk.getEmptyChunk(chunkX, chunkZ, this);
     }
 
     @Override
-    public void requestChunkTask(IntSet protocols, int x, int z) throws ChunkException {
+    public void requestChunkTask(ObjectSet<GameVersion> protocols, int x, int z) throws ChunkException {
         Chunk chunk = (Chunk) this.getChunk(x, z, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
@@ -110,7 +120,7 @@ public class Anvil extends BaseLevelProvider {
             final Chunk chunkClone = chunk.cloneForChunkSending();
             this.level.getAsyncChuckExecutor().execute(() -> {
                 NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
-                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                             timestamp,
                             x,
                             z,
@@ -121,7 +131,7 @@ public class Anvil extends BaseLevelProvider {
             });
         }else {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                         timestamp,
                         x,
                         z,
@@ -182,6 +192,25 @@ public class Anvil extends BaseLevelProvider {
             putChunk(index, chunk);
         }
         return chunk;
+    }
+
+    @Override
+    public boolean isOffThreadChunkReadSupported() {
+        return this.level != null;
+    }
+
+    @Override
+    public synchronized BaseFullChunk readChunkOffThread(int chunkX, int chunkZ) {
+        // synchronized 于 provider:region 共享 RandomAccessFile(seek+read 非原子),须与主线程 loadChunk/saveChunk/GC 串行
+        // synchronized on the provider: regions share a RandomAccessFile (seek+read is not atomic), so reads must serialize with main-thread loadChunk/saveChunk/GC
+        int regionX = getRegionIndexX(chunkX);
+        int regionZ = getRegionIndexZ(chunkZ);
+        BaseRegionLoader region = this.loadRegion(regionX, regionZ);
+        try {
+            return region.readChunk(chunkX - (regionX << 5), chunkZ - (regionZ << 5));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

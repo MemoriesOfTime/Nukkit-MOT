@@ -19,11 +19,11 @@ public class RefreshEntitlementsPacket extends DataPacket {
 
     @Override
     public void decode() {
-        //TODO
+        this.decodeUnsupported();
     }
 
     @Override
     public void encode() {
-        //TODO
+        this.encodeUnsupported();
     }
 }

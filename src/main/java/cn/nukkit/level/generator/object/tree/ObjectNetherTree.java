@@ -22,7 +22,7 @@ public abstract class ObjectNetherTree extends ObjectTree {
 
     @Override
     public void placeObject(final ChunkManager level, final int x, final int y, final int z, final NukkitRandom random) {
-        if (checkY(level, y)) {
+        if (checkY(level, y + treeHeight)) {
             return;
         }
 

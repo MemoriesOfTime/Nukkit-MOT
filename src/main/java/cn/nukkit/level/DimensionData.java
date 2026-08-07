@@ -17,11 +17,7 @@ public class DimensionData {
         this.minHeight = minHeight;
         this.maxHeight = maxHeight;
 
-        int height = maxHeight - minHeight;
-        if (minHeight <= 0 && maxHeight > 0) {
-            height += 1; // 0 y coordinate counts too
-        }
-        this.height = height;
+        this.height = maxHeight - minHeight + 1;
     }
 
     public int getSectionOffset() {

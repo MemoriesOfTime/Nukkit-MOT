@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
+import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockFrogSpawn extends BlockFlowable {
     public BlockFrogSpawn() {
@@ -23,7 +26,7 @@ public class BlockFrogSpawn extends BlockFlowable {
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[0];
+        return Item.EMPTY_ARRAY;
     }
 
     @Override
@@ -31,12 +34,21 @@ public class BlockFrogSpawn extends BlockFlowable {
         return 1;
     }
 
-    /*@Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        if (!(block instanceof BlockWater) || !(block.up() instanceof BlockAir)) {
-            return false;
+    @Override
+    public boolean canBeFlowedInto() {
+        return false;
+    }
+
+    @Override
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
+        if (target instanceof BlockWater) {
+            Block up = target.up();
+            if (up.getId() == Block.AIR) {
+                this.getLevel().setBlock(up, this, true, true);
+                return true;
+            }
         }
-        System.out.println(block.getClass().getName() + " " + block.up().getClass().getName());
-        return this.getLevel().setBlock(this, this, true, true);
-    }*/
+
+        return false;
+    }
 }

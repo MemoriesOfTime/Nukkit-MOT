@@ -1,0 +1,137 @@
+package cn.nukkit.inventory.transaction;
+
+import cn.nukkit.Player;
+import cn.nukkit.event.inventory.GrindItemEvent;
+import cn.nukkit.inventory.GrindstoneInventory;
+import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.transaction.action.GrindstoneItemAction;
+import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
+import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.types.NetworkInventoryAction;
+import lombok.Getter;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class GrindstoneTransaction extends InventoryTransaction {
+
+    @Getter
+    private Item equipmentItem;
+    @Getter
+    private Item ingredientItem;
+    @Getter
+    private Item outputItem;
+    @Getter
+    private int experienceDropped;
+    private final List<Item> outputItemCheck = new ArrayList<>();
+
+    public GrindstoneTransaction(Player source, List<InventoryAction> actions) {
+        super(source, actions);
+
+        for (InventoryAction action : actions) {
+            if (action instanceof SlotChangeAction slotChangeAction) {
+                if (!(slotChangeAction.getInventory() instanceof GrindstoneInventory)) {
+                    this.outputItemCheck.add(slotChangeAction.getTargetItemUnsafe());
+                }
+            }
+        }
+    }
+
+    @Override
+    public void addAction(InventoryAction action) {
+        super.addAction(action);
+        if (action instanceof GrindstoneItemAction) {
+            switch (((GrindstoneItemAction) action).getType()) {
+                case NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT:
+                    this.equipmentItem = action.getTargetItem();
+                    break;
+                case NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL:
+                    this.ingredientItem = action.getTargetItem();
+                    break;
+                case NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT:
+                    this.outputItem = action.getSourceItem();
+                    break;
+            }
+        }
+    }
+
+    @Override
+    public boolean canExecute() {
+        if (!super.canExecute()) {
+            return false;
+        }
+
+        Inventory inventory = getSource().getWindowById(Player.GRINDSTONE_WINDOW_ID);
+        if (!(inventory instanceof GrindstoneInventory grindstoneInventory)) {
+            return false;
+        }
+
+        if (this.outputItem == null || this.outputItem.isNull()) {
+            return false;
+        }
+
+        // equipment 或 ingredient 至少有一个非空
+        boolean hasEquipment = this.equipmentItem != null && !this.equipmentItem.isNull();
+        boolean hasIngredient = this.ingredientItem != null && !this.ingredientItem.isNull();
+        if (!hasEquipment && !hasIngredient) {
+            return false;
+        }
+
+        for (Item check : this.outputItemCheck) {
+            if (check != null && !this.outputItem.equals(check)) {
+                source.getServer().getLogger().debug("Illegal output");
+                return false;
+            }
+        }
+
+        Item equipmentOptional = hasEquipment ? equipmentItem : Item.get(Item.AIR);
+        Item ingredientOptional = hasIngredient ? ingredientItem : Item.get(Item.AIR);
+
+        return equipmentOptional.equals(grindstoneInventory.getEquipment(), true, true)
+                && ingredientOptional.equals(grindstoneInventory.getIngredient(), true, true)
+                && outputItem.equals(grindstoneInventory.getResult(), true, true);
+    }
+
+    @Override
+    public boolean execute() {
+        if (this.invalid || this.hasExecuted() || !this.canExecute()) {
+            this.source.removeAllWindows(false);
+            this.sendInventories();
+            return false;
+        }
+
+        GrindstoneInventory inventory = (GrindstoneInventory) getSource().getWindowById(Player.GRINDSTONE_WINDOW_ID);
+        int experience = inventory.calculateExperience();
+        GrindItemEvent event = new GrindItemEvent(inventory, this.equipmentItem, this.outputItem, this.ingredientItem, experience, this.source);
+        this.source.getServer().getPluginManager().callEvent(event);
+        if (event.isCancelled()) {
+            this.sendInventories();
+            source.setNeedSendInventory(true);
+            return true;
+        }
+
+        for (InventoryAction action : this.actions) {
+            if (action.execute(this.source)) {
+                action.onExecuteSuccess(this.source);
+            } else {
+                action.onExecuteFail(this.source);
+            }
+        }
+
+        this.experienceDropped = event.getExperienceDropped();
+        return true;
+    }
+
+    public static boolean isIn(List<InventoryAction> actions) {
+        for (InventoryAction action : actions) {
+            if (action instanceof GrindstoneItemAction) return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean checkForItemPart(List<InventoryAction> actions) {
+        return isIn(actions);
+    }
+}

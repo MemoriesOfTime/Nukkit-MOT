@@ -13,13 +13,14 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 
 /**
  * Created by PetteriM1
  */
-public class BlockShulkerBox extends BlockTransparentMeta {
+public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntityHolder<BlockEntityShulkerBox> {
 
     public BlockShulkerBox() {
         this(0);
@@ -42,6 +43,18 @@ public class BlockShulkerBox extends BlockTransparentMeta {
     @Override
     public String getName() {
         return this.getDyeColor().getName() + " Shulker Box";
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityShulkerBox> getBlockEntityClass() {
+        return BlockEntityShulkerBox.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.SHULKER_BOX;
     }
 
     @Override
@@ -112,7 +125,7 @@ public class BlockShulkerBox extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.getLevel().setBlock(block, this, true, true);
         CompoundTag nbt = BlockEntity.getDefaultCompound(this, BlockEntity.SHULKER_BOX)
                 .putByte("facing", face.getIndex());
@@ -189,5 +202,10 @@ public class BlockShulkerBox extends BlockTransparentMeta {
             return new Item[]{this.toItem()};
         }
         return super.getDrops(player, item);
+    }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
     }
 }

@@ -1,5 +1,6 @@
 package cn.nukkit.level.format;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
@@ -38,11 +39,21 @@ public interface FullChunk extends Cloneable {
     
     int getFullBlock(int x, int y, int z, int layer);
 
+    @Deprecated
     default int getBlockRuntimeId(int protocolId, int x, int y, int z) {
         return this.getBlockRuntimeId(protocolId, x, y, z, 0);
     }
 
+    @Deprecated
     default int getBlockRuntimeId(int protocolId, int x, int y, int z, int layer) {
+        return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getBlockId(x, y, z, layer), this.getBlockData(x, y, z, layer));
+    }
+
+    default int getBlockRuntimeId(GameVersion protocolId, int x, int y, int z) {
+        return this.getBlockRuntimeId(protocolId, x, y, z, 0);
+    }
+
+    default int getBlockRuntimeId(GameVersion protocolId, int x, int y, int z, int layer) {
         return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getBlockId(x, y, z, layer), this.getBlockData(x, y, z, layer));
     }
 
@@ -116,6 +127,8 @@ public interface FullChunk extends Cloneable {
     int recalculateHeightMapColumn(int chunkX, int chunkZ);
 
     void populateSkyLight();
+
+    void populateBlockLight();
 
     default public boolean has3dBiomes() {
         return false;
@@ -214,7 +227,7 @@ public interface FullChunk extends Cloneable {
 
     int[] getBiomeColorArray();
 
-    byte[] getHeightMapArray();
+    short[] getHeightMapArray();
 
     byte[] getBlockIdArray(int layer);
 

@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.common.base.Preconditions;
 import org.jetbrains.annotations.NotNull;
@@ -26,7 +27,7 @@ public class StringItemToolBase extends ItemTool implements ItemDurable, StringI
     }
 
     @Override
-    public String getNamespaceId(int protocolId) {
+    public String getNamespaceId(GameVersion protocolId) {
         return this.getNamespaceId();
     }
 
@@ -41,7 +42,7 @@ public class StringItemToolBase extends ItemTool implements ItemDurable, StringI
     }
 
     @Override
-    public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_16_100;
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_16_100;
     }
 }

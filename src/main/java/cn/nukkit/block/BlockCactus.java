@@ -13,6 +13,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Nukkit Project Team
@@ -68,13 +69,33 @@ public class BlockCactus extends BlockTransparentMeta {
     }
 
     @Override
-    protected AxisAlignedBB recalculateBoundingBox() {
-        return new SimpleAxisAlignedBB(this.x + 0.0625, this.y + 0.0625, this.z + 0.0625, this.x + 0.9375, this.y + 0.9375, this.z + 0.9375);
+    public double getMinX() {
+        return this.x + 0.0625;
+    }
+
+    @Override
+    public double getMinZ() {
+        return this.z + 0.0625;
+    }
+
+    @Override
+    public double getMaxX() {
+        return this.x + 0.9375;
+    }
+
+    @Override
+    public double getMaxZ() {
+        return this.z + 0.9375;
     }
 
     @Override
     protected AxisAlignedBB recalculateCollisionBoundingBox() {
-        return new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x + 1, this.y + 1, this.z + 1);
+        return new SimpleAxisAlignedBB(x, y, z, x + 1, y + 1, z + 1);
+    }
+
+    @Override
+    public double getMaxY() {
+        return this.y + 0.9375;
     }
 
     @Override
@@ -121,7 +142,7 @@ public class BlockCactus extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
         if (down.getId() == SAND || down.getId() == CACTUS) {
             Block block0 = north();

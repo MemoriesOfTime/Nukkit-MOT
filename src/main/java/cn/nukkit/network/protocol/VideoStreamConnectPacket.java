@@ -14,6 +14,9 @@ public class VideoStreamConnectPacket extends DataPacket {
     public float screenshotFrequency;
     public byte action;
 
+    public int width;
+    public int height;
+
     @Override
     public byte pid() {
         return NETWORK_ID;
@@ -21,6 +24,7 @@ public class VideoStreamConnectPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -29,5 +33,9 @@ public class VideoStreamConnectPacket extends DataPacket {
         this.putString(address);
         this.putLFloat(screenshotFrequency);
         this.putByte(action);
+        if (protocol >= ProtocolInfo.v1_12_0) {
+            this.putLInt(width);
+            this.putLInt(height);
+        }
     }
 }

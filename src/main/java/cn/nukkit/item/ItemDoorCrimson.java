@@ -1,7 +1,9 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemDoorCrimson extends Item {
 
@@ -18,4 +20,8 @@ public class ItemDoorCrimson extends Item {
         this.block = Block.get(BlockID.CRIMSON_DOOR_BLOCK);
     }
 
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_16_0;
+    }
 }

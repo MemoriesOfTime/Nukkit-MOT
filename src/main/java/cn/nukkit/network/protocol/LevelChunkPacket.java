@@ -53,6 +53,7 @@ public class LevelChunkPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -83,7 +84,23 @@ public class LevelChunkPacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_20_60) {
             this.putVarInt(this.dimension);
         }
-        if (protocol >= ProtocolInfo.v1_12_0) {
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putUnsignedVarInt(this.subChunkCount);
+            // subChunkLimit is optional<boolean, VarInt>; present when requestSubChunks is true
+            if (this.requestSubChunks) {
+                this.putBoolean(true);
+                this.putVarInt(this.subChunkLimit);
+            } else {
+                this.putBoolean(false);
+            }
+            this.putBoolean(this.cacheEnabled);
+            this.putUnsignedVarInt(this.blobIds == null ? 0 : this.blobIds.length);
+            if (this.blobIds != null) {
+                for (long blobId : this.blobIds) {
+                    this.putLLong(blobId);
+                }
+            }
+        } else if (protocol >= ProtocolInfo.v1_12_0) {
             if (protocol >= ProtocolInfo.v1_18_0) {
                 if (!this.requestSubChunks) {
                     this.putUnsignedVarInt(this.subChunkCount);
@@ -91,7 +108,7 @@ public class LevelChunkPacket extends DataPacket {
                     this.putUnsignedVarInt(-1);
                 } else {
                     this.putUnsignedVarInt(-2);
-                    this.putUnsignedVarInt(this.subChunkLimit);
+                    this.putLShort(this.subChunkLimit);
                 }
             }else {
                 this.putUnsignedVarInt(this.subChunkCount);

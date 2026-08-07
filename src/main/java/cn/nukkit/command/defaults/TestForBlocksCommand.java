@@ -45,7 +45,7 @@ public class TestForBlocksCommand extends VanillaCommand {
 
         if (list.hasResult(3)) {
             String str = list.getResult(3);
-            mode = TestForBlocksMode.valueOf(str.toUpperCase(Locale.ENGLISH));
+            mode = TestForBlocksMode.valueOf(str.toUpperCase(Locale.ROOT));
         }
 
         AxisAlignedBB blocksAABB = new SimpleAxisAlignedBB(Math.min(begin.getX(), end.getX()), Math.min(begin.getY(), end.getY()), Math.min(begin.getZ(), end.getZ()), Math.max(begin.getX(), end.getX()), Math.max(begin.getY(), end.getY()), Math.max(begin.getZ(), end.getZ()));

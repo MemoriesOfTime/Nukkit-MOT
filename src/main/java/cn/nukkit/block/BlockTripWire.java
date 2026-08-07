@@ -8,6 +8,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author CreeperFace
@@ -82,7 +83,7 @@ public class BlockTripWire extends BlockFlowable {
 
         if (!powered) {
             this.setPowered(true);
-            this.level.setBlock(this, this, true, false);
+            this.level.setBlock(this, this, true, true);
             this.updateHook(false);
 
             this.level.scheduleUpdate(this, 10);
@@ -135,7 +136,7 @@ public class BlockTripWire extends BlockFlowable {
                 this.level.scheduleUpdate(this, 10);
             } else {
                 this.setPowered(false);
-                this.level.setBlock(this, this, true, false);
+                this.level.setBlock(this, this, true, true);
                 this.updateHook(false);
             }
             return type;
@@ -145,7 +146,7 @@ public class BlockTripWire extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.getLevel().setBlock(this, this, true, true);
         this.updateHook(false);
 
@@ -156,7 +157,7 @@ public class BlockTripWire extends BlockFlowable {
     public boolean onBreak(Item item) {
         if (item.getId() == Item.SHEARS) {
             this.setDisarmed(true);
-            this.level.setBlock(this, this, true, false);
+            this.level.setBlock(this, this, true, true);
             this.updateHook(false);
             this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
         } else {

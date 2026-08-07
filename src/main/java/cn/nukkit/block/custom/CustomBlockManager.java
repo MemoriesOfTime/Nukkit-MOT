@@ -1,8 +1,10 @@
 package cn.nukkit.block.custom;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockUnknown;
 import cn.nukkit.block.custom.comparator.AlphabetPaletteComparator;
 import cn.nukkit.block.custom.comparator.HashedPaletteComparator;
 import cn.nukkit.block.custom.container.BlockContainer;
@@ -12,6 +14,8 @@ import cn.nukkit.block.custom.properties.BlockProperties;
 import cn.nukkit.block.custom.properties.BlockProperty;
 import cn.nukkit.block.custom.properties.EnumBlockProperty;
 import cn.nukkit.block.custom.properties.exception.InvalidBlockPropertyMetaException;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.RuntimeItemMapping;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.BlockPalette;
@@ -22,25 +26,23 @@ import cn.nukkit.level.format.leveldb.NukkitLegacyMapper;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.utils.Utils;
+import cn.nukkit.utils.VanillaPaletteDownloader;
+import com.google.gson.*;
 import it.unimi.dsi.fastutil.ints.*;
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.*;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.nbt.*;
+import org.jetbrains.annotations.Nullable;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 @Log4j2
@@ -48,6 +50,7 @@ public class CustomBlockManager {
 
     public static final Path BIN_PATH = Paths.get("bin/");
     public static final int LOWEST_CUSTOM_BLOCK_ID = 10000;
+    private static final String ID_MAPPING_FILE = "custom_block_ids.json";
 
     private static CustomBlockManager instance;
 
@@ -65,7 +68,15 @@ public class CustomBlockManager {
     private final Server server;
 
     private final Int2ObjectMap<CustomBlockDefinition> blockDefinitions = new Int2ObjectOpenHashMap<>();
-    private final Int2ObjectMap<CustomBlockState> legacy2CustomState = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<CustomBlockState> legacy2CustomState = new Int2ObjectRBTreeMap<>();
+    private final AtomicInteger nextBlockId = new AtomicInteger(LOWEST_CUSTOM_BLOCK_ID);
+    private final Map<String, Integer> identifier2Id = new ConcurrentHashMap<>();
+
+    private final Int2BooleanOpenHashMap customBlockTransparent = new Int2BooleanOpenHashMap();
+    private final Int2BooleanOpenHashMap customBlockSolid = new Int2BooleanOpenHashMap();
+    private final Int2BooleanOpenHashMap customBlockDiffusesSkyLight = new Int2BooleanOpenHashMap();
+    private final Int2IntOpenHashMap customBlockLight = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap customBlockLightFilter = new Int2IntOpenHashMap();
 
     private volatile boolean closed = false;
 
@@ -80,17 +91,146 @@ public class CustomBlockManager {
                 throw new IllegalStateException("Failed to create BIN_DIRECTORY", e);
             }
         }
+
+        if (this.server.getServerConfig().customBlockSettings().autoDownloadVanillaPalette()) {
+            VanillaPaletteDownloader.downloadMissing(filesPath);
+        }
+
+        this.loadIdMapping();
     }
 
+    /**
+     * @deprecated 请使用 {@link #registerCustomBlock(String, Supplier)} 代替，ID将自动分配
+     * Use {@link #registerCustomBlock(String, Supplier)} instead, ID will be allocated automatically
+     */
+    @Deprecated
     public void registerCustomBlock(String identifier, int nukkitId, Supplier<BlockContainer> factory) {
-        this.registerCustomBlock(identifier, nukkitId, CustomBlockDefinition.builder(factory.get()).build(), factory);
+        this.registerCustomBlockInternal(identifier, nukkitId, null, CustomBlockDefinition.builder(factory.get()).build(), meta -> {
+            BlockContainer blockContainer = factory.get();
+            if (blockContainer instanceof BlockStorageContainer storageContainer) {
+                storageContainer.setStorage(meta);
+            }
+            return blockContainer;
+        });
     }
 
+    /**
+     * @deprecated 请使用 {@link #registerCustomBlock(String, CustomBlockDefinition, Supplier)} 代替，ID将自动分配
+     * Use {@link #registerCustomBlock(String, CustomBlockDefinition, Supplier)} instead, ID will be allocated automatically
+     */
+    @Deprecated
     public void registerCustomBlock(String identifier, int nukkitId, CustomBlockDefinition blockDefinition, Supplier<BlockContainer> factory) {
-        this.registerCustomBlock(identifier, nukkitId, null, blockDefinition, meta -> factory.get());
+        this.registerCustomBlockInternal(identifier, nukkitId, null, blockDefinition, meta -> {
+            BlockContainer blockContainer = factory.get();
+            if (blockContainer instanceof BlockStorageContainer storageContainer) {
+                storageContainer.setStorage(meta);
+            }
+            return blockContainer;
+        });
     }
 
+    /**
+     * 注册自定义方块（自动分配ID）
+     * Register a custom block with automatic ID allocation
+     *
+     * @param identifier 方块标识符 / block identifier (e.g., "mymod:custom_block")
+     * @param factory 方块工厂 / block factory
+     * @return 分配的方块ID / allocated block ID
+     */
+    public int registerCustomBlock(String identifier, Supplier<BlockContainer> factory) {
+        int id = this.getOrAllocateId(identifier);
+        CustomBlockDefinition blockDefinition = CustomBlockDefinition.builder(factory.get()).build();
+        this.registerCustomBlockInternal(identifier, id, null, blockDefinition, meta -> {
+            BlockContainer blockContainer = factory.get();
+            if (blockContainer instanceof BlockStorageContainer storageContainer) {
+                storageContainer.setStorage(meta);
+            }
+            return blockContainer;
+        });
+        return id;
+    }
+
+    /**
+     * 注册自定义方块（自动分配ID，带定义）
+     * Register a custom block with automatic ID allocation and block definition
+     *
+     * @param identifier 方块标识符 / block identifier (e.g., "mymod:custom_block")
+     * @param blockDefinition 方块定义 / block definition
+     * @param factory 方块工厂 / block factory
+     * @return 分配的方块ID / allocated block ID
+     */
+    public int registerCustomBlock(String identifier, CustomBlockDefinition blockDefinition, Supplier<BlockContainer> factory) {
+        int id = this.getOrAllocateId(identifier);
+        this.registerCustomBlockInternal(identifier, id, null, blockDefinition, meta -> {
+            BlockContainer blockContainer = factory.get();
+            if (blockContainer instanceof BlockStorageContainer storageContainer) {
+                storageContainer.setStorage(meta);
+            }
+            return blockContainer;
+        });
+        return id;
+    }
+
+    /**
+     * 注册自定义方块（自动分配ID，带属性和定义）
+     * Register a custom block with automatic ID allocation, properties and block definition
+     *
+     * @param identifier 方块标识符 / block identifier (e.g., "mymod:custom_block")
+     * @param properties 方块属性 / block properties
+     * @param blockDefinition 方块定义 / block definition
+     * @param factory 方块工厂 / block factory
+     * @return 分配的方块ID / allocated block ID
+     */
+    public int registerCustomBlock(String identifier, BlockProperties properties, CustomBlockDefinition blockDefinition, BlockContainerFactory factory) {
+        int id = this.getOrAllocateId(identifier);
+        this.registerCustomBlockInternal(identifier, id, properties, blockDefinition, factory);
+        return id;
+    }
+
+    private static void variantGenerations(BlockProperties properties, String[] states, List<Map<String, Serializable>> variants, Map<String, Serializable> temp, int offset) {
+        if (states.length - offset >= 0) {
+            final String currentState = states[states.length - offset];
+
+            properties.getBlockProperty(currentState).forEach((value) -> {
+                temp.put(currentState, value);
+                if(!variants.contains(temp))
+                    variants.add(new HashMap<>(temp));
+                variantGenerations(properties, states, variants, temp, offset + 1);
+            });
+
+            temp.put(currentState, 0);//def value
+        }
+    }
+
+    private static List<Map<String, Serializable>> variantGenerations(BlockProperties properties, String[] states) {
+        final Map<String, Serializable> temp = new HashMap<>();
+        for(String state : states) {
+            temp.put(state, 0);//def value
+        }
+
+        final List<Map<String, Serializable>> variants = new ArrayList<>();
+        if(states.length == 0) {
+            variants.add(temp);
+        }
+
+        variantGenerations(properties, states, variants, temp, 1);
+        return variants;
+    }
+
+    /**
+     * @deprecated 请使用 {@link #registerCustomBlock(String, BlockProperties, CustomBlockDefinition, BlockContainerFactory)} 代替，ID将自动分配
+     * Use {@link #registerCustomBlock(String, BlockProperties, CustomBlockDefinition, BlockContainerFactory)} instead, ID will be allocated automatically
+     */
+    @Deprecated
     public void registerCustomBlock(String identifier, int nukkitId, BlockProperties properties, CustomBlockDefinition blockDefinition, BlockContainerFactory factory) {
+        this.registerCustomBlockInternal(identifier, nukkitId, properties, blockDefinition, factory);
+    }
+
+    /**
+     * 内部注册方法，包含实际的注册逻辑
+     * Internal registration method containing actual registration logic
+     */
+    private void registerCustomBlockInternal(String identifier, int nukkitId, BlockProperties properties, CustomBlockDefinition blockDefinition, BlockContainerFactory factory) {
         if (this.closed) {
             throw new IllegalStateException("Block registry was already closed");
         }
@@ -105,6 +245,10 @@ public class CustomBlockManager {
             log.warn("Custom block {} was registered using wrong method! Trying to use sample properties!", identifier);
         }
 
+        if (blockSample instanceof Block block) {
+            cacheBlockAttributes(nukkitId, block);
+        }
+
         if (properties != null && blockDefinition == null) {
             throw new IllegalArgumentException("Block network data can not be empty for block with more permutations: " + identifier);
         }
@@ -116,21 +260,41 @@ public class CustomBlockManager {
         this.blockDefinitions.put(defaultState.getLegacyId(), blockDefinition);
 
         int itemId = 255 - nukkitId;
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
-            mapping.registerItem(identifier, nukkitId, itemId, 0);
-        }
+
+        RuntimeItems.registerCustomBlockLegacyId(identifier, itemId);
 
         if (properties != null) {
-            for (int meta = 1; meta < properties.getBitSize(); meta++) {
-                CustomBlockState state;
-                try {
-                    state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | meta, properties, factory);
-                } catch (InvalidBlockPropertyMetaException e) {
-                    log.error(e);
-                    break; // Nukkit has more states than our block
-                }
-                this.legacy2CustomState.put(state.getLegacyId(), state);
+            BlockProperties finalProperties = properties;
+            variantGenerations(properties, properties.getNames().toArray(new String[0]))
+                    .forEach(states -> {
+                        int meta = 0;
+
+                        for (String name : states.keySet()) {
+                            meta = finalProperties.setValue(meta, name, states.get(name));
+                        }
+
+                        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                            mapping.registerCustomBlockItem(identifier, itemId, meta);
+                        }
+
+                        CustomBlockState state;
+                        try {
+                            state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | (meta & Block.DATA_MASK), finalProperties, factory);
+                        } catch (InvalidBlockPropertyMetaException e) {
+                            log.error(e);
+                            return; // Nukkit has more states than our block
+                        }
+                        this.legacy2CustomState.put(state.getLegacyId(), state);
+                    });
+        } else {
+            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                mapping.registerCustomBlockItem(identifier, itemId, 0);
             }
+        }
+
+        if (blockDefinition != null && blockDefinition.shouldRegisterCreativeItem()) {
+            ItemBlock itemBlock = new ItemBlock((Block) blockSample);
+            Item.addCreativeItem(itemBlock, blockDefinition.getCreativeCategory(), blockDefinition.getCreativeGroup());
         }
     }
 
@@ -157,6 +321,39 @@ public class CustomBlockManager {
         return new CustomBlockState(identifier, legacyId, state, factory);
     }
 
+    private void cacheBlockAttributes(int blockId, Block block) {
+        customBlockTransparent.put(blockId, block.isTransparent());
+        customBlockSolid.put(blockId, block.isSolid());
+        customBlockDiffusesSkyLight.put(blockId, block.diffusesSkyLight());
+        customBlockLight.put(blockId, block.getLightLevel());
+        customBlockLightFilter.put(blockId, Block.computeCustomBlockLightFilter(block));
+    }
+
+    public boolean getCachedTransparent(int blockId) {
+        if (customBlockTransparent.containsKey(blockId)) return customBlockTransparent.get(blockId);
+        return Block.get(blockId).isTransparent();
+    }
+
+    public boolean getCachedSolid(int blockId) {
+        if (customBlockSolid.containsKey(blockId)) return customBlockSolid.get(blockId);
+        return Block.get(blockId).isSolid();
+    }
+
+    public boolean getCachedDiffusesSkyLight(int blockId) {
+        if (customBlockDiffusesSkyLight.containsKey(blockId)) return customBlockDiffusesSkyLight.get(blockId);
+        return Block.get(blockId).diffusesSkyLight();
+    }
+
+    public int getCachedLight(int blockId) {
+        if (customBlockLight.containsKey(blockId)) return customBlockLight.get(blockId);
+        return Block.get(blockId).getLightLevel();
+    }
+
+    public int getCachedLightFilter(int blockId) {
+        if (customBlockLightFilter.containsKey(blockId)) return customBlockLightFilter.get(blockId);
+        return Block.computeCustomBlockLightFilter(Block.get(blockId));
+    }
+
     public boolean closeRegistry() throws IOException {
         if (this.closed) {
             throw new IllegalStateException("Block registry was already closed");
@@ -166,37 +363,63 @@ public class CustomBlockManager {
         if (this.legacy2CustomState.isEmpty()) {
             return false;
         }
+        GlobalBlockPalette.setUseHashedBlockNetworkIds(true);
 
         long startTime = System.currentTimeMillis();
 
-        BlockPalette storagePalette = GlobalBlockPalette.getPaletteByProtocol(LevelDBConstants.PALETTE_VERSION);
+        BlockPalette storagePalette = GlobalBlockPalette.getPaletteByProtocol(GameVersion.getFeatureVersion());
         boolean result = false;
-        for (BlockPalette palette : GlobalBlockPalette.NEW_PALETTES) {
+        ObjectSet<GameVersion> completePaletteSet = new ObjectArraySet<>();
+        for (GameVersion gameVersion : GameVersion.values()) {
+            int protocol = gameVersion.getProtocol();
+            if (protocol < ProtocolInfo.v1_16_100 || protocol < this.server.minimumProtocol) {
+                continue;
+            }
+
+            BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
+            if (completePaletteSet.contains(palette.getGameVersion())) {
+                continue;
+            }
+            completePaletteSet.add(palette.getGameVersion());
+
             if (palette.getProtocol() == storagePalette.getProtocol()) {
                 this.recreateBlockPalette(palette, new ObjectArrayList<>(NukkitLegacyMapper.loadBlockPalette()));
-                result = true;
             } else {
-                Path path = this.getVanillaPalettePath(palette.getProtocol());
+                Path path = this.getVanillaPalettePath(palette.getGameVersion());
                 if (!Files.exists(path)) {
-                    log.warn("No vanilla palette found for {}.", Utils.getVersionByProtocol(palette.getProtocol()));
+                    log.warn("No vanilla palette found for {}.", palette.getGameVersion().toString());
                     continue;
                 }
                 this.recreateBlockPalette(palette);
-                result = true;
             }
+            result = true;
         }
 
+        GlobalBlockPalette.compactCaches();
+
         log.info("Custom block registry closed in {}ms", (System.currentTimeMillis() - startTime));
-        return true;
+        this.saveIdMapping();
+        return result;
     }
 
     private void recreateBlockPalette(BlockPalette palette) throws IOException {
-        List<NbtMap> vanillaPalette = new ObjectArrayList<>(this.loadVanillaPalette(palette.getProtocol()));
+        List<NbtMap> vanillaPalette = new ObjectArrayList<>(this.loadVanillaPalette(palette.getGameVersion()));
         this.recreateBlockPalette(palette, vanillaPalette);
     }
 
     private void recreateBlockPalette(BlockPalette palette, List<NbtMap> vanillaPalette) {
-        List<NbtMap> vanillaPaletteList = new ObjectArrayList<>();
+        Map<String, List<NbtMap>> vanillaPaletteList;
+        if (palette.getProtocol() >= ProtocolInfo.v1_18_30) {
+            vanillaPaletteList = new Object2ObjectRBTreeMap<>(HashedPaletteComparator.INSTANCE);
+        } else {
+            vanillaPaletteList = new Object2ObjectRBTreeMap<>(AlphabetPaletteComparator.INSTANCE);
+        }
+
+        int paletteVersion = -1;
+        String lastName = null;
+        List<NbtMap> group = new ObjectArrayList<>();
+        int runtimeId = 0;
+        Int2ObjectMap<NbtMap> runtimeId2State = new Int2ObjectOpenHashMap<>();
         for (NbtMap state : vanillaPalette) {
             //删除不属于原版的内容
             if (state.containsKey("network_id") || state.containsKey("name_hash") || state.containsKey("block_id")) {
@@ -206,64 +429,88 @@ public class CustomBlockManager {
                 builder.remove("block_id");
                 state = builder.build();
             }
-            vanillaPaletteList.add(state);
+
+            int version = state.getInt("version");
+            if (version != paletteVersion) {
+                paletteVersion = version;
+            }
+
+            String name = state.getString("name");
+            if (lastName != null && !name.equals(lastName)) {
+                vanillaPaletteList.put(lastName, group);
+                group = new ObjectArrayList<>();
+            }
+            group.add(state);
+            runtimeId2State.put(runtimeId++, state);
+            lastName = name;
+        }
+        if (lastName != null) {
+            vanillaPaletteList.put(lastName, group);
         }
 
         Object2ObjectMap<NbtMap, IntSet> state2Legacy = new Object2ObjectLinkedOpenHashMap<>();
 
-        int paletteVersion = vanillaPaletteList.get(0).getInt("version");
-
         for (Int2IntMap.Entry entry : palette.getLegacyToRuntimeIdMap().int2IntEntrySet()) {
-            int runtimeId = entry.getIntValue();
-            NbtMap state = vanillaPaletteList.get(runtimeId);
+            int rid = entry.getIntValue();
+            NbtMap state = runtimeId2State.get(rid);
             if (state == null) {
-                log.info("Unknown runtime ID {}! protocol={}", runtimeId, palette.getProtocol());
+                log.info("Unknown runtime ID {}! protocol={}", rid, palette.getProtocol());
                 continue;
             }
             IntSet legacyIds = state2Legacy.computeIfAbsent(state, s -> new IntOpenHashSet());
             legacyIds.add(entry.getIntKey());
         }
 
+        lastName = null;
+        group = new ObjectArrayList<>();
         for (CustomBlockState definition : this.legacy2CustomState.values()) {
             NbtMap state = definition.getBlockState();
             if (state.getInt("version") != paletteVersion) {
                 state = state.toBuilder().putInt("version", paletteVersion).build();
             }
             state2Legacy.computeIfAbsent(state, s -> new IntOpenHashSet()).add(legacyToFullId(definition.getLegacyId()));
-            vanillaPaletteList.add(state);
-        }
 
-        if (palette.getProtocol() >= ProtocolInfo.v1_18_30) {
-            vanillaPaletteList.sort(HashedPaletteComparator.INSTANCE);
-        } else {
-            vanillaPaletteList.sort(AlphabetPaletteComparator.INSTANCE);
+            String name = state.getString("name");
+            if (lastName != null && !name.equals(lastName)) {
+                vanillaPaletteList.put(lastName, group);
+                group = new ObjectArrayList<>();
+            }
+            group.add(state);
+            lastName = name;
+        }
+        if (lastName != null) {
+            vanillaPaletteList.put(lastName, group);
         }
 
         palette.clearStates();
-        boolean levelDb = palette.getProtocol() == GlobalBlockPalette.getPaletteByProtocol(LevelDBConstants.PALETTE_VERSION).getProtocol(); //防止小版本不相等问题
+        boolean levelDb = palette.getProtocol() == GlobalBlockPalette.getPaletteByProtocol(GameVersion.getFeatureVersion()).getProtocol(); //防止小版本不相等问题
         if (levelDb) {
             BlockStateMapping.get().clearMapping();
         }
 
-        for (int runtimeId = 0; runtimeId < vanillaPaletteList.size(); runtimeId++) {
-            NbtMap state = vanillaPaletteList.get(runtimeId);
-            if (levelDb) {
-                BlockStateMapping.get().registerState(runtimeId, state);
-            }
+        runtimeId = 0;
+        for (List<NbtMap> states : vanillaPaletteList.values()) {
+            for (NbtMap state : states) {
+                if(levelDb && !BlockStateMapping.get().containsState(state)) {
+                    BlockStateMapping.get().registerState(runtimeId, state);
+                }
 
-            IntSet legacyIds = state2Legacy.get(state);
-            if (legacyIds == null) {
-                continue;
-            }
+                IntSet legacyIds = state2Legacy.get(state);
+                if (legacyIds != null) {
+                    CompoundTag nukkitState = convertNbtMap(state);
+                    for (Integer fullId : legacyIds) {
+                        palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
+                    }
+                }
 
-            CompoundTag nukkitState = convertNbtMap(state);
-            for (Integer fullId : legacyIds) {
-                palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
+                runtimeId++;
             }
         }
+
+        palette.lock();
     }
 
-    private List<NbtMap> loadVanillaPalette(int version) throws FileNotFoundException {
+    private List<NbtMap> loadVanillaPalette(GameVersion version) throws FileNotFoundException {
         Path path = this.getVanillaPalettePath(version);
         if (!Files.exists(path)) {
             throw new FileNotFoundException("Missing vanilla palette for version " + version);
@@ -276,10 +523,11 @@ public class CustomBlockManager {
         }
     }
 
-    private Path getVanillaPalettePath(int version) {
-        return this.getBinPath().resolve("vanilla_palette_" + version + ".nbt");
+    private Path getVanillaPalettePath(GameVersion version) {
+        return this.getBinPath().resolve("vanilla_palette_" + (version.isNetEase() ? "netease_" : "") + version.getProtocol() + ".nbt");
     }
 
+    @Nullable
     public Block getBlock(int legacyId) {
         CustomBlockState state = this.legacy2CustomState.get(legacyId);
         if (state == null) {
@@ -311,7 +559,7 @@ public class CustomBlockManager {
         if (block instanceof Block) {
             return (Block) block;
         }
-        return null;
+        return new BlockUnknown(id, meta);
     }
 
     public Class<?> getClassType(int blockId) {
@@ -330,6 +578,128 @@ public class CustomBlockManager {
         return Collections.unmodifiableCollection(this.blockDefinitions.values());
     }
 
+    /**
+     * 检查是否已注册自定义方块
+     * Check if any custom blocks are registered
+     *
+     * @return 如果存在已注册的自定义方块则返回true / returns true if there are registered custom blocks
+     */
+    public boolean hasCustomBlocks() {
+        return !this.blockDefinitions.isEmpty();
+    }
+
+    /**
+     * 获取已注册方块的ID，如果未注册则分配新ID
+     * Get the ID for a registered block, or allocate a new ID if not registered
+     *
+     * @param identifier 方块标识符 / block identifier
+     * @return 方块ID / block ID
+     */
+    private int getOrAllocateId(String identifier) {
+        return this.identifier2Id.computeIfAbsent(identifier, id -> {
+            int newId;
+            do {
+                newId = this.nextBlockId.getAndIncrement();
+            } while (this.isIdOccupied(newId));
+            log.debug("Allocated block ID {} for identifier {}", newId, identifier);
+            return newId;
+        });
+    }
+
+    /**
+     * 检查ID是否已被占用
+     * Check if an ID is already occupied
+     *
+     * @param id 要检查的ID / ID to check
+     * @return 如果ID已被占用则返回true / returns true if ID is occupied
+     */
+    private boolean isIdOccupied(int id) {
+        return this.legacy2CustomState.containsKey(id << Block.DATA_BITS) ||
+               this.identifier2Id.containsValue(id);
+    }
+
+    /**
+     * 从文件加载ID映射
+     * Load ID mapping from file
+     */
+    private void loadIdMapping() {
+        Path mappingPath = this.getBinPath().resolve(ID_MAPPING_FILE);
+        if (!Files.exists(mappingPath)) {
+            return;
+        }
+
+        try (Reader reader = Files.newBufferedReader(mappingPath, StandardCharsets.UTF_8)) {
+            JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+
+            int maxId = LOWEST_CUSTOM_BLOCK_ID;
+            for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
+                int id = entry.getValue().getAsInt();
+                this.identifier2Id.put(entry.getKey(), id);
+                if (id >= maxId) {
+                    maxId = id + 1;
+                }
+            }
+            this.nextBlockId.set(maxId);
+
+            log.info("Loaded {} custom block ID mappings from {}", this.identifier2Id.size(), ID_MAPPING_FILE);
+        } catch (Exception e) {
+            log.error("Failed to load custom block ID mapping from {}", mappingPath, e);
+        }
+    }
+
+    /**
+     * 保存ID映射到文件
+     * Save ID mapping to file
+     */
+    private void saveIdMapping() {
+        if (this.identifier2Id.isEmpty()) {
+            return;
+        }
+
+        Path mappingPath = this.getBinPath().resolve(ID_MAPPING_FILE);
+
+        JsonObject json = new JsonObject();
+        for (Map.Entry<String, Integer> entry : this.identifier2Id.entrySet()) {
+            json.addProperty(entry.getKey(), entry.getValue());
+        }
+
+        try (Writer writer = Files.newBufferedWriter(mappingPath, StandardCharsets.UTF_8)) {
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            gson.toJson(json, writer);
+            log.info("Saved {} custom block ID mappings to {}", this.identifier2Id.size(), ID_MAPPING_FILE);
+        } catch (IOException e) {
+            log.error("Failed to save custom block ID mapping to {}", mappingPath, e);
+        }
+    }
+
+    /**
+     * 根据标识符获取方块ID
+     * Get block ID by identifier
+     *
+     * @param identifier 方块标识符 / block identifier
+     * @return 方块ID，如果未找到则返回-1 / block ID, or -1 if not found
+     */
+    public int getBlockId(String identifier) {
+        return this.identifier2Id.getOrDefault(identifier, -1);
+    }
+
+    /**
+     * 根据方块ID获取标识符
+     * Get identifier by block ID
+     *
+     * @param nukkitId 方块ID / block ID
+     * @return 方块标识符，如果未找到则返回null / block identifier, or null if not found
+     */
+    @Nullable
+    public String getIdentifier(int nukkitId) {
+        for (Map.Entry<String, Integer> entry : this.identifier2Id.entrySet()) {
+            if (entry.getValue() == nukkitId) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
     private static int legacyToFullId(int legacyId) {
         int blockId = legacyId >> Block.DATA_BITS;
         int meta = legacyId & Block.DATA_MASK;
@@ -339,10 +709,8 @@ public class CustomBlockManager {
     public static CompoundTag convertNbtMap(NbtMap nbt) {
         try {
             ByteArrayOutputStream stream = new ByteArrayOutputStream();
-            try (NBTOutputStream nbtOutputStream = NbtUtils.createWriter(stream)) {
+            try (stream; NBTOutputStream nbtOutputStream = NbtUtils.createWriter(stream)) {
                 nbtOutputStream.writeTag(nbt);
-            } finally {
-                stream.close();
             }
             return NBTIO.read(stream.toByteArray(), ByteOrder.BIG_ENDIAN, false);
         } catch (IOException e) {

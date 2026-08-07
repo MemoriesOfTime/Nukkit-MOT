@@ -42,12 +42,12 @@ public class BlockJukebox extends BlockSolid implements BlockEntityHolder<BlockE
 
     @Override
     public double getHardness() {
-        return 0.8;
+        return 2;
     }
 
     @Override
     public double getResistance() {
-        return 30;
+        return 6;
     }
 
     @Override
@@ -62,7 +62,7 @@ public class BlockJukebox extends BlockSolid implements BlockEntityHolder<BlockE
 
     @Override
     public Item toItem() {
-        return new ItemBlock(this, 0);
+        return new ItemBlock(Block.get(this.getId(), 0), 0);
     }
 
     @Override
@@ -75,17 +75,23 @@ public class BlockJukebox extends BlockSolid implements BlockEntityHolder<BlockE
         BlockEntityJukebox jukebox = (BlockEntityJukebox) blockEntity;
         if (jukebox.getRecordItem().getId() != 0) {
             jukebox.dropItem();
-        } else if (item instanceof ItemRecord) {
+        } else if (item instanceof ItemRecord itemRecord) {
             jukebox.setRecordItem(item);
             jukebox.play();
-            player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
+
+            if (player != null) {
+                player.sendPopupJukebox("%record.nowPlaying", new String[]{((ItemRecord) item).getDiscName()}, true);
+
+                item.count--;
+                return true;
+            }
         }
 
         return false;
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (super.place(item, block, target, face, fx, fy, fz, player)) {
             createBlockEntity();
             return true;
@@ -93,20 +99,6 @@ public class BlockJukebox extends BlockSolid implements BlockEntityHolder<BlockE
 
         return false;
     }
-
-    /*@Override // Replaced with BlockEntityJukebox#onBreak
-    public boolean onBreak(Item item) {
-        if (super.onBreak(item)) {
-            BlockEntity blockEntity = this.level.getBlockEntity(this);
-
-            if (blockEntity instanceof BlockEntityJukebox) {
-                ((BlockEntityJukebox) blockEntity).dropItem();
-            }
-            return true;
-        }
-
-        return false;
-    }*/
 
     @Override
     public BlockEntityJukebox createBlockEntity() {
@@ -123,5 +115,21 @@ public class BlockJukebox extends BlockSolid implements BlockEntityHolder<BlockE
     @Override
     public BlockColor getColor() {
         return BlockColor.DIRT_BLOCK_COLOR;
+    }
+
+    @Override
+    public boolean canBePushed() {
+        return false;
+    }
+
+    @Override
+    public boolean hasComparatorInputOverride() {
+        return true;
+    }
+
+    @Override
+    public int getComparatorInputOverride() {
+        BlockEntity blockEntity = this.getLevel().getBlockEntityIfLoaded(this);
+        return blockEntity instanceof BlockEntityJukebox ? ((BlockEntityJukebox) blockEntity).getComparatorSignal() : 0;
     }
 }

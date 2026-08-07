@@ -1,10 +1,13 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import lombok.ToString;
 
+import java.io.IOException;
+
 /**
- * @author glorydark
+ * @since v712
  */
 @ToString
 public class JigsawStructureDataPacket extends DataPacket {
@@ -30,6 +33,11 @@ public class JigsawStructureDataPacket extends DataPacket {
 
     @Override
     public void encode() {
-        this.putNbtTag(this.nbt);
+        this.reset();
+        try {
+            this.put(NBTIO.writeNetwork(this.nbt != null ? this.nbt : new CompoundTag()));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

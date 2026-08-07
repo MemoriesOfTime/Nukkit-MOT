@@ -61,6 +61,7 @@ public abstract class ItemEdible extends Item {
                 --this.count;
                 player.getInventory().setItemInHand(this);
             }
+            player.getLevel().getVibrationManager().callVibrationEvent(new cn.nukkit.level.vibration.VibrationEvent(player, player.add(0, player.getEyeHeight()), cn.nukkit.level.vibration.VibrationType.EAT));
         }
         return true;
     }
@@ -68,5 +69,14 @@ public abstract class ItemEdible extends Item {
     @Override
     public boolean canRelease() {
         return true;
+    }
+
+    @Override
+    public int getUseDuration() {
+        Food food = Food.getByRelative(this);
+        if (food != null) {
+            return food.getEatingTickSupplier() == null ? food.getEatingTick() : food.getEatingTickSupplier().getAsInt();
+        }
+        return 10;
     }
 }

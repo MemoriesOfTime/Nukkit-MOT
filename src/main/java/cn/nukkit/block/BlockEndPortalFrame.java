@@ -9,6 +9,7 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by Pub4Game on 26.12.2015.
@@ -138,7 +139,7 @@ public class BlockEndPortalFrame extends BlockTransparentMeta implements Faceabl
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(faces[player != null ? player.getDirection().getHorizontalIndex() : 0]);
         this.getLevel().setBlock(block, this, true, true);
         return true;

@@ -51,7 +51,7 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable, BlockEntity
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (Math.abs(player.x - this.x) < 2 && Math.abs(player.z - this.z) < 2) {
             double y = player.y + player.getEyeHeight();
 
@@ -117,7 +117,7 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable, BlockEntity
 
         BlockEntityBarrel barrel = (BlockEntityBarrel) blockEntity;
 
-        if (barrel.namedTag.contains("Lock") && barrel.namedTag.get("Lock") instanceof StringTag) {
+        if (barrel.namedTag.get("Lock") instanceof StringTag) {
             if (!barrel.namedTag.getString("Lock").equals(item.getCustomName())) {
                 return true;
             }

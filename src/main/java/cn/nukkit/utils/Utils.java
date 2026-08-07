@@ -1,6 +1,8 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.mob.*;
@@ -11,9 +13,13 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nullable;
@@ -27,6 +33,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * This class contains miscellaneous stuff used in other parts of the program.
@@ -55,8 +62,22 @@ public class Utils {
     public static final IntSet monstersList = new IntOpenHashSet(Arrays.asList(EntityBlaze.NETWORK_ID, EntityCaveSpider.NETWORK_ID, EntityCreeper.NETWORK_ID, EntityDrowned.NETWORK_ID, EntityElderGuardian.NETWORK_ID, EntityEnderman.NETWORK_ID, EntityEndermite.NETWORK_ID, EntityEvoker.NETWORK_ID, EntityGhast.NETWORK_ID, EntityGuardian.NETWORK_ID, EntityHoglin.NETWORK_ID, EntityHusk.NETWORK_ID, EntityPiglinBrute.NETWORK_ID, EntityPillager.NETWORK_ID, EntityRavager.NETWORK_ID, EntityShulker.NETWORK_ID, EntitySilverfish.NETWORK_ID, EntitySkeleton.NETWORK_ID, EntitySlime.NETWORK_ID, EntitySpider.NETWORK_ID, EntityStray.NETWORK_ID, EntityVex.NETWORK_ID, EntityVindicator.NETWORK_ID, EntityWitch.NETWORK_ID, EntityWither.NETWORK_ID, EntityWitherSkeleton.NETWORK_ID, EntityZoglin.NETWORK_ID, EntityZombie.NETWORK_ID, EntityZombiePigman.NETWORK_ID, EntityZombieVillager.NETWORK_ID, EntityZombieVillagerV2.NETWORK_ID));
     /**
      * List of biomes where water can freeze
+     * @deprecated Use {@link cn.nukkit.level.biome.Biome#getBiome(int)} and {@link cn.nukkit.level.biome.Biome#isFreezing()} instead
      */
-    public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(10, 11, 12, 26, 30, 31, 140, 158));
+    @Deprecated
+    public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(
+            10,  // FROZEN_OCEAN
+            11,  // FROZEN_RIVER
+            12,  // ICE_PLAINS
+            13,  // ICE_MOUNTAINS
+            26,  // COLD_BEACH
+            30,  // COLD_TAIGA
+            31,  // COLD_TAIGA_HILLS
+            46,  // NEW_FROZEN_OCEAN
+            47,  // DEEP_FROZEN_OCEAN
+            140, // ICE_PLAINS_SPIKES
+            158  // COLD_TAIGA_M
+    ));
 
     /**
      * 检查物品或方块是否已在nk中实现
@@ -75,7 +96,7 @@ public class Utils {
     }
 
     public static boolean hasItemOrBlock(String id) {
-        return Item.NAMESPACED_ID_ITEM.containsKey(id.toLowerCase(Locale.ENGLISH));
+        return Item.NAMESPACED_ID_ITEM.containsKey(id.toLowerCase(Locale.ROOT));
     }
 
     public static boolean hasItemOrBlock(int id) {
@@ -109,9 +130,6 @@ public class Utils {
     public static void writeFile(File file, InputStream content) throws IOException {
         if (content == null) {
             throw new IllegalArgumentException("content must not be null");
-        }
-        if (!file.exists()) {
-            file.createNewFile();
         }
         try (FileOutputStream stream = new FileOutputStream(file)) {
             byte[] buffer = new byte[1024];
@@ -393,7 +411,7 @@ public class Utils {
         if (min == max) {
             return max;
         }
-        return random.nextInt(max + 1 - min) + min;
+        return ThreadLocalRandom.current().nextInt(max + 1 - min) + min;
     }
 
     /**
@@ -407,7 +425,7 @@ public class Utils {
         if (min == max) {
             return max;
         }
-        return min + random.nextDouble() * (max-min);
+        return min + ThreadLocalRandom.current().nextDouble() * (max-min);
     }
 
     public static float rand(float min, float max) {
@@ -423,7 +441,7 @@ public class Utils {
      * @return random boolean
      */
     public static boolean rand() {
-        return random.nextBoolean();
+        return ThreadLocalRandom.current().nextBoolean();
     }
 
     public static int dynamic(int value) {
@@ -513,6 +531,22 @@ public class Utils {
             case ProtocolInfo.v1_21_30 -> "1.21.30";
             case ProtocolInfo.v1_21_40 -> "1.21.40";
             case ProtocolInfo.v1_21_50_26, ProtocolInfo.v1_21_50 -> "1.21.50";
+            case ProtocolInfo.v1_21_60 -> "1.21.60";
+            case ProtocolInfo.v1_21_70_24, ProtocolInfo.v1_21_70 -> "1.21.70";
+            case ProtocolInfo.v1_21_80 -> "1.21.80";
+            case ProtocolInfo.v1_21_90 -> "1.21.90";
+            case ProtocolInfo.v1_21_93 -> "1.21.93";
+            case ProtocolInfo.v1_21_100 -> "1.21.100";
+            case ProtocolInfo.v1_21_110_26 -> "1.21.110";
+            case ProtocolInfo.v1_21_111 -> "1.21.111";
+            case ProtocolInfo.v1_21_120 -> "1.21.120";
+            case ProtocolInfo.v1_21_124 -> "1.21.124";
+            case ProtocolInfo.v1_21_130_28, ProtocolInfo.v1_21_130 -> "1.21.130";
+            case ProtocolInfo.v1_26_0 -> "1.26.0";
+            case ProtocolInfo.v1_26_10 -> "1.26.10";
+            case ProtocolInfo.v1_26_20_26, ProtocolInfo.v1_26_20 -> "1.26.20";
+            case ProtocolInfo.v1_26_30 -> "1.26.30";
+            case ProtocolInfo.v1_26_40 -> "1.26.40";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };
@@ -540,9 +574,9 @@ public class Utils {
             case 6:
                 return "HoloLens";
             case 7:
-                return "Windows 10";
-            case 8:
                 return "Windows";
+            case 8:
+                return "Windows x86";
             case 9:
                 return "Dedicated";
             case 10:
@@ -656,6 +690,29 @@ public class Utils {
             }
         }
 
-        return blocks.toArray(new Block[0]);
+        return blocks.toArray(Block.EMPTY_ARRAY);
+    }
+
+    public static JsonElement loadJsonResource(String file) {
+        try {
+            InputStream stream = Server.class.getClassLoader().getResourceAsStream(file);
+            if (stream == null) {
+                throw new AssertionError("Unable to load " + file);
+            }
+
+            JsonElement element = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+            stream.close();
+            return element;
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to load " + file, e);
+        }
+    }
+
+    public static ObjectSet<GameVersion> intSet2GameVersionSet(IntSet protocols, boolean isNetEase) {
+        ObjectSet<GameVersion> versions = new ObjectOpenHashSet<>();
+        for (int protocol : protocols) {
+            versions.add(GameVersion.byProtocol(protocol, isNetEase));
+        }
+        return versions;
     }
 }

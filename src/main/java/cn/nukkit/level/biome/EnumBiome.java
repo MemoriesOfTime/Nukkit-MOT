@@ -11,6 +11,7 @@ import cn.nukkit.level.biome.impl.forest.FlowerForestBiome;
 import cn.nukkit.level.biome.impl.forest.ForestBiome;
 import cn.nukkit.level.biome.impl.forest.ForestHillsBiome;
 import cn.nukkit.level.biome.impl.iceplains.IcePlainsBiome;
+import cn.nukkit.level.biome.impl.iceplains.IcePlainsHillsBiome;
 import cn.nukkit.level.biome.impl.iceplains.IcePlainsSpikesBiome;
 import cn.nukkit.level.biome.impl.jungle.*;
 import cn.nukkit.level.biome.impl.mesa.*;
@@ -18,6 +19,7 @@ import cn.nukkit.level.biome.impl.mushroom.MushroomIslandBiome;
 import cn.nukkit.level.biome.impl.mushroom.MushroomIslandShoreBiome;
 import cn.nukkit.level.biome.impl.nether.*;
 import cn.nukkit.level.biome.impl.ocean.*;
+import cn.nukkit.level.biome.impl.plains.MeadowBiome;
 import cn.nukkit.level.biome.impl.plains.PlainsBiome;
 import cn.nukkit.level.biome.impl.plains.SunflowerPlainsBiome;
 import cn.nukkit.level.biome.impl.river.FrozenRiverBiome;
@@ -53,6 +55,7 @@ public enum EnumBiome {
     FROZEN_OCEAN(10, new FrozenOceanBiome()),
     FROZEN_RIVER(11, new FrozenRiverBiome()),
     ICE_PLAINS(12, new IcePlainsBiome()),
+    ICE_MOUNTAINS(13, new IcePlainsHillsBiome()),
     MUSHROOM_ISLAND(14, new MushroomIslandBiome()),
     MUSHROOM_ISLAND_SHORE(15, new MushroomIslandShoreBiome()),
     BEACH(16, new BeachBiome()),
@@ -117,7 +120,12 @@ public enum EnumBiome {
     SOUL_SAND_VALLEY(178, new SoulSandValleyBiome()),
     CRIMSON_FOREST(179, new CrimsonForestBiome()),
     WARPED_FOREST(180, new WarpedForestBiome()),
-    BASALT_DELTAS(181, new BasaltDeltasBiome());
+    BASALT_DELTAS(181, new BasaltDeltasBiome()),
+    JAGGED_PEAKS(182, new JaggedPeaksBiome()),
+    FROZEN_PEAKS(183, new FrozenPeaksBiome()),
+    SNOWY_SLOPES(184, new SnowySlopesBiome()),
+    GROVE(185, new GroveBiome()),
+    MEADOW(186, new MeadowBiome());
 
     public final int id;
     public final Biome biome;
@@ -126,6 +134,24 @@ public enum EnumBiome {
         Biome.register(id, biome);
         this.id = id;
         this.biome = biome;
+    }
+
+    /**
+     * Return the biome ID corresponding to the current enum instance.
+     *
+     * @return The biome ID.
+     */
+    public int getId() {
+        return this.id;
+    }
+
+    /**
+     * Return the biome corresponding to the current enum instance.
+     *
+     * @return The biome.
+     */
+    public Biome getBiome() {
+        return this.biome;
     }
 
     /**

@@ -36,10 +36,14 @@ public class BossEventPacket extends DataPacket {
     public long playerEid;
     public float healthPercent;
     public String title = "";
-    public short unknown;
+    /**
+     * @since v776 1.21.60
+     */
+    public String filteredTitle = "";
+    public short darkenScreen;
     public int color;
     public int overlay;
-    
+
     @Override
     public byte pid() {
         if(this.protocol >= ProtocolInfo.v1_2_0){
@@ -55,29 +59,45 @@ public class BossEventPacket extends DataPacket {
     @Override
     public void decode() {
         this.bossEid = this.getEntityUniqueId();
-        this.type = (int) this.getUnsignedVarInt();
-        if (protocol >= ProtocolInfo.v1_2_0) {
-            switch (this.type) {
-                case TYPE_REGISTER_PLAYER:
-                case TYPE_UNREGISTER_PLAYER:
-                case TYPE_QUERY:
-                    this.playerEid = this.getEntityUniqueId();
-                    break;
-                case TYPE_SHOW:
-                    this.title = this.getString();
-                    this.healthPercent = this.getLFloat();
-                case TYPE_UPDATE_PROPERTIES:
-                    this.unknown = (short) this.getShort();
-                case TYPE_TEXTURE:
-                    this.color = (int) this.getUnsignedVarInt();
-                    this.overlay = (int) this.getUnsignedVarInt();
-                    break;
-                case TYPE_HEALTH_PERCENT:
-                    this.healthPercent = this.getLFloat();
-                    break;
-                case TYPE_TITLE:
-                    this.title = this.getString();
-                    break;
+        if (this.protocol >= ProtocolInfo.v1_26_30) {
+            this.playerEid = this.getEntityUniqueId();
+            this.type = this.getByte();
+            this.title = this.getString();
+            this.filteredTitle = this.getString();
+            this.healthPercent = this.getLFloat();
+            this.color = this.getByte() & 0xff;
+            this.overlay = this.getByte() & 0xff;
+        } else {
+            this.type = (int) this.getUnsignedVarInt();
+            if (protocol >= ProtocolInfo.v1_2_0) {
+                switch (this.type) {
+                    case TYPE_REGISTER_PLAYER:
+                    case TYPE_UNREGISTER_PLAYER:
+                    case TYPE_QUERY:
+                        this.playerEid = this.getEntityUniqueId();
+                        break;
+                    case TYPE_SHOW:
+                        this.title = this.getString();
+                        if (this.protocol >= ProtocolInfo.v1_21_60) {
+                            this.filteredTitle = this.getString();
+                        }
+                        this.healthPercent = this.getLFloat();
+                    case TYPE_UPDATE_PROPERTIES:
+                        this.darkenScreen = (short) this.getShort();
+                    case TYPE_TEXTURE:
+                        this.color = (int) this.getUnsignedVarInt();
+                        this.overlay = (int) this.getUnsignedVarInt();
+                        break;
+                    case TYPE_HEALTH_PERCENT:
+                        this.healthPercent = this.getLFloat();
+                        break;
+                    case TYPE_TITLE:
+                        this.title = this.getString();
+                        if (this.protocol >= ProtocolInfo.v1_21_60) {
+                            this.filteredTitle = this.getString();
+                        }
+                        break;
+                }
             }
         }
     }
@@ -92,29 +112,45 @@ public class BossEventPacket extends DataPacket {
         }
         this.reset();
         this.putEntityUniqueId(this.bossEid);
-        this.putUnsignedVarInt(this.type);
-        if (protocol >= ProtocolInfo.v1_2_0) {
-            switch (this.type) {
-                case TYPE_REGISTER_PLAYER:
-                case TYPE_UNREGISTER_PLAYER:
-                case TYPE_QUERY:
-                    this.putEntityUniqueId(this.playerEid);
-                    break;
-                case TYPE_SHOW:
-                    this.putString(this.title);
-                    this.putLFloat(this.healthPercent);
-                case TYPE_UPDATE_PROPERTIES:
-                    this.putShort(this.unknown);
-                case TYPE_TEXTURE:
-                    this.putUnsignedVarInt(this.color);
-                    this.putUnsignedVarInt(this.overlay);
-                    break;
-                case TYPE_HEALTH_PERCENT:
-                    this.putLFloat(this.healthPercent);
-                    break;
-                case TYPE_TITLE:
-                    this.putString(this.title);
-                    break;
+        if (this.protocol >= ProtocolInfo.v1_26_30) {
+            this.putEntityUniqueId(this.playerEid);
+            this.putByte((byte) this.type);
+            this.putString(this.title);
+            this.putString(this.filteredTitle);
+            this.putLFloat(this.healthPercent);
+            this.putByte((byte) this.color);
+            this.putByte((byte) this.overlay);
+        } else {
+            this.putUnsignedVarInt(this.type);
+            if (protocol >= ProtocolInfo.v1_2_0) {
+                switch (this.type) {
+                    case TYPE_REGISTER_PLAYER:
+                    case TYPE_UNREGISTER_PLAYER:
+                    case TYPE_QUERY:
+                        this.putEntityUniqueId(this.playerEid);
+                        break;
+                    case TYPE_SHOW:
+                        this.putString(this.title);
+                        if (this.protocol >= ProtocolInfo.v1_21_60) {
+                            this.putString(this.filteredTitle);
+                        }
+                        this.putLFloat(this.healthPercent);
+                    case TYPE_UPDATE_PROPERTIES:
+                        this.putShort(this.darkenScreen);
+                    case TYPE_TEXTURE:
+                        this.putUnsignedVarInt(this.color);
+                        this.putUnsignedVarInt(this.overlay);
+                        break;
+                    case TYPE_HEALTH_PERCENT:
+                        this.putLFloat(this.healthPercent);
+                        break;
+                    case TYPE_TITLE:
+                        this.putString(this.title);
+                        if (this.protocol >= ProtocolInfo.v1_21_60) {
+                            this.putString(this.filteredTitle);
+                        }
+                        break;
+                }
             }
         }
     }

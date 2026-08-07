@@ -7,8 +7,7 @@ import cn.nukkit.item.ItemID;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import org.jetbrains.annotations.NotNull;
-
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * @author Gabriel8579

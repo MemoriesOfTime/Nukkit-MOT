@@ -88,7 +88,7 @@ public class FillCommand extends VanillaCommand {
                 if (list.hasResult(3)) tileData = list.getResult(3);
                 if (list.hasResult(4)) {
                     String str = list.getResult(4);
-                    oldBlockHandling = FillMode.valueOf(str.toUpperCase(Locale.ENGLISH));
+                    oldBlockHandling = FillMode.valueOf(str.toUpperCase(Locale.ROOT));
                 }
                 switch (oldBlockHandling) {
                     case OUTLINE -> {

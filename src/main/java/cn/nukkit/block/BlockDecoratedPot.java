@@ -6,18 +6,23 @@ import cn.nukkit.blockentity.BlockEntityDecoratedPot;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.particle.GenericParticle;
 import cn.nukkit.level.particle.Particle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Faceable;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 
 public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityDecoratedPot> {
@@ -133,9 +138,42 @@ public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable,
     }
 
     @Override
+    public Item toItem() {
+        Item drop = new ItemBlock(this, 0);
+
+        Optional.ofNullable(getBlockEntity())
+                .map(BlockEntityDecoratedPot::getCleanedNBT)
+                .filter(nbt -> nbt.getList("sherds", StringTag.class).getAll().stream()
+                        .anyMatch(sherd -> !sherd.parseValue().equals("minecraft:brick")))
+                .ifPresent(nbt -> {
+                    nbt.remove("isMovable");
+                    nbt.remove("item");
+                    drop.setCompoundTag(nbt);
+                });
+
+        return drop;
+    }
+
+    @Override
     public Item[] getDrops(Item item) {
-        return super.getDrops(item);
-        //TODO 调整掉落
+        if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
+            return new Item[]{this.toItem()};
+        }
+
+        ObjectArrayList<Item> drops = new ObjectArrayList<>(4);
+
+        Optional.ofNullable(getBlockEntity())
+                .map(BlockEntityDecoratedPot::getCleanedNBT)
+                .ifPresent(nbt -> {
+                    nbt.getList("sherds", StringTag.class).getAll().forEach(sherd -> {
+                        Item drop = Item.fromString(sherd.parseValue());
+                        if (drop.getId() != Item.AIR) {
+                            drops.add(drop);
+                        }
+                    });
+                });
+
+        return drops.toArray(Item.EMPTY_ARRAY);
     }
 
     @Override

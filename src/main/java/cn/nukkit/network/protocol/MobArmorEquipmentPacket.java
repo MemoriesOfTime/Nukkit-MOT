@@ -1,7 +1,6 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -12,6 +11,13 @@ import lombok.ToString;
 public class MobArmorEquipmentPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.MOB_ARMOR_EQUIPMENT_PACKET;
+
+    public long eid;
+    public Item[] slots = new Item[4];
+    /**
+     * @since v712
+     */
+    public Item body = Item.AIR_ITEM;
 
     @Override
     public byte pid() {
@@ -24,13 +30,6 @@ public class MobArmorEquipmentPacket extends DataPacket {
         }
         return NETWORK_ID;
     }
-
-    public long eid;
-    public Item[] slots = new Item[4];
-    /**
-     * @since v712
-     */
-    public Item body = Item.AIR_ITEM;
 
     @Override
     public void decode() {
@@ -60,12 +59,12 @@ public class MobArmorEquipmentPacket extends DataPacket {
             this.eid = this.getEntityUniqueId();
         }
         this.slots = new Item[4];
-        this.slots[0] = this.getSlot(this.protocol);
-        this.slots[1] = this.getSlot(this.protocol);
-        this.slots[2] = this.getSlot(this.protocol);
-        this.slots[3] = this.getSlot(this.protocol);
+        this.slots[0] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
+        this.slots[1] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
+        this.slots[2] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
+        this.slots[3] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
         if (this.protocol >= ProtocolInfo.v1_21_20) {
-            this.body = this.getSlot(this.protocol);
+            this.body = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
         }
     }
 
@@ -92,17 +91,24 @@ public class MobArmorEquipmentPacket extends DataPacket {
             return;
         }
         this.reset();
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.eid);
-        }else{
-            this.putEntityUniqueId(this.eid);
+        this.putEntityRuntimeId(this.eid);
+        if (this.protocol >= ProtocolInfo.v1_26_30) {
+            this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[0]);
+            this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[1]);
+            this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[2]);
+            this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[3]);
+        } else {
+            this.putSlot(this.gameVersion, this.slots[0]);
+            this.putSlot(this.gameVersion, this.slots[1]);
+            this.putSlot(this.gameVersion, this.slots[2]);
+            this.putSlot(this.gameVersion, this.slots[3]);
         }
-        this.putSlot(protocol, this.slots[0]);
-        this.putSlot(protocol, this.slots[1]);
-        this.putSlot(protocol, this.slots[2]);
-        this.putSlot(protocol, this.slots[3]);
         if (this.protocol >= ProtocolInfo.v1_21_20) {
-            this.putSlot(protocol, this.body);
+            if (this.protocol >= ProtocolInfo.v1_26_30) {
+                this.putNetworkItemStackDescriptor(this.gameVersion, this.body);
+            } else {
+                this.putSlot(this.gameVersion, this.body);
+            }
         }
     }
 }

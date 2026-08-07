@@ -4,19 +4,17 @@ import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockWoodBark extends BlockWood {
 
-    private static final String[] names = new String[]{
+    private static final String[] NAMES = {
             "Oak Wood",
             "Spruce Wood",
             "Birch Wood",
             "Jungle Wood",
             "Acacia Wood",
             "Dark Oak Wood",
-            // illegal
-            "Oak Wood",
-            "Oak Wood"
     };
 
     public static final int STRIPPED_BIT = 0b1000;
@@ -41,7 +39,12 @@ public class BlockWoodBark extends BlockWood {
     
     @Override
     public String getName() {
-        return names[getDamage() & 0x7];
+        int variant = (this.getDamage() & 0x7);
+        String name = variant >= NAMES.length ? NAMES[0] : NAMES[variant];
+        if ((this.getDamage() & STRIPPED_BIT) != 0) {
+            name = "Stripped " + name;
+        }
+        return name;
     }
     
     @Override
@@ -55,7 +58,7 @@ public class BlockWoodBark extends BlockWood {
     }
     
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (face.getAxis().isHorizontal()) {
             if (face.getAxis() == BlockFace.Axis.X) {
                 setDamage(getDamage() | 0x10);

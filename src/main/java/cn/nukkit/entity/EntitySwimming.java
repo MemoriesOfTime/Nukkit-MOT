@@ -13,6 +13,7 @@ import org.apache.commons.math3.util.FastMath;
 public abstract class EntitySwimming extends BaseEntity {
 
     private boolean inWaterCached = true;
+    private boolean inBubbleColumnCached = false;
 
     public EntitySwimming(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -28,30 +29,37 @@ public abstract class EntitySwimming extends BaseEntity {
         }
 
         Vector3 target = this.target;
-        if (!(target instanceof EntityCreature) || (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) || !((Entity) target).canBeFollowed()) {
-            double near = Integer.MAX_VALUE;
-            for (Entity entity : this.getLevel().getEntities()) {
-                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
-                    continue;
-                }
-
-                if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
-                    continue;
-                }
-
-                double distance = this.distanceSquared(creature);
-                if (distance > near || !this.targetOption(creature, distance)) {
-                    continue;
-                }
-                near = distance;
-
-                this.stayTime = 0;
-                this.moveTime = 0;
-                this.target = creature;
-            }
+        if (target instanceof EntityCreature creature &&
+                !creature.closed &&
+                creature.isAlive() &&
+                creature.canBeFollowed() &&
+                this.targetOption(creature, this.distanceSquared(target))) {
+            return;
         }
 
-        if (this.target instanceof EntityCreature && !((EntityCreature) this.target).closed && ((EntityCreature) this.target).isAlive() && this.targetOption((EntityCreature) this.target, this.distanceSquared(this.target))) {
+        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
+            if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
+                continue;
+            }
+
+            if (creature instanceof BaseEntity base && base.isFriendly() == this.isFriendly()) {
+                continue;
+            }
+
+            double distance = this.distanceSquared(creature);
+            if (!this.targetOption(creature, distance)) {
+                continue;
+            }
+
+            this.stayTime = 0;
+            this.moveTime = 0;
+            this.target = creature;
+        }
+
+        if (this.target instanceof EntityCreature &&
+                !((EntityCreature) this.target).closed &&
+                ((EntityCreature) this.target).isAlive() &&
+                this.targetOption((EntityCreature) this.target, this.distanceSquared(this.target))) {
             return;
         }
 
@@ -135,6 +143,7 @@ public abstract class EntitySwimming extends BaseEntity {
 
             boolean inWater = this.isInsideOfWater();
             this.inWaterCached = inWater;
+            this.inBubbleColumnCached = this.isInsideBubbleColumn();
             if (inWater && (this.motionX > 0 || this.motionZ > 0)) {
                 this.motionY = Utils.rand(-0.12, 0.12);
             } else if (!this.isOnGround() && !inWater) {
@@ -171,7 +180,7 @@ public abstract class EntitySwimming extends BaseEntity {
     @Override
     public boolean entityBaseTick(int tickDiff) {
         boolean result = super.entityBaseTick(tickDiff);
-        if (this.inWaterCached) {
+        if (this.inWaterCached && !this.inBubbleColumnCached) {
             this.setAirTicks(300);
         } else {
             int airTicks = getAirTicks() - tickDiff * 6;

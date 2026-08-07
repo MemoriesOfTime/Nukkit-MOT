@@ -70,6 +70,11 @@ public class EntityHorse extends EntityHorseBase {
     }
 
     @Override
+    public boolean canWearHorseArmor() {
+        return !this.isBaby();
+    }
+
+    @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         boolean canTarget = super.targetOption(creature, distance);
 
@@ -78,7 +83,7 @@ public class EntityHorse extends EntityHorseBase {
                 return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
             }else if (creature instanceof Player player) {
                 return player.spawned && player.isAlive() && !player.closed &&
-                        this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 40;
+                        distance <= 40 && this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast());
             }
         }
         return false;
@@ -96,6 +101,10 @@ public class EntityHorse extends EntityHorseBase {
 
         if (this.isSaddled()) {
             drops.add(Item.get(Item.SADDLE, 0, 1));
+        }
+
+        if (this.hasHorseArmor()) {
+            drops.add(this.getHorseArmor());
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);

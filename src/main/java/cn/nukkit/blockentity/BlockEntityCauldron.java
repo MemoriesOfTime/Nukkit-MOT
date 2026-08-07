@@ -105,13 +105,13 @@ public class BlockEntityCauldron extends BlockEntitySpawnable {
             Player[] pl = level.getChunkPlayers(getChunkX(), getChunkZ()).values().toArray(Player.EMPTY_ARRAY);
             for (Player p : pl) {
                 UpdateBlockPacket air = new UpdateBlockPacket();
-                air.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(p.protocol, 0);
+                air.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(p.getGameVersion(), 0);
                 air.flags = UpdateBlockPacket.FLAG_ALL_PRIORITY;
                 air.x = (int) x;
                 air.y = (int) y;
                 air.z = (int) z;
                 UpdateBlockPacket self = (UpdateBlockPacket) air.clone();
-                self.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(p.protocol, block.getId(), block.getDamage());
+                self.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(p.getGameVersion(), block.getId(), block.getDamage());
                 p.dataPacket(air);
                 p.dataPacket(self);
             }
@@ -127,7 +127,8 @@ public class BlockEntityCauldron extends BlockEntitySpawnable {
 
     @Override
     public boolean isBlockEntityValid() {
-        return getBlock().getId() == Block.CAULDRON_BLOCK;
+        int id = getBlock().getId();
+        return id == Block.CAULDRON_BLOCK || id == Block.LAVA_CAULDRON;
     }
 
     @Override

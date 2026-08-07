@@ -7,6 +7,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/12/2 by xtypr.
@@ -60,7 +61,7 @@ public class BlockTorch extends BlockFlowable implements Faceable {
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             int side = this.getDamage();
-            if ((side != 0 && !Block.canConnectToFullSolid(this.getSide(BlockFace.fromIndex(faces2[side])))) || (side == 0 && !isSupportValidBelow())) {
+            if (side < 0 || side >= faces2.length || (side != 0 && !Block.canConnectToFullSolid(this.getSide(BlockFace.fromIndex(faces2[side])))) || (side == 0 && !isSupportValidBelow())) {
                 this.getLevel().useBreakOn(this);
                 return Level.BLOCK_UPDATE_NORMAL;
             }
@@ -71,7 +72,7 @@ public class BlockTorch extends BlockFlowable implements Faceable {
 
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (block instanceof BlockWater || block.level.isBlockWaterloggedAt(block.getChunk(), (int) block.x, (int) block.y, (int) block.z)) {
             return false;
         }

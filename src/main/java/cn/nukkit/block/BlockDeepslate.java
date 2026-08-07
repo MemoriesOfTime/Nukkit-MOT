@@ -2,9 +2,12 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockDeepslate extends BlockSolidMeta {
 
@@ -65,8 +68,15 @@ public class BlockDeepslate extends BlockSolidMeta {
         if (!canHarvest(item)) {
             return Item.EMPTY_ARRAY;
         }
-
-        return new Item[]{this.toItem()};
+        if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
+            return new Item[]{this.toItem()};
+        }
+        return new Item[]{new ItemBlock(Block.get(BlockID.COBBLED_DEEPSLATE))};
+    }
+    
+    @Override
+    public Item toItem() {
+        return new ItemBlock(Block.get(this.getId(), 0), 0);
     }
 
     @Override
@@ -75,7 +85,7 @@ public class BlockDeepslate extends BlockSolidMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(faces[face.getIndex()]);
         this.getLevel().setBlock(block, this, true, true);
         return true;

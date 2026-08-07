@@ -17,7 +17,7 @@ public class BlockEntityMusic extends BlockEntity {
         }
 
         if (!this.namedTag.contains("powered")) {
-            this.namedTag.putBoolean("note", false);
+            this.namedTag.putBoolean("powered", false);
         }
 
         super.initBlockEntity();

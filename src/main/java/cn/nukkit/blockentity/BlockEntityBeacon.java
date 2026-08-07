@@ -4,14 +4,17 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.event.entity.EntityPotionEffectEvent;
+import cn.nukkit.inventory.BeaconInventory;
+import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.potion.Effect;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -67,6 +70,12 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
 
     private long currentTick = 0;
 
+    // Cache for expensive calculations (recalculated every 2 update cycles = 160 ticks = 8 seconds)
+    private static final int CACHE_RECALC_INTERVAL = 2;
+    private int cacheCounter = 0;
+    private int cachedPowerLevel = -1; // -1 = uninitialized
+    private boolean cachedSkyAccess = false;
+
     @Override
     public boolean onUpdate() {
         //Only apply effects every 4 secs
@@ -75,11 +84,20 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
         }
 
         int oldPowerLevel = this.getPowerLevel();
+
+        // Recalculate expensive checks periodically, use cached values otherwise
+        if (cachedPowerLevel < 0 || cacheCounter >= CACHE_RECALC_INTERVAL) {
+            cacheCounter = 0;
+            cachedPowerLevel = calculatePowerLevel();
+            cachedSkyAccess = hasSkyAccess();
+        }
+        cacheCounter++;
+
         //Get the power level based on the pyramid
-        setPowerLevel(calculatePowerLevel());
+        setPowerLevel(cachedPowerLevel);
 
         //Skip beacons that do not have a pyramid or sky access
-        if (this.getPowerLevel() < 1 || !hasSkyAccess()) {
+        if (this.getPowerLevel() < 1 || !cachedSkyAccess) {
             if (oldPowerLevel > 0) {
                 this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BEACON_DEACTIVATE);
             }
@@ -91,12 +109,14 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
         }
 
         int duration = 9 + (getPowerLevel() << 1);
+        int range = 10 + getPowerLevel() * 10;
+        double rangeSquared = (double) range * range;
 
         for (Map.Entry<Long, Player> entry : this.level.getPlayers().entrySet()) {
             Player p = entry.getValue();
 
             //If the player is in range
-            if (p.distance(this) < 10 + getPowerLevel() * 10) {
+            if (p.distanceSquared(this) < rangeSquared) {
                 Effect e;
 
                 if (getPrimaryPower() != 0) {
@@ -149,7 +169,7 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
         //Check every block from our y coord to the top of the world
         for (int y = getFloorY() + 1; y <= this.level.getMaxBlockY(); y++) {
             int testBlockId = level.getBlockIdAt(chunk, getFloorX(), y, getFloorZ());
-            if (!Block.transparent[testBlockId]) {
+            if (!Block.isBlockTransparentById(testBlockId)) {
                 //There is no sky access
                 return false;
             }
@@ -221,7 +241,16 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
         }
     }
 
-    private static final List<Integer> allowedEffects = Arrays.asList(Effect.SPEED, Effect.HASTE, Effect.DAMAGE_RESISTANCE, Effect.JUMP, Effect.STRENGTH, Effect.REGENERATION);
+    private static final IntSet ALLOWED_EFFECTS = new IntOpenHashSet(new int[]{Effect.SPEED, Effect.HASTE, Effect.DAMAGE_RESISTANCE, Effect.JUMP, Effect.STRENGTH, Effect.REGENERATION});
+    private static final IntSet PAYMENT_ITEMS = new IntOpenHashSet(new int[]{ItemID.NETHERITE_INGOT, ItemID.EMERALD, ItemID.DIAMOND, ItemID.GOLD_INGOT, ItemID.IRON_INGOT});
+
+    public static boolean isAllowedEffect(int effectId) {
+        return effectId == 0 || ALLOWED_EFFECTS.contains(effectId);
+    }
+
+    public static boolean isPaymentItem(int itemId) {
+        return PAYMENT_ITEMS.contains(itemId);
+    }
 
     @Override
     public boolean updateCompoundTag(CompoundTag nbt, Player player) {
@@ -229,23 +258,43 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
             return false;
         }
 
+        // Invalidate cache on player interaction
+        this.cacheCounter = CACHE_RECALC_INTERVAL;
+
+        Inventory inv = player.getWindowById(Player.BEACON_WINDOW_ID);
+        if (inv instanceof BeaconInventory beaconInventory) {
+            int power = getPowerLevel();
+            if (power < 1) {
+                Server.getInstance().getLogger().debug(player.getName() + " beacon has no power");
+                return false;
+            }
+
+            int material = beaconInventory.useMaterial();
+            if (!isPaymentItem(material)) {
+                Server.getInstance().getLogger().debug(player.getName() + " tried to set effect but there's no payment in beacon inventory");
+                return false;
+            }
+            inv.setItem(0, Item.get(Item.AIR));
+        } else {
+            Server.getInstance().getLogger().debug(player.getName() + " tried to set effect but beacon inventory is null");
+            return false;
+        }
+
         int primary = nbt.getInt("primary");
-        if (allowedEffects.contains(primary)) {
+        if (isAllowedEffect(primary)) {
             this.setPrimaryPower(primary);
         } else {
             Server.getInstance().getLogger().debug(player.getName() + " tried to set an invalid primary effect to a beacon: " + primary);
         }
 
         int secondary = nbt.getInt("secondary");
-        if (allowedEffects.contains(secondary)) {
+        if (isAllowedEffect(secondary)) {
             this.setSecondaryPower(secondary);
         } else {
             Server.getInstance().getLogger().debug(player.getName() + " tried to set an invalid secondary effect to a beacon: " + secondary);
         }
 
         this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BEACON_POWER);
-
-        player.getWindowById(Player.BEACON_WINDOW_ID).setItem(0, Item.get(Item.AIR));
         return true;
     }
 }

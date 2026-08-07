@@ -25,6 +25,7 @@ public class StopSoundPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override

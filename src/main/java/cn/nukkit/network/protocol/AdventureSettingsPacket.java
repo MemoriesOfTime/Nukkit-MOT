@@ -15,6 +15,7 @@ import static cn.nukkit.api.API.Usage.DEPRECATED;
  */
 @ToString
 @API(usage = DEPRECATED, definition = UNIVERSAL) //在1.19.30弃用
+@SuppressWarnings("dep-ann")
 public class AdventureSettingsPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.ADVENTURE_SETTINGS_PACKET;
@@ -68,6 +69,12 @@ public class AdventureSettingsPacket extends DataPacket {
 
     @Override
     public void decode() {
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.flags = this.getUnsignedVarInt();
+            this.commandPermission = this.getUnsignedVarInt();
+            return;
+        }
+
         this.flags = getUnsignedVarInt();
         if(this.protocol < ProtocolInfo.v_1_0_0 && this.protocol >= ProtocolInfo.v_0_16_0){
             this.userPermission = (int) this.getUnsignedVarInt();
@@ -110,19 +117,23 @@ public class AdventureSettingsPacket extends DataPacket {
             return;
         }
         this.reset();
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putUnsignedVarInt(this.flags);
+            this.putUnsignedVarInt(this.commandPermission);
+            return;
+        }
+
         this.putUnsignedVarInt(this.flags);
         this.putUnsignedVarInt(this.commandPermission);
-        if (protocol >= ProtocolInfo.v1_2_0) {
-            this.putUnsignedVarInt(this.flags2);
-            this.putUnsignedVarInt(this.playerPermission);
-            this.putUnsignedVarInt(this.customFlags);
-            this.putLLong(this.entityUniqueId);
-        }
+        this.putUnsignedVarInt(this.flags2);
+        this.putUnsignedVarInt(this.playerPermission);
+        this.putUnsignedVarInt(this.customFlags);
+        this.putLLong(this.entityUniqueId);
     }
 
     public boolean getFlag(int flag) {
         if ((flag & BITFLAG_SECOND_SET) != 0) {
-            return (this.flags2 & flag) != 0;
+            return (this.flags2 & (flag ^ BITFLAG_SECOND_SET)) != 0;
         }
         return (this.flags & flag) != 0;
     }
@@ -132,7 +143,7 @@ public class AdventureSettingsPacket extends DataPacket {
         if (flag <= 0) {
             return;
         }
-        int newFlags2 = (flag & BITFLAG_SECOND_SET);
+        int newFlags2 = (flag & BITFLAG_SECOND_SET) != 0 ? (flag ^ BITFLAG_SECOND_SET) : 0;
 
         if (value) {
             if (newFlags2 != 0) {

@@ -7,7 +7,9 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 public abstract class BlockAmethystBud extends BlockTransparentMeta implements Faceable {
     public BlockAmethystBud() {
@@ -26,7 +28,7 @@ public abstract class BlockAmethystBud extends BlockTransparentMeta implements F
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (Block.canConnectToFullSolid(this.getSide(face.getOpposite()))) {
             this.setDamage(face.getIndex());
             return this.getLevel().setBlock(this, this, true, true);
@@ -108,6 +110,11 @@ public abstract class BlockAmethystBud extends BlockTransparentMeta implements F
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[0];
+        return Item.EMPTY_ARRAY;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.PURPLE_BLOCK_COLOR;
     }
 }

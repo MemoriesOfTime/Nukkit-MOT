@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb.structure;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.custom.container.BlockStorageContainer;
@@ -7,7 +8,6 @@ import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -55,17 +55,25 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     public LevelDBChunkSection(LevelDBChunk parent, int y) {
-        this.parent = new WeakReference<>(parent);
+        this.setParent(parent);
         this.y = y;
         this.storages = new StateBlockStorage[]{ new StateBlockStorage(), new StateBlockStorage() };
     }
 
+    public LevelDBChunkSection(int y, @Nullable StateBlockStorage[] storages, boolean hasSkyLight) {
+        this(null, y, storages, null, null, null, false, hasSkyLight);
+    }
+
+    /**
+     * @deprecated Use {@link #LevelDBChunkSection(int, StateBlockStorage[], boolean)} instead
+     */
+    @Deprecated
     public LevelDBChunkSection(int y, @Nullable StateBlockStorage[] storages) {
         this(null, y, storages, null, null, null, false, false);
     }
 
     public LevelDBChunkSection(LevelDBChunk parent, int y, @Nullable StateBlockStorage[] storages, byte[] blockLight, byte[] skyLight, byte[] compressedLight, boolean hasBlockLight, boolean hasSkyLight) {
-        this.parent = new WeakReference<>(parent);
+        this.setParent(parent);
         this.y = y;
 
         if (storages == null || storages.length == 0) {
@@ -115,6 +123,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     public void setParent(LevelDBChunk parent) {
         this.parent = new WeakReference<>(parent);
+
+        // Set hasSkyLight based on dimension (Overworld = 0 has sky light)
+        if (parent != null && parent.getProvider() != null) {
+            this.hasSkyLight = parent.getProvider().getLevel().getDimensionData().getDimensionId() == 0;
+        }
     }
 
     @Override
@@ -136,7 +149,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 return BlockID.AIR;
             }
 
-            return (this.storages[layer].get(x, y, z)) >> Block.DATA_BITS;
+            return (this.storages[layer].getBlockState(x, y, z)).getLegacyId();
         } finally {
             this.readLock.unlock();
         }
@@ -183,7 +196,12 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     @Override
-    public int getBlockData( int x, int y, int z, int layer) {
+    public int getBlockData(int x, int y, int z) {
+        return getBlockData(x, y, z, 0);
+    }
+
+    @Override
+    public int getBlockData(int x, int y, int z, int layer) {
         try {
             this.readLock.lock();
 
@@ -191,7 +209,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 return 0;
             }
 
-            return (this.storages[layer].get(x, y, z)) & Block.DATA_MASK;
+            return (this.storages[layer].getBlockState(x, y, z)).getLegacyData();
         } finally {
             this.readLock.unlock();
         }
@@ -250,8 +268,18 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int[] getBlockState(int x, int y, int z, int layer) {
-        int full = this.getFullBlock(x, y, z, layer);
-        return new int[] { full >> Block.DATA_BITS, full & Block.DATA_MASK };
+        try {
+            this.readLock.lock();
+
+            if (!this.hasLayerUnsafe(layer)) {
+                return new int[] { BlockID.AIR, 0 };
+            }
+
+            BlockStateSnapshot blockState = this.storages[layer].getBlockState(x, y, z);
+            return new int[] { blockState.getLegacyId(), blockState.getLegacyData() };
+        } finally {
+            this.readLock.unlock();
+        }
     }
 
     @Override
@@ -365,11 +393,6 @@ public class LevelDBChunkSection implements ChunkSection {
         } finally {
             this.writeLock.unlock();
         }
-    }
-
-    @Override
-    public int getBlockData(int x, int y, int z) {
-        return getBlockData(x, y, z, 0);
     }
 
     public boolean setBlock(int x, int y, int z, int layer, int blockId, int meta) {
@@ -598,18 +621,17 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     @Override
-    public byte[] getBytes(int protocolId) {
+    public byte[] getBytes(GameVersion gameVersion) {
         try {
             this.readLock.lock();
 
             //TODO: properly mv support
             byte[] ids = this.storages[0].getBlockIds();
             byte[] data = this.storages[0].getBlockData();
-
             byte[] merged = new byte[ids.length + data.length];
             System.arraycopy(ids, 0, merged, 0, ids.length);
             System.arraycopy(data, 0, merged, ids.length, data.length);
-            if (protocolId < ProtocolInfo.v1_2_0) {
+            if (gameVersion.getProtocol() < ProtocolInfo.v1_2_0) {
                 ByteBuffer buffer = ByteBuffer.allocate(10240);
                 byte[] skyLight = new byte[2048];
                 byte[] blockLight = new byte[2048];
@@ -617,13 +639,8 @@ public class LevelDBChunkSection implements ChunkSection {
                     for (int z = 0; z < 16; z++) {
                         int i = (x << 7) | (z << 3);
                         for (int y = 0; y < 16; y += 2) {
-                            ids[(i << 1) | y] = (byte) this.getBlockId(x, y, z);
-                            ids[(i << 1) | (y + 1)] = (byte) this.getBlockId(x, y + 1, z);
-                            int b1 = this.getBlockData(x, y, z);
-                            int b2 = this.getBlockData(x, y + 1, z);
-                            data[i | (y >> 1)] = (byte) ((b2 << 4) | b1);
-                            b1 = this.getBlockSkyLight(x, y, z);
-                            b2 = this.getBlockSkyLight(x, y + 1, z);
+                            int b1 = this.getBlockSkyLight(x, y, z);
+                            int b2 = this.getBlockSkyLight(x, y + 1, z);
                             skyLight[i | (y >> 1)] = (byte) ((b2 << 4) | b1);
                             b1 = this.getBlockLight(x, y, z);
                             b2 = this.getBlockLight(x, y + 1, z);
@@ -631,16 +648,12 @@ public class LevelDBChunkSection implements ChunkSection {
                         }
                     }
                 }
-                Arrays.fill(blockLight, (byte) 0xff);
-                Arrays.fill(skyLight, (byte) 0xff);
                 return buffer
-                        .put(ids)
-                        .put(data)
+                        .put(merged)
                         .put(skyLight)
                         .put(blockLight)
                         .array();
             }
-
             return merged;
         } finally {
             this.readLock.unlock();
@@ -694,7 +707,7 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     @Override
-    public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
+    public void writeTo(GameVersion gameVersion, BinaryStream stream, boolean antiXray) {
         try {
             this.readLock.lock();
 
@@ -704,7 +717,7 @@ public class LevelDBChunkSection implements ChunkSection {
             stream.putByte((byte) layers);
 
             for (int i = 0; i < layers; i++) {
-                this.storages[i].writeTo(protocol, stream, antiXray);
+                this.storages[i].writeTo(gameVersion, stream, antiXray);
             }
         } finally {
             this.readLock.unlock();
@@ -813,5 +826,21 @@ public class LevelDBChunkSection implements ChunkSection {
     @Override
     public void setDirty() {
         this.dirty = true;
+    }
+
+    @Override
+    public boolean maybeHasLightSource() {
+        try {
+            this.readLock.lock();
+
+            for (StateBlockStorage storage : this.storages) {
+                if (storage != null && storage.maybeHasLightSource()) {
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            this.readLock.unlock();
+        }
     }
 }

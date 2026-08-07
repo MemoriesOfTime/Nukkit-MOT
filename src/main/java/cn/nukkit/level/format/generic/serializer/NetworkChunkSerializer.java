@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.generic.serializer;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntitySpawnable;
@@ -9,21 +10,21 @@ import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
-import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.utils.*;
+import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.ThreadCache;
+import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -45,15 +46,20 @@ public class NetworkChunkSerializer {
         negativeSubChunks = stream.getBuffer();
     }
 
-    public static void serialize(IntSet protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback,
-            boolean antiXray, DimensionData dimensionData) {
-        for (int protocolId : protocols) {
+    @Deprecated
+    public static void serialize(IntSet protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback, boolean antiXray, DimensionData dimensionData) {
+        Server.mvw("NetworkChunkSerializer#serialize(IntSet, BaseChunk, Consumer<NetworkChunkSerializerCallback>, boolean, DimensionData) is deprecated, please use NetworkChunkSerializer#serialize(ObjectSet<GameVersion>, BaseChunk, Consumer<NetworkChunkSerializerCallback>, boolean, DimensionData) instead.");
+        serialize(Utils.intSet2GameVersionSet(protocols, false), chunk, callback, antiXray, dimensionData);
+    }
+
+    public static void serialize(ObjectSet<GameVersion> protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback, boolean antiXray, DimensionData dimensionData) {
+        for (GameVersion gameVersion : protocols) {
+            int protocolId = gameVersion.getProtocol();
             // 0.11 ~ 1.0.0
             if (protocolId <= ProtocolInfo.v_1_0_0) {
                 serialize_011___100(protocolId, chunk, callback, antiXray, dimensionData);
                 continue;
             }
-
             byte[] blockEntities;
             if (chunk.getBlockEntities().isEmpty()) {
                 blockEntities = new byte[0];
@@ -72,35 +78,40 @@ public class NetworkChunkSerializer {
             }
 
             BinaryStream stream = ThreadCache.binaryStream.get().reset();
-            NetworkChunkData networkChunkData = new NetworkChunkData(protocolId, subChunkCount, antiXray,
-                    dimensionData);
+            NetworkChunkData networkChunkData = new NetworkChunkData(gameVersion, subChunkCount, antiXray, dimensionData);
             if (protocolId >= ProtocolInfo.v1_18_30) {
                 serialize1_18_30(stream, chunk, sections, networkChunkData);
             } else if (protocolId >= ProtocolInfo.v1_18_0) {
                 serialize1_18_0(stream, chunk, sections, networkChunkData);
             } else {
-                subChunkCount = Math.max(1, subChunkCount - chunk.getSectionOffset());
+                int offset = chunk.getSectionOffset();
+                subChunkCount = Math.max(1, subChunkCount - offset);
+                // Pre-1.18 clients only support 256-block height (16 sub-chunks)
+                int maxSubChunkCount = 16;
+                subChunkCount = Math.min(maxSubChunkCount, subChunkCount);
                 networkChunkData.setChunkSections(subChunkCount);
-
-                int maxDimensionSections = dimensionData.getHeight() >> 4;
 
                 if (protocolId < ProtocolInfo.v1_12_0) {
                     stream.putByte((byte) subChunkCount);
                 }
 
-                int offset = chunk.getSectionOffset();
                 for (int i = offset; i < subChunkCount + offset; i++) {
                     if (protocolId < ProtocolInfo.v1_13_0) {
                         stream.putByte((byte) 0);
-                        stream.put(sections[i].getBytes(protocolId));
+                        stream.put(sections[i].getBytes(gameVersion));
                     } else {
-                        sections[i].writeTo(protocolId, stream, antiXray);
+                        sections[i].writeTo(gameVersion, stream, antiXray);
                     }
                 }
 
                 if (protocolId < ProtocolInfo.v1_12_0) {
-                    for (byte height : chunk.getHeightMapArray()) {
-                        stream.putByte(height);
+                    // heightMap is stored relative to minBlockY (offset << 4); convert back to absolute Y and clamp to 0-255
+                    int heightOffset = offset << 4;
+                    for (short height : chunk.getHeightMapArray()) {
+                        int clamped = height - heightOffset;
+                        if (clamped < 0) clamped = 0;
+                        if (clamped > 255) clamped = 255;
+                        stream.putByte((byte) clamped);
                     }
                     stream.put(PAD_256);
                 }
@@ -114,13 +125,12 @@ public class NetworkChunkSerializer {
             }
             stream.put(blockEntities);
 
-            callback.accept(
-                    new NetworkChunkSerializerCallback(protocolId, stream, networkChunkData.getChunkSections()));
+            callback.accept(new NetworkChunkSerializerCallback(gameVersion, stream, networkChunkData.getChunkSections()));
         }
     }
 
     public static void serialize_011___100(int protocolId, BaseChunk chunk,
-            Consumer<NetworkChunkSerializerCallback> callback, boolean antiXray, DimensionData dimensionData) {
+                                           Consumer<NetworkChunkSerializerCallback> callback, boolean antiXray, DimensionData dimensionData) {
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk sent");
         }
@@ -180,7 +190,7 @@ public class NetworkChunkSerializer {
                             orderBlockIds[(posY << 8) + (posZ << 4) + posX] = dbBlockIds[(posX << 8) | (posZ << 4)
                                     | posY];
                         }
-                        
+
                         int anvilIndex = (posY << 7) + (posZ << 3) + (posX >> 1);
                         int dbsl = dbBlockSkyLight[anvilIndex] & 0xff;
                         int dbl = dbBlockLight[anvilIndex] & 0xff;
@@ -289,7 +299,7 @@ public class NetworkChunkSerializer {
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
 
-        byte[] biomePalettes = serialize3DBiomes(chunk, chunkData.getProtocol(), maxDimensionSections);
+        byte[] biomePalettes = serialize3DBiomes(chunk, chunkData.getGameVersion(), maxDimensionSections);
         stream.reset();
 
         // Overworld has negative coordinates, But the anvil world does not support it
@@ -300,7 +310,7 @@ public class NetworkChunkSerializer {
         }
 
         for (int i = 0; i < subChunkCount; i++) {
-            sections[i].writeTo(chunkData.getProtocol(), stream, chunkData.isAntiXray());
+            sections[i].writeTo(chunkData.getGameVersion(), stream, chunkData.isAntiXray());
         }
 
         stream.put(biomePalettes);
@@ -315,7 +325,7 @@ public class NetworkChunkSerializer {
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
 
-        byte[] biomePalettes = serialize3DBiomes(chunk, chunkData.getProtocol(), 25);
+        byte[] biomePalettes = serialize3DBiomes(chunk, chunkData.getGameVersion(), 25);
         stream.reset();
 
         // Overworld has negative coordinates, But the anvil world does not support it
@@ -325,9 +335,8 @@ public class NetworkChunkSerializer {
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 
-        int offset = chunk.getSectionOffset();
-        for (int i = offset; i < subChunkCount; i++) {
-            sections[i].writeTo(chunkData.getProtocol(), stream, chunkData.isAntiXray());
+        for (int i = 0; i < subChunkCount; i++) {
+            sections[i].writeTo(chunkData.getGameVersion(), stream, chunkData.isAntiXray());
         }
 
         stream.put(biomePalettes);
@@ -336,7 +345,7 @@ public class NetworkChunkSerializer {
         chunkData.setChunkSections(writtenSections);
     }
 
-    private static byte[] serialize3DBiomes(BaseFullChunk chunk, int protocolId, int maxDimensionSections) {
+    private static byte[] serialize3DBiomes(BaseFullChunk chunk, GameVersion protocolId, int maxDimensionSections) {
         if (chunk.has3dBiomes()) {
             BinaryStream binaryStream = ThreadCache.binaryStream.get().reset();
             for (int y = 0; y < maxDimensionSections; y++) {
@@ -369,13 +378,17 @@ public class NetworkChunkSerializer {
         }
     }
 
-    private static byte[] convert2DBiomesTo3D(int protocolId, BaseFullChunk chunk, int sections) {
-        PalettedBlockStorage palette = PalettedBlockStorage
-                .createWithDefaultState(Biome.getBiomeIdOrCorrect(protocolId, chunk.getBiomeId(0, 0)));
+    private static byte[] convert2DBiomesTo3D(GameVersion protocolId, BaseFullChunk chunk, int sections) {
+        int defaultBiome = chunk.getBiomeId(0, 0);
+        PalettedBlockStorage palette = PalettedBlockStorage.createWithDefaultState(Biome.getBiomeIdOrCorrect(protocolId, defaultBiome));
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                for (int y = 0; y < 16; y++) {
-                    palette.setBlock(x, y, z, chunk.getBiomeId(x, z));
+                int biome = chunk.getBiomeId(x, z);
+                if (biome != defaultBiome) {
+                    int corrected = Biome.getBiomeIdOrCorrect(protocolId, biome);
+                    for (int y = 0; y < 16; y++) {
+                        palette.setBlock(x, y, z, corrected);
+                    }
                 }
             }
         }
@@ -394,7 +407,7 @@ public class NetworkChunkSerializer {
     @AllArgsConstructor
     @Data
     public static class NetworkChunkSerializerCallback {
-        private int protocolId;
+        private GameVersion gameVersion;
         private BinaryStream stream;
         private Integer subchunks;
     }
@@ -402,7 +415,7 @@ public class NetworkChunkSerializer {
     @AllArgsConstructor
     @Data
     public static class NetworkChunkSerializerCallbackData {
-        private int protocol;
+        private GameVersion gameVersion;
         private long timestamp;
         private int x;
         private int z;

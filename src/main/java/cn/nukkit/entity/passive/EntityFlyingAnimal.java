@@ -1,6 +1,8 @@
 package cn.nukkit.entity.passive;
 
+import cn.nukkit.Player;
 import cn.nukkit.entity.EntityFlying;
+import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -9,6 +11,26 @@ public abstract class EntityFlyingAnimal extends EntityFlying implements EntityA
 
     public EntityFlyingAnimal(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
+
+    @Override
+    public boolean isFriendly() {
+        return true;
+    }
+
+    @Override
+    public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
+        if (!this.isLeashed()) {
+            if (item.getId() == Item.LEAD) {
+                this.leash(player);
+                return true; // onInteract: true = decrease count
+            }
+        } else {
+            this.unleash();
+            return false;
+        }
+
+        return super.onInteract(player, item, clickedPos);
     }
 
     @Override

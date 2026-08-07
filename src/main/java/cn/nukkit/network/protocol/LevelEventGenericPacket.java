@@ -22,6 +22,7 @@ public class LevelEventGenericPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -29,7 +30,7 @@ public class LevelEventGenericPacket extends DataPacket {
         this.reset();
         this.putVarInt(eventId);
         try {
-            this.put(NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN, true));
+            this.put(NBTIO.writeValue(tag, ByteOrder.LITTLE_ENDIAN, true));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

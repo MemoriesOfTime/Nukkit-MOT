@@ -1,6 +1,8 @@
 package cn.nukkit.level.format.leveldb.structure;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -218,7 +220,12 @@ public class StateBlockStorage {
         this.set(elementIndex(pos.x, pos.y, pos.z), BlockStateMapping.get().getBlockStateFromFullId(value));
     }
 
+    @Deprecated
     public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
+        this.writeTo(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), stream, antiXray);
+    }
+
+    public void writeTo(GameVersion protocol, BinaryStream stream, boolean antiXray) {
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
         for (int i = 0; i < SECTION_SIZE; i++) {
@@ -380,6 +387,23 @@ public class StateBlockStorage {
                 this.blockIds != null ? this.blockIds.clone() : null,
                 this.blockData != null ? this.blockData.copy(): null
         );
+    }
+
+    /**
+     * Check if this storage may contain light-emitting blocks.
+     * This is a fast check that only looks at the palette, not every block position.
+     * If this returns false, the storage definitely has no light sources.
+     * If this returns true, the storage may have light sources (needs full scan).
+     *
+     * @return true if light sources may exist, false if definitely none
+     */
+    public boolean maybeHasLightSource() {
+        for (BlockStateSnapshot state : this.palette) {
+            if (Block.getBlockLight(state.getLegacyId()) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static int elementIndex(int x, int y, int z) {

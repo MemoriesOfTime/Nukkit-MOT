@@ -9,7 +9,6 @@ import cn.nukkit.permission.Permission;
 import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.PluginException;
 import cn.nukkit.utils.Utils;
-import io.netty.util.internal.ConcurrentSet;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.File;
@@ -39,11 +38,16 @@ public class PluginManager {
 
     protected final Map<String, Set<Permissible>> permSubs = new ConcurrentHashMap<>();
 
-    protected final Set<Permissible> defSubs = new ConcurrentSet<>();
+    protected final Set<Permissible> defSubs = ConcurrentHashMap.newKeySet();
 
-    protected final Set<Permissible> defSubsOp = new ConcurrentSet<>();
+    protected final Set<Permissible> defSubsOp = ConcurrentHashMap.newKeySet();
 
     protected final Map<String, PluginLoader> fileAssociations = new HashMap<>();
+
+    /**
+     * Cache: Event class -> HandlerList, avoiding repeated reflection lookups.
+     */
+    private final Map<Class<? extends Event>, HandlerList> handlerListCache = new ConcurrentHashMap<>();
 
     public PluginManager(Server server, SimpleCommandMap commandMap) {
         this.server = server;
@@ -57,9 +61,9 @@ public class PluginManager {
     public boolean registerInterface(Class<? extends PluginLoader> loaderClass) {
         if (loaderClass != null) {
             try {
-                Constructor constructor = loaderClass.getDeclaredConstructor(Server.class);
+                Constructor<? extends PluginLoader> constructor = loaderClass.getDeclaredConstructor(Server.class);
                 constructor.setAccessible(true);
-                this.fileAssociations.put(loaderClass.getName(), (PluginLoader) constructor.newInstance(this.server));
+                this.fileAssociations.put(loaderClass.getName(), constructor.newInstance(this.server));
                 return true;
             } catch (Exception e) {
                 return false;
@@ -237,11 +241,7 @@ public class PluginManager {
                     }
 
                     if (softDependencies.containsKey(name)) {
-                        for (String dependency : new ArrayList<>(softDependencies.get(name))) {
-                            if (loadedPlugins.containsKey(dependency) || this.getPlugin(dependency) != null) {
-                                softDependencies.get(name).remove(dependency);
-                            }
-                        }
+                        softDependencies.get(name).removeIf(dependency -> loadedPlugins.containsKey(dependency) || this.getPlugin(dependency) != null);
 
                         if (softDependencies.get(name).isEmpty()) {
                             softDependencies.remove(name);
@@ -353,7 +353,7 @@ public class PluginManager {
 
     public void subscribeToPermission(String permission, Permissible permissible) {
         if (!this.permSubs.containsKey(permission)) {
-            this.permSubs.put(permission, new ConcurrentSet<>());
+            this.permSubs.put(permission, ConcurrentHashMap.newKeySet());
         }
         this.permSubs.get(permission).add(permissible);
     }
@@ -521,6 +521,7 @@ public class PluginManager {
         this.permissions.clear();
         this.defaultPerms.clear();
         this.defaultPermsOp.clear();
+        this.handlerListCache.clear();
     }
 
     public void callEvent(Event event) {
@@ -604,10 +605,16 @@ public class PluginManager {
     }
 
     private HandlerList getEventListeners(Class<? extends Event> type) throws IllegalAccessException {
+        HandlerList cached = handlerListCache.get(type);
+        if (cached != null) {
+            return cached;
+        }
         try {
             Method method = getRegistrationClass(type).getDeclaredMethod("getHandlers");
             method.setAccessible(true);
-            return (HandlerList) method.invoke(null);
+            HandlerList handlerList = (HandlerList) method.invoke(null);
+            handlerListCache.put(type, handlerList);
+            return handlerList;
         } catch (NullPointerException e) {
             throw new IllegalArgumentException("getHandlers method in " + type.getName() + " was not static!");
         } catch (Exception e) {

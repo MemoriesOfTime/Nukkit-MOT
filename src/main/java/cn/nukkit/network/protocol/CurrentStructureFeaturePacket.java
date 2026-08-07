@@ -3,7 +3,7 @@ package cn.nukkit.network.protocol;
 import lombok.ToString;
 
 /**
- * @author glorydark
+ * @since v712
  */
 @ToString
 public class CurrentStructureFeaturePacket extends DataPacket {
@@ -29,6 +29,7 @@ public class CurrentStructureFeaturePacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putString(this.currentStructureFeature);
     }
 }

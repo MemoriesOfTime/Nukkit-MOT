@@ -58,12 +58,12 @@ public interface BlockEntityHolder<E extends BlockEntity> {
         } else {
             initialData = initialData.copy();
         }
-        BlockEntity created = BlockEntity.createBlockEntity(typeName, chunk, 
+        BlockEntity created = BlockEntity.createBlockEntity(typeName, chunk,
                 initialData
                     .putString("id", typeName)
                     .putInt("x", getFloorX())
                     .putInt("y", getFloorY())
-                    .putInt("z", getFloorZ()), 
+                    .putInt("z", getFloorZ()),
                 args);
 
         Class<? extends E> entityClass = getBlockEntityClass();
@@ -123,7 +123,7 @@ public interface BlockEntityHolder<E extends BlockEntity> {
     static <E extends BlockEntity, H extends BlockEntityHolder<E>> E setBlockAndCreateEntity(
             @NotNull H holder, boolean direct, boolean update, @Nullable CompoundTag initialData,
             @Nullable Object... args) {
-        Block block = holder.getBlock(); 
+        Block block = holder.getBlock();
         Level level = block.getLevel();
         Block layer0 = level.getBlock(block, 0);
         Block layer1 = level.getBlock(block, 1);
@@ -137,7 +137,7 @@ public interface BlockEntityHolder<E extends BlockEntity> {
                 throw e;
             }
         }
-        
+
         return null;
     }
 

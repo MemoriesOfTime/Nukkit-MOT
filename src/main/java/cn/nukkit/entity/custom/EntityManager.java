@@ -28,7 +28,7 @@ public class EntityManager {
     }
 
     public EntityManager() {
-        for (Map.Entry<Integer, String> entry : Entity.getEntityRuntimeMapping(ProtocolInfo.CURRENT_PROTOCOL).entrySet()) {
+        for (Map.Entry<Integer, String> entry : Entity.getEntityRuntimeMapping().entrySet()) {
             legacy_ids.put(entry.getValue(), entry.getKey());
         }
     }
@@ -42,6 +42,16 @@ public class EntityManager {
         if (this.identifierToDefinition.containsKey(entityDefinition.getIdentifier())) {
             throw new IllegalArgumentException("Custom entity " + entityDefinition.getIdentifier() + " was already registered");
         }
+
+        if (!Entity.hasDefaultConstructor(entityDefinition.getImplementation())) {
+            Server.getInstance().getLogger().error("Custom entity \"" + entityDefinition.getIdentifier()
+                    + "\" (" + entityDefinition.getImplementation().getName()
+                    + ") does not expose a (FullChunk, CompoundTag) constructor. "
+                    + "Nukkit-MOT cannot process this entity.",
+                    new RuntimeException("Custom entity without (FullChunk, CompoundTag) constructor"));
+            return;
+        }
+
         this.identifierToDefinition.put(entityDefinition.getIdentifier(), entityDefinition);
         this.runtimeIdToDefinition.put(entityDefinition.getRuntimeId(), entityDefinition);
         if (entityDefinition.getAlternateName() != null && !entityDefinition.getAlternateName().trim().isEmpty()) {

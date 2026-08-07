@@ -25,22 +25,23 @@ public abstract class EntityFlying extends BaseEntity {
         }
 
         Vector3 target = this.target;
-        if (!(target instanceof EntityCreature) || (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) || !((Entity) target).canBeFollowed()) {
-            double near = Integer.MAX_VALUE;
-            for (Entity entity : this.getLevel().getEntities()) {
-                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
+        if (!(target instanceof EntityCreature) ||
+                (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) ||
+                !((Entity) target).canBeFollowed()) {
+
+            for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
+                if (!(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
 
-                if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
+                if (creature instanceof BaseEntity base && base.isFriendly() == this.isFriendly()) {
                     continue;
                 }
 
                 double distance = this.distanceSquared(creature);
-                if (distance > near || !this.targetOption(creature, distance)) {
+                if (!this.targetOption(creature, distance)) {
                     continue;
                 }
-                near = distance;
 
                 this.stayTime = 0;
                 this.moveTime = 0;
@@ -48,7 +49,9 @@ public abstract class EntityFlying extends BaseEntity {
             }
         }
 
-        if (this.target instanceof EntityCreature && !((EntityCreature) this.target).closed && ((EntityCreature) this.target).isAlive() && this.targetOption((EntityCreature) this.target, this.distanceSquared(this.target))) {
+        if (this.target instanceof EntityCreature creature &&
+                !creature.closed && creature.isAlive() &&
+                this.targetOption(creature, this.distanceSquared(this.target))) {
             return;
         }
 
@@ -57,7 +60,6 @@ public abstract class EntityFlying extends BaseEntity {
             if (Utils.rand(1, 100) > 5) {
                 return;
             }
-
             x = Utils.rand(10, 30);
             z = Utils.rand(10, 30);
             this.target = this.add(Utils.rand() ? x : -x, 0, Utils.rand() ? z : -z);
@@ -135,7 +137,7 @@ public abstract class EntityFlying extends BaseEntity {
 
             int block;
             if (this.stayTime <= 0 && this.motionY == 0 && (Math.abs(motionX) > 0 || Math.abs(motionZ) > 0) &&
-                    (Block.solid[(block = this.level.getBlockIdAt(this.getFloorX(), this.getFloorY() - 1, this.getFloorZ()))] || block == Block.WATER || block == Block.STILL_WATER || block == Block.LAVA || block == Block.STILL_LAVA)) {
+                    (Block.isBlockSolidById(block = this.level.getBlockIdAt(this.getFloorX(), this.getFloorY() - 1, this.getFloorZ())) || block == Block.WATER || block == Block.STILL_WATER || block == Block.LAVA || block == Block.STILL_LAVA)) {
                 this.motionY = 0.05;
             }
 

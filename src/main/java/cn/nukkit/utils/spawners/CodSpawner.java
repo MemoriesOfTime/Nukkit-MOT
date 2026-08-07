@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.entity.passive.EntityCod;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.utils.AbstractEntitySpawner;
 import cn.nukkit.utils.SpawnerTask;
 import cn.nukkit.utils.Utils;
@@ -23,7 +24,7 @@ public class CodSpawner extends AbstractEntitySpawner {
         final int blockId = level.getBlockIdAt((int) pos.x, (int) pos.y, (int) pos.z);
         if (blockId == Block.WATER || blockId == Block.STILL_WATER) {
             final int biomeId = level.getBiomeId((int) pos.x, (int) pos.z);
-            if (biomeId == 0 || biomeId == 24 || (biomeId >= 42 && biomeId <= 45)) {
+            if (biomeId == EnumBiome.OCEAN.id || biomeId == EnumBiome.DEEP_OCEAN.id || (biomeId >= EnumBiome.LUKEWARM_OCEAN.id && biomeId <= EnumBiome.DEEP_COLD_OCEAN.id)) {
                 final int b = level.getBlockIdAt((int) pos.x, (int) (pos.y -1), (int) pos.z);
                 if (b == Block.WATER || b == Block.STILL_WATER) {
                     for (int i = 0; i < Utils.rand(4, 7); i++) {

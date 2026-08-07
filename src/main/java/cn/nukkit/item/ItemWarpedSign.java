@@ -1,7 +1,8 @@
 package cn.nukkit.item;
 
-
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.BlockWarpedSignPost;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemWarpedSign extends ItemSign {
 
@@ -15,5 +16,10 @@ public class ItemWarpedSign extends ItemSign {
 
     public ItemWarpedSign(Integer meta, int count) {
         super(WARPED_SIGN, meta, count, "Warped Sign", new BlockWarpedSignPost());
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_16_0;
     }
 }

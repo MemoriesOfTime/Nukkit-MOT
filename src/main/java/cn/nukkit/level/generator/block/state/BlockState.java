@@ -1,8 +1,11 @@
 package cn.nukkit.level.generator.block.state;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.generator.math.Rotation;
+
+import java.util.Objects;
 
 public class BlockState {
     public static final BlockState AIR = new BlockState(0);
@@ -40,7 +43,7 @@ public class BlockState {
     }
 
     public int getRuntimeId() {
-        return GlobalBlockPalette.getOrCreateRuntimeId(id, meta);
+        return GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getFeatureVersion(), id, meta);
     }
 
     public Block getBlock() {
@@ -54,5 +57,17 @@ public class BlockState {
             case COUNTERCLOCKWISE_90 -> new BlockState(id, Rotation.counterclockwise90(id, meta));
             default -> this;
         };
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof BlockState that)) return false;
+        return id == that.id && meta == that.meta;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, meta);
     }
 }

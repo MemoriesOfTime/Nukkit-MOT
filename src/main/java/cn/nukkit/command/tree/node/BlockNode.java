@@ -3,7 +3,6 @@ package cn.nukkit.command.tree.node;
 import cn.nukkit.block.Block;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.item.Item;
-import cn.nukkit.level.GlobalBlockPalette;
 
 /**
  * 解析对应参数为{@link Block}值
@@ -15,7 +14,7 @@ public class BlockNode extends ParamNode<Block> {
     public void fill(String arg) {
         Block block = Item.fromString(arg).getBlockUnsafe();
         if (block == null) {
-            this.error();
+            error("commands.give.block.notFound", arg);
             return;
         }
         this.value = block;

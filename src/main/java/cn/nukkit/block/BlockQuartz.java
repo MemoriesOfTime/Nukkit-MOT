@@ -6,6 +6,7 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -63,7 +64,7 @@ public class BlockQuartz extends BlockSolidMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (this.getDamage() != QUARTZ_NORMAL) {
             this.setDamage(((this.getDamage() & 0x03) | faces[face.getIndex()]));
         }

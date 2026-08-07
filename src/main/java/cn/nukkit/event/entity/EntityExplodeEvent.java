@@ -7,6 +7,7 @@ import cn.nukkit.event.HandlerList;
 import cn.nukkit.level.Position;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * @author Angelic47
@@ -22,6 +23,8 @@ public class EntityExplodeEvent extends EntityEvent implements Cancellable {
 
     protected final Position position;
     protected List<Block> blocks;
+
+    protected Set<Block> ignitions;
     protected double yield;
 
     public EntityExplodeEvent(Entity entity, Position position, List<Block> blocks, double yield) {
@@ -49,5 +52,13 @@ public class EntityExplodeEvent extends EntityEvent implements Cancellable {
 
     public void setYield(double yield) {
         this.yield = yield;
+    }
+
+    public Set<Block> getIgnitions() {
+        return ignitions;
+    }
+
+    public void setIgnitions(Set<Block> ignitions) {
+        this.ignitions = ignitions;
     }
 }

@@ -5,6 +5,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import lombok.ToString;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
 @ToString
 public class AddVolumeEntityPacket extends DataPacket {
@@ -26,11 +27,6 @@ public class AddVolumeEntityPacket extends DataPacket {
      */
     private String instanceName;
 
-
-    public AddVolumeEntityPacket() {
-
-    }
-
     @Override
     public byte pid() {
         return NETWORK_ID;
@@ -39,10 +35,19 @@ public class AddVolumeEntityPacket extends DataPacket {
     @Override
     public void decode() {
         id = getUnsignedVarInt();
-        data = getTag();
-        engineVersion = getString();
-        identifier = getString();
-        instanceName = getString();
+        data = getTagNetworkLE();
+        if (protocol >= 486) {
+            identifier = getString();
+            instanceName = getString();
+            if (protocol >= 503) {
+                getBlockVector3(); // minBounds
+                getBlockVector3(); // maxBounds
+                getVarInt(); // dimension
+            }
+            engineVersion = getString();
+        } else if (protocol >= 465) {
+            engineVersion = getString();
+        }
     }
 
     @Override
@@ -50,13 +55,25 @@ public class AddVolumeEntityPacket extends DataPacket {
         reset();
         putUnsignedVarInt(id);
         try {
-            putByteArray(NBTIO.write(data));
+            this.put(NBTIO.write(data, ByteOrder.LITTLE_ENDIAN, true));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        putString(engineVersion);
-        putString(identifier);
-        putString(instanceName);
+        if (protocol >= 486) {
+            // v486+: identifier, instanceName before engineVersion
+            putString(identifier);
+            putString(instanceName);
+            if (protocol >= 503) {
+                // v503+: minBounds, maxBounds, dimension (not currently used by server)
+                putBlockVector3(0, 0, 0);
+                putBlockVector3(0, 0, 0);
+                putVarInt(0);
+            }
+            putString(engineVersion);
+        } else if (protocol >= 465) {
+            // v465-v485: only engineVersion
+            putString(engineVersion);
+        }
     }
 
     public long getId() {

@@ -6,6 +6,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by PetteriM1
@@ -46,7 +47,7 @@ public class BlockIceFrosted extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         boolean success = super.place(item, block, target, face, fx, fy, fz, player);
         if (success) {
             level.scheduleUpdate(this, Utils.random.nextInt(20, 40));
@@ -69,8 +70,10 @@ public class BlockIceFrosted extends BlockTransparentMeta {
                 level.scheduleUpdate(this, Utils.random.nextInt(20, 40));
             }
         } else if (type == Level.BLOCK_UPDATE_NORMAL) {
+            // Like vanilla: don't melt immediately on neighbor update
+            // Instead, schedule a delayed check to allow Frost Walker ice to stabilize
             if (countNeighbors() < 2) {
-                level.setBlock(this, get(WATER), true);
+                level.scheduleUpdate(this, Utils.random.nextInt(20, 40));
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
             if ((this.getLevel().getBlockLightAt((int) this.x, (int) this.y, (int) this.z) >= 12 || (level.getTime() % Level.TIME_FULL < 13184 || level.getTime() % Level.TIME_FULL > 22800)) && (Utils.random.nextInt(3) == 0 || countNeighbors() < 4)) {
@@ -122,5 +125,10 @@ public class BlockIceFrosted extends BlockTransparentMeta {
             }
         }
         return neighbors;
+    }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
     }
 }

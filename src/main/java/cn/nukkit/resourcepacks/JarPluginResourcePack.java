@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -25,7 +26,6 @@ public class JarPluginResourcePack extends AbstractResourcePack {
     protected File jarPluginFile;
     protected ByteBuffer zippedByteBuffer;
     protected byte[] sha256;
-    protected String encryptionKey = "";
 
     public static boolean hasResourcePack(File jarPluginFile) {
         try {
@@ -39,11 +39,15 @@ public class JarPluginResourcePack extends AbstractResourcePack {
     protected static ZipEntry findManifestInJar(ZipFile jar) {
         ZipEntry manifest = jar.getEntry(RESOURCE_PACK_PATH + "manifest.json");
         if (manifest == null) {
+            manifest = jar.getEntry(RESOURCE_PACK_PATH + "pack_manifest.json");
+        }
+        if (manifest == null) {
             manifest = jar.stream()
-                    .filter(e -> e.getName().toLowerCase().endsWith("manifest.json") && !e.isDirectory())
+                    .filter(e -> !e.isDirectory() &&
+                            (e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") || e.getName().toLowerCase(Locale.ROOT).endsWith("pack_manifest.json")))
                     .filter(e -> {
                         File fe = new File(e.getName());
-                        if (!fe.getName().equalsIgnoreCase("manifest.json")) {
+                        if (!fe.getName().equalsIgnoreCase("manifest.json") && !fe.getName().equalsIgnoreCase("pack_manifest.json")) {
                             return false;
                         }
                         return fe.getParent() == null || fe.getParentFile().getParent() == null;
@@ -79,12 +83,11 @@ public class JarPluginResourcePack extends AbstractResourcePack {
 
             ZipEntry encryptionKeyEntry = jar.getEntry(RESOURCE_PACK_PATH + "encryption.key");
             if (encryptionKeyEntry != null) {
-                this.encryptionKey = new String(jar.getInputStream(encryptionKeyEntry).readAllBytes(),StandardCharsets.UTF_8);
-                log.debug(this.encryptionKey);
+                this.setEncryptionKey(new String(jar.getInputStream(encryptionKeyEntry).readAllBytes(), StandardCharsets.UTF_8));
             }
 
             jar.stream().forEach(entry -> {
-                if (entry.getName().startsWith(RESOURCE_PACK_PATH) && !entry.isDirectory() && !entry.getName().equals(RESOURCE_PACK_PATH + "encryption.key")) {
+                if (!entry.isDirectory() && entry.getName().startsWith(RESOURCE_PACK_PATH) && !entry.getName().equals(RESOURCE_PACK_PATH + "encryption.key")) {
                     try {
                         zipOutputStream.putNextEntry(new ZipEntry(entry.getName().substring(RESOURCE_PACK_PATH.length())));
                         zipOutputStream.write(jar.getInputStream(entry).readAllBytes());
@@ -125,11 +128,6 @@ public class JarPluginResourcePack extends AbstractResourcePack {
     @Override
     public byte[] getSha256() {
         return this.sha256;
-    }
-
-    @Override
-    public String getEncryptionKey() {
-        return encryptionKey;
     }
 
     @Override

@@ -1,5 +1,6 @@
 package cn.nukkit.level.particle;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.LevelEventPacket;
@@ -20,14 +21,15 @@ public class MobSpawnParticle extends Particle {
     }
 
     @Override
-    public DataPacket[] mvEncode(int protocol) {
+    public DataPacket[] mvEncode(GameVersion protocol) {
         LevelEventPacket packet = new LevelEventPacket();
         packet.evid = LevelEventPacket.EVENT_PARTICLE_SPAWN;
         packet.x = (float) this.x;
         packet.y = (float) this.y;
         packet.z = (float) this.z;
         packet.data = (this.width & 0xff) + ((this.height & 0xff) << 8);
-        packet.protocol = protocol;
+        packet.protocol = protocol.getProtocol();
+        packet.gameVersion = protocol;
         packet.tryEncode();
         return new DataPacket[]{packet};
     }

@@ -1,5 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 public class ItemAxeNetherite extends ItemTool {
 
     public ItemAxeNetherite() {
@@ -37,5 +40,10 @@ public class ItemAxeNetherite extends ItemTool {
     @Override
     public boolean canBreakShield() {
         return true;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_16_0;
     }
 }

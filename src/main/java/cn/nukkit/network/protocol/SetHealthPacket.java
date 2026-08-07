@@ -1,6 +1,5 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 @ToString
@@ -29,6 +28,7 @@ public class SetHealthPacket extends DataPacket {
         } else if (this.protocol <= ProtocolInfo.v_0_10_0) {
             this.health = this.getByte();
         }
+        this.decodeUnsupported();
     }
 
     @Override

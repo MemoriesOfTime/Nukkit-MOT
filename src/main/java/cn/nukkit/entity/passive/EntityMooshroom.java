@@ -10,7 +10,6 @@ import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;

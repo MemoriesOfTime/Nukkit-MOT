@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 
 public class BlockMudBricks extends BlockSolid {
@@ -33,6 +34,17 @@ public class BlockMudBricks extends BlockSolid {
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+
+    @Override
+    public Item[] getDrops(Item item) {
+        if (item.isPickaxe()) {
+            return new Item[]{
+                    toItem()
+            };
+        } else {
+            return Item.EMPTY_ARRAY;
+        }
     }
 
     @Override

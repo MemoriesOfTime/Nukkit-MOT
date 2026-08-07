@@ -1,5 +1,6 @@
 package cn.nukkit.level.particle;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.LevelEventPacket;
@@ -25,14 +26,15 @@ public class GenericParticle extends Particle {
     }
 
     @Override
-    public DataPacket[] mvEncode(int protocol) {
+    public DataPacket[] mvEncode(GameVersion protocol) {
         LevelEventPacket packet = new LevelEventPacket();
         packet.evid = (short) (LevelEventPacket.EVENT_ADD_PARTICLE_MASK | getMultiversionId(protocol, this.id));
         packet.x = (float) this.x;
         packet.y = (float) this.y;
         packet.z = (float) this.z;
         packet.data = this.data;
-        packet.protocol = protocol;
+        packet.protocol = protocol.getProtocol();
+        packet.gameVersion = protocol;
         packet.tryEncode();
         return new DataPacket[]{packet};
     }

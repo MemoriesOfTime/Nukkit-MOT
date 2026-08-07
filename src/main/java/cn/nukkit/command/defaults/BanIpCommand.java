@@ -1,6 +1,7 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
@@ -36,10 +37,12 @@ public class BanIpCommand extends VanillaCommand {
                 CommandParameter.newType("player", CommandParamType.STRING),
                 CommandParameter.newType("reason", true, CommandParamType.STRING)
         });
-        this.commandParameters.put("byIp", new CommandParameter[]{
-                CommandParameter.newType("ip", CommandParamType.STRING, new IPStringNode()),
-                CommandParameter.newType("reason", true, CommandParamType.STRING)
-        });
+        if (!Server.getInstance().netEaseMode) { // make client assertion happy
+            this.commandParameters.put("byIp", new CommandParameter[]{
+                    CommandParameter.newType("ip", CommandParamType.STRING, new IPStringNode()),
+                    CommandParameter.newType("reason", true, CommandParamType.STRING)
+            });
+        }
         this.enableParamTree();
     }
 
@@ -58,7 +61,7 @@ public class BanIpCommand extends VanillaCommand {
                     log.addSuccess("commands.banip.success.players", player.getAddress(), player.getName()).output(true);
                     return 1;
                 } else {
-                    String name = value.toLowerCase(Locale.ENGLISH);
+                    String name = value.toLowerCase(Locale.ROOT);
                     String path = sender.getServer().getDataPath() + "players/";
                     File file = new File(path + name + ".dat");
                     CompoundTag nbt = null;

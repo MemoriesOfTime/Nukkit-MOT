@@ -1,5 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 /**
  * @author PetteriM1
  */
@@ -25,5 +28,10 @@ public class ItemWarpedFungusOnAStick extends ItemTool {
     @Override
     public boolean noDamageOnBreak() {
         return true;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_16_0;
     }
 }

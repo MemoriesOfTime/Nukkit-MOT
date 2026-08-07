@@ -34,10 +34,4 @@ public class BlockBlueIce extends BlockIcePacked {
     public boolean isTransparent() {
         return false;
     }
-    
-    
-    @Override
-    public int getLightLevel() {
-        return 4;
-    }
 }

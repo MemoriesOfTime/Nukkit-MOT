@@ -3,9 +3,11 @@ package cn.nukkit.utils;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.FileWriteTask;
+import com.fasterxml.jackson.dataformat.toml.TomlMapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import lombok.Getter;
 import org.snakeyaml.engine.v2.api.Dump;
 import org.snakeyaml.engine.v2.api.DumpSettings;
 import org.snakeyaml.engine.v2.api.Load;
@@ -35,16 +37,21 @@ public class Config {
     public static final int SERIALIZED = 4; // .sl
     public static final int ENUM = 5; // .txt, .list, .enum
     public static final int ENUMERATION = Config.ENUM;
+    public static final int TOML = 6; // .toml
 
     private ConfigSection config = new ConfigSection();
     private File file;
     private boolean correct = false;
     private int type = Config.DETECT;
+    @Getter
+    private String header;
 
     /**
      * List of supported config file formats
      */
     public static final Map<String, Integer> format = new TreeMap<>();
+
+    private static final Pattern PROPERTY_LINE_PATTERN = Pattern.compile("[a-zA-Z0-9\\-_.]*+=+[^\\r\\n]*");
 
     static {
         format.put("properties", Config.PROPERTIES);
@@ -60,6 +67,7 @@ public class Config {
         format.put("txt", Config.ENUM);
         format.put("list", Config.ENUM);
         format.put("enum", Config.ENUM);
+        format.put("toml", Config.TOML);
     }
 
     /**
@@ -167,8 +175,10 @@ public class Config {
         } else {
             if (this.type == Config.DETECT) {
                 String extension = "";
-                if (this.file.getName().lastIndexOf('.') != -1 && this.file.getName().lastIndexOf('.') != 0) {
-                    extension = this.file.getName().substring(this.file.getName().lastIndexOf('.') + 1);
+                String fileName = this.file.getName();
+                int dotIndex = fileName.lastIndexOf('.');
+                if (dotIndex != -1 && dotIndex != 0) {
+                    extension = fileName.substring(dotIndex + 1);
                 }
                 if (format.containsKey(extension)) {
                     this.type = format.get(extension);
@@ -279,6 +289,15 @@ public class Config {
     }
 
     /**
+     * Set the header comment for config files that support comments (properties, yaml, toml).
+     * Each line will be prefixed with '#' in the output.
+     * Set to empty string to remove the header, or null to use format-specific default.
+     */
+    public void setHeader(String header) {
+        this.header = header;
+    }
+
+    /**
      * Save the config to disk
      *
      * @return saved
@@ -311,7 +330,11 @@ public class Config {
                             .setDumpComments(false)
                             .build();
                     Dump yaml = new Dump(dumperOptions);
-                    content = new StringBuilder(yaml.dumpToString(this.config));
+                    content = new StringBuilder(writeHeader());
+                    content.append(yaml.dumpToString(this.config));
+                    break;
+                case Config.TOML:
+                    content = new StringBuilder(this.writeToml());
                     break;
                 case Config.ENUM:
                     for (Object o : this.config.entrySet()) {
@@ -322,11 +345,14 @@ public class Config {
             }
             if (async) {
                 Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new FileWriteTask(this.file, content.toString()));
+                // Async save can only report task submission, not the eventual filesystem result.
+                return true;
             } else {
                 try {
                     Utils.writeFile(this.file, content.toString());
                 } catch (IOException e) {
                     Server.getInstance().getLogger().logException(e);
+                    return false;
                 }
             }
             return true;
@@ -550,8 +576,49 @@ public class Config {
         }
     }
 
+    /**
+     * Extract header comments from the beginning of file content.
+     * Reads consecutive '#' comment lines, stops at first non-comment non-empty line.
+     */
+    private void loadHeader(String content) {
+        StringBuilder sb = new StringBuilder();
+        for (String line : content.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("#")) {
+                if (!sb.isEmpty()) sb.append("\n");
+                sb.append(trimmed.substring(1).strip());
+            } else if (!trimmed.isEmpty()) {
+                break;
+            }
+        }
+        if (!sb.isEmpty()) {
+            this.header = sb.toString();
+        }
+    }
+
+    /**
+     * Generate header comment string with '#' prefix for each line.
+     * Returns empty string if no header is set.
+     */
+    private String writeHeader() {
+        String h = this.header;
+        if (h == null) {
+            h = switch (this.type) {
+                case PROPERTIES -> "Properties Config File";
+                case TOML -> "TOML Config File";
+                default -> null;
+            };
+        }
+        if (h == null || h.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String line : h.split("\n")) {
+            sb.append("# ").append(line).append("\r\n");
+        }
+        return sb.toString();
+    }
+
     private String writeProperties() {
-        StringBuilder content = new StringBuilder("#Properties Config File\r\n");
+        StringBuilder content = new StringBuilder(writeHeader());
         for (Object o : this.config.entrySet()) {
             Map.Entry entry = (Map.Entry) o;
             Object v = entry.getValue();
@@ -566,7 +633,7 @@ public class Config {
 
     private void parseProperties(String content) {
         for (final String line : content.split("\n")) {
-            if (Pattern.compile("[a-zA-Z0-9\\-_.]*+=+[^\\r\\n]*").matcher(line).matches()) {
+            if (PROPERTY_LINE_PATTERN.matcher(line).matches()) {
                 final int splitIndex = line.indexOf('=');
                 if (splitIndex == -1) {
                     continue;
@@ -576,7 +643,7 @@ public class Config {
                 if (this.config.containsKey(key)) {
                     MainLogger.getLogger().debug("[Config] Repeated property " + key + " in file " + this.file.toString());
                 }
-                switch (value.toLowerCase()) {
+                switch (value.toLowerCase(Locale.ROOT)) {
                     case "on":
                     case "true":
                     case "yes":
@@ -592,6 +659,28 @@ public class Config {
                         break;
                 }
             }
+        }
+    }
+
+    private void parseToml(String content) {
+        try {
+            TomlMapper mapper = new TomlMapper();
+            @SuppressWarnings("unchecked")
+            LinkedHashMap<String, Object> map = mapper.readValue(content, LinkedHashMap.class);
+            this.config = new ConfigSection(map);
+        } catch (Exception e) {
+            MainLogger.getLogger().error("[Config] Failed to parse TOML", e);
+            this.correct = false;
+        }
+    }
+
+    private String writeToml() {
+        try {
+            TomlMapper mapper = new TomlMapper();
+            return writeHeader() + mapper.writeValueAsString(this.config.getAllMap());
+        } catch (Exception e) {
+            MainLogger.getLogger().error("[Config] Failed to write TOML", e);
+            return "";
         }
     }
 
@@ -616,19 +705,25 @@ public class Config {
     private void parseContent(String content) {
         switch (this.type) {
             case Config.PROPERTIES:
+                this.loadHeader(content);
                 this.parseProperties(content);
                 break;
             case Config.JSON:
                 GsonBuilder builder = new GsonBuilder();
                 Gson gson = builder.create();
-                this.config = new ConfigSection(gson.fromJson(content, new LinkedHashMapTypeToken().getType()));
+                this.config = new ConfigSection(gson.fromJson(content, new LinkedHashMapTypeToken()));
                 break;
             case Config.YAML:
+                this.loadHeader(content);
                 LoadSettings settings = LoadSettings.builder()
                         .setParseComments(false)
                         .build();
                 Load yaml = new Load(settings);
                 this.config = new ConfigSection((LinkedHashMap<String, Object>) yaml.loadFromString(content));
+                break;
+            case Config.TOML:
+                this.loadHeader(content);
+                this.parseToml(content);
                 break;
             case Config.ENUM:
                 this.parseList(content);

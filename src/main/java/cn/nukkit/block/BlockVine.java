@@ -12,6 +12,7 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
@@ -155,7 +156,7 @@ public class BlockVine extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (block.getId() != VINE && target.isSolid() && face.getHorizontalIndex() != -1) {
             this.setDamage(getMetaFromFace(face.getOpposite()));
             this.getLevel().setBlock(block, this, true, true);

@@ -10,6 +10,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.EnumSet;
 
@@ -20,6 +21,10 @@ import java.util.EnumSet;
 public class BlockRedstoneWire extends BlockFlowable {
 
     private boolean canProvidePower = true;
+    private boolean scheduledDecay = false;
+
+    private static final ThreadLocal<Integer> UPDATE_DEPTH = ThreadLocal.withInitial(() -> 0);
+    private static final int MAX_UPDATE_DEPTH = 16;
 
     public BlockRedstoneWire() {
         this(0);
@@ -40,7 +45,7 @@ public class BlockRedstoneWire extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (!canBePlacedOn(block.down())) {
             return false;
         }
@@ -80,70 +85,85 @@ public class BlockRedstoneWire extends BlockFlowable {
     }
 
     private void calculateCurrentChanges(boolean force, boolean stillExists) {
-        Vector3 pos = this.getLocation();
-
-        int meta = this.getDamage();
-        int maxStrength = meta;
-        this.canProvidePower = false;
-        int power = this.getIndirectPower();
-
-        this.canProvidePower = true;
-
-        if (power > 0 && power > maxStrength - 1) {
-            maxStrength = power;
+        if (UPDATE_DEPTH.get() >= MAX_UPDATE_DEPTH) {
+            return;
         }
+        UPDATE_DEPTH.set(UPDATE_DEPTH.get() + 1);
+        try {
+            Vector3 pos = this.getLocation();
 
-        int strength = 0;
+            int meta = this.getDamage();
+            int maxStrength = meta;
+            this.canProvidePower = false;
+            int power = this.getIndirectPower();
 
-        for (BlockFace face : Plane.HORIZONTAL) {
-            Vector3 v = pos.getSide(face);
+            this.canProvidePower = true;
 
-            if (v.getX() == this.getX() && v.getZ() == this.getZ()) {
-                continue;
+            if (power > 0 && power > maxStrength - 1) {
+                maxStrength = power;
             }
 
+            int strength = 0;
 
-            strength = this.getMaxCurrentStrength(v, strength);
+            for (BlockFace face : Plane.HORIZONTAL) {
+                Vector3 v = pos.getSide(face);
 
-            boolean vNormal = this.level.getBlock(v).isNormalBlock();
+                if (v.getX() == this.getX() && v.getZ() == this.getZ()) {
+                    continue;
+                }
 
-            if (vNormal && !this.level.getBlock(pos.up()).isNormalBlock()) {
-                strength = this.getMaxCurrentStrength(v.up(), strength);
-            } else if (!vNormal) {
-                strength = this.getMaxCurrentStrength(v.down(), strength);
-            }
-        }
+                strength = this.getMaxCurrentStrength(v, strength);
 
-        if (strength > maxStrength) {
-            maxStrength = strength - 1;
-        } else if (maxStrength > 0) {
-            --maxStrength;
-        } else {
-            maxStrength = 0;
-        }
+                boolean vNormal = this.level.getBlock(v).isNormalBlock();
 
-        if (power > maxStrength - 1) {
-            maxStrength = power;
-        } else if (power < maxStrength && strength <= maxStrength) {
-            maxStrength = Math.max(power, strength - 1);
-        }
-
-        if (meta != maxStrength) {
-            if (stillExists) {
-                this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, meta, maxStrength));
-
-                this.setDamage(maxStrength);
-                this.level.setBlock(this, this, false, false);
+                if (vNormal && !this.level.getBlock(pos.up()).isNormalBlock()) {
+                    strength = this.getMaxCurrentStrength(v.up(), strength);
+                } else if (!vNormal) {
+                    strength = this.getMaxCurrentStrength(v.down(), strength);
+                }
             }
 
-            this.level.updateAroundRedstone(this, null);
-            for (BlockFace face : BlockFace.values()) {
-                this.level.updateAroundRedstone(pos.getSide(face), face.getOpposite());
+            if (strength > maxStrength) {
+                maxStrength = strength - 1;
+            } else if (maxStrength > 0) {
+                --maxStrength;
+            } else {
+                maxStrength = 0;
             }
-        } else if (force) {
-            for (BlockFace face : BlockFace.values()) {
-                this.level.updateAroundRedstone(pos.getSide(face), face.getOpposite());
+
+            if (power > maxStrength - 1) {
+                maxStrength = power;
+            } else if (power < maxStrength && strength <= maxStrength) {
+                maxStrength = Math.max(power, strength - 1);
             }
+
+            if (meta != maxStrength) {
+                if (stillExists) {
+                    this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, meta, maxStrength));
+                    this.setDamage(maxStrength);
+                    this.level.setBlock(this, this, false, false);
+                }
+
+                this.level.updateAroundRedstone(this, null);
+                for (BlockFace face : BlockFace.values()) {
+                    this.level.updateAroundRedstone(pos.getSide(face), face.getOpposite());
+                }
+
+                if (maxStrength > 0) {
+                    if (!scheduledDecay) {
+                        this.level.scheduleUpdate(this, this, 2);
+                        scheduledDecay = true;
+                    }
+                } else {
+                    scheduledDecay = false;
+                }
+            } else if (force) {
+                for (BlockFace face : BlockFace.values()) {
+                    this.level.updateAroundRedstone(pos.getSide(face), face.getOpposite());
+                }
+            }
+        } finally {
+            UPDATE_DEPTH.set(UPDATE_DEPTH.get() - 1);
         }
     }
 
@@ -192,6 +212,12 @@ public class BlockRedstoneWire extends BlockFlowable {
 
     @Override
     public int onUpdate(int type) {
+        if (type == Level.BLOCK_UPDATE_SCHEDULED) {
+            scheduledDecay = false;
+            this.calculateCurrentChanges(false, true);
+            return type;
+        }
+
         if (type != Level.BLOCK_UPDATE_NORMAL && type != Level.BLOCK_UPDATE_REDSTONE) {
             return 0;
         }
@@ -213,12 +239,12 @@ public class BlockRedstoneWire extends BlockFlowable {
         return Level.BLOCK_UPDATE_REDSTONE;
     }
 
-    public boolean canBePlacedOn(Vector3 v) {
-        return this.canBePlacedOn(this.level.getBlock(v));
+    public boolean canBePlacedOn(Vector3 pos) {
+        return this.canBePlacedOn(this.level.getBlock(pos));
     }
 
-    private boolean canBePlacedOn(Block b) {
-        return (b.isSolid() && !b.isTransparent() && b.getId() != GLOWSTONE) || b.getId() == HOPPER_BLOCK;
+    public boolean canBePlacedOn(Block support) {
+        return support.isSolid(BlockFace.UP);
     }
 
     @Override
@@ -246,9 +272,13 @@ public class BlockRedstoneWire extends BlockFlowable {
                     }
                 }
 
-                if (side.getAxis().isHorizontal() && enumset.isEmpty()) {
+                BlockFace outputSide = side.getAxis().isHorizontal() ? side.getOpposite() : side;
+                if (outputSide.getAxis().isHorizontal() && enumset.isEmpty()) {
                     return power;
-                } else if (enumset.contains(side) && !enumset.contains(side.rotateYCCW()) && !enumset.contains(side.rotateY())) {
+                } else if (enumset.size() == 1) {
+                    BlockFace connectedSide = enumset.iterator().next();
+                    return outputSide == connectedSide || outputSide == connectedSide.getOpposite() ? power : 0;
+                } else if (enumset.contains(outputSide)) {
                     return power;
                 } else {
                     return 0;
@@ -314,7 +344,17 @@ public class BlockRedstoneWire extends BlockFlowable {
         if (block.getId() == Block.REDSTONE_WIRE) {
             return 0;
         }
-        return block.isNormalBlock() ? getStrongPower(pos.getSide(face), face) : block.getWeakPower(face);
+        if (block.isNormalBlock()) {
+            int power = 0;
+            for (BlockFace side : BlockFace.values()) {
+                power = Math.max(power, getStrongPower(pos.getSide(side), side));
+                if (power >= 15) {
+                    return power;
+                }
+            }
+            return power;
+        }
+        return block.getWeakPower(face);
     }
 
     private int getStrongPower(Vector3 pos, BlockFace direction) {

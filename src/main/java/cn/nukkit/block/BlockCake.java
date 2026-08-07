@@ -5,10 +5,13 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemCake;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Nukkit Project Team
@@ -81,7 +84,7 @@ public class BlockCake extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (down().getId() != Block.AIR) {
             getLevel().setBlock(block, this, true, true);
 
@@ -120,7 +123,8 @@ public class BlockCake extends BlockTransparentMeta {
         }
         if (player != null && player.canEat(false)) {
             if (getDamage() <= 0x06) setDamage(getDamage() + 1);
-            if (getDamage() >= 0x06) {
+            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player, this.add(0.5, 0.5, 0.5), VibrationType.EAT));
+            if (getDamage() > 0x06) {
                 getLevel().setBlock(this, Block.get(BlockID.AIR), true);
             } else {
                 Food.getByRelative(this).eatenBy(player);

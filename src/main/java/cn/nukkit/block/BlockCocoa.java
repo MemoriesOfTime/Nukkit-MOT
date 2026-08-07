@@ -14,6 +14,7 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by CreeperFace on 27. 10. 2016.
@@ -69,12 +70,12 @@ public class BlockCocoa extends BlockTransparentMeta implements Faceable {
     protected AxisAlignedBB recalculateBoundingBox() {
         AxisAlignedBB[] bbs;
 
-        int damage = this.getDamage();
-        if (damage > 11) {
-            this.setDamage(11);
+        int damage = this.getSafeDamage();
+        if (damage != this.getDamage()) {
+            this.setDamage(damage);
         }
 
-        switch (getDamage()) {
+        switch (damage) {
             case 1:
             case 5:
             case 9:
@@ -95,11 +96,11 @@ public class BlockCocoa extends BlockTransparentMeta implements Faceable {
                 break;
         }
 
-        return bbs[(this.getDamage() >> 2)].getOffsetBoundingBox(x, y, z);
+        return bbs[(damage >> 2)].getOffsetBoundingBox(x, y, z);
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (target.getId() == Block.WOOD && (target.getDamage() & 0x03) == BlockWood.JUNGLE) {
             if (face != BlockFace.DOWN && face != BlockFace.UP) {
                 this.setDamage(faces[face.getIndex()]);
@@ -113,9 +114,10 @@ public class BlockCocoa extends BlockTransparentMeta implements Faceable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            Block side = this.getSide(BlockFace.fromIndex(faces2[this.getDamage()]));
+            int damage = this.getSafeDamage();
+            Block side = this.getSide(BlockFace.fromIndex(faces2[damage]));
 
-            if (side.getId() != Block.WOOD && (side.getDamage() & 0x03) != BlockWood.JUNGLE) {
+            if (side.getId() != Block.WOOD || (side.getDamage() & 0x03) != BlockWood.JUNGLE) {
                 this.getLevel().useBreakOn(this);
                 return Level.BLOCK_UPDATE_NORMAL;
             }
@@ -139,6 +141,10 @@ public class BlockCocoa extends BlockTransparentMeta implements Faceable {
         }
 
         return 0;
+    }
+
+    private int getSafeDamage() {
+        return Math.max(0, Math.min(this.getDamage(), faces2.length - 1));
     }
 
     @Override

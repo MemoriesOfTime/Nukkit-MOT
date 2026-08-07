@@ -302,7 +302,7 @@ public class BlockBell extends BlockTransparentMeta implements Faceable, BlockEn
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (block.canBeReplaced() && block.getId() != AIR && !(block instanceof BlockLiquid)) {
             face = BlockFace.UP;
         }

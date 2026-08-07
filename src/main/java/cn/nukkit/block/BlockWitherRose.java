@@ -28,11 +28,11 @@ public class BlockWitherRose extends BlockFlower {
 
     @Override
     public void onEntityCollide(Entity entity) {
-        if (level.getServer().getDifficulty() != 0 && entity instanceof EntityLiving living) {
+        if (entity instanceof EntityLiving living && level.getServer().getDifficulty() != 0) {
             if (!living.invulnerable && !living.hasEffect(Effect.WITHER)
                     && (!(living instanceof Player) || !((Player) living).isCreative() && !((Player) living).isSpectator())) {
                 Effect effect = Effect.getEffect(Effect.WITHER);
-                effect.setDuration(40);
+                effect.setDuration(50); // No damage is given if less due to how the effect is ticked
                 living.addEffect(effect, EntityPotionEffectEvent.Cause.WITHER_ROSE);
             }
         }

@@ -41,3 +41,6 @@ resource_packs/*
 dependency-reduced-pom.xml
 *.log
 /logs
+/.gradle/
+/bin/
+.codex

@@ -1,0 +1,8 @@
+package cn.nukkit.item;
+
+public class ItemHarnessBlack extends ItemHarness {
+
+    public ItemHarnessBlack() {
+        super(ItemNamespaceId.BLACK_HARNESS, "Black Harness");
+    }
+}

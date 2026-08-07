@@ -6,10 +6,7 @@ import com.google.gson.reflect.TypeToken;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 /**
  * @author MagicDroidX
@@ -26,7 +23,7 @@ public class BanEntry {
     private String reason = "Banned";
 
     public BanEntry(String name) {
-        this.name = name.toLowerCase();
+        this.name = name.toLowerCase(Locale.ROOT);
         this.creationDate = new Date();
     }
 
@@ -99,7 +96,7 @@ public class BanEntry {
     }
 
     public static BanEntry fromString(String str) {
-        Map<String, String> map = new Gson().fromJson(str, new TreeMapTypeToken().getType());
+        Map<String, String> map = new Gson().fromJson(str, new TreeMapTypeToken());
         BanEntry banEntry = new BanEntry(map.get("name"));
         try {
             banEntry.setCreationDate(new SimpleDateFormat(format).parse(map.get("creationDate")));

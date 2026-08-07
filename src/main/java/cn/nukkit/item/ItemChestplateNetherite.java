@@ -1,5 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 public class ItemChestplateNetherite extends ItemArmor {
 
     public ItemChestplateNetherite() {
@@ -36,6 +39,11 @@ public class ItemChestplateNetherite extends ItemArmor {
 
     @Override
     public int getToughness() {
-        return 2;
+        return 3;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_16_0;
     }
 }

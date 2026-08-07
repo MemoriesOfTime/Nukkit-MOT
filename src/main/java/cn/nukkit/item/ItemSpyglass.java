@@ -1,7 +1,9 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * @author LT_Name
@@ -43,5 +45,10 @@ public class ItemSpyglass extends Item {
     @Override
     public boolean canRelease() {
         return true;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_17_0;
     }
 }

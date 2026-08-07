@@ -1,5 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 public class ItemSwordNetherite extends ItemTool {
 
     public ItemSwordNetherite() {
@@ -32,5 +35,10 @@ public class ItemSwordNetherite extends ItemTool {
     @Override
     public int getMaxDurability() {
         return ItemTool.DURABILITY_NETHERITE;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_16_0;
     }
 }

@@ -117,7 +117,7 @@ public class EntityMagmaCube extends EntityJumpingMob {
         super.kill();
 
         if (this.size == SIZE_BIG) {
-            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, this.namedTag, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
+            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, this.namedTag, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT, this);
             level.getServer().getPluginManager().callEvent(ev);
 
             if (ev.isCancelled()) {
@@ -131,7 +131,7 @@ public class EntityMagmaCube extends EntityJumpingMob {
                 }
             }
         } else if (this.size == SIZE_MEDIUM) {
-            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, this.namedTag, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
+            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, this.namedTag, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT, this);
             level.getServer().getPluginManager().callEvent(ev);
 
             if (ev.isCancelled()) {

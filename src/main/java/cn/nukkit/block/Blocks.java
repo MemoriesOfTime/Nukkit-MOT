@@ -154,7 +154,7 @@ public class Blocks {
         list[CARROT_BLOCK] = BlockCarrot.class; //141
         list[POTATO_BLOCK] = BlockPotato.class; //142
         list[WOODEN_BUTTON] = BlockButtonWooden.class; //143
-        list[SKULL_BLOCK] = BlockSkull.class; //144
+        list[SKULL_BLOCK] = BlockSkullSkeleton.class; //144
         list[ANVIL] = BlockAnvil.class; //145
         list[TRAPPED_CHEST] = BlockTrappedChest.class; //146
         list[LIGHT_WEIGHTED_PRESSURE_PLATE] = BlockWeightedPressurePlateLight.class; //147
@@ -459,7 +459,9 @@ public class Blocks {
 
         list[COPPER_ORE] = BlockOreCopper.class; //566
         list[LIGHTNING_ROD] = BlockLightningRod.class; //567
+        list[CRAFTER] = BlockCrafter.class; //568
 
+        list[HEAVY_CORE] = BlockHeavyCore.class; //571
         list[DRIPSTONE_BLOCK] = BlockDripstone.class; //572
         list[ROOTED_DIRT] = BlockDirtRooted.class; //573
         list[HANGING_ROOTS] = BlockRootsHanging.class; //574
@@ -497,33 +499,57 @@ public class Blocks {
         list[WAXED_CUT_COPPER] = BlockCopperCutWaxed.class; //606
         list[WAXED_EXPOSED_CUT_COPPER] = BlockCopperCutExposedWaxed.class; //607
         list[WAXED_WEATHERED_CUT_COPPER] = BlockCopperCutWeatheredWaxed.class; //608
-
+        list[CUT_COPPER_STAIRS] = BlockStairsCopperCut.class; //609
+        list[EXPOSED_CUT_COPPER_STAIRS] = BlockStairsCopperCutExposed.class; //610
+        list[WEATHERED_CUT_COPPER_STAIRS] = BlockStairsCopperCutWeathered.class; //611
+        list[OXIDIZED_CUT_COPPER_STAIRS] = BlockStairsCopperCutOxidized.class; //612
+        list[WAXED_CUT_COPPER_STAIRS] = BlockStairsCopperCutWaxed.class; //613
+        list[WAXED_EXPOSED_CUT_COPPER_STAIRS] = BlockStairsCopperCutExposedWaxed.class; //614
+        list[WAXED_WEATHERED_CUT_COPPER_STAIRS] = BlockStairsCopperCutWeatheredWaxed.class; //615
+        list[CUT_COPPER_SLAB] = BlockSlabCopperCut.class; //616
+        list[EXPOSED_CUT_COPPER_SLAB] = BlockSlabCopperCutExposed.class; //617
+        list[WEATHERED_CUT_COPPER_SLAB] = BlockSlabCopperCutWeathered.class; //618
+        list[OXIDIZED_CUT_COPPER_SLAB] = BlockSlabCopperCutOxidized.class; //619
+        list[WAXED_CUT_COPPER_SLAB] = BlockSlabCopperCutWaxed.class; //620
+        list[WAXED_EXPOSED_CUT_COPPER_SLAB] = BlockSlabCopperCutExposedWaxed.class; //621
+        list[WAXED_WEATHERED_CUT_COPPER_SLAB] = BlockSlabCopperCutWeatheredWaxed.class; //622
+        list[DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCopperCut.class; //623
+        list[EXPOSED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCopperCutExposed.class; //624
+        list[WEATHERED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCopperCutWeathered.class; //625
+        list[OXIDIZED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCopperCutOxidized.class; //626
+        list[WAXED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCopperCutWaxed.class; //627
+        list[WAXED_EXPOSED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCopperCutExposedWaxed.class; //628
+        list[WAXED_WEATHERED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCopperCutWeatheredWaxed.class; //629
         list[CAVE_VINES_BODY_WITH_BERRIES] = BlockCaveVinesBerriesBody.class; //630
         list[CAVE_VINES_HEAD_WITH_BERRIES] = BlockCaveVinesBerriesHead.class; //631
         list[SMOOTH_BASALT] = BlockBasaltSmooth.class; //632
         list[DEEPSLATE] = BlockDeepslate.class; //633
         list[COBBLED_DEEPSLATE] = BlockDeepslateCobbled.class; //634
-
+        list[COBBLED_DEEPSLATE_SLAB] = BlockSlabDeepslateCobbled.class; //635
         list[COBBLED_DEEPSLATE_STAIRS] = BlockStairsDeepslateCobbled.class; //636
-
+        list[COBBLED_DEEPSLATE_WALL] = BlockWallDeepslateCobbled.class; //637
         list[POLISHED_DEEPSLATE] = BlockDeepslatePolished.class; //638
-
+        list[POLISHED_DEEPSLATE_SLAB] = BlockSlabDeepslatePolished.class; //639
         list[POLISHED_DEEPSLATE_STAIRS] = BlockStairsDeepslatePolished.class; //640
-
+        list[POLISHED_DEEPSLATE_WALL] = BlockWallDeepslatePolished.class; //641
         list[DEEPSLATE_TILES] = BlockTilesDeepslate.class; //642
-
+        list[DEEPSLATE_TILE_SLAB] = BlockSlabDeepslateTile.class; //643
         list[DEEPSLATE_TILE_STAIRS] = BlockStairsDeepslateTile.class; //644
-
+        list[DEEPSLATE_TILE_WALL] = BlockWallDeepslateTile.class; //645
         list[DEEPSLATE_BRICKS] = BlockBricksDeepslate.class; //646
-
+        list[DEEPSLATE_BRICK_SLAB] = BlockSlabDeepslateBrick.class; //647
         list[DEEPSLATE_BRICK_STAIRS] = BlockStairsDeepslateBrick.class; //648
-
+        list[DEEPSLATE_BRICK_WALL] = BlockWallDeepslateBrick.class; //649
         list[CHISELED_DEEPSLATE] = BlockDeepslateChiseled.class; //650
+        list[COBBLED_DEEPSLATE_DOUBLE_SLAB] = BlockDoubleSlabDeepslateCobbled.class; //651
+        list[POLISHED_DEEPSLATE_DOUBLE_SLAB] = BlockDoubleSlabDeepslatePolished.class; //652
+        list[DEEPSLATE_TILE_DOUBLE_SLAB] = BlockDoubleSlabDeepslateTile.class; //653
+        list[DEEPSLATE_BRICK_DOUBLE_SLAB] = BlockDoubleSlabDeepslateBrick.class; //654
         list[DEEPSLATE_LAPIS_ORE] = BlockDeepslateLapisOre.class; // 655
         list[DEEPSLATE_IRON_ORE] = BlockDeepslateIronOre.class; // 656
         list[DEEPSLATE_GOLD_ORE] = BlockDeepslateGoldOre.class; // 657
-        list[DEEPSLATE_REDSTONE_ORE] = BlockDeepslateRedstoneOre.class; // 658
-        list[LIT_DEEPSLATE_REDSTONE_ORE] = BlockLitDeepslateRedstoneOre.class; // 659
+        list[DEEPSLATE_REDSTONE_ORE] = BlockOreRedstoneDeepslate.class; // 658
+        list[LIT_DEEPSLATE_REDSTONE_ORE] = BlockOreRedstoneDeepslateGlowing.class; // 659
         list[DEEPSLATE_DIAMOND_ORE] = BlockDeepslateDiamondOre.class; // 660
         list[DEEPSLATE_COAL_ORE] = BlockDeepslateCoalOre.class; // 661
         list[DEEPSLATE_EMERALD_ORE] = BlockDeepslateEmeraldOre.class; // 662
@@ -567,7 +593,9 @@ public class Blocks {
         list[BLACK_CANDLE_CAKE] = BlockCandleCakeBlack.class; //700
         list[WAXED_OXIDIZED_COPPER] = BlockCopperOxidizedWaxed.class; //701
         list[WAXED_OXIDIZED_CUT_COPPER] = BlockCopperCutOxidizedWaxed.class; //702
-
+        list[WAXED_OXIDIZED_CUT_COPPER_STAIRS] = BlockStairsCopperCutOxidizedWaxed.class; //703
+        list[WAXED_OXIDIZED_CUT_COPPER_SLAB] = BlockSlabCopperCutOxidized.class; //704
+        list[WAXED_OXIDIZED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCopperCutOxidized.class; //705
         list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
         list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
         list[RAW_GOLD_BLOCK] = BlockRawGold.class; //708
@@ -590,23 +618,75 @@ public class Blocks {
         list[MUD_BRICKS] = BlockMudBricks.class; //730
 
         list[PACKED_MUD] = BlockPackedMud.class; //732
-
+        list[MUD_BRICK_SLAB] = BlockSlabMudBrick.class; //733
+        list[MUD_BRICK_DOUBLE_SLAB] = BlockDoubleSlabMudBrick.class; //734
         list[MUD_BRICK_STAIRS] = BlockStairsMudBrick.class; //735
-
+        list[MUD_BRICK_WALL] = BlockWallMudBrick.class; //736
         list[MANGROVE_ROOTS] = BlockMangroveRoots.class; //737
         list[MUDDY_MANGROVE_ROOTS] = BlockMangroveRootsMuddy.class; //738
         list[MANGROVE_LOG] = BlockLogMangrove.class; //739
         list[STRIPPED_MANGROVE_LOG] = BlockLogStrippedMangrove.class; //740
         list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
-
+        list[MANGROVE_BUTTON] = BlockButtonMangrove.class; //742
+        list[MANGROVE_STAIRS] = BlockStairsMangrove.class; //743
+        list[MANGROVE_SLAB] = BlockSlabMangrove.class; //744
+        list[MANGROVE_PRESSURE_PLATE] = BlockPressurePlateMangrove.class; //745
+        list[MANGROVE_FENCE] = BlockFenceMangrove.class; //746
+        list[MANGROVE_FENCE_GATE] = BlockFenceGateMangrove.class; //747
+        list[MANGROVE_DOOR_BLOCK] = BlockDoorMangrove.class; //748
+        list[MANGROVE_STANDING_SIGN] = BlockMangroveSignPost.class; //749
+        list[MANGROVE_WALL_SIGN] = BlockMangroveWallSign.class; //750
+        list[MANGROVE_TRAPDOOR] = BlockTrapdoorMangrove.class; //751
+        list[MANGROVE_WOOD] = BlockWoodMangrove.class; //752
+        list[STRIPPED_MANGROVE_WOOD] = BlockWoodStrippedMangrove.class; //753
+        list[MANGROVE_DOUBLE_SLAB] = BlockDoubleSlabMangrove.class; //754
+        list[OAK_HANGING_SIGN] = BlockHangingSignOak.class; //755
+        list[SPRUCE_HANGING_SIGN] = BlockHangingSignSpruce.class; //756
+        list[BIRCH_HANGING_SIGN] = BlockHangingSignBirch.class; //757
+        list[JUNGLE_HANGING_SIGN] = BlockHangingSignJungle.class; //758
+        list[ACACIA_HANGING_SIGN] = BlockHangingSignAcacia.class; //759
+        list[DARK_OAK_HANGING_SIGN] = BlockHangingSignDarkOak.class; //760
+        list[CRIMSON_HANGING_SIGN] = BlockHangingSignCrimson.class; //761
+        list[WARPED_HANGING_SIGN] = BlockHangingSignWarped.class; //762
+        list[MANGROVE_HANGING_SIGN] = BlockHangingSignMangrove.class; //763
+        list[BAMBOO_MOSAIC] = BlockBambooMosaic.class; //764
         list[BAMBOO_PLANKS] = BlockPlanksBamboo.class; //765
+        list[BAMBOO_BUTTON] = BlockButtonBamboo.class; //766
+        list[BAMBOO_STAIRS] = BlockStairsBamboo.class; //777
+        list[BAMBOO_SLAB] = BlockSlabBamboo.class; //768
+        list[BAMBOO_PRESSURE_PLATE] = BlockPressurePlateBamboo.class; //769
+        list[BAMBOO_FENCE] = BlockFenceBamboo.class; //769
+        list[BAMBOO_FENCE_GATE] = BlockFenceGateBamboo.class; //771
 
-        list[SUSPICIOUS_SAND] = BlockSuspiciousSand.class; // 784
+        list[BAMBOO_DOOR] = BlockDoorBamboo.class; //772
+        list[BAMBOO_STANDING_SIGN] = BlockBambooSignPost.class; //773
+        list[BAMBOO_WALL_SIGN] = BlockBambooWallSign.class; //774
+        list[BAMBOO_TRAPDOOR] = BlockTrapdoorBamboo.class; //775
+        list[BAMBOO_DOUBLE_SLAB] = BlockDoubleSlabBamboo.class; //776
+        list[BAMBOO_HANGING_SIGN] = BlockHangingSignBamboo.class; //777
+        list[BAMBOO_MOSAIC_STAIRS] = BlockStairsBambooMosaic.class; //778
+        list[BAMBOO_MOSAIC_SLAB] = BlockSlabBambooMosaic.class; //779
+        list[BAMBOO_MOSAIC_DOUBLE_SLAB] = BlockDoubleSlabBambooMosaic.class; //780
 
+        list[CHISELED_BOOKSHELF] = BlockBookshelfChiseled.class; //781
+        list[BAMBOO_BLOCK] = BlockBambooBlock.class; //782
+        list[STRIPPED_BAMBOO_BLOCK] = BlockStrippedBambooBlock.class; //783
+        list[SUSPICIOUS_SAND] = BlockSuspiciousSand.class; //784
+        list[CHERRY_BUTTON] = BlockButtonCherry.class; //785
+        list[CHERRY_DOOR_BLOCK] = BlockDoorCherry.class; //786
+        list[CHERRY_FENCE] = BlockFenceCherry.class; //787
+        list[CHERRY_FENCE_GATE] = BlockFenceGateCherry.class; //788
+        list[CHERRY_HANGING_SIGN] = BlockHangingSignCherry.class; //789
         list[STRIPPED_CHERRY_LOG] = BlockLogStrippedCherry.class; //790
         list[CHERRY_LOG] = BlockCherryLog.class; //791
         list[CHERRY_PLANKS] = BlockPlanksCherry.class; //792
-
+        list[CHERRY_PRESSURE_PLATE] = BlockPressurePlateCherry.class; //793
+        list[CHERRY_SLAB] = BlockSlabCherry.class; //794
+        list[CHERRY_DOUBLE_SLAB] = BlockDoubleSlabCherry.class; //795
+        list[CHERRY_STAIRS] = BlockStairsCherry.class; //796
+        list[CHERRY_STANDING_SIGN] = BlockCherrySignPost.class; //797
+        list[CHERRY_TRAPDOOR] = BlockTrapdoorCherry.class; //798
+        list[CHERRY_WALL_SIGN] = BlockCherryWallSign.class; //799
         list[STRIPPED_CHERRY_WOOD] = BlockWoodStrippedCherry.class; //800
         list[CHERRY_WOOD] = BlockWoodCherry.class; //801
         list[CHERRY_SAPLING] = BlockCherrySapling.class; //802
@@ -615,8 +695,50 @@ public class Blocks {
 
         list[DECORATED_POT] = BlockDecoratedPot.class; //806
 
-        list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; //828
+        list[TORCHFLOWER_CROP] = BlockTorchflowerCrop.class; //822
+        list[TORCHFLOWER] = BlockTorchflower.class; //823
 
+        list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; //828
+        list[PITCHER_CROP] = BlockPitcherCrop.class; //829
+
+        list[CALIBRATED_SCULK_SENSOR] = BlockCalibratedSculkSensor.class; //835
+
+        list[SNIFFER_EGG] = BlockSnifferEgg.class; //851
+        list[PITCHER_PLANT] = BlockPitcherPlant.class; //867
+
+        list[TUFF_SLAB] = BlockSlabTuff.class; //999
+        list[TUFF_DOUBLE_SLAB] = BlockDoubleSlabTuff.class; //1000
+        list[TUFF_STAIRS] = BlockStairsTuff.class; //1001
+        list[TUFF_WALL] = BlockWallTuff.class; //1002
+        list[POLISHED_TUFF] = BlockTuffPolished.class; //1003
+        list[POLISHED_TUFF_SLAB] = BlockSlabTuffPolished.class; //1004
+        list[POLISHED_TUFF_DOUBLE_SLAB] = BlockDoubleSlabTuffPolished.class; //1005
+        list[POLISHED_TUFF_STAIRS] = BlockStairsTuffPolished.class; //1006
+        list[POLISHED_TUFF_WALL] = BlockWallTuffPolished.class; //1007
+        list[CHISELED_TUFF] = BlockTuffChiseled.class; //1008
+        list[TUFF_BRICKS] = BlockTuffBricks.class; //1009
+        list[TUFF_BRICK_SLAB] = BlockSlabTuffBrick.class; //1010
+        list[TUFF_BRICK_DOUBLE_SLAB] = BlockDoubleSlabTuffBrick.class; //1011
+        list[TUFF_BRICK_STAIRS] = BlockStairsTuffBrick.class; //1012
+        list[TUFF_BRICK_WALL] = BlockWallTuffBrick.class; //1013
+        list[CHISELED_TUFF_BRICKS] = BlockTuffBricksChiseled.class; //1014
+
+        list[CHISELED_COPPER] = BlockCopperChiseled.class; //1015
+        list[EXPOSED_CHISELED_COPPER] = BlockCopperChiseledExposed.class; //1016
+        list[WEATHERED_CHISELED_COPPER] = BlockCopperChiseledWeathered.class; //1017
+        list[OXIDIZED_CHISELED_COPPER] = BlockCopperChiseledOxidized.class; //1018
+        list[WAXED_CHISELED_COPPER] = BlockCopperChiseledWaxed.class; //1019
+        list[WAXED_EXPOSED_CHISELED_COPPER] = BlockCopperChiseledExposedWaxed.class; //1020
+        list[WAXED_OXIDIZED_CHISELED_COPPER] = BlockCopperChiseledOxidizedWaxed.class; //1021
+        list[WAXED_WEATHERED_CHISELED_COPPER] = BlockCopperChiseledWeatheredWaxed.class; //1022
+        list[COPPER_GRATE] = BlockGrateCopper.class; //1023
+        list[EXPOSED_COPPER_GRATE] = BlockGrateCopperExposed.class; //1024
+        list[WEATHERED_COPPER_GRATE] = BlockGrateCopperWeathered.class; //1025
+        list[OXIDIZED_COPPER_GRATE] = BlockGrateCopperOxidized.class; //1026
+        list[WAXED_COPPER_GRATE] = BlockGrateCopperWaxed.class; //1027
+        list[WAXED_EXPOSED_COPPER_GRATE] = BlockGrateCopperExposedWaxed.class; //1028
+        list[WAXED_WEATHERED_COPPER_GRATE] = BlockGrateCopperWeatheredWaxed.class; //1029
+        list[WAXED_OXIDIZED_COPPER_GRATE] = BlockGrateCopperOxidizedWaxed.class; //1030
         list[COPPER_BULB] = BlockCopperBulb.class; //1031
         list[EXPOSED_COPPER_BULB] = BlockExposedCopperBulb.class; //1032
         list[WEATHERED_COPPER_BULB] = BlockWeatheredCopperBulb.class; //1033
@@ -625,6 +747,167 @@ public class Blocks {
         list[WAXED_EXPOSED_COPPER_BULB] = BlockWaxedExposedCopperBulb.class; //1036
         list[WAXED_WEATHERED_COPPER_BULB] = BlockWaxedWeatheredCopperBulb.class; //1037
         list[WAXED_OXIDIZED_COPPER_BULB] = BlockWaxedOxidizedCopperBulb.class; //1038
+        list[COPPER_DOOR] = BlockDoorCopper.class; //1039
+        list[EXPOSED_COPPER_DOOR] = BlockDoorCopperExposed.class; //1040
+        list[WEATHERED_COPPER_DOOR] = BlockDoorCopperWeathered.class; //1041
+        list[OXIDIZED_COPPER_DOOR] = BlockDoorCopperOxidized.class; //1042
+        list[WAXED_COPPER_DOOR] = BlockDoorCopperWaxed.class; //1043
+        list[WAXED_EXPOSED_COPPER_DOOR] = BlockDoorCopperExposedWaxed.class; //1044
+        list[WAXED_WEATHERED_COPPER_DOOR] = BlockDoorCopperWeatheredWaxed.class; //1045
+        list[WAXED_OXIDIZED_COPPER_DOOR] = BlockDoorCopperOxidizedWaxed.class; //1046
+        list[COPPER_TRAPDOOR] = BlockTrapdoorCopper.class; //1047
+        list[EXPOSED_COPPER_TRAPDOOR] = BlockTrapdoorCopperExposed.class; //1048
+        list[WEATHERED_COPPER_TRAPDOOR] = BlockTrapdoorCopperWeathered.class; //1049
+        list[OXIDIZED_COPPER_TRAPDOOR] = BlockTrapdoorCopperOxidized.class; //1050
+        list[WAXED_COPPER_TRAPDOOR] = BlockTrapdoorCopperWaxed.class; //1051
+        list[WAXED_EXPOSED_COPPER_TRAPDOOR] = BlockTrapdoorCopperExposedWaxed.class; //1052
+        list[WAXED_WEATHERED_COPPER_TRAPDOOR] = BlockTrapdoorCopperWeatheredWaxed.class; //1053
+        list[WAXED_OXIDIZED_COPPER_TRAPDOOR] = BlockTrapdoorCopperOxidizedWaxed.class; //1054
+
+        list[WITHER_SKELETON_SKULL] = BlockSkullWitherSkeleton.class; //1220
+        list[ZOMBIE_HEAD] = BlockHeadZombie.class; //1221
+        list[PLAYER_HEAD] = BlockHeadPlayer.class; //1222
+        list[CREEPER_HEAD] = BlockHeadCreeper.class; //1223
+        list[DRAGON_HEAD] = BlockHeadDragon.class; //1224
+        list[PIGLIN_HEAD] = BlockHeadPiglin.class; //1225
+
+        list[PALE_OAK_BUTTON] = BlockButtonPaleOak.class; //1244
+        list[PALE_OAK_DOOR] = BlockDoorPaleOak.class; //1245
+        list[PALE_OAK_FENCE] = BlockFencePaleOak.class; //1246
+        list[PALE_OAK_FENCE_GATE] = BlockFenceGatePaleOak.class; //1247
+        list[PALE_OAK_HANGING_SIGN] = BlockHangingSignPaleOak.class; //1248
+        list[STRIPPED_PALE_OAK_LOG] = BlockLogStrippedPaleOak.class; //1249
+        list[PALE_OAK_LOG] = BlockLogPaleOak.class; //1250
+        list[PALE_OAK_PLANKS] = BlockPlanksPaleOak.class; //1251
+        list[PALE_OAK_PRESSURE_PLATE] = BlockPressurePlatePaleOak.class; //1252
+        list[PALE_OAK_SLAB] = BlockSlabPaleOak.class; //1253
+        list[PALE_OAK_DOUBLE_SLAB] = BlockDoubleSlabPaleOak.class; //1254
+        list[PALE_OAK_STAIRS] = BlockStairsPaleOak.class; //1255
+        list[PALE_OAK_STANDING_SIGN] = BlockSignPostPaleOak.class; //1256
+        list[PALE_OAK_TRAPDOOR] = BlockTrapdoorPaleOak.class; //1257
+        list[PALE_OAK_WALL_SIGN] = BlockWallSignPaleOak.class; //1258
+        list[STRIPPED_PALE_OAK_WOOD] = BlockWoodStrippedPaleOak.class; //1259
+        list[PALE_OAK_WOOD] = BlockWoodPaleOak.class; //1260
+        list[PALE_OAK_SAPLING] = BlockSaplingPaleOak.class; //1261
+        list[PALE_OAK_LEAVES] = BlockLeavesPaleOak.class; //1262
+
+        list[PALE_MOSS_BLOCK] = BlockMossPale.class; //1264
+        list[PALE_MOSS_CARPET] = BlockCarpetMossPale.class; //1265
+        list[PALE_HANGING_MOSS] = BlockHangingMossPale.class; //1266
+        list[CREAKING_HEART] = BlockCreakingHeart.class; //1267
+        list[RESIN_BRICKS] = BlockBricksResin.class; //1268
+        list[RESIN_BRICK_SLAB] = BlockSlabResinBrick.class; //1269
+        list[RESIN_BRICK_DOUBLE_SLAB] = BlockDoubleSlabResinBrick.class; //1270
+        list[RESIN_BRICK_STAIRS] = BlockStairsResinBrick.class; //1271
+        list[RESIN_BRICK_WALL] = BlockWallResinBrick.class; //1272
+        list[OPEN_EYEBLOSSOM] = BlockEyeblossomOpen.class; //1273
+        list[CLOSED_EYEBLOSSOM] = BlockEyeblossomClosed.class; //1274
+        list[CHISELED_RESIN_BRICKS] = BlockBricksResinChiseled.class; //1275
+        list[RESIN_BLOCK] = BlockResin.class; //1276
+        list[RESIN_CLUMP] = BlockResinClump.class; //1277
+        list[BUSH] = BlockBush.class; //1278
+        list[WILDFLOWERS] = BlockWildflowers.class; //1279
+        list[FIREFLY_BUSH] = BlockFireflyBush.class; //1280
+        list[LEAF_LITTER] = BlockLeafLitter.class; //1281
+        list[DRIED_GHAST] = BlockDriedGhast.class; //1282
+        list[SHORT_DRY_GRASS] = BlockShortDryGrass.class; //1283
+        list[TALL_DRY_GRASS] = BlockTallDryGrass.class; //1284
+        list[CACTUS_FLOWER] = BlockCactusFlower.class; //1285
+        list[COPPER_CHEST] = BlockChestCopper.class; //1286
+        list[EXPOSED_COPPER_CHEST] = BlockChestCopperExposed.class; //1287
+        list[WEATHERED_COPPER_CHEST] = BlockChestCopperWeathered.class; //1288
+        list[OXIDIZED_COPPER_CHEST] = BlockChestCopperOxidized.class; //1289
+        list[WAXED_COPPER_CHEST] = BlockChestCopperWaxed.class; //1290
+        list[WAXED_EXPOSED_COPPER_CHEST] = BlockChestCopperExposedWaxed.class; //1291
+        list[WAXED_WEATHERED_COPPER_CHEST] = BlockChestCopperWeatheredWaxed.class; //1292
+        list[WAXED_OXIDIZED_COPPER_CHEST] = BlockChestCopperOxidizedWaxed.class; //1293
+        list[COPPER_GOLEM_STATUE] = BlockCopperGolemStatue.class; //1294
+        list[EXPOSED_COPPER_GOLEM_STATUE] = BlockCopperGolemStatueExposed.class; //1295
+        list[WEATHERED_COPPER_GOLEM_STATUE] = BlockCopperGolemStatueWeathered.class; //1296
+        list[OXIDIZED_COPPER_GOLEM_STATUE] = BlockCopperGolemStatueOxidized.class; //1297
+        list[WAXED_COPPER_GOLEM_STATUE] = BlockCopperGolemStatueWaxed.class; //1298
+        list[WAXED_EXPOSED_COPPER_GOLEM_STATUE] = BlockCopperGolemStatueExposedWaxed.class; //1299
+        list[WAXED_WEATHERED_COPPER_GOLEM_STATUE] = BlockCopperGolemStatueWeatheredWaxed.class; //1300
+        list[WAXED_OXIDIZED_COPPER_GOLEM_STATUE] = BlockCopperGolemStatueOxidizedWaxed.class; //1301
+        list[OAK_SHELF] = BlockShelfOak.class; //1302
+        list[SPRUCE_SHELF] = BlockShelfSpruce.class; //1303
+        list[BIRCH_SHELF] = BlockShelfBirch.class; //1304
+        list[JUNGLE_SHELF] = BlockShelfJungle.class; //1305
+        list[ACACIA_SHELF] = BlockShelfAcacia.class; //1306
+        list[DARK_OAK_SHELF] = BlockShelfDarkOak.class; //1307
+        list[MANGROVE_SHELF] = BlockShelfMangrove.class; //1308
+        list[CHERRY_SHELF] = BlockShelfCherry.class; //1309
+        list[PALE_OAK_SHELF] = BlockShelfPaleOak.class; //1310
+        list[BAMBOO_SHELF] = BlockShelfBamboo.class; //1311
+        list[CRIMSON_SHELF] = BlockShelfCrimson.class; //1312
+        list[WARPED_SHELF] = BlockShelfWarped.class; //1313
+        list[EXPOSED_LIGHTNING_ROD] = BlockLightningRodExposed.class; //1314
+        list[WEATHERED_LIGHTNING_ROD] = BlockLightningRodWeathered.class; //1315
+        list[OXIDIZED_LIGHTNING_ROD] = BlockLightningRodOxidized.class; //1316
+        list[WAXED_LIGHTNING_ROD] = BlockLightningRodWaxed.class; //1317
+        list[WAXED_EXPOSED_LIGHTNING_ROD] = BlockLightningRodExposedWaxed.class; //1318
+        list[WAXED_WEATHERED_LIGHTNING_ROD] = BlockLightningRodWeatheredWaxed.class; //1319
+        list[WAXED_OXIDIZED_LIGHTNING_ROD] = BlockLightningRodOxidizedWaxed.class; //1320
+        list[COPPER_BARS] = BlockBarsCopper.class; //1321
+        list[EXPOSED_COPPER_BARS] = BlockBarsCopperExposed.class; //1322
+        list[WEATHERED_COPPER_BARS] = BlockBarsCopperWeathered.class; //1323
+        list[OXIDIZED_COPPER_BARS] = BlockBarsCopperOxidized.class; //1324
+        list[WAXED_COPPER_BARS] = BlockBarsCopperWaxed.class; //1325
+        list[WAXED_EXPOSED_COPPER_BARS] = BlockBarsCopperExposedWaxed.class; //1326
+        list[WAXED_WEATHERED_COPPER_BARS] = BlockBarsCopperWeatheredWaxed.class; //1327
+        list[WAXED_OXIDIZED_COPPER_BARS] = BlockBarsCopperOxidizedWaxed.class; //1328
+        list[COPPER_CHAIN] = BlockChainCopper.class; //1329
+        list[EXPOSED_COPPER_CHAIN] = BlockChainCopperExposed.class; //1330
+        list[WEATHERED_COPPER_CHAIN] = BlockChainCopperWeathered.class; //1331
+        list[OXIDIZED_COPPER_CHAIN] = BlockChainCopperOxidized.class; //1332
+        list[WAXED_COPPER_CHAIN] = BlockChainCopperWaxed.class; //1333
+        list[WAXED_EXPOSED_COPPER_CHAIN] = BlockChainCopperExposedWaxed.class; //1334
+        list[WAXED_WEATHERED_COPPER_CHAIN] = BlockChainCopperWeatheredWaxed.class; //1335
+        list[WAXED_OXIDIZED_COPPER_CHAIN] = BlockChainCopperOxidizedWaxed.class; //1336
+        list[COPPER_TORCH] = BlockTorchCopper.class; //1337
+        list[COPPER_LANTERN] = BlockLanternCopper.class; //1338
+        list[EXPOSED_COPPER_LANTERN] = BlockLanternCopperExposed.class; //1339
+        list[WEATHERED_COPPER_LANTERN] = BlockLanternCopperWeathered.class; //1340
+        list[OXIDIZED_COPPER_LANTERN] = BlockLanternCopperOxidized.class; //1341
+        list[WAXED_COPPER_LANTERN] = BlockLanternCopperWaxed.class; //1342
+        list[WAXED_EXPOSED_COPPER_LANTERN] = BlockLanternCopperExposedWaxed.class; //1343
+        list[WAXED_WEATHERED_COPPER_LANTERN] = BlockLanternCopperWeatheredWaxed.class; //1344
+        list[WAXED_OXIDIZED_COPPER_LANTERN] = BlockLanternCopperOxidizedWaxed.class; //1345
+
+        list[GOLDEN_DANDELION] = BlockDandelionGolden.class; //1346
+        list[SULFUR] = BlockSulfur.class; //1347
+        list[SULFUR_SLAB] = BlockSlabSulfur.class; //1348
+        list[SULFUR_DOUBLE_SLAB] = BlockDoubleSlabSulfur.class; //1349
+        list[SULFUR_STAIRS] = BlockStairsSulfur.class; //1350
+        list[SULFUR_WALL] = BlockWallSulfur.class; //1351
+        list[POLISHED_SULFUR] = BlockSulfurPolished.class; //1352
+        list[POLISHED_SULFUR_SLAB] = BlockSlabSulfurPolished.class; //1353
+        list[POLISHED_SULFUR_DOUBLE_SLAB] = BlockDoubleSlabSulfurPolished.class; //1354
+        list[POLISHED_SULFUR_STAIRS] = BlockStairsSulfurPolished.class; //1355
+        list[POLISHED_SULFUR_WALL] = BlockWallSulfurPolished.class; //1356
+        list[SULFUR_BRICKS] = BlockSulfurBricks.class; //1357
+        list[SULFUR_BRICK_SLAB] = BlockSlabSulfurBrick.class; //1358
+        list[SULFUR_BRICK_DOUBLE_SLAB] = BlockDoubleSlabSulfurBrick.class; //1359
+        list[SULFUR_BRICK_STAIRS] = BlockStairsSulfurBrick.class; //1360
+        list[SULFUR_BRICK_WALL] = BlockWallSulfurBrick.class; //1361
+        list[CHISELED_SULFUR] = BlockSulfurChiseled.class; //1362
+        list[POTENT_SULFUR] = BlockSulfurPotent.class; //1363
+        list[CINNABAR] = BlockCinnabar.class; //1364
+        list[CINNABAR_SLAB] = BlockSlabCinnabar.class; //1365
+        list[CINNABAR_DOUBLE_SLAB] = BlockDoubleSlabCinnabar.class; //1366
+        list[CINNABAR_STAIRS] = BlockStairsCinnabar.class; //1367
+        list[CINNABAR_WALL] = BlockWallCinnabar.class; //1368
+        list[POLISHED_CINNABAR] = BlockCinnabarPolished.class; //1369
+        list[POLISHED_CINNABAR_SLAB] = BlockSlabCinnabarPolished.class; //1370
+        list[POLISHED_CINNABAR_DOUBLE_SLAB] = BlockDoubleSlabCinnabarPolished.class; //1371
+        list[POLISHED_CINNABAR_STAIRS] = BlockStairsCinnabarPolished.class; //1372
+        list[POLISHED_CINNABAR_WALL] = BlockWallCinnabarPolished.class; //1373
+        list[CINNABAR_BRICKS] = BlockCinnabarBricks.class; //1374
+        list[CINNABAR_BRICK_SLAB] = BlockSlabCinnabarBrick.class; //1375
+        list[CINNABAR_BRICK_DOUBLE_SLAB] = BlockDoubleSlabCinnabarBrick.class; //1376
+        list[CINNABAR_BRICK_STAIRS] = BlockStairsCinnabarBrick.class; //1377
+        list[CINNABAR_BRICK_WALL] = BlockWallCinnabarBrick.class; //1378
+        list[CHISELED_CINNABAR] = BlockCinnabarChiseled.class; //1379
     }
 
     static void init() {

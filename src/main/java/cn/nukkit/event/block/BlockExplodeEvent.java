@@ -6,6 +6,7 @@ import cn.nukkit.event.HandlerList;
 import cn.nukkit.level.Position;
 
 import java.util.List;
+import java.util.Set;
 
 public class BlockExplodeEvent extends BlockEvent implements Cancellable {
 
@@ -16,8 +17,11 @@ public class BlockExplodeEvent extends BlockEvent implements Cancellable {
     }
 
     protected final Position position;
-    protected List<Block> blocks;
+    protected final double fireChance;
+
     protected double yield;
+    protected Set<Block> blocks;
+    protected Set<Block> ignitions;
 
     /**
      * Block explode event is called when a block explodes (For example a bed in nether)
@@ -26,22 +30,24 @@ public class BlockExplodeEvent extends BlockEvent implements Cancellable {
      * @param blocks Blocks affected by the explosion
      * @param yield Explosion yield
      */
-    public BlockExplodeEvent(Block block, Position position, List<Block> blocks, double yield) {
+    public BlockExplodeEvent(Block block, Position position, Set<Block> blocks, Set<Block> ignitions, double yield, double fireChance) {
         super(block);
         this.position = position;
         this.blocks = blocks;
         this.yield = yield;
+        this.ignitions = ignitions;
+        this.fireChance = fireChance;
     }
 
     public Position getPosition() {
         return this.position;
     }
 
-    public List<Block> getBlockList() {
+    public Set<Block> getAffectedBlocks() {
         return this.blocks;
     }
 
-    public void setBlockList(List<Block> blocks) {
+    public void setAffectedBlocks(Set<Block> blocks) {
         this.blocks = blocks;
     }
 
@@ -51,5 +57,17 @@ public class BlockExplodeEvent extends BlockEvent implements Cancellable {
 
     public void setYield(double yield) {
         this.yield = yield;
+    }
+
+    public Set<Block> getIgnitions() {
+        return ignitions;
+    }
+
+    public void setIgnitions(Set<Block> ignitions) {
+        this.ignitions = ignitions;
+    }
+
+    public double getFireChance() {
+        return fireChance;
     }
 }

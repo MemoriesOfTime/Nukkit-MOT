@@ -26,6 +26,10 @@ public class CameraSetInstruction {
      */
     private Vector3f entityOffset;
     private OptionalBoolean defaultPreset = OptionalBoolean.empty();
+    /**
+     * @since v818
+     */
+    private boolean removeIgnoreStartingValues;
 
     @Data
     public static class EaseData {

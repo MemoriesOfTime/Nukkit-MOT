@@ -20,7 +20,7 @@ public class SetDisplayObjectivePacket extends DataPacket {
 
     @Override
     public void decode() {
-        //only server -> client
+        this.decodeUnsupported();
     }
 
     @Override

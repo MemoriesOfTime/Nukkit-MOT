@@ -5,8 +5,11 @@ import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.sound.ButtonClickSound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by CreeperFace on 27. 11. 2016.
@@ -45,7 +48,7 @@ public abstract class BlockButton extends BlockFlowable implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
 
         this.setDamage(face.getIndex());
         if (!isSupportValid(this.getSide(this.getFacing().getOpposite()))) {
@@ -68,8 +71,9 @@ public abstract class BlockButton extends BlockFlowable implements Faceable {
 
         this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 0, 15));
         this.setDamage(this.getDamage() ^ BUTTON_PRESSED_BIT);
-        this.level.setBlock(this, this, true, false);
+        this.level.setBlock(this, this, true, true);
         this.level.addSound(new ButtonClickSound(this.add(0.5, 0.5, 0.5)));
+        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player != null ? player : this, this.add(0.5, 0.5, 0.5), VibrationType.BLOCK_ACTIVATE));
         this.level.scheduleUpdate(this, 30);
 
         level.updateAroundRedstone(getLocation(), null);
@@ -89,8 +93,9 @@ public abstract class BlockButton extends BlockFlowable implements Faceable {
                 this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 15, 0));
 
                 this.setDamage(this.getDamage() ^ BUTTON_PRESSED_BIT);
-                this.level.setBlock(this, this, true, false);
+                this.level.setBlock(this, this, true, true);
                 this.level.addSound(new ButtonClickSound(this.add(0.5, 0.5, 0.5)));
+                this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0.5, 0.5, 0.5), VibrationType.BLOCK_DEACTIVATE));
 
                 level.updateAroundRedstone(getLocation(), null);
                 level.updateAroundRedstone(getLocation().getSide(getFacing().getOpposite()), null);
@@ -137,11 +142,18 @@ public abstract class BlockButton extends BlockFlowable implements Faceable {
 
     @Override
     public boolean onBreak(Item item) {
-        if (isActivated()) {
-            this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 15, 0));
+        if (!super.onBreak(item)) {
+            return false;
         }
 
-        return super.onBreak(item);
+        if (isActivated()) {
+            this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 15, 0));
+
+            this.level.updateAroundRedstone(this, null);
+            this.level.updateAroundRedstone(getSideVec(getFacing().getOpposite()), null);
+        }
+
+        return true;
     }
 
     @Override

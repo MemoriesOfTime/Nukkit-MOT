@@ -12,12 +12,14 @@ public class NukkitMetrics {
 
     private static boolean metricsStarted = false;
 
+    private static Metrics metrics;
+
     public NukkitMetrics(Server server) {
         if (metricsStarted) {
             return;
         }
 
-        Metrics metrics = new Metrics("Nukkit", server.getServerUniqueId().toString(), true, server.getLogger());
+        metrics = new Metrics("Nukkit", server.getServerUniqueId().toString(), true, server.getLogger());
 
         metrics.addCustomChart(new Metrics.SingleLineChart("players", server::getOnlinePlayersCount));
         metrics.addCustomChart(new Metrics.SimplePie("codename", () -> "MOT"));
@@ -26,28 +28,18 @@ public class NukkitMetrics {
 
         metrics.addCustomChart(new Metrics.AdvancedPie("player_platform", () -> {
             Map<String, Integer> valueMap = new HashMap<>();
-
             server.getOnlinePlayers().forEach((uuid, player) -> {
                 String deviceOS = Utils.getOS(player);
-                if (!valueMap.containsKey(deviceOS)) {
-                    valueMap.put(deviceOS, 1);
-                } else {
-                    valueMap.put(deviceOS, valueMap.get(deviceOS) + 1);
-                }
+                valueMap.merge(deviceOS, 1, Integer::sum);
             });
             return valueMap;
         }));
 
         metrics.addCustomChart(new Metrics.AdvancedPie("player_game_version", () -> {
             Map<String, Integer> valueMap = new HashMap<>();
-
             server.getOnlinePlayers().forEach((uuid, player) -> {
                 String gameVersion = player.getLoginChainData().getGameVersion();
-                if (!valueMap.containsKey(gameVersion)) {
-                    valueMap.put(gameVersion, 1);
-                } else {
-                    valueMap.put(gameVersion, valueMap.get(gameVersion) + 1);
-                }
+                valueMap.merge(gameVersion, 1, Integer::sum);
             });
             return valueMap;
         }));
@@ -85,5 +77,14 @@ public class NukkitMetrics {
         }));
 
         metricsStarted = true;
+    }
+
+    /**
+     * Shuts down the metrics scheduler.
+     */
+    public void shutdown() {
+        if (metrics != null) {
+            metrics.shutdown();
+        }
     }
 }

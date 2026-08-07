@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
 import cn.nukkit.resourcepacks.ResourcePack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.Getter;
@@ -21,6 +22,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
      * @since v662 1.20.70
      */
     public boolean hasAddonPacks;
+    /**
+     * @since v818 1.21.90
+     */
+    public boolean forceDisableVibrantVisuals = !Server.getInstance().isVibrantVisualsEnabled();
     public boolean scripting;
     public boolean forceServerPacks;
     public ResourcePack[] behaviourPackEntries = ResourcePack.EMPTY_ARRAY;
@@ -31,6 +36,7 @@ public class ResourcePacksInfoPacket extends DataPacket {
      */
     @Getter
     @Setter
+    @SuppressWarnings("dep-ann")
     private List<CDNEntry> CDNEntries = new ObjectArrayList<>();
     /**
      * @since v766
@@ -43,6 +49,7 @@ public class ResourcePacksInfoPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -74,6 +81,9 @@ public class ResourcePacksInfoPacket extends DataPacket {
             if (this.protocol >= ProtocolInfo.v1_17_10 && this.protocol < ProtocolInfo.v1_21_30) {
                 this.putBoolean(this.forceServerPacks);
             }
+            if (this.protocol >= ProtocolInfo.v1_21_90) {
+                this.putBoolean(this.forceDisableVibrantVisuals);
+            }
         }
         if (this.protocol >= ProtocolInfo.v1_21_50) {
             this.putUUID(this.worldTemplateId);
@@ -101,22 +111,31 @@ public class ResourcePacksInfoPacket extends DataPacket {
     }
 
     private void encodeBehaviourPacks(ResourcePack[] packs) {
-        this.putLShort(packs.length);
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putUnsignedVarInt(packs.length);
+        } else {
+            this.putLShort(packs.length);
+        }
         for (ResourcePack entry : packs) {
             this.putString(entry.getPackId().toString());
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
             this.putString(entry.getEncryptionKey());
-            if(this.protocol >= ProtocolInfo.v1_2_0){
-                this.putString(entry.getSubPackName());
-                this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
-                this.putBoolean(entry.usesScripting());
+            if (this.protocol < ProtocolInfo.v1_2_0) {
+                continue;
             }
+            this.putString(entry.getSubPackName());
+            this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
+            this.putBoolean(entry.usesScripting());
         }
     }
 
     private void encodeResourcePacks(ResourcePack[] packs) {
-        this.putLShort(packs.length);
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putUnsignedVarInt(packs.length);
+        } else {
+            this.putLShort(packs.length);
+        }
         for (ResourcePack entry : packs) {
             if (this.protocol >= ProtocolInfo.v1_21_50) {
                 this.putUUID(entry.getPackId());
@@ -125,19 +144,20 @@ public class ResourcePacksInfoPacket extends DataPacket {
             }
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
-            this.putString(entry.getEncryptionKey()); // encryption key
-            if (protocol >= ProtocolInfo.v1_2_0) {
-                this.putString(""); // sub-pack name
+            this.putString(entry.getEncryptionKey());
+            if (this.protocol < ProtocolInfo.v1_2_0) {
+                continue;
             }
+            this.putString(entry.getSubPackName());
             if (protocol > ProtocolInfo.v1_5_0) {
                 this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
                 if (protocol >= ProtocolInfo.v1_9_0) {
-                    this.putBoolean(false); // scripting
+                    this.putBoolean(entry.usesScripting());
                     if (protocol >= ProtocolInfo.v1_16_200) {
                         if (protocol >= ProtocolInfo.v1_21_20) {
                             this.putBoolean(entry.isAddonPack());
                         }
-                        this.putBoolean(false); // raytracing capable
+                        this.putBoolean(Server.getInstance().isRaytracingEnabled()); // raytracing capable
                         if (protocol >= ProtocolInfo.v1_21_40) {
                             this.putString(entry.getCDNUrl());
                         }

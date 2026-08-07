@@ -1,11 +1,10 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
-import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemBlock;
-import cn.nukkit.item.ItemPotion;
-import cn.nukkit.item.ItemTool;
+import cn.nukkit.item.*;
 import cn.nukkit.level.Sound;
+import cn.nukkit.level.generator.object.ObjectTallGrass;
+import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.utils.BlockColor;
 
 /**
@@ -75,14 +74,31 @@ public class BlockDirt extends BlockSolidMeta {
                 }
                 return true;
             }
-        } else if (player != null && item.getId() == Item.POTION && item.getDamage() == ItemPotion.NO_EFFECTS) {
-            item.count--;
-            Item emptyBottle = Item.get(Item.GLASS_BOTTLE);
-            if (player.getInventory().canAddItem(emptyBottle)) {
-                player.getInventory().addItem(emptyBottle);
-            } else {
-                player.getLevel().dropItem(player.add(0, 1.3, 0), emptyBottle, player.getDirectionVector().multiply(0.4));
+        } else if (item.getId() == Item.DYE && item.getDamage() == ItemDye.BONE_MEAL) {
+            Block up = this.up();
+            if (up instanceof BlockWater) {
+                if (player != null && !player.isCreative()) {
+                    item.count--;
+                }
+                this.level.addParticle(new BoneMealParticle(this));
+                if (up.up() instanceof BlockWater) {
+                    ObjectTallGrass.growSeagrass(this.getLevel(), this);
+                }
+                return true;
             }
+        } else if (item.getId() == Item.POTION && item.getDamage() == ItemPotion.NO_EFFECTS) {
+            if (player != null) {
+                if (!player.isCreative()) {
+                    item.count--;
+                }
+                Item emptyBottle = Item.get(Item.GLASS_BOTTLE);
+                if (player.getInventory().canAddItem(emptyBottle)) {
+                    player.getInventory().addItem(emptyBottle);
+                } else {
+                    player.getLevel().dropItem(player.add(0, 1.3, 0), emptyBottle, player.getDirectionVector().multiply(0.4));
+                }
+            }
+
             this.getLevel().setBlock(this, get(MUD), true);
             return true;
         }

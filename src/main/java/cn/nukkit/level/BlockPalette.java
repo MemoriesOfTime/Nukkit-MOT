@@ -1,13 +1,14 @@
 package cn.nukkit.level;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.utils.Config;
-import cn.nukkit.utils.Utils;
+import cn.nukkit.utils.Hash;
+import cn.nukkit.utils.NetEaseConverter;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
@@ -20,45 +21,129 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 
 @Log4j2
 public class BlockPalette {
 
-    private final int protocol;
-    private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
-    private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
-    private final Map<CompoundTag, Integer> stateToLegacy = new HashMap<>();
+    private static final int MISSING_LEGACY_MAPPING_CACHE_SIZE = 1024;
 
-    private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
+    private final int protocol;
+    private final GameVersion gameVersion;
+    private final Int2IntOpenHashMap legacyToRuntimeId = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap runtimeIdToLegacy = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap stateHashToLegacy = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap legacyToHashId = new Int2IntOpenHashMap();
+
+    private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder()
+            .maximumSize(MISSING_LEGACY_MAPPING_CACHE_SIZE)
+            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .build();
 
     private volatile boolean locked;
 
+    @Deprecated
     public BlockPalette(int protocol) {
-        this.protocol = protocol;
+        this(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public BlockPalette(GameVersion gameVersion) {
+        this.protocol = gameVersion.getProtocol();
+        this.gameVersion = gameVersion;
+
         legacyToRuntimeId.defaultReturnValue(-1);
         runtimeIdToLegacy.defaultReturnValue(-1);
+        stateHashToLegacy.defaultReturnValue(-1);
+        legacyToHashId.defaultReturnValue(-1);
 
         loadBlockStates(paletteFor(protocol));
-        loadBlockStatesExtras();
+        this.lock();
     }
 
     private ListTag<CompoundTag> paletteFor(int protocol) {
         ListTag<CompoundTag> tag;
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("runtime_block_states_" + protocol + ".dat")) {
+        String name = "runtime_block_states_" + protocol + ".dat";
+        boolean useNetEaseConversion = false;
+
+        if (gameVersion.isNetEase()) {
+            String neteaseName = "runtime_block_states_netease_" + protocol + ".dat";
+            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseName);
+            if (neteaseStream != null) {
+                name = neteaseName;
+                try {
+                    neteaseStream.close();
+                } catch (IOException ignored) {
+                }
+            } else {
+                log.debug("NetEase resource file not found: {}, will convert from standard version", neteaseName);
+                useNetEaseConversion = true;
+            }
+        }
+
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
             if (stream == null) {
                 throw new AssertionError("Unable to locate block state nbt " + protocol);
             }
             //noinspection unchecked
             tag = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
-        } catch (IOException e) {
+
+            if (useNetEaseConversion) {
+                ListTag<CompoundTag> fullPalette = loadFullBlockPalette(protocol);
+                log.info("Using full block_palette_{}.nbt for NetEase conversion ({} blocks)", protocol, fullPalette.size());
+                tag = NetEaseConverter.convertBlockStates(fullPalette, true);
+            }
+        } catch (IOException | NullPointerException e) {
             throw new AssertionError("Unable to load block palette " + protocol, e);
         }
         return tag;
+    }
+
+    /**
+     * Loads the full block palette.
+     * The block_palette contains all block states, while runtime_block_states
+     * only contains a subset of them.
+     *
+     * @param protocol the protocol version
+     * @return the full block palette, or {@code null} if the file does not exist
+     */
+    private ListTag<CompoundTag> loadFullBlockPalette(int protocol) {
+        String paletteName = "BlockPaletteRaw/block_palette_" + protocol + ".nbt";
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(paletteName)) {
+            if (stream == null) {
+                return null;
+            }
+
+            Object tag = NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
+
+            if (tag instanceof ListTag) {
+                //noinspection unchecked
+                return (ListTag<CompoundTag>) tag;
+            } else if (tag instanceof CompoundTag) {
+                CompoundTag compoundTag = (CompoundTag) tag;
+                if (compoundTag.contains("")) {
+                    //noinspection unchecked
+                    return (ListTag<CompoundTag>) compoundTag.get("");
+                }
+                // 尝试其他可能的 key
+                for (String key : compoundTag.getTags().keySet()) {
+                    Object value = compoundTag.get(key);
+                    if (value instanceof ListTag) {
+                        //noinspection unchecked
+                        return (ListTag<CompoundTag>) value;
+                    }
+                }
+                log.error("Could not find ListTag in CompoundTag for palette: {}", paletteName);
+                return null;
+            } else {
+                log.error("Unexpected tag type for palette {}: {}", paletteName, tag.getClass().getName());
+                return null;
+            }
+        } catch (IOException e) {
+            log.error("Error loading full block palette: {}", paletteName, e);
+            return null;
+        }
     }
 
     private void loadBlockStates(ListTag<CompoundTag> blockStates) {
@@ -94,33 +179,12 @@ public class BlockPalette {
         return true;
     }
 
-    /**
-     * 加载扩展数据，用于在不修改runtime_block_states.dat文件的情况下额外增加一些内容
-     */
-    private void loadBlockStatesExtras() {
-        try (InputStream resourceAsStream = Server.class.getClassLoader().getResourceAsStream("RuntimeBlockStatesExtras/" + protocol + ".json")) {
-            if (resourceAsStream == null) {
-                return;
-            }
-            List<Map> extras = new Config().loadFromStream(resourceAsStream).getMapList("extras");
-            //noinspection unchecked
-            for (Map<String, Object> map : extras) {
-                int id = Utils.toInt(map.get("id"));
-                int data = Utils.toInt(map.getOrDefault("data", 0));
-                int runtimeId = Utils.toInt(map.get("runtimeId"));
-                int legacyId = id << Block.DATA_BITS | data;
-                legacyToRuntimeId.put(legacyId, runtimeId);
-                if (!runtimeIdToLegacy.containsKey(runtimeId)) {
-                    runtimeIdToLegacy.put(runtimeId, legacyId);
-                }
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public int getProtocol() {
         return this.protocol;
+    }
+
+    public GameVersion getGameVersion() {
+        return this.gameVersion;
     }
 
     public Int2IntMap getLegacyToRuntimeIdMap() {
@@ -131,7 +195,9 @@ public class BlockPalette {
         this.locked = false;
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
-        this.stateToLegacy.clear();
+        this.stateHashToLegacy.clear();
+        this.legacyToHashId.clear();
+        this.legacyToRuntimeIdCache.invalidateAll();
     }
 
     public void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
@@ -139,33 +205,29 @@ public class BlockPalette {
             throw new IllegalStateException("Block palette is already locked!");
         }
 
+        Block.registerKnownState(blockId, data);
+
         int legacyId = blockId << Block.DATA_BITS | data;
         this.legacyToRuntimeId.put(legacyId, runtimeId);
         this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-        this.stateToLegacy.putIfAbsent(blockState, legacyId);
-
-        // Hack: Map IDs for item frame up & down states
-        if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
-            if (data == 7) {
-                int offset = 5;
-
-                runtimeId = runtimeId + offset;
-                legacyId = blockId << Block.DATA_BITS | 5; // Up
-                this.legacyToRuntimeId.put(legacyId, runtimeId);
-                this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-
-                int offset2 = 0;
-
-                runtimeId = runtimeId + offset + offset2;
-                legacyId = blockId << Block.DATA_BITS | 4; // Down
-                this.legacyToRuntimeId.put(legacyId, runtimeId);
-                this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-            }
-        }
+        int stateHash = Hash.hashBlock(blockState);
+        this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
+        this.legacyToHashId.putIfAbsent(legacyId, stateHash);
     }
 
     public void lock() {
         this.locked = true;
+        this.trim();
+    }
+
+    /**
+     * Shrinks the internal fastutil maps after bulk registration to release unused capacity.
+     */
+    public void trim() {
+        this.legacyToRuntimeId.trim();
+        this.runtimeIdToLegacy.trim();
+        this.stateHashToLegacy.trim();
+        this.legacyToHashId.trim();
     }
 
     public int getRuntimeId(int id) {
@@ -181,7 +243,7 @@ public class BlockPalette {
             if (runtimeId == -1) {
                 Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyId);
                 if (cache == null) {
-                    log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
+                    logMissingRuntimeIdMapping("({}) Missing block runtime id mappings for {}:{}", gameVersion, id, meta);
                     runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
                     legacyToRuntimeIdCache.put(legacyId, runtimeId);
                 } else {
@@ -196,8 +258,103 @@ public class BlockPalette {
         return runtimeIdToLegacy.get(runtimeId);
     }
 
-    public int getLegacyFullId(CompoundTag compoundTag) {
-        return stateToLegacy.getOrDefault(compoundTag, -1);
+    /**
+     * 从哈希ID获取完整的旧方块ID
+     * Get full legacy block ID from hash ID
+     * <p>
+     * 哈希ID是通过方块状态NBT计算得出的哈希值，用于新版本的方块网络传输
+     * Hash ID is calculated from block state NBT and used for block network transmission in newer versions
+     *
+     * @param hashId 方块状态的哈希ID / hash ID of the block state
+     * @return 完整的旧方块ID (blockId << Block.DATA_BITS | meta)，如果找不到则返回-1 / full legacy block ID, returns -1 if not found
+     */
+    public int getLegacyFullIdFromHashId(int hashId) {
+        return stateHashToLegacy.get(hashId);
+    }
+
+    public int getLegacyFullId(CompoundTag blockState) {
+        return stateHashToLegacy.get(Hash.hashBlock(blockState));
+    }
+
+    /**
+     * 获取方块的哈希ID (使用默认meta值0)
+     * Get hash ID of a block (using default meta value 0)
+     *
+     * @param id 方块ID / block ID
+     * @return 方块的哈希ID / hash ID of the block
+     */
+    public int getHashId(int id) {
+        return this.getHashId(id, 0);
+    }
+
+    /**
+     * 获取方块的哈希ID
+     * Get hash ID of a block
+     * <p>
+     * 哈希ID用于新版本协议(1.19.80+)的方块网络传输，基于方块状态NBT的哈希值
+     * Hash ID is used for block network transmission in newer protocols (1.19.80+), based on block state NBT hash
+     *
+     * @param id 方块ID / block ID
+     * @param meta 方块元数据值 / block metadata value
+     * @return 方块的哈希ID，如果找不到则返回INFO_UPDATE方块的哈希ID / hash ID of the block, returns INFO_UPDATE block's hash ID if not found
+     */
+    public int getHashId(int id, int meta) {
+        int legacyId = protocol >= 388 ? ((id << Block.DATA_BITS) | meta) : ((id << 4) | meta);
+        int hashId = legacyToHashId.get(legacyId);
+        if (hashId == -1) {
+            hashId = legacyToHashId.get(id << Block.DATA_BITS);
+            if (hashId == -1) {
+                hashId = legacyToHashId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
+            }
+        }
+        return hashId;
+    }
+
+    /**
+     * 通过 fullId 直接查询 runtimeId，跳过 id/meta 的拆分与重组
+     * Get runtimeId directly by fullId (blockId << DATA_BITS | meta), skipping id/meta split
+     */
+    public int getRuntimeIdByFullId(int legacyFullId) {
+        int runtimeId = legacyToRuntimeId.get(legacyFullId);
+        if (runtimeId == -1) {
+            int id = legacyFullId >> Block.DATA_BITS;
+            runtimeId = legacyToRuntimeId.get(id << Block.DATA_BITS);
+            if (runtimeId == -1) {
+                Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyFullId);
+                if (cache == null) {
+                    logMissingRuntimeIdMapping("({}) Missing block runtime id mappings for fullId:{}", gameVersion, legacyFullId);
+                    runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
+                    legacyToRuntimeIdCache.put(legacyFullId, runtimeId);
+                } else {
+                    runtimeId = cache;
+                }
+            }
+        }
+        return runtimeId;
+    }
+
+    /**
+     * 通过 fullId 直接查询 hashId，跳过 id/meta 的拆分与重组
+     * Get hashId directly by fullId (blockId << DATA_BITS | meta), skipping id/meta split
+     */
+    public int getHashIdByFullId(int legacyFullId) {
+        int hashId = legacyToHashId.get(legacyFullId);
+        if (hashId == -1) {
+            int id = legacyFullId >> Block.DATA_BITS;
+            hashId = legacyToHashId.get(id << Block.DATA_BITS);
+            if (hashId == -1) {
+                hashId = legacyToHashId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
+            }
+        }
+        return hashId;
+    }
+
+    private void logMissingRuntimeIdMapping(String message, Object... args) {
+        if (this.gameVersion == GameVersion.getLastVersion() || this.gameVersion == GameVersion.getLastNetEaseVersion()) {
+            log.info(message, args);
+            return;
+        }
+        log.debug(message, args);
     }
 
 }

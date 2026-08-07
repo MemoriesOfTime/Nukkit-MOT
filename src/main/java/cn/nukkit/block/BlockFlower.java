@@ -8,6 +8,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/11/23 by xtypr.
@@ -70,7 +71,7 @@ public class BlockFlower extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
         int id = down.getId();
         if (id == Block.GRASS || id == Block.DIRT || id == Block.FARMLAND || id == Block.PODZOL || id == MYCELIUM) {
@@ -119,7 +120,7 @@ public class BlockFlower extends BlockFlowable {
                         Utils.random.nextInt(-1, 2),
                         Utils.random.nextInt(-3, 4));
 
-                if (level.getBlock(vec).getId() == AIR && level.getBlock(vec.down()).getId() == GRASS && vec.getY() >= 0 && vec.getY() < 256) {
+                if (vec.getY() >= 0 && vec.getY() < 256 && level.getBlock(vec).getId() == AIR && level.getBlock(vec.down()).getId() == GRASS) {
                     if (Utils.random.nextInt(10) == 0) {
                         this.level.setBlock(vec, this.getUncommonFlower(), true);
                     } else {

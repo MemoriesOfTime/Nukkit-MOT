@@ -12,7 +12,7 @@ public class ItemNode extends ParamNode<Item> {
     public void fill(String arg) {
         Item item = Item.fromString(arg);
         if (item.isNull()) {
-            error();
+            error("commands.give.item.notFound", arg);
             return;
         }
         this.value = item;

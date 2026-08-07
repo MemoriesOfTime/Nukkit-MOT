@@ -43,6 +43,7 @@ public class AddPlayerPacket extends DataPacket {
     public float speedZ;
     public float pitch;
     public float yaw;
+    public float headYaw = -1;
     public Item item;
     public boolean slim = false;
     public Skin skin;
@@ -56,6 +57,7 @@ public class AddPlayerPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -123,6 +125,19 @@ public class AddPlayerPacket extends DataPacket {
         this.reset();
         this.putUUID(this.uuid);
         this.putString(this.username);
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.entityUniqueId);
+            this.putEntityUniqueId(this.entityRuntimeId);
+            this.putVector3f(this.x, this.y, this.z);
+            this.putVector3f(this.speedX, this.speedY, this.speedZ);
+            this.putLFloat(this.pitch);
+            this.putLFloat(this.headYaw == -1 ? this.yaw : this.headYaw);
+            this.putLFloat(this.yaw);
+            this.putSlot(gameVersion, this.item);
+            this.put(Binary.writeMetadata(gameVersion, this.metadata));
+            return;
+        }
+
         if (protocol >= 223 && protocol <= 282) {
             this.putString("");
             this.putVarInt(0);
@@ -142,12 +157,12 @@ public class AddPlayerPacket extends DataPacket {
         this.putVector3f(this.speedX, this.speedY, this.speedZ);
         this.putLFloat(this.pitch);
         this.putLFloat(this.yaw);
-        this.putLFloat(this.yaw);
-        this.putSlot(protocol, this.item);
+        this.putLFloat(this.headYaw == -1 ? this.yaw : this.headYaw);
+        this.putSlot(gameVersion, this.item);
         if (protocol >= ProtocolInfo.v1_18_30) {
             this.putVarInt(this.gameType);
         }
-        this.put(Binary.writeMetadata(protocol, this.metadata));
+        this.put(Binary.writeMetadata(gameVersion, this.metadata));
         if (protocol > 274) {
             if (protocol < ProtocolInfo.v1_19_10) {
                 this.putUnsignedVarInt(0);
@@ -169,6 +184,9 @@ public class AddPlayerPacket extends DataPacket {
                 this.putLInt(63); // abilityValues - survival abilities
                 this.putLFloat(0.1f); // flySpeed
                 this.putLFloat(0.05f); // walkSpeed
+                if (this.protocol >= ProtocolInfo.v1_21_60) {
+                    this.putLFloat(1.0f); // getVerticalFlySpeed()
+                }
             }
             this.putUnsignedVarInt(0);
             this.putString(deviceId);

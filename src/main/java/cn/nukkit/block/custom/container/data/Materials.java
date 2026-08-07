@@ -229,7 +229,7 @@ public class Materials implements NBTData {
         this.tag.putCompound(face, new CompoundTag()
                 .putBoolean("ambient_occlusion", ambientOcclusion)
                 .putBoolean("face_dimming", faceDimming)
-                .putString("render_method", renderMethod.name().toLowerCase(Locale.ENGLISH))
+                .putString("render_method", renderMethod.name().toLowerCase(Locale.ROOT))
                 .putString("texture", texture));
     }
 

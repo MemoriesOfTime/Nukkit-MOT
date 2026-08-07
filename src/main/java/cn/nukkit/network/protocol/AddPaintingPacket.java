@@ -21,6 +21,7 @@ public class AddPaintingPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -49,10 +50,10 @@ public class AddPaintingPacket extends DataPacket {
         }
         this.reset();
         this.putEntityUniqueId(this.entityUniqueId);
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.entityRuntimeId);
-        }else{
+        if (protocol < ProtocolInfo.v1_2_0) {
             this.putEntityUniqueId(this.entityRuntimeId);
+        } else {
+            this.putEntityRuntimeId(this.entityRuntimeId);
         }
         if (protocol < 361) {
             this.putBlockVector3((int) this.x, (int) this.y, (int) this.z);

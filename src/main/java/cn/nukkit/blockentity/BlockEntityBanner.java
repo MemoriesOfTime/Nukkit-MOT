@@ -67,7 +67,8 @@ public class BlockEntityBanner extends BlockEntitySpawnable {
     }
 
     public BannerPattern getPattern(int index) {
-        return BannerPattern.fromCompoundTag(this.namedTag.getList("Patterns").size() > index && index >= 0 ? this.namedTag.getList("Patterns", CompoundTag.class).get(index) : new CompoundTag());
+        ListTag<CompoundTag> patterns = this.namedTag.getList("Patterns", CompoundTag.class);
+        return BannerPattern.fromCompoundTag(index >= 0 && index < patterns.size() ? patterns.get(index) : new CompoundTag());
     }
 
     public void removePattern(int index) {

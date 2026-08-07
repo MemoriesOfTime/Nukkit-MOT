@@ -11,4 +11,20 @@ public class JsonUtils {
         }
         return (T) value;
     }
+
+    /**
+     * Optional variant of {@link #childAsType}: returns {@code defaultValue} when the node is
+     * missing or has an unexpected type, instead of throwing.
+     * <p>
+     * Used for legacy clients (e.g. v1.1.0) and offline clients whose JWT chain omits fields
+     * that are only present for Xbox-authenticated sessions (such as {@code XUID}).
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T childAsTypeOrDefault(Map<?, ?> data, String key, Class<T> asType, T defaultValue) {
+        Object value = data.get(key);
+        if (asType.isInstance(value)) {
+            return (T) value;
+        }
+        return defaultValue;
+    }
 }

@@ -28,6 +28,7 @@ public enum PlayerActionType {
     /**
      * @deprecated since v729
      */
+    @SuppressWarnings("dep-ann")
     START_SPIN_ATTACK,
     STOP_SPIN_ATTACK,
     INTERACT_WITH_BLOCK,
@@ -66,7 +67,11 @@ public enum PlayerActionType {
     /**
      * @since v748
      */
-    START_USING_ITEM
+    START_USING_ITEM,
+    /**
+     * @since v2168 (1.26.40)
+     */
+    INTERNAL_UPDATE
     ;
 
     private static final PlayerActionType[] VALUES = values();

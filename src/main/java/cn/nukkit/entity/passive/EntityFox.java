@@ -60,4 +60,9 @@ public class EntityFox extends EntityWalkingAnimal {
     public boolean isFeedItem(Item item) {
         return item.getId() == Item.SWEET_BERRIES;
     }
+
+    @Override
+    protected boolean canBeDamagedBySweetBerryBush() {
+        return false;
+    }
 }

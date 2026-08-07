@@ -6,6 +6,7 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -48,7 +49,7 @@ public abstract class BlockStairs extends BlockSolidMeta implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(faces[player != null ? player.getDirection().getHorizontalIndex() : 0]);
         if ((fy > 0.5 && face != BlockFace.UP) || face == BlockFace.DOWN) {
             this.setDamage(this.getDamage() | 0x04); //Upside-down stairs

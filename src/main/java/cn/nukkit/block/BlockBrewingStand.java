@@ -81,7 +81,7 @@ public class BlockBrewingStand extends BlockTransparentMeta implements BlockEnti
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         getLevel().setBlock(block, this, true, true);
 
         CompoundTag nbt = new CompoundTag()
@@ -126,7 +126,7 @@ public class BlockBrewingStand extends BlockTransparentMeta implements BlockEnti
                 }
             }
 
-            if (brewing.namedTag.contains("Lock") && brewing.namedTag.get("Lock") instanceof StringTag) {
+            if (brewing.namedTag.get("Lock") instanceof StringTag) {
                 if (!brewing.namedTag.getString("Lock").equals(item.getCustomName())) {
                     return false;
                 }

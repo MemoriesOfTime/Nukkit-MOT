@@ -15,7 +15,7 @@ public class Data2dSerializer {
         byte[] data2d = new byte[768];
         ByteBuf buffer = Unpooled.wrappedBuffer(data2d);
         buffer.writerIndex(0);
-        byte[] heightMap = chunk.getHeightMapArray();
+        short[] heightMap = chunk.getHeightMapArray();
         byte[] biomes = chunk.getBiomeIdArray();
         for (int height : heightMap) {
             buffer.writeShortLE(height);
@@ -27,7 +27,7 @@ public class Data2dSerializer {
 
     public static void deserialize(DB dB, ChunkBuilder chunkBuilder) {
         byte[] data2d = dB.get(LevelDBKey.DATA_2D.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ(), chunkBuilder.getDimensionData().getDimensionId()));
-        int[] heightMap = new int[512];
+        int[] heightMap = new int[256];
         byte[] biomes = new byte[256];
 
         if (data2d != null) {
@@ -42,4 +42,3 @@ public class Data2dSerializer {
         chunkBuilder.biome2d(biomes);
     }
 }
-

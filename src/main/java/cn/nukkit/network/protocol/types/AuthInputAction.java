@@ -125,6 +125,10 @@ public enum AuthInputAction {
     /**
      * @since v766
      */
+    HOTBAR_ONLY_TOUCH,
+    /**
+     * @since v766
+     */
     JUMP_RELEASED_RAW,
     /**
      * @since v766
@@ -145,7 +149,11 @@ public enum AuthInputAction {
     /**
      * @since v766
      */
-    SNEAK_CURRENT_RAW
+    SNEAK_CURRENT_RAW,
+    /**
+     * @since v2168 1.26.40
+     */
+    INTERNAL_UPDATE
     ;
 
     private static final AuthInputAction[] VALUES = values();

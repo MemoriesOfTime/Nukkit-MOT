@@ -3,7 +3,6 @@ package cn.nukkit.block.custom.container;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.custom.properties.BlockProperties;
 import cn.nukkit.block.custom.properties.BlockProperty;
-import cn.nukkit.block.custom.properties.EnumBlockProperty;
 import cn.nukkit.block.custom.properties.RegisteredBlockProperty;
 import cn.nukkit.level.format.leveldb.LevelDBConstants;
 import org.cloudburstmc.nbt.NbtMap;
@@ -94,11 +93,11 @@ public interface BlockStorageContainer extends BlockContainer {
     default NbtMap getStateNbt() {
         NbtMapBuilder states = NbtMap.builder();
         for (RegisteredBlockProperty property : this.getBlockProperties().getAllProperties()) {
-            if (property.getProperty() instanceof EnumBlockProperty<?>) {
-                states.put(property.getProperty().getName(), this.getPropertyValue(property.getProperty()).toString());
-            } else {
-                states.put(property.getProperty().getName(), this.getPropertyValue(property.getProperty()));
-            }
+            BlockProperty<?> blockProperty = property.getProperty();
+            states.put(
+                    blockProperty.getPersistenceName(),
+                    blockProperty.getPersistenceValue(this.getStorage(), property.getOffset())
+            );
         }
         return NbtMap.builder()
                 .putString("name", this.getIdentifier())

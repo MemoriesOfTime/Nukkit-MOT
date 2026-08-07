@@ -1,5 +1,6 @@
 package cn.nukkit.level.util;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.BlockVector3;
@@ -7,29 +8,41 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.ChunkException;
 import io.netty.buffer.ByteBuf;
-import it.unimi.dsi.fastutil.ints.Int2IntFunction;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.ints.*;
+
+import java.util.Arrays;
 
 public class PalettedBlockStorage {
 
     protected static final int SIZE = 4096; // 16 * 16 * 16
+    public static final byte COPY_LAST_MARKER = (byte) ((0x7F << 1) | 1);
 
     protected IntList palette;
     protected BitArray bitArray;
+    private Int2IntMap paletteIndexLookup;
 
     public static PalettedBlockStorage createFromBlockPalette() {
         return createFromBlockPalette(BitArrayVersion.V2, 0);
     }
 
+    @Deprecated
     public static PalettedBlockStorage createFromBlockPalette(int protocol) {
         return PalettedBlockStorage.createFromBlockPalette(BitArrayVersion.V2, protocol);
     }
 
+    @Deprecated
     public static PalettedBlockStorage createFromBlockPalette(BitArrayVersion version, int protocol) {
+        return PalettedBlockStorage.createFromBlockPalette(version, GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public static PalettedBlockStorage createFromBlockPalette(GameVersion gameVersion) {
+        return PalettedBlockStorage.createFromBlockPalette(BitArrayVersion.V2, gameVersion);
+    }
+
+    public static PalettedBlockStorage createFromBlockPalette(BitArrayVersion version, GameVersion gameVersion) {
         int runtimeId;
-        if (protocol >= ProtocolInfo.v1_16_100) {
-            runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, 0); // Air is first
+        if (gameVersion.getProtocol() >= ProtocolInfo.v1_16_100) {
+            runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, 0); // Air is first
         } else {
             runtimeId = 0;
         }
@@ -48,11 +61,19 @@ public class PalettedBlockStorage {
         this.bitArray = version.createPalette(SIZE);
         this.palette = new IntArrayList(16);
         this.palette.add(defaultState);
+        this.paletteIndexLookup = new Int2IntOpenHashMap(16);
+        this.paletteIndexLookup.defaultReturnValue(-1);
+        this.paletteIndexLookup.put(defaultState, 0);
     }
 
     protected PalettedBlockStorage(BitArray bitArray, IntList palette) {
         this.palette = palette;
         this.bitArray = bitArray;
+        this.paletteIndexLookup = new Int2IntOpenHashMap(palette.size());
+        this.paletteIndexLookup.defaultReturnValue(-1);
+        for (int i = 0; i < palette.size(); i++) {
+            this.paletteIndexLookup.put(palette.getInt(i), i);
+        }
     }
 
     protected int getPaletteHeader(BitArrayVersion version) {
@@ -102,6 +123,7 @@ public class PalettedBlockStorage {
         BitArrayVersion version  = BitArrayVersion.get(header >> 1, true);
 
         this.palette.clear();
+        this.paletteIndexLookup.clear();
 
         int paletteSize = 1;
         if (version == BitArrayVersion.V0) {
@@ -124,6 +146,7 @@ public class PalettedBlockStorage {
         for (int i = 0; i < paletteSize; i++) {
             int runtimeId = byteBuf.readIntLE();
             this.palette.add(runtimeId);
+            this.paletteIndexLookup.put(runtimeId, i);
             if (runtimeId < 0) {
                 Server.getInstance().getLogger().warning("Invalid runtimeId: " + runtimeId + ", palette: " + palette);
             }
@@ -133,7 +156,7 @@ public class PalettedBlockStorage {
     public void writeToStorage(ByteBuf byteBuf) {
         int paletteSize = this.palette.size();
         BitArrayVersion version = paletteSize <= 1 ? BitArrayVersion.V0 : this.bitArray.getVersion();
-        byteBuf.writeByte(this.getPaletteHeader(version, false));
+        byteBuf.writeByte(this.getPaletteHeader(version, true));
 
         if (version != BitArrayVersion.V0) {
             for (int i : this.bitArray.getWords()) {
@@ -181,7 +204,7 @@ public class PalettedBlockStorage {
     }
 
     private int idFor(int runtimeId) {
-        int index = this.palette.indexOf(runtimeId);
+        int index = this.paletteIndexLookup.get(runtimeId);
         if (index != -1) {
             return index;
         }
@@ -195,6 +218,7 @@ public class PalettedBlockStorage {
             }
         }
         this.palette.add(runtimeId);
+        this.paletteIndexLookup.put(runtimeId, index);
         return index;
     }
 
@@ -212,5 +236,11 @@ public class PalettedBlockStorage {
 
     public PalettedBlockStorage copy() {
         return new PalettedBlockStorage(this.bitArray.copy(), new IntArrayList(this.palette));
+    }
+
+    public boolean contentEquals(PalettedBlockStorage other) {
+        if (this == other) return true;
+        if (other == null || !this.palette.equals(other.palette)) return false;
+        return Arrays.equals(this.bitArray.getWords(), other.bitArray.getWords());
     }
 }

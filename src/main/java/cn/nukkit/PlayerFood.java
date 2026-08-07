@@ -68,9 +68,8 @@ public class PlayerFood {
         }
         int foodLevel0 = ev.getFoodLevel();
         float fsl = ev.getFoodSaturationLevel();
-        this.foodLevel = foodLevel;
         if (fsl != -1) {
-            if (fsl > foodLevel) fsl = foodLevel;
+            if (fsl > foodLevel0) fsl = foodLevel0;
             this.foodSaturationLevel = fsl;
         }
         this.foodLevel = foodLevel0;
@@ -139,7 +138,10 @@ public class PlayerFood {
         if (!this.player.isFoodEnabled()) return;
         if (this.player.isAlive()) {
             int diff = Server.getInstance().getDifficulty();
-            if (this.foodLevel > 17 || diff == 0) {
+            // Peaceful mode healing is handled in Player.java
+            if (diff == 0) return;
+
+            if (this.foodLevel > 17) {
                 this.foodTickTimer += tickDiff;
                 if (this.foodTickTimer >= 80) {
                     if (this.player.getLevel().getGameRules().getBoolean(GameRule.NATURAL_REGENERATION)
@@ -172,7 +174,7 @@ public class PlayerFood {
             }
 
             if (this.player.hasEffect(Effect.HUNGER)) {
-                this.updateFoodExpLevel(0.1 * (this.getPlayer().getEffect(Effect.HUNGER).getAmplifier() + 1));
+                this.updateFoodExpLevel(0.005 * (this.getPlayer().getEffect(Effect.HUNGER).getAmplifier() + 1) * tickDiff);
             }
         }
     }
@@ -182,9 +184,10 @@ public class PlayerFood {
         if (Server.getInstance().getDifficulty() == 0) return;
         if (this.player.hasEffect(Effect.SATURATION)) return;
         this.foodExpLevel += use;
-        if (this.foodExpLevel > 4) {
+        // Wiki: exhaustion resets when it "reaches" 4.0, and overflow carries over
+        while (this.foodExpLevel >= 4) {
             this.useHunger(1);
-            this.foodExpLevel = 0;
+            this.foodExpLevel -= 4;
         }
     }
 

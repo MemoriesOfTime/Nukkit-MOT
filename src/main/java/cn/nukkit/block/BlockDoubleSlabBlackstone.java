@@ -7,7 +7,7 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockDoubleSlabBlackstone extends BlockSolid {
     public BlockDoubleSlabBlackstone() {
-        
+
     }
 
     @Override
@@ -39,12 +39,12 @@ public class BlockDoubleSlabBlackstone extends BlockSolid {
     public boolean canHarvestWithHand() {
         return false;
     }
-    
+
     @Override
     public Item toItem() {
         return new ItemBlock(Block.get(BLACKSTONE_SLAB), this.getDamage() & 0x07);
     }
-    
+
     @Override
     public Item[] getDrops(Item item) {
         if (item.isPickaxe()) {
@@ -52,10 +52,10 @@ public class BlockDoubleSlabBlackstone extends BlockSolid {
             slab.setCount(2);
             return new Item[]{ slab };
         } else {
-            return new Item[0];
+            return Item.EMPTY_ARRAY;
         }
     }
-    
+
     @Override
     public BlockColor getColor() {
         return BlockColor.BLACK_BLOCK_COLOR;

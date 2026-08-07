@@ -1,12 +1,27 @@
 package cn.nukkit.network.encryption;
 
+import cn.nukkit.Nukkit;
+import cn.nukkit.Server;
+import cn.nukkit.network.protocol.types.auth.AuthPayload;
+import cn.nukkit.network.protocol.types.auth.AuthType;
+import cn.nukkit.network.protocol.types.auth.CertificateChainPayload;
+import cn.nukkit.network.protocol.types.auth.TokenPayload;
 import lombok.experimental.UtilityClass;
+import lombok.extern.log4j.Log4j2;
 import org.jose4j.json.JsonUtil;
+import org.jose4j.json.internal.json_simple.parser.JSONParser;
+import org.jose4j.json.internal.json_simple.parser.ParseException;
 import org.jose4j.jwa.AlgorithmConstraints;
+import org.jose4j.jwk.HttpsJwks;
 import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.InvalidJwtException;
+import org.jose4j.jwt.consumer.JwtConsumer;
+import org.jose4j.jwt.consumer.JwtConsumerBuilder;
+import org.jose4j.jwt.consumer.JwtContext;
 import org.jose4j.jwx.HeaderParameterNames;
+import org.jose4j.keys.resolvers.HttpsJwksVerificationKeyResolver;
 import org.jose4j.lang.JoseException;
 
 import javax.crypto.Cipher;
@@ -15,6 +30,12 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.net.ssl.HttpsURLConnection;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
@@ -28,33 +49,291 @@ import java.util.Map;
 /**
  * <a href="https://github.com/CloudburstMC/Protocol/blob/6b48673067d5c0e60f5e0a5a7e889dbf2aafa1a1/bedrock/bedrock-common/src/main/java/com/nukkitx/protocol/bedrock/util/EncryptionUtils.java">...</a>
  */
+@Log4j2
 @UtilityClass
 public class EncryptionUtils {
     public static final ECPublicKey MOJANG_PUBLIC_KEY;
     @Deprecated
     public static final ECPublicKey OLD_MOJANG_PUBLIC_KEY;
+    public static final ECPublicKey NETEASE_PUBLIC_KEY;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String MOJANG_PUBLIC_KEY_BASE64 =
             "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
     private static final String OLD_MOJANG_PUBLIC_KEY_BASE64 =
             "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE8ELkixyLcwlZryUQcu1TvPOmI2B7vX83ndnWRUaXm74wFfa5f/lwQNTfrLVHa2PmenpGI6JhIMUJaWZrjmMj90NoKNFSNBuKdm8rYiXsfaz3K36x/1U26HpG0ZxK/V1V";
+    private static final String NETEASE_PUBLIC_KEY_BASE64 =
+            "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEEsmU+IF/XeAF3yiqJ7Ko36btx6JtdB26wV9Eyw4AYR/nmesznkfXxwQ4B0NkSnGIZccbb2f3nFUYughKSoAcNHx+lQm8F9h9RwhrNgeN907z06LUA2AqWcwqasxyaU0E";
     private static final KeyPairGenerator KEY_PAIR_GEN;
 
     public static final String ALGORITHM_TYPE = AlgorithmIdentifiers.ECDSA_USING_P384_CURVE_AND_SHA384;
     private static final org.jose4j.jwa.AlgorithmConstraints ALGORITHM_CONSTRAINTS =
             new AlgorithmConstraints(AlgorithmConstraints.ConstraintType.PERMIT, ALGORITHM_TYPE);
 
+    private static final String DISCOVERY_ENDPOINT =
+            "https://client.discovery.minecraft-services.net/api/v1.0/discovery/MinecraftPE/builds/1.0.0.0";
+
+    public static final JwtConsumer OFFLINE_CONSUMER = new JwtConsumerBuilder()
+            .setSkipAllValidators()
+            .setSkipSignatureVerification()
+            .setRequireExpirationTime()
+            .setSkipDefaultAudienceValidation()
+            .build();
+
+    /**
+     * Lazy holder for JWT consumers to avoid blocking network calls during class initialization.
+     * These are only needed for v1.21.90+ authentication.
+     */
+    private static class JwtConsumerHolder {
+        private static volatile Map<String, Object> DISCOVERY_DATA = null;
+        private static volatile Map<String, Object> OPENID_CONFIGURATION = null;
+        private static volatile JwtConsumer MOJANG_CONSUMER = null;
+        private static final Object LOCK = new Object();
+        private static volatile AuthCacheManager CACHE_MANAGER = null;
+
+        private static final JwtConsumer OFFLINE_CONSUMER = EncryptionUtils.OFFLINE_CONSUMER;
+
+        private static AuthCacheManager getCacheManager() {
+            if (CACHE_MANAGER != null) {
+                return CACHE_MANAGER;
+            }
+
+            synchronized (LOCK) {
+                if (CACHE_MANAGER != null) {
+                    return CACHE_MANAGER;
+                }
+
+                // Initialize cache manager with data path from Nukkit
+                String dataPath = Nukkit.DATA_PATH;
+                CACHE_MANAGER = new AuthCacheManager(dataPath);
+                return CACHE_MANAGER;
+            }
+        }
+
+        private static Map<String, Object> getDiscoveryData() {
+            if (DISCOVERY_DATA != null) {
+                return DISCOVERY_DATA;
+            }
+
+            synchronized (LOCK) {
+                if (DISCOVERY_DATA != null) {
+                    return DISCOVERY_DATA;
+                }
+
+                // Try to load from disk cache first
+                AuthCacheManager cacheManager = getCacheManager();
+                Map<String, Object> cachedData = cacheManager.loadDiscoveryData();
+                if (cachedData != null) {
+                    DISCOVERY_DATA = cachedData;
+                    log.debug("Using cached discovery data from disk");
+                    return cachedData;
+                }
+
+                // Cache miss or expired, fetch from remote
+                log.debug("Discovery cache miss, fetching from remote: {}", DISCOVERY_ENDPOINT);
+
+                int maxRetries = 3;
+                long retryDelay = 1000; // 1 second
+
+                for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        URL url = new URL(DISCOVERY_ENDPOINT);
+                        HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+                        connection.setRequestMethod("GET");
+                        connection.setRequestProperty("Accept", "application/json");
+                        connection.setConnectTimeout(5000);
+                        connection.setReadTimeout(5000);
+                        connection.connect();
+                        if (connection.getResponseCode() != 200) {
+                            throw new IOException("Failed to fetch discovery data: " + connection.getResponseMessage());
+                        }
+                        try(InputStream stream = connection.getInputStream();
+                            InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                            //noinspection unchecked
+                            JSONParser parser = new JSONParser();
+                            Map<String, Object> data = (Map<String, Object>) parser.parse(reader);
+                            DISCOVERY_DATA = data;
+                            // Save to disk cache
+                            cacheManager.saveDiscoveryData(data);
+                            return data;
+                        }
+                    } catch (ParseException | IOException e) {
+                        if (attempt < maxRetries) {
+                            log.error("Failed to fetch discovery data (attempt {}/{}): {}. Retrying in {}ms...", attempt, maxRetries, e.getMessage(), retryDelay);
+                            try {
+                                Thread.sleep(retryDelay);
+                                retryDelay *= 2;
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                throw new AssertionError("Interrupted while retrying discovery data fetch", ie);
+                            }
+                        } else {
+                            throw new AssertionError("Unable to fetch discovery data from " + DISCOVERY_ENDPOINT + " after " + maxRetries + " attempts", e);
+                        }
+                    }
+                }
+                throw new AssertionError("Failed to fetch discovery data after all retries");
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private static Map<String, Object> getAuthEnvironment() {
+            Map<String, Object> discoveryData = getDiscoveryData();
+            Map<String, Object> result = (Map<String, Object>) discoveryData.get("result");
+
+            if (result == null) {
+                throw new AssertionError("Discovery data does not contain 'result' key" + discoveryData);
+            }
+            Map<String, Object> environments = (Map<String, Object>) result.get("serviceEnvironments");
+            if (environments == null) {
+                throw new AssertionError("Discovery data does not contain 'serviceEnvironments' key" + result);
+            }
+            Map<String, Object> authEnv = (Map<String, Object>) environments.get("auth");
+            if (authEnv == null) {
+                throw new AssertionError("Discovery data does not contain 'auth' environment" + environments);
+            }
+            Map<String, Object> prodEnv = (Map<String, Object>) authEnv.get("prod");
+            if (prodEnv == null) {
+                throw new AssertionError("Discovery data does not contain 'prod' environment" + authEnv);
+            }
+            return prodEnv;
+        }
+
+        private static String getServiceUri() {
+            String issuer = (String) getAuthEnvironment().get("serviceUri");
+            if (issuer == null) {
+                throw new AssertionError("Discovery data does not contain 'issuer' key in 'prod' environment");
+            }
+            return issuer;
+        }
+
+        private static Map<String, Object> getOpenIdConfiguration() {
+            if (OPENID_CONFIGURATION != null) {
+                return OPENID_CONFIGURATION;
+            }
+
+            synchronized (LOCK) {
+                if (OPENID_CONFIGURATION != null) {
+                    return OPENID_CONFIGURATION;
+                }
+
+                // Try to load from disk cache first
+                AuthCacheManager cacheManager = getCacheManager();
+                Map<String, Object> cachedConfig = cacheManager.loadOpenIdConfiguration();
+                if (cachedConfig != null) {
+                    OPENID_CONFIGURATION = cachedConfig;
+                    log.debug("Using cached OpenID configuration from disk");
+                    return cachedConfig;
+                }
+
+                // Cache miss or expired, fetch from remote
+                String serviceUri = getServiceUri();
+                String openIdConfigUrl = serviceUri + "/.well-known/openid-configuration";
+                log.debug("OpenID configuration cache miss, fetching from remote: {}", openIdConfigUrl);
+
+                int maxRetries = 3;
+                long retryDelay = 1000; // 1 second
+
+                for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        URL url = new URL(openIdConfigUrl);
+                        HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+                        connection.setRequestMethod("GET");
+                        connection.setRequestProperty("Accept", "application/json");
+                        connection.setConnectTimeout(5000);
+                        connection.setReadTimeout(5000);
+                        connection.connect();
+                        if (connection.getResponseCode() != 200) {
+                            throw new IOException("Failed to fetch OpenID configuration: " + connection.getResponseMessage());
+                        }
+                        try (InputStream stream = connection.getInputStream();
+                             InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                            //noinspection unchecked
+                            JSONParser parser = new JSONParser();
+                            Map<String, Object> config = (Map<String, Object>) parser.parse(reader);
+                            OPENID_CONFIGURATION = config;
+                            // Save to disk cache
+                            cacheManager.saveOpenIdConfiguration(config);
+                            return config;
+                        }
+                    } catch (ParseException | IOException e) {
+                        if (attempt < maxRetries) {
+                            log.error("Failed to fetch OpenID configuration (attempt {}/{}): {}. Retrying in {}ms...", attempt, maxRetries, e.getMessage(), retryDelay);
+                            try {
+                                Thread.sleep(retryDelay);
+                                retryDelay *= 2;
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                throw new AssertionError("Interrupted while retrying OpenID configuration fetch", ie);
+                            }
+                        } else {
+                            throw new AssertionError("Unable to fetch OpenID configuration from " + openIdConfigUrl + " after " + maxRetries + " attempts", e);
+                        }
+                    }
+                }
+                throw new AssertionError("Failed to fetch OpenID configuration after all retries");
+            }
+        }
+
+        private static String getJwksUrl() {
+            Map<String, Object> openIdConfiguration = getOpenIdConfiguration();
+            String jwksUrl = (String) openIdConfiguration.get("jwks_uri");
+            if (jwksUrl == null || jwksUrl.isEmpty()) {
+                throw new AssertionError("OpenID configuration does not contain 'jwks_uri' key: " + openIdConfiguration);
+            }
+            return jwksUrl;
+        }
+
+        private static String getIssuer() {
+            Map<String, Object> openIdConfiguration = getOpenIdConfiguration();
+            String issuer = (String) openIdConfiguration.get("issuer");
+            if (issuer == null || issuer.isEmpty()) {
+                throw new AssertionError("OpenID configuration does not contain 'issuer' key: " + openIdConfiguration);
+            }
+            return issuer;
+        }
+
+        private static JwtConsumer getMojangConsumer() {
+            if (MOJANG_CONSUMER != null) {
+                return MOJANG_CONSUMER;
+            }
+
+            synchronized (LOCK) {
+                if (MOJANG_CONSUMER != null) {
+                    return MOJANG_CONSUMER;
+                }
+
+                String jwksUrl = getJwksUrl();
+                String issuer = getIssuer();
+
+                HttpsJwks jwks = new HttpsJwks(jwksUrl);
+                HttpsJwksVerificationKeyResolver resolver = new HttpsJwksVerificationKeyResolver(jwks);
+
+                JwtConsumer consumer = new JwtConsumerBuilder()
+                        .setVerificationKeyResolver(resolver)
+                        .setRequireExpirationTime()
+                        .setRequireSubject()
+                        .setExpectedAudience(true, "api://auth-minecraft-services/multiplayer")
+                        .setExpectedIssuer(issuer)
+                        .build();
+
+                MOJANG_CONSUMER = consumer;
+                return consumer;
+            }
+        }
+    }
+
     static {
         // DO NOT REMOVE THIS
         // Since Java 8u231, secp384r1 is deprecated and will throw an exception.
         String namedGroups = System.getProperty("jdk.tls.namedGroups");
-        System.setProperty("jdk.tls.namedGroups", namedGroups == null || namedGroups.isEmpty() ? "secp384r1" : ", secp384r1");
+        System.setProperty("jdk.tls.namedGroups", namedGroups == null || namedGroups.isEmpty() ? "secp384r1" : namedGroups + ", secp384r1");
 
         try {
             KEY_PAIR_GEN = KeyPairGenerator.getInstance("EC");
             KEY_PAIR_GEN.initialize(new ECGenParameterSpec("secp384r1"));
             MOJANG_PUBLIC_KEY = parseKey(MOJANG_PUBLIC_KEY_BASE64);
             OLD_MOJANG_PUBLIC_KEY = parseKey(OLD_MOJANG_PUBLIC_KEY_BASE64);
+            NETEASE_PUBLIC_KEY = parseKey(NETEASE_PUBLIC_KEY_BASE64);
         } catch (NoSuchAlgorithmException | InvalidAlgorithmParameterException | InvalidKeySpecException e) {
             throw new AssertionError("Unable to initialize required encryption", e);
         }
@@ -96,6 +375,25 @@ public class EncryptionUtils {
         return clientData.getUnverifiedPayloadBytes();
     }
 
+    public static ChainValidationResult validatePayload(AuthPayload payload)
+            throws JoseException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidJwtException {
+        if (payload instanceof CertificateChainPayload chainPayload) {
+            List<String> chain = chainPayload.getChain();
+            if (chain == null || chain.isEmpty()) {
+                throw new IllegalStateException("Certificate chain is empty");
+            }
+            return validateChain(chain);
+        } else if (payload instanceof TokenPayload tokenPayload) {
+            String token = tokenPayload.getToken();
+            if (token == null || token.isEmpty()) {
+                throw new IllegalStateException("Token is empty");
+            }
+            return validateToken(payload.getAuthType(), token);
+        } else {
+            throw new IllegalArgumentException("Unsupported AuthPayload type: " + payload.getClass().getName());
+        }
+    }
+
     public static ChainValidationResult validateChain(List<String> chain)
             throws JoseException, NoSuchAlgorithmException, InvalidKeySpecException {
         switch (chain.size()) {
@@ -105,6 +403,7 @@ public class EncryptionUtils {
                 identity.setCompactSerialization(chain.get(0));
                 return new ChainValidationResult(false, identity.getUnverifiedPayload());
             case 3:
+                boolean signed = true;
                 ECPublicKey currentKey = null;
                 Map<String, Object> parsedPayload = null;
                 for (int i = 0; i < 3; i++) {
@@ -116,27 +415,45 @@ public class EncryptionUtils {
                     if (currentKey == null) {
                         currentKey = expectedKey;
                     } else if (!currentKey.equals(expectedKey)) {
-                        throw new IllegalStateException("Received broken chain");
+                        signed = false;
+                        // throw new IllegalStateException("Received broken chain");
                     }
 
                     signature.setAlgorithmConstraints(ALGORITHM_CONSTRAINTS);
                     signature.setKey(currentKey);
                     if (!signature.verifySignature()) {
-                        throw new IllegalStateException("Chain signature doesn't match content");
+                        signed = false;
+                        // throw new IllegalStateException("Chain signature doesn't match content");
                     }
 
-                    // the second chain entry has to be signed by Mojang
-                    if (i == 1 && (!currentKey.equals(MOJANG_PUBLIC_KEY))) {
-                        throw new IllegalStateException("The chain isn't signed by Mojang!");
+                    // the second chain entry has to be signed by Mojang or NetEase
+                    if (i == 1 && !currentKey.equals(MOJANG_PUBLIC_KEY) && (!Server.getInstance().netEaseMode || !currentKey.equals(NETEASE_PUBLIC_KEY))) {
+                        signed = false;
+                        // throw new IllegalStateException("The chain isn't signed by Mojang!");
                     }
 
                     parsedPayload = JsonUtil.parseJson(signature.getUnverifiedPayload());
                     String identityPublicKey = JsonUtils.childAsType(parsedPayload, "identityPublicKey", String.class);
                     currentKey = parseKey(identityPublicKey);
                 }
-                return new ChainValidationResult(true, parsedPayload);
+                return new ChainValidationResult(signed, parsedPayload);
             default:
                 throw new IllegalStateException("Unexpected login chain length");
+        }
+    }
+
+    public static ChainValidationResult validateToken(AuthType type, String token) throws InvalidJwtException, JoseException {
+        JwtContext context;
+        if (type != AuthType.FULL && type != AuthType.GUEST) {
+            if (type == AuthType.SELF_SIGNED) {
+                context = OFFLINE_CONSUMER.process(token);
+                return new ChainValidationResult(false, context);
+            } else {
+                throw new JoseException("Unsupported AuthType: " + type);
+            }
+        } else {
+            context = JwtConsumerHolder.getMojangConsumer().process(token);
+            return new ChainValidationResult(true, context);
         }
     }
 

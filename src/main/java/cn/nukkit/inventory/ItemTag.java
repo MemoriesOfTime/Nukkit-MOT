@@ -1,14 +1,20 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.Server;
-import cn.nukkit.utils.Config;
 import cn.nukkit.utils.Identifier;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.stream.Collectors;
 
+@Log4j2
 public final class ItemTag {
     public final static Identifier ARROW = new Identifier("minecraft:arrow");
     public final static Identifier BANNER = new Identifier("minecraft:banner");
@@ -62,20 +68,22 @@ public final class ItemTag {
     private static final Map<String, Set<String>> ITEM_2_TAGS = new HashMap<>();
 
     static {
-        final var config = new Config(Config.JSON);
-        try {
-            config.load(Server.class.getModule().getResourceAsStream("tag_2_items.json"));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        InputStream stream = Server.class.getClassLoader().getResourceAsStream("item_tags.json");
+        if (stream == null) {
+            throw new AssertionError("Unable to load item_tags.json");
         }
-        config.getAll().forEach((k, v) -> TAG_2_ITEMS.put(k, ((List<?>) v).stream().map(s -> (String) s).collect(Collectors.toSet())));
-
-        try {
-            config.load(Server.class.getModule().getResourceAsStream("item_2_tags.json"));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        JsonObject json = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject();
+        for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
+            String tag = entry.getKey();
+            JsonArray items = entry.getValue().getAsJsonArray();
+            Set<String> itemSet = TAG_2_ITEMS.computeIfAbsent(tag, k -> new HashSet<>());
+            for (JsonElement element : items) {
+                String identifier = element.getAsString();
+                itemSet.add(identifier);
+                ITEM_2_TAGS.computeIfAbsent(identifier, k -> new HashSet<>()).add(tag);
+            }
         }
-        config.getAll().forEach((k, v) -> ITEM_2_TAGS.put(k, ((List<?>) v).stream().map(s -> (String) s).collect(Collectors.toSet())));
+        log.debug("Loaded {} item tags with {} items", TAG_2_ITEMS.size(), ITEM_2_TAGS.size());
     }
 
     public static Map<String, Set<String>> getTag2Items() {

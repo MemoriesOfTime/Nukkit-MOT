@@ -5,7 +5,6 @@ import cn.nukkit.entity.data.LongEntityData;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 
 public abstract class EntityTameableAnimal extends cn.nukkit.entity.passive.EntityTameable implements cn.nukkit.entity.EntityTameable {
 
@@ -13,7 +12,7 @@ public abstract class EntityTameableAnimal extends cn.nukkit.entity.passive.Enti
 
     private String ownerUUID = "";
 
-    private boolean sitting = false;
+    private boolean sitting;
 
     public EntityTameableAnimal(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -31,6 +30,7 @@ public abstract class EntityTameableAnimal extends cn.nukkit.entity.passive.Enti
                     this.setOwner(player);
                 }
                 this.setSitting(namedTag.getBoolean(NAMED_TAG_SITTING));
+                this.pitch = 0.0;
             }
         }
     }

@@ -1,7 +1,6 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.entity.Attribute;
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -28,6 +27,7 @@ public class UpdateAttributesPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -67,11 +67,26 @@ public class UpdateAttributesPacket extends DataPacket {
         }
 
         this.reset();
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.entityId);
-        }else{
+        if (protocol < ProtocolInfo.v1_2_0) {
             this.putEntityUniqueId(this.entityId);
+
+            if (this.entries == null) {
+                this.putUnsignedVarInt(0);
+            } else {
+                this.putUnsignedVarInt(this.entries.length);
+                for (Attribute entry : this.entries) {
+                    this.putLFloat(entry.getMinValue());
+                    this.putLFloat(entry.getMaxValue());
+                    this.putLFloat(entry.getValue());
+                    this.putLFloat(entry.getDefaultValue());
+                    this.putString(entry.getName());
+                }
+            }
+            return;
         }
+
+        this.putEntityRuntimeId(this.entityId);
+
         if (this.entries == null) {
             this.putUnsignedVarInt(0);
         } else {

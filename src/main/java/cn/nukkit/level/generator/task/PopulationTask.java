@@ -111,6 +111,7 @@ public class PopulationTask extends AsyncTask {
                     centerChunk.setPopulated();
                     centerChunk.recalculateHeightMap();
                     centerChunk.populateSkyLight();
+                    centerChunk.populateBlockLight();
                     centerChunk.setLightPopulated();
                     this.centerChunk = centerChunk;
                 }

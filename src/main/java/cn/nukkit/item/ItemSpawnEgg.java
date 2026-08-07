@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -15,15 +16,16 @@ import cn.nukkit.entity.passive.EntityPig;
 import cn.nukkit.entity.passive.EntitySheep;
 import cn.nukkit.event.entity.CreatureSpawnEvent;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
-
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author MagicDroidX
@@ -55,7 +57,7 @@ public class ItemSpawnEgg extends Item {
         }
 
         if (!Server.getInstance().spawnEggsEnabled) {
-            player.sendMessage("\u00A7cSpawn eggs are disabled on this server");
+            player.sendMessage("§cSpawn eggs are disabled on this server");
             return false;
         }
 
@@ -90,7 +92,8 @@ public class ItemSpawnEgg extends Item {
             return true;
         }
 
-        FullChunk chunk = level.getChunk((int) block.getX() >> 4, (int) block.getZ() >> 4);
+        Location spawnLocation = getSpawnLocation(level, block, target, player);
+        FullChunk chunk = level.getChunk(spawnLocation.getChunkX(), spawnLocation.getChunkZ());
 
         if (chunk == null) {
             return false;
@@ -98,22 +101,22 @@ public class ItemSpawnEgg extends Item {
 
         CompoundTag nbt = new CompoundTag()
                 .putList(new ListTag<DoubleTag>("Pos")
-                        .add(new DoubleTag("", block.getX() + 0.5))
-                        .add(new DoubleTag("", target.getBoundingBox() == null ? block.getY() : target.getBoundingBox().getMaxY() + 0.0001f))
-                        .add(new DoubleTag("", block.getZ() + 0.5)))
+                        .add(new DoubleTag("", spawnLocation.x))
+                        .add(new DoubleTag("", spawnLocation.y))
+                        .add(new DoubleTag("", spawnLocation.z)))
                 .putList(new ListTag<DoubleTag>("Motion")
                         .add(new DoubleTag("", 0))
                         .add(new DoubleTag("", 0))
                         .add(new DoubleTag("", 0)))
                 .putList(new ListTag<FloatTag>("Rotation")
-                        .add(new FloatTag("", ThreadLocalRandom.current().nextFloat() * 360))
-                        .add(new FloatTag("", 0)));
+                        .add(new FloatTag("", (float) spawnLocation.yaw))
+                        .add(new FloatTag("", (float) spawnLocation.pitch)));
 
         if (this.hasCustomName()) {
             nbt.putString("CustomName", this.getCustomName());
         }
 
-        CreatureSpawnEvent ev = new CreatureSpawnEvent(this.meta, block, nbt, CreatureSpawnEvent.SpawnReason.SPAWN_EGG);
+        CreatureSpawnEvent ev = new CreatureSpawnEvent(this.meta, block, nbt, CreatureSpawnEvent.SpawnReason.SPAWN_EGG, player);
         level.getServer().getPluginManager().callEvent(ev);
 
         if (ev.isCancelled()) {
@@ -142,5 +145,28 @@ public class ItemSpawnEgg extends Item {
             return true;
         }
         return false;
+    }
+
+    static Location getSpawnLocation(Level level, Block block, Block target, Vector3 facingTarget) {
+        double spawnY = target.getBoundingBox() == null ? block.getY() : target.getBoundingBox().getMaxY() + 0.0001f;
+        Location spawnLocation = new Location(block.getX() + 0.5, spawnY, block.getZ() + 0.5, 0, 0, level);
+        return facingTarget == null ? spawnLocation : spawnLocation.setYawFacing(facingTarget);
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        int meta = this.getDamage();
+        return switch (meta) {
+            case 20, 21 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_60;
+            case 131 -> protocolId.getProtocol() >= ProtocolInfo.v1_18_30;
+            case 132, 133, 134 -> protocolId.getProtocol() >= ProtocolInfo.v1_18_10;
+            case 138, 139 -> protocolId.getProtocol() >= ProtocolInfo.v1_20_0_23;
+            case 142 -> protocolId.getProtocol() >= ProtocolInfo.v1_20_80;
+            case 140, 144 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_0;
+            case 141, 143, 145, 146 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_50;
+            case 147 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_90;
+            case 148 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_100;
+            default -> meta < 138;
+        };
     }
 }

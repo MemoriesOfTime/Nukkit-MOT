@@ -10,15 +10,13 @@ import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
 import cn.nukkit.event.block.BlockUpdateEvent;
-import cn.nukkit.event.entity.EntityDamageByBlockEvent;
-import cn.nukkit.event.entity.EntityDamageByEntityEvent;
-import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
-import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.particle.HugeExplodeSeedParticle;
+import cn.nukkit.level.util.ExplosionSource;
 import cn.nukkit.math.*;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Hash;
@@ -36,26 +34,35 @@ public class WeakExplosion extends Explosion {
     private final Level level;
     private final Position source;
     private final double size;
-    private final Object what;
+    private final ExplosionSource sourceObject;
     private boolean doesDamage = true;
     private List<Block> affectedBlocks = new ArrayList<>();
 
-    public WeakExplosion(Position center, double size, Entity what) {
-        super(center, size, what);
+    public WeakExplosion(Position center, double size, Entity sourceObject) {
+        this(center, size, new ExplosionSource.EntitySource(sourceObject));
+    }
+
+    protected WeakExplosion(Position center, double size, ExplosionSource sourceObject) {
+        super(center, size, sourceObject);
         this.level = center.getLevel();
         this.source = center;
         this.size = Math.max(size, 0);
-        this.what = what;
+        this.sourceObject = sourceObject;
     }
 
     @Override
     public boolean explodeA() {
-        if (what instanceof EntityExplosive && ((Entity) what).isInsideOfWater()) {
-            this.doesDamage = false;
-            return true;
+        if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
+            Entity entity = entitySource.entity();
+            if (entity instanceof EntityExplosive && entity.isInsideOfWater()) {
+                this.doesDamage = false;
+                return true;
+            }
         }
+
         if (this.size < 0.1) return false;
         if (!level.getServer().explosionBreakBlocks) return true;
+
         Vector3 vector = new Vector3(0, 0, 0);
         Vector3 vBlock = new Vector3(0, 0, 0);
         for (int i = 0; i < 16; ++i) {
@@ -102,8 +109,9 @@ public class WeakExplosion extends Explosion {
     public boolean explodeB() {
         LongArraySet updateBlocks = new LongArraySet();
         double yield = (1d / this.size) * 100d;
-        if (this.what instanceof Entity) {
-            EntityExplodeEvent ev = new EntityExplodeEvent((Entity) this.what, this.source, this.affectedBlocks, yield);
+        if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
+            Entity exploder = entitySource.entity();
+            EntityExplodeEvent ev = new EntityExplodeEvent(exploder, this.source, this.affectedBlocks, yield);
             this.level.getServer().getPluginManager().callEvent(ev);
             if (ev.isCancelled()) {
                 return false;
@@ -112,6 +120,7 @@ public class WeakExplosion extends Explosion {
                 this.affectedBlocks = ev.getBlockList();
             }
         }
+
         double explosionSize = this.size * 2d;
         double minX = NukkitMath.floorDouble(this.source.x - explosionSize - 1);
         double maxX = NukkitMath.ceilDouble(this.source.x + explosionSize + 1);
@@ -120,7 +129,10 @@ public class WeakExplosion extends Explosion {
         double minZ = NukkitMath.floorDouble(this.source.z - explosionSize - 1);
         double maxZ = NukkitMath.ceilDouble(this.source.z + explosionSize + 1);
         AxisAlignedBB explosionBB = new SimpleAxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
-        Entity[] list = this.level.getNearbyEntities(explosionBB, this.what instanceof Entity ? (Entity) this.what : null);
+
+        Entity[] list = this.level.getNearbyEntities(explosionBB,
+                this.sourceObject instanceof ExplosionSource.EntitySource es ? es.entity() : null);
+
         for (Entity entity : list) {
             double distance = entity.distance(this.source) / explosionSize;
             if (distance <= 1) {
@@ -128,36 +140,41 @@ public class WeakExplosion extends Explosion {
                 int exposure = 1;
                 double impact = (1 - distance) * exposure;
                 int damage = this.doesDamage ? (int) (((impact * impact + impact) / 2) * 5 * explosionSize + 1) : 0;
-                if (this.what instanceof Entity) {
-                    entity.attack(new EntityDamageByEntityEvent((Entity) this.what, entity, DamageCause.ENTITY_EXPLOSION, damage));
-                } else if (this.what instanceof Block) {
-                    entity.attack(new EntityDamageByBlockEvent((Block) this.what, entity, DamageCause.BLOCK_EXPLOSION, damage));
+
+                if (this.sourceObject instanceof ExplosionSource.EntitySource es) {
+                    entity.attack(new EntityDamageByEntityEvent(es.entity(), entity, DamageCause.ENTITY_EXPLOSION, damage));
+                } else if (this.sourceObject instanceof ExplosionSource.BlockSource bs) {
+                    entity.attack(new EntityDamageByBlockEvent(bs.block(), entity, DamageCause.BLOCK_EXPLOSION, damage));
                 } else {
                     entity.attack(new EntityDamageEvent(entity, DamageCause.BLOCK_EXPLOSION, damage));
                 }
+
                 if (!(entity instanceof EntityItem || entity instanceof EntityXPOrb)) {
                     entity.setMotion(motion.multiply(impact));
                 }
             }
         }
+
         ItemBlock air = new ItemBlock(Block.get(BlockID.AIR));
         BlockEntity container;
+
         for (Block block : this.affectedBlocks) {
-            if (block.getId() == Block.TNT) {
-                ((BlockTNT) block).prime(Utils.rand(10, 30), this.what instanceof Entity ? (Entity) this.what : null);
+            if (block instanceof BlockTNT tnt) {
+                Entity exploder = (this.sourceObject instanceof ExplosionSource.EntitySource es) ? es.entity() : null;
+                tnt.prime(Utils.rand(10, 30), exploder);
             } else if (block.getId() == Block.BED_BLOCK && (block.getDamage() & 0x08) == 0x08) {
-                this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, Block.AIR);
+                this.level.setBlockAt(block.getFloorX(), block.getFloorY(), block.getFloorZ(), Block.AIR);
                 continue; // We don't want drops from both bed parts
-            } else if ((container = block.getLevel().getBlockEntity(block)) instanceof InventoryHolder) {
+            } else if ((container = block.getLevel().getBlockEntity(block)) instanceof InventoryHolder inventoryHolder) {
                 if (block.getLevel().getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
                     if (container instanceof BlockEntityShulkerBox) {
                         this.level.dropItem(block.add(0.5, 0.5, 0.5), block.toItem());
-                        ((InventoryHolder) container).getInventory().clearAll();
+                        inventoryHolder.getInventory().clearAll();
                     } else {
-                        for (Item drop : ((InventoryHolder) container).getInventory().getContents().values()) {
+                        for (Item drop : inventoryHolder.getInventory().getContents().values()) {
                             this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
                         }
-                        ((InventoryHolder) container).getInventory().clearAll();
+                        inventoryHolder.getInventory().clearAll();
                     }
                 }
             } else if (Math.random() * 100 < yield) {
@@ -165,8 +182,11 @@ public class WeakExplosion extends Explosion {
                     this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
                 }
             }
-            this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, BlockID.AIR);
+
+            this.level.setBlockAt(block.getFloorX(), block.getFloorY(), block.getFloorZ(), BlockID.AIR);
+
             Vector3 pos = new Vector3(block.x, block.y, block.z);
+
             for (BlockFace side : BlockFace.values()) {
                 Vector3 sideBlock = pos.getSide(side);
                 long index = Hash.hashBlock((int) sideBlock.x, (int) sideBlock.y, (int) sideBlock.z);

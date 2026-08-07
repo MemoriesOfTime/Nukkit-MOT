@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterChunker;
@@ -17,21 +18,20 @@ import org.cloudburstmc.blockstateupdater.util.tagupdater.CompoundTagUpdaterCont
 import org.cloudburstmc.nbt.NbtMap;
 import org.cloudburstmc.protocol.common.util.Preconditions;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
-
-import static cn.nukkit.level.format.leveldb.LevelDBConstants.PALETTE_VERSION;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Log4j2
 public class BlockStateMapping {
 
-    private static final BlockStateMapping INSTANCE = new BlockStateMapping(PALETTE_VERSION);
+    static final int MAX_CUSTOM_STATE_CACHE_SIZE = 4096;
+
+    private static final BlockStateMapping INSTANCE = new BlockStateMapping(GameVersion.getFeatureVersion());
     private static final CompoundTagUpdaterContext CONTEXT;
     private static final int LATEST_UPDATER_VERSION;
 
-    private final int version;
+    private final GameVersion version;
 
     private LegacyStateMapper legacyMapper;
 
@@ -55,17 +55,17 @@ public class BlockStateMapping {
             return Objects.equals(nbtMap, nbtMap2);
         }
     });
-    private final Object2ObjectMap<NbtMap, BlockStateSnapshot> customCacheMap = new Object2ObjectOpenCustomHashMap<>(new Hash.Strategy<>() {
+    private final AtomicInteger customCacheEvictions = new AtomicInteger();
+    private final Map<NbtMap, BlockStateSnapshot> customCacheMap = new LinkedHashMap<>(256, 0.75f, true) {
         @Override
-        public int hashCode(NbtMap nbtMap) {
-            return nbtMap.hashCode();
+        protected boolean removeEldestEntry(Map.Entry<NbtMap, BlockStateSnapshot> eldest) {
+            boolean shouldRemove = this.size() > MAX_CUSTOM_STATE_CACHE_SIZE;
+            if (shouldRemove) {
+                customCacheEvictions.incrementAndGet();
+            }
+            return shouldRemove;
         }
-
-        @Override
-        public boolean equals(NbtMap nbtMap, NbtMap nbtMap2) {
-            return Objects.equals(nbtMap, nbtMap2);
-        }
-    });
+    };
 
     static {
         INSTANCE.setLegacyMapper(new NukkitLegacyMapper());
@@ -98,12 +98,16 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_20_80.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_0.INSTANCE);
 
-        blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);
 
-        if (Boolean.parseBoolean(System.getProperty("leveldb-chunker"))) {
-            blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);
-            log.warn("Enabled chunker.app LevelDB updater. This may impact chunk loading performance!");
-        }
+        blockStateUpdaters.add(BlockStateUpdater_1_21_10.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_20.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_30.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_40.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_60.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_110.INSTANCE);
+
+        blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
 
         CompoundTagUpdaterContext context = new CompoundTagUpdaterContext();
         blockStateUpdaters.forEach(updater -> updater.registerUpdaters(context));
@@ -115,16 +119,39 @@ public class BlockStateMapping {
         return INSTANCE;
     }
 
-    public BlockStateMapping(int version) {
+    public BlockStateMapping(GameVersion version) {
         this(version, null);
     }
 
-    public BlockStateMapping(int version, LegacyStateMapper legacyStateMapper) {
+    public BlockStateMapping(GameVersion version, LegacyStateMapper legacyStateMapper) {
         this.version = version;
         this.legacyMapper = legacyStateMapper;
     }
 
+    public boolean containsState(NbtMap state) {
+        return paletteMap.containsKey(state);
+    }
+
     public void registerState(int runtimeId, NbtMap state) {
+        registerState(runtimeId, state, -1, -1);
+    }
+
+    /**
+     * 注册一个块状态，可选地预设 legacyId/legacyData。
+     * <p>
+     * 用于修正 vanilla 合并方块（如 lava_cauldron 在 1.20+ 合并进 cauldron）的反查遮蔽问题：
+     * {@code runtimeIdToLegacy.putIfAbsent} 会让主 id 先注册而遮蔽被合并 id，预设 legacyId 可覆盖。
+     * <p>
+     * Registers a block state with optional preset legacyId/legacyData. Fixes reverse-lookup shadowing
+     * for merged vanilla blocks (e.g. lava_cauldron merged into cauldron in 1.20+), where
+     * {@code runtimeIdToLegacy.putIfAbsent} lets the primary id win and shadow the merged id.
+     *
+     * @param runtimeId palette 中的运行时 id / runtime id in the palette
+     * @param state     vanilla 块状态 NbtMap / vanilla block state NbtMap
+     * @param legacyId  预设 legacy id（-1 表示延迟从调色板反查）/ preset legacy id (-1 = lazy lookup)
+     * @param legacyData 预设 legacy data（-1 表示延迟从调色板反查）/ preset legacy data (-1 = lazy lookup)
+     */
+    public void registerState(int runtimeId, NbtMap state, int legacyId, int legacyData) {
         Preconditions.checkArgument(!this.runtime2State.containsKey(runtimeId),
                 "Mapping for runtimeId " + runtimeId + " is already created!");
         Preconditions.checkArgument(!this.paletteMap.containsKey(state),
@@ -134,6 +161,8 @@ public class BlockStateMapping {
                 .version(this.version)
                 .vanillaState(state)
                 .runtimeId(runtimeId)
+                .legacyId(legacyId)
+                .legacyData(legacyData)
                 .build();
         this.runtime2State.put(runtimeId, blockState);
         this.paletteMap.put(state, blockState);
@@ -142,6 +171,10 @@ public class BlockStateMapping {
     public void clearMapping() {
         this.runtime2State.clear();
         this.paletteMap.clear();
+        synchronized (this.customCacheMap) {
+            this.customCacheMap.clear();
+        }
+        this.customCacheEvictions.set(0);
     }
 
     public void setLegacyMapper(LegacyStateMapper legacyStateMapper) {
@@ -152,7 +185,7 @@ public class BlockStateMapping {
         return this.legacyMapper;
     }
 
-    public int getVersion() {
+    public GameVersion getVersion() {
         return this.version;
     }
 
@@ -285,7 +318,14 @@ public class BlockStateMapping {
         NbtMap cached = BLOCK_UPDATE_CACHE.get(state);
         if (cached == null) {
             int version = state.getInt("version"); // TODO: validate this when updating next time
+
+            // 1.18.10/1.18.30/1.19.0/1.19.20 三个版本号一致，避免漏掉更新，这里版本号-1处理
+            if (version == 17959425) {
+                version -= 1;
+            }
+
             cached = CONTEXT.update(state, LATEST_UPDATER_VERSION == version ? version - 1 : version);
+
             BLOCK_UPDATE_CACHE.put(state, cached);
         }
         return cached;
@@ -301,18 +341,36 @@ public class BlockStateMapping {
             return blockState;
         }
 
-        blockState = this.customCacheMap.get(state);
-        if (blockState != null) {
+        synchronized (this.customCacheMap) {
+            blockState = this.customCacheMap.get(state);
+            if (blockState != null) {
+                return blockState;
+            }
+
+            blockState = BlockStateSnapshot.builder()
+                    .vanillaState(state)
+                    .runtimeId(this.getDefaultState().getRuntimeId())
+                    .version(this.version)
+                    .custom(true)
+                    .build();
+            this.customCacheMap.put(state, blockState);
             return blockState;
         }
+    }
 
-        blockState = BlockStateSnapshot.builder()
-                .vanillaState(state)
-                .runtimeId(this.getDefaultState().getRuntimeId())
-                .version(this.version)
-                .custom(true)
-                .build();
-        this.customCacheMap.put(state, blockState);
-        return blockState;
+    /**
+     * Returns the current number of cached custom states for bounded-cache assertions in tests.
+     */
+    int getCustomCacheSizeForTesting() {
+        synchronized (this.customCacheMap) {
+            return this.customCacheMap.size();
+        }
+    }
+
+    /**
+     * Returns how many custom cache entries were evicted by the LRU policy during tests.
+     */
+    int getCustomCacheEvictionsForTesting() {
+        return this.customCacheEvictions.get();
     }
 }

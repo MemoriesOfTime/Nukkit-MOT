@@ -1,6 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.item.trim.ItemTrimMaterialType;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * @author MagicDroidX
@@ -23,5 +25,10 @@ public class ItemAmethystShard extends Item implements ItemTrimMaterial {
     @Override
     public ItemTrimMaterialType getMaterial() {
         return ItemTrimMaterialType.MATERIAL_AMETHYST;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_17_0;
     }
 }

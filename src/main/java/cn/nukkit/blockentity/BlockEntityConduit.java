@@ -171,9 +171,9 @@ public class BlockEntityConduit extends BlockEntitySpawnable {
             for (int zz = -1; zz <= 1; zz++) {
                 for (int yy = -1; yy <= 1; yy++) {
                     Block block = level.getBlock(this.chunk, tileX + xx, tileY + yy, tileZ + zz, BlockLayer.NORMAL.ordinal(), false);
-                    if (!Block.isWater(block.getId())) {
+                    if (!block.isWater()) {
                         block = level.getBlock(this.chunk, tileX + xx, tileY + yy, tileZ + zz, BlockLayer.WATERLOGGED.ordinal(), false);
-                        if (!Block.isWater(block.getId())) {
+                        if (!block.isWater()) {
                             return false;
                         }
                     }

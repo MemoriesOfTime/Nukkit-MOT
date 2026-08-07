@@ -53,7 +53,7 @@ public class EntityMule extends EntityHorseBase {
 
         if (canTarget && (creature instanceof Player player)) {
             return player.spawned && player.isAlive() && !player.closed &&
-                    this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 49;
+                    distance <= 49 && this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast());
         }
         return false;
     }

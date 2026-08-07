@@ -1,7 +1,5 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
-
 /**
  * @author MagicDroidX
  * Nukkit Project
@@ -47,6 +45,7 @@ public class BatchPacket extends DataPacket {
             this.putByteArray(this.payload);
             return;
         }
+        this.encodeUnsupported();
     }
 
     public void trim() {

@@ -1,0 +1,15 @@
+.git
+.github
+target
+run
+worlds
+plugins
+players
+logs
+*.iml
+.idea
+.vscode
+.claude
+docs
+Dockerfile
+.dockerignore

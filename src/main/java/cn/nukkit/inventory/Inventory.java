@@ -2,6 +2,7 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.util.Collection;
 import java.util.Map;
@@ -27,6 +28,11 @@ public interface Inventory {
 
     Item getItem(int index);
 
+    @ApiStatus.Internal
+    default Item getUnclonedItem(int index) {
+        return getItem(index);
+    }
+
     default Item getItemFast(int index) {
         return getItem(index);
     }
@@ -36,6 +42,29 @@ public interface Inventory {
     }
 
     boolean setItem(int index, Item item, boolean send);
+
+    /**
+     * Unconditionally write an item to the given slot, bypassing all inventory
+     * change events (EntityInventoryChangeEvent, EntityArmorChangeEvent, etc.).
+     * <p>
+     * This is intended solely for server-authoritative rollback/restore
+     * operations where the server's snapshot must be restored regardless of
+     * plugin event handlers that might veto a normal {@link #setItem} call.
+     * Using this method in any other context will silently break plugin
+     * integrations that rely on change events.
+     * <p>
+     * No network packet is sent (equivalent to {@code send = false}). Callers
+     * are responsible for ensuring visual synchronisation afterwards, e.g. via
+     * {@code sendContents}/{@code sendSlot} or the {@code resyncActor} path in
+     * {@link cn.nukkit.inventory.request.ItemStackRequestHandler}.
+     *
+     * @param index the slot index
+     * @param item  the item to write (null or empty item clears the slot)
+     */
+    @ApiStatus.Internal
+    default void setItemForce(int index, Item item) {
+        setItem(index, item, false);
+    }
 
     Item[] addItem(Item... slots);
 

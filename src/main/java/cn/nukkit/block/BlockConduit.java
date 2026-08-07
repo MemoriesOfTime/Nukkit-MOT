@@ -6,6 +6,7 @@ import cn.nukkit.blockentity.BlockEntityConduit;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
 
 public class BlockConduit extends BlockSolidMeta implements BlockEntityHolder {
@@ -64,7 +65,7 @@ public class BlockConduit extends BlockSolidMeta implements BlockEntityHolder {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (this.getLevel().setBlock(this, this, true, true)) {
             BlockEntity.createBlockEntity(BlockEntity.CONDUIT, this.getChunk(), BlockEntity.getDefaultCompound(this, BlockEntity.CONDUIT));
             return true;
@@ -80,5 +81,10 @@ public class BlockConduit extends BlockSolidMeta implements BlockEntityHolder {
     @Override
     public @NotNull String getBlockEntityType() {
         return BlockEntity.CONDUIT;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.DIAMOND_BLOCK_COLOR;
     }
 }

@@ -11,17 +11,19 @@ import cn.nukkit.inventory.ShulkerBoxInventory;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemDye;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * @author CreeperFace
  */
 public class InventoryTransaction {
 
-    private boolean invalid;
+    protected boolean invalid;
     protected boolean hasExecuted;
 
     protected Player source;
@@ -145,14 +147,24 @@ public class InventoryTransaction {
         this.inventories.add(inventory);
     }
 
-    protected boolean matchItems(List<Item> needItems, List<Item> haveItems) {
+    protected final Pattern TRIM_PATTERN = Pattern.compile("^minecraft:[a-z_]+_smithing_template$");
+
+    protected boolean matchItems(boolean clientAuthTrim, boolean clientAuthLapis) {
+        List<Item> haveItems = new ArrayList<>();
+        List<Item> needItems = new ArrayList<>();
+
         for (InventoryAction action : this.actions) {
             if (action.getTargetItem().getId() != Item.AIR) {
                 needItems.add(action.getTargetItem());
             }
 
+            if (clientAuthTrim && action instanceof SlotChangeAction slotChangeAction) {
+                slotChangeAction.setSmithingClientAuth(true);
+            }
+
             if (!action.isValid(this.source)) {
                 invalid = true;
+                Server.getInstance().getLogger().debug("matchItems: action.isValid() failed for " + action);
                 return false;
             }
 
@@ -178,6 +190,18 @@ public class InventoryTransaction {
             }
         }
 
+        if (clientAuthLapis) {
+            haveItems.removeIf(item -> item.getId() == Item.DYE && item.getDamage() == ItemDye.LAPIS_LAZULI);
+        }
+
+        if (clientAuthTrim) {
+            needItems.removeIf(item -> TRIM_PATTERN.matcher(item.getNamespaceId()).matches() && item.getDamage() == 0 && item.getCount() <= 1);
+        }
+
+        if (!haveItems.isEmpty() || !needItems.isEmpty()) {
+            Server.getInstance().getLogger().debug("matchItems failed: unmatched haveItems=" + haveItems + ", needItems=" + needItems);
+        }
+
         return haveItems.isEmpty() && needItems.isEmpty();
     }
 
@@ -200,20 +224,22 @@ public class InventoryTransaction {
     }
 
     public boolean canExecute() {
-        List<Item> haveItems = new ArrayList<>();
-        List<Item> needItems = new ArrayList<>();
-        return matchItems(needItems, haveItems) && !this.actions.isEmpty() && haveItems.isEmpty() && needItems.isEmpty();
+        return matchItems(false, false) && !this.invalid && !this.actions.isEmpty();
     }
 
     protected boolean callExecuteEvent() {
-        InventoryTransactionEvent ev = new InventoryTransactionEvent(this);
-        this.source.getServer().getPluginManager().callEvent(ev);
+        return callExecuteEvents(this);
+    }
+
+    public static boolean callExecuteEvents(InventoryTransaction transaction) {
+        InventoryTransactionEvent ev = new InventoryTransactionEvent(transaction);
+        transaction.source.getServer().getPluginManager().callEvent(ev);
 
         SlotChangeAction from = null;
         SlotChangeAction to = null;
         Player who = null;
 
-        for (InventoryAction action : this.actions) {
+        for (InventoryAction action : transaction.actions) {
             if (!(action instanceof SlotChangeAction)) {
                 continue;
             }
@@ -236,7 +262,7 @@ public class InventoryTransaction {
             }
 
             InventoryClickEvent ev2 = new InventoryClickEvent(who, from.getInventory(), from.getSlot(), from.getSourceItem(), from.getTargetItem());
-            this.source.getServer().getPluginManager().callEvent(ev2);
+            transaction.source.getServer().getPluginManager().callEvent(ev2);
 
             if (ev2.isCancelled()) {
                 return false;
@@ -290,5 +316,9 @@ public class InventoryTransaction {
 
     public boolean hasExecuted() {
         return this.hasExecuted;
+    }
+
+    public boolean checkForItemPart(List<InventoryAction> actions) {
+        return false;
     }
 }

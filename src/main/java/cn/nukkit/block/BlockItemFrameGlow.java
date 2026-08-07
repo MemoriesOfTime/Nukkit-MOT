@@ -7,6 +7,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelEventPacket;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockItemFrameGlow extends BlockItemFrame {
 
@@ -34,7 +35,7 @@ public class BlockItemFrameGlow extends BlockItemFrame {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (target.isSolid() && (!block.isSolid() || block.canBeReplaced())) {
             this.setDamage(FACING[face.getIndex()]);
 

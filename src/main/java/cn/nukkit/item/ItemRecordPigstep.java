@@ -1,5 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 /**
  * @author PetteriM1
  */
@@ -20,5 +23,15 @@ public class ItemRecordPigstep extends ItemRecord {
     @Override
     public String getSoundId() {
         return "record.pigstep";
+    }
+
+    @Override
+    public String getDiscName() {
+        return "Lena Raine - Pigstep";
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_16_0;
     }
 }

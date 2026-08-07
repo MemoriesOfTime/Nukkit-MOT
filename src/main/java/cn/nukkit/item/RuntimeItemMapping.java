@@ -1,13 +1,20 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.item.RuntimeItems.MappingEntry;
 import cn.nukkit.item.customitem.CustomItem;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ItemComponentPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.NetEaseConverter;
 import cn.nukkit.utils.Utils;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -22,19 +29,25 @@ import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
+import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
 
 @Log4j2
 public class RuntimeItemMapping {
 
     private final int protocolId;
+    private final GameVersion gameVersion;
 
     private final Int2ObjectMap<LegacyEntry> runtime2Legacy = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<RuntimeEntry> legacy2Runtime = new Int2ObjectOpenHashMap<>();
     private final Map<String, LegacyEntry> identifier2Legacy = new HashMap<>();
+
+    private final Map<String, ItemComponentPacket.ItemDefinition> vanillaItems = new HashMap<>();
 
     private final List<RuntimeEntry> itemPaletteEntries = new ArrayList<>();
     private final Int2ObjectMap<String> runtimeId2Name = new Int2ObjectOpenHashMap<>();
@@ -44,14 +57,66 @@ public class RuntimeItemMapping {
 
     private byte[] itemPalette;
 
+    private static final ByteOrder[] BLOCK_STATE_BYTE_ORDERS = {
+            ByteOrder.LITTLE_ENDIAN,
+            ByteOrder.BIG_ENDIAN
+    };
+
+    @Deprecated
     public RuntimeItemMapping(Map<String, MappingEntry> mappings, int protocolId) {
-        this.protocolId = protocolId;
+        this(mappings, GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public RuntimeItemMapping(Map<String, MappingEntry> mappings, GameVersion gameVersion) {
+        this.protocolId = gameVersion.getProtocol();
+        this.gameVersion = gameVersion;
         String itemStatesFile = "runtime_item_states_" + protocolId + ".json";
+        boolean useNetEaseConversion = false;
+
+        if (gameVersion.isNetEase()) {
+            String neteaseFile = "runtime_item_states_netease_" + protocolId + ".json";
+            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseFile);
+            if (neteaseStream != null) {
+                itemStatesFile = neteaseFile;
+                try {
+                    neteaseStream.close();
+                } catch (Exception ignored) {
+                }
+            } else {
+                log.debug("NetEase resource file not found: {}, will convert from standard version", neteaseFile);
+                useNetEaseConversion = true;
+            }
+        }
+
         InputStream stream = Server.class.getClassLoader().getResourceAsStream(itemStatesFile);
         if (stream == null) {
             throw new AssertionError("Unable to load " + itemStatesFile);
         }
         JsonArray json = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray();
+
+        if (useNetEaseConversion) {
+            json = NetEaseConverter.convertItemStates(json);
+            log.info("Converted {} item states to NetEase version", json.size());
+        }
+
+        CompoundTag itemComponents = null;
+        if (protocolId >= ProtocolInfo.v1_21_60) {
+            String componentsFile = "ItemComponents/item_components_" + protocolId + ".nbt";
+            if (gameVersion.isNetEase()) {
+                String neteaseFile = "ItemComponents/item_components_netease_" + protocolId + ".nbt";
+                try (InputStream neteaseStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream(neteaseFile)) {
+                    if (neteaseStream != null) {
+                        componentsFile = neteaseFile;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            try (InputStream inputStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream(componentsFile)) {
+                itemComponents = NBTIO.read(new BufferedInputStream(new GZIPInputStream(inputStream)), ByteOrder.BIG_ENDIAN, false);
+            } catch (Exception e) {
+                throw new AssertionError("Error while loading " + componentsFile, e);
+            }
+        }
 
         for (JsonElement element : json) {
             if (!element.isJsonObject()) {
@@ -60,6 +125,18 @@ public class RuntimeItemMapping {
             JsonObject entry = element.getAsJsonObject();
             String identifier = entry.get("name").getAsString();
             int runtimeId = entry.get("id").getAsInt();
+            int version = entry.has("version") ? entry.get("version").getAsInt() : 0;
+            boolean componentBased = entry.has("componentBased") && entry.get("componentBased").getAsBoolean();
+            if (protocolId >= ProtocolInfo.v1_21_60) {
+                CompoundTag components = (CompoundTag) itemComponents.get(identifier);
+                this.vanillaItems.put(identifier, new ItemComponentPacket.ItemDefinition(
+                        identifier,
+                        runtimeId,
+                        componentBased,
+                        version,
+                        components
+                ));
+            }
 
             //高版本"minecraft:wool"的名称改为"minecraft:white_wool"
             //他们的legacyId均为35，这里避免冲突忽略"minecraft:wool"
@@ -141,6 +218,32 @@ public class RuntimeItemMapping {
         }
     }
 
+    public void registerCustomBlockItem(String identifier, int legacyId, int damage) {
+        int fullId = this.getFullId(legacyId, damage);
+        LegacyEntry legacyEntry = new LegacyEntry(legacyId, false, damage);
+
+        if (Nukkit.DEBUG > 1) {
+            if (this.runtime2Legacy.containsKey(legacyId)) {
+                log.warn("RuntimeItemMapping: Registering " + identifier + " but runtime id " + legacyId + " is already used");
+            }
+        }
+
+        this.customItems.add(identifier);
+
+        this.runtimeId2Name.put(legacyId, identifier);
+        this.name2RuntimeId.put(identifier, legacyId);
+
+        this.runtime2Legacy.put(legacyId, legacyEntry);
+        this.identifier2Legacy.put(identifier, legacyEntry);
+        if (this.legacy2Runtime.containsKey(fullId)) {
+            log.debug("RuntimeItemMapping contains duplicated legacy item state runtimeId=" + legacyId + " identifier=" + identifier);
+        } else {
+            RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, legacyId, false, true);
+            this.legacy2Runtime.put(fullId, runtimeEntry);
+            this.itemPaletteEntries.add(runtimeEntry);
+        }
+    }
+
     synchronized boolean registerCustomItem(CustomItem customItem) {
         int runtimeId = CustomItemDefinition.getRuntimeId(customItem.getNamespaceId());
         String namespaceId = customItem.getNamespaceId();
@@ -207,7 +310,8 @@ public class RuntimeItemMapping {
                 if (Server.getInstance().enableExperimentMode && protocolId >= ProtocolInfo.v1_16_100) {
                     paletteBuffer.putString(entry.getIdentifier());
                     paletteBuffer.putLShort(entry.getRuntimeId());
-                    paletteBuffer.putBoolean(true); // Component item
+                    var def = Item.getCustomItemDefinition(entry.getIdentifier());
+                    paletteBuffer.putBoolean(def != null && def.isComponentBased());
                 }
             } else {
                 paletteBuffer.putString(entry.getIdentifier());
@@ -240,25 +344,41 @@ public class RuntimeItemMapping {
         return runtimeEntry;
     }
 
-    public Item parseCreativeItem(JsonObject json, boolean ignoreUnknown) {
-        return this.parseCreativeItem(json, ignoreUnknown, this.protocolId);
+    boolean isRegistered(int id, int meta) {
+        boolean containsKey = this.legacy2Runtime.containsKey(this.getFullId(id, meta));
+        if (!containsKey) {
+            containsKey = this.legacy2Runtime.containsKey(this.getFullId(id, 0));
+        }
+        return containsKey;
     }
 
+    public Item parseCreativeItem(JsonObject json, boolean ignoreUnknown) {
+        return this.parseCreativeItem(json, ignoreUnknown, this.gameVersion);
+    }
+
+    @Deprecated
     public Item parseCreativeItem(JsonObject json, boolean ignoreUnknown, int protocolId) {
+        return this.parseCreativeItem(json, ignoreUnknown, GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public Item parseCreativeItem(JsonObject json, boolean ignoreUnknown, GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
         String identifier = json.get("id").getAsString();
         LegacyEntry legacyEntry = this.fromIdentifier(identifier);
+        int[] flattenedEntry = null;
         if (legacyEntry == null || !Utils.hasItemOrBlock(legacyEntry.getLegacyId())) {
-            OptionalInt networkId = this.getNetworkIdByNamespaceId(identifier);
-            if ("minecraft:raw_iron".equalsIgnoreCase(identifier)) {
-                int test = 1;
+            flattenedEntry = RuntimeItems.getLegacyFromFlattenedId(identifier);
+            if (flattenedEntry != null && !Utils.hasItemOrBlock(flattenedEntry[0])) {
+                flattenedEntry = null;
             }
-            if (networkId.isEmpty() || !Item.NAMESPACED_ID_ITEM.containsKey(identifier)) {
+            OptionalInt networkId = this.getNetworkIdByNamespaceId(identifier);
+            if (flattenedEntry == null && (networkId.isEmpty() || !Item.NAMESPACED_ID_ITEM.containsKey(identifier))) {
                 if (!ignoreUnknown) {
                     throw new IllegalStateException("Can not find legacyEntry for " + identifier);
                 }
                 log.trace("Can not find legacyEntry for " + identifier);
                 return null;
-            } else {
+            } else if (flattenedEntry == null) {
                 legacyEntry = null;
             }
         }
@@ -272,39 +392,169 @@ public class RuntimeItemMapping {
             nbtBytes = new byte[0];
         }
 
+        Item stringItem = parseCreativeStringItem(identifier, json, nbtBytes);
+        if (stringItem != null) {
+            return normalizeCreativeItemForTargetVersion(gameVersion, stringItem);
+        }
+
         int legacyId = ItemID.STRING_IDENTIFIED_ITEM;
         if (legacyEntry != null) {
             legacyId = legacyEntry.getLegacyId();
+        } else if (flattenedEntry != null) {
+            legacyId = flattenedEntry[0];
         }
         int damage = 0;
         if (json.has("damage")) {
             damage = json.get("damage").getAsInt();
         } else if (legacyEntry != null && legacyEntry.isHasDamage()) {
             damage = legacyEntry.getDamage();
+        } else if (json.has("block_state_b64")) {
+            byte[] blockStateBytes = Base64.getDecoder().decode(json.get("block_state_b64").getAsString());
+            int fullId = resolveLegacyFullIdFromBlockState(gameVersion, identifier, blockStateBytes, ignoreUnknown);
+            if (fullId == -1) {
+                if (flattenedEntry != null) {
+                    damage = flattenedEntry[1];
+                } else if (legacyEntry == null) {
+                    return null;
+                }
+                damage = resolveLegacyDamageFromBlockStateFallback(legacyId, damage, blockStateBytes);
+            } else {
+                damage = fullId & Block.DATA_MASK;
+            }
         } else if (json.has("blockRuntimeId")) {
             int runtimeId = json.get("blockRuntimeId").getAsInt();
-            int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, runtimeId);
-            if (fullId == -1) {
-                if (ignoreUnknown) {
-                    return null;
+            if (runtimeId != 0) {
+                int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, runtimeId);
+                if (fullId == -1) {
+                    if (flattenedEntry != null) {
+                        damage = flattenedEntry[1];
+                    } else if (legacyEntry != null) {
+                        // Keep the default item meta when the runtime block state no longer
+                        // matches the target protocol's block palette.
+                    } else {
+                        if (ignoreUnknown) {
+                            return null;
+                        } else {
+                            throw new IllegalStateException("Can not find blockRuntimeId for " + identifier + " (" + runtimeId + ")");
+                        }
+                    }
                 } else {
-                    throw new IllegalStateException("Can not find blockRuntimeId for " + runtimeId);
+                    damage = fullId & Block.DATA_MASK;
                 }
             }
+        } else if (flattenedEntry != null) {
+            damage = flattenedEntry[1];
+        }
 
-            damage = fullId & 0xf;
+        if (legacyId == BlockID.RED_MUSHROOM_BLOCK || legacyId == BlockID.BROWN_MUSHROOM_BLOCK) {
+            damage = 14;
         }
 
         int count = json.has("count") ? json.get("count").getAsInt() : 1;
+        Item item;
         if (legacyEntry != null) {
-            return Item.get(legacyId, damage, count, nbtBytes);
+            item = Item.get(legacyId, damage, count, nbtBytes);
         } else {
-            Item item = Item.fromString(identifier);
+            item = Item.fromString(identifier);
             item.setDamage(damage);
             item.setCount(count);
             item.setCompoundTag(nbtBytes);
+        }
+        return normalizeCreativeItemForTargetVersion(gameVersion, item);
+    }
+
+    private Item parseCreativeStringItem(String identifier, JsonObject json, byte[] nbtBytes) {
+        if (this.getNetworkIdByNamespaceId(identifier).isEmpty()) {
+            return null;
+        }
+
+        Item item = Item.fromString(identifier);
+        if (item.getId() != Item.STRING_IDENTIFIED_ITEM) {
+            return null;
+        }
+
+        if (json.has("damage")) {
+            item.setDamage(json.get("damage").getAsInt());
+        }
+        item.setCount(json.has("count") ? json.get("count").getAsInt() : 1);
+        item.setCompoundTag(nbtBytes);
+        return item;
+    }
+
+    private int resolveLegacyFullIdFromBlockState(GameVersion gameVersion, String identifier, byte[] blockStateBytes, boolean ignoreUnknown) {
+        Exception decodeFailure = null;
+        boolean decodedAny = false;
+        for (ByteOrder byteOrder : BLOCK_STATE_BYTE_ORDERS) {
+            try {
+                CompoundTag blockState = NBTIO.read(blockStateBytes, byteOrder, false);
+                decodedAny = true;
+                int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, blockState);
+                if (fullId != -1) {
+                    return fullId;
+                }
+            } catch (Exception e) {
+                if (decodeFailure == null) {
+                    decodeFailure = e;
+                } else {
+                    decodeFailure.addSuppressed(e);
+                }
+            }
+        }
+
+        if (decodeFailure != null && !decodedAny) {
+            if (!ignoreUnknown) {
+                throw new IllegalStateException("Can not decode block_state_b64 for " + identifier, decodeFailure);
+            }
+            log.trace("Can not decode block_state_b64 for {}", identifier, decodeFailure);
+            return -1;
+        }
+
+        if (!ignoreUnknown) {
+            throw new IllegalStateException("Can not find block state for " + identifier + " on " + gameVersion);
+        }
+        log.trace("Can not find block state for {} on {}", identifier, gameVersion);
+        return -1;
+    }
+
+    private int resolveLegacyDamageFromBlockStateFallback(int legacyId, int currentDamage, byte[] blockStateBytes) {
+        if (blockStateBytes.length == 0) {
+            return currentDamage;
+        }
+
+        for (ByteOrder byteOrder : BLOCK_STATE_BYTE_ORDERS) {
+            try {
+                CompoundTag blockState = NBTIO.read(blockStateBytes, byteOrder, false);
+                CompoundTag states = blockState.getCompound("states");
+                int facingDirection;
+                if (states.containsInt("facing_direction")) {
+                    facingDirection = states.getInt("facing_direction");
+                } else if (states.containsByte("facing_direction")) {
+                    facingDirection = states.getByte("facing_direction");
+                } else {
+                    continue;
+                }
+
+                return switch (legacyId) {
+                    case BlockID.DROPPER, BlockID.DISPENSER, BlockID.PISTON, BlockID.STICKY_PISTON -> facingDirection;
+                    default -> currentDamage;
+                };
+            } catch (Exception e) {
+                log.trace("Can not derive legacy damage from block_state_b64 for legacy id {} using {} byte order", legacyId, byteOrder, e);
+            }
+        }
+        return currentDamage;
+    }
+
+    private Item normalizeCreativeItemForTargetVersion(GameVersion gameVersion, Item item) {
+        if (gameVersion.getProtocol() > ProtocolInfo.v1_17_40 || item.getId() != Item.BANNER || !item.hasCompoundTag()) {
             return item;
         }
+
+        CompoundTag tag = item.getNamedTag();
+        if (tag != null && tag.getTags().size() == 1 && tag.containsInt("Type") && tag.getInt("Type") == 0) {
+            item.clearNamedTag();
+        }
+        return item;
     }
 
 
@@ -359,6 +609,14 @@ public class RuntimeItemMapping {
 
     public byte[] getItemPalette() {
         return this.itemPalette;
+    }
+
+    public List<RuntimeEntry> getItemPaletteEntries() {
+        return this.itemPaletteEntries;
+    }
+
+    public Collection<ItemComponentPacket.ItemDefinition> getVanillaItemDefinitions() {
+        return this.vanillaItems.values();
     }
 
     public int getProtocolId() {

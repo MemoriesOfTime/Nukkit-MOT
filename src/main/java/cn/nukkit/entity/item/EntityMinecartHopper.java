@@ -2,6 +2,7 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockComposter;
 import cn.nukkit.block.BlockHopper;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityContainer;
@@ -34,8 +35,12 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
 
     public EntityMinecartHopper(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
-        setDisplayBlock(Block.get(Block.HOPPER_BLOCK), false);
         setName("Minecart with Hopper");
+    }
+
+    @Override
+    protected Block getDefaultDisplayBlock() {
+        return Block.get(Block.HOPPER_BLOCK);
     }
 
     @Override
@@ -95,7 +100,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
         super.initEntity();
 
         this.inventory = new MinecartHopperInventory(this);
-        if (this.namedTag.contains("Items") && this.namedTag.get("Items") instanceof ListTag) {
+        if (this.namedTag.get("Items") instanceof ListTag) {
             ListTag<CompoundTag> inventoryList = this.namedTag.getList("Items", CompoundTag.class);
             for (CompoundTag item : inventoryList.getAll()) {
                 this.inventory.setItem(item.getByte("Slot"), NBTIO.getItemHelper(item));
@@ -130,14 +135,15 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
     }
 
     @Override
-    public boolean onUpdate(int currentTick) {
-        if (!super.onUpdate(currentTick)) {
-            return false;
-        }
+    public boolean entityBaseTick(int tickDiff) {
+        boolean hasUpdate = super.entityBaseTick(tickDiff);
 
-        this.transferCooldown--;
+        if (!this.closed && this.isAlive()) {
+            if (this.isOnTransferCooldown()) {
+                this.transferCooldown--;
+                return true;
+            }
 
-        if (!this.isOnTransferCooldown()) {
             boolean changed = pushItems();
 
             if (!changed) {
@@ -152,9 +158,11 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
             if (changed) {
                 this.setTransferCooldown(8);
             }
+
+            return true;
         }
 
-        return true;
+        return hasUpdate;
     }
 
     @Override
@@ -168,6 +176,27 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
 
         if (be instanceof BlockEntityHopper // 漏斗会主动从漏斗矿车中拉取
                 || !(be instanceof InventoryHolder)) {
+            return false;
+        }
+
+        if (bottomBlock instanceof BlockComposter composter) {
+            if (composter.isFull()) {
+                return false;
+            }
+            for (int i = 0; i < this.inventory.getSize(); i++) {
+                Item item = this.inventory.getItem(i);
+                if (!item.isNull()) {
+                    Item itemToAdd = item.clone();
+                    itemToAdd.setCount(1);
+
+                    int chance = BlockComposter.getChance(itemToAdd);
+                    if (chance > 0 && composter.addItem(itemToAdd, null, chance)) {
+                        item.count--;
+                        this.inventory.setItem(i, item);
+                        return true;
+                    }
+                }
+            }
             return false;
         }
 
@@ -197,7 +226,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                             item.count--;
                             pushedItem = true;
                         }
-                    } else if (targetInv.getSmelting().getId() == itemToAdd.getId() && targetInv.getSmelting().getDamage() == itemToAdd.getDamage() && smelting.count < smelting.getMaxStackSize()) {
+                    } else if (smelting.getId() == itemToAdd.getId() && smelting.getDamage() == itemToAdd.getDamage() && smelting.count < smelting.getMaxStackSize()) {
                         event = new InventoryMoveItemEvent(this.inventory, targetInv, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
                         this.server.getPluginManager().callEvent(event);
 

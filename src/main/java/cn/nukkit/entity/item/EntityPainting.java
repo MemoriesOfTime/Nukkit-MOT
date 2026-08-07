@@ -73,7 +73,7 @@ public class EntityPainting extends EntityHanging {
     }
 
     public final static Motive[] motives = Arrays.stream(Motive.values())
-            .filter(m -> ((m.newPainting && Server.getInstance().enableNewPaintings) || !m.newPainting))
+            .filter(m -> (!m.newPainting || Server.getInstance().enableNewPaintings))
             .toArray(Motive[]::new);
 
     private Motive motive;
@@ -189,13 +189,12 @@ public class EntityPainting extends EntityHanging {
     }
 
     private static boolean checkPlacePaint(int x, int z, Level level, BlockFace face, Block block, Block target) {
-        if (target.getSide(face.rotateYCCW(), x).isAir() ||
-                target.getSide(face.rotateYCCW(), x).up(z).isAir() ||
-                target.up(z).isAir()) {
+        if (target.getSide(face.rotateYCCW(), x).up(z).isTransparent() ||
+                block.getSide(face.rotateYCCW(), x).up(z).isSolid()) {
             return true;
         } else {
             Block side = block.getSide(face.rotateYCCW(), x);
-            Block up = block.getSide(face.rotateYCCW(), x).up(z).getLevelBlock();
+            Block up = side.up(z).getLevelBlock();
             Block up1 = block.up(z);
             Set<FullChunk> chunks = Sets.newHashSet(side.getChunk(), up.getChunk(), up1.getChunk());
             Collection<Entity> entities = chunks.stream().map(c -> c.getEntities().values()).reduce(new ArrayList<>(), (e1, e2) -> {

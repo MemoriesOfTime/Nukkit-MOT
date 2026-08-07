@@ -182,7 +182,7 @@ public class BlockBed extends BlockTransparentMeta implements Faceable, BlockEnt
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
         if (!down.isTransparent() || down instanceof BlockSlab) {
             Block next = this.getSide(player.getHorizontalFacing());

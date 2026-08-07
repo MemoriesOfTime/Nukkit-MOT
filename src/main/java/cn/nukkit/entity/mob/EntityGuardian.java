@@ -10,7 +10,6 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 
 import java.util.HashMap;
@@ -85,7 +84,7 @@ public class EntityGuardian extends EntitySwimmingMob {
         boolean hasUpdate = super.entityBaseTick(tickDiff);
         if (!this.closed && followTarget != null) {
             if (laserTargetEid != followTarget.getId()) {
-                this.setDataProperty( new LongEntityData(Entity.DATA_TARGET_EID, laserTargetEid = followTarget.getId()));
+                this.setDataProperty(new LongEntityData(Entity.DATA_TARGET_EID, laserTargetEid = followTarget.getId()));
                 laserChargeTick = 60;
             }
             if (targetOption((EntityCreature) followTarget, this.distanceSquared(followTarget))) {
@@ -93,11 +92,11 @@ public class EntityGuardian extends EntitySwimmingMob {
                     if (this.getServer().getMobAiEnabled()) {
                         attackEntity(followTarget);
                     }
-                    this.setDataProperty( new LongEntityData(Entity.DATA_TARGET_EID, laserTargetEid = -1));
+                    this.setDataProperty(new LongEntityData(Entity.DATA_TARGET_EID, laserTargetEid = -1));
                     laserChargeTick = 60;
                 }
             } else {
-                this.setDataProperty( new LongEntityData(Entity.DATA_TARGET_EID, laserTargetEid = -1));
+                this.setDataProperty(new LongEntityData(Entity.DATA_TARGET_EID, laserTargetEid = -1));
                 laserChargeTick = 60;
             }
         }

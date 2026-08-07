@@ -107,7 +107,7 @@ public class BlockEnderChest extends BlockTransparentMeta implements Faceable, B
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(FACES[player != null ? player.getDirection().getHorizontalIndex() : 0]);
 
         this.getLevel().setBlock(block, this, true, true);
@@ -153,7 +153,7 @@ public class BlockEnderChest extends BlockTransparentMeta implements Faceable, B
                 chest = (BlockEntityEnderChest) BlockEntity.createBlockEntity(BlockEntity.ENDER_CHEST, this.getChunk(), nbt);
             }
 
-            if (chest.namedTag.contains("Lock") && chest.namedTag.get("Lock") instanceof StringTag) {
+            if (chest.namedTag.get("Lock") instanceof StringTag) {
                 if (!chest.namedTag.getString("Lock").equals(item.getCustomName())) {
                     return true;
                 }

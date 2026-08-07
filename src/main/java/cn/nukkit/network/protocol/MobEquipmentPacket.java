@@ -1,7 +1,6 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import lombok.ToString;
 
 /**
@@ -54,12 +53,8 @@ public class MobEquipmentPacket extends DataPacket {
             this.hotbarSlot = this.getByte();// selectedHotbarIndex
             return;
         }
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.eid = this.getEntityRuntimeId();
-        }else{
-            this.eid = this.getEntityUniqueId();
-        }
-        this.item = this.getSlot(this.protocol);
+        this.eid = this.getEntityRuntimeId();
+        this.item = this.getNetworkItemStackDescriptor(this.gameVersion);
         this.inventorySlot = this.getByte();
         this.hotbarSlot = this.getByte();
         if(this.protocol < ProtocolInfo.v_1_0_0){
@@ -98,12 +93,8 @@ public class MobEquipmentPacket extends DataPacket {
             return;
         }
         this.reset();
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.eid);
-        }else{
-            this.putEntityUniqueId(this.eid);
-        }
-        this.putSlot(protocol, this.item);
+        this.putEntityRuntimeId(this.eid);
+        this.putNetworkItemStackDescriptor(gameVersion, this.item);
         this.putByte((byte) this.inventorySlot);
         this.putByte((byte) this.hotbarSlot);
         this.putByte((byte) this.windowId);

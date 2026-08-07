@@ -19,9 +19,9 @@ public record Permutation(Component component, String condition, String[] blockT
                 .putString("condition", condition);
         ListTag<StringTag> stringTagListTag = new ListTag<>();
         for (String s : blockTags) {
-            stringTagListTag.add(new StringTag(s));
+            stringTagListTag.add(new StringTag("", s));
         }
-        if (stringTagListTag.size() > 0) {
+        if (!stringTagListTag.isEmpty()) {
             result.putList("blockTags", stringTagListTag);
         }
         return result;

@@ -389,7 +389,7 @@ public class ExecuteCommand extends VanillaCommand {
                 TestForBlocksCommand.TestForBlocksMode mode = TestForBlocksCommand.TestForBlocksMode.ALL;
                 if (list.hasResult(5)) {
                     String str5 = list.getResult(5);
-                    mode = TestForBlocksCommand.TestForBlocksMode.valueOf(str5.toUpperCase(Locale.ENGLISH));
+                    mode = TestForBlocksCommand.TestForBlocksMode.valueOf(str5.toUpperCase(Locale.ROOT));
                 }
 
                 AxisAlignedBB blocksAABB = new SimpleAxisAlignedBB(Math.min(begin.getX(), end.getX()), Math.min(begin.getY(), end.getY()), Math.min(begin.getZ(), end.getZ()), Math.max(begin.getX(), end.getX()), Math.max(begin.getY(), end.getY()), Math.max(begin.getZ(), end.getZ()));
@@ -521,7 +521,7 @@ public class ExecuteCommand extends VanillaCommand {
 
                 String operation = list.getResult(4);
                 List<Entity> scorers = list.getResult(5);
-                Set<IScorer> selectorScorers = scorers.stream().filter(t -> t != null).map(t -> t instanceof Player ? new PlayerScorer((Player) t) : new EntityScorer(t)).collect(Collectors.toSet());
+                Set<IScorer> selectorScorers = scorers.stream().filter(Objects::nonNull).map(t -> t instanceof Player ? new PlayerScorer((Player) t) : new EntityScorer(t)).collect(Collectors.toSet());
                 if (selectorScorers.size() > 1) {
                     log.addTooManyTargets().output();
                     return 0;

@@ -25,7 +25,7 @@ public class PlayerFogPacket extends DataPacket {
 
     @Override
     public void decode() {
-        //unused
+        this.decodeUnsupported();
     }
 
     @Override

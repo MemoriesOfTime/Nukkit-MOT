@@ -1,0 +1,26 @@
+package cn.nukkit.block;
+
+public class BlockWallDeepslatePolished extends BlockWallDeepslateCobbled {
+    public BlockWallDeepslatePolished() {
+        this(0);
+    }
+
+    public BlockWallDeepslatePolished(int meta) {
+        super(meta);
+    }
+
+    @Override
+    public String getName() {
+        return "Polished Deepslate Wall";
+    }
+
+    @Override
+    public int getId() {
+        return POLISHED_DEEPSLATE_WALL;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:polished_deepslate_wall";
+    }
+}

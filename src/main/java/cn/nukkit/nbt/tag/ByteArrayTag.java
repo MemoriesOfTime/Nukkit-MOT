@@ -85,6 +85,13 @@ public class ByteArrayTag extends Tag {
     }
 
     @Override
+    public int hashCode() {
+        int result = super.hashCode();
+        result = 31 * result + Arrays.hashCode(data);
+        return result;
+    }
+
+    @Override
     public Tag copy() {
         byte[] cp = new byte[data.length];
         System.arraycopy(data, 0, cp, 0, data.length);

@@ -9,29 +9,20 @@ import java.util.Arrays;
  */
 public final class DataPalette implements Cloneable {
 
-    protected static final ThreadLocal<boolean[]> countCache = new ThreadLocal<boolean[]>() {
-        @Override
-        protected boolean[] initialValue() {
-            // TODO use actual block size
-            return new boolean[4096];
-        }
-    };
+    private static final ThreadLocal<boolean[]> countCache = ThreadLocal.withInitial(() -> {
+        // TODO use actual block size
+        return new boolean[4096];
+    });
 
-    protected static final ThreadLocal<char[]> mapFullToBitCache = new ThreadLocal<char[]>() {
-        @Override
-        protected char[] initialValue() {
-            // TODO use actual block size
-            return new char[4096];
-        }
-    };
+    private static final ThreadLocal<char[]> mapFullToBitCache = ThreadLocal.withInitial(() -> {
+        // TODO use actual block size
+        return new char[4096];
+    });
 
-    protected static final ThreadLocal<char[]> mapBitToFullCache = new ThreadLocal<char[]>() {
-        @Override
-        protected char[] initialValue() {
-            // TODO use actual block size
-            return new char[4096];
-        }
-    };
+    private static final ThreadLocal<char[]> mapBitToFullCache = ThreadLocal.withInitial(() -> {
+        // TODO use actual block size
+        return new char[4096];
+    });
 
     private char[] rawData;
 

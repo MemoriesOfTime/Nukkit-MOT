@@ -2,8 +2,10 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockBasalt extends BlockSolidMeta {
     public BlockBasalt() {
@@ -25,7 +27,7 @@ public class BlockBasalt extends BlockSolidMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setPillarAxis(face.getAxis());
         this.getLevel().setBlock(block, this, true, true);
         return true;
@@ -74,5 +76,10 @@ public class BlockBasalt extends BlockSolidMeta {
     @Override
     public int getId() {
         return BASALT;
+    }
+
+    @Override
+    public Item toItem() {
+        return new ItemBlock(Block.get(this.getId(), 0), 0);
     }
 }

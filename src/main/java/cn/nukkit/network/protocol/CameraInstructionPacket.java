@@ -7,10 +7,7 @@ import cn.nukkit.nbt.tag.ByteTag;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.protocol.types.camera.CameraEase;
-import cn.nukkit.network.protocol.types.camera.CameraFadeInstruction;
-import cn.nukkit.network.protocol.types.camera.CameraSetInstruction;
-import cn.nukkit.network.protocol.types.camera.CameraTargetInstruction;
+import cn.nukkit.network.protocol.types.camera.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.CameraPresetManager;
 import lombok.Getter;
@@ -24,6 +21,8 @@ import org.cloudburstmc.protocol.common.util.Preconditions;
 import java.awt.*;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -41,6 +40,22 @@ public class CameraInstructionPacket extends DataPacket {
      * @since v712
      */
     private OptionalBoolean removeTarget = OptionalBoolean.empty();
+    /**
+     * @since v827
+     */
+    private CameraFovInstruction fovInstruction;
+    /**
+     * @since v859
+     */
+    private CameraSplineInstruction splineInstruction;
+    /**
+     * @since v859
+     */
+    private CameraAttachToEntityInstruction attachInstruction;
+    /**
+     * @since v859
+     */
+    private OptionalBoolean detachFromEntity = OptionalBoolean.empty();
 
     @Override
     @Deprecated
@@ -76,6 +91,50 @@ public class CameraInstructionPacket extends DataPacket {
                     return new CameraTargetInstruction(targetCenterOffset, uniqueEntityId);
                 }));
                 this.setRemoveTarget(this.getOptional(OptionalBoolean.empty(), buf -> OptionalBoolean.of(buf.getBoolean())));
+            }
+
+            if (this.protocol >= ProtocolInfo.v1_21_100) {
+                this.setFovInstruction(this.getOptional(null, buf -> {
+                    float fov = buf.getFloat();
+                    float easeTime = buf.getFloat();
+                    CameraEase easeType = CameraEase.values()[buf.getByte()];
+                    boolean clear = buf.getBoolean();
+                    return new CameraFovInstruction(fov, easeTime, easeType, clear);
+                }));
+            }
+
+            if (this.protocol >= ProtocolInfo.v1_21_120) {
+                this.setSplineInstruction(this.getOptional(null, buf -> {
+                    float totalTime = buf.getFloat();
+                    CameraSplineType type = CameraSplineType.values()[buf.getByte()];
+                    List<Vector3f> curve = new ArrayList<>();
+                    buf.getArray(curve, BinaryStream::getVector3f);
+                    List<CameraSplineInstruction.SplineProgressOption> progressKeyFrames = new ArrayList<>();
+                    if (this.protocol >= ProtocolInfo.v1_26_0) {
+                        // v924+: includes easing function
+                        buf.getArray(progressKeyFrames, buf2 -> {
+                            float value = buf2.getLFloat();
+                            float time = buf2.getLFloat();
+                            CameraEase easingFunc = CameraEase.values()[buf2.getLInt()];
+                            return new CameraSplineInstruction.SplineProgressOption(value, time, easingFunc);
+                        });
+                    } else {
+                        // Pre-v924: only value and time
+                        buf.getArray(progressKeyFrames, buf2 -> {
+                            Vector2f v = buf2.getVector2f();
+                            return new CameraSplineInstruction.SplineProgressOption(v.getX(), v.getY());
+                        });
+                    }
+                    List<CameraSplineInstruction.SplineRotationOption> rotationOption = new ArrayList<>();
+                    buf.getArray(rotationOption, buf2 -> {
+                        Vector3f keyFrameValues = buf2.getVector3f();
+                        float keyFrameTimes = buf2.getFloat();
+                        return new CameraSplineInstruction.SplineRotationOption(keyFrameValues, keyFrameTimes);
+                    });
+                    return new CameraSplineInstruction(totalTime, type, curve, progressKeyFrames, rotationOption);
+                }));
+                this.setAttachInstruction(this.getOptional(null, buf -> new CameraAttachToEntityInstruction(buf.getLLong())));
+                this.setDetachFromEntity(this.getOptional(OptionalBoolean.empty(), buf -> OptionalBoolean.of(buf.getBoolean())));
             }
         } else {
             CompoundTag data = this.getTag();
@@ -170,6 +229,42 @@ public class CameraInstructionPacket extends DataPacket {
                 this.putOptional(OptionalBoolean::isPresent, this.getRemoveTarget(),
                         (b, optional) -> b.putBoolean(optional.getAsBoolean()));
             }
+
+            if (this.protocol >= ProtocolInfo.v1_21_100) {
+                this.putOptionalNull(this.getFovInstruction(), (b, fovInstruction) -> {
+                    b.putLFloat(fovInstruction.getFov());
+                    b.putLFloat(fovInstruction.getEaseTime());
+                    b.putByte((byte) fovInstruction.getEaseType().ordinal());
+                    b.putBoolean(fovInstruction.isClear());
+                });
+            }
+
+            if (this.protocol >= ProtocolInfo.v1_21_120) {
+                this.putOptionalNull(this.getSplineInstruction(), (buf, splineInstruction) -> {
+                    buf.putLFloat(splineInstruction.getTotalTime());
+                    buf.putByte((byte) splineInstruction.getType().ordinal());
+                    buf.putArray(splineInstruction.getCurve(), BinaryStream::putVector3f);
+                    if (this.protocol >= ProtocolInfo.v1_26_0) {
+                        // v924+: includes easing function
+                        buf.putArray(splineInstruction.getProgressKeyFrames(), (buf2, progress) -> {
+                            buf2.putLFloat(progress.getValue());
+                            buf2.putLFloat(progress.getTime());
+                            buf2.putLInt(progress.getEasingFunc().ordinal());
+                        });
+                    } else {
+                        // Pre-v924: only value and time as Vector2f
+                        buf.putArray(splineInstruction.getProgressKeyFrames(), (buf2, progress) -> {
+                            buf2.putVector2f(progress.getValue(), progress.getTime());
+                        });
+                    }
+                    buf.putArray(splineInstruction.getRotationOption(), (buf2, rotationOption) -> {
+                        buf2.putVector3f(rotationOption.getKeyFrameValues());
+                        buf2.putLFloat(rotationOption.getKeyFrameTimes());
+                    });
+                });
+                this.putOptionalNull(this.getAttachInstruction(), (b, attachInstruction) -> b.putLLong(attachInstruction.getUniqueEntityId()));
+                this.putOptional(OptionalBoolean::isPresent,this.getDetachFromEntity(), (b, detachFromEntity) -> b.putBoolean(detachFromEntity.getAsBoolean()));
+            }
         } else {
             CompoundTag data = new CompoundTag();
             if (this.getSetInstruction() != null) {
@@ -259,6 +354,9 @@ public class CameraInstructionPacket extends DataPacket {
         }
         this.putOptional(OptionalBoolean::isPresent, set.getDefaultPreset(),
                 (b1, optional) -> b1.putBoolean(optional.getAsBoolean()));
+        if (this.protocol >= ProtocolInfo.v1_21_90) {
+            this.putBoolean(set.isRemoveIgnoreStartingValues());
+        }
     }
 
     protected CameraSetInstruction readSetInstruction() {
@@ -278,7 +376,11 @@ public class CameraInstructionPacket extends DataPacket {
             }
         }
         OptionalBoolean defaultPreset = this.getOptional(OptionalBoolean.empty(), b1 -> OptionalBoolean.of(b1.getBoolean()));
-        return new CameraSetInstruction(definition, ease, pos, rot, facing, viewOffset, entityOffset, defaultPreset);
+        boolean removeIgnoreStartingValues = false;
+        if (this.protocol >= ProtocolInfo.v1_21_90) {
+            removeIgnoreStartingValues = this.getBoolean();
+        }
+        return new CameraSetInstruction(definition, ease, pos, rot, facing, viewOffset, entityOffset, defaultPreset, removeIgnoreStartingValues);
     }
 
     protected void putEase(CameraSetInstruction.EaseData ease) {

@@ -9,6 +9,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemSweetBerries;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.Sound;
@@ -78,7 +79,7 @@ public class BlockSweetBerryBush extends BlockFlowable {
             }
 
             BlockGrowEvent ev = new BlockGrowEvent(this, block);
-            this.getLevel().getServer().getPluginManager().callEvent(ev);
+            ev.call();
             if (ev.isCancelled()) {
                 return false;
             }
@@ -97,9 +98,13 @@ public class BlockSweetBerryBush extends BlockFlowable {
         }
 
         int amount = age - 1 + ThreadLocalRandom.current().nextInt(2);
+        int fortuneLevel = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
+        if (fortuneLevel > 0) {
+            amount += ThreadLocalRandom.current().nextInt(fortuneLevel + 1);
+        }
 
         BlockHarvestEvent event = new BlockHarvestEvent(this, new BlockSweetBerryBush(1), new Item[]{new ItemSweetBerries(0, amount)});
-        this.getLevel().getServer().getPluginManager().callEvent(event);
+        event.call();
 
         if (!event.isCancelled()) {
             this.getLevel().setBlock(this, event.getNewState(), true, true);
@@ -127,6 +132,7 @@ public class BlockSweetBerryBush extends BlockFlowable {
             if (this.getDamage() < 3 && ThreadLocalRandom.current().nextInt(5) == 0
                     && this.getLevel().getFullLight(add(0, 1, 0)) >= BlockCrops.MINIMUM_LIGHT_LEVEL) {
                 BlockGrowEvent event = new BlockGrowEvent(this, Block.get(this.getId(), this.getDamage() + 1));
+                event.call();
                 if (!event.isCancelled()) {
                     this.getLevel().setBlock(this, event.getNewState(), true, true);
                 }
@@ -150,14 +156,10 @@ public class BlockSweetBerryBush extends BlockFlowable {
 
 
     public static boolean isSupportValid(Block block) {
-        switch (block.getId()) {
-            case GRASS:
-            case DIRT:
-            case PODZOL:
-                return true;
-            default:
-                return false;
-        }
+        return switch (block.getId()) {
+            case GRASS, DIRT, PODZOL -> true;
+            default -> false;
+        };
     }
 
     @Override
@@ -182,6 +184,10 @@ public class BlockSweetBerryBush extends BlockFlowable {
         int amount = 0;
         if(age > 1) {
             amount = age - 1 + ThreadLocalRandom.current().nextInt(2);
+            int fortuneLevel = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
+            if (fortuneLevel > 0) {
+                amount += ThreadLocalRandom.current().nextInt(fortuneLevel + 1);
+            }
         }
 
         return new Item[]{ new ItemSweetBerries(0, amount) };

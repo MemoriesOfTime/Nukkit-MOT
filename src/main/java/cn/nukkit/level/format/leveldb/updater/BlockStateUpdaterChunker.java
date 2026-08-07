@@ -5,8 +5,6 @@ import lombok.NoArgsConstructor;
 import org.cloudburstmc.blockstateupdater.BlockStateUpdater;
 import org.cloudburstmc.blockstateupdater.util.tagupdater.CompoundTagUpdaterContext;
 
-import static cn.nukkit.level.format.leveldb.LevelDBConstants.*;
-
 /**
  * This is updater for worlds converted using chunker.app
  */
@@ -18,10 +16,12 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
     @Override
     public void registerUpdaters(CompoundTagUpdaterContext ctx) {
         this.addProperty(ctx, "minecraft:anvil", "damage", "undamaged");
+        this.addProperty(ctx, "minecraft:leaves", "update_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:leaves2", "update_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:azalea_leaves", "update_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:azalea_leaves_flowered", "update_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:jungle_leaves", "update_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:bamboo_sapling", "age_bit", (byte) 0);
-        this.addProperty(ctx, "minecraft:bedrock", "infiniburn_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:big_dripleaf", "big_dripleaf_tilt", "none");
         this.addProperty(ctx, "minecraft:blackstone_double_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:cauldron", "cauldron_liquid", "water");
@@ -40,7 +40,7 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
         this.addProperty(ctx, "minecraft:dirt", "dirt_type", "normal");
         this.addProperty(ctx, "minecraft:double_cut_copper_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:double_wooden_slab", "wood_type", "oak");
-        this.addProperty(ctx, "minecraft:double_stone_block_slab", "top_slot_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:double_stone_slab4", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:double_stone_block_slab2", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:double_stone_block_slab3", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:double_stone_block_slab4", "top_slot_bit", (byte) 0);
@@ -50,8 +50,6 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
         this.addProperty(ctx, "minecraft:frame", "item_frame_map_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:kelp", "kelp_age", (int) 0);
         this.addProperty(ctx, "minecraft:lava_cauldron", "cauldron_liquid", "lava");
-        this.addProperty(ctx, "minecraft:leaves", "update_bit", (byte) 0);
-        this.addProperty(ctx, "minecraft:leaves2", "update_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:oxidized_double_cut_copper_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:polished_blackstone_brick_double_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:polished_blackstone_double_slab", "top_slot_bit", (byte) 0);
@@ -68,7 +66,6 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
         this.addProperty(ctx, "minecraft:tnt", "allow_underwater_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:trip_wire", "suspended_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:warped_double_slab", "top_slot_bit", (byte) 0);
-        this.addProperty(ctx, "minecraft:water", "liquid_depth", (int) 0);
         this.addProperty(ctx, "minecraft:waxed_double_cut_copper_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:waxed_exposed_double_cut_copper_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:waxed_oxidized_double_cut_copper_slab", "top_slot_bit", (byte) 0);
@@ -80,7 +77,7 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
     }
 
     private void addProperty(CompoundTagUpdaterContext ctx, String identifier, String propertyName, Object value) {
-        ctx.addUpdater(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION, true)
+        ctx.addUpdater(1, 20, 10, true)
                 .match("name", identifier)
                 .visit("states")
                 .tryAdd(propertyName, value);

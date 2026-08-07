@@ -35,7 +35,7 @@ public class BlockSandstone extends BlockSolidMeta {
 
     @Override
     public double getResistance() {
-        return 4;
+        return 0.8;
     }
 
     @Override

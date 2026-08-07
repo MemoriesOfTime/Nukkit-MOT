@@ -1,5 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 public class ItemChestBoatBirch extends ItemChestBoatBase {
     public ItemChestBoatBirch() {
         this(0, 1);
@@ -20,5 +23,10 @@ public class ItemChestBoatBirch extends ItemChestBoatBase {
     @Override
     public int getBoatId() {
         return 2;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_19_0_29;
     }
 }

@@ -1,0 +1,38 @@
+package cn.nukkit.item;
+
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
+/**
+ * @author Glorydark
+ */
+public class ItemHelmetCopper extends StringItemArmorBase {
+
+    public ItemHelmetCopper() {
+        super(COPPER_HELMET, "Copper Helmet");
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_21_100;
+    }
+
+    @Override
+    public int getTier() {
+        return ItemArmor.TIER_COPPER;
+    }
+    @Override
+    public boolean isHelmet() {
+        return true;
+    }
+
+    @Override
+    public int getArmorPoints() {
+        return 2;
+    }
+
+    @Override
+    public int getMaxDurability() {
+        return 122;
+    }
+}

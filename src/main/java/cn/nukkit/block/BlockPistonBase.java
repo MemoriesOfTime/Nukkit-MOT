@@ -10,6 +10,8 @@ import cn.nukkit.event.block.BlockPistonEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
@@ -53,12 +55,12 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
     @Override
     public double getResistance() {
-        return 2.5;
+        return 1.5;
     }
 
     @Override
     public double getHardness() {
-        return 0.5;
+        return 1.5;
     }
 
     @Override
@@ -67,7 +69,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (Math.abs(player.getFloorX() - this.x) < 2 && Math.abs(player.getFloorZ() - this.z) < 2) {
             double y = player.y + player.getEyeHeight();
 
@@ -127,14 +129,15 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         }
 
         BlockEntity blockEntity = this.level.getBlockEntity(this);
-        if (blockEntity instanceof BlockEntityPistonArm) {
-            BlockEntityPistonArm arm = (BlockEntityPistonArm) blockEntity;
+        if (blockEntity instanceof BlockEntityPistonArm arm) {
             boolean powered = this.isPowered();
 
-            if (arm.state % 2 == 0 && arm.powered != powered && this.checkState(powered)) {
-                arm.powered = powered;
-                if (arm.chunk != null) {
-                    arm.chunk.setChanged();
+            if (arm.state % 2 == 0 && arm.powered != powered) {
+                if (this.checkState(powered)) {
+                    arm.powered = powered;
+                    if (arm.chunk != null) {
+                        arm.chunk.setChanged();
+                    }
                 }
             }
         }
@@ -152,6 +155,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             }
 
             this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_PISTON_OUT);
+            this.getLevel().getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0.5, 0.5, 0.5), VibrationType.BLOCK_ACTIVATE));
             return true;
         } else if (!isPowered && isExtended()) {
             if (!this.doMove(false)) {
@@ -159,6 +163,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             }
 
             this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_PISTON_IN);
+            this.getLevel().getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0.5, 0.5, 0.5), VibrationType.BLOCK_DEACTIVATE));
             return true;
         }
 
@@ -202,17 +207,25 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
         List<BlockVector3> attached = Collections.emptyList();
         if (canMove && (this.sticky || extending)) {
+            List<Block> newBlocks = calculator.getBlocksToMove();
+
+            // Validate before any mutation — a mid-loop return false must not leave side effects.
+            for (Block oldBlock : newBlocks) {
+                if (this.level.getBlock(oldBlock.getLocation()).getId() != oldBlock.getId()) {
+                    return false;
+                }
+            }
+
             List<Block> destroyBlocks = calculator.getBlocksToDestroy();
             for (int i = destroyBlocks.size() - 1; i >= 0; --i) {
                 Block block = destroyBlocks.get(i);
-                this.level.useBreakOn(block, null, null, false);
+                this.level.useBreakOn(block, null, null, true);
 
                 if (Server.getInstance().dropSpawners && block instanceof BlockMobSpawner){
                     this.level.dropItem(block.add(0.5, 0.5, 0.5), Item.get(Item.MONSTER_SPAWNER, 0, 1));
                 }
             }
 
-            List<Block> newBlocks = calculator.getBlocksToMove();
             attached = newBlocks.stream().map(Vector3::asBlockVector3).collect(Collectors.toList());
             BlockFace side = extending ? direction : direction.getOpposite();
 
@@ -235,7 +248,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                 Block newBlock = newBlocks.get(i);
                 Vector3 oldPos = newBlock.add(0);
                 newBlock.position(newBlock.add(0).getSide(side));
-                this.level.setBlock(newBlock, Block.get(BlockID.MOVING_BLOCK), true);
+                this.level.setBlock(newBlock, Block.get(BlockID.MOVING_BLOCK), true, true);
 
                 CompoundTag nbt = BlockEntity.getDefaultCompound(newBlock, BlockEntity.MOVING_BLOCK)
                         .putInt("pistonPosX", this.getFloorX())
@@ -252,13 +265,13 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
                 BlockEntity.createBlockEntity(BlockEntity.MOVING_BLOCK, newBlock, nbt);
                 if (this.level.getBlockIdAt(oldPos.getFloorX(), oldPos.getFloorY(), oldPos.getFloorZ()) != BlockID.MOVING_BLOCK) {
-                    this.level.setBlock(oldPos, Block.get(BlockID.AIR));
+                    this.level.setBlock(oldPos, Block.get(BlockID.AIR), true, true);
                 }
             }
         }
 
         if (extending) {
-            this.level.setBlock(this.getSide(direction), this.createHead(this.getDamage()));
+            this.level.setBlock(this.getSide(direction), this.createHead(this.getDamage()), true, true);
         }
 
         BlockEntityPistonArm blockEntity = (BlockEntityPistonArm) this.level.getBlockEntity(this);

@@ -1,11 +1,16 @@
 package cn.nukkit.level.particle;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 import static cn.nukkit.utils.Utils.dynamic;
 
@@ -133,6 +138,32 @@ public abstract class Particle extends Vector3 {
      * @since v766
      */
     public static final int TYPE_EYEBLOSSOM_CLOSE = dynamic(97);
+    /**
+     * @since v944
+     */
+    public static final int TYPE_PAUSE_MOB_GROWTH = dynamic(99);
+    /**
+     * @since v944
+     */
+    public static final int TYPE_RESET_MOB_GROWTH = dynamic(100);
+    /**
+     * @since v975
+     */
+    public static final int TYPE_SULFUR_CUBE = dynamic(101);
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int TYPE_ORANGE_POPLAR_LEAVES = dynamic(102);
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int TYPE_RED_POPLAR_LEAVES = dynamic(103);
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int TYPE_YELLOW_POPLAR_LEAVES = dynamic(104);
+
+    private static final Set<Integer> DEFINED_TYPE_IDS = getDefinedTypeIds();
 
     public Particle() {
         super(0, 0, 0);
@@ -150,12 +181,30 @@ public abstract class Particle extends Vector3 {
         super(x, y, z);
     }
 
+    @Deprecated
     public DataPacket[] encode() {
         Server.mvw("Particle#encode()");
-        return this.mvEncode(ProtocolInfo.CURRENT_PROTOCOL);
+        return this.mvEncode(GameVersion.getLastVersion());
     }
 
+    @Deprecated
     public static int getMultiversionId(int protocol, int particle) {
+        return getMultiversionId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), particle);
+    }
+
+    public static int getMultiversionId(GameVersion gameVersion, int particle) {
+        if (!DEFINED_TYPE_IDS.contains(particle)) {
+            return particle;
+        }
+        int protocol = gameVersion.getProtocol();
+        int id = getStandardMultiversionId(protocol, particle);
+        if (gameVersion.isNetEase() && id > getStandardMultiversionId(protocol, TYPE_SNEEZE)) {
+            id++;
+        }
+        return id;
+    }
+
+    private static int getStandardMultiversionId(int protocol, int particle) {
         int id = particle;
         if (protocol < ProtocolInfo.v1_20_70 && id == 91) {
             id = 18;
@@ -180,10 +229,15 @@ public abstract class Particle extends Vector3 {
         }
     }
 
-    public abstract DataPacket[] mvEncode(int protocol);
+    @Deprecated
+    public DataPacket[] mvEncode(int protocol) {
+        return this.mvEncode(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public abstract DataPacket[] mvEncode(GameVersion gameVersion);
 
     public static Integer getParticleIdByName(String name) {
-        name = name.toUpperCase();
+        name = name.toUpperCase(Locale.ROOT);
 
         try {
             Field field = Particle.class.getField((name.startsWith("TYPE_") ? name : ("TYPE_" + name)));
@@ -201,5 +255,22 @@ public abstract class Particle extends Vector3 {
 
     public static boolean particleExists(String name) {
         return getParticleIdByName(name) != null;
+    }
+
+    private static Set<Integer> getDefinedTypeIds() {
+        Set<Integer> ids = new HashSet<>();
+        for (Field field : Particle.class.getFields()) {
+            if (field.getType() != int.class
+                    || !Modifier.isStatic(field.getModifiers())
+                    || !field.getName().startsWith("TYPE_")) {
+                continue;
+            }
+            try {
+                ids.add(field.getInt(null));
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException("Unable to initialize particle type ids", e);
+            }
+        }
+        return ids;
     }
 }

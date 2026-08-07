@@ -3,18 +3,20 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.Server;
 import cn.nukkit.block.custom.CustomBlockDefinition;
 import cn.nukkit.block.custom.CustomBlockManager;
+import cn.nukkit.block.custom.serializer.CustomBlockDefinitionSerializer;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.types.AuthoritativeMovementMode;
 import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.network.protocol.types.NetworkPermissions;
+import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.log4j.Log4j2;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -22,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+@Log4j2
 @ToString
 public class StartGamePacket extends DataPacket {
 
@@ -32,7 +35,12 @@ public class StartGamePacket extends DataPacket {
     public static final int GAME_PUBLISH_SETTING_FRIENDS_ONLY = 2;
     public static final int GAME_PUBLISH_SETTING_FRIENDS_OF_FRIENDS = 3;
     public static final int GAME_PUBLISH_SETTING_PUBLIC = 4;
-    private static final Logger log = LoggerFactory.getLogger(StartGamePacket.class);
+
+    private static final byte[] EMPTY_UUID;
+
+    static {
+        EMPTY_UUID = Binary.writeUUID(new UUID(0, 0));
+    }
 
     @Override
     public byte pid() {
@@ -70,7 +78,7 @@ public class StartGamePacket extends DataPacket {
     public int spawnY;
     public int spawnZ;
     public boolean hasAchievementsDisabled = true;
-    public boolean worldEditor;
+    public int editorWorldType;
     public int dayCycleStopTime = -1;
     public boolean eduMode = false;
     public int eduEditionOffer = 0;
@@ -109,18 +117,36 @@ public class StartGamePacket extends DataPacket {
     public String worldName;
     public String premiumWorldTemplateId = "";
     public boolean isTrial = false;
+    /**
+     * @deprecated use {@link #authoritativeMovementMode} instead.
+     */
+    @Deprecated
     public boolean isMovementServerAuthoritative;
+    /**
+     * @deprecated since v818. {@link AuthoritativeMovementMode#SERVER_WITH_REWIND} is now the default movement mode.
+     */
+    @SuppressWarnings("dep-ann")
+    public AuthoritativeMovementMode authoritativeMovementMode;
+    public int rewindHistorySize;
     public boolean isServerAuthoritativeBlockBreaking;
+    /**
+     * Server authoritative inventory mode
+     * @since v1.16.100 (protocol 407+)
+     */
+    public boolean isInventoryServerAuthoritative;
     public long currentTick;
     public int enchantmentSeed;
     public Collection<CustomBlockDefinition> blockDefinitions = CustomBlockManager.get().getBlockDefinitions();
-    public String multiplayerCorrelationId = "";
+    public String multiplayerCorrelationId = "00000000-0000-0000-0000-000000000000";
     public boolean isDisablingPersonas;
     public boolean isDisablingCustomSkins;
     /**
      * @since v527
      */
     public CompoundTag playerPropertyData = new CompoundTag("");
+    /**
+     * If true, the server will inform clients that they have the ability to generate visual level chunks outside of player interaction distances.
+     */
     public boolean clientSideGenerationEnabled;
     public byte chatRestrictionLevel;
     public boolean disablePlayerInteractions;
@@ -163,9 +189,32 @@ public class StartGamePacket extends DataPacket {
      * @since v685
      */
     public String scenarioId = "";
+    /**
+     * @since v818
+     */
+    public String ownerIdentifier = "";
+    /**
+     * @since v827
+     * @deprecated v897
+     */
+    @SuppressWarnings("dep-ann")
+    public boolean tickDeathSystemsEnabled;
+    /**
+     * @since v1001
+     */
+    public int serverEditorConnectionPolicy;
+    /**
+     * @since v1001
+     */
+    public boolean allowAnonymousBlockDropsInEditorWorlds;
+    /**
+     * @since v1001
+     */
+    public boolean loggingChat;
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     public boolean b1, b2 , b3;// 0.14.3
@@ -173,6 +222,10 @@ public class StartGamePacket extends DataPacket {
 
     @Override
     public void encode() {
+        if (this.authoritativeMovementMode == null) { //兼容插件
+            this.authoritativeMovementMode = (this.isMovementServerAuthoritative || this.protocol >= ProtocolInfo.v1_21_80) ? AuthoritativeMovementMode.SERVER : AuthoritativeMovementMode.CLIENT;
+        }
+
         if(this.protocol < ProtocolInfo.v_1_0_0){
             this.tryReset();
             if(this.protocol >= ProtocolInfo.v_0_16_0){
@@ -230,12 +283,13 @@ public class StartGamePacket extends DataPacket {
         }
 
         this.reset();
-        this.putEntityUniqueId(this.entityUniqueId);
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.entityRuntimeId);
-        }else{
-            this.putEntityUniqueId(this.entityRuntimeId);
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.encodeLegacyStartGame();
+            return;
         }
+
+        this.putEntityUniqueId(this.entityUniqueId);
+        this.putEntityRuntimeId(this.entityRuntimeId);
         this.putVarInt(this.playerGamemode);
         this.putVector3f(this.x, this.y, this.z);
         this.putLFloat(this.yaw);
@@ -261,7 +315,7 @@ public class StartGamePacket extends DataPacket {
         this.putBlockVector3(this.spawnX, this.spawnY, this.spawnZ);
         this.putBoolean(this.hasAchievementsDisabled);
         if (protocol >= ProtocolInfo.v1_19_10) {
-            this.putBoolean(this.worldEditor);
+            this.putVarInt(this.editorWorldType);
             if (protocol >= ProtocolInfo.v1_19_80) {
                 this.putBoolean(this.createdInEditor);
                 this.putBoolean(this.exportedFromEditor);
@@ -269,7 +323,11 @@ public class StartGamePacket extends DataPacket {
         }
         this.putVarInt(this.dayCycleStopTime);
         if (protocol >= 388) {
-            this.putVarInt(this.eduEditionOffer);
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                this.putUnsignedVarInt(this.eduEditionOffer);
+            } else {
+                this.putVarInt(this.eduEditionOffer);
+            }
         } else {
             this.putBoolean(this.eduMode);
         }
@@ -296,16 +354,7 @@ public class StartGamePacket extends DataPacket {
         }
         this.putBoolean(this.commandsEnabled);
         this.putBoolean(this.isTexturePacksRequired);
-        if (this.protocol >= ProtocolInfo.v1_2_0){
-            this.putGameRules(protocol, gameRules);
-        }else{
-            this.putUnsignedVarInt(this.ruleDatas.length);// TODO :: Fix this
-            for (GameRules rule : this.ruleDatas) {
-                this.putString(rule.toString());
-                this.putBoolean(false); //unknown1
-                this.putBoolean(false); //unknown2
-            }
-        }
+        this.putGameRules(this.gameVersion, gameRules, true);
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (Server.getInstance().enableExperimentMode && !this.experiments.isEmpty()) {
                 this.putLInt(this.experiments.size()); // Experiment count
@@ -327,7 +376,11 @@ public class StartGamePacket extends DataPacket {
             if (protocol < 332) {
                 this.putBoolean(this.trustPlayers);
             }
-            this.putVarInt(this.permissionLevel);
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                this.putByte((byte) this.permissionLevel);
+            } else {
+                this.putVarInt(this.permissionLevel);
+            }
             if (protocol < 332) {
                 this.putVarInt(this.gamePublish);
             }
@@ -376,13 +429,20 @@ public class StartGamePacket extends DataPacket {
                 if (protocol >= ProtocolInfo.v1_19_20) {
                     this.putByte(this.chatRestrictionLevel);
                     this.putBoolean(this.disablePlayerInteractions);
-                    if (protocol >= ProtocolInfo.v1_21_0) {
+                    if (protocol >= ProtocolInfo.v1_21_0 && protocol < ProtocolInfo.v1_26_0) {
                         this.putString(this.serverId);
                         this.putString(this.worldId);
                         this.putString(this.scenarioId);
+                        if (protocol >= ProtocolInfo.v1_21_90) {
+                            this.putString(this.ownerIdentifier); // OwnerId
+                        }
                     }
                 }
             }
+        }
+        if (protocol >= ProtocolInfo.v1_26_30) {
+            this.putVarInt(this.serverEditorConnectionPolicy);
+            this.putBoolean(this.allowAnonymousBlockDropsInEditorWorlds);
         }
         /* Level settings end */
 
@@ -393,14 +453,16 @@ public class StartGamePacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_13_0) {
             if (protocol >= ProtocolInfo.v1_16_100) {
                 if (protocol >= ProtocolInfo.v1_16_210) {
-                    this.putVarInt(this.isMovementServerAuthoritative ? 1 : 0); // 2 - rewind
-                    this.putVarInt(0); // RewindHistorySize
-                    this.putBoolean(this.isServerAuthoritativeBlockBreaking); // isServerAuthoritativeBlockBreaking
+                    if (protocol < ProtocolInfo.v1_21_90) {
+                        this.putVarInt(this.authoritativeMovementMode.ordinal());
+                    }
+                    this.putVarInt(this.rewindHistorySize);
+                    this.putBoolean(this.isServerAuthoritativeBlockBreaking);
                 } else {
-                    this.putVarInt(this.isMovementServerAuthoritative ? 1 : 0); // 2 - rewind
+                    this.putVarInt(this.authoritativeMovementMode.ordinal());
                 }
             } else {
-                this.putBoolean(this.isMovementServerAuthoritative);
+                this.putBoolean(this.authoritativeMovementMode != AuthoritativeMovementMode.CLIENT);
             }
         }
         this.putLLong(this.currentTick);
@@ -414,7 +476,8 @@ public class StartGamePacket extends DataPacket {
                     for (CustomBlockDefinition definition : this.blockDefinitions) {
                         this.putString(definition.identifier());
                         try {
-                            this.put(NBTIO.write(definition.nbt(), ByteOrder.LITTLE_ENDIAN, true));
+                            CompoundTag serializedNbt = CustomBlockDefinitionSerializer.serialize(definition.nbt(), protocol);
+                            this.put(NBTIO.write(serializedNbt, ByteOrder.LITTLE_ENDIAN, true));
                         } catch (Exception e) {
                              log.error("Error while encoding NBT data of CustomBlockDefinition", e);
                         }
@@ -425,14 +488,14 @@ public class StartGamePacket extends DataPacket {
             } else {
                 this.put(GlobalBlockPalette.getCompiledTable(this.protocol));
             }
-            if (protocol >= ProtocolInfo.v1_12_0) {
-                this.put(RuntimeItems.getMapping(protocol).getItemPalette());
+            if (protocol >= ProtocolInfo.v1_12_0 && protocol < ProtocolInfo.v1_21_60) {
+                this.put(RuntimeItems.getMapping(gameVersion).getItemPalette());
             }
             this.putString(this.multiplayerCorrelationId);
             if (protocol == 354 && version != null && version.startsWith("1.11.4")) {
                 this.putBoolean(this.isOnlySpawningV1Villagers);
             } else if (protocol >= ProtocolInfo.v1_16_0) {
-                this.putBoolean(false); // isInventoryServerAuthoritative
+                this.putBoolean(protocol >= ProtocolInfo.v1_16_100 && this.isInventoryServerAuthoritative);
                 if (protocol >= ProtocolInfo.v1_16_230_50) {
                     this.putString(""); // serverEngine
                     if (protocol >= ProtocolInfo.v1_18_0) {
@@ -445,13 +508,28 @@ public class StartGamePacket extends DataPacket {
                         }
                         this.putLLong(0L); // BlockRegistryChecksum
                         if (protocol >= ProtocolInfo.v1_19_0_29) {
-                            this.putUUID(new UUID(0, 0)); // worldTemplateId
+                            //this.putUUID(new UUID(0, 0)); // worldTemplateId
+                            this.put(EMPTY_UUID); // worldTemplateId
                             if (protocol >= ProtocolInfo.v1_19_20) {
                                 this.putBoolean(this.clientSideGenerationEnabled);
                                 if (protocol >= ProtocolInfo.v1_19_80) {
                                     this.putBoolean(this.blockNetworkIdsHashed);
                                     if (protocol >= ProtocolInfo.v1_20_0_23) {
+                                        if (protocol >= ProtocolInfo.v1_21_100 && protocol < ProtocolInfo.v1_21_130_28) {
+                                            this.putBoolean(this.tickDeathSystemsEnabled);
+                                        }
                                         this.putBoolean(this.networkPermissions.isServerAuthSounds());
+                                        if (protocol >= ProtocolInfo.v1_26_30 && protocol < ProtocolInfo.v1_26_40) {
+                                            this.putBoolean(this.loggingChat);
+                                        }
+                                        if (protocol >= ProtocolInfo.v1_26_0) {
+                                            // v924: Server telemetry data
+                                            this.putBoolean(false); // containServerJoinInformation
+                                            this.putString(this.serverId); // serverIdentifier
+                                            this.putString(this.scenarioId); // scenarioIdentifier
+                                            this.putString(this.worldId); // worldIdentifier
+                                            this.putString(this.ownerIdentifier); // ownerIdentifier
+                                        }
                                     }
                                 }
                             }
@@ -460,6 +538,32 @@ public class StartGamePacket extends DataPacket {
                 }
             }
         }
+    }
+
+    private void encodeLegacyStartGame() {
+        this.putEntityUniqueId(this.entityUniqueId);
+        this.putEntityRuntimeId(this.entityRuntimeId);
+        this.putVarInt(this.playerGamemode);
+        this.putVector3f(this.x, this.y, this.z);
+        this.putLFloat(this.pitch);
+        this.putLFloat(this.yaw);
+        this.putVarInt(this.seed);
+        this.putVarInt(this.dimension);
+        this.putVarInt(this.generator);
+        this.putVarInt(this.worldGamemode);
+        this.putVarInt(this.difficulty);
+        this.putBlockVector3(this.spawnX, this.spawnY, this.spawnZ);
+        this.putBoolean(this.hasAchievementsDisabled);
+        this.putVarInt(this.dayCycleStopTime);
+        this.putBoolean(this.eduMode);
+        this.putLFloat(this.rainLevel);
+        this.putLFloat(this.lightningLevel);
+        this.putBoolean(this.commandsEnabled);
+        this.putBoolean(this.isTexturePacksRequired);
+        this.putGameRules(this.gameVersion, this.gameRules, true);
+        this.putString(this.levelId);
+        this.putString(this.worldName);
+        this.putString(this.premiumWorldTemplateId);
     }
 
     @SuppressWarnings("unused")

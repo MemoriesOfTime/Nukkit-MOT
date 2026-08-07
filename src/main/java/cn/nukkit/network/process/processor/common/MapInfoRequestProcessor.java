@@ -50,7 +50,7 @@ public class MapInfoRequestProcessor extends DataPacketProcessor<MapInfoRequestP
                 if (be instanceof BlockEntityItemFrame itemFrame1) {
 
                     if (itemFrame1.getItem() instanceof ItemMap && ((ItemMap) itemFrame1.getItem()).getMapId() == pk.mapId) {
-                        ((ItemMap) itemFrame1.getItem()).sendImage(player);
+                        ((ItemMap) itemFrame1.getItem()).trySendImage(player);
                         break;
                     }
                 }
@@ -69,7 +69,7 @@ public class MapInfoRequestProcessor extends DataPacketProcessor<MapInfoRequestP
                     @Override
                     public void onRun() {
                         finalMapItem.renderMap(player.getLevel(), (player.getFloorX() / 128) << 7, (player.getFloorZ() / 128) << 7, 1);
-                        finalMapItem.sendImage(player);
+                        finalMapItem.trySendImage(player);
                     }
                 });
             }

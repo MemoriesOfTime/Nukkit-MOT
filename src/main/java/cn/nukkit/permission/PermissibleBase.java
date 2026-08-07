@@ -4,7 +4,6 @@ import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.PluginException;
 import cn.nukkit.utils.ServerException;
-import io.netty.util.internal.ConcurrentSet;
 
 import java.util.Map;
 import java.util.Set;
@@ -20,7 +19,7 @@ public class PermissibleBase implements Permissible {
 
     private Permissible parent = null;
 
-    private final Set<PermissionAttachment> attachments = new ConcurrentSet<>();
+    private final Set<PermissionAttachment> attachments = ConcurrentHashMap.newKeySet();
 
     private final Map<String, PermissionAttachmentInfo> permissions = new ConcurrentHashMap<>();
 

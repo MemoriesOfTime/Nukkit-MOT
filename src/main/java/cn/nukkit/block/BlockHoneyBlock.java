@@ -53,4 +53,14 @@ public class BlockHoneyBlock extends BlockSolid {
             }
         }
     }
+
+    @Override
+    public double getFrictionFactor() {
+        return 0.8;
+    }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
+    }
 }

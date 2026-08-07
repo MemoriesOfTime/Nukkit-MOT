@@ -91,6 +91,132 @@ public enum DisconnectFailReason {
     CONN_INACTIVITY_TIMEOUT,
     STALE_CONNECTION_BEING_REPLACED,
     REALMS_SESSION_NOT_FOUND,
-    BAD_PACKET
+    BAD_PACKET,
+    CONN_FAILED_TO_CREATE_OFFER,
+    CONN_FAILED_TO_CREATE_ANSWER,
+    CONN_FAILED_TO_SET_LOCAL_DESCRIPTION,
+    CONN_FAILED_TO_SET_REMOTE_DESCRIPTION,
+    CONN_NEGOTIATION_TIMEOUT_WAITING_FOR_RESPONSE,
+    CONN_NEGOTIATION_TIMEOUT_WAITING_FOR_ACCEPT,
+    CONN_INCOMING_CONNECTION_IGNORED,
+    CONN_SIGNALING_PARSING_FAILURE,
+    CONN_SIGNALING_UNKNOWN_ERROR,
+    CONN_SIGNALING_UNICAST_DELIVERY_FAILED,
+    CONN_SIGNALING_BROADCAST_DELIVERY_FAILED,
+    CONN_SIGNALING_GENERIC_DELIVERY_FAILED,
+    EDITOR_MISMATCH_EDITOR_WORLD,
+    EDITOR_MISMATCH_VANILLA_WORLD,
+    WORLD_TRANSFER_NOT_PRIMARY_CLIENT,
+    SERVER_SHUTDOWN,
+    GAME_SETUP_CANCELLED,
+    GAME_SETUP_FAILED,
+    NO_VENUE,
+    CONN_SIGNALING_SIGN_IN_FAILED,
+    SESSION_ACCESS_DENIED,
+    SERVICE_SIGN_IN_ISSUE,
+    CONN_NO_SIGNALING_CHANNEL,
+    CONN_NOT_LOGGED_IN,
+    CONN_CLIENT_SIGNALING_ERROR,
+    SUB_CLIENT_LOGIN_DISABLED,
+    /**
+     * @since v729
+     */
+    DEEP_LINK_TRYING_TO_OPEN_DEMO_WORLD_WHILE_SIGNED_IN,
+    /**
+     * @since v800
+     */
+    ASYNC_JOIN_TASK_DENIED,
+    /**
+     * @since v818
+     */
+    REALMS_TIMELINE_REQUIRED,
+    /**
+     * @since v818
+     */
+    GUEST_WITHOUT_HOST,
+    /**
+     * @since v818
+     */
+    FAILED_TO_JOIN_EXPERIENCE,
+    /**
+     * @since v827
+     */
+    NETHER_NET_DATA_CHANNEL_CLOSED,
+    /**
+     * @since v859
+     */
+    DISCOVERY_ENVIRONMENT_MISMATCH,
+    /**
+     * @since v859
+     */
+    HOST_WITHOUT_KEYS,
+    /**
+     * @since v924
+     */
+    HOST_SIGNED_OUT,
+    /**
+     * @since v924
+     */
+    SCRIPT_WATCHDOG_EXCEPTION,
+    /**
+     * @since v924
+     */
+    SCRIPT_MEMORY_LIMIT_EXCEEDED,
+    /**
+     * @since v924
+     */
+    STORAGE_LOW_DURING_GAMEPLAY,
+    /**
+     * @since v924
+     */
+    STORAGE_FULL_DURING_GAMEPLAY,
+    /**
+     * @since v924
+     */
+    LEVEL_STORAGE_CORRUPTION,
+    /**
+     * @since v924
+     */
+    EDITION_MISMATCH_VANILLA_TO_EDU,
+    /**
+     * @since v924
+     */
+    EDITION_MISMATCH_EDU_TO_VANILLA,
+    /**
+     * @since v924
+     */
+    EDITOR_MISMATCH_EDITOR_TO_VANILLA,
+    /**
+     * @since v924
+     */
+    EDITOR_MISMATCH_VANILLA_TO_EDITOR,
+    /**
+     * @since v924
+     */
+    DENY_LISTED,
+    /**
+     * @since v975
+     */
+    NONCE_MISSING,
+    /**
+     * @since v975
+     */
+    NONCE_NOT_FOUND,
+    /**
+     * @since v975
+     */
+    NONCE_EXPIRED,
+    /**
+     * @since v975
+     */
+    NONCE_NOT_VALID,
+    /**
+     * @since v1001
+     */
+    HOST_DISCONNECTED,
+    /**
+     * @since v1001
+     */
+    EDITOR_JOIN_INTENT_POLICY_FAILURE,
 }
 

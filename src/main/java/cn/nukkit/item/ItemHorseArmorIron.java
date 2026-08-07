@@ -3,11 +3,11 @@ package cn.nukkit.item;
 public class ItemHorseArmorIron extends Item {
 
     public ItemHorseArmorIron() {
-        this(0, 0);
+        this(0, 1);
     }
 
     public ItemHorseArmorIron(Integer meta) {
-        this(meta, 0);
+        this(meta, 1);
     }
 
     public ItemHorseArmorIron(Integer meta, int count) {
@@ -17,5 +17,15 @@ public class ItemHorseArmorIron extends Item {
     @Override
     public int getMaxStackSize() {
         return 1;
+    }
+
+    @Override
+    public boolean isHorseArmor() {
+        return true;
+    }
+
+    @Override
+    public int getArmorPoints() {
+        return 5;
     }
 }

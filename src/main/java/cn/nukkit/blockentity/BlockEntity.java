@@ -11,8 +11,10 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.ChunkException;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Constructor;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author MagicDroidX
@@ -40,6 +42,7 @@ public abstract class BlockEntity extends Position {
     public static final String PISTON_ARM = "PistonArm";
     public static final String MOVING_BLOCK = "MovingBlock";
     public static final String COMPARATOR = "Comparator";
+    public static final String COMMAND_BLOCK = "CommandBlock";
     public static final String HOPPER = "Hopper";
     public static final String BED = "Bed";
     public static final String JUKEBOX = "Jukebox";
@@ -57,6 +60,16 @@ public abstract class BlockEntity extends Position {
     public static final String TARGET = "Target";
     public static final String BRUSHABLE_BLOCK = "BrushableBlock";
     public static final String CONDUIT = "Conduit";
+    public static final String HANGING_SIGN = "HangingSign";
+    public static final String POTENT_SULFUR = "PotentSulfur";
+    public static final String CHISELED_BOOKSHELF = "ChiseledBookshelf";
+    public static final String CRAFTER = "Crafter";
+    public static final String SHELF = "Shelf";
+    public static final String CREAKING_HEART = "CreakingHeart";
+    public static final String COPPER_GOLEM_STATUE = "CopperGolemStatue";
+    public static final String SCULK_SENSOR = "SculkSensor";
+    public static final String CALIBRATED_SCULK_SENSOR = "CalibratedSculkSensor";
+    public static final String SCULK_SHRIEKER = "SculkShrieker";
 
     // Not a vanilla block entity
     public static final String PERSISTENT_CONTAINER = "PersistentContainer";
@@ -70,6 +83,8 @@ public abstract class BlockEntity extends Position {
     public long id;
 
     public boolean movable;
+
+    public final AtomicBoolean scheduledForBlockEntityUpdate = new AtomicBoolean(false);
 
     public boolean closed = false;
     public CompoundTag namedTag;
@@ -108,13 +123,8 @@ public abstract class BlockEntity extends Position {
     public static BlockEntity createBlockEntity(String type, FullChunk chunk, CompoundTag nbt, Object... args) {
         BlockEntity blockEntity = null;
 
-        if (knownBlockEntities.containsKey(type)) {
-            Class<? extends BlockEntity> clazz = knownBlockEntities.get(type);
-
-            if (clazz == null) {
-                return null;
-            }
-
+        Class<? extends BlockEntity> clazz = knownBlockEntities.get(type);
+        if (clazz != null) {
             for (Constructor<?> constructor : clazz.getConstructors()) {
                 if (blockEntity != null) {
                     break;
@@ -170,6 +180,7 @@ public abstract class BlockEntity extends Position {
         this.namedTag.putBoolean("isMovable", this.movable);
     }
 
+    @Nullable
     public CompoundTag getCleanedNBT() {
         this.saveNBT();
         CompoundTag tag = this.namedTag.clone();
@@ -248,9 +259,21 @@ public abstract class BlockEntity extends Position {
         blockEntity.getPersistentDataContainer().setStorage(this.getPersistentDataContainer().getStorage().clone());
     }
 
+    /**
+     * Instance identity. A {@link BlockEntity} is uniquely identified by its runtime instance, not
+     * by class + coordinates — otherwise a tile removed and recreated at the same position would be
+     * treated as the same object by collections (e.g. the sculk vibration listener set), routing
+     * callbacks to the stale, closed instance. Pair with {@link #hashCode()} (identity-based) so
+     * every collection membership check matches actual lifecycle.
+     */
     @Override
     public boolean equals(Object obj) {
-        return obj instanceof BlockEntity && this.getClass().equals(obj.getClass()) && super.equals(obj);
+        return this == obj;
+    }
+
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
     }
 
     public boolean canSaveToStorage() {

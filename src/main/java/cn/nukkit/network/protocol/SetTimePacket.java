@@ -27,6 +27,7 @@ public class SetTimePacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -49,5 +50,8 @@ public class SetTimePacket extends DataPacket {
 
         this.reset();
         this.putVarInt(this.time);
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.putBoolean(true); //started
+        }
     }
 }

@@ -13,6 +13,7 @@ public class CraftCreativeAction implements ItemStackRequestAction {
      * creative item network IDs sent in the CreativeContent packet.
      */
     int creativeItemNetworkId;
+    int numberOfRequestedCrafts;
 
     @Override
     public ItemStackRequestActionType getType() {

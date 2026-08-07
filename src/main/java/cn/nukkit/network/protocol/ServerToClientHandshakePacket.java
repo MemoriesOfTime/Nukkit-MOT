@@ -16,6 +16,7 @@ public class ServerToClientHandshakePacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override

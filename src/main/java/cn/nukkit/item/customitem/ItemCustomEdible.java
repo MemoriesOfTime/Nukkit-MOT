@@ -1,5 +1,6 @@
 package cn.nukkit.item.customitem;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.item.ItemEdible;
 import cn.nukkit.item.ItemID;
@@ -46,12 +47,17 @@ public abstract class ItemCustomEdible extends ItemEdible implements CustomItem 
     }
 
     @Override
+    public boolean canBePutInOffhandSlot() {
+        return CustomItem.isAllowedInOffHand(this);
+    }
+
+    @Override
     public String getNamespaceId() {
         return id;
     }
 
     @Override
-    public String getNamespaceId(int protocolId) {
+    public String getNamespaceId(GameVersion protocolId) {
         return this.getNamespaceId();
     }
 

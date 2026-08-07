@@ -1,0 +1,43 @@
+package cn.nukkit.network.protocol.v113;
+
+import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
+public class AddHangingEntityPacket_v113 extends DataPacket_v113 {
+    public static final byte NETWORK_ID = ProtocolInfo_v113.ADD_HANGING_ENTITY_PACKET;
+
+    @Override
+    public byte pid() {
+        if(this.protocol < ProtocolInfo.v_1_0_0){
+            return ProtocolInfo.oldProtocolInfo.get(this.protocol).get(this.getClass());
+        }
+        return NETWORK_ID;
+    }
+
+    public long entityUniqueId;
+    public long entityRuntimeId;
+    public int x;
+    public int y;
+    public int z;
+    public int unknown;
+
+    @Override
+    public void decode() {
+        this.entityUniqueId = this.getEntityUniqueId();
+        this.entityRuntimeId = this.getEntityRuntimeId();
+        BlockVector3 v3 = this.getBlockVector3();
+        this.x = v3.x;
+        this.y = v3.y;
+        this.z = v3.z;
+        this.unknown = this.getVarInt();
+    }
+
+    @Override
+    public void encode() {
+        this.reset();
+        this.putEntityUniqueId(this.entityUniqueId);
+        this.putEntityRuntimeId(this.entityRuntimeId);
+        this.putBlockVector3(this.x, this.y, this.z);
+        this.putVarInt(this.unknown);
+    }
+}

@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.properties.VanillaProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemID;
@@ -8,6 +9,7 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/12/8 by xtypr.
@@ -73,10 +75,25 @@ public class BlockPumpkin extends BlockSolidMeta implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setBlockFace(player != null ? player.getDirection().getOpposite() : BlockFace.SOUTH);
         this.getLevel().setBlock(block, this, true, true);
         return true;
+    }
+
+    @Override
+    public boolean onBreak(Item item) {
+        for (BlockFace face : BlockFace.Plane.HORIZONTAL) {
+            Block block = this.getSide(face);
+            if (block instanceof BlockStemPumpkin stemPumpkin) {
+                if (stemPumpkin.getBlockFace() == face.getOpposite()) {
+                    stemPumpkin.setPropertyValue(VanillaProperties.FACING_DIRECTION, BlockFace.DOWN);
+                    this.getLevel().setBlock(stemPumpkin, stemPumpkin, true, true);
+                }
+            }
+        }
+
+        return super.onBreak(item);
     }
 
     @Override

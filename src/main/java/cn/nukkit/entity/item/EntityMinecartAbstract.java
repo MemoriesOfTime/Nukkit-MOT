@@ -23,7 +23,6 @@ import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.MinecartType;
 import cn.nukkit.utils.Rail;
 import cn.nukkit.utils.Rail.Orientation;
@@ -119,129 +118,109 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(40);
         super.initEntity();
 
+        this.setHealth(40);
         prepareDataProperty();
     }
 
     @Override
-    public boolean onUpdate(int currentTick) {
-        if (this.closed) {
-            return false;
+    public boolean entityBaseTick(int tickDiff) {
+        // The damage token
+        if (getHealth() < 20) {
+            setHealth(getHealth() + 1);
         }
 
-        if (!this.isAlive()) {
-            this.despawnFromAll();
-            this.close();
-            return false;
+        // Entity variables
+        lastX = x;
+        lastY = y;
+        lastZ = z;
+        motionY -= 0.03999999910593033D;
+        int dx = MathHelper.floor(x);
+        int dy = MathHelper.floor(y);
+        int dz = MathHelper.floor(z);
+
+        // Some hack to check rails
+        if (Rail.isRailBlock(level.getBlockIdAt(dx, dy - 1, dz))) {
+            --dy;
         }
 
-        int tickDiff = currentTick - this.lastUpdate;
+        Block block = level.getBlock(new Vector3(dx, dy, dz));
 
-        if (tickDiff <= 0) {
-            return false;
+        // Ensure that the block is a rail
+        if (Rail.isRailBlock(block)) {
+            processMovement(dx, dy, dz, (BlockRail) block);
+            // Activate the minecart/TNT
+            if (block instanceof BlockRailActivator && ((BlockRailActivator) block).isActive()) {
+                activate(dx, dy, dz, (block.getDamage() & 0x8) != 0);
+            }
+        } else {
+            setFalling();
+        }
+        checkBlockCollision();
+
+        // Minecart head
+        pitch = 0;
+        double diffX = this.lastX - this.x;
+        double diffZ = this.lastZ - this.z;
+        double yawToChange = yaw;
+        if (diffX * diffX + diffZ * diffZ > 0.001D) {
+            yawToChange = (FastMath.atan2(diffZ, diffX) * 180 / Math.PI);
         }
 
-        this.lastUpdate = currentTick;
+        // Reverse yaw if yaw is below 0
+        if (yawToChange < 0) {
+            // -90-(-90)-(-90) = 90
+            yawToChange -= yawToChange - yawToChange;
+        }
 
-        if (isAlive()) {
-            super.onUpdate(currentTick);
+        setRotation(yawToChange, pitch);
 
-            // The damage token
-            if (getHealth() < 20) {
-                setHealth(getHealth() + 1);
-            }
+        Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
+        Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
 
-            // Entity variables
-            lastX = x;
-            lastY = y;
-            lastZ = z;
-            motionY -= 0.03999999910593033D;
-            int dx = MathHelper.floor(x);
-            int dy = MathHelper.floor(y);
-            int dz = MathHelper.floor(z);
+        this.getServer().getPluginManager().callEvent(new VehicleUpdateEvent(this));
 
-            // Some hack to check rails
-            if (Rail.isRailBlock(level.getBlockIdAt(dx, dy - 1, dz))) {
-                --dy;
-            }
+        if (!from.equals(to)) {
+            this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
+        }
 
-            Block block = level.getBlock(new Vector3(dx, dy, dz));
-
-            // Ensure that the block is a rail
-            if (Rail.isRailBlock(block)) {
-                processMovement(dx, dy, dz, (BlockRail) block);
-                // Activate the minecart/TNT
-                if (block instanceof BlockRailActivator && ((BlockRailActivator) block).isActive()) {
-                    activate(dx, dy, dz, (block.getDamage() & 0x8) != 0);
-                }
-            } else {
-                setFalling();
-            }
-            checkBlockCollision();
-
-            // Minecart head
-            pitch = 0;
-            double diffX = this.lastX - this.x;
-            double diffZ = this.lastZ - this.z;
-            double yawToChange = yaw;
-            if (diffX * diffX + diffZ * diffZ > 0.001D) {
-                yawToChange = (FastMath.atan2(diffZ, diffX) * 180 / Math.PI);
-            }
-
-            // Reverse yaw if yaw is below 0
-            if (yawToChange < 0) {
-                // -90-(-90)-(-90) = 90
-                yawToChange -= yawToChange - yawToChange;
-            }
-
-            setRotation(yawToChange, pitch);
-
-            Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
-            Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
-
-            this.getServer().getPluginManager().callEvent(new VehicleUpdateEvent(this));
-
-            if (!from.equals(to)) {
-                this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
-            }
-
-            // Collisions
+        // Collisions
+        if (this instanceof InventoryHolder) {
             for (cn.nukkit.entity.Entity entity : level.getNearbyEntities(boundingBox.grow(0.2D, 0, 0.2D), this)) {
-                if (!passengers.contains(entity) && entity instanceof EntityMinecartAbstract) {
+                if (entity instanceof EntityMinecartAbstract && !passengers.contains(entity)) {
                     entity.applyEntityCollision(this);
                 }
             }
-
-            Iterator<cn.nukkit.entity.Entity> linkedIterator = this.passengers.iterator();
-
-            while (linkedIterator.hasNext()) {
-                cn.nukkit.entity.Entity linked = linkedIterator.next();
-
-                if (!linked.isAlive()) {
-                    if (linked.riding == this) {
-                        linked.riding = null;
-                    }
-
-                    linkedIterator.remove();
-                }
-            }
-
-            //使矿车通知漏斗更新而不是漏斗来检测矿车
-            //通常情况下，矿车的数量远远少于漏斗，所以说此举能大福提高性能
-            if (this instanceof InventoryHolder holder) {
-                checkPickupHopper(new SimpleAxisAlignedBB(this.x, this.y - 1, this.z, this.x, this.y, this.z), holder);
-                //漏斗矿车会自行拉取物品!
-                if (!(this instanceof EntityMinecartHopper)) {
-                    checkPushHopper(new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x, this.y + 2, this.z), holder);
-                }
-            }
-
-            // No need to onGround or Motion diff! This always have an update
-            return true;
         }
 
-        return false;
+        Iterator<cn.nukkit.entity.Entity> linkedIterator = this.passengers.iterator();
+
+        while (linkedIterator.hasNext()) {
+            cn.nukkit.entity.Entity linked = linkedIterator.next();
+
+            if (!linked.isAlive()) {
+                if (linked.riding == this) {
+                    linked.riding = null;
+                }
+
+                linkedIterator.remove();
+            }
+        }
+
+        //使矿车通知漏斗更新而不是漏斗来检测矿车
+        //通常情况下，矿车的数量远远少于漏斗，所以说此举能大福提高性能
+        if (this instanceof InventoryHolder holder) {
+            checkPickupHopper(new SimpleAxisAlignedBB(this.x, this.y - 1, this.z, this.x, this.y, this.z), holder);
+            //漏斗矿车会自行拉取物品!
+            if (!(this instanceof EntityMinecartHopper)) {
+                checkPushHopper(new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x, this.y + 2, this.z), holder);
+            }
+        }
+
+        // We call super here after movement code so block collision checks use up to date position
+        return super.entityBaseTick(tickDiff) || this.getRollingAmplitude() > 0 || !(this.motionX == 0 && this.motionY == 0 && this.motionZ == 0);
     }
 
     @Override
@@ -335,8 +314,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 motiveZ *= 1 + entityCollisionReduction;
                 motiveX *= 0.5D;
                 motiveZ *= 0.5D;
-                if (entity instanceof EntityMinecartAbstract) {
-                    EntityMinecartAbstract mine = (EntityMinecartAbstract) entity;
+                if (entity instanceof EntityMinecartAbstract mine) {
                     double desinityX = mine.x - x;
                     double desinityZ = mine.z - z;
                     Vector3 vector = new Vector3(desinityX, 0, desinityZ).normalize();
@@ -421,6 +399,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                     var be = this.level.getBlockEntity(tmpBV);
                     if (be instanceof BlockEntityHopper blockEntityHopper) {
                         blockEntityHopper.setMinecartInvPushTo(holder);
+                        blockEntityHopper.scheduleUpdate();
                         return true;
                     }
                 }
@@ -450,6 +429,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                     var be = this.level.getBlockEntity(tmpBV);
                     if (be instanceof BlockEntityHopper blockEntityHopper) {
                         blockEntityHopper.setMinecartInvPickupFrom(holder);
+                        blockEntityHopper.scheduleUpdate();
                         return true;
                     }
                 }
@@ -498,7 +478,9 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             isSlowed = !block.isActive();
         }
 
-        switch (Orientation.byMetadata(block.getRealMeta())) {
+        int railMeta = normalizeRailMeta(block.getRealMeta());
+
+        switch (Orientation.byMetadata(railMeta)) {
             case ASCENDING_NORTH:
                 motionX -= 0.0078125D;
                 y += 1;
@@ -517,7 +499,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 break;
         }
 
-        int[][] facing = matrix[block.getRealMeta()];
+        int[][] facing = matrix[railMeta];
         double facing1 = facing[1][0] - facing[0][0];
         double facing2 = facing[1][2] - facing[0][2];
         double speedOnTurns = Math.sqrt(facing1 * facing1 + facing2 * facing2);
@@ -687,7 +669,8 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         Block block = level.getBlock(new Vector3(checkX, checkY, checkZ));
 
         if (Rail.isRailBlock(block)) {
-            int[][] facing = matrix[((BlockRail) block).getRealMeta()];
+            int railMeta = normalizeRailMeta(((BlockRail) block).getRealMeta());
+            int[][] facing = matrix[railMeta];
             double rail;
             // Genisys mistake (Doesn't check surrounding more exactly)
             double nextOne = (double) checkX + 0.5D + (double) facing[0][0] * 0.5D;
@@ -728,6 +711,10 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         }
     }
 
+    static int normalizeRailMeta(int railMeta) {
+        return Orientation.byMetadata(railMeta).metadata();
+    }
+
     @Override
     public void onPlayerInput(Player player, double strafe, double forward) {
         this.setCurrentSpeed(forward);
@@ -749,32 +736,62 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             if (namedTag.getBoolean("CustomDisplayTile")) {
                 int display = namedTag.getInt("DisplayTile");
                 int offSet = namedTag.getInt("DisplayOffset");
-                setDataProperty( new ByteEntityData(DATA_HAS_DISPLAY, 1));
-                setDataProperty( new IntEntityData(DATA_DISPLAY_ITEM, display));
-                setDataProperty( new IntEntityData(DATA_DISPLAY_OFFSET, offSet));
+                if (blockInside == null && display != 0) {
+                    blockInside = Block.get(display & 0xFFFF, (display >> 16) & 0xFFFF);
+                }
+                setDataProperty(new ByteEntityData(DATA_HAS_DISPLAY, 1));
+                setDataProperty(new IntEntityData(DATA_DISPLAY_ITEM, display));
+                setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, offSet));
             }
         } else {
+            if (blockInside == null) {
+                Block defaultBlock = getDefaultDisplayBlock();
+                if (defaultBlock != null && defaultBlock.isNormalBlock()) {
+                    blockInside = defaultBlock;
+                }
+            }
             int display = blockInside == null ? 0
                     : blockInside.getId()
                     | blockInside.getDamage() << 16;
             if (display == 0) {
-                setDataProperty( new ByteEntityData(DATA_HAS_DISPLAY, 0));
+                setDataProperty(new ByteEntityData(DATA_HAS_DISPLAY, 0));
                 return;
             }
-            setDataProperty( new ByteEntityData(DATA_HAS_DISPLAY, 1));
-            setDataProperty( new IntEntityData(DATA_DISPLAY_ITEM, display));
-            setDataProperty( new IntEntityData(DATA_DISPLAY_OFFSET, 6));
+            setDataProperty(new ByteEntityData(DATA_HAS_DISPLAY, 1));
+            setDataProperty(new IntEntityData(DATA_DISPLAY_ITEM, display));
+            setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, 6));
         }
     }
 
+    /**
+     * The block this minecart type shows by default when freshly spawned (no
+     * persisted {@code CustomDisplayTile} NBT and no plugin override). Returns
+     * {@code null} for plain minecarts. Called from {@link #prepareDataProperty()},
+     * which runs during {@link #initEntity()} — before the subclass constructor
+     * body — so this hook is the only chance to set the default display block
+     * before the spawn metadata is computed.
+     *
+     * @return the default display block, or {@code null} for none
+     */
+    protected Block getDefaultDisplayBlock() {
+        return null;
+    }
+
     private void saveEntityData() {
-        boolean hasDisplay = super.getDataPropertyByte(ProtocolInfo.CURRENT_PROTOCOL, DATA_HAS_DISPLAY) == 1
+        if (blockInside == null && super.getDataPropertyByte((ProtocolInfo.CURRENT_PROTOCOL, DATA_HAS_DISPLAY) == 1) {
+            int display = getDataPropertyInt(DATA_DISPLAY_ITEM);
+            if (display != 0) {
+                blockInside = Block.get(display & 0xFFFF, (display >> 16) & 0xFFFF);
+            }
+        }
+        boolean hasDisplay = super.getDataPropertyByte(DATA_HAS_DISPLAY) == 1
                 || blockInside != null;
         int display;
         int offSet;
         namedTag.putBoolean("CustomDisplayTile", hasDisplay);
         if (hasDisplay) {
-            display = blockInside.getId()
+            display = blockInside == null ? 0
+                    : blockInside.getId()
                     | blockInside.getDamage() << 16;
             offSet = getDataPropertyInt(ProtocolInfo.CURRENT_PROTOCOL, DATA_DISPLAY_OFFSET);
             namedTag.putInt("DisplayTile", display);
@@ -842,7 +859,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @param offset The offset
      */
     public void setDisplayBlockOffset(int offset) {
-        setDataProperty( new IntEntityData(DATA_DISPLAY_OFFSET, offset));
+        setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, offset));
     }
 
     /**

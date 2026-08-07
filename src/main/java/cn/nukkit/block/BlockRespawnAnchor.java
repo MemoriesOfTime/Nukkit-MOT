@@ -135,6 +135,7 @@ public class BlockRespawnAnchor extends BlockMeta {
             case 0 -> 0;
             case 1 -> 3;
             case 2 -> 7;
+            case 3 -> 11;
             default -> 15;
         };
     }
@@ -179,5 +180,21 @@ public class BlockRespawnAnchor extends BlockMeta {
             return new Item[]{this.toItem()};
         }
         return Item.EMPTY_ARRAY;
+    }
+
+    @Override
+    public boolean hasComparatorInputOverride() {
+        return true;
+    }
+
+    @Override
+    public int getComparatorInputOverride() {
+        return switch (this.getDamage()) {
+            case 1 -> 3;
+            case 2 -> 7;
+            case 3 -> 11;
+            case 4 -> 15;
+            default -> 0;
+        };
     }
 }

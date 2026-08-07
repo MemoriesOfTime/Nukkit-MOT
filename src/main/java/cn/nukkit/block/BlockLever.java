@@ -6,9 +6,12 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.sound.LeverSound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Nukkit Project Team
@@ -69,10 +72,11 @@ public class BlockLever extends BlockFlowable implements Faceable {
 
         this.getLevel().setBlock(this, this, false, true);
         this.getLevel().addSound(new LeverSound(this, this.isPowerOn()));
+        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player != null ? player : this, this.add(0.5, 0.5, 0.5), this.isPowerOn() ? VibrationType.BLOCK_ACTIVATE : VibrationType.BLOCK_DEACTIVATE));
 
         LeverOrientation orientation = LeverOrientation.byMetadata(this.isPowerOn() ? this.getDamage() ^ 0x08 : this.getDamage());
         BlockFace face = orientation.getFacing();
-        level.updateAroundRedstone(this.getLocation(), null);
+        this.level.updateAroundRedstone(this.getLocation(), null);
         this.level.updateAroundRedstone(this.getLocation().getSide(face.getOpposite()), isPowerOn() ? face : null);
         return true;
     }
@@ -90,7 +94,7 @@ public class BlockLever extends BlockFlowable implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         LeverOrientation faces = LeverOrientation.forFacings(face, player.getHorizontalFacing());
         this.setDamage(faces.getMetadata());
         if (!isSupportValid(this.getSide(faces.facing.getOpposite()))) {
@@ -101,12 +105,19 @@ public class BlockLever extends BlockFlowable implements Faceable {
 
     @Override
     public boolean onBreak(Item item) {
-        this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
+        if (!super.onBreak(item)) {
+            return false;
+        }
 
         if (isPowerOn()) {
-            BlockFace face = LeverOrientation.byMetadata(this.getDamage() ^ 0x08).getFacing();
-            this.level.updateAround(this.getLocation().getSide(face.getOpposite()));
+            this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 15, 0));
+
+            LeverOrientation orientation = LeverOrientation.byMetadata(this.getDamage() ^ 0x08);
+            BlockFace face = orientation.getFacing();
+            this.level.updateAroundRedstone(this, null);
+            this.level.updateAroundRedstone(this.getSideVec(face.getOpposite()), face);
         }
+
         return true;
     }
 

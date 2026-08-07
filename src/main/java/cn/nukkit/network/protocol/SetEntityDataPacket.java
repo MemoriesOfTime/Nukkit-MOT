@@ -2,7 +2,6 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.entity.data.EntityMetadata;
 import cn.nukkit.network.protocol.types.PropertySyncData;
-import cn.nukkit.network.protocol.v113.ProtocolInfoV113;
 import cn.nukkit.utils.Binary;
 import lombok.ToString;
 
@@ -37,6 +36,7 @@ public class SetEntityDataPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -61,12 +61,12 @@ public class SetEntityDataPacket extends DataPacket {
             return;
         }
         this.reset();
-        if (this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.eid);
-        }else{
+        if (protocol < ProtocolInfo.v1_2_0) {
             this.putEntityUniqueId(this.eid);
+        } else {
+            this.putEntityRuntimeId(this.eid);
         }
-        this.put(Binary.writeMetadata(protocol, this.metadata));
+        this.put(Binary.writeMetadata(gameVersion, this.metadata));
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (protocol >= ProtocolInfo.v1_19_40) {
                 this.putUnsignedVarInt(this.syncedProperties.intProperties().length);

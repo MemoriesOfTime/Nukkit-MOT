@@ -10,6 +10,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
@@ -39,7 +40,7 @@ public class BlockSmokerLit extends BlockFurnaceBurning {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(Block.FACES2534[player != null ? player.getDirection().getHorizontalIndex() : 0]);
         this.getLevel().setBlock(block, this, true, true);
         CompoundTag nbt = new CompoundTag()
@@ -72,7 +73,7 @@ public class BlockSmokerLit extends BlockFurnaceBurning {
                 return false;
             }
 
-            if (smoker.namedTag.contains("Lock") && smoker.namedTag.get("Lock") instanceof StringTag) {
+            if (smoker.namedTag.get("Lock") instanceof StringTag) {
                 if (!smoker.namedTag.getString("Lock").equals(item.getCustomName())) {
                     return true;
                 }

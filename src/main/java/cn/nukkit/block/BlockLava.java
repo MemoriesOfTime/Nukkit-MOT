@@ -6,15 +6,13 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityPrimedTNT;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.event.entity.EntityCombustByBlockEvent;
-import cn.nukkit.event.entity.EntityDamageByBlockEvent;
-import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
-import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
@@ -61,16 +59,12 @@ public class BlockLava extends BlockLiquid {
             entity.setOnFire(ev.getDuration());
         }
 
-        if (!entity.hasEffect(Effect.FIRE_RESISTANCE)) {
-            entity.attack(new EntityDamageByBlockEvent(this, entity, DamageCause.LAVA, 4));
-        }
-
         super.onEntityCollide(entity);
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        boolean ret = this.getLevel().setBlock(this, this, true, false);
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
+        boolean ret = this.getLevel().setBlock(this, this, true, true);
         this.getLevel().scheduleUpdate(this, this.tickRate());
 
         return ret;
@@ -199,5 +193,10 @@ public class BlockLava extends BlockLiquid {
         if (!(entity instanceof EntityPrimedTNT)) {
             super.addVelocityToEntity(entity, vector);
         }
+    }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
     }
 }

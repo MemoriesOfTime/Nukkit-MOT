@@ -2,26 +2,38 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
 import cn.nukkit.entity.data.Skin;
+import cn.nukkit.network.encryption.EncryptionUtils;
+import cn.nukkit.network.protocol.types.auth.AuthPayload;
+import cn.nukkit.network.protocol.types.auth.AuthType;
+import cn.nukkit.network.protocol.types.auth.CertificateChainPayload;
+import cn.nukkit.network.protocol.types.auth.TokenPayload;
 import cn.nukkit.utils.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import lombok.ToString;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.JwtContext;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-
-import static cn.nukkit.utils.ClientChainData.decodeToken;
 
 @ToString
 public class LoginPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.LOGIN_PACKET;
 
+    /**
+     * The JWT payload signed by Minecraft's authentication server.
+     * Assuming this is a valid signature, it can be trusted to contain the player's identity and other information.
+     */
+    private AuthPayload authPayload;
+
     public String username;
     private int protocol_;
     public UUID clientUUID;
+    public String minecraftId;
     public long clientId;
     public String logindata;
     public Skin skin;
@@ -132,7 +144,7 @@ public class LoginPacket extends DataPacket {
             decodeSkinData_old();
             return;
         }
-
+        this.protocol_ = this.getInt();
         if (this.protocol_ > ProtocolInfo.CURRENT_PROTOCOL + 1000) {
             int ofs = this.getOffset();
             this.setOffset(1);
@@ -151,6 +163,10 @@ public class LoginPacket extends DataPacket {
             this.protocol_ = getInt();
         }
         if (ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol_)) { // Avoid errors with unsupported versions
+            // v1.1 login format: protocol(int) + gameEdition(byte) + payload(byteArray)
+            if (this.protocol_ >= ProtocolInfo.v1_1_0 && this.protocol_ < ProtocolInfo.v1_2_0) {
+                this.getByte(); // gameEdition
+            }
             this.setBuffer(this.getByteArray(), 0);
             decodeChainData();
             decodeSkinData();
@@ -159,10 +175,40 @@ public class LoginPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.encodeUnsupported();
     }
 
     public int getProtocol() {
         return protocol_;
+    }
+
+    protected AuthPayload readAuthJwt(String authJwt) {
+        Map<String, Object> map = GSON.fromJson(authJwt, new MapTypeToken());
+
+        AuthType authType = AuthType.UNKNOWN;
+        if (map.containsKey("AuthenticationType")) { // >= v1.21.90
+            int authTypeOrdinal = ((Number) map.get("AuthenticationType")).intValue();
+            if (authTypeOrdinal < 0 || authTypeOrdinal >= AuthType.values().length - 1) {
+                throw new IllegalArgumentException("Invalid AuthenticationType ordinal: " + authTypeOrdinal);
+            }
+            authType = AuthType.values()[authTypeOrdinal + 1];
+        }
+
+        if (map.get("Token") instanceof String token && !token.isBlank()) {
+            return new TokenPayload(token, authType);
+        } else {
+            String certificate = (String) map.get("Certificate");
+            if (certificate != null && !certificate.isBlank()) {
+                map = GSON.fromJson(certificate, new MapTypeToken());
+            }
+
+            List<String> chains = (List<String>) map.get("chain");
+            if (chains == null || chains.isEmpty()) {
+                throw new IllegalArgumentException("Invalid Certificate chain in JWT");
+            }
+
+            return new CertificateChainPayload(chains, authType);
+        }
     }
 
     private void decodeChainData_old() {
@@ -233,22 +279,46 @@ public class LoginPacket extends DataPacket {
 
     private void decodeChainData() {
         int size = this.getLInt();
-        if (size > 52428800) {
+        if (size > 3145728) {
             throw new IllegalArgumentException("The chain data is too big: " + size);
         }
 
-        String data = new String(this.get(size), StandardCharsets.UTF_8);
+        this.authPayload = this.readAuthJwt(new String(this.get(size), StandardCharsets.UTF_8));
 
-        Map<String, List<String>> map = GSON.fromJson(data, new MapTypeToken().getType());
-        if (map.isEmpty() || !map.containsKey("chain") || map.get("chain").isEmpty()) return;
-        for (String c : map.get("chain")) {
-            JsonObject chainMap = decodeToken(c);
-            if (chainMap == null) continue;
-            if (chainMap.has("extraData")) {
-                JsonObject extra = chainMap.get("extraData").getAsJsonObject();
-                if (extra.has("displayName")) this.username = extra.get("displayName").getAsString();
-                if (extra.has("identity")) this.clientUUID = UUID.fromString(extra.get("identity").getAsString());
+        try {
+            // 不要在这里验证数据，只读取必要的字段
+            if (this.authPayload instanceof CertificateChainPayload chainPayload) {
+                List<String> chain = chainPayload.getChain();
+                if (chain == null || chain.isEmpty()) {
+                    throw new IllegalStateException("Certificate chain is empty");
+                }
+
+                for (String c : chain) {
+                    JsonObject chainMap = ClientChainData.decodeToken(c);
+                    if (chainMap == null) continue;
+                    if (chainMap.has("extraData")) {
+                        JsonObject extra = chainMap.get("extraData").getAsJsonObject();
+                        if (extra.has("displayName")) this.username = extra.get("displayName").getAsString();
+                        if (extra.has("identity")) this.clientUUID = UUID.fromString(extra.get("identity").getAsString());
+                    }
+                }
+            } else if (this.authPayload instanceof TokenPayload tokenPayload) {
+                String token = tokenPayload.getToken();
+                if (token == null || token.isEmpty()) {
+                    throw new IllegalStateException("Token is empty");
+                }
+
+                JwtContext context = EncryptionUtils.OFFLINE_CONSUMER.process(token);
+                JwtClaims claims = context.getJwtClaims();
+                String xuid = claims.getClaimValueAsString("xid");
+                this.username = claims.getClaimValueAsString("xname");
+                this.clientUUID = UUID.nameUUIDFromBytes(("pocket-auth-1-xuid:" + xuid).getBytes(StandardCharsets.UTF_8));
+                this.minecraftId = claims.getClaimValueAsString("mid");
+            } else {
+                throw new IllegalArgumentException("Unsupported AuthPayload type: " + this.authPayload.getClass().getName());
             }
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid JWT: " + e.getMessage(), e);
         }
     }
 
@@ -259,7 +329,7 @@ public class LoginPacket extends DataPacket {
             return; // Get disconnected due to "invalid skin"
         }
 
-        JsonObject skinToken = decodeToken(new String(this.get(size), StandardCharsets.UTF_8));
+        JsonObject skinToken = ClientChainData.decodeToken(new String(this.get(size), StandardCharsets.UTF_8));
         if (skinToken == null) throw new RuntimeException("Invalid null skin token");
 
         // 将1.19.62按1.19.63版本处理 修复1.19.62皮肤修改问题
@@ -295,6 +365,8 @@ public class LoginPacket extends DataPacket {
 
             if (skinToken.has("SkinGeometry")) {
                 skin.setGeometryData(new String(Base64.getDecoder().decode(skinToken.get("SkinGeometry").getAsString()), StandardCharsets.UTF_8));
+            } else {
+                skin.setGeometryData(Skin.STEVE_GEOMETRY_OLD);
             }
         } else {
             if (skinToken.has("PlayFabId")) {
@@ -307,16 +379,9 @@ public class LoginPacket extends DataPacket {
 
             if (protocol_ >= ProtocolInfo.v1_19_60) {
                 if (skinToken.has("SkinId")) {
-                    //这边获取到的"SkinId"是FullId
-                    //FullId = SkinId + CapeId
-                    //而Skin对象中的skinId不是FullId,我们需要减掉CapeId
-                    String fullSkinId = skinToken.get("SkinId").getAsString();
-                    skin.setFullSkinId(fullSkinId);
-                    if (skin.getCapeId() != null) {
-                        skin.setSkinId(fullSkinId.substring(0, fullSkinId.length() - skin.getCapeId().length()));
-                    }else {
-                        skin.setSkinId(fullSkinId);
-                    }
+                    String skinId = skinToken.get("SkinId").getAsString();
+                    skin.setSkinId(skinId);
+                    skin.setFullSkinId(skinId);
                 }
             }
 
@@ -417,6 +482,6 @@ public class LoginPacket extends DataPacket {
         return new PersonaPieceTint(pieceType, colors);
     }
 
-    private static class MapTypeToken extends TypeToken<Map<String, List<String>>> {
+    private static class MapTypeToken extends TypeToken<Map<String, Object>> {
     }
 }

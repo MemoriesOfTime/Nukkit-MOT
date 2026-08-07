@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.event.Cancellable;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.item.Item;
+import org.jetbrains.annotations.Nullable;
 
 public class ComposterFillEvent extends BlockEvent implements Cancellable {
 
@@ -23,6 +24,7 @@ public class ComposterFillEvent extends BlockEvent implements Cancellable {
         this.success = success;
     }
 
+    @Nullable
     public Player getPlayer() {
         return player;
     }

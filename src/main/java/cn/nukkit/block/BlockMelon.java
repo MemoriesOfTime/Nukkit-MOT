@@ -4,8 +4,11 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMelon;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+
+import cn.nukkit.block.properties.VanillaProperties;
 
 /**
  * Created on 2015/12/11 by Pub4Game.
@@ -50,6 +53,21 @@ public class BlockMelon extends BlockSolid {
         return new Item[]{
                 new ItemMelon(0, Math.min(9, count))
         };
+    }
+
+    @Override
+    public boolean onBreak(Item item) {
+        for (BlockFace face : BlockFace.Plane.HORIZONTAL) {
+            Block block = this.getSide(face);
+            if (block instanceof BlockStemMelon stemMelon) {
+                if (stemMelon.getBlockFace() == face.getOpposite()) {
+                    stemMelon.setPropertyValue(VanillaProperties.FACING_DIRECTION, BlockFace.DOWN);
+                    this.getLevel().setBlock(stemMelon, stemMelon, true, true);
+                }
+            }
+        }
+
+        return super.onBreak(item);
     }
 
     @Override

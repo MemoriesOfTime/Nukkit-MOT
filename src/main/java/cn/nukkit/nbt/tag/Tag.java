@@ -5,6 +5,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Objects;
 
 public abstract class Tag {
 
@@ -53,7 +54,12 @@ public abstract class Tag {
             return false;
         }
         Tag o = (Tag) obj;
-        return getId() == o.getId() && !(name == null && o.name != null || name != null && o.name == null) && !(name != null && !name.equals(o.name));
+        return getId() == o.getId() && Objects.equals(name, o.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getId(), parseValue());
     }
 
     public void print(PrintStream out) {

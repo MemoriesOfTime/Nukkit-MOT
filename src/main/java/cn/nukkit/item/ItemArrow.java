@@ -1,5 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
@@ -27,5 +30,17 @@ public class ItemArrow extends Item {
 
     public int getPotionId() {
         return getDamage() - TIPPED_ARROW;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        int damage = this.getDamage();
+        if (damage <= 42) {
+            return true;
+        }
+        if (damage == 43) {
+            return protocolId.getProtocol() >= ProtocolInfo.v1_16_0;
+        }
+        return protocolId.getProtocol() >= ProtocolInfo.v1_21_0;
     }
 }

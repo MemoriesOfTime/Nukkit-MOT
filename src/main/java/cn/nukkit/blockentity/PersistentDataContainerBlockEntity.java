@@ -54,11 +54,6 @@ public class PersistentDataContainerBlockEntity extends BlockEntity implements P
     }
 
     @Override
-    public boolean equals(Object obj) {
-        return obj instanceof PersistentDataContainerBlockEntity && super.equals(obj);
-    }
-
-    @Override
     public boolean canSaveToStorage() {
         return !this.isEmpty();
     }

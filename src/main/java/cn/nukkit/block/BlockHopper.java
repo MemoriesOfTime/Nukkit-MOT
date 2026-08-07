@@ -18,6 +18,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
@@ -74,7 +75,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         BlockFace facing = face.getOpposite();
 
         if (facing == BlockFace.UP) {
@@ -156,6 +157,14 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
             if (powered == this.isEnabled()) {
                 this.setEnabled(!powered);
                 this.level.setBlock(this, this, true, false);
+
+                // Wake up the hopper block entity when unpowered
+                if (!powered) {
+                    BlockEntity be = this.level.getBlockEntity(this);
+                    if (be instanceof BlockEntityHopper hopper) {
+                        hopper.scheduleUpdate();
+                    }
+                }
             }
 
             return type;
@@ -207,13 +216,18 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
         void setTransferCooldown(int transferCooldown);
 
         default boolean pullItems() {
+            Vector3 up = this.getPosition().up();
+            BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(up);
+            return this.pullItems(blockEntity, this.getPosition().getLevel().getBlock(up));
+        }
+
+        default boolean pullItems(BlockEntity blockEntity, Block block) {
             Inventory inventory = this.getInventory();
 
             if (inventory.isFull()) {
                 return false;
             }
 
-            BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(this.getPosition().up());
             if (blockEntity instanceof BlockEntityFurnace) {
                 FurnaceInventory inv = ((BlockEntityFurnace) blockEntity).getInventory();
                 Item item = inv.getResult();
@@ -273,6 +287,28 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                         inv.setItem(i, item);
                         return true;
                     }
+                }
+            } else {
+                if (block instanceof BlockComposter composter) {
+                    if (!composter.isFull()) {
+                        return false;
+                    }
+                    Item item = composter.empty();
+                    if (item == null || item.isNull()) {
+                        return false;
+                    }
+                    Item itemToAdd = item.clone();
+                    itemToAdd.setCount(1);
+                    if (!inventory.canAddItem(itemToAdd)) {
+                        return false;
+                    }
+                    InventoryMoveItemEvent ev = new InventoryMoveItemEvent(null, inventory, this, item, InventoryMoveItemEvent.Action.PICKUP);
+                    ev.call();
+                    if (ev.isCancelled()) {
+                        return false;
+                    }
+                    Item[] items = inventory.addItem(itemToAdd);
+                    return items.length < 1;
                 }
             }
             return false;

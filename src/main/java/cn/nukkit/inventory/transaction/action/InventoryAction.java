@@ -45,6 +45,22 @@ public abstract class InventoryAction {
     }
 
     /**
+     * Returns the item that the action attempted to replace the source item with.
+     *
+     * @return target item
+     */
+    public Item getTargetItemUnsafe() {
+        return targetItem;
+    }
+
+    /**
+     * Replaces the target item of this action.
+     */
+    public void setTargetItem(Item targetItem) {
+        this.targetItem = targetItem;
+    }
+
+    /**
      * Called by inventory transactions before any actions are processed. If this returns false, the transaction will
      * be cancelled.
      *

@@ -61,6 +61,10 @@ public abstract class BlockThin extends BlockTransparent {
     }
 
     public boolean canConnect(Block block) {
-        return block.isSolid() || block.getId() == this.getId() || block.getId() == GLASS_PANE || block.getId() == GLASS;
+        return block instanceof BlockWall
+                || block.isSolid()
+                || block.getId() == this.getId()
+                || block.getId() == GLASS_PANE
+                || block.getId() == GLASS;
     }
 }

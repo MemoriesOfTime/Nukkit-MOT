@@ -40,7 +40,8 @@ public class BlockEntitySerializer {
 
     public static void saveBlockEntities(WriteBatch db, LevelDBChunk chunk) {
         byte[] key = LevelDBKey.BLOCK_ENTITIES.getKey(chunk.getX(), chunk.getZ(), chunk.getProvider().getLevel().getDimension());
-        if (chunk.getBlockEntities().isEmpty()) {
+        Collection<CompoundTag> unknownTiles = chunk.getUnknownTiles();
+        if (chunk.getBlockEntities().isEmpty() && unknownTiles.isEmpty()) {
             db.delete(key);
             return;
         }
@@ -54,6 +55,11 @@ public class BlockEntitySerializer {
                     blockEntity.saveNBT();
                     NBTIO.write(blockEntity.namedTag, stream, ByteOrder.LITTLE_ENDIAN);
                 }
+            }
+            // Round-trip tiles that could not be constructed (unknown/modded types) verbatim so
+            // their data is preserved instead of being deleted on save.
+            for (CompoundTag unknown : unknownTiles) {
+                NBTIO.write(unknown, stream, ByteOrder.LITTLE_ENDIAN);
             }
             value = stream.toByteArray();
         } catch (IOException e) {

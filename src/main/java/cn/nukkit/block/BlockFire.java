@@ -43,6 +43,11 @@ public class BlockFire extends BlockFlowable {
     }
 
     @Override
+    public boolean hasDynamicCollision() {
+        return true;
+    }
+
+    @Override
     public boolean hasEntityCollision() {
         return true;
     }
@@ -72,16 +77,12 @@ public class BlockFire extends BlockFlowable {
         if (entity instanceof EntityPotion) {
             if (((EntityPotion) entity).potionId == Potion.WATER) {
                 BlockFadeEvent event = new BlockFadeEvent(this, Block.get(AIR));
-                this.level.getServer().getPluginManager().callEvent(event);
+                event.call();
                 if (!event.isCancelled()) {
                     this.level.setBlock(this, event.getNewState(), true);
                 }
             }
             return;
-        }
-
-        if (!entity.hasEffect(Effect.FIRE_RESISTANCE) && this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE)) {
-            entity.attack(new EntityDamageByBlockEvent(this, entity, DamageCause.FIRE, 1));
         }
 
         EntityCombustByBlockEvent ev = new EntityCombustByBlockEvent(this, entity, 8);
@@ -119,7 +120,7 @@ public class BlockFire extends BlockFlowable {
                     this.getLevel().canBlockSeeSky(this.south()) ||
                     this.getLevel().canBlockSeeSky(this.north());
 
-            if (!forever && this.getLevel().isRaining() && canBlockSeeSky) {
+            if (!forever && canBlockSeeSky && this.getLevel().isRaining()) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
             }
 

@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
@@ -11,15 +12,14 @@ import cn.nukkit.utils.BinaryStream;
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.*;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.NoSuchElementException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 
@@ -28,6 +28,7 @@ public class GlobalBlockPalette {
 
     private static final Gson GSON = new Gson();
     private static boolean initialized;
+    private static volatile boolean useHashedBlockNetworkIds;
 
     private static final AtomicInteger runtimeIdAllocator282 = new AtomicInteger(0);
     private static final AtomicInteger runtimeIdAllocator291 = new AtomicInteger(0);
@@ -40,49 +41,72 @@ public class GlobalBlockPalette {
     private static final AtomicInteger runtimeIdAllocator389 = new AtomicInteger(0);
     private static final AtomicInteger runtimeIdAllocator407 = new AtomicInteger(0);
 
-    private static final Int2IntMap legacyToRuntimeId223 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId261 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId274 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId282 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId291 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId313 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId332 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId340 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId354 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId361 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId388 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId389 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId407 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId223 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId261 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId274 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId282 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId291 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId313 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId332 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId340 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId354 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId361 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId388 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId389 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId407 = new Int2IntOpenHashMap();
 
-    private static final BlockPalette blockPalette419;
-    private static final BlockPalette blockPalette428;
-    private static final BlockPalette blockPalette440;
-    private static final BlockPalette blockPalette448;
-    private static final BlockPalette blockPalette465;
-    private static final BlockPalette blockPalette471;
-    private static final BlockPalette blockPalette486;
-    private static final BlockPalette blockPalette503;
-    private static final BlockPalette blockPalette527;
-    private static final BlockPalette blockPalette544;
-    private static final BlockPalette blockPalette560;
-    private static final BlockPalette blockPalette567;
-    private static final BlockPalette blockPalette575;
-    private static final BlockPalette blockPalette582;
-    private static final BlockPalette blockPalette589;
-    private static final BlockPalette blockPalette594;
-    private static final BlockPalette blockPalette618;
-    private static final BlockPalette blockPalette622;
-    private static final BlockPalette blockPalette630;
-    private static final BlockPalette blockPalette649;
-    private static final BlockPalette blockPalette662;
-    private static final BlockPalette blockPalette671;
-    private static final BlockPalette blockPalette685;
-    private static final BlockPalette blockPalette712;
-    private static final BlockPalette blockPalette729;
-    private static final BlockPalette blockPalette748;
-    private static final BlockPalette blockPalette766;
+    private static final Map<GameVersion, BlockPalette> paletteCache = new ConcurrentHashMap<>();
 
-    public static final BlockPalette[] NEW_PALETTES;
+    // Standard protocol → palette version mapping (threshold protocol → palette GameVersion)
+    private static final NavigableMap<Integer, GameVersion> STANDARD_PALETTE_THRESHOLDS = new TreeMap<>();
+    // NetEase protocol → palette version mapping
+    private static final NavigableMap<Integer, GameVersion> NETEASE_PALETTE_THRESHOLDS = new TreeMap<>();
+
+    static {
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_16_100, GameVersion.V1_16_100);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_16_210, GameVersion.V1_16_210);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_17_0, GameVersion.V1_17_0);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_17_10, GameVersion.V1_17_10);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_17_30, GameVersion.V1_17_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_17_40, GameVersion.V1_17_40);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_18_10_26, GameVersion.V1_18_10);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_18_30, GameVersion.V1_18_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_0_29, GameVersion.V1_19_0);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_20, GameVersion.V1_19_20);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_50_20, GameVersion.V1_19_50);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_60, GameVersion.V1_19_60);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_70_24, GameVersion.V1_19_70);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_80, GameVersion.V1_19_80);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_0_23, GameVersion.V1_20_0);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_10_21, GameVersion.V1_20_10);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_30_24, GameVersion.V1_20_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_40, GameVersion.V1_20_40);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_50, GameVersion.V1_20_50);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_60, GameVersion.V1_20_60);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_70, GameVersion.V1_20_70);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_80, GameVersion.V1_20_80);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_0, GameVersion.V1_21_0);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_20, GameVersion.V1_21_20);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_30, GameVersion.V1_21_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_40, GameVersion.V1_21_40);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_50_26, GameVersion.V1_21_50);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_60, GameVersion.V1_21_60);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_70_24, GameVersion.V1_21_70);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_80, GameVersion.V1_21_80);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_90, GameVersion.V1_21_90);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_100, GameVersion.V1_21_100);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_110_26, GameVersion.V1_21_111);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_10, GameVersion.V1_26_10);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_20_26, GameVersion.V1_26_20);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_30, GameVersion.V1_26_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_40, GameVersion.V1_26_40);
+
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_20_50_NETEASE.getProtocol(), GameVersion.V1_20_50_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_2_NETEASE.getProtocol(), GameVersion.V1_21_2_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_50_NETEASE.getProtocol(), GameVersion.V1_21_50_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_93_NETEASE.getProtocol(), GameVersion.V1_21_93_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_124_NETEASE.getProtocol(), GameVersion.V1_21_124_NETEASE);
+    }
 
     private static byte[] compiledTable282;
     private static byte[] compiledTable291;
@@ -110,63 +134,11 @@ public class GlobalBlockPalette {
         legacyToRuntimeId389.defaultReturnValue(-1);
         legacyToRuntimeId407.defaultReturnValue(-1);
 
-        blockPalette419 = new BlockPalette(ProtocolInfo.v1_16_100);
-        blockPalette428 = new BlockPalette(ProtocolInfo.v1_16_210);
-        blockPalette440 = new BlockPalette(ProtocolInfo.v1_17_0);
-        blockPalette448 = new BlockPalette(ProtocolInfo.v1_17_10);
-        blockPalette465 = new BlockPalette(ProtocolInfo.v1_17_30);
-        blockPalette471 = new BlockPalette(ProtocolInfo.v1_17_40);
-        blockPalette486 = new BlockPalette(ProtocolInfo.v1_18_10);
-        blockPalette503 = new BlockPalette(ProtocolInfo.v1_18_30);
-        blockPalette527 = new BlockPalette(ProtocolInfo.v1_19_0);
-        blockPalette544 = new BlockPalette(ProtocolInfo.v1_19_20);
-        blockPalette560 = new BlockPalette(ProtocolInfo.v1_19_50);
-        blockPalette567 = new BlockPalette(ProtocolInfo.v1_19_60);
-        blockPalette575 = new BlockPalette(ProtocolInfo.v1_19_70);
-        blockPalette582 = new BlockPalette(ProtocolInfo.v1_19_80);
-        blockPalette589 = new BlockPalette(ProtocolInfo.v1_20_0);
-        blockPalette594 = new BlockPalette(ProtocolInfo.v1_20_10);
-        blockPalette618 = new BlockPalette(ProtocolInfo.v1_20_30);
-        blockPalette622 = new BlockPalette(ProtocolInfo.v1_20_40);
-        blockPalette630 = new BlockPalette(ProtocolInfo.v1_20_50);
-        blockPalette649 = new BlockPalette(ProtocolInfo.v1_20_60);
-        blockPalette662 = new BlockPalette(ProtocolInfo.v1_20_70);
-        blockPalette671 = new BlockPalette(ProtocolInfo.v1_20_80);
-        blockPalette685 = new BlockPalette(ProtocolInfo.v1_21_0);
-        blockPalette712 = new BlockPalette(ProtocolInfo.v1_21_20);
-        blockPalette729 = new BlockPalette(ProtocolInfo.v1_21_30);
-        blockPalette748 = new BlockPalette(ProtocolInfo.v1_21_40);
-        blockPalette766 = new BlockPalette(ProtocolInfo.v1_21_50);
-
-        NEW_PALETTES = new BlockPalette[]{
-                blockPalette419,
-                blockPalette428,
-                blockPalette440,
-                blockPalette448,
-                blockPalette465,
-                blockPalette471,
-                blockPalette486,
-                blockPalette503,
-                blockPalette527,
-                blockPalette544,
-                blockPalette560,
-                blockPalette567,
-                blockPalette575,
-                blockPalette582,
-                blockPalette589,
-                blockPalette594,
-                blockPalette618,
-                blockPalette622,
-                blockPalette630,
-                blockPalette649,
-                blockPalette662,
-                blockPalette671,
-                blockPalette685,
-                blockPalette712,
-                blockPalette729,
-                blockPalette748,
-                blockPalette766
-        };
+        // cache current block palette
+        getPaletteByProtocol(GameVersion.getLastVersion());
+        if (Server.getInstance().netEaseMode) {
+            getPaletteByProtocol(GameVersion.V1_21_50_NETEASE);
+        }
     }
 
     public static void init() {
@@ -181,7 +153,7 @@ public class GlobalBlockPalette {
         if (stream223 == null) throw new AssertionError("Unable to locate RuntimeID table 223");
         Collection<TableEntryOld> entries223 = GSON.fromJson(new InputStreamReader(stream223, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
         for (TableEntryOld entry : entries223) {
-            legacyToRuntimeId223.put((entry.id << 4) | entry.data, entry.runtimeID);
+            registerLegacyState(legacyToRuntimeId223, 4, entry.id, entry.data, entry.runtimeID);
         }
         // Compiled table not needed for 223
         // 261
@@ -189,7 +161,7 @@ public class GlobalBlockPalette {
         if (stream261 == null) throw new AssertionError("Unable to locate RuntimeID table 261");
         Collection<TableEntryOld> entries261 = GSON.fromJson(new InputStreamReader(stream261, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
         for (TableEntryOld entry : entries261) {
-            legacyToRuntimeId261.put((entry.id << 4) | entry.data, entry.runtimeID);
+            registerLegacyState(legacyToRuntimeId261, 4, entry.id, entry.data, entry.runtimeID);
         }
         // Compiled table not needed 261
         // 274
@@ -197,7 +169,7 @@ public class GlobalBlockPalette {
         if (stream274 == null) throw new AssertionError("Unable to locate RuntimeID table 274");
         Collection<TableEntryOld> entries274 = GSON.fromJson(new InputStreamReader(stream274, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
         for (TableEntryOld entry : entries274) {
-            legacyToRuntimeId274.put((entry.id << 4) | entry.data, entry.runtimeID);
+            registerLegacyState(legacyToRuntimeId274, 4, entry.id, entry.data, entry.runtimeID);
         }
         // Compiled table not needed 274
         // 282
@@ -207,7 +179,7 @@ public class GlobalBlockPalette {
         BinaryStream table282 = new BinaryStream();
         table282.putUnsignedVarInt(entries282.size());
         for (TableEntry entry : entries282) {
-            legacyToRuntimeId282.put((entry.id << 4) | entry.data, runtimeIdAllocator282.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId282, 4, entry.id, entry.data, runtimeIdAllocator282.getAndIncrement());
             table282.putString(entry.name);
             table282.putLShort(entry.data);
         }
@@ -219,7 +191,7 @@ public class GlobalBlockPalette {
         BinaryStream table291 = new BinaryStream();
         table291.putUnsignedVarInt(entries291.size());
         for (TableEntry entry : entries291) {
-            legacyToRuntimeId291.put((entry.id << 4) | entry.data, runtimeIdAllocator291.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId291, 4, entry.id, entry.data, runtimeIdAllocator291.getAndIncrement());
             table291.putString(entry.name);
             table291.putLShort(entry.data);
         }
@@ -231,7 +203,7 @@ public class GlobalBlockPalette {
         BinaryStream table313 = new BinaryStream();
         table313.putUnsignedVarInt(entries313.size());
         for (TableEntry entry : entries313) {
-            legacyToRuntimeId313.put((entry.id << 4) | entry.data, runtimeIdAllocator313.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId313, 4, entry.id, entry.data, runtimeIdAllocator313.getAndIncrement());
             table313.putString(entry.name);
             table313.putLShort(entry.data);
         }
@@ -243,7 +215,7 @@ public class GlobalBlockPalette {
         BinaryStream table332 = new BinaryStream();
         table332.putUnsignedVarInt(entries332.size());
         for (TableEntry entry : entries332) {
-            legacyToRuntimeId332.put((entry.id << 4) | entry.data, runtimeIdAllocator332.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId332, 4, entry.id, entry.data, runtimeIdAllocator332.getAndIncrement());
             table332.putString(entry.name);
             table332.putLShort(entry.data);
         }
@@ -255,7 +227,7 @@ public class GlobalBlockPalette {
         BinaryStream table340 = new BinaryStream();
         table340.putUnsignedVarInt(entries340.size());
         for (TableEntry entry : entries340) {
-            legacyToRuntimeId340.put((entry.id << 4) | entry.data, runtimeIdAllocator340.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId340, 4, entry.id, entry.data, runtimeIdAllocator340.getAndIncrement());
             table340.putString(entry.name);
             table340.putLShort(entry.data);
         }
@@ -267,7 +239,7 @@ public class GlobalBlockPalette {
         BinaryStream table354 = new BinaryStream();
         table354.putUnsignedVarInt(entries354.size());
         for (TableEntry entry : entries354) {
-            legacyToRuntimeId354.put((entry.id << 4) | entry.data, runtimeIdAllocator354.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId354, 4, entry.id, entry.data, runtimeIdAllocator354.getAndIncrement());
             table354.putString(entry.name);
             table354.putLShort(entry.data);
         }
@@ -279,7 +251,7 @@ public class GlobalBlockPalette {
         BinaryStream table361 = new BinaryStream();
         table361.putUnsignedVarInt(entries361.size());
         for (TableEntry entry : entries361) {
-            legacyToRuntimeId361.put((entry.id << 4) | entry.data, runtimeIdAllocator361.getAndIncrement());
+            registerLegacyState(legacyToRuntimeId361, 4, entry.id, entry.data, runtimeIdAllocator361.getAndIncrement());
             table361.putString(entry.name);
             table361.putLShort(entry.data);
             table361.putLShort(entry.id);
@@ -300,7 +272,7 @@ public class GlobalBlockPalette {
             int runtimeId = runtimeIdAllocator388.getAndIncrement();
             if (!state.contains("meta")) continue;
             for (int val : state.getIntArray("meta")) {
-                legacyToRuntimeId388.put(state.getShort("id") << 6 | val, runtimeId);
+                registerLegacyState(legacyToRuntimeId388, 6, state.getShort("id"), val, runtimeId);
             }
             state.remove("meta");
         }
@@ -318,7 +290,7 @@ public class GlobalBlockPalette {
             int runtimeId = runtimeIdAllocator389.getAndIncrement();
             if (!state.contains("meta")) continue;
             for (int val : state.getIntArray("meta")) {
-                legacyToRuntimeId389.put(state.getShort("id") << 6 | val, runtimeId);
+                registerLegacyState(legacyToRuntimeId389, 6, state.getShort("id"), val, runtimeId);
             }
             state.remove("meta");
         }
@@ -342,8 +314,7 @@ public class GlobalBlockPalette {
             int id = state.getInt("id");
             int data = state.getShort("data");
             int runtimeId = runtimeIdAllocator407.getAndIncrement();
-            int legacyId = id << 6 | data;
-            legacyToRuntimeId407.put(legacyId, runtimeId);
+            registerLegacyState(legacyToRuntimeId407, 6, id, data, runtimeId);
             state.remove("data");
         }
         try {
@@ -351,71 +322,79 @@ public class GlobalBlockPalette {
         } catch (IOException e) {
             throw new AssertionError("Unable to write block palette 407", e);
         }
+
+        compactCaches();
     }
 
-    public static BlockPalette getPaletteByProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_21_50_26) {
-            return blockPalette766;
-        } else if (protocol >= ProtocolInfo.v1_21_40) {
-            return blockPalette748;
-        } else if (protocol >= ProtocolInfo.v1_21_30) {
-            return blockPalette729;
-        } else if (protocol >= ProtocolInfo.v1_21_20) {
-            return blockPalette712;
-        } else if (protocol >= ProtocolInfo.v1_21_0) {
-            return blockPalette685;
-        } else if (protocol >= ProtocolInfo.v1_20_80) {
-            return blockPalette671;
-        } else if (protocol >= ProtocolInfo.v1_20_70) {
-            return blockPalette662;
-        } else if (protocol >= ProtocolInfo.v1_20_60) {
-            return blockPalette649;
-        } else if (protocol >= ProtocolInfo.v1_20_50) {
-            return blockPalette630;
-        } if (protocol >= ProtocolInfo.v1_20_40) {
-            return blockPalette622;
-        } else if (protocol >= ProtocolInfo.v1_20_30_24) {
-            return blockPalette618;
-        } else if (protocol >= ProtocolInfo.v1_20_10_21) {
-            return blockPalette594;
-        } else if (protocol >= ProtocolInfo.v1_20_0_23) {
-            return blockPalette589;
-        } else if (protocol >= ProtocolInfo.v1_19_80) {
-            return blockPalette582;
-        } else if (protocol >= ProtocolInfo.v1_19_70_24) {
-            return blockPalette575;
-        } else if (protocol >= ProtocolInfo.v1_19_60) {
-            return blockPalette567;
-        } else if (protocol >= ProtocolInfo.v1_19_50_20) {
-            return blockPalette560;
-        } else if (protocol >= ProtocolInfo.v1_19_20) {
-            return blockPalette544;
-        } else if (protocol >= ProtocolInfo.v1_19_0_29) {
-            return blockPalette527;
-        } else if (protocol >= ProtocolInfo.v1_18_30) {
-            return blockPalette503;
-        } else if (protocol >= ProtocolInfo.v1_18_10_26) {
-            return blockPalette486;
-        } else if (protocol >= ProtocolInfo.v1_17_40) {
-            return blockPalette471;
-        } else if (protocol >= ProtocolInfo.v1_17_30) {
-            return blockPalette465;
-        } else if (protocol >= ProtocolInfo.v1_17_10) {
-            return blockPalette448;
-        } else if (protocol >= ProtocolInfo.v1_17_0) {
-            return blockPalette440;
-        } else if (protocol >= ProtocolInfo.v1_16_210) {
-            return blockPalette428;
-        } else if (protocol >= ProtocolInfo.v1_16_100) {
-            return blockPalette419;
+    /**
+     * Trims global palette lookup tables after registration so long-lived caches keep a smaller footprint.
+     */
+    public static void compactCaches() {
+        trimLegacyMap(legacyToRuntimeId223);
+        trimLegacyMap(legacyToRuntimeId261);
+        trimLegacyMap(legacyToRuntimeId274);
+        trimLegacyMap(legacyToRuntimeId282);
+        trimLegacyMap(legacyToRuntimeId291);
+        trimLegacyMap(legacyToRuntimeId313);
+        trimLegacyMap(legacyToRuntimeId332);
+        trimLegacyMap(legacyToRuntimeId340);
+        trimLegacyMap(legacyToRuntimeId354);
+        trimLegacyMap(legacyToRuntimeId361);
+        trimLegacyMap(legacyToRuntimeId388);
+        trimLegacyMap(legacyToRuntimeId389);
+        trimLegacyMap(legacyToRuntimeId407);
+
+        for (BlockPalette palette : paletteCache.values()) {
+            palette.trim();
         }
-
-        throw new IllegalArgumentException("Tried to get BlockPalette for unsupported protocol version: " + protocol);
     }
 
+    /**
+     * Applies fastutil's in-place trim operation to a legacy lookup map.
+     */
+    private static void trimLegacyMap(Int2IntOpenHashMap map) {
+        map.trim();
+    }
+
+    /**
+     * Registers a legacy state mapping and records the block state as observed for sparse prototype caching.
+     */
+    private static void registerLegacyState(Int2IntOpenHashMap map, int dataBits, int id, int data, int runtimeId) {
+        map.put((id << dataBits) | data, runtimeId);
+        Block.registerKnownState(id, data);
+    }
+
+    @Deprecated
+    public static BlockPalette getPaletteByProtocol(int protocol) {
+        return getPaletteByProtocol(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public static BlockPalette getPaletteByProtocol(GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
+        NavigableMap<Integer, GameVersion> thresholds = gameVersion.isNetEase()
+                ? NETEASE_PALETTE_THRESHOLDS
+                : STANDARD_PALETTE_THRESHOLDS;
+        Map.Entry<Integer, GameVersion> entry = thresholds.floorEntry(protocol);
+        if (entry == null) {
+            throw new IllegalArgumentException("Tried to get BlockPalette for unsupported protocol version: " + protocol
+                    + (gameVersion.isNetEase() ? " (NetEase)" : ""));
+        }
+        return paletteCache.computeIfAbsent(entry.getValue(), BlockPalette::new);
+    }
+
+    @Deprecated
     public static int getOrCreateRuntimeId(int protocol, int id, int meta) {
+        return getOrCreateRuntimeId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), id, meta);
+    }
+
+    public static int getOrCreateRuntimeId(GameVersion gameVersion, int id, int meta) {
+        int protocol = gameVersion.getProtocol();
         if (protocol >= ProtocolInfo.v1_16_100) {
-            return getPaletteByProtocol(protocol).getRuntimeId(id, meta);
+            BlockPalette palette = getPaletteByProtocol(gameVersion);
+            if (shouldUseHashedBlockNetworkIds(gameVersion)) {
+                return palette.getHashId(id, meta);
+            }
+            return palette.getRuntimeId(id, meta);
         }
 
         if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
@@ -530,7 +509,13 @@ public class GlobalBlockPalette {
         }
     }
 
+    @Deprecated
     public static int getOrCreateRuntimeId(int protocol, int legacyId) throws NoSuchElementException {
+        return getOrCreateRuntimeId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), legacyId);
+    }
+
+    public static int getOrCreateRuntimeId(GameVersion gameVersion, int legacyId) throws NoSuchElementException {
+        int protocol = gameVersion.getProtocol();
         if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
         int runtimeId;
         switch (protocol) {
@@ -577,11 +562,16 @@ public class GlobalBlockPalette {
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId361.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             default: // 388+
-                return getOrCreateRuntimeId(protocol, legacyId >> Block.DATA_BITS, legacyId & Block.DATA_MASK);
+                return getOrCreateRuntimeId(gameVersion, legacyId >> Block.DATA_BITS, legacyId & Block.DATA_MASK);
         }
     }
 
+    @Deprecated
     public static int getLegacyFullId(int protocolId, int runtimeId) {
+        return getLegacyFullId(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode), runtimeId);
+    }
+
+    public static int getLegacyFullId(GameVersion protocolId, int runtimeId) {
         BlockPalette blockPalette = getPaletteByProtocol(protocolId);
         if (blockPalette != null) {
             return blockPalette.getLegacyFullId(runtimeId);
@@ -589,22 +579,131 @@ public class GlobalBlockPalette {
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }
 
-    public static int getLegacyFullId(int protocolId, CompoundTag compoundTag) {
+    /**
+     * 从哈希ID获取完整的旧方块ID
+     * Get full legacy block ID from hash ID
+     * <p>
+     * 用于从新版本协议(1.19.80+)使用的哈希ID转换回内部使用的旧方块ID
+     * Used to convert hash ID used in newer protocols (1.19.80+) back to internal legacy block ID
+     *
+     * @param protocolId 游戏版本 / game version
+     * @param hashId 方块状态的哈希ID / hash ID of the block state
+     * @return 完整的旧方块ID / full legacy block ID
+     * @throws IllegalArgumentException 如果协议版本不支持 / if protocol version is not supported
+     */
+    public static int getLegacyFullIdFromHashId(GameVersion protocolId, int hashId) {
         BlockPalette blockPalette = getPaletteByProtocol(protocolId);
         if (blockPalette != null) {
-            return blockPalette.getLegacyFullId(compoundTag);
+            return blockPalette.getLegacyFullIdFromHashId(hashId);
         }
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }
 
-    public static int getOrCreateRuntimeId(int legacyId) throws NoSuchElementException {
-        Server.mvw("GlobalBlockPalette#getOrCreateRuntimeId(int)");
-        return getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, legacyId >> 4, legacyId & 0xf);
+    @Deprecated
+    public static int getLegacyFullId(int protocolId, CompoundTag blockState) {
+        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
+        if (blockPalette != null) {
+            return blockPalette.getLegacyFullId(blockState);
+        }
+        throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }
 
+    public static int getLegacyFullId(GameVersion protocolId, CompoundTag blockState) {
+        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
+        if (blockPalette != null) {
+            return blockPalette.getLegacyFullId(blockState);
+        }
+        throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
+    }
+
+    /**
+     * 获取或创建方块的哈希ID
+     * Get or create hash ID of a block
+     * <p>
+     * 如果启用了哈希方块网络ID功能，则返回方块的哈希ID，否则返回-1
+     * Returns the block's hash ID if hashed block network IDs are enabled, otherwise returns -1
+     *
+     * @param gameVersion 游戏版本 / game version
+     * @param id 方块ID / block ID
+     * @param meta 方块元数据值 / block metadata value
+     * @return 方块的哈希ID，如果功能未启用则返回-1 / hash ID of the block, returns -1 if feature is not enabled
+     */
+    public static int getOrCreateHashId(GameVersion gameVersion, int id, int meta) {
+        if (shouldUseHashedBlockNetworkIds(gameVersion)) {
+            return getPaletteByProtocol(gameVersion).getHashId(id, meta);
+        }
+        return -1;
+    }
+
+    /**
+     * 从旧方块ID获取或创建哈希ID
+     * Get or create hash ID from legacy block ID
+     * <p>
+     * 如果启用了哈希方块网络ID功能，则返回方块的哈希ID，否则返回-1
+     * Returns the block's hash ID if hashed block network IDs are enabled, otherwise returns -1
+     *
+     * @param gameVersion 游戏版本 / game version
+     * @param legacyId 完整的旧方块ID (blockId << Block.DATA_BITS | meta) / full legacy block ID
+     * @return 方块的哈希ID，如果功能未启用则返回-1 / hash ID of the block, returns -1 if feature is not enabled
+     * @throws NoSuchElementException 如果找不到方块 / if block is not found
+     */
+    public static int getOrCreateHashId(GameVersion gameVersion, int legacyId) throws NoSuchElementException {
+        if (shouldUseHashedBlockNetworkIds(gameVersion)) {
+            return getPaletteByProtocol(gameVersion).getHashId(legacyId >> Block.DATA_BITS, legacyId & Block.DATA_MASK);
+        }
+        return -1;
+    }
+
+    /**
+     * 检查指定游戏版本是否应该使用哈希方块网络ID
+     * Check if hashed block network IDs should be used for the specified game version
+     * <p>
+     * 当启用了哈希网络ID功能且游戏版本 >= 1.19.80时返回true
+     * Returns true when hashed network IDs are enabled and game version >= 1.19.80
+     * <p>
+     * 哈希网络ID是基于方块状态NBT的哈希值，用于支持自定义方块和更灵活的方块状态传输
+     * Hashed network IDs are based on block state NBT hash and used to support custom blocks and more flexible block state transmission
+     *
+     * @param gameVersion 游戏版本 / game version
+     * @return 是否应该使用哈希方块网络ID / whether hashed block network IDs should be used
+     */
+    public static boolean shouldUseHashedBlockNetworkIds(GameVersion gameVersion) {
+        return useHashedBlockNetworkIds && gameVersion.getProtocol() >= ProtocolInfo.v1_19_80;
+    }
+
+    /**
+     * 获取全局哈希方块网络ID功能是否启用
+     * Get whether global hashed block network IDs feature is enabled
+     *
+     * @return 是否启用哈希方块网络ID / whether hashed block network IDs are enabled
+     */
+    public static boolean useHashedBlockNetworkIds() {
+        return useHashedBlockNetworkIds;
+    }
+
+    /**
+     * 设置全局哈希方块网络ID功能的启用状态
+     * Set the enabled state of global hashed block network IDs feature
+     * <p>
+     * 此功能主要用于支持自定义方块，启用后会使用基于NBT哈希的网络ID代替传统的运行时ID
+     * This feature is mainly used to support custom blocks, when enabled it uses NBT hash-based network IDs instead of traditional runtime IDs
+     *
+     * @param enabled 是否启用 / whether to enable
+     */
+    public static void setUseHashedBlockNetworkIds(boolean enabled) {
+        useHashedBlockNetworkIds = enabled;
+    }
+
+    @Deprecated
+    public static int getOrCreateRuntimeId(int legacyId) throws NoSuchElementException {
+        Server.mvw("GlobalBlockPalette#getOrCreateRuntimeId(int)");
+        return getOrCreateRuntimeId(GameVersion.getLastVersion(), legacyId >> 4, legacyId & 0xf);
+    }
+
+    @Deprecated
     public static int getLegacyFullId(int runtimeId) {
         Server.mvw("GlobalBlockPalette#getLegacyFullId(int)");
-        return getLegacyFullId(ProtocolInfo.CURRENT_PROTOCOL, runtimeId);
+        return getLegacyFullId(GameVersion.getLastVersion(), runtimeId);
     }
 
     @SuppressWarnings("unused")
