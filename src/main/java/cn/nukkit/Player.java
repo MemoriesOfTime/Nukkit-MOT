@@ -5291,13 +5291,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         Item i = serverItem;
                                         Item oldItem = i.clone();
                                         if ((i = this.level.useItemOn(blockVector.asVector3(), i, face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this)) != null) {
-                                            if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
+                                            boolean itemChanged = !i.equals(oldItem) || i.getCount() != oldItem.getCount();
+                                            if (itemChanged) {
                                                 if (oldItem.getId() == i.getId() || i.getId() == 0) {
                                                     inventory.setItemInHand(i);
                                                 } else {
                                                     server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
                                                 }
                                                 inventory.sendHeldItem(this.getViewers().values());
+                                            } else if (!oldItem.equalsExact(useItemData.itemInHand)) {
+                                                this.needSendHeldItem = true;
                                             }
                                             break transactionSwitch;
                                         } else {
