@@ -91,6 +91,7 @@ public class CraftingManager {
 
     public final Map<Integer, FurnaceRecipe> furnaceRecipes = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, BlastFurnaceRecipe> blastFurnaceRecipes = new Int2ObjectOpenHashMap<>();
+    private final Map<Integer, SmokerRecipe> smokerRecipes = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, BrewingRecipe> brewingRecipes = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, ContainerRecipe> containerRecipes = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, CampfireRecipe> campfireRecipes = new Int2ObjectOpenHashMap<>();
@@ -597,7 +598,7 @@ public class CraftingManager {
     @SuppressWarnings("unchecked")
     private void loadSmeltingRecipe(RuntimeItemMapping itemMapping, Map recipe, Config furnaceXpConfig) {
         String smeltingBlock = (String) recipe.get("block");
-        if (!"furnace".equals(smeltingBlock) && !"blast_furnace".equals(smeltingBlock) && !"campfire".equals(smeltingBlock)) {
+        if (!"furnace".equals(smeltingBlock) && !"blast_furnace".equals(smeltingBlock) && !"smoker".equals(smeltingBlock) && !"campfire".equals(smeltingBlock)) {
             return;
         }
 
@@ -642,6 +643,15 @@ public class CraftingManager {
             }
             case "blast_furnace": {
                 BlastFurnaceRecipe furnaceRecipe = new BlastFurnaceRecipe(outputItem, inputItem);
+                double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId() + ":" + inputItem.getDamage(), 0d);
+                if (xp != 0) {
+                    this.setRecipeXp(furnaceRecipe, xp);
+                }
+                this.registerRecipe(furnaceRecipe);
+                break;
+            }
+            case "smoker": {
+                SmokerRecipe furnaceRecipe = new SmokerRecipe(outputItem, inputItem);
                 double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId() + ":" + inputItem.getDamage(), 0d);
                 if (xp != 0) {
                     this.setRecipeXp(furnaceRecipe, xp);
@@ -908,6 +918,16 @@ public class CraftingManager {
         //TODO Fix 1.10.0 - 1.14.0 client crash
         if (protocol < ProtocolInfo.v1_10_0 || protocol > ProtocolInfo.v1_13_0) {
             for (FurnaceRecipe recipe : this.getFurnaceRecipes().values()) {
+                if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
+                    pk.addFurnaceRecipe(recipe);
+                }
+            }
+            for (BlastFurnaceRecipe recipe : this.getBlastFurnaceRecipes().values()) {
+                if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
+                    pk.addFurnaceRecipe(recipe);
+                }
+            }
+            for (SmokerRecipe recipe : this.getSmokerRecipes().values()) {
                 if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
                     pk.addFurnaceRecipe(recipe);
                 }
@@ -1317,6 +1337,10 @@ public class CraftingManager {
         return this.blastFurnaceRecipes;
     }
 
+    public Map<Integer, SmokerRecipe> getSmokerRecipes() {
+        return this.smokerRecipes;
+    }
+
     public Map<Integer, ContainerRecipe> getContainerRecipes() {
         return this.containerRecipes;
     }
@@ -1372,6 +1396,16 @@ public class CraftingManager {
         return recipe;
     }
 
+    public FurnaceRecipe matchSmokerRecipe(Item input) {
+        Map<Integer, SmokerRecipe> recipes = this.getSmokerRecipes();
+        if (recipes == null) {
+            return null;
+        }
+        FurnaceRecipe recipe = recipes.get(getItemHash(input));
+        if (recipe == null) recipe = recipes.get(getItemHash(input, 0));
+        return recipe;
+    }
+
     public static UUID getMultiItemHash(Collection<Item> items) {
         BinaryStream stream = new BinaryStream(items.size() * 5);
         for (Item item : items) {
@@ -1390,6 +1424,10 @@ public class CraftingManager {
             this.registerBlastFurnaceRecipe((BlastFurnaceRecipe) recipe);
             return;
         }
+        if (recipe instanceof SmokerRecipe) {
+            this.registerSmokerRecipe((SmokerRecipe) recipe);
+            return;
+        }
         recipe.setId(UUID.randomUUID());
         this.furnaceRecipes.put(getItemHash(recipe.getInput()), recipe);
     }
@@ -1402,6 +1440,11 @@ public class CraftingManager {
     public void registerBlastFurnaceRecipe(BlastFurnaceRecipe recipe) {
         recipe.setId(UUID.randomUUID());
         this.blastFurnaceRecipes.put(getItemHash(recipe.getInput()), recipe);
+    }
+
+    public void registerSmokerRecipe(SmokerRecipe recipe) {
+        recipe.setId(UUID.randomUUID());
+        this.smokerRecipes.put(getItemHash(recipe.getInput()), recipe);
     }
 
     public void registerCampfireRecipe(CampfireRecipe recipe) {
