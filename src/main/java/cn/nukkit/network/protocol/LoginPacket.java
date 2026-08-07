@@ -260,6 +260,16 @@ public class LoginPacket extends DataPacket {
                     skin.getTintColors().add(getTint(object.getAsJsonObject()));
                 }
             }
+
+            if (skinToken.has("SkinIID")) {
+                skin.setSkinIID(skinToken.get("SkinIID").getAsString());
+            }
+            if (skinToken.has("GrowthLevel")) {
+                skin.setGrowthLevel(skinToken.get("GrowthLevel").getAsInt());
+            }
+            if (skinToken.has("BloomData")) {
+                skin.setBloomData(skinToken.get("BloomData").getAsString());
+            }
         }
     }
 

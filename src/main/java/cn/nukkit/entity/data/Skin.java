@@ -1,6 +1,7 @@
 package cn.nukkit.entity.data;
 
 import cn.nukkit.Server;
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
 import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
@@ -76,6 +77,13 @@ public class Skin {
     private String geometryDataEngineVersion = "0.0.0";
     private boolean overridingPlayerAppearance = true;
     private String profileHash = "";
+
+    @OnlyNetEase
+    private String skinIID = "";
+    @OnlyNetEase
+    private int growthLevel;
+    @OnlyNetEase
+    private String bloomData = "";
 
     public boolean isValid() {
         return isValid(Server.getInstance().doNotLimitSkinGeometry);
@@ -386,6 +394,36 @@ public class Skin {
 
     public boolean isOverridingPlayerAppearance() {
         return this.overridingPlayerAppearance;
+    }
+
+    @OnlyNetEase
+    public String getSkinIID() {
+        return this.skinIID;
+    }
+
+    @OnlyNetEase
+    public void setSkinIID(String skinIID) {
+        this.skinIID = skinIID == null ? "" : skinIID;
+    }
+
+    @OnlyNetEase
+    public int getGrowthLevel() {
+        return this.growthLevel;
+    }
+
+    @OnlyNetEase
+    public void setGrowthLevel(int growthLevel) {
+        this.growthLevel = growthLevel;
+    }
+
+    @OnlyNetEase
+    public String getBloomData() {
+        return this.bloomData;
+    }
+
+    @OnlyNetEase
+    public void setBloomData(String bloomData) {
+        this.bloomData = bloomData == null ? "" : bloomData;
     }
 
     private static SerializedImage parseBufferedImage(BufferedImage image) {

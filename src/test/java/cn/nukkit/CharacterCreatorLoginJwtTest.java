@@ -317,4 +317,43 @@ class CharacterCreatorLoginJwtTest {
         pkt.decode();
         return pkt;
     }
+
+    /**
+     * 网易皮肤扩展字段（SkinIID / GrowthLevel / BloomData）必须从皮肤 JWT 正确解析到 Skin 对象。
+     * 参考 SynapseAPI LoginPacket14 的字段名与类型。
+     * <p>
+     * NetEase skin extension fields (SkinIID / GrowthLevel / BloomData) must be parsed from the
+     * skin JWT into the Skin object. Field names and types follow SynapseAPI LoginPacket14.
+     */
+    @Test
+    void netEaseSkinExtensionFieldsAreParsed() {
+        JsonObject skinPayload = buildPersonaSkinPayload();
+        skinPayload.addProperty("SkinIID", "netease-skin-iid-123");
+        skinPayload.addProperty("GrowthLevel", 7);
+        skinPayload.addProperty("BloomData", "bloom-payload-base64");
+        skinPayload.addProperty("IsReconnect", true);
+
+        LoginPacket pkt = decode(buildLoginPacketBuffer(2168, skinPayload));
+        assertNotNull(pkt.skin, "skin should be parsed");
+        assertEquals("netease-skin-iid-123", pkt.skin.getSkinIID(), "SkinIID");
+        assertEquals(7, pkt.skin.getGrowthLevel(), "GrowthLevel");
+        assertEquals("bloom-payload-base64", pkt.skin.getBloomData(), "BloomData");
+    }
+
+    /**
+     * 缺失网易扩展字段时不报错，Skin 对象返回默认值（空串 / 0）。
+     * <p>
+     * Missing NetEase extension fields must not throw; the Skin object returns defaults.
+     */
+    @Test
+    void netEaseSkinExtensionFieldsDefaultWhenAbsent() {
+        JsonObject skinPayload = buildPersonaSkinPayload();
+        // 不添加 SkinIID / GrowthLevel / BloomData / IsReconnect
+
+        LoginPacket pkt = decode(buildLoginPacketBuffer(2168, skinPayload));
+        assertNotNull(pkt.skin);
+        assertEquals("", pkt.skin.getSkinIID(), "SkinIID default");
+        assertEquals(0, pkt.skin.getGrowthLevel(), "GrowthLevel default");
+        assertEquals("", pkt.skin.getBloomData(), "BloomData default");
+    }
 }

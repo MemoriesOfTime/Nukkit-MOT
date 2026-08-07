@@ -1,6 +1,7 @@
 package cn.nukkit.utils;
 
 import cn.nukkit.Server;
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.encryption.ChainValidationResult;
 import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.LoginPacket;
@@ -219,6 +220,12 @@ public final class ClientChainData implements LoginChainData {
         return neteaseEnv;
     }
 
+    @Override
+    @OnlyNetEase
+    public boolean isNetEaseReconnect() {
+        return neteaseReconnect;
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Override
     ///////////////////////////////////////////////////////////////////////////
@@ -275,6 +282,8 @@ public final class ClientChainData implements LoginChainData {
     private String neteaseClientEngineVersion;
     private String neteaseClientPatchVersion;
     private String neteaseClientBit;
+    @OnlyNetEase
+    private boolean neteaseReconnect;
 
     private JsonObject rawData;
 
@@ -313,6 +322,7 @@ public final class ClientChainData implements LoginChainData {
         if (skinToken.has("Waterdog_IP")) this.waterdogIP = skinToken.get("Waterdog_IP").getAsString();
         if (skinToken.has("Waterdog_XUID")) this.waterdogXUID = skinToken.get("Waterdog_XUID").getAsString();
         if (skinToken.has("ViaProxyAuthToken")) this.viaProxyAuthToken = skinToken.get("ViaProxyAuthToken").getAsString();
+        if (skinToken.has("IsReconnect")) this.neteaseReconnect = skinToken.get("IsReconnect").getAsBoolean();
 
         if (this.isWaterdog()) {
             xboxAuthed = true;
