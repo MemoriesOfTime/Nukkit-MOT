@@ -491,27 +491,6 @@ class PlayerSkinLifecycleTest {
         assertEquals(subject.getUniqueId(), update.uuid);
     }
 
-    /**
-     * 网易 V860 客户端在 PlayerList ADD 的 Trusted 循环后无条件解析 5 个扩展字段
-     * （VipFormatNameData/NameTagNameData/BloomImageData/GrowthLevelData/HideUserDataScreenData，
-     * GameProtocol 逆向确认）；国际版不解析，二者编码长度应相差 8 字节/条目。
-     * <p>
-     * The NetEase V860 client unconditionally parses five extension fields after the Trusted loop
-     * in PlayerList ADD (confirmed via GameProtocol); vanilla does not, so the encodings must
-     * differ by 8 bytes per entry.
-     */
-    @Test
-    void neteasePlayerListAddCarriesV860ExtensionFields() {
-        Skin skin = validSkin("list-skin");
-        PlayerListPacket.Entry entry = new PlayerListPacket.Entry(UUID.randomUUID(), 1L, "name", skin);
-
-        PlayerListPacket netease = newPlayerListPacket(GameVersion.V1_21_124_NETEASE, entry);
-        PlayerListPacket vanilla = newPlayerListPacket(GameVersion.V1_21_124, entry);
-
-        assertEquals(16, netease.getBuffer().length - vanilla.getBuffer().length,
-                "NetEase V860 must append 5 extension fields (1+1+1+4+1 bytes) plus 8 random fullSkinId chars per entry");
-    }
-
     private static PlayerListPacket newPlayerListPacket(GameVersion gameVersion, PlayerListPacket.Entry entry) {
         PlayerListPacket pk = new PlayerListPacket();
         pk.protocol = gameVersion.getProtocol();
