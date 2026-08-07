@@ -3,6 +3,7 @@ package cn.nukkit.nbt.tag;
 import cn.nukkit.nbt.stream.NBTInputStream;
 import cn.nukkit.nbt.stream.NBTOutputStream;
 import cn.nukkit.utils.Binary;
+import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -37,8 +38,16 @@ public class ByteArrayTag extends Tag {
     @Override
     void load(NBTInputStream dis) throws IOException {
         int length = dis.readInt();
-        data = new byte[length];
-        dis.readFully(data);
+        if (dis.isReadSafely() && length > 64) {
+            ByteArrayList list = new ByteArrayList(64);
+            for (int i = 0; i < length; i++) {
+                list.add(dis.readByte());
+            }
+            data = list.toByteArray();
+        } else {
+            data = new byte[length];
+            dis.readFully(data);
+        }
     }
 
     public byte[] getData() {

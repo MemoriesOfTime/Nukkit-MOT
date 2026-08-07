@@ -709,7 +709,7 @@ public class BinaryStream {
             for (int i = 0; i < nbtTagCount; i++) {
                 try {
                     // TODO: 05/02/2019 This hack is necessary because we keep the raw NBT tag. Try to remove it.
-                    CompoundTag tag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN, true);
+                    CompoundTag tag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN, true);
                     // Hack for tool damage
                     if (tag.contains("Damage")) {
                         boolean isOriginStringItem = id != null
@@ -890,11 +890,11 @@ public class BinaryStream {
                 int nbtSize = stream.readShort();
                 CompoundTag compoundTag = null;
                 if (nbtSize > 0) {
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                    compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
                 } else if (nbtSize == -1) {
                     int tagCount = stream.readUnsignedByte();
                     if (tagCount != 1) throw new IllegalArgumentException("Expected 1 tag but got " + tagCount);
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                    compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
                 }
                 if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {
                     item.setCompoundTag(NBTIO.write(compoundTag, ByteOrder.LITTLE_ENDIAN));
@@ -979,11 +979,11 @@ public class BinaryStream {
 
             CompoundTag compoundTag = null;
             if (nbtSize > 0) {
-                compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
             } else if (nbtSize == -1) {
                 int tagCount = stream.readUnsignedByte();
                 if (tagCount != 1) throw new IllegalArgumentException("Expected 1 tag but got " + tagCount);
-                compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
             }
 
             if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {
@@ -1674,11 +1674,11 @@ public class BinaryStream {
 
                 CompoundTag compoundTag = null;
                 if (nbtSize > 0) {
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                    compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
                 } else if (nbtSize == -1) {
                     int tagCount = stream.readUnsignedByte();
                     if (tagCount != 1) throw new IllegalArgumentException("Expected 1 tag but got " + tagCount);
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                    compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
                 }
 
                 if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {

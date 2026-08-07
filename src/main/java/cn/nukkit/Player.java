@@ -3850,6 +3850,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 MovePlayerPacket movePlayerPacket = (MovePlayerPacket) packet;
+                if (!Float.isFinite(movePlayerPacket.x) || !Float.isFinite(movePlayerPacket.y) || !Float.isFinite(movePlayerPacket.z)
+                        || !Float.isFinite(movePlayerPacket.yaw) || !Float.isFinite(movePlayerPacket.pitch) || !Float.isFinite(movePlayerPacket.headYaw)) {
+                    server.getLogger().debug(username + ": infinite move player position");
+                    break;
+                }
                 Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                 double dis = newPos.distanceSquared(this);
 
@@ -3893,6 +3898,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 break;
             case ProtocolInfo.PLAYER_AUTH_INPUT_PACKET:
                 PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
+                Vector3f inputPos = authPacket.getPosition();
+                if (!Float.isFinite(inputPos.x) || !Float.isFinite(inputPos.y) || !Float.isFinite(inputPos.z)
+                        || !Float.isFinite(authPacket.getYaw()) || !Float.isFinite(authPacket.getPitch()) || !Float.isFinite(authPacket.getHeadYaw())) {
+                    server.getLogger().debug(username + ": infinite input position");
+                    return;
+                }
                 this.handleAuthInputItemStackRequest(authPacket);
 
                 if (!this.isMovementServerAuthoritative()) {

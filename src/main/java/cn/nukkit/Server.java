@@ -149,7 +149,7 @@ public class Server {
     private final Config whitelist;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
-    private boolean hasStopped;
+    private volatile boolean hasStopped;
 
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
@@ -1380,11 +1380,10 @@ public class Server {
         if (this.hasStopped) {
             return;
         }
+        this.hasStopped = true;
 
         try {
             isRunning.compareAndSet(true, false);
-
-            this.hasStopped = true;
 
             ServerStopEvent serverStopEvent = new ServerStopEvent();
             pluginManager.callEvent(serverStopEvent);
