@@ -2539,6 +2539,10 @@ public class Server {
             }
         }
 
+        if (name != null && (name.contains("/") || name.contains("\\"))) {
+            return this.findLevelByPath(this.resolveLevelFile(name));
+        }
+
         return null;
     }
 
@@ -2684,6 +2688,16 @@ public class Server {
      * name is recognized when re-requested via an equivalent path.
      */
     private boolean isLevelPathLoaded(File resolved) {
+        return this.findLevelByPath(resolved) != null;
+    }
+
+    /**
+     * 按规范化路径匹配已加载的世界，供 loadLevel 去重和 getLevelByName
+     * 的路径回退共用，保证两端用同一套比对逻辑。
+     * <p>Match an already-loaded level by canonical provider path, shared by
+     * loadLevel's dedup check and getLevelByName's path fallback.
+     */
+    private Level findLevelByPath(File resolved) {
         for (Level level : this.levelArray) {
             String providerPath;
             try {
@@ -2698,10 +2712,10 @@ public class Server {
                 loaded = new File(providerPath).getAbsoluteFile();
             }
             if (loaded.equals(resolved)) {
-                return true;
+                return level;
             }
         }
-        return false;
+        return null;
     }
 
     /**
