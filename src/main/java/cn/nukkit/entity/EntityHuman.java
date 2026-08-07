@@ -325,10 +325,7 @@ public class EntityHuman extends EntityHumanType {
             boolean retainNpcListEntry = !(this instanceof Player)
                     && PlayerEntitySkinSender.requiresRetainedEntry(player);
             if (this instanceof Player) {
-                // 仅在该观察者尚未收到本玩家列表项时下发 ADD，避免重复下发导致网易客户端隐形。
-                // Send the PlayerList ADD only when this viewer hasn't received it yet;
-                // resending ADD hides the entity on NetEase clients.
-                if (player.sentSkins.add(this.uuid)) {
+                if (!player.sentSkins.contains(this.uuid)) {
                     this.server.updatePlayerListData(
                             new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
                             new Player[]{player});

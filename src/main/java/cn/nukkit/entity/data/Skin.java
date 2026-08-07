@@ -11,7 +11,10 @@ import lombok.ToString;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.List;
 
@@ -394,6 +397,48 @@ public class Skin {
 
     public boolean isOverridingPlayerAppearance() {
         return this.overridingPlayerAppearance;
+    }
+
+    /**
+     * 对影响客户端渲染的皮肤负载计算 SHA-256 指纹，用于判断两次下发是否为同一张皮肤。
+     * <p>
+     * SHA-256 fingerprint over the skin payload that affects client rendering; tells whether two
+     * deliveries carry the same skin.
+     */
+    public String getContentFingerprint() {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
+        updateFingerprint(digest, this.getSkinId());
+        updateFingerprint(digest, this.getGeometryData());
+        updateFingerprint(digest, this.getSkinResourcePatch());
+        updateFingerprint(digest, this.getCapeId());
+        updateFingerprint(digest, this.getSkinData());
+        updateFingerprint(digest, this.getCapeData());
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static void updateFingerprint(MessageDigest digest, String value) {
+        updateFingerprint(digest, Objects.requireNonNullElse(value, "").getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void updateFingerprint(MessageDigest digest, SerializedImage image) {
+        updateFingerprint(digest, ByteBuffer.allocate(Integer.BYTES * 2)
+                .putInt(image.width)
+                .putInt(image.height)
+                .array());
+        updateFingerprint(digest, image.data);
+    }
+
+    private static void updateFingerprint(MessageDigest digest, byte[] value) {
+        byte[] data = Objects.requireNonNullElseGet(value, () -> new byte[0]);
+        // 长度前缀，避免相邻字段拼接出相同摘要。
+        // Length prefix, so adjacent fields cannot collide by concatenation.
+        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(data.length).array());
+        digest.update(data);
     }
 
     @OnlyNetEase

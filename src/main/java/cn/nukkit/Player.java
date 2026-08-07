@@ -311,6 +311,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public final Set<UUID> sentSkins = ConcurrentHashMap.newKeySet();
 
+    /**
+     * 已向本观察者确认过的皮肤指纹，键为被观察玩家 UUID；用于抑制网易 V860 的重复皮肤确认
+     * （对同一列表项二次确认会隐藏该实体，见 {@code PlayerEntitySkinSender#prepareConfirmSkin}）。
+     * <p>
+     * Skin fingerprints already confirmed to this viewer, keyed by subject UUID; suppresses duplicate
+     * NetEase V860 confirmations, which would hide the entity when the same entry is confirmed twice.
+     */
+    public final Map<UUID, String> confirmedSkins = new ConcurrentHashMap<>();
+
     protected Vector3 newPosition = null;
 
     protected int chunkRadius;
@@ -965,6 +974,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     || !viewer.sentSkins.contains(this.getUniqueId())) {
                 continue;
             }
+            viewer.confirmedSkins.remove(this.getUniqueId());
             PlayerSkinPacket packet = new PlayerSkinPacket();
             packet.uuid = this.getUniqueId();
             packet.skin = skin;
@@ -6393,7 +6403,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     // the REMOVE itself is broadcast by removeOnlinePlayer.
                     this.server.getOnlinePlayers().values().stream()
                             .filter(p -> p != this)
-                            .forEach(p -> p.sentSkins.remove(this.getUniqueId()));
+                            .forEach(p -> {
+                                p.sentSkins.remove(this.getUniqueId());
+                                p.confirmedSkins.remove(this.getUniqueId());
+                            });
                     this.loggedIn = false;
                 }
             }

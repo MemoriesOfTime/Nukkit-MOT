@@ -1610,6 +1610,7 @@ public class Server {
                 remove.type = PlayerListPacket.TYPE_REMOVE;
                 remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(playerListEntry.uuid)};
                 viewer.dataPacket(remove);
+                viewer.confirmedSkins.remove(playerListEntry.uuid);
             }
             viewer.sentSkins.add(playerListEntry.uuid);
         }
@@ -1631,6 +1632,7 @@ public class Server {
         for (Player player : players) {
             player.dataPacket(pk);
             player.sentSkins.remove(uuid);
+            player.confirmedSkins.remove(uuid);
         }
     }
 
