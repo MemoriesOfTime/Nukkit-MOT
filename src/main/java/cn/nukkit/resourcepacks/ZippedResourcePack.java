@@ -4,9 +4,9 @@ import cn.nukkit.Server;
 import com.google.gson.JsonParser;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -95,22 +95,25 @@ public class ZippedResourcePack extends AbstractResourcePack {
                 Server.getInstance().getLogger().logException(e);
             }
         }
-
         return this.sha256;
     }
 
     @Override
     public byte[] getPackChunk(int off, int len) {
+        int size = this.getPackSize();
         byte[] chunk;
-        if (this.getPackSize() - off > len) {
+        if (size - off > len) {
             chunk = new byte[len];
         } else {
-            chunk = new byte[this.getPackSize() - off];
+            chunk = new byte[size - off];
         }
 
-        try (FileInputStream fis = new FileInputStream(this.file)) {
-            fis.skip(off);
-            fis.read(chunk);
+        if (chunk.length == 0) {
+            return chunk;
+        }
+        try (RandomAccessFile raf = new RandomAccessFile(this.file, "r")) {
+            raf.seek(off);
+            raf.readFully(chunk);
         } catch (Exception e) {
             Server.getInstance().getLogger().logException(e);
         }
