@@ -2481,7 +2481,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setAbsorption(float absorption) {
-        if (absorption != this.absorption) {
+        if (absorption != this.absorption || (this instanceof Player player && player.protocol >= ProtocolInfo.v1_21_60)) {
             this.absorption = absorption;
             if (this instanceof Player player) player.setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
         }

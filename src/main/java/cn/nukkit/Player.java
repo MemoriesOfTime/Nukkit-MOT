@@ -3154,9 +3154,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             nbt.putString("Level", this.level.getName());
             Position sp = this.level.getSpawnLocation();
             nbt.getList("Pos", DoubleTag.class)
-                    .add(new DoubleTag("0", sp.x))
-                    .add(new DoubleTag("1", sp.y))
-                    .add(new DoubleTag("2", sp.z));
+                    .add(0, new DoubleTag("0", sp.x))
+                    .add(1, new DoubleTag("1", sp.y))
+                    .add(2, new DoubleTag("2", sp.z));
         } else {
             this.setLevel(level);
         }

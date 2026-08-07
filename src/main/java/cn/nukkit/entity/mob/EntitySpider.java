@@ -56,6 +56,9 @@ public class EntitySpider extends EntityWalkingMob implements EntityArthropod {
 
         super.initEntity();
 
+        // Keep eyes visible when invisible (vanilla behavior)
+        this.setDataFlag(Entity.DATA_FLAGS_EXTENDED, Entity.DATA_FLAG_RENDER_WHEN_INVISIBLE, true);
+
         this.setDamage(new int[] { 0, 2, 2, 3 });
     }
 
