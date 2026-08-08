@@ -26,7 +26,11 @@ public class MobArmorEquipmentPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.eid = this.getEntityRuntimeId();
+        if (this.protocol >= ProtocolInfo.v1_2_0) {
+            this.eid = this.getEntityRuntimeId();
+        } else {
+            this.eid = this.getEntityUniqueId();
+        }
         this.slots = new Item[4];
         this.slots[0] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
         this.slots[1] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
@@ -40,7 +44,11 @@ public class MobArmorEquipmentPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putEntityRuntimeId(this.eid);
+        if (this.protocol >= ProtocolInfo.v1_2_0) {
+            this.putEntityRuntimeId(this.eid);
+        } else {
+            this.putEntityUniqueId(this.eid);
+        }
         if (this.protocol >= ProtocolInfo.v1_26_30) {
             this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[0]);
             this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[1]);

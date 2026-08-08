@@ -45,15 +45,9 @@ public class MobEffectPacket extends DataPacket {
         this.reset();
         if (this.protocol < ProtocolInfo.v1_2_0) {
             this.putEntityUniqueId(this.eid);
-            this.putByte((byte) this.eventId);
-            this.putVarInt(this.effectId);
-            this.putVarInt(this.amplifier);
-            this.putBoolean(this.particles);
-            this.putVarInt(this.duration);
-            return;
+        } else {
+            this.putEntityRuntimeId(this.eid);
         }
-
-        this.putEntityRuntimeId(this.eid);
         this.putByte((byte) this.eventId);
         this.putVarInt(this.effectId);
         this.putVarInt(this.amplifier);

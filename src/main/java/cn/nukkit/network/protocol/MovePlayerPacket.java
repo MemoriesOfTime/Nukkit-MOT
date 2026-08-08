@@ -31,20 +31,9 @@ public class MovePlayerPacket extends DataPacket {
     public void decode() {
         if (protocol < ProtocolInfo.v1_2_0) {
             this.eid = this.getEntityUniqueId();
-            Vector3f v = this.getVector3f();
-            this.x = v.x;
-            this.y = v.y;
-            this.z = v.z;
-            this.pitch = this.getLFloat();
-            this.yaw = this.getLFloat();
-            this.headYaw = this.getLFloat();
-            this.mode = this.getByte();
-            this.onGround = this.getBoolean();
-            this.ridingEid = this.getEntityUniqueId();
-            return;
+        } else {
+            this.eid = this.getEntityRuntimeId();
         }
-
-        this.eid = this.getEntityRuntimeId();
         Vector3f v = this.getVector3f();
         this.x = v.x;
         this.y = v.y;
