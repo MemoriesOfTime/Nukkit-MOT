@@ -805,6 +805,7 @@ public class Server {
         Potion.init();
         Attribute.init();
         DispenseBehaviorRegister.init();
+        GlobalBlockPalette.setUseHashedBlockNetworkIds(this.serverConfig.customBlockSettings().useHashedBlockNetworkIds());
         CustomBlockManager.init(this);
         GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getLastVersion(), 0, 0);
         BiomeDefinitionListPacket.getCachedPacket(GameVersion.getLastVersion());
