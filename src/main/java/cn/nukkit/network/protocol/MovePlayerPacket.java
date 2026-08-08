@@ -43,7 +43,11 @@ public class MovePlayerPacket extends DataPacket {
         this.headYaw = this.getLFloat();
         this.mode = this.getByte();
         this.onGround = this.getBoolean();
-        this.ridingEid = this.getEntityRuntimeId();
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.ridingEid = this.getEntityUniqueId();
+        } else {
+            this.ridingEid = this.getEntityRuntimeId();
+        }
         if (this.protocol >= ProtocolInfo.v1_26_40) {
             // v2168 wraps the teleport block in a single outer boolean
             if (this.getBoolean()) {
@@ -64,24 +68,20 @@ public class MovePlayerPacket extends DataPacket {
         this.reset();
         if (protocol < ProtocolInfo.v1_2_0) {
             this.putEntityUniqueId(this.eid);
-            this.putVector3f(this.x, this.y, this.z);
-            this.putLFloat(this.pitch);
-            this.putLFloat(this.yaw);
-            this.putLFloat(this.headYaw);
-            this.putByte((byte) this.mode);
-            this.putBoolean(this.onGround);
-            this.putEntityUniqueId(this.ridingEid);
-            return;
+        }else{
+            this.putEntityRuntimeId(this.eid);
         }
-
-        this.putEntityRuntimeId(this.eid);
         this.putVector3f(this.x, this.y, this.z);
         this.putLFloat(this.pitch);
         this.putLFloat(this.yaw);
         this.putLFloat(this.headYaw);
         this.putByte((byte) this.mode);
         this.putBoolean(this.onGround);
-        this.putEntityRuntimeId(this.ridingEid);
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.ridingEid);
+        }else{
+            this.putEntityRuntimeId(this.ridingEid);
+        }
         if (this.protocol >= ProtocolInfo.v1_26_40) {
             this.putBoolean(this.mode == MODE_TELEPORT);
             if (this.mode == MODE_TELEPORT) {
