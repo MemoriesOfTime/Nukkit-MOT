@@ -205,7 +205,9 @@ public class CraftingDataPacket extends DataPacket {
                             this.putSlot(gameVersion, furnace.getResult(), true);
                             this.putUUID(furnace.getId());
                             String craftingTag;
-                            if (recipe instanceof BlastFurnaceRecipe) {
+                            if (recipe instanceof SmokerRecipe) {
+                                craftingTag = CRAFTING_TAG_SMOKER;
+                            } else if (recipe instanceof BlastFurnaceRecipe) {
                                 craftingTag = CRAFTING_TAG_BLAST_FURNACE;
                             } else {
                                 craftingTag = CRAFTING_TAG_FURNACE;
@@ -556,7 +558,7 @@ public class CraftingDataPacket extends DataPacket {
         this.putUnsignedVarInt(1); // Results length
         this.putSlot(gameVersion, furnace.getResult(), true);
         this.putUUID(furnace.getId());
-        this.putString(furnace instanceof BlastFurnaceRecipe ? CRAFTING_TAG_BLAST_FURNACE : CRAFTING_TAG_FURNACE);
+        this.putString(furnace instanceof SmokerRecipe ? CRAFTING_TAG_SMOKER : furnace instanceof BlastFurnaceRecipe ? CRAFTING_TAG_BLAST_FURNACE : CRAFTING_TAG_FURNACE);
         this.putVarInt(0); // priority
         this.putBoolean(false); // requirementPresent (furnace has no unlock requirement)
         this.putUnsignedVarInt(furnace.getNetworkId());
