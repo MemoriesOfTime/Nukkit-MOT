@@ -49,7 +49,7 @@ public class PlayerOffhandInventory extends BaseInventory {
 
     @Override
     public void sendContents(Player... players) {
-        Item item = this.getItemFast(0);
+        Item item = this.getItem(0);
         MobEquipmentPacket pk = this.createMobEquipmentPacket(item);
 
         for (Player player : players) {
@@ -67,7 +67,7 @@ public class PlayerOffhandInventory extends BaseInventory {
 
     @Override
     public void sendSlot(int index, Player... players) {
-        Item item = this.getItemFast(0);
+        Item item = this.getItem(0);
         MobEquipmentPacket pk = this.createMobEquipmentPacket(item);
 
         for (Player player : players) {

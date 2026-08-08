@@ -424,6 +424,10 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v975 1.26.20
      */
     public static final int DATA_FLAG_NAMEPLATE_DEPTH_TESTED = 129;
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int DATA_FLAG_NOT_PICKABLE_FROM_INSIDE = 130;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
@@ -2477,7 +2481,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setAbsorption(float absorption) {
-        if (absorption != this.absorption) {
+        if (absorption != this.absorption || (this instanceof Player player && player.protocol >= ProtocolInfo.v1_21_60)) {
             this.absorption = absorption;
             if (this instanceof Player player) player.setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
         }
@@ -3665,7 +3669,7 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if(Objects.equals(property.getIdentifier(), identifier) && property instanceof EnumEntityProperty enumEntityProperty) {
+            if(property instanceof EnumEntityProperty enumEntityProperty && Objects.equals(property.getIdentifier(), identifier)) {
                 int index = enumEntityProperty.findIndex(value);
 
                 if(index >= 0) {
@@ -3682,8 +3686,8 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if (!identifier.equals(property.getIdentifier()) ||
-                    !(property instanceof EnumEntityProperty enumProperty)) {
+            if (!(property instanceof EnumEntityProperty enumProperty) ||
+                    !identifier.equals(property.getIdentifier())) {
                 continue;
             }
             String[] values = enumProperty.getEnums();

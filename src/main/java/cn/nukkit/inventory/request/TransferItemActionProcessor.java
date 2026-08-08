@@ -169,7 +169,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
 
         // 防御：如果 src 的底层 setItem 不知为何把原物品写没了（如插件篡改为 AIR），
         // 也要把 src 恢复，避免客户端回滚看到不一致状态。
-        if (srcInv.getItem(srcSlot).isNull() && !fullTransfer) {
+        if (!fullTransfer && srcInv.getItem(srcSlot).isNull()) {
             srcInv.setItemForce(srcSlot, originalSourceItem);
         }
 

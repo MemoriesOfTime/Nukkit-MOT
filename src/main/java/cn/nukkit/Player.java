@@ -311,6 +311,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public final Set<UUID> sentSkins = ConcurrentHashMap.newKeySet();
 
+    /**
+     * 已向本观察者确认过的皮肤指纹，键为被观察玩家 UUID；用于抑制网易 V860 的重复皮肤确认
+     * （对同一列表项二次确认会隐藏该实体，见 {@code PlayerEntitySkinSender#prepareConfirmSkin}）。
+     * <p>
+     * Skin fingerprints already confirmed to this viewer, keyed by subject UUID; suppresses duplicate
+     * NetEase V860 confirmations, which would hide the entity when the same entry is confirmed twice.
+     */
+    public final Map<UUID, String> confirmedSkins = new ConcurrentHashMap<>();
+
     protected Vector3 newPosition = null;
 
     protected int chunkRadius;
@@ -965,6 +974,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     || !viewer.sentSkins.contains(this.getUniqueId())) {
                 continue;
             }
+            viewer.confirmedSkins.remove(this.getUniqueId());
             PlayerSkinPacket packet = new PlayerSkinPacket();
             packet.uuid = this.getUniqueId();
             packet.skin = skin;
@@ -2517,7 +2527,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             if (this.riding == null && this.inventory != null) {
-                if (this.isFoodEnabled() && this.getServer().getDifficulty() > 0 && distanceSquared >= 0.05) {
+                if (this.isFoodEnabled() && distanceSquared >= 0.05 && this.getServer().getDifficulty() > 0) {
                     double jump = 0;
                     double distance = Math.sqrt(distanceSquared);
                     double swimming = this.isInsideOfWater() ? 0.01 * distance : 0;
@@ -3166,9 +3176,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             nbt.putString("Level", this.level.getName());
             Position sp = this.level.getSpawnLocation();
             nbt.getList("Pos", DoubleTag.class)
-                    .add(new DoubleTag("0", sp.x))
-                    .add(new DoubleTag("1", sp.y))
-                    .add(new DoubleTag("2", sp.z));
+                    .add(0, new DoubleTag("0", sp.x))
+                    .add(1, new DoubleTag("1", sp.y))
+                    .add(2, new DoubleTag("2", sp.z));
         } else {
             this.setLevel(level);
         }
@@ -3297,6 +3307,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (dimensionDataPacket != null) {
                 this.forceDataPacket(dimensionDataPacket, null);
             }
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.forceDataPacket(new VoxelShapesPacket(), null);
         }
 
         StartGamePacket startGamePacket = new StartGamePacket();
@@ -3858,6 +3872,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 MovePlayerPacket movePlayerPacket = (MovePlayerPacket) packet;
+                if (!Float.isFinite(movePlayerPacket.x) || !Float.isFinite(movePlayerPacket.y) || !Float.isFinite(movePlayerPacket.z)
+                        || !Float.isFinite(movePlayerPacket.yaw) || !Float.isFinite(movePlayerPacket.pitch) || !Float.isFinite(movePlayerPacket.headYaw)) {
+                    server.getLogger().debug(username + ": infinite move player position");
+                    break;
+                }
                 Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                 double dis = newPos.distanceSquared(this);
 
@@ -3879,7 +3898,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = this.getLocation();
                 }
 
-                if (this.forceMovement != null && (newPos.distanceSquared(this.forceMovement) > 0.1 || revert)) {
+                if (this.forceMovement != null && (revert || newPos.distanceSquared(this.forceMovement) > 0.1)) {
                     this.sendPosition(this.forceMovement, MovePlayerPacket.MODE_RESET);
                 } else {
 
@@ -3901,6 +3920,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 break;
             case ProtocolInfo.PLAYER_AUTH_INPUT_PACKET:
                 PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
+                Vector3f inputPos = authPacket.getPosition();
+                if (!Float.isFinite(inputPos.x) || !Float.isFinite(inputPos.y) || !Float.isFinite(inputPos.z)
+                        || !Float.isFinite(authPacket.getYaw()) || !Float.isFinite(authPacket.getPitch()) || !Float.isFinite(authPacket.getHeadYaw())) {
+                    server.getLogger().debug(username + ": infinite input position");
+                    return;
+                }
                 this.handleAuthInputItemStackRequest(authPacket);
 
                 if (!this.isMovementServerAuthoritative()) {
@@ -4263,7 +4288,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = this.getLocation();
                 }
 
-                if (this.forceMovement != null && (clientPosition.distanceSquared(this.forceMovement) > 0.1 || revertMotion)) {
+                if (this.forceMovement != null && (revertMotion || clientPosition.distanceSquared(this.forceMovement) > 0.1)) {
                     this.sendPosition(this.forceMovement, MovePlayerPacket.MODE_RESET);
                 } else {
                     float yaw = authPacket.getYaw() % 360;
@@ -4780,6 +4805,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         ContainerClosePacket pk = new ContainerClosePacket();
                         pk.windowId = -1;
                         pk.wasServerInitiated = false;
+                        pk.type = containerClosePacket.type;
                         this.dataPacket(pk);
                     }
                     //TODO Find out why the correct id is not returned
@@ -4798,6 +4824,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     ContainerClosePacket pk = new ContainerClosePacket();
                     pk.windowId = containerClosePacket.windowId;
                     pk.wasServerInitiated = false;
+                    pk.type = containerClosePacket.type;
                     this.dataPacket(pk);
 
 //                    for (Inventory open : new ArrayList<>(this.windows.keySet())) {
@@ -5270,8 +5297,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             lastRightClickPos = blockVector;
                             lastRightClickTime = System.currentTimeMillis();
 
-                            if (spamming && (this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR
-                                    || (this.isSpectator() && !this.server.useClientSpectator))) {
+                            if (spamming && ((this.isSpectator() && !this.server.useClientSpectator)
+                                    || this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR)) {
                                 return;
                             }
 
@@ -5297,13 +5324,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         Item i = serverItem;
                                         Item oldItem = i.clone();
                                         if ((i = this.level.useItemOn(blockVector.asVector3(), i, face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this)) != null) {
-                                            if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
+                                            boolean itemChanged = !i.equals(oldItem) || i.getCount() != oldItem.getCount();
+                                            if (itemChanged) {
                                                 if (oldItem.getId() == i.getId() || i.getId() == 0) {
                                                     inventory.setItemInHand(i);
                                                 } else {
                                                     server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
                                                 }
                                                 inventory.sendHeldItem(this.getViewers().values());
+                                            } else if (!oldItem.equalsExact(useItemData.itemInHand)) {
+                                                this.needSendHeldItem = true;
                                             }
                                             break transactionSwitch;
                                         } else {
@@ -5777,7 +5807,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         // HACK: Client spams multiple left clicks so we need to skip them.
-        if ((this.lastBreakPosition.equals(blockPos) && (currentBreak - this.lastBreak) < 10) || pos.distanceSquared(this) > 100) {
+        if (((currentBreak - this.lastBreak) < 10 && this.lastBreakPosition.equals(blockPos)) || pos.distanceSquared(this) > 100) {
             return;
         }
 
@@ -5919,7 +5949,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         int maxMsgLength = this.protocol >= ProtocolInfo.v1_18_0 ? 512 : 255;
 
         for (String msg : message.split("\n")) {
-            if (!msg.trim().isEmpty() && msg.length() <= maxMsgLength) {
+            if (msg.length() <= maxMsgLength && !msg.trim().isEmpty()) {
                 PlayerChatEvent chatEvent = new PlayerChatEvent(this, msg);
                 this.server.getPluginManager().callEvent(chatEvent);
                 if (!chatEvent.isCancelled()) {
@@ -6385,12 +6415,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     // the REMOVE itself is broadcast by removeOnlinePlayer.
                     this.server.getOnlinePlayers().values().stream()
                             .filter(p -> p != this)
-                            .forEach(p -> p.sentSkins.remove(this.getUniqueId()));
+                            .forEach(p -> {
+                                p.sentSkins.remove(this.getUniqueId());
+                                p.confirmedSkins.remove(this.getUniqueId());
+                            });
                     this.loggedIn = false;
                 }
             }
 
-            if (ev != null && !Objects.equals(this.username, "") && this.spawned && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
                 this.server.broadcastMessage(ev.getQuitMessage());
             }
 
@@ -8244,7 +8277,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
         Player other = (Player) obj;
-        return Objects.equals(this.getUniqueId(), other.getUniqueId()) && this.getId() == other.getId();
+        return this.getId() == other.getId() && Objects.equals(this.getUniqueId(), other.getUniqueId());
     }
 
     public boolean isBreakingBlock() {

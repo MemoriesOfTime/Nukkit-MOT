@@ -73,7 +73,6 @@ import cn.nukkit.plugin.service.NKServiceManager;
 import cn.nukkit.plugin.service.ServiceManager;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
-import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.resourcepacks.ResourcePackManager;
 import cn.nukkit.resourcepacks.loader.JarPluginResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
@@ -88,6 +87,7 @@ import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
 import cn.nukkit.utils.serverconfig.ConfigComments;
 import cn.nukkit.utils.serverconfig.ConfigMigration;
+import cn.nukkit.utils.serverconfig.ResourcePackMigration;
 import cn.nukkit.utils.serverconfig.ServerConfig;
 import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import com.google.common.base.Preconditions;
@@ -149,7 +149,7 @@ public class Server {
     private final Config whitelist;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
-    private boolean hasStopped;
+    private volatile boolean hasStopped;
 
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
@@ -827,13 +827,11 @@ public class Server {
         this.serverID = UUID.randomUUID();
 
         this.craftingManager = new CraftingManager();
+        ResourcePackMigration.migrate(new File(Nukkit.DATA_PATH));
         HashSet<ResourcePackLoader> packLoaders = new HashSet<>();
         packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")));
+        packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs")));
         packLoaders.add(new JarPluginResourcePackLoader(new File(this.pluginPath)));
-        if (this.netEaseMode) {
-            packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs_netease"), ResourcePack.SupportType.NETEASE));
-            packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs_netease"), ResourcePack.SupportType.NETEASE));
-        }
         this.resourcePackManager = new ResourcePackManager(packLoaders);
 
         this.pluginManager = new PluginManager(this, this.commandMap);
@@ -995,7 +993,7 @@ public class Server {
                 content.close();
 
                 boolean isMaster = Nukkit.getBranch().equals("master");
-                if (!this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null") && isMaster) {
+                if (isMaster && !this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null")) {
                     this.getLogger().info("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + this.getNukkitVersion() + " Latest: " + latest);
                     this.getLogger().info("§c[Nukkit-MOT][Update] §eYou can download the latest build from https://github.com/MemoriesOfTime/Nukkit-MOT/");
                 } else if (!isMaster) {
@@ -1042,39 +1040,213 @@ public class Server {
         return recipients.size();
     }
 
-    public int broadcast(String message, String permissions) {
+    /**
+     * 收集订阅了任一指定权限频道的去重 {@link CommandSender} 集合。
+     * <p>
+     * Collect the de-duplicated {@link CommandSender}s subscribed to at least one given permission channel.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 a {@code ;}-separated permission channel list
+     */
+    private Set<CommandSender> getBroadcastRecipients(String permissions) {
         Set<CommandSender> recipients = new HashSet<>();
-
         for (String permission : permissions.split(";")) {
             for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
-                if (permissible instanceof CommandSender && permissible.hasPermission(permission)) {
-                    recipients.add((CommandSender) permissible);
+                if (permissible instanceof CommandSender sender && permissible.hasPermission(permission)) {
+                    recipients.add(sender);
                 }
             }
         }
+        return recipients;
+    }
 
+    /**
+     * 向全体用户频道广播标题（默认淡入/停留/淡出 20/20/5）。
+     * <p>
+     * Broadcast a title with subtitle to the default user channel (default timings 20/20/5).
+     *
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle) {
+        return this.broadcastTitle(title, subtitle, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播标题。Broadcast a title to the subscribers of the given permission channels.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 {@code ;}-separated permission channels
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle, String permissions) {
+        return this.broadcastTitle(title, subtitle, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播标题（默认淡入/停留/淡出 20/20/5）。
+     * <p>
+     * Broadcast a title to the given recipients with default timings; only {@link Player} recipients display it.
+     *
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle, Collection<? extends CommandSender> recipients) {
+        return this.broadcastTitle(title, subtitle, 20, 20, 5, recipients);
+    }
+
+    /**
+     * 向全体用户频道广播标题，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast a title with custom fade-in/stay/fade-out (in ticks) to the default user channel.
+     */
+    public int broadcastTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        return this.broadcastTitle(title, subtitle, fadeIn, stay, fadeOut, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播标题，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast a title with custom timings to the subscribers of the given permission channels.
+     */
+    public int broadcastTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut, String permissions) {
+        return this.broadcastTitle(title, subtitle, fadeIn, stay, fadeOut, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播标题，可自定义淡入/停留/淡出（tick）；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast a title with custom timings to the given recipients; only {@link Player} recipients display it.
+     *
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 向全体用户频道广播 Tip 消息。
+     * <p>
+     * Broadcast a tip to the default user channel; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Tip 的玩家数 number of players that displayed the tip
+     */
+    public int broadcastTip(String message) {
+        return this.broadcastTip(message, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播 Tip 消息。Broadcast a tip to the subscribers of the given permission channels.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 {@code ;}-separated permission channels
+     * @return 实际显示 Tip 的玩家数 number of players that displayed the tip
+     */
+    public int broadcastTip(String message, String permissions) {
+        return this.broadcastTip(message, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播 Tip 消息；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast a tip to the given recipients; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Tip 的玩家数 number of players that displayed the tip
+     */
+    public int broadcastTip(String message, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendTip(message);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 向全体用户频道广播 Action Bar 消息（默认淡入/停留/淡出 1/0/1）。
+     * <p>
+     * Broadcast an action bar to the default user channel (default timings 1/0/1).
+     *
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message) {
+        return this.broadcastActionBar(message, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播 Action Bar 消息。Broadcast an action bar to the subscribers of the given permission channels.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 {@code ;}-separated permission channels
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message, String permissions) {
+        return this.broadcastActionBar(message, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播 Action Bar 消息（默认淡入/停留/淡出 1/0/1）；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast an action bar to the given recipients with default timings; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message, Collection<? extends CommandSender> recipients) {
+        return this.broadcastActionBar(message, 1, 0, 1, recipients);
+    }
+
+    /**
+     * 向全体用户频道广播 Action Bar 消息，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast an action bar with custom fade-in/duration/fade-out (in ticks) to the default user channel.
+     */
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut) {
+        return this.broadcastActionBar(message, fadeIn, duration, fadeOut, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播 Action Bar 消息，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast an action bar with custom timings to the subscribers of the given permission channels.
+     */
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, String permissions) {
+        return this.broadcastActionBar(message, fadeIn, duration, fadeOut, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播 Action Bar 消息，可自定义淡入/停留/淡出（tick）；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast an action bar with custom timings to the given recipients; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendActionBar(message, fadeIn, duration, fadeOut);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int broadcast(String message, String permissions) {
+        Set<CommandSender> recipients = getBroadcastRecipients(permissions);
         for (CommandSender recipient : recipients) {
             recipient.sendMessage(message);
         }
-
         return recipients.size();
     }
 
     public int broadcast(TextContainer message, String permissions) {
-        Set<CommandSender> recipients = new HashSet<>();
-
-        for (String permission : permissions.split(";")) {
-            for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
-                if (permissible instanceof CommandSender && permissible.hasPermission(permission)) {
-                    recipients.add((CommandSender) permissible);
-                }
-            }
-        }
-
+        Set<CommandSender> recipients = getBroadcastRecipients(permissions);
         for (CommandSender recipient : recipients) {
             recipient.sendMessage(message);
         }
-
         return recipients.size();
     }
 
@@ -1208,11 +1380,10 @@ public class Server {
         if (this.hasStopped) {
             return;
         }
+        this.hasStopped = true;
 
         try {
             isRunning.compareAndSet(true, false);
-
-            this.hasStopped = true;
 
             ServerStopEvent serverStopEvent = new ServerStopEvent();
             pluginManager.callEvent(serverStopEvent);
@@ -1439,6 +1610,7 @@ public class Server {
                 remove.type = PlayerListPacket.TYPE_REMOVE;
                 remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(playerListEntry.uuid)};
                 viewer.dataPacket(remove);
+                viewer.confirmedSkins.remove(playerListEntry.uuid);
             }
             viewer.sentSkins.add(playerListEntry.uuid);
         }
@@ -1460,6 +1632,7 @@ public class Server {
         for (Player player : players) {
             player.dataPacket(pk);
             player.sentSkins.remove(uuid);
+            player.confirmedSkins.remove(uuid);
         }
     }
 
@@ -2379,6 +2552,10 @@ public class Server {
             }
         }
 
+        if (name != null && (name.contains("/") || name.contains("\\"))) {
+            return this.findLevelByPath(this.resolveLevelFile(name));
+        }
+
         return null;
     }
 
@@ -2524,6 +2701,16 @@ public class Server {
      * name is recognized when re-requested via an equivalent path.
      */
     private boolean isLevelPathLoaded(File resolved) {
+        return this.findLevelByPath(resolved) != null;
+    }
+
+    /**
+     * 按规范化路径匹配已加载的世界，供 loadLevel 去重和 getLevelByName
+     * 的路径回退共用，保证两端用同一套比对逻辑。
+     * <p>Match an already-loaded level by canonical provider path, shared by
+     * loadLevel's dedup check and getLevelByName's path fallback.
+     */
+    private Level findLevelByPath(File resolved) {
         for (Level level : this.levelArray) {
             String providerPath;
             try {
@@ -2538,10 +2725,10 @@ public class Server {
                 loaded = new File(providerPath).getAbsoluteFile();
             }
             if (loaded.equals(resolved)) {
-                return true;
+                return level;
             }
         }
-        return false;
+        return null;
     }
 
     /**

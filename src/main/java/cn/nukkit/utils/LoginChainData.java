@@ -1,5 +1,6 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.encryption.EncryptionUtils;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
@@ -116,5 +117,14 @@ public interface LoginChainData {
 
     default String getNetEaseEnv() {
         return "";
+    }
+
+    /**
+     * 网易客户端是否为断线重连。
+     * <p>Whether the NetEase client is reconnecting after a disconnect.
+     */
+    @OnlyNetEase
+    default boolean isNetEaseReconnect() {
+        return false;
     }
 }

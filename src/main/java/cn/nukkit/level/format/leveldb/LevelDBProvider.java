@@ -48,6 +48,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -87,6 +88,10 @@ public class LevelDBProvider implements LevelProvider {
     // One slot per chunk: newest batch wins and commits before reads.
     private final ConcurrentHashMap<Long, PendingWrite> pendingWrites = new ConcurrentHashMap<>();
     private volatile boolean pendingWriteBacklogWarned;
+    // 重试耗尽的槽位数；与 failed 标记为 true 的条目数一致。
+    // Slots with retries exhausted; matches the number of entries flagged failed.
+    private final AtomicInteger failedWrites = new AtomicInteger();
+    private volatile long nextFailedWriteRetryAt;
 
     private static final int MAX_PENDING_WRITE_RETRIES = 3;
 
@@ -95,6 +100,10 @@ public class LevelDBProvider implements LevelProvider {
     long closeSweepLockTimeoutMillis = TimeUnit.SECONDS.toMillis(5);
     long closeSweepBudgetMillis = TimeUnit.SECONDS.toMillis(60);
     long databaseCloseTimeoutMillis = TimeUnit.SECONDS.toMillis(5);
+    // 失败槽位的重试间隔与保留上限；包内可变以便测试注入。
+    // Retry interval and retention cap for failed slots; mutable for tests.
+    long failedWriteRetryIntervalMillis = TimeUnit.SECONDS.toMillis(30);
+    int maxRetainedFailedWrites = 1024;
 
     // 字段仅在持有 lock 时读写 / Fields are read and written only while holding lock
     static final class PendingWrite {
@@ -104,6 +113,12 @@ public class LevelDBProvider implements LevelProvider {
         LevelDBChunk chunkRef;
         int retries;
         Throwable failure;
+        // 例外：重试清扫需免锁筛选候选，故用 volatile 保证可见性。
+        // Exception: the retry sweep selects candidates lock-free, so this stays volatile.
+        volatile boolean failed;
+        // 例外：清扫在锁外用 CAS 抢占排队名额，同槽位至多一个待执行的重投任务。
+        // Exception: the sweep claims a queue slot by CAS outside the lock, capping re-drives at one per slot.
+        final AtomicBoolean retryQueued = new AtomicBoolean();
     }
 
     private enum PendingWriteCommit {
@@ -728,6 +743,8 @@ public class LevelDBProvider implements LevelProvider {
                 pw.chunkRef = keepChunkRef ? chunk : null;
                 pw.retries = 0;
                 pw.failure = null;
+                // 新批次取代失败批次，重试预算随之重置。/ A new batch supersedes the failed one and resets its budget.
+                this.clearPendingWriteFailure(pw);
             } finally {
                 pw.lock.unlock();
             }
@@ -763,6 +780,8 @@ public class LevelDBProvider implements LevelProvider {
                 continue;
             }
             if (result == PendingWriteCommit.FAILED) {
+                // 批次可能已因超限被丢弃，此时须摘除空槽位。/ The batch may have been dropped at the cap; drop the empty slot.
+                this.removeEmptyPendingWrite(hash, pw);
                 throw new DBException("Failed to commit chunk at " + Level.getHashX(hash) + ", " + Level.getHashZ(hash), failure);
             }
             this.removeEmptyPendingWrite(hash, pw);
@@ -815,6 +834,7 @@ public class LevelDBProvider implements LevelProvider {
                 }
             }
             if (result == PendingWriteCommit.FAILED) {
+                this.removeEmptyPendingWrite(hash, pw);
                 return false;
             }
             this.removeEmptyPendingWrite(hash, pw);
@@ -835,6 +855,7 @@ public class LevelDBProvider implements LevelProvider {
             try {
                 this.db.write(batch);
                 pw.failure = null;
+                this.clearPendingWriteFailure(pw);
                 if (pw.chunkRef != null) {
                     pw.chunkRef.clearChangesIfUnmodified(pw.changeSnapshot);
                 }
@@ -848,16 +869,57 @@ public class LevelDBProvider implements LevelProvider {
                     log.warn("Chunk write failed for {} at {}, {} (retry {}/{})", this.getName(),
                             Level.getHashX(hash), Level.getHashZ(hash), pw.retries, MAX_PENDING_WRITE_RETRIES, e);
                 } else {
-                    // 保留 batch 并失败屏障，供后续重试。/ Retain the batch and fail the barrier.
-                    pw.batch = batch;
                     pw.failure = e;
                     result = PendingWriteCommit.FAILED;
-                    log.error("Chunk write remains pending for {} at {}, {} after {} retries", this.getName(),
-                            Level.getHashX(hash), Level.getHashZ(hash), MAX_PENDING_WRITE_RETRIES, e);
+                    if (pw.failed) {
+                        // 已占用保留额度；重投再次失败只留摘要，避免故障期间日志刷屏。
+                        // Already holds a retention slot; a re-drive failure logs a summary only to avoid flooding.
+                        pw.batch = batch;
+                        log.warn("Chunk write for {} at {}, {} still failing after {} retries: {}", this.getName(),
+                                Level.getHashX(hash), Level.getHashZ(hash), MAX_PENDING_WRITE_RETRIES, e.toString());
+                    } else if (this.tryReserveFailedWrite(pw)) {
+                        // 保留 batch 并失败屏障，交给重试清扫。/ Retain the batch and fail the barrier; the retry sweep drives it.
+                        pw.batch = batch;
+                        log.error("Chunk write remains pending for {} at {}, {} after {} retries", this.getName(),
+                                Level.getHashX(hash), Level.getHashZ(hash), MAX_PENDING_WRITE_RETRIES, e);
+                    } else {
+                        // 保留上限已满：丢弃本批次，否则持续故障会让失败槽无界增长。
+                        // Retention cap reached: drop this batch, or a sustained fault grows failed slots without bound.
+                        closeBatchQuietly(batch, this.getName());
+                        log.error("Discarding chunk write for {} at {}, {} after {} retries; {} failed writes already retained (limit {}) - this chunk's changes are lost",
+                                this.getName(), Level.getHashX(hash), Level.getHashZ(hash), MAX_PENDING_WRITE_RETRIES,
+                                this.failedWrites.get(), this.maxRetainedFailedWrites, e);
+                    }
                 }
             }
         }
         return result;
+    }
+
+    /**
+     * 原子预留保留额度并标记槽位；超限返回 {@code false}。调用方须持有 {@code pw.lock}。
+     * Atomically reserves a retention slot and flags the entry; returns {@code false} at the cap. Requires {@code pw.lock}.
+     */
+    private boolean tryReserveFailedWrite(PendingWrite pw) {
+        if (pw.failed) {
+            return true;
+        }
+        // 先占位再校验，避免多个槽位同时通过检查后一起越过上限。
+        // Claim first and validate after, so concurrent slots cannot both pass the check and overshoot the cap.
+        if (this.failedWrites.incrementAndGet() > this.maxRetainedFailedWrites) {
+            this.failedWrites.decrementAndGet();
+            return false;
+        }
+        pw.failed = true;
+        return true;
+    }
+
+    /** 清除重试耗尽标记；调用方须持有 {@code pw.lock}。/ Clears the retry-exhausted flag with {@code pw.lock} held. */
+    private void clearPendingWriteFailure(PendingWrite pw) {
+        if (pw.failed) {
+            pw.failed = false;
+            this.failedWrites.decrementAndGet();
+        }
     }
 
     private void removeEmptyPendingWrite(long hash, PendingWrite pw) {
@@ -867,11 +929,58 @@ public class LevelDBProvider implements LevelProvider {
             }
             cur.lock.lock();
             try {
-                return cur.batch == null ? null : cur;
+                if (cur.batch != null) {
+                    return cur;
+                }
+                this.clearPendingWriteFailure(cur);
+                return null;
             } finally {
                 cur.lock.unlock();
             }
         });
+    }
+
+    /**
+     * 按间隔重投失败槽位，故障恢复后即可落盘。
+     * Re-drives failed slots on an interval so they land once the fault clears.
+     */
+    private void retryFailedWrites() {
+        if (this.closed || this.failedWrites.get() <= 0) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now < this.nextFailedWriteRetryAt) {
+            return;
+        }
+        this.nextFailedWriteRetryAt = now + this.failedWriteRetryIntervalMillis;
+        for (Entry<Long, PendingWrite> entry : this.pendingWrites.entrySet()) {
+            // 免锁筛选：漏选的槽位会在下一轮清扫补上。/ Lock-free filter: a missed slot is picked up next sweep.
+            PendingWrite pw = entry.getValue();
+            // executor 阻塞时不重复排队，否则恢复后会形成重投风暴。
+            // Skip slots already queued, or a blocked executor turns recovery into a re-drive storm.
+            if (pw.failed && pw.retryQueued.compareAndSet(false, true)) {
+                this.enqueueRetry(entry.getKey(), pw);
+            }
+        }
+    }
+
+    private void enqueueRetry(long hash, PendingWrite pw) {
+        Runnable retry = () -> {
+            // 先释放排队名额，任务执行期间可再接受一次清扫排队。
+            // Release the queue slot first, so one further sweep may queue while this runs.
+            pw.retryQueued.set(false);
+            try {
+                this.commitPendingWrite(hash);
+            } catch (DBException ignored) {
+                // 失败已记录；batch 留待下一轮清扫。/ Failure logged; the batch waits for the next sweep.
+            }
+        };
+        try {
+            this.executor.execute(retry);
+        } catch (RejectedExecutionException e) {
+            // executor 已关闭时同步兜底。/ Retry inline after executor shutdown.
+            retry.run();
+        }
     }
 
     private void enqueueCommit(long hash) {
@@ -899,7 +1008,7 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private void warnOnPendingWriteBacklog() {
-        int size = this.pendingWrites.size();
+        int size = this.getActivePendingWriteCount();
         int max = Server.getInstance().maxPendingChunkWrites;
         if (size >= max) {
             if (!this.pendingWriteBacklogWarned) {
@@ -911,14 +1020,27 @@ public class LevelDBProvider implements LevelProvider {
         }
     }
 
-    /** 挂起的区块写数。/ Number of pending chunk writes. */
+    /**
+     * 仍可推进的挂起写数；失败槽位由重试清扫驱动，不参与背压。
+     * Pending writes that can still progress; failed slots are driven by the retry sweep and stay out of backpressure.
+     */
+    private int getActivePendingWriteCount() {
+        return Math.max(0, this.pendingWrites.size() - this.failedWrites.get());
+    }
+
+    /** 挂起的区块写数（含失败槽位）。/ Number of pending chunk writes, failed slots included. */
     public int getPendingWriteCount() {
         return this.pendingWrites.size();
     }
 
+    /** 重试耗尽、等待清扫重投的槽位数。/ Retry-exhausted slots awaiting the retry sweep. */
+    public int getFailedWriteCount() {
+        return this.failedWrites.get();
+    }
+
     @Override
     public boolean isChunkSaveBacklogged() {
-        return this.pendingWrites.size() >= Server.getInstance().maxPendingChunkWrites;
+        return this.getActivePendingWriteCount() >= Server.getInstance().maxPendingChunkWrites;
     }
 
     private WriteBatch save0(int chunkX, int chunkZ, LevelDBChunk chunk) {
@@ -1025,11 +1147,16 @@ public class LevelDBProvider implements LevelProvider {
         while (iterator.hasNext()) {
             LevelDBChunk chunk = (LevelDBChunk) iterator.next();
             if (wait) {
-                // 先提交挂起写，避免关闭时重复序列化。/ Commit pending data before close-time save.
-                this.commitPendingWrite(Level.chunkHash(chunk.getX(), chunk.getZ()));
-                // 落盘后仍脏才同步重存。/ Sync-save only if still dirty.
-                if (chunk.hasChanged()) {
-                    this.saveChunkSync(chunk.getX(), chunk.getZ(), chunk);
+                // 单个区块失败不得中断其余区块的保存。/ One failing chunk must not abort the remaining saves.
+                try {
+                    // 先提交挂起写，避免关闭时重复序列化。/ Commit pending data before close-time save.
+                    this.commitPendingWrite(Level.chunkHash(chunk.getX(), chunk.getZ()));
+                    // 落盘后仍脏才同步重存。/ Sync-save only if still dirty.
+                    if (chunk.hasChanged()) {
+                        this.saveChunkSync(chunk.getX(), chunk.getZ(), chunk);
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to save chunk {}, {} during close for: {}", chunk.getX(), chunk.getZ(), this.getName(), e);
                 }
             }
             chunk.unload(level.isSaveOnUnloadEnabled(), false);
@@ -1263,18 +1390,33 @@ public class LevelDBProvider implements LevelProvider {
             } catch (InterruptedException e) {
                 this.executor.shutdownNow();
             }
-            // 排空超时后限时抢救 batch；跳过被卡写入占用的槽。
-            // On drain timeout, flush within a budget and skip slots held by wedged writes.
+            // 限时抢救残留 batch；持续故障时每槽写入可能耗时数秒，故两条路径共用同一预算。
+            // Flush leftover batches within a budget; a sustained fault costs seconds per slot, so both paths share it.
+            long deadline = System.currentTimeMillis() + this.closeSweepBudgetMillis;
             if (drained) {
+                int abandoned = 0;
                 for (Long hash : new ArrayList<>(this.pendingWrites.keySet())) {
-                    this.commitPendingWrite(hash);
+                    if (System.currentTimeMillis() >= deadline) {
+                        abandoned++;
+                        continue;
+                    }
+                    // 单个槽位失败不得中断其余槽位的排空。/ One failing slot must not abort the remaining flushes.
+                    try {
+                        this.commitPendingWrite(hash);
+                    } catch (DBException e) {
+                        log.error("Failed to flush pending chunk write at {}, {} during close for: {}",
+                                Level.getHashX(hash), Level.getHashZ(hash), this.getName(), e);
+                    }
+                }
+                if (abandoned > 0) {
+                    log.warn("Close-time flush budget of {} ms exhausted for: {}; {} pending chunk writes abandoned",
+                            this.closeSweepBudgetMillis, this.getName(), abandoned);
                 }
             } else if (!this.pendingWrites.isEmpty()) {
                 log.warn("Executor drain timed out with {} pending chunk writes for: {}; attempting bounded inline flush", this.pendingWrites.size(), this.getName());
-                long deadline = System.currentTimeMillis() + this.closeSweepBudgetMillis;
                 int abandoned = 0;
                 for (Long hash : new ArrayList<>(this.pendingWrites.keySet())) {
-                    if (System.currentTimeMillis() > deadline
+                    if (System.currentTimeMillis() >= deadline
                             || !this.tryCommitPendingWrite(hash, this.closeSweepLockTimeoutMillis)) {
                         abandoned++;
                     }
@@ -1465,6 +1607,12 @@ public class LevelDBProvider implements LevelProvider {
     @Override
     public void doGarbageCollection() {
         //leveldb不需要回收regions
+        this.retryFailedWrites();
+    }
+
+    @Override
+    public void doGarbageCollection(long time) {
+        this.retryFailedWrites();
     }
 
     public CompoundTag getLevelData() {

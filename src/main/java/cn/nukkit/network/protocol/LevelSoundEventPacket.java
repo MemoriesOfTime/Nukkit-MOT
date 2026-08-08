@@ -945,8 +945,20 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v1001
      */
     public static final int SOUND_GEYSER_CONTINUOUS_ERUPTION_ACTIVE = 610;
+    /**
+     * @since v2168
+     */
+    public static final int SOUND_MOUNT = 611;
+    /**
+     * @since v2168
+     */
+    public static final int SOUND_DISMOUNT = 612;
+    /**
+     * @since v2168
+     */
+    public static final int SOUND_STRAW_BED_BREAK_LEAVE = 613;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(611);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(614);
 
     public int sound;
     public float x;
@@ -1598,6 +1610,9 @@ public class LevelSoundEventPacket extends DataPacket {
             case SOUND_BUCKET_EMPTY_LAND_ANIMAL -> "bucket.empty.land_animal";
             case SOUND_GEYSER_CONTINUOUS_ERUPTION_START -> "geyser_continuous_eruption_start";
             case SOUND_GEYSER_CONTINUOUS_ERUPTION_ACTIVE -> "geyser_continuous_eruption_active";
+            case SOUND_MOUNT -> "mount";
+            case SOUND_DISMOUNT -> "dismount";
+            case SOUND_STRAW_BED_BREAK_LEAVE -> "straw_bed.break_leave";
             default -> SOUND_UNDEFINED_NAME;
         };
     }

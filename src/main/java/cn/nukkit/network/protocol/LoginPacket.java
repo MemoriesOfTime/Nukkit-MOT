@@ -88,7 +88,7 @@ public class LoginPacket extends DataPacket {
             authType = AuthType.values()[authTypeOrdinal + 1];
         }
 
-        if (map.containsKey("Token") && map.get("Token") instanceof String token && !((String) map.get("Token")).isBlank()) {
+        if (map.get("Token") instanceof String token && !token.isBlank()) {
             return new TokenPayload(token, authType);
         } else {
             String certificate = (String) map.get("Certificate");
@@ -264,6 +264,16 @@ public class LoginPacket extends DataPacket {
                 for (JsonElement object : skinToken.get("PieceTintColors").getAsJsonArray()) {
                     skin.getTintColors().add(getTint(object.getAsJsonObject()));
                 }
+            }
+
+            if (skinToken.has("SkinIID")) {
+                skin.setSkinIID(skinToken.get("SkinIID").getAsString());
+            }
+            if (skinToken.has("GrowthLevel")) {
+                skin.setGrowthLevel(skinToken.get("GrowthLevel").getAsInt());
+            }
+            if (skinToken.has("BloomData")) {
+                skin.setBloomData(skinToken.get("BloomData").getAsString());
             }
         }
     }

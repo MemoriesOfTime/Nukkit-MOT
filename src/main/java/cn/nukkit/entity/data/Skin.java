@@ -1,6 +1,7 @@
 package cn.nukkit.entity.data;
 
 import cn.nukkit.Server;
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
 import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
@@ -10,7 +11,10 @@ import lombok.ToString;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.List;
 
@@ -75,6 +79,14 @@ public class Skin {
     private boolean trusted = true;
     private String geometryDataEngineVersion = "0.0.0";
     private boolean overridingPlayerAppearance = true;
+    private String profileHash = "";
+
+    @OnlyNetEase
+    private String skinIID = "";
+    @OnlyNetEase
+    private int growthLevel;
+    @OnlyNetEase
+    private String bloomData = "";
 
     public boolean isValid() {
         return isValid(Server.getInstance().doNotLimitSkinGeometry);
@@ -90,7 +102,7 @@ public class Skin {
 
     private boolean isValidSkin(boolean doNotLimitSkinGeometry) {
         String geometryData = this.getGeometryData();
-        return skinId != null && !skinId.trim().isEmpty() && skinId.length() < 100 && //skinId
+        return skinId != null && skinId.length() < 100 && !skinId.trim().isEmpty() && //skinId
                 skinData != null && skinData.width >= 64 && skinData.height >= 32 &&
                 skinData.data.length >= SINGLE_SKIN_SIZE && (doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE) && //skinData
                 ((geometryData != null && !geometryData.isEmpty()) &&
@@ -313,6 +325,14 @@ public class Skin {
         this.trusted = trusted;
     }
 
+    public String getProfileHash() {
+        return profileHash;
+    }
+
+    public void setProfileHash(String profileHash) {
+        this.profileHash = profileHash == null ? "" : profileHash;
+    }
+
     public String getSkinColor() {
         return skinColor;
     }
@@ -377,6 +397,78 @@ public class Skin {
 
     public boolean isOverridingPlayerAppearance() {
         return this.overridingPlayerAppearance;
+    }
+
+    /**
+     * 对影响客户端渲染的皮肤负载计算 SHA-256 指纹，用于判断两次下发是否为同一张皮肤。
+     * <p>
+     * SHA-256 fingerprint over the skin payload that affects client rendering; tells whether two
+     * deliveries carry the same skin.
+     */
+    public String getContentFingerprint() {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
+        updateFingerprint(digest, this.getSkinId());
+        updateFingerprint(digest, this.getGeometryData());
+        updateFingerprint(digest, this.getSkinResourcePatch());
+        updateFingerprint(digest, this.getCapeId());
+        updateFingerprint(digest, this.getSkinData());
+        updateFingerprint(digest, this.getCapeData());
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static void updateFingerprint(MessageDigest digest, String value) {
+        updateFingerprint(digest, Objects.requireNonNullElse(value, "").getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void updateFingerprint(MessageDigest digest, SerializedImage image) {
+        updateFingerprint(digest, ByteBuffer.allocate(Integer.BYTES * 2)
+                .putInt(image.width)
+                .putInt(image.height)
+                .array());
+        updateFingerprint(digest, image.data);
+    }
+
+    private static void updateFingerprint(MessageDigest digest, byte[] value) {
+        byte[] data = Objects.requireNonNullElseGet(value, () -> new byte[0]);
+        // 长度前缀，避免相邻字段拼接出相同摘要。
+        // Length prefix, so adjacent fields cannot collide by concatenation.
+        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(data.length).array());
+        digest.update(data);
+    }
+
+    @OnlyNetEase
+    public String getSkinIID() {
+        return this.skinIID;
+    }
+
+    @OnlyNetEase
+    public void setSkinIID(String skinIID) {
+        this.skinIID = skinIID == null ? "" : skinIID;
+    }
+
+    @OnlyNetEase
+    public int getGrowthLevel() {
+        return this.growthLevel;
+    }
+
+    @OnlyNetEase
+    public void setGrowthLevel(int growthLevel) {
+        this.growthLevel = growthLevel;
+    }
+
+    @OnlyNetEase
+    public String getBloomData() {
+        return this.bloomData;
+    }
+
+    @OnlyNetEase
+    public void setBloomData(String bloomData) {
+        this.bloomData = bloomData == null ? "" : bloomData;
     }
 
     private static SerializedImage parseBufferedImage(BufferedImage image) {

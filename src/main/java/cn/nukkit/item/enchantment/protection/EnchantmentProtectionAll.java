@@ -36,7 +36,7 @@ public class EnchantmentProtectionAll extends EnchantmentProtection {
 
         // legacy 额外排除 MAGIC(保护附魔不减免魔法)
         if (level <= 0 || cause == DamageCause.VOID || cause == DamageCause.CUSTOM || cause == DamageCause.HUNGER
-                || (!Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction() && cause == DamageCause.MAGIC)) {
+                || (cause == DamageCause.MAGIC && !Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction())) {
             return 0;
         }
 

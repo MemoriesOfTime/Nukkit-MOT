@@ -26,13 +26,15 @@ public class V975PacketRegressionTest extends AbstractPacketRegressionTest {
     }
 
     /**
-     * v975 (1.26.20) and v1001 (1.26.30) both implement the ServerStoreInfoPacket
+     * v975 (1.26.20) / v1001 (1.26.30) / v2168 (1.26.40) all implement the ServerStoreInfoPacket
      * and the outer ServerPresenceInfoPacket envelope identically.
+     * (v2168 presence body reverts to the v975 plain-string form — CB's v2168 helper extends v975.)
      */
     static Stream<Arguments> v975AndV1001() {
         return Stream.of(
                 Arguments.of(975),
-                Arguments.of(ProtocolInfo.v1_26_30)
+                Arguments.of(ProtocolInfo.v1_26_30),
+                Arguments.of(ProtocolInfo.v1_26_40)
         );
     }
 

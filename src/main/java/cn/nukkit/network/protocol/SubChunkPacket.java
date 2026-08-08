@@ -34,10 +34,55 @@ public class SubChunkPacket extends DataPacket {
     public void encode() {
         this.reset();
 
-        if (this.protocol >= ProtocolInfo.v1_18_10) {
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.encodeV2168();
+        } else if (this.protocol >= ProtocolInfo.v1_18_10) {
             this.encodeV486();
         } else {
             this.encodeV471();
+        }
+    }
+
+    private void encodeV2168() {
+        this.putBoolean(this.cacheEnabled);
+        this.putVarInt(this.dimension);
+        // v2168: centerPosition 改为 3 个 LInt / centerPosition changed to three LInts
+        this.putLInt(this.centerPosition.x);
+        this.putLInt(this.centerPosition.y);
+        this.putLInt(this.centerPosition.z);
+
+        this.putUnsignedVarInt(this.subChunks.size());
+        for (SubChunkData subChunk : this.subChunks) {
+            this.putByte((byte) subChunk.offset.x);
+            this.putByte((byte) subChunk.offset.y);
+            this.putByte((byte) subChunk.offset.z);
+
+            this.putByte((byte) subChunk.result.ordinal());
+
+            boolean hasData = subChunk.data != null;
+            this.putBoolean(hasData);
+            if (hasData) {
+                this.putByteArray(subChunk.data);
+            }
+
+            this.putByte((byte) subChunk.heightMapType.ordinal());
+            boolean hasHeightMap = subChunk.heightMapType == HeightMapDataType.HAS_DATA;
+            this.putBoolean(hasHeightMap);
+            if (hasHeightMap) {
+                this.put(subChunk.heightMapData);
+            }
+
+            this.putByte((byte) subChunk.renderHeightMapType.ordinal());
+            boolean hasRenderHeightMap = subChunk.renderHeightMapType == HeightMapDataType.HAS_DATA;
+            this.putBoolean(hasRenderHeightMap);
+            if (hasRenderHeightMap) {
+                this.put(subChunk.renderHeightMapData);
+            }
+
+            this.putBoolean(subChunk.hasBlobId);
+            if (subChunk.hasBlobId) {
+                this.putLLong(subChunk.blobId);
+            }
         }
     }
 
@@ -112,6 +157,16 @@ public class SubChunkPacket extends DataPacket {
         public HeightMapDataType renderHeightMapType = HeightMapDataType.NO_DATA;
         public byte[] renderHeightMapData;
         public long blobId;
+        /**
+         * Companion presence flag for v2168 blobId optionalNull serialization.
+         * When false, blobId is omitted on the wire.
+         *
+         * v2168 blobId optionalNull 序列化的伴随存在标志。
+         * 为 false 时 blobId 不写入数据包。
+         *
+         * @since v1_26_40 (2168)
+         */
+        public boolean hasBlobId;
     }
 
     public enum HeightMapDataType {

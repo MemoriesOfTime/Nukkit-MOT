@@ -124,7 +124,7 @@ public class EntityHuman extends EntityHumanType {
                 this.setNameTag(this.namedTag.getString("NameTag"));
             }
 
-            if (this.namedTag.contains("Skin") && this.namedTag.get("Skin") instanceof CompoundTag) {
+            if (this.namedTag.get("Skin") instanceof CompoundTag) {
                 CompoundTag skinTag = this.namedTag.getCompound("Skin");
                 if (!skinTag.contains("Transparent")) {
                     skinTag.putBoolean("Transparent", false);
@@ -281,8 +281,8 @@ public class EntityHuman extends EntityHumanType {
                 ListTag<CompoundTag> piecesTag = new ListTag<>("PersonaPieces");
                 for (PersonaPiece piece : personaPieces) {
                     piecesTag.add(new CompoundTag().putString("PieceId", piece.id)
-                            .putString("PieceType", piece.type)
-                            .putString("PackId", piece.packId)
+                            .putString("PieceType", piece.type.getSerializeName())
+                            .putString("PackId", piece.packId.toString())
                             .putBoolean("IsDefault", piece.isDefault)
                             .putString("ProductId", piece.productId));
                 }
@@ -295,7 +295,7 @@ public class EntityHuman extends EntityHumanType {
                     ListTag<StringTag> colors = new ListTag<>("Colors");
                     colors.setAll(tint.colors.stream().map(s -> new StringTag("", s)).collect(Collectors.toList()));
                     tintsTag.add(new CompoundTag()
-                            .putString("PieceType", tint.pieceType)
+                            .putString("PieceType", tint.pieceType.getSerializeName())
                             .putList(colors));
                 }
             }
@@ -325,10 +325,7 @@ public class EntityHuman extends EntityHumanType {
             boolean retainNpcListEntry = !(this instanceof Player)
                     && PlayerEntitySkinSender.requiresRetainedEntry(player);
             if (this instanceof Player) {
-                // 仅在该观察者尚未收到本玩家列表项时下发 ADD，避免重复下发导致网易客户端隐形。
-                // Send the PlayerList ADD only when this viewer hasn't received it yet;
-                // resending ADD hides the entity on NetEase clients.
-                if (player.sentSkins.add(this.uuid)) {
+                if (!player.sentSkins.contains(this.uuid)) {
                     this.server.updatePlayerListData(
                             new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
                             new Player[]{player});

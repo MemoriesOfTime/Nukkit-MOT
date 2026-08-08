@@ -325,7 +325,8 @@ public class Level implements ChunkManager, Metadatable {
     private final Long2ObjectOpenHashMap<SoftReference<Map<Integer, Object>>> changedBlocks = new Long2ObjectOpenHashMap<>();
     // Storing the vector is redundant
     private final Object changeBlocksPresent = new Object();
-    // Storing extra blocks past 512 is redundant
+    // 哨兵:标记区块变更过多,tick 末尾整块重发;它永不写入,因此不能用 size() 判定
+    // Sentinel marking "too many changes, resend the whole chunk"; never populated, so never test it via size()
     private final Int2ObjectOpenHashMap<Object> changeBlocksFullMap = new Int2ObjectOpenHashMap<>();
 
     private final BlockUpdateScheduler updateQueue;
@@ -1254,7 +1255,7 @@ public class Level implements ChunkManager, Metadatable {
                         Map<Integer, Object> blocks = entry.getValue().get();
                         int chunkX = Level.getHashX(index);
                         int chunkZ = Level.getHashZ(index);
-                        if (blocks == null || blocks.size() > MAX_BLOCK_CACHE) {
+                        if (this.shouldResendWholeChunk(blocks)) {
                             FullChunk chunk = this.getChunk(chunkX, chunkZ);
                             if (chunk != null) {
                                 for (Player p : this.getChunkPlayers(chunkX, chunkZ).values()) {
@@ -2459,6 +2460,16 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    /**
+     * 判断区块本 tick 是否需整块重发:引用被回收、命中哨兵、或变更数超过缓存上限。
+     * <p>
+     * Whether the chunk must be resent as a whole this tick: reference collected, sentinel hit,
+     * or changes above the cache cap. The sentinel is never populated, so it cannot be detected by size.
+     */
+    private boolean shouldResendWholeChunk(Map<Integer, Object> blocks) {
+        return blocks == null || blocks == changeBlocksFullMap || blocks.size() > MAX_BLOCK_CACHE;
+    }
+
     public void antiXrayOnBlockChange(@Nullable Player player, @NotNull Vector3 vector3, int type) {
         if (!this.antiXrayEnabled()) {
             return;
@@ -3102,7 +3113,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Entity getEntity(long entityId) {
-        return this.entities.containsKey(entityId) ? this.entities.get(entityId) : null;
+        return this.entities.get(entityId);
     }
 
     public Entity[] getEntities() {
@@ -3205,7 +3216,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public BlockEntity getBlockEntityById(long blockEntityId) {
-        return this.blockEntities.containsKey(blockEntityId) ? this.blockEntities.get(blockEntityId) : null;
+        return this.blockEntities.get(blockEntityId);
     }
 
     @NonComputationAtomic
@@ -5552,7 +5563,10 @@ public class Level implements ChunkManager, Metadatable {
             }
             return GameVersion.V1_20_50_NETEASE;
         }
-        if (protocol >= GameVersion.V1_26_30.getProtocol()) {
+
+        if (protocol >= GameVersion.V1_26_40.getProtocol()) {
+            return GameVersion.V1_26_40;
+        } else if (protocol >= GameVersion.V1_26_30.getProtocol()) {
             return GameVersion.V1_26_30;
         } else if (protocol >= GameVersion.V1_26_20_26.getProtocol()) {
             return GameVersion.V1_26_20;
@@ -5712,7 +5726,9 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == GameVersion.V1_26_10.getProtocol())  if (player == GameVersion.V1_26_10.getProtocol()) return true;
         if (chunk == GameVersion.V1_26_20.getProtocol())
             if (player >= GameVersion.V1_26_20_26.getProtocol()) if (player < GameVersion.V1_26_30.getProtocol()) return true;
-        if (chunk == GameVersion.V1_26_30.getProtocol())  if (player >= GameVersion.V1_26_30.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_30.getProtocol())
+            if (player >= GameVersion.V1_26_30.getProtocol()) if (player < GameVersion.V1_26_40.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_40.getProtocol()) if (player >= GameVersion.V1_26_40.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

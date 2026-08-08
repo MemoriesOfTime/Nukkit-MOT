@@ -61,6 +61,7 @@ public class BatchingHelper {
             for (DataPacket packet : packets) {
                 packet.protocol = players[0].protocol;
                 packet.gameVersion = players[0].getGameVersion();
+                packet.clean();
                 players[0].getNetworkSession().sendPacket(packet);
             }
             return;
@@ -88,6 +89,7 @@ public class BatchingHelper {
                     DataPacket pk = packet.clone();
                     pk.protocol = encodingProtocol.getProtocol();
                     pk.gameVersion = encodingProtocol;
+                    pk.clean();
                     pk.tryEncode();
                     encodedPacket.put(encodingProtocol, pk);
                 }

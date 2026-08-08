@@ -3,10 +3,7 @@ package cn.nukkit;
 import cn.nukkit.entity.data.Skin;
 import cn.nukkit.inventory.PlayerOffhandInventory;
 import cn.nukkit.network.SourceInterface;
-import cn.nukkit.network.protocol.DataPacket;
-import cn.nukkit.network.protocol.PlayerListPacket;
-import cn.nukkit.network.protocol.PlayerSkinPacket;
-import cn.nukkit.network.protocol.RemoveEntityPacket;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.utils.LoginChainData;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +71,27 @@ class PlayerSkinLifecycleTest {
         assertEquals(PlayerListPacket.TYPE_ADD, packets.get(1).type);
         assertEquals("Updated Name", packets.get(1).entries[0].name);
         assertTrue(viewer.sentSkins.contains(subject.getUniqueId()));
+    }
+
+    /**
+     * displayName 变更会 REMOVE→ADD 重建条目（客户端确认状态随之失效），观察者的确认指纹必须作废，
+     * 否则下次确认会因指纹相同被误抑制，皮肤在重建后无法重新确认。
+     * <p>
+     * A displayName change rebuilds the entry (REMOVE → ADD), invalidating the client's confirmation
+     * state; the viewer's fingerprint must be cleared or the next confirmation is suppressed as a
+     * duplicate and the rebuilt entry never gets re-confirmed.
+     */
+    @Test
+    void v860DisplayNameChangeInvalidatesConfirmedFingerprint() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "subject-skin");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124_NETEASE, "viewer-skin");
+        registerViewer(subject, viewer);
+        viewer.confirmedSkins.put(subject.getUniqueId(), subject.getSkin().getContentFingerprint());
+
+        subject.setDisplayName("Updated Name");
+
+        assertFalse(viewer.confirmedSkins.containsKey(subject.getUniqueId()),
+                "displayName rebuild must invalidate the confirmation fingerprint");
     }
 
     @Test
@@ -310,6 +328,177 @@ class PlayerSkinLifecycleTest {
                 "Self must still receive its own Tab entry on addOnlinePlayer");
         assertEquals(subject.getUniqueId(), selfPackets.get(0).entries[0].uuid);
         assertTrue(subject.sentSkins.contains(subject.getUniqueId()));
+    }
+
+    /**
+     * 网易 V860 对同一列表项重复确认同一皮肤会隐藏实体：同指纹必须被抑制，
+     * 指纹变化时先 REMOVE→ADD 重建条目再放行。
+     * <p>
+     * NetEase V860 hides an entity when the same list entry is confirmed twice; an identical
+     * fingerprint must be suppressed, while a changed one rebuilds the entry first (REMOVE → ADD).
+     */
+    @Test
+    void prepareConfirmSkinSuppressesDuplicateAndRebuildsOnChange() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "subject-skin");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124_NETEASE, "viewer-skin");
+        registerViewer(subject, viewer);
+        subject.hasSpawned.put(viewer.getLoaderId(), viewer);
+        when(this.server.getPlayer(subject.getUniqueId())).thenReturn(Optional.of(subject));
+
+        Skin first = validSkin("subject-skin");
+        assertTrue(PlayerEntitySkinSender.prepareConfirmSkin(viewer, subject.getUniqueId(), first));
+        assertEquals(first.getContentFingerprint(), viewer.confirmedSkins.get(subject.getUniqueId()));
+
+        assertFalse(PlayerEntitySkinSender.prepareConfirmSkin(viewer, subject.getUniqueId(), first),
+                "Confirming the same fingerprint twice must be suppressed");
+
+        Skin changed = validSkin("changed-skin");
+        assertTrue(PlayerEntitySkinSender.prepareConfirmSkin(viewer, subject.getUniqueId(), changed),
+                "A changed fingerprint must rebuild the entry before confirming");
+
+        List<PlayerListPacket> packets = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertEquals(2, packets.size());
+        assertEquals(PlayerListPacket.TYPE_REMOVE, packets.get(0).type);
+        assertEquals(subject.getUniqueId(), packets.get(0).entries[0].uuid);
+        assertEquals(PlayerListPacket.TYPE_ADD, packets.get(1).type);
+        assertEquals(changed.getContentFingerprint(), viewer.confirmedSkins.get(subject.getUniqueId()));
+    }
+
+    /**
+     * 条目或实体未就绪时不得确认：缺任一项客户端都会静默丢弃确认包，
+     * 且一旦记下指纹便不会重发，必须提前拦下。
+     * <p>
+     * Neither a missing PlayerList entry nor a missing entity may be confirmed; the client drops
+     * the packet silently while the recorded fingerprint would suppress any retry.
+     */
+    @Test
+    void prepareConfirmSkinBlocksWhenEntryOrEntityNotReady() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "subject-skin");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124_NETEASE, "viewer-skin");
+        registerViewer(subject, viewer);
+
+        assertFalse(PlayerEntitySkinSender.prepareConfirmSkin(viewer, subject.getUniqueId(), subject.getSkin()),
+                "Entity not spawned to the viewer must block confirmation");
+
+        subject.hasSpawned.put(viewer.getLoaderId(), viewer);
+        when(this.server.getPlayer(subject.getUniqueId())).thenReturn(Optional.of(subject));
+        assertTrue(PlayerEntitySkinSender.prepareConfirmSkin(viewer, subject.getUniqueId(), subject.getSkin()));
+    }
+
+    /**
+     * needsSkinConfirmation 用于巡检补发：条目与实体就绪且从未确认过才为 true。
+     * <p>
+     * needsSkinConfirmation drives the sweep: only entries that are both in place and
+     * never confirmed before are reported as pending.
+     */
+    @Test
+    void needsSkinConfirmationReflectsPendingState() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "subject-skin");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124_NETEASE, "viewer-skin");
+
+        assertFalse(PlayerEntitySkinSender.needsSkinConfirmation(viewer, subject.getUniqueId()));
+
+        registerViewer(subject, viewer);
+        subject.hasSpawned.put(viewer.getLoaderId(), viewer);
+        when(this.server.getPlayer(subject.getUniqueId())).thenReturn(Optional.of(subject));
+        assertTrue(PlayerEntitySkinSender.needsSkinConfirmation(viewer, subject.getUniqueId()));
+
+        PlayerEntitySkinSender.prepareConfirmSkin(viewer, subject.getUniqueId(), subject.getSkin());
+        assertFalse(PlayerEntitySkinSender.needsSkinConfirmation(viewer, subject.getUniqueId()));
+    }
+
+    /**
+     * 非网易观察者不受 ConfirmSkin 去重约束，始终放行。
+     * <p>
+     * Non-NetEase viewers are exempt from confirmation dedup and always pass.
+     */
+    @Test
+    void nonNetEaseViewerIsAlwaysConfirmable() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124, "subject-skin");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124, "viewer-skin");
+
+        assertTrue(PlayerEntitySkinSender.prepareConfirmSkin(viewer, subject.getUniqueId(), subject.getSkin()));
+        assertTrue(viewer.confirmedSkins.isEmpty());
+    }
+
+    /**
+     * 皮肤内容指纹：同内容同指纹，不同 skinId 不同指纹。
+     * <p>
+     * Content fingerprints: identical content hashes equal, distinct skinId does not.
+     */
+    @Test
+    void contentFingerprintDistinguishesSkinContent() {
+        Skin a = validSkin("skin-a");
+        Skin b = validSkin("skin-a");
+        Skin c = validSkin("skin-c");
+        assertEquals(a.getContentFingerprint(), b.getContentFingerprint());
+        assertNotEquals(a.getContentFingerprint(), c.getContentFingerprint());
+    }
+
+    /**
+     * 条目被 REMOVE→ADD 重建后，观察者的确认指纹必须作废，否则巡检永远不再补发确认。
+     * <p>
+     * A REMOVE→ADD rebuild must invalidate the viewer's confirmation fingerprint, or the sweep
+     * would never re-confirm the rebuilt entry.
+     */
+    @Test
+    void playerListRebuildInvalidatesConfirmedFingerprint() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "subject-skin");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124_NETEASE, "viewer-skin");
+        registerViewer(subject, viewer);
+        viewer.confirmedSkins.put(subject.getUniqueId(), "stale-fingerprint");
+        this.playerList.put(subject.getUniqueId(), subject);
+
+        // 模拟 displayName/locatorBarColor 变更触发的条目重建（REMOVE→ADD）。
+        this.server.updatePlayerListData(new PlayerListPacket.Entry(subject.getUniqueId(), subject.getId(),
+                "new-name", subject.getSkin(), ""), new Player[]{viewer});
+
+        assertFalse(viewer.confirmedSkins.containsKey(subject.getUniqueId()),
+                "Rebuilt entry must invalidate the stale confirmation fingerprint");
+        assertTrue(viewer.sentSkins.contains(subject.getUniqueId()));
+
+        List<PlayerListPacket> packets = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertEquals(2, packets.size());
+        assertEquals(PlayerListPacket.TYPE_REMOVE, packets.get(0).type);
+        assertEquals(PlayerListPacket.TYPE_ADD, packets.get(1).type);
+    }
+
+    /**
+     * 换肤后观察者的旧确认指纹必须作废，否则皮肤换回旧样式时确认会被误抑制。
+     * <p>
+     * A skin change must invalidate the viewer's confirmation fingerprint, or reverting to a
+     * former skin suppresses its confirmation as a duplicate.
+     */
+    @Test
+    void skinChangeInvalidatesViewerConfirmationFingerprint() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "subject-skin");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124_NETEASE, "viewer-skin");
+        registerViewer(subject, viewer);
+        viewer.confirmedSkins.put(subject.getUniqueId(), subject.getSkin().getContentFingerprint());
+
+        subject.setSkin(validSkin("new-skin"));
+
+        assertFalse(viewer.confirmedSkins.containsKey(subject.getUniqueId()),
+                "Skin change must invalidate the stale confirmation fingerprint");
+        assertTrue(viewer.sentSkins.contains(subject.getUniqueId()));
+        PlayerSkinPacket update = assertInstanceOf(PlayerSkinPacket.class, viewer.sentPackets.get(0));
+        assertEquals(subject.getUniqueId(), update.uuid);
+    }
+
+    private static PlayerListPacket newPlayerListPacket(GameVersion gameVersion, PlayerListPacket.Entry entry) {
+        PlayerListPacket pk = new PlayerListPacket();
+        pk.protocol = gameVersion.getProtocol();
+        pk.gameVersion = gameVersion;
+        pk.type = PlayerListPacket.TYPE_ADD;
+        pk.entries = new PlayerListPacket.Entry[]{entry};
+        pk.encode();
+        return pk;
     }
 
     private void registerViewer(RecordingPlayer subject, RecordingPlayer viewer) {

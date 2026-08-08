@@ -111,11 +111,11 @@ public class BlockEntityCopperGolemStatue extends BlockEntitySpawnable {
     public void initActorDataFromItem(@NotNull cn.nukkit.item.Item item) {
         if (item.hasCustomBlockData()) {
             CompoundTag customBlockData = item.getCustomBlockData();
-            if (customBlockData.contains("Actor") && customBlockData.get("Actor") instanceof CompoundTag actorTag) {
+            if (customBlockData.get("Actor") instanceof CompoundTag actorTag) {
                 if (actorTag.contains("ActorIdentifier")) {
                     this.actorIdentifier = actorTag.getString("ActorIdentifier");
                 }
-                if (actorTag.contains("SaveData") && actorTag.get("SaveData") instanceof CompoundTag saveData) {
+                if (actorTag.get("SaveData") instanceof CompoundTag saveData) {
                     this.actorSaveData = saveData;
                 }
             }
