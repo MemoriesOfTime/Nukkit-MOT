@@ -91,6 +91,10 @@ public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntity
     public Item toItem() {
         ItemBlock item = new ItemBlock(this, this.getDamage(), 1);
 
+        if (this.level == null) {
+            return item;
+        }
+
         BlockEntityShulkerBox t = (BlockEntityShulkerBox) this.getLevel().getBlockEntity(this);
 
         if (t != null) {
