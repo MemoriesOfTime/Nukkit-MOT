@@ -460,6 +460,9 @@ public class RuntimeItemMapping {
             item.setCount(count);
             item.setCompoundTag(nbtBytes);
         }
+        if (item instanceof ItemBlock) {
+            item.setDamage(item.getBlock().toItem().getDamage());
+        }
         return normalizeCreativeItemForTargetVersion(gameVersion, item);
     }
 
