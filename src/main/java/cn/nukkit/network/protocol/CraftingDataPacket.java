@@ -105,7 +105,9 @@ public class CraftingDataPacket extends DataPacket {
         } else {
             for (Recipe recipe : entries) {
                 RecipeType networkType = recipe.getType();
-                if ((networkType == RecipeType.FURNACE || networkType == RecipeType.FURNACE_DATA) && protocol >= ProtocolInfo.v1_26_20_26) {
+                if ((networkType == RecipeType.FURNACE || networkType == RecipeType.FURNACE_DATA
+                        || networkType == RecipeType.BLAST_FURNACE || networkType == RecipeType.BLAST_FURNACE_DATA)
+                        && protocol >= ProtocolInfo.v1_26_20_26) {
                     networkType = RecipeType.SHAPELESS;
                 }
                 this.putVarInt(networkType.getNetworkType(protocol));
@@ -196,6 +198,8 @@ public class CraftingDataPacket extends DataPacket {
                         break;
                     case FURNACE:
                     case FURNACE_DATA:
+                    case BLAST_FURNACE:
+                    case BLAST_FURNACE_DATA:
                         FurnaceRecipe furnace = (FurnaceRecipe) recipe;
                         if (protocol >= ProtocolInfo.v1_26_20_26) {
                             this.putString(furnace.getRecipeId());
@@ -229,12 +233,18 @@ public class CraftingDataPacket extends DataPacket {
                                 damage = runtimeEntry.isHasDamage() ? 0 : input.getDamage();
                             }
                             this.putVarInt(runtimeId);
-                            if (recipe.getType() == RecipeType.FURNACE_DATA) {
+                            if (recipe.getType() == RecipeType.FURNACE_DATA || recipe.getType() == RecipeType.BLAST_FURNACE_DATA) {
                                 this.putVarInt(damage);
                             }
                             this.putSlot(gameVersion, furnace.getResult(), protocol >= ProtocolInfo.v1_16_100);
                             if (protocol >= 354) {
-                                this.putString(CRAFTING_TAG_FURNACE);
+                                if (recipe instanceof SmokerRecipe) {
+                                    this.putString(CRAFTING_TAG_SMOKER);
+                                } else if (recipe instanceof BlastFurnaceRecipe) {
+                                    this.putString(CRAFTING_TAG_BLAST_FURNACE);
+                                } else {
+                                    this.putString(CRAFTING_TAG_FURNACE);
+                                }
                             }
                         }
                         break;
