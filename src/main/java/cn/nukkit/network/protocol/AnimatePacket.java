@@ -36,11 +36,7 @@ public class AnimatePacket extends DataPacket {
         if (this.action == null) {
             this.action = Action.NO_ACTION;
         }
-        if (protocol >= ProtocolInfo.v1_2_0) {
-            this.eid = getEntityRuntimeId();
-        } else {
-            this.eid = getEntityUniqueId();
-        }
+        this.eid = getEntityRuntimeId();
         if (this.protocol >= ProtocolInfo.v1_21_120) {
             this.data = this.getLFloat();
         }
