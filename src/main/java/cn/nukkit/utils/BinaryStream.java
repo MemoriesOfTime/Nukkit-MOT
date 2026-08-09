@@ -1938,6 +1938,27 @@ public class BinaryStream {
         return new String(this.getByteArray(), StandardCharsets.UTF_8);
     }
 
+    /**
+     * 读取 UTF-8 字符串，code point 数超过 {@code maxChars} 时抛出 {@link IllegalArgumentException}，
+     * 用于解码阶段按 protocol-docs / JSON Schema 的 maxLength 字符语义拒绝超长伪造数据包。
+     * <p>
+     * Reads a length-prefixed UTF-8 string, throwing {@link IllegalArgumentException} if the code point
+     * count exceeds {@code maxChars} (protocol-docs / JSON-Schema maxLength character semantics). A
+     * byte-level fast-fail guard (≤ {@code maxChars * 4}) rejects oversized forged packets before the
+     * payload is allocated. {@code maxChars <= 0} disables the check.
+     */
+    public String getString(int maxChars) {
+        // Fast-fail on the varint length prefix first: 4 bytes is the largest UTF-8 encoding of one
+        // code point, so maxChars code points fit in at most maxChars*4 bytes.
+        byte[] raw = this.getByteArray(maxChars <= 0 ? 0 : maxChars * 4);
+        String s = new String(raw, StandardCharsets.UTF_8);
+        if (maxChars > 0 && Character.codePointCount(s, 0, s.length()) > maxChars) {
+            throw new IllegalArgumentException(
+                    "String length " + Character.codePointCount(s, 0, s.length()) + " exceeds maximum " + maxChars);
+        }
+        return s;
+    }
+
     public void putString(String string) {
         byte[] b = string.getBytes(StandardCharsets.UTF_8);
         this.putByteArray(b);
