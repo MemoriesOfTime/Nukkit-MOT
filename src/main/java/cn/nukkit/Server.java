@@ -3616,10 +3616,21 @@ public class Server {
         this.ip = this.getPropertyString("server-ip", "0.0.0.0");
         this.ipv6Port = this.getPropertyInt("server-ipv6-port", -1);
         this.ipv6Address = this.getPropertyString("server-ipv6", "::");
-        // IPv6 listener: port < 0 (default -1) disables it; otherwise binds ipv6-address:ipv6-port
-        this.ipv6Enabled = this.ipv6Port >= 0 && this.ipv6Port != this.port && !this.ipv6Address.isBlank();
+        if (!this.ipv6Address.isBlank()) {
+            try {
+                InetAddress resolved = InetAddress.getByName(this.ipv6Address);
+                if (!(resolved instanceof Inet6Address)) {
+                    throw new IllegalArgumentException("server-ipv6 must be an IPv6 address, got: " + this.ipv6Address + " (resolved to " + resolved.getHostAddress() + ")");
+                }
+                this.ipv6Address = resolved.getHostAddress();
+            } catch (UnknownHostException e) {
+                throw new IllegalArgumentException("Unable to resolve server-ipv6 address: " + this.ipv6Address, e);
+            }
+        }
+        // IPv6 listener: port <= 0 (default -1) disables it; a valid port binds ipv6-address:ipv6-port
+        this.ipv6Enabled = this.ipv6Port > 0 && this.ipv6Port != this.port && !this.ipv6Address.isBlank();
         if (this.ipv6Port >= 0 && !this.ipv6Enabled) {
-            log.warn("IPv6 listener requested on port {} but it was disabled (blank address or same as server-port {})", this.ipv6Port, this.port);
+            log.warn("IPv6 listener requested on port {} but it was disabled (port must be > 0, non-blank address, and differ from server-port {})", this.ipv6Port, this.port);
         }
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
