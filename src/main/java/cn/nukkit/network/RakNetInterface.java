@@ -50,7 +50,8 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private Network network;
 
     private final Channel channel;
-    private Channel ipv6Channel;
+    private final Channel ipv6Channel;
+    private final EventLoopGroup eventLoopGroup;
     private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -69,11 +70,11 @@ public class RakNetInterface implements AdvancedSourceInterface {
             transport = new Transport(NioDatagramChannel.class, NioEventLoopGroup::new);
         }
 
-        EventLoopGroup group = transport.eventLoopGroupFactory.apply(Runtime.getRuntime().availableProcessors());
+        this.eventLoopGroup = transport.eventLoopGroupFactory.apply(Runtime.getRuntime().availableProcessors());
 
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .channelFactory(RakChannelFactory.server(transport.datagramChannel))
-                .group(group)
+                .group(this.eventLoopGroup)
                 .option(RakChannelOption.RAK_GUID, this.serverId)
                 .option(RakChannelOption.RAK_SUPPORTED_PROTOCOLS, new int[]{8, 9, 10, 11})
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)
@@ -114,13 +115,38 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
         String address = this.server.getIp().isBlank() ? "0.0.0.0" : this.server.getIp();
 
-        this.channel = bootstrap.bind(address, this.server.getPort()).awaitUninterruptibly().channel();
-        addLocalhostExceptions(this.channel);
+        Channel v4Channel = null;
+        Channel v6Channel = null;
+        try {
+            ChannelFuture v4Future = bootstrap.bind(address, this.server.getPort()).awaitUninterruptibly();
+            if (!v4Future.isSuccess()) {
+                throw new RuntimeException("Failed to bind IPv4 listener on " + address + ":" + this.server.getPort(), v4Future.cause());
+            }
+            v4Channel = v4Future.channel();
+            addLocalhostExceptions(v4Channel);
 
-        if (this.server.isIpv6Enabled()) {
-            String ipv6Address = this.server.getIpv6Address().isBlank() ? "::" : this.server.getIpv6Address();
-            this.ipv6Channel = bootstrap.bind(ipv6Address, this.server.getIpv6Port()).awaitUninterruptibly().channel();
-            addLocalhostExceptions(this.ipv6Channel);
+            if (this.server.isIpv6Enabled()) {
+                String ipv6Address = this.server.getIpv6Address().isBlank() ? "::" : this.server.getIpv6Address();
+                ChannelFuture v6Future = bootstrap.bind(ipv6Address, this.server.getIpv6Port()).awaitUninterruptibly();
+                if (!v6Future.isSuccess()) {
+                    throw new RuntimeException("Failed to bind IPv6 listener on [" + ipv6Address + "]:" + this.server.getIpv6Port(), v6Future.cause());
+                }
+                v6Channel = v6Future.channel();
+                addLocalhostExceptions(v6Channel);
+            }
+        } catch (RuntimeException e) {
+            closeQuietly(v4Channel);
+            closeQuietly(v6Channel);
+            this.eventLoopGroup.shutdownGracefully();
+            throw e;
+        }
+        this.channel = v4Channel;
+        this.ipv6Channel = v6Channel;
+    }
+
+    private static void closeQuietly(Channel channel) {
+        if (channel != null) {
+            channel.close().awaitUninterruptibly();
         }
     }
 
@@ -233,6 +259,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
         if (this.ipv6Channel != null) {
             this.ipv6Channel.close().awaitUninterruptibly();
         }
+        this.eventLoopGroup.shutdownGracefully();
     }
 
     @Override
@@ -243,6 +270,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
         if (this.ipv6Channel != null) {
             this.ipv6Channel.close().awaitUninterruptibly();
         }
+        this.eventLoopGroup.shutdownGracefully();
     }
 
     @Override
