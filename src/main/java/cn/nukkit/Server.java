@@ -1,7 +1,9 @@
 package cn.nukkit;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.block.custom.CustomBlockManager;
+import cn.nukkit.block.tags.BlockTags;
 import cn.nukkit.blockentity.*;
 import cn.nukkit.command.*;
 import cn.nukkit.console.NukkitConsole;
@@ -1467,6 +1469,16 @@ public class Server {
         this.tickCounter = 0;
 
         log.info(this.baseLang.translateString("nukkit.server.startFinished", String.valueOf((double) (System.currentTimeMillis() - Nukkit.START_TIME) / 1000)));
+        Block dirt = Block.get(BlockID.DIRT);
+        Block amethyst = Block.get(BlockID.AMETHYST_BLOCK);
+        log.info("Dirt's tag: {}", dirt.getBlockTags());
+        log.info("Dirt's name: {}", dirt.getName());
+        log.info("Dirt has minecraft:dirt tag? : {}", dirt.hasBlockTag(BlockTags.DIRT));
+        log.info("Dirt has minecraft:birch tag? : {}", dirt.hasBlockTag(BlockTags.BIRCH));
+        log.info("Amethyst's tag: {}", amethyst.getBlockTags());
+        log.info("Amethyst's name: {}", amethyst.getName());
+        log.info("Amethyst has minecraft:dirt tag? : {}", amethyst.hasBlockTag(BlockTags.DIRT));
+        log.info("Amethyst has minecraft:is_pickaxe_item_destructible tag? : {}", amethyst.hasBlockTag(BlockTags.IS_PICKAXE_ITEM_DESTRUCTIBLE));
         this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, System::gc, 20);
 
         this.tickProcessor();

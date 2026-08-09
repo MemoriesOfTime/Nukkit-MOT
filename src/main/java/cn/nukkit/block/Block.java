@@ -3,6 +3,8 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.custom.CustomBlockManager;
+import cn.nukkit.block.tags.BlockTag;
+import cn.nukkit.block.tags.BlockTags;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.player.PlayerInteractEvent;
@@ -34,6 +36,7 @@ import java.lang.reflect.Constructor;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
@@ -1609,6 +1612,14 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public boolean isSuspiciousBlock() {
         return false;
+    }
+
+    public Set<BlockTag> getBlockTags() {
+        return BlockTags.getTagsSet(this.getId());
+    }
+
+    public boolean hasBlockTag(BlockTag blockTag) {
+        return this.getBlockTags().contains(blockTag);
     }
 
     public PersistentDataContainer getPersistentDataContainer() {
