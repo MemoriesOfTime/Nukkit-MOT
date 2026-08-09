@@ -208,6 +208,10 @@ public class Server {
     @NotNull
     private String ip = "0.0.0.0";
     private int port;
+    private boolean ipv6Enabled = false;
+    @NotNull
+    private String ipv6Address = "::";
+    private int ipv6Port = -1;
     private QueryHandler queryHandler;
     private QueryRegenerateEvent queryRegenerateEvent;
     private final UUID serverID;
@@ -840,6 +844,11 @@ public class Server {
         this.queryRegenerateEvent = new QueryRegenerateEvent(this, 5);
 
         log.info(this.baseLang.translateString("nukkit.server.networkStart", new String[]{this.getIp().isBlank() ? "0.0.0.0" : this.getIp(), String.valueOf(this.getPort())}));
+        if (this.ipv6Enabled) {
+            // IPv6 地址用方括号包裹，与 IPv4 行复用同一本地化文案以保持风格统一
+            String ipv6Host = "[" + (this.ipv6Address.isBlank() ? "::" : this.ipv6Address) + "]";
+            log.info(this.baseLang.translateString("nukkit.server.networkStart", new String[]{ipv6Host, String.valueOf(this.ipv6Port)}));
+        }
         this.network = new Network(this);
         this.network.setName(this.getMotd());
         this.network.setSubName(this.getSubMotd());
@@ -1927,6 +1936,19 @@ public class Server {
     @NotNull
     public String getIp() {
         return ip;
+    }
+
+    public boolean isIpv6Enabled() {
+        return ipv6Enabled;
+    }
+
+    @NotNull
+    public String getIpv6Address() {
+        return ipv6Address;
+    }
+
+    public int getIpv6Port() {
+        return ipv6Port;
     }
 
     public UUID getServerUniqueId() {
@@ -3592,6 +3614,13 @@ public class Server {
         this.viewDistance = Math.max(1, this.getPropertyInt("view-distance", 8));
         this.port = this.getPropertyInt("server-port", 19132);
         this.ip = this.getPropertyString("server-ip", "0.0.0.0");
+        this.ipv6Port = this.getPropertyInt("server-ipv6-port", -1);
+        this.ipv6Address = this.getPropertyString("server-ipv6", "::");
+        // IPv6 listener: port < 0 (default -1) disables it; otherwise binds ipv6-address:ipv6-port
+        this.ipv6Enabled = this.ipv6Port >= 0 && this.ipv6Port != this.port && !this.ipv6Address.isBlank();
+        if (this.ipv6Port >= 0 && !this.ipv6Enabled) {
+            log.warn("IPv6 listener requested on port {} but it was disabled (blank address or same as server-port {})", this.ipv6Port, this.port);
+        }
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
         } catch (NumberFormatException exception) {
@@ -3803,6 +3832,8 @@ public class Server {
             put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
+            put("server-ipv6-port", -1);
+            put("server-ipv6", "::");
             put("view-distance", 8);
             put("max-players", 50);
             put("language", "eng");

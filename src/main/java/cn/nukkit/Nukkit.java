@@ -62,7 +62,6 @@ public class Nukkit {
 
     public static void main(String[] args) {
 
-        System.setProperty("java.net.preferIPv4Stack" , "true");
         System.setProperty("log4j.skipJansi", "false");
         System.getProperties().putIfAbsent("io.netty.allocator.type", "unpooled"); // Disable memory pooling unless specified
 
