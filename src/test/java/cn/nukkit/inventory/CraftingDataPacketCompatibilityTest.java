@@ -44,7 +44,14 @@ public class CraftingDataPacketCompatibilityTest {
                 GameVersion.V1_19_60,  // 567: 有 recipeId/priority/networkId, 无 assumeSymmetry/requirement/trim
                 GameVersion.V1_20_50,  // 630: +trim
                 GameVersion.V1_20_80,  // 671: +assumeSymmetry
-                GameVersion.V1_21_0,   // 685: +requirement
+                GameVersion.V1_21_0,   // 685: +requirement (仅 SHAPELESS/SHAPED, SHULKER_BOX 尚无)
+                // 关键: 685~729 区间(1.21.0~1.21.30)SHULKER_BOX 不携带 requirement 字段;
+                // 748(1.21.40)起才与 SHAPELESS 一致。补全此区间各临界点以防字节错位回归。
+                GameVersion.V1_21_2,   // 686: requirement 仅 SHAPELESS (曾因 SHULKER_BOX 多写 1 字节致客户端解码崩溃)
+                GameVersion.V1_21_20,  // 712
+                GameVersion.V1_21_30,  // 729
+                GameVersion.V1_21_40,  // 748: SHULKER_BOX 开始携带 requirement
+                GameVersion.V1_21_50,  // 766
                 GameVersion.V1_21_130, // 898
                 GameVersion.V1_26_0,   // 924
                 GameVersion.V1_26_10,  // 944
@@ -66,7 +73,6 @@ public class CraftingDataPacketCompatibilityTest {
         byte[] packet = batch.get(packetLen);
 
         int protocol = gv.getProtocol();
-        boolean hasRequirement = protocol >= ProtocolInfo.v1_21_0;
         boolean hasAssumeSymmetry = protocol >= ProtocolInfo.v1_20_80;
 
         BinaryStream ps = new BinaryStream(packet);
@@ -94,7 +100,16 @@ public class CraftingDataPacketCompatibilityTest {
                     ps.getUUID();
                     String tag = ps.getString();
                     ps.getVarInt(); // priority
-                    if (hasRequirement) {
+                    // 真实协议: requirement 字段 SHAPELESS 自 v1_21_0(685) 起携带;
+                    // SHULKER_BOX 自 v1_21_40(748) 起才携带, 之前不携带。
+                    // 若对 SHULKER_BOX 提前读取, 会与编码端的多写字节相互抵消,
+                    // 掩盖客户端实际按协议跳过该字段所导致的流错位。
+                    // <p>
+                    // Real protocol: requirement is present for SHAPELESS since v1_21_0(685),
+                    // but only since v1_21_40(748) for SHULKER_BOX. Reading it early for
+                    // SHULKER_BOX would cancel the encoder's extra byte and hide the stream
+                    // misalignment that real clients (which skip it per protocol) suffer.
+                    if (hasRequirement(protocol, type)) {
                         int ctx = ps.getByte();
                         if (ctx == 0) { // UnlockingContext.NONE -> 附带材料数组
                             int n = (int) ps.getUnsignedVarInt();
@@ -125,7 +140,7 @@ public class CraftingDataPacketCompatibilityTest {
                     if (hasAssumeSymmetry) {
                         ps.getBoolean();
                     }
-                    if (hasRequirement) {
+                    if (hasRequirement(protocol, 1 /* SHAPED */)) {
                         int ctx = ps.getByte();
                         if (ctx == 0) {
                             int n = (int) ps.getUnsignedVarInt();
@@ -210,6 +225,28 @@ public class CraftingDataPacketCompatibilityTest {
             assertEquals(62, tagCount.get("blast_furnace"), "all blast furnace recipes on 26.20");
             assertEquals(9, tagCount.get("smoker"), "all smoker recipes on 26.20");
         }
+    }
+
+    /**
+     * 指定协议版本下, 该配方网络类型是否在 wire 上携带 unlocking requirement 字段.
+     * <p>
+     * 反映真实客户端协议 (对照 CloudburstMC CraftingDataSerializer):
+     * SHAPELESS/SHAPED 自 v1_21_0(685) 起, SHULKER_BOX 自 v1_21_40(748) 起;
+     * 早于此版本对 SHULKER_BOX 写入该字段会导致客户端解码字节错位。
+     * <p>
+     * Whether a given recipe network type carries the unlocking requirement field on the wire
+     * at this protocol version, mirroring real client protocol (CloudburstMC CraftingDataSerializer).
+     */
+    private static boolean hasRequirement(int protocol, int networkType) {
+        if (protocol < ProtocolInfo.v1_21_0) {
+            return false;
+        }
+        // SHULKER_BOX (5): v1_21_40(748) 起才携带 requirement
+        if (networkType == 5) {
+            return protocol >= ProtocolInfo.v1_21_40;
+        }
+        // SHAPELESS(0) / SHAPED(1): v1_21_0(685) 起携带
+        return true;
     }
 
     // instanceItem=true 的 slot: varint runtimeId(0 即止) + lshort count + uvarint damage + varint blockRuntimeId + byteArray userData
