@@ -328,16 +328,36 @@ class CharacterCreatorLoginJwtTest {
     @Test
     void netEaseSkinExtensionFieldsAreParsed() {
         JsonObject skinPayload = buildPersonaSkinPayload();
+        byte[] bloom = {1, 2, 3, 4};
         skinPayload.addProperty("SkinIID", "netease-skin-iid-123");
         skinPayload.addProperty("GrowthLevel", 7);
-        skinPayload.addProperty("BloomData", "bloom-payload-base64");
+        skinPayload.addProperty("BloomData", Base64.getEncoder().encodeToString(bloom));
         skinPayload.addProperty("IsReconnect", true);
 
         LoginPacket pkt = decode(buildLoginPacketBuffer(2168, skinPayload));
         assertNotNull(pkt.skin, "skin should be parsed");
         assertEquals("netease-skin-iid-123", pkt.skin.getSkinIID(), "SkinIID");
         assertEquals(7, pkt.skin.getGrowthLevel(), "GrowthLevel");
-        assertEquals("bloom-payload-base64", pkt.skin.getBloomData(), "BloomData");
+        assertArrayEquals(bloom, pkt.skin.getBloomData(), "BloomData");
+    }
+
+    /**
+     * BloomData 超过主皮肤图大小时必须被丢弃，防止伪造的过大负载撑爆客户端/服务端。
+     * 参考 SynapseAPI LoginPacket14 的长度校验。
+     * <p>
+     * BloomData larger than the main skin image must be dropped to reject oversized payloads.
+     */
+    @Test
+    void netEaseBloomDataLargerThanSkinIsDropped() {
+        JsonObject skinPayload = buildPersonaSkinPayload();
+        // 伪造一个大于 256*256*4 主皮肤图的 Bloom
+        byte[] oversized = new byte[256 * 256 * 4 + 1];
+        skinPayload.addProperty("BloomData", Base64.getEncoder().encodeToString(oversized));
+
+        LoginPacket pkt = decode(buildLoginPacketBuffer(2168, skinPayload));
+        assertNotNull(pkt.skin);
+        // 被丢弃 → 返回默认空数组 / Dropped → returns the default empty array
+        assertArrayEquals(new byte[0], pkt.skin.getBloomData(), "BloomData should be dropped");
     }
 
     /**
@@ -354,6 +374,6 @@ class CharacterCreatorLoginJwtTest {
         assertNotNull(pkt.skin);
         assertEquals("", pkt.skin.getSkinIID(), "SkinIID default");
         assertEquals(0, pkt.skin.getGrowthLevel(), "GrowthLevel default");
-        assertEquals("", pkt.skin.getBloomData(), "BloomData default");
+        assertArrayEquals(new byte[0], pkt.skin.getBloomData(), "BloomData default");
     }
 }
