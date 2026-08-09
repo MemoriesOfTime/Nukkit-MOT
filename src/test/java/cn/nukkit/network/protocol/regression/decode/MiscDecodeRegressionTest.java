@@ -6,6 +6,7 @@ import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
+import cn.nukkit.network.protocol.types.NetworkInventoryAction;
 import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.types.inventory.InventoryLayout;
 import cn.nukkit.network.protocol.types.inventory.InventoryTabLeft;
@@ -58,6 +59,10 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersions(ProtocolInfo.v1_20_50);
     }
 
+    static Stream<Arguments> versionsFrom622() {
+        return filteredVersions(ProtocolInfo.v1_20_40);
+    }
+
     static Stream<Arguments> versionsFrom313() {
         return filteredVersions(313);
     }
@@ -103,7 +108,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
     }
 
     static Stream<Arguments> versionsFrom407PreV844() {
-        return filteredVersionsRange(ProtocolInfo.v1_16_0, ProtocolInfo.v1_21_110);
+        return filteredVersionsRange(ProtocolInfo.v1_16_0, ProtocolInfo.v1_21_111);
     }
 
     static Stream<Arguments> versionsFrom486() {
@@ -165,6 +170,16 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         return Stream.of(Arguments.of(ProtocolInfo.v1_21_30));
     }
 
+    static Stream<Arguments> versionsForCraftResultsDeprecatedItemInstance() {
+        return Stream.of(
+                Arguments.of(ProtocolInfo.v1_16_220),
+                Arguments.of(ProtocolInfo.v1_17_40),
+                Arguments.of(ProtocolInfo.v1_18_10),
+                Arguments.of(ProtocolInfo.v1_21_30),
+                Arguments.of(ProtocolInfo.CURRENT_PROTOCOL)
+        );
+    }
+
     static Stream<Arguments> versionsFrom818() {
         return filteredVersions(818);
     }
@@ -203,6 +218,10 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
 
     static Stream<Arguments> versionsAtV944() {
         return Stream.of(Arguments.of(ProtocolInfo.v1_26_10));
+    }
+
+    static Stream<Arguments> versionsAt1001() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_26_30));
     }
 
     private PlayerAuthInputPacket decodeNetEasePlayerAuthInput(int protocol, GameVersion gameVersion, long inputFlags) {
@@ -367,12 +386,13 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         UUID packId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         var cb = new org.cloudburstmc.protocol.bedrock.packet.ResourcePackChunkRequestPacket();
         cb.setPackId(packId);
-        // packVersion intentionally null so CB writes just "uuid" (no _version suffix)
+        cb.setPackVersion("1.2.3");
         cb.setChunkIndex(3);
 
         ResourcePackChunkRequestPacket nk = crossEncode(cb, ResourcePackChunkRequestPacket::new, protocol);
 
         assertEquals(packId, nk.packId);
+        assertEquals("1.2.3", nk.packVersion);
         assertEquals(3, nk.chunkIndex);
     }
 
@@ -605,6 +625,10 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         cb.setAvgEndFrameTimeMS(0.3f);
         cb.setAvgRemainderTimePercent(80.0f);
         cb.setAvgUnaccountedTimePercent(5.0f);
+        if (protocol >= ProtocolInfo.v1_26_30) {
+            cb.getWhiskerScopes().add(new org.cloudburstmc.protocol.bedrock.data.diagnostics.WhiskerScopeDataSummary(
+                    "scope", "  ", 10L, 20L, 30L));
+        }
 
         ServerboundDiagnosticsPacket nk = crossEncode(cb, ServerboundDiagnosticsPacket::new, protocol);
 
@@ -617,6 +641,55 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(0.3f, nk.avgEndFrameTimeMS, 0.001f);
         assertEquals(80.0f, nk.avgRemainderTimePercent, 0.001f);
         assertEquals(5.0f, nk.avgUnaccountedTimePercent, 0.001f);
+        if (protocol >= ProtocolInfo.v1_26_30) {
+            assertEquals(1, nk.whiskerScopes.size());
+            ServerboundDiagnosticsPacket.WhiskerScopeDataSummary scope = nk.whiskerScopes.get(0);
+            assertEquals("scope", scope.label);
+            assertEquals("  ", scope.indentation);
+            assertEquals(10L, scope.totalHighCostNS);
+            assertEquals(20L, scope.totalMidCostNS);
+            assertEquals(30L, scope.totalLowCostNS);
+        }
+    }
+
+    // ==================== SubChunkRequestPacket ====================
+
+    @ParameterizedTest(name = "SubChunkRequestPacket v{0}")
+    @MethodSource("versionsAt1001")
+    void subChunkRequestV1001(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.SubChunkRequestPacket();
+        cb.setDimension(2);
+        cb.setSubChunkPosition(org.cloudburstmc.math.vector.Vector3i.from(1000, -4, -1000));
+        cb.getPositionOffsets().add(org.cloudburstmc.math.vector.Vector3i.from(1, -2, 3));
+        cb.getPositionOffsets().add(org.cloudburstmc.math.vector.Vector3i.from(-4, 5, -6));
+
+        SubChunkRequestPacket nk = crossEncode(cb, SubChunkRequestPacket::new, protocol);
+
+        assertEquals(2, nk.dimension);
+        assertEquals(1000, nk.subChunkPosition.x);
+        assertEquals(-4, nk.subChunkPosition.y);
+        assertEquals(-1000, nk.subChunkPosition.z);
+        assertEquals(2, nk.positionOffsets.size());
+        assertEquals(1, nk.positionOffsets.get(0).x);
+        assertEquals(-2, nk.positionOffsets.get(0).y);
+        assertEquals(3, nk.positionOffsets.get(0).z);
+    }
+
+    @ParameterizedTest(name = "SubChunkRequestPacket rejects too many offsets v{0}")
+    @MethodSource("versionsAt1001")
+    void subChunkRequestRejectsTooManyOffsetsV1001(int protocol) {
+        BinaryStream stream = new BinaryStream();
+        stream.putUnsignedVarInt(ProtocolInfo.SUB_CHUNK_REQUEST_PACKET);
+        stream.putVarInt(2);
+        stream.putUnsignedVarInt(8193);
+
+        SubChunkRequestPacket nk = new SubChunkRequestPacket();
+        nk.protocol = protocol;
+        nk.gameVersion = GameVersion.byProtocol(protocol, false);
+        nk.setBuffer(stream.getBuffer());
+        nk.getUnsignedVarInt();
+
+        assertThrows(IllegalArgumentException.class, nk::decode);
     }
 
     // ==================== CommandBlockUpdatePacket ====================
@@ -989,6 +1062,34 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
+    /**
+     * Verifies that v1001 (1.26.30) DisconnectFailReason ordinals map correctly
+     * between Nukkit-MOT and CloudburstMC. The enum is used as a wire varint
+     * (ordinal), so any missing/duplicated entry would corrupt the reason.
+     */
+    @ParameterizedTest(name = "DisconnectPacket v{0} v1001 reasons round-trip")
+    @MethodSource("versionsFrom622")
+    void disconnectV1001Reasons(int protocol) {
+        for (var cbReason : new org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason[]{
+                org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason.HOST_DISCONNECTED,
+                org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason.EDITOR_JOIN_INTENT_POLICY_FAILURE,
+                org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason.NONCE_NOT_VALID,
+                org.cloudburstmc.protocol.bedrock.data.DisconnectFailReason.SCRIPT_WATCHDOG_EXCEPTION
+        }) {
+            var cb = new org.cloudburstmc.protocol.bedrock.packet.DisconnectPacket();
+            cb.setReason(cbReason);
+            cb.setMessageSkipped(true);
+
+            DisconnectPacket nk = crossEncode(cb, DisconnectPacket::new, protocol);
+
+            // Ordinal is the wire value, so it must match for both the id and the constant name.
+            assertEquals(cbReason.ordinal(), nk.reason.ordinal(),
+                    "ordinal mismatch for " + cbReason + " at v" + protocol);
+            assertEquals(cbReason.name(), nk.reason.name(),
+                    "name mismatch for " + cbReason + " at v" + protocol);
+        }
+    }
+
     // ==================== PlayerLocationPacket ====================
 
     @ParameterizedTest(name = "PlayerLocationPacket v{0}")
@@ -1175,6 +1276,64 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         if (protocol >= ProtocolInfo.v1_21_70_24) {
             assertEquals(-1L, nk.entityUniqueId);
         }
+    }
+
+    @ParameterizedTest(name = "LevelSoundEventPacket string sound names v{0}")
+    @MethodSource("versionsAt1001")
+    void levelSoundEventV1001CommonSoundNames(int protocol) {
+        assertLevelSoundEventV1001Name(protocol, org.cloudburstmc.protocol.bedrock.data.SoundEvent.STEP, LevelSoundEventPacket.SOUND_STEP);
+        assertLevelSoundEventV1001Name(protocol, org.cloudburstmc.protocol.bedrock.data.SoundEvent.BREAK, LevelSoundEventPacket.SOUND_BREAK);
+        assertLevelSoundEventV1001Name(protocol, org.cloudburstmc.protocol.bedrock.data.SoundEvent.ITEM_USE_ON, LevelSoundEventPacket.SOUND_ITEM_USE_ON);
+        assertLevelSoundEventV1001Name(protocol, org.cloudburstmc.protocol.bedrock.data.SoundEvent.ATTACK, LevelSoundEventPacket.SOUND_ATTACK);
+        assertLevelSoundEventV1001Name(protocol, org.cloudburstmc.protocol.bedrock.data.SoundEvent.USE_SMITHING_TABLE, LevelSoundEventPacket.SOUND_SMITHING_TABLE_USE);
+    }
+
+    @Test
+    void levelSoundEventV1001DecodesCompleteCloudburstSoundNameSet() {
+        for (org.cloudburstmc.protocol.bedrock.data.SoundEvent sound : org.cloudburstmc.protocol.bedrock.data.SoundEvent.values()) {
+            String name = sound.getSerializeName();
+            if ("undefined".equals(name)) {
+                continue;
+            }
+
+            LevelSoundEventPacket nk = decodeLevelSoundEventV1001Name(sound);
+            assertNotEquals(LevelSoundEventPacket.SOUND_UNDEFINED, nk.sound, "Unknown Nukkit sound id for Cloudburst sound name: " + name);
+            assertEquals(nk.getCount(), nk.getOffset(), "LevelSoundEventPacket decode should consume the full payload");
+
+            nk.encode();
+            var cbRoundTrip = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.LevelSoundEventPacket.class);
+            assertNotNull(cbRoundTrip.getSound(), "Unknown Cloudburst sound name encoded after round trip for: " + name);
+            assertEquals(name, cbRoundTrip.getSound().getSerializeName());
+        }
+    }
+
+    private void assertLevelSoundEventV1001Name(int protocol, org.cloudburstmc.protocol.bedrock.data.SoundEvent sound, int expectedSound) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.LevelSoundEventPacket();
+        cb.setSound(sound);
+        cb.setPosition(org.cloudburstmc.math.vector.Vector3f.from(5.5f, 64.0f, -10.5f));
+        cb.setExtraData(-1);
+        cb.setIdentifier("");
+        cb.setBabySound(false);
+        cb.setRelativeVolumeDisabled(false);
+        cb.setEntityUniqueId(-1L);
+
+        LevelSoundEventPacket nk = crossEncode(cb, LevelSoundEventPacket::new, protocol);
+
+        assertEquals(expectedSound, nk.sound);
+        assertEquals(nk.getCount(), nk.getOffset(), "LevelSoundEventPacket decode should consume the full payload");
+    }
+
+    private LevelSoundEventPacket decodeLevelSoundEventV1001Name(org.cloudburstmc.protocol.bedrock.data.SoundEvent sound) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.LevelSoundEventPacket();
+        cb.setSound(sound);
+        cb.setPosition(org.cloudburstmc.math.vector.Vector3f.from(5.5f, 64.0f, -10.5f));
+        cb.setExtraData(-1);
+        cb.setIdentifier("");
+        cb.setBabySound(false);
+        cb.setRelativeVolumeDisabled(false);
+        cb.setEntityUniqueId(-1L);
+
+        return crossEncode(cb, LevelSoundEventPacket::new, ProtocolInfo.v1_26_30);
     }
 
     // ==================== BlockEntityDataPacket ====================
@@ -2086,6 +2245,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         UUID packId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         var cb = new org.cloudburstmc.protocol.bedrock.packet.ResourcePackChunkDataPacket();
         cb.setPackId(packId);
+        cb.setPackVersion("1.2.3");
         cb.setChunkIndex(2);
         cb.setProgress(65536L);
         cb.setData(Unpooled.wrappedBuffer(new byte[]{1, 2, 3}));
@@ -2093,6 +2253,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         ResourcePackChunkDataPacket nk = crossEncode(cb, ResourcePackChunkDataPacket::new, protocol);
 
         assertEquals(packId, nk.packId);
+        assertEquals("1.2.3", nk.packVersion);
         assertEquals(2, nk.chunkIndex);
         assertEquals(65536L, nk.progress);
         assertArrayEquals(new byte[]{1, 2, 3}, nk.data);
@@ -2107,6 +2268,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         byte[] sha256 = new byte[]{0x1, 0x2, 0x3, 0x4};
         var cb = new org.cloudburstmc.protocol.bedrock.packet.ResourcePackDataInfoPacket();
         cb.setPackId(packId);
+        cb.setPackVersion("1.2.3");
         cb.setMaxChunkSize(1024L);
         cb.setChunkCount(3L);
         cb.setCompressedPackSize(100000L);
@@ -2117,6 +2279,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         ResourcePackDataInfoPacket nk = crossEncode(cb, ResourcePackDataInfoPacket::new, protocol);
 
         assertEquals(packId, nk.packId);
+        assertEquals("1.2.3", nk.packVersion);
         assertEquals(1024, nk.maxChunkSize);
         assertEquals(3, nk.chunkCount);
         assertEquals(100000L, nk.compressedPackSize);
@@ -2297,6 +2460,84 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(nk.getCount(), nk.getOffset(), "InventoryTransactionPacket decode should consume the full payload");
     }
 
+    @ParameterizedTest(name = "InventoryTransactionPacket v1001 signed pseudo-window id v{0}")
+    @MethodSource("versionsAt1001")
+    void inventoryTransactionV1001SignedPseudoWindowId(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket();
+        cb.setLegacyRequestId(0);
+        cb.setTransactionType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType.ITEM_RELEASE);
+        cb.getActions().add(new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryActionData(
+                org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventorySource.fromNonImplementedTodo(NetworkInventoryAction.SOURCE_TYPE_CRAFTING_RESULT),
+                0,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR
+        ));
+        cb.setActionType(InventoryTransactionPacket.RELEASE_ITEM_ACTION_RELEASE);
+        cb.setHotbarSlot(2);
+        cb.setItemInHand(org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR);
+        cb.setHeadPosition(Vector3f.from(1.5f, 64.0f, -2.5f));
+
+        InventoryTransactionPacket nk = crossEncode(cb, InventoryTransactionPacket::new, protocol);
+
+        assertEquals(1, nk.actions.length);
+        assertEquals(NetworkInventoryAction.SOURCE_TODO, nk.actions[0].sourceType);
+        assertEquals(NetworkInventoryAction.SOURCE_TYPE_CRAFTING_RESULT, nk.actions[0].windowId);
+        assertTrue(nk.isCraftingPart);
+        assertEquals(nk.getCount(), nk.getOffset(), "InventoryTransactionPacket decode should consume the full payload");
+    }
+
+    @ParameterizedTest(name = "InventoryTransactionPacket v1001 item use signed fields v{0}")
+    @MethodSource("versionsAt1001")
+    void inventoryTransactionV1001ItemUseSignedFields(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket();
+        cb.setLegacyRequestId(0);
+        cb.setTransactionType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType.ITEM_USE);
+        cb.getActions().add(new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryActionData(
+                org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventorySource.fromContainerWindowId(0),
+                4,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR
+        ));
+        cb.setActionType(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR);
+        cb.setTriggerType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.TriggerType.PLAYER_INPUT);
+        cb.setBlockPosition(Vector3i.from(5, 60, -10));
+        cb.setBlockFace(1);
+        cb.setHotbarSlot(3);
+        cb.setItemInHand(org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR);
+        cb.setPlayerPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        cb.setClickPosition(Vector3f.from(0.5f, 0.5f, 0.5f));
+        cb.setBlockDefinition(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                "test:block_42",
+                42,
+                NbtMap.EMPTY
+        ));
+        cb.setClientInteractPrediction(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.PredictedResult.SUCCESS);
+        cb.setClientCooldownState((byte) 7);
+
+        InventoryTransactionPacket nk = crossEncode(cb, InventoryTransactionPacket::new, protocol, helper -> helper.setBlockDefinitions(
+                org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                        .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder()
+                        .add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                                "test:block_42",
+                                42,
+                                NbtMap.EMPTY
+                        ))
+                        .build()
+        ));
+
+        assertInstanceOf(UseItemData.class, nk.transactionData);
+        var itemUse = (UseItemData) nk.transactionData;
+        assertEquals(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR, itemUse.actionType);
+        assertEquals(1, itemUse.triggerType);
+        assertEquals(5, itemUse.blockPos.x);
+        assertEquals(60, itemUse.blockPos.y);
+        assertEquals(-10, itemUse.blockPos.z);
+        assertEquals(1, itemUse.face.getIndex());
+        assertEquals(1, itemUse.clientInteractPrediction);
+        assertEquals(7, itemUse.clientCooldownState);
+        assertEquals(nk.getCount(), nk.getOffset(), "InventoryTransactionPacket decode should consume the full payload");
+    }
+
     @ParameterizedTest(name = "InventoryTransactionPacket v{0} with network ids")
     @MethodSource("versions407To428")
     void inventoryTransactionWithNetworkIds(int protocol) {
@@ -2350,6 +2591,9 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         InventoryTransactionPacket nk = crossEncode(cb, InventoryTransactionPacket::new, protocol);
 
         assertEquals(-4, nk.legacyRequestId);
+        assertEquals(1, nk.legacySlots.size());
+        assertEquals(0, nk.legacySlots.get(0).containerId);
+        assertArrayEquals(new byte[]{1, 3, 5}, nk.legacySlots.get(0).slots);
         assertEquals(1, nk.actions.length);
         assertEquals(4, nk.actions[0].inventorySlot);
         assertInstanceOf(ReleaseItemData.class, nk.transactionData);
@@ -2579,6 +2823,186 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
     }
 
+    /**
+     * v2168 PlayerAuthInput 内嵌 ItemUseTransaction 新格式：actions 双布尔守卫、
+     * actionType(VarInt)、triggerType/blockFace/clientInteractPrediction/clientCooldownState(byte)、
+     * InventorySource 双布尔守卫。验证 Nukkit-MOT 正确解码且消费完整负载。
+     * <p>
+     * v2168 PlayerAuthInput embedded ItemUseTransaction new shape: double-boolean actions guard,
+     * actionType(VarInt), triggerType/blockFace/clientInteractPrediction/clientCooldownState as bytes,
+     * InventorySource double-boolean guard. Verifies Nukkit-MOT decodes correctly and consumes the full payload.
+     */
+    @ParameterizedTest(name = "PlayerAuthInputPacket v{0} v2168 embedded item interaction new shape")
+    @MethodSource("versionsAt2168")
+    void playerAuthInputWithItemInteractionV2168(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket();
+        cb.setRotation(Vector3f.from(10.5f, 20.5f, 30.5f));
+        cb.setPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        cb.setMotion(org.cloudburstmc.math.vector.Vector2f.from(0.25f, -0.5f));
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.UP);
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.PERFORM_ITEM_INTERACTION);
+        cb.setInputMode(org.cloudburstmc.protocol.bedrock.data.InputMode.TOUCH);
+        cb.setPlayMode(org.cloudburstmc.protocol.bedrock.data.ClientPlayMode.NORMAL);
+        cb.setInputInteractionModel(org.cloudburstmc.protocol.bedrock.data.InputInteractionModel.CROSSHAIR);
+        cb.setInteractRotation(org.cloudburstmc.math.vector.Vector2f.from(5.0f, 6.0f));
+        cb.setTick(123L);
+        cb.setDelta(Vector3f.from(0.1f, 0.2f, 0.3f));
+        cb.setAnalogMoveVector(org.cloudburstmc.math.vector.Vector2f.from(0.6f, -0.4f));
+        cb.setCameraOrientation(Vector3f.from(0.0f, 1.0f, 0.0f));
+        cb.setRawMoveVector(org.cloudburstmc.math.vector.Vector2f.from(-0.25f, 0.75f));
+
+        var itemUseTransaction = new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction();
+        itemUseTransaction.setLegacyRequestId(0);
+        itemUseTransaction.getActions().add(new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryActionData(
+                org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventorySource.fromContainerWindowId(0),
+                4,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR
+        ));
+        itemUseTransaction.setActionType(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK);
+        itemUseTransaction.setTriggerType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.TriggerType.SIMULATION_TICK);
+        itemUseTransaction.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(10, 50, 20));
+        itemUseTransaction.setBlockFace(1);
+        itemUseTransaction.setHotbarSlot(0);
+        itemUseTransaction.setItemInHand(org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR);
+        itemUseTransaction.setPlayerPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        itemUseTransaction.setClickPosition(Vector3f.from(0.5f, 1.0f, 0.25f));
+        itemUseTransaction.setBlockDefinition(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                "test:block_42",
+                42,
+                org.cloudburstmc.nbt.NbtMap.EMPTY
+        ));
+        itemUseTransaction.setClientInteractPrediction(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.PredictedResult.FAILURE);
+        itemUseTransaction.setClientCooldownState(5);
+        cb.setItemUseTransaction(itemUseTransaction);
+
+        PlayerAuthInputPacket nk = crossEncode(cb, PlayerAuthInputPacket::new, protocol, helper -> helper.setBlockDefinitions(
+                org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                        .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder()
+                        .add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                                "test:block_42",
+                                42,
+                                org.cloudburstmc.nbt.NbtMap.EMPTY
+                        ))
+                        .build()
+        ));
+
+        assertNotNull(nk.getItemUseTransaction());
+        assertEquals(1, nk.getItemUseTransaction().actions.length);
+        assertEquals(NetworkInventoryAction.SOURCE_CONTAINER, nk.getItemUseTransaction().actions[0].sourceType);
+        assertEquals(0, nk.getItemUseTransaction().actions[0].windowId);
+        assertEquals(4, nk.getItemUseTransaction().actions[0].inventorySlot);
+        assertInstanceOf(UseItemData.class, nk.getItemUseTransaction().transactionData);
+        var itemUse = (UseItemData) nk.getItemUseTransaction().transactionData;
+        assertEquals(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK, itemUse.actionType);
+        assertEquals(2, itemUse.triggerType);
+        assertEquals(10, itemUse.blockPos.x);
+        assertEquals(50, itemUse.blockPos.y);
+        assertEquals(20, itemUse.blockPos.z);
+        assertEquals(1, itemUse.face.getIndex());
+        assertEquals(42, itemUse.blockRuntimeId);
+        assertEquals(0, itemUse.clientInteractPrediction);
+        assertEquals((byte) 5, itemUse.clientCooldownState);
+        assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
+    }
+
+    /**
+     * 回归（v2168）：default 分支动作（如 STOP_DESTROY_BLOCK）此前不消费 position+face，导致后续字段错位。
+     * <p>
+     * Regression (v2168): default-branch actions (e.g. STOP_DESTROY_BLOCK) previously skipped position+face and desynced later fields.
+     */
+    @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with default-branch block actions")
+    @MethodSource("versionsAt2168")
+    void playerAuthInputWithDefaultBranchBlockActions(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket();
+        cb.setRotation(Vector3f.from(10.5f, 20.5f, 30.5f));
+        cb.setPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        cb.setMotion(org.cloudburstmc.math.vector.Vector2f.from(0.25f, -0.5f));
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.UP);
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.PERFORM_BLOCK_ACTIONS);
+        cb.setInputMode(org.cloudburstmc.protocol.bedrock.data.InputMode.TOUCH);
+        cb.setPlayMode(org.cloudburstmc.protocol.bedrock.data.ClientPlayMode.NORMAL);
+        cb.setInputInteractionModel(org.cloudburstmc.protocol.bedrock.data.InputInteractionModel.CROSSHAIR);
+        cb.setTick(456L);
+        cb.setDelta(Vector3f.from(0.5f, 0.6f, 0.7f));
+        if (protocol >= ProtocolInfo.v1_19_70) {
+            cb.setAnalogMoveVector(org.cloudburstmc.math.vector.Vector2f.from(0.33f, -0.66f));
+        }
+        if (protocol >= ProtocolInfo.v1_21_40) {
+            cb.setInteractRotation(org.cloudburstmc.math.vector.Vector2f.from(7.0f, 8.0f));
+            cb.setCameraOrientation(Vector3f.from(0.0f, 2.0f, 0.0f));
+        }
+        if (protocol >= ProtocolInfo.v1_21_50) {
+            cb.setRawMoveVector(org.cloudburstmc.math.vector.Vector2f.from(-0.5f, 0.25f));
+        }
+
+        // 显式 case：START_DESTROY_BLOCK（Nukkit 走 switch 内分支，原本就正确）
+        var startBreak = new org.cloudburstmc.protocol.bedrock.data.PlayerBlockActionData();
+        startBreak.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.START_BREAK);
+        startBreak.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(10, 64, -2));
+        startBreak.setFace(1);
+        cb.getPlayerActions().add(startBreak);
+
+        // default 分支：STOP_DESTROY_BLOCK（Nukkit 序号 2，不在显式 case 中，此前会漏读 position+face）
+        var stopBreak = new org.cloudburstmc.protocol.bedrock.data.PlayerBlockActionData();
+        stopBreak.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.STOP_BREAK);
+        stopBreak.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(11, 65, -3));
+        stopBreak.setFace(2);
+        cb.getPlayerActions().add(stopBreak);
+
+        // default 分支：BLOCK_INTERACT（Nukkit INTERACT_WITH_BLOCK，序号 25）
+        var blockInteract = new org.cloudburstmc.protocol.bedrock.data.PlayerBlockActionData();
+        blockInteract.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.BLOCK_INTERACT);
+        blockInteract.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(12, 66, -4));
+        blockInteract.setFace(3);
+        cb.getPlayerActions().add(blockInteract);
+
+        PlayerAuthInputPacket nk = crossEncode(cb, PlayerAuthInputPacket::new, protocol);
+
+        var actions = nk.getBlockActionData();
+        assertEquals(3, actions.size(), "all three block actions should be decoded");
+
+        var start = actions.get(cn.nukkit.network.protocol.types.PlayerActionType.START_DESTROY_BLOCK);
+        assertNotNull(start, "START_DESTROY_BLOCK must be present");
+        assertEquals(10, start.getPosition().x);
+        assertEquals(64, start.getPosition().y);
+        assertEquals(-2, start.getPosition().z);
+        assertEquals(1, start.getFacing());
+
+        // default 分支动作现在必须携带正确的 position+face（此前为 null/-1）
+        var stop = actions.get(cn.nukkit.network.protocol.types.PlayerActionType.STOP_DESTROY_BLOCK);
+        assertNotNull(stop, "STOP_DESTROY_BLOCK must be present");
+        assertEquals(11, stop.getPosition().x);
+        assertEquals(65, stop.getPosition().y);
+        assertEquals(-3, stop.getPosition().z);
+        assertEquals(2, stop.getFacing());
+
+        var interact = actions.get(cn.nukkit.network.protocol.types.PlayerActionType.INTERACT_WITH_BLOCK);
+        assertNotNull(interact, "INTERACT_WITH_BLOCK must be present");
+        assertEquals(12, interact.getPosition().x);
+        assertEquals(66, interact.getPosition().y);
+        assertEquals(-4, interact.getPosition().z);
+        assertEquals(3, interact.getFacing());
+
+        // 若 position+face 未被消费，后续这些字段会错位并导致断言失败。
+        // <p>Without consuming position+face, these later fields would read garbage and fail.
+        if (protocol >= ProtocolInfo.v1_19_70) {
+            assertNotNull(nk.getAnalogMoveVector());
+            assertEquals(0.33f, nk.getAnalogMoveVector().x, 0.001f);
+            assertEquals(-0.66f, nk.getAnalogMoveVector().y, 0.001f);
+        }
+        if (protocol >= ProtocolInfo.v1_21_40) {
+            assertNotNull(nk.getCameraOrientation());
+            assertEquals(2.0f, nk.getCameraOrientation().y, 0.001f);
+        }
+        if (protocol >= ProtocolInfo.v1_21_50) {
+            assertNotNull(nk.getRawMoveVector());
+            assertEquals(-0.5f, nk.getRawMoveVector().x, 0.001f);
+            assertEquals(0.25f, nk.getRawMoveVector().y, 0.001f);
+        }
+        assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
+    }
+
     @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with item interaction triggerType and clientInteractPrediction")
     @MethodSource("versionsV712ToV748")
     void playerAuthInputWithItemInteractionV712(int protocol) {
@@ -2729,6 +3153,80 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
     }
 
+    @ParameterizedTest(name = "PlayerAuthInputPacket v1001 keeps embedded item interaction legacy shape v{0}")
+    @MethodSource("versionsAt1001")
+    void playerAuthInputWithItemInteractionV1001UsesLegacyEmbeddedShape(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket();
+        cb.setRotation(Vector3f.from(10.5f, 20.5f, 30.5f));
+        cb.setPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        cb.setMotion(org.cloudburstmc.math.vector.Vector2f.from(0.25f, -0.5f));
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.UP);
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.PERFORM_ITEM_INTERACTION);
+        cb.setInputMode(org.cloudburstmc.protocol.bedrock.data.InputMode.TOUCH);
+        cb.setPlayMode(org.cloudburstmc.protocol.bedrock.data.ClientPlayMode.NORMAL);
+        cb.setInputInteractionModel(org.cloudburstmc.protocol.bedrock.data.InputInteractionModel.CROSSHAIR);
+        cb.setInteractRotation(org.cloudburstmc.math.vector.Vector2f.from(5.0f, 6.0f));
+        cb.setTick(123L);
+        cb.setDelta(Vector3f.from(0.1f, 0.2f, 0.3f));
+        cb.setAnalogMoveVector(org.cloudburstmc.math.vector.Vector2f.from(0.6f, -0.4f));
+        cb.setCameraOrientation(Vector3f.from(0.0f, 1.0f, 0.0f));
+        cb.setRawMoveVector(org.cloudburstmc.math.vector.Vector2f.from(-0.25f, 0.75f));
+
+        var itemUseTransaction = new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction();
+        itemUseTransaction.setLegacyRequestId(0);
+        itemUseTransaction.getActions().add(new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryActionData(
+                org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventorySource.fromContainerWindowId(0),
+                4,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR,
+                org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR
+        ));
+        itemUseTransaction.setActionType(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK);
+        itemUseTransaction.setTriggerType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.TriggerType.SIMULATION_TICK);
+        itemUseTransaction.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(10, 50, 20));
+        itemUseTransaction.setBlockFace(1);
+        itemUseTransaction.setHotbarSlot(0);
+        itemUseTransaction.setItemInHand(org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR);
+        itemUseTransaction.setPlayerPosition(Vector3f.from(1.25f, 64.0f, -3.5f));
+        itemUseTransaction.setClickPosition(Vector3f.from(0.5f, 1.0f, 0.25f));
+        itemUseTransaction.setBlockDefinition(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                "test:block_42",
+                42,
+                org.cloudburstmc.nbt.NbtMap.EMPTY
+        ));
+        itemUseTransaction.setClientInteractPrediction(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.PredictedResult.FAILURE);
+        itemUseTransaction.setClientCooldownState(5);
+        cb.setItemUseTransaction(itemUseTransaction);
+
+        PlayerAuthInputPacket nk = crossEncode(cb, PlayerAuthInputPacket::new, protocol, helper -> helper.setBlockDefinitions(
+                org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                        .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder()
+                        .add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                                "test:block_42",
+                                42,
+                                org.cloudburstmc.nbt.NbtMap.EMPTY
+                        ))
+                        .build()
+        ));
+
+        assertNotNull(nk.getItemUseTransaction());
+        assertEquals(1, nk.getItemUseTransaction().actions.length);
+        assertEquals(NetworkInventoryAction.SOURCE_CONTAINER, nk.getItemUseTransaction().actions[0].sourceType);
+        assertEquals(0, nk.getItemUseTransaction().actions[0].windowId);
+        assertEquals(4, nk.getItemUseTransaction().actions[0].inventorySlot);
+        assertInstanceOf(UseItemData.class, nk.getItemUseTransaction().transactionData);
+        var itemUse = (UseItemData) nk.getItemUseTransaction().transactionData;
+        assertEquals(InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK, itemUse.actionType);
+        assertEquals(2, itemUse.triggerType);
+        assertEquals(10, itemUse.blockPos.x);
+        assertEquals(50, itemUse.blockPos.y);
+        assertEquals(20, itemUse.blockPos.z);
+        assertEquals(1, itemUse.face.getIndex());
+        assertEquals(42, itemUse.blockRuntimeId);
+        assertEquals(0, itemUse.clientInteractPrediction);
+        assertEquals((byte) 5, itemUse.clientCooldownState);
+        assertEquals(nk.getCount(), nk.getOffset(), "PlayerAuthInputPacket decode should consume the full payload");
+    }
+
     @ParameterizedTest(name = "PlayerAuthInputPacket v{0} with vehicle prediction")
     @MethodSource("versionsAtV662")
     void playerAuthInputWithVehiclePrediction(int protocol) {
@@ -2848,6 +3346,54 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin.BLOCK_ENTITY_DATA_TEXT,
                 request.getTextProcessingEventOrigin());
         assertEquals(nk.getCount(), nk.getOffset(), "ItemStackRequestPacket decode should consume the full payload");
+    }
+
+    @ParameterizedTest(name = "ItemStackRequestPacket v{0} craft results use item instance")
+    @MethodSource("versionsForCraftResultsDeprecatedItemInstance")
+    void itemStackRequestCraftResultsDeprecatedUsesItemInstance(int protocol) {
+        var gameVersion = GameVersion.byProtocol(protocol, false);
+        int runtimeId = cn.nukkit.item.RuntimeItems.getMapping(gameVersion)
+                .toRuntime(cn.nukkit.item.Item.DIAMOND_SWORD, 0)
+                .getRuntimeId();
+
+        ItemStackRequestPacket nk = decodeRawItemStackRequestPacket(protocol, stream -> {
+            stream.putUnsignedVarInt(1);
+            stream.putVarInt(91);
+            stream.putUnsignedVarInt(1);
+
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                // v2168: 主 VarUInt 紧凑 id(17) + 跳 7 重复字节(18) / primary compact VarUInt id + skip-7 duplicate byte
+                stream.putUnsignedVarInt(17);
+                stream.putByte((byte) 18);
+                stream.putUnsignedVarInt(1);
+                writeItemInstanceV2168(stream, "minecraft:diamond_sword", 1, 0, 0);
+            } else {
+                stream.putByte((byte) craftResultsDeprecatedActionId(protocol));
+                stream.putUnsignedVarInt(1);
+                writeItemInstance(stream, runtimeId, 1, 0, 0);
+            }
+            stream.putByte((byte) 1);
+
+            if (protocol >= ProtocolInfo.v1_16_200) {
+                stream.putUnsignedVarInt(0);
+            }
+            if (protocol >= ProtocolInfo.v1_19_30) {
+                stream.putLInt(-1);
+            }
+        });
+
+        assertEquals(1, nk.getRequests().size());
+        var request = nk.getRequests().get(0);
+        assertEquals(91, request.getRequestId());
+        assertEquals(1, request.getActions().length);
+        assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftResultsDeprecatedAction.class,
+                request.getActions()[0]);
+        var action = (cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftResultsDeprecatedAction)
+                request.getActions()[0];
+        assertEquals(1, action.getTimesCrafted());
+        assertEquals(1, action.getResultItems().length);
+        assertEquals(cn.nukkit.item.Item.DIAMOND_SWORD, action.getResultItems()[0].getId());
+        assertEquals(1, action.getResultItems()[0].getCount());
     }
 
     @ParameterizedTest(name = "ItemStackRequestPacket pre-v554 without text origin v{0}")
@@ -3255,13 +3801,26 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         cb.setTrustedSkin(true);
         cb.setSkin(org.cloudburstmc.protocol.bedrock.data.skin.SerializedSkin.builder()
                 .skinId("test_skin_id")
+                .playFabId("")
                 .skinResourcePatch("{\"geometry\":{\"default\":\"geometry.humanoid.custom\"}}")
                 .skinData(org.cloudburstmc.protocol.bedrock.data.skin.ImageData.of(skinBytes))
                 .capeData(org.cloudburstmc.protocol.bedrock.data.skin.ImageData.EMPTY)
                 .geometryData("")
+                .geometryDataEngineVersion("")
+                .animationData("")
+                .capeId("")
+                .fullSkinId("")
+                .armSize("")
+                .skinColor("")
+                .color(java.awt.Color.WHITE)
+                .personaPieces(java.util.Collections.emptyList())
+                .tintColors(java.util.Collections.emptyList())
                 .premium(false)
                 .persona(false)
                 .capeOnClassic(false)
+                .animations(java.util.Collections.emptyList())
+                .trusted(true)
+                .profileHash("test_profile_hash")
                 .build());
 
         PlayerSkinPacket nk = crossEncode(cb, PlayerSkinPacket::new, protocol);
@@ -3438,6 +3997,270 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(2, nk.nameMap.get("minecraft:dirt"));
     }
 
+    // ==================== ScriptMessagePacket ====================
+
+    @ParameterizedTest(name = "ScriptMessagePacket v{0}")
+    @MethodSource("versionsFrom486")
+    void scriptMessage(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ScriptMessagePacket();
+        cb.setChannel("test:channel");
+        cb.setMessage("{\"value\":42}");
+
+        ScriptMessagePacket nk = crossEncode(cb, ScriptMessagePacket::new, protocol);
+
+        assertEquals("test:channel", nk.channel);
+        assertEquals("{\"value\":42}", nk.message);
+        assertEquals(nk.getCount(), nk.getOffset(), "ScriptMessagePacket decode should consume the full payload");
+    }
+
+    // ==================== ServerStoreInfoPacket ====================
+
+    static Stream<Arguments> versionsFrom975() {
+        return filteredVersions(ProtocolInfo.v1_26_20);
+    }
+
+    @ParameterizedTest(name = "ServerStoreInfoPacket v{0}")
+    @MethodSource("versionsFrom975")
+    void serverStoreInfo(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerStoreInfoPacket();
+        cb.setStore(new org.cloudburstmc.protocol.bedrock.data.ClientStoreEntrypointConfiguration("store-1", "Test Shop"));
+
+        ServerStoreInfoPacket nk = crossEncode(cb, ServerStoreInfoPacket::new, protocol);
+
+        assertNotNull(nk.store);
+        assertEquals("store-1", nk.store.getStoreId());
+        assertEquals("Test Shop", nk.store.getStoreName());
+        assertEquals(nk.getCount(), nk.getOffset(), "ServerStoreInfoPacket decode should consume the full payload");
+    }
+
+    // ==================== ServerPresenceInfoPacket ====================
+
+    @ParameterizedTest(name = "ServerPresenceInfoPacket v{0}")
+    @MethodSource("versionsFrom975")
+    void serverPresenceInfo(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerPresenceInfoPacket();
+        cb.setPresenceConfiguration(new org.cloudburstmc.protocol.bedrock.data.PresenceConfiguration(
+                "exp-name", "world-name", "rich-1"));
+
+        ServerPresenceInfoPacket nk = crossEncode(cb, ServerPresenceInfoPacket::new, protocol);
+
+        assertNotNull(nk.presenceConfiguration);
+        assertEquals("exp-name", nk.presenceConfiguration.getExperienceName());
+        assertEquals("world-name", nk.presenceConfiguration.getWorldName());
+        // richPresenceId 仅存在于 [v1001, v2168)：CB 的 v2168 helper 继承 v975，丢弃了该字段
+        // richPresenceId only exists in [v1001, v2168): CB's v2168 helper extends v975, dropping the field
+        if (protocol >= ProtocolInfo.v1_26_30 && protocol < ProtocolInfo.v1_26_40) {
+            assertEquals("rich-1", nk.presenceConfiguration.getRichPresenceId());
+        } else {
+            assertNull(nk.presenceConfiguration.getRichPresenceId());
+        }
+        assertEquals(nk.getCount(), nk.getOffset(), "ServerPresenceInfoPacket decode should consume the full payload");
+    }
+
+    // ==================== SendPartyDestinationCookiePacket ====================
+
+    static Stream<Arguments> versionsFrom1001() {
+        return filteredVersions(ProtocolInfo.v1_26_30);
+    }
+
+    @ParameterizedTest(name = "SendPartyDestinationCookiePacket v{0}")
+    @MethodSource("versionsFrom1001")
+    void sendPartyDestinationCookie(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.SendPartyDestinationCookiePacket();
+        cb.setCookie("cookie-data");
+        cb.setIntent(org.cloudburstmc.protocol.bedrock.packet.SendPartyDestinationCookiePacket.Intent.OPT_IN);
+        cb.setDestinationName("my-destination");
+
+        SendPartyDestinationCookiePacket nk = crossEncode(cb, SendPartyDestinationCookiePacket::new, protocol);
+
+        assertEquals("cookie-data", nk.cookie);
+        assertEquals(SendPartyDestinationCookiePacket.Intent.OPT_IN, nk.intent);
+        assertEquals("my-destination", nk.destinationName);
+        assertEquals(nk.getCount(), nk.getOffset(), "SendPartyDestinationCookiePacket decode should consume the full payload");
+    }
+
+    // ==================== ClientboundUpdateSoundDataPacket ====================
+
+    @ParameterizedTest(name = "ClientboundUpdateSoundDataPacket v{0}")
+    @MethodSource("versionsFrom1001")
+    void clientboundUpdateSoundData(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ClientboundUpdateSoundDataPacket();
+        cb.setServerSoundHandle(123456789L);
+        if (protocol >= ProtocolInfo.v1_26_40) {
+            cb.setVolume(new org.cloudburstmc.protocol.bedrock.data.sound.SetVolumeSoundData(0.8f));
+            cb.setPitch(new org.cloudburstmc.protocol.bedrock.data.sound.SetPitchSoundData(1.25f));
+            cb.setFade(new org.cloudburstmc.protocol.bedrock.data.sound.FadeSoundData(0.5f, 2.0f));
+            cb.setSeekTo(new org.cloudburstmc.protocol.bedrock.data.sound.SeekToSoundData(3.5f));
+            cb.setStop(new org.cloudburstmc.protocol.bedrock.data.sound.StopSoundData());
+            cb.setPause(new org.cloudburstmc.protocol.bedrock.data.sound.PauseSoundData());
+            cb.setResume(new org.cloudburstmc.protocol.bedrock.data.sound.ResumeSoundData());
+        } else {
+            cb.setType("music.game.creative");
+        }
+
+        ClientboundUpdateSoundDataPacket nk = crossEncode(cb, ClientboundUpdateSoundDataPacket::new, protocol);
+
+        assertEquals(123456789L, nk.serverSoundHandle);
+        if (protocol >= ProtocolInfo.v1_26_40) {
+            assertTrue(nk.stop);
+            assertEquals(0.8f, nk.volume, 1e-4f);
+            assertEquals(1.25f, nk.pitch, 1e-4f);
+            assertEquals(0.5f, nk.fadeTargetVolume, 1e-4f);
+            assertEquals(2.0f, nk.fadeDuration, 1e-4f);
+            assertEquals(3.5f, nk.seekToSeconds, 1e-4f);
+            assertTrue(nk.pause);
+            assertTrue(nk.resume);
+        } else {
+            assertEquals("music.game.creative", nk.type);
+        }
+        assertEquals(nk.getCount(), nk.getOffset(), "ClientboundUpdateSoundDataPacket decode should consume the full payload");
+    }
+
+    // ==================== ItemStackRequestPacket v2168 action payloads ====================
+
+    static Stream<Arguments> versionsAt2168() {
+        return Stream.of(Arguments.of(ProtocolInfo.v1_26_40));
+    }
+
+    /**
+     * 覆盖 v2168 专属的动作载荷变化：slot stackNetworkId、MINE_BLOCK stackNetworkId、
+     * 砂轮 recipeNetworkId 均改为 LInt。
+     * <p>
+     * Covers v2168-specific action payload changes: slot stackNetworkId, MINE_BLOCK
+     * stackNetworkId and grindstone recipeNetworkId all became LInt.
+     */
+    @ParameterizedTest(name = "ItemStackRequestPacket v{0} v2168 action payloads")
+    @MethodSource("versionsAt2168")
+    void itemStackRequestV2168ActionPayloads(int protocol) {
+        var hotbar = new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequestSlotData(
+                org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.HOTBAR, 2, 777,
+                new org.cloudburstmc.protocol.bedrock.data.inventory.FullContainerName(
+                        org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.HOTBAR, null));
+        var inventory = new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequestSlotData(
+                org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.INVENTORY, 9, 888,
+                new org.cloudburstmc.protocol.bedrock.data.inventory.FullContainerName(
+                        org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType.INVENTORY, 5));
+
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ItemStackRequestPacket();
+        cb.getRequests().add(new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequest(
+                64,
+                new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.ItemStackRequestAction[]{
+                        new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.TakeAction(3, hotbar, inventory),
+                        new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.MineBlockAction(4, 55, 999123),
+                        new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.CraftGrindstoneAction(77, 1, 12),
+                        new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.CraftLoomAction("minecraft:cre_pattern", 2),
+                        new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.BeaconPaymentAction(1, 10)
+                },
+                new String[0]
+        ));
+
+        ItemStackRequestPacket nk = crossEncode(cb, ItemStackRequestPacket::new, protocol);
+
+        assertEquals(1, nk.getRequests().size());
+        var request = nk.getRequests().get(0);
+        assertEquals(64, request.getRequestId());
+        assertEquals(5, request.getActions().length);
+
+        var take = assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.TakeAction.class,
+                request.getActions()[0]);
+        assertEquals(3, take.getCount());
+        assertEquals(cn.nukkit.network.protocol.types.inventory.ContainerSlotType.HOTBAR, take.getSource().getContainer());
+        assertEquals(2, take.getSource().getSlot());
+        assertEquals(777, take.getSource().getStackNetworkId());
+        assertEquals(cn.nukkit.network.protocol.types.inventory.ContainerSlotType.INVENTORY, take.getDestination().getContainer());
+        assertEquals(9, take.getDestination().getSlot());
+        assertEquals(888, take.getDestination().getStackNetworkId());
+        assertEquals(Integer.valueOf(5), take.getDestination().getDynamicId());
+
+        var mine = assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.MineBlockAction.class,
+                request.getActions()[1]);
+        assertEquals(4, mine.getHotbarSlot());
+        assertEquals(55, mine.getPredictedDurability());
+        assertEquals(999123, mine.getStackNetworkId());
+
+        var grindstone = assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftGrindstoneAction.class,
+                request.getActions()[2]);
+        assertEquals(77, grindstone.getRecipeNetworkId());
+        assertEquals(1, grindstone.getNumberOfRequestedCrafts());
+        assertEquals(12, grindstone.getRepairCost());
+
+        var loom = assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftLoomAction.class,
+                request.getActions()[3]);
+        assertEquals("minecraft:cre_pattern", loom.getPatternId());
+        assertEquals(2, loom.getTimesCrafted());
+
+        var beacon = assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.BeaconPaymentAction.class,
+                request.getActions()[4]);
+        assertEquals(1, beacon.getPrimaryEffect());
+        assertEquals(10, beacon.getSecondaryEffect());
+
+        assertEquals(nk.getCount(), nk.getOffset(), "ItemStackRequestPacket decode should consume the full payload");
+    }
+
+    /**
+     * v2168 CRAFT_RECIPE_AUTO ingredients 采用新格式（对应 cb readIngredient2）：
+     * VarUInt type + 重复 type byte + 分支主体 + unsignedShortLE count。
+     * 覆盖 DEFAULT ingredient（含 identifier + aux）和 INVALID ingredient 的解码。
+     * <p>
+     * v2168 CRAFT_RECIPE_AUTO ingredients use the new shape (mirrors cb readIngredient2):
+     * VarUInt type + duplicate type byte + per-type body + unsignedShortLE count.
+     * Covers DEFAULT ingredient (identifier + aux) and INVALID ingredient decoding.
+     */
+    @ParameterizedTest(name = "ItemStackRequestPacket v{0} v2168 AutoCraft ingredients")
+    @MethodSource("versionsAt2168")
+    void itemStackRequestV2168AutoCraftIngredients(int protocol) {
+        var stickDef = new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleItemDefinition("minecraft:stick", 320, false);
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ItemStackRequestPacket();
+        cb.getRequests().add(new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequest(
+                200,
+                new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.ItemStackRequestAction[]{
+                        new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.AutoCraftRecipeAction(
+                                100, // recipeNetworkId
+                                2,   // numberOfRequestedCrafts
+                                java.util.List.of(
+                                        new org.cloudburstmc.protocol.bedrock.data.inventory.descriptor.ItemDescriptorWithCount(
+                                                new org.cloudburstmc.protocol.bedrock.data.inventory.descriptor.DefaultDescriptor(stickDef, 0),
+                                                5 // count
+                                        ),
+                                        new org.cloudburstmc.protocol.bedrock.data.inventory.descriptor.ItemDescriptorWithCount(
+                                                org.cloudburstmc.protocol.bedrock.data.inventory.descriptor.InvalidDescriptor.INSTANCE,
+                                                0
+                                        )
+                                ),
+                                2    // timesCrafted
+                        )
+                },
+                new String[0]
+        ));
+
+        ItemStackRequestPacket nk = crossEncode(cb, ItemStackRequestPacket::new, protocol);
+
+        assertEquals(1, nk.getRequests().size());
+        var request = nk.getRequests().get(0);
+        assertEquals(200, request.getRequestId());
+        assertEquals(1, request.getActions().length);
+        var auto = assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.AutoCraftRecipeAction.class,
+                request.getActions()[0]);
+        assertEquals(100, auto.getRecipeNetworkId());
+        assertEquals(2, auto.getNumberOfRequestedCrafts());
+        assertEquals(2, auto.getIngredients().size());
+
+        // DEFAULT ingredient: 解析为 minecraft:stick, aux=0, count=5
+        var ing0 = auto.getIngredients().get(0);
+        assertEquals(5, ing0.getCount());
+        assertInstanceOf(cn.nukkit.network.protocol.types.inventory.descriptor.DefaultDescriptor.class, ing0.getDescriptor());
+        var def0 = (cn.nukkit.network.protocol.types.inventory.descriptor.DefaultDescriptor) ing0.getDescriptor();
+        assertEquals(cn.nukkit.item.Item.fromString("minecraft:stick").getId(), def0.getItemId());
+        assertEquals(0, def0.getAuxValue());
+
+        // INVALID ingredient: count=0
+        var ing1 = auto.getIngredients().get(1);
+        assertEquals(0, ing1.getCount());
+        assertInstanceOf(cn.nukkit.network.protocol.types.inventory.descriptor.InvalidDescriptor.class, ing1.getDescriptor());
+
+        assertEquals(nk.getCount(), nk.getOffset(), "ItemStackRequestPacket decode should consume the full payload");
+    }
+
     private ItemStackRequestPacket decodeRawItemStackRequestPacket(int protocol, Consumer<BinaryStream> packetBodyWriter) {
         var packet = new ItemStackRequestPacket();
         packet.protocol = protocol;
@@ -3469,6 +4292,51 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         }
         stream.putByte((byte) slot);
         stream.putVarInt(stackNetworkId);
+    }
+
+    private static int craftResultsDeprecatedActionId(int protocol) {
+        if (protocol >= ProtocolInfo.v1_18_10_26) {
+            return cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType
+                    .CRAFT_RESULTS_DEPRECATED.getId();
+        }
+        if (protocol >= ProtocolInfo.v1_17_40) {
+            return 17;
+        }
+        if (protocol >= ProtocolInfo.v1_16_210) {
+            return 15;
+        }
+        if (protocol >= ProtocolInfo.v1_16_200) {
+            return 14;
+        }
+        return 13;
+    }
+
+    private static void writeItemInstanceV2168(BinaryStream stream, String identifier, int count, int damage, int blockRuntimeId) {
+        BinaryStream userData = new BinaryStream();
+        userData.putLShort(0);
+        userData.putLInt(0);
+        userData.putLInt(0);
+
+        stream.putUnsignedVarInt(1); // descriptor type DEFAULT
+        stream.putByte((byte) 1);    // duplicate type byte
+        stream.putString(identifier);
+        stream.putVarInt(damage);
+        stream.putLShort(count);
+        stream.putUnsignedVarInt(blockRuntimeId);
+        stream.putByteArray(userData.getBuffer());
+    }
+
+    private static void writeItemInstance(BinaryStream stream, int runtimeId, int count, int damage, int blockRuntimeId) {
+        BinaryStream userData = new BinaryStream();
+        userData.putLShort(0);
+        userData.putLInt(0);
+        userData.putLInt(0);
+
+        stream.putVarInt(runtimeId);
+        stream.putLShort(count);
+        stream.putUnsignedVarInt(damage);
+        stream.putVarInt(blockRuntimeId);
+        stream.putByteArray(userData.getBuffer());
     }
 
     private static <T> T readField(Object instance, String fieldName, Class<T> type) {

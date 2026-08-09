@@ -167,6 +167,24 @@ public class NBTOutputStream implements DataOutput, AutoCloseable {
         }
     }
 
+    /**
+     * Writes a tag value without the leading type id and name (headerless form), used by
+     * {@code LevelEventGenericPacket} — whose wire format expects a root NBT value with no name
+     * header, unlike the named-tag form written by {@link #writeTag(Tag)}.
+     */
+    public void writeValue(Tag tag) throws IOException {
+        this.writeValue(tag, 16);
+    }
+
+    public void writeValue(Tag tag, int maxDepth) throws IOException {
+        Objects.requireNonNull(tag, "tag");
+        if (this.closed.get()) {
+            throw new IllegalStateException("closed");
+        } else {
+            this.serialize(tag, tag.getId(), maxDepth);
+        }
+    }
+
     private void serialize(Tag tag, int type, int maxDepth) throws IOException {
         if (maxDepth < 0) {
             throw new IllegalArgumentException("Reached depth limit");

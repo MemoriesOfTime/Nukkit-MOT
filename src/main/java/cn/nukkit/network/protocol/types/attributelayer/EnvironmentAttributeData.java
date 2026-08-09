@@ -9,8 +9,14 @@ public class EnvironmentAttributeData {
     public int currentTransitionTicks;
     public int totalTransitionTicks;
     public CameraEase easing;
+    public int localTransitionTicks;
+    public boolean noiseTransition;
 
     public EnvironmentAttributeData(String attributeName, AttributeData from, AttributeData attribute, AttributeData to, int currentTransitionTicks, int totalTransitionTicks, CameraEase easing) {
+        this(attributeName, from, attribute, to, currentTransitionTicks, totalTransitionTicks, easing, 0, false);
+    }
+
+    public EnvironmentAttributeData(String attributeName, AttributeData from, AttributeData attribute, AttributeData to, int currentTransitionTicks, int totalTransitionTicks, CameraEase easing, int localTransitionTicks, boolean noiseTransition) {
         this.attributeName = attributeName;
         this.from = from;
         this.attribute = attribute;
@@ -18,6 +24,8 @@ public class EnvironmentAttributeData {
         this.currentTransitionTicks = currentTransitionTicks;
         this.totalTransitionTicks = totalTransitionTicks;
         this.easing = easing;
+        this.localTransitionTicks = localTransitionTicks;
+        this.noiseTransition = noiseTransition;
     }
 
     public enum CameraEase {

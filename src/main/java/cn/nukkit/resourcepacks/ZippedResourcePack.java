@@ -4,9 +4,9 @@ import cn.nukkit.Server;
 import com.google.gson.JsonParser;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -18,9 +18,6 @@ public class ZippedResourcePack extends AbstractResourcePack {
 
     private File file;
     private byte[] sha256;
-
-    private String encryptionKey = "";
-    private String cdnUrl = "";
 
     public ZippedResourcePack(File file) {
         this(file, SupportType.UNIVERSAL);
@@ -50,8 +47,8 @@ public class ZippedResourcePack extends AbstractResourcePack {
             }
             if (entry == null) {
                 entry = zip.stream()
-                        .filter(e-> (e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") || e.getName().toLowerCase(Locale.ROOT).endsWith("pack_manifest.json"))
-                                && !e.isDirectory())
+                        .filter(e-> !e.isDirectory() &&
+                                (e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") || e.getName().toLowerCase(Locale.ROOT).endsWith("pack_manifest.json")))
                         .filter(e-> {
                             File fe = new File(e.getName());
                             if (!fe.getName().equalsIgnoreCase("manifest.json") && !fe.getName().equalsIgnoreCase("pack_manifest.json")) {
@@ -72,10 +69,8 @@ public class ZippedResourcePack extends AbstractResourcePack {
             if (parentFolder == null || !parentFolder.isDirectory()) {
                 throw new IOException("Invalid resource pack path");
             }
-            File keyFile = new File(parentFolder, this.file.getName() + ".key");
-            if (keyFile.exists()) {
-                this.encryptionKey = Files.readString(keyFile.toPath());
-            }
+            // 加密密钥只能来自 packs.yml（由 ResourcePackManager.applyPackConfig 注入）。
+            // Encryption keys now come exclusively from packs.yml (injected by ResourcePackManager.applyPackConfig).
         } catch (IOException e) {
             Server.getInstance().getLogger().logException(e);
         }
@@ -100,22 +95,25 @@ public class ZippedResourcePack extends AbstractResourcePack {
                 Server.getInstance().getLogger().logException(e);
             }
         }
-
         return this.sha256;
     }
 
     @Override
     public byte[] getPackChunk(int off, int len) {
+        int size = this.getPackSize();
         byte[] chunk;
-        if (this.getPackSize() - off > len) {
+        if (size - off > len) {
             chunk = new byte[len];
         } else {
-            chunk = new byte[this.getPackSize() - off];
+            chunk = new byte[size - off];
         }
 
-        try (FileInputStream fis = new FileInputStream(this.file)) {
-            fis.skip(off);
-            fis.read(chunk);
+        if (chunk.length == 0) {
+            return chunk;
+        }
+        try (RandomAccessFile raf = new RandomAccessFile(this.file, "r")) {
+            raf.seek(off);
+            raf.readFully(chunk);
         } catch (Exception e) {
             Server.getInstance().getLogger().logException(e);
         }
@@ -123,17 +121,11 @@ public class ZippedResourcePack extends AbstractResourcePack {
         return chunk;
     }
 
-    @Override
-    public String getEncryptionKey() {
-        return this.encryptionKey;
-    }
-
-    @Override
-    public String getCDNUrl() {
-        return this.cdnUrl;
-    }
-
+    /**
+     * @deprecated Use {@link #setCDNUrl(String)} instead
+     */
+    @Deprecated
     public void setCdnUrl(String cdnUrl) {
-        this.cdnUrl = cdnUrl;
+        this.setCDNUrl(cdnUrl);
     }
 }

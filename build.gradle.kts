@@ -1,7 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
 
-@Suppress("DSL_SCOPE_VIOLATION") // https://youtrack.jetbrains.com/issue/IDEA-262280
-
 plugins {
     id("java-library")
     id("maven-publish")
@@ -46,7 +44,14 @@ val mockitoAgent by configurations.creating {
 }
 
 dependencies {
-    api(libs.raknet)
+    api(libs.raknet) {
+        exclude("io.netty", "netty-common")
+        exclude("io.netty", "netty-codec-base")
+        exclude("io.netty", "netty-buffer")
+        exclude("io.netty", "netty-transport")
+        exclude("io.netty", "netty-transport-native-unix-common")
+        exclude("io.netty", "netty-codec-haproxy")
+    }
     api(libs.netty.epoll)
     api(libs.netty.codec.haproxy)
     api(libs.nukkitx.natives)
@@ -76,6 +81,7 @@ dependencies {
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
+    annotationProcessor(libs.log4j.core)
 
     compileOnly(libs.jsr305)
 
@@ -101,7 +107,7 @@ dependencies {
         exclude("io.netty", "netty-buffer")
     }
     testImplementation(libs.cloudburst.math)
-    testImplementation(libs.allay.protocol.extension)
+    testImplementation(libs.netease.protocol.extension)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.bundles.mockito)
@@ -141,6 +147,12 @@ publishing {
 tasks {
     compileJava {
         options.encoding = "UTF-8"
+        options.compilerArgs.addAll(
+            listOf(
+                "-Alog4j.graalvm.groupId=cn.nukkit",
+                "-Alog4j.graalvm.artifactId=Nukkit"
+            )
+        )
     }
 
     test {
@@ -150,6 +162,24 @@ tasks {
                 classpath.from(mockitoAgent)
             }
         )
+    }
+
+    // Minify all .json resources in the build output to shrink the JAR.
+    // Source files in src/main/resources stay readable; only the copied artifacts are minified.
+    // Idempotent: already-minified files are unchanged on a second pass.
+    processResources {
+        doLast {
+            val minifyGson = com.google.gson.GsonBuilder().disableHtmlEscaping().create()
+            @Suppress("DEPRECATION")
+            val outDir = destinationDir
+            outDir.walkTopDown()
+                .filter { it.isFile && it.extension.equals("json", ignoreCase = true) }
+                .forEach { file ->
+                    val parsed = com.google.gson.JsonParser.parseReader(file.reader(Charsets.UTF_8))
+                    file.writeText(minifyGson.toJson(parsed), Charsets.UTF_8)
+                    logger.debug("Minified ${file.name}")
+                }
+        }
     }
 
     jar {

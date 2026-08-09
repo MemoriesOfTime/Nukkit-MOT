@@ -20,6 +20,7 @@ import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.event.level.LevelInitEvent;
 import cn.nukkit.event.level.LevelLoadEvent;
+import cn.nukkit.event.server.BatchPacketsEvent;
 import cn.nukkit.event.server.PlayerDataSerializeEvent;
 import cn.nukkit.event.server.QueryRegenerateEvent;
 import cn.nukkit.event.server.ServerStopEvent;
@@ -55,7 +56,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.BatchingHelper;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
@@ -73,7 +73,6 @@ import cn.nukkit.plugin.service.NKServiceManager;
 import cn.nukkit.plugin.service.ServiceManager;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
-import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.resourcepacks.ResourcePackManager;
 import cn.nukkit.resourcepacks.loader.JarPluginResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
@@ -88,6 +87,7 @@ import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
 import cn.nukkit.utils.serverconfig.ConfigComments;
 import cn.nukkit.utils.serverconfig.ConfigMigration;
+import cn.nukkit.utils.serverconfig.ResourcePackMigration;
 import cn.nukkit.utils.serverconfig.ServerConfig;
 import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import com.google.common.base.Preconditions;
@@ -149,7 +149,7 @@ public class Server {
     private final Config whitelist;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
-    private boolean hasStopped;
+    private volatile boolean hasStopped;
 
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
@@ -269,7 +269,6 @@ public class Server {
     private final DB nameLookup;
     private PlayerDataSerializer playerDataSerializer;
     private SpawnerTask spawnerTask;
-    private final BatchingHelper batchingHelper;
 
     /**
      * The server's MOTD. Remember to call network.setName() when updated.
@@ -511,9 +510,17 @@ public class Server {
      */
     public boolean enableExperimentMode;
     /**
-     * Asynchronous chunk sending (Experiment)
+     * Asynchronous chunk sending, loading and saving (Experiment)
+     * <p>
+     * 异步区块发送、加载与保存(实验性)
      */
     public boolean asyncChunkSending;
+    /**
+     * 每世界挂起区块写上限,超限暂停卸载(背压)
+     * <p>
+     * Max pending chunk writes per world before unloading pauses (backpressure)
+     */
+    public int maxPendingChunkWrites = 128;
     /**
      * Show a console message when a plugin uses deprecated API methods
      */
@@ -530,6 +537,12 @@ public class Server {
      * Server authority block destruction
      */
     public boolean serverAuthoritativeBlockBreaking;
+    /**
+     * Server authoritative inventory mode
+     * When enabled, server has final authority over inventory changes
+     * @since v1.16.100 (protocol 407+)
+     */
+    public boolean serverAuthoritativeInventory;
     /**
      * Network encryption
      */
@@ -605,7 +618,8 @@ public class Server {
      */
     public boolean enableProxyProtocol;
     /**
-     * Whitelist of proxy IPs/CIDRs allowed to send Proxy Protocol headers (e.g. "127.0.0.1", "10.0.0.0/8")
+     * Whitelist of proxy IPv4/IPv6 CIDRs allowed to send Proxy Protocol headers
+     * (e.g. "127.0.0.1", "10.0.0.0/8", "2001:db8::/32")
      */
     public List<String> proxyProtocolWhitelist;
     /**
@@ -721,8 +735,6 @@ public class Server {
 
         this.scheduler = new ServerScheduler();
 
-        this.batchingHelper = new BatchingHelper();
-
         if (this.getPropertyBoolean("enable-rcon", false)) {
             try {
                 String randomPassword = Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13);
@@ -812,13 +824,11 @@ public class Server {
         this.serverID = UUID.randomUUID();
 
         this.craftingManager = new CraftingManager();
+        ResourcePackMigration.migrate(new File(Nukkit.DATA_PATH));
         HashSet<ResourcePackLoader> packLoaders = new HashSet<>();
         packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")));
+        packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs")));
         packLoaders.add(new JarPluginResourcePackLoader(new File(this.pluginPath)));
-        if (this.netEaseMode) {
-            packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs_netease"), ResourcePack.SupportType.NETEASE));
-            packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs_netease"), ResourcePack.SupportType.NETEASE));
-        }
         this.resourcePackManager = new ResourcePackManager(packLoaders);
 
         this.pluginManager = new PluginManager(this, this.commandMap);
@@ -833,6 +843,8 @@ public class Server {
         this.network.setName(this.getMotd());
         this.network.setSubName(this.getSubMotd());
         this.network.registerInterface(new RakNetInterface(this));
+
+        EntityProperty.init();
 
         this.pluginManager.loadInternalPlugin();
         if (loadPlugins) {
@@ -933,7 +945,6 @@ public class Server {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
 
-        EntityProperty.init();
         EntityProperty.buildPacket();
         EntityProperty.buildPlayerProperty();
 
@@ -979,7 +990,7 @@ public class Server {
                 content.close();
 
                 boolean isMaster = Nukkit.getBranch().equals("master");
-                if (!this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null") && isMaster) {
+                if (isMaster && !this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null")) {
                     this.getLogger().info("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + this.getNukkitVersion() + " Latest: " + latest);
                     this.getLogger().info("§c[Nukkit-MOT][Update] §eYou can download the latest build from https://github.com/MemoriesOfTime/Nukkit-MOT/");
                 } else if (!isMaster) {
@@ -1026,39 +1037,213 @@ public class Server {
         return recipients.size();
     }
 
-    public int broadcast(String message, String permissions) {
+    /**
+     * 收集订阅了任一指定权限频道的去重 {@link CommandSender} 集合。
+     * <p>
+     * Collect the de-duplicated {@link CommandSender}s subscribed to at least one given permission channel.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 a {@code ;}-separated permission channel list
+     */
+    private Set<CommandSender> getBroadcastRecipients(String permissions) {
         Set<CommandSender> recipients = new HashSet<>();
-
         for (String permission : permissions.split(";")) {
             for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
-                if (permissible instanceof CommandSender && permissible.hasPermission(permission)) {
-                    recipients.add((CommandSender) permissible);
+                if (permissible instanceof CommandSender sender && permissible.hasPermission(permission)) {
+                    recipients.add(sender);
                 }
             }
         }
+        return recipients;
+    }
 
+    /**
+     * 向全体用户频道广播标题（默认淡入/停留/淡出 20/20/5）。
+     * <p>
+     * Broadcast a title with subtitle to the default user channel (default timings 20/20/5).
+     *
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle) {
+        return this.broadcastTitle(title, subtitle, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播标题。Broadcast a title to the subscribers of the given permission channels.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 {@code ;}-separated permission channels
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle, String permissions) {
+        return this.broadcastTitle(title, subtitle, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播标题（默认淡入/停留/淡出 20/20/5）。
+     * <p>
+     * Broadcast a title to the given recipients with default timings; only {@link Player} recipients display it.
+     *
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle, Collection<? extends CommandSender> recipients) {
+        return this.broadcastTitle(title, subtitle, 20, 20, 5, recipients);
+    }
+
+    /**
+     * 向全体用户频道广播标题，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast a title with custom fade-in/stay/fade-out (in ticks) to the default user channel.
+     */
+    public int broadcastTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        return this.broadcastTitle(title, subtitle, fadeIn, stay, fadeOut, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播标题，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast a title with custom timings to the subscribers of the given permission channels.
+     */
+    public int broadcastTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut, String permissions) {
+        return this.broadcastTitle(title, subtitle, fadeIn, stay, fadeOut, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播标题，可自定义淡入/停留/淡出（tick）；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast a title with custom timings to the given recipients; only {@link Player} recipients display it.
+     *
+     * @return 实际显示标题的玩家数 number of players that displayed the title
+     */
+    public int broadcastTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 向全体用户频道广播 Tip 消息。
+     * <p>
+     * Broadcast a tip to the default user channel; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Tip 的玩家数 number of players that displayed the tip
+     */
+    public int broadcastTip(String message) {
+        return this.broadcastTip(message, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播 Tip 消息。Broadcast a tip to the subscribers of the given permission channels.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 {@code ;}-separated permission channels
+     * @return 实际显示 Tip 的玩家数 number of players that displayed the tip
+     */
+    public int broadcastTip(String message, String permissions) {
+        return this.broadcastTip(message, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播 Tip 消息；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast a tip to the given recipients; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Tip 的玩家数 number of players that displayed the tip
+     */
+    public int broadcastTip(String message, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendTip(message);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 向全体用户频道广播 Action Bar 消息（默认淡入/停留/淡出 1/0/1）。
+     * <p>
+     * Broadcast an action bar to the default user channel (default timings 1/0/1).
+     *
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message) {
+        return this.broadcastActionBar(message, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播 Action Bar 消息。Broadcast an action bar to the subscribers of the given permission channels.
+     *
+     * @param permissions {@code ;} 分隔的权限频道列表 {@code ;}-separated permission channels
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message, String permissions) {
+        return this.broadcastActionBar(message, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播 Action Bar 消息（默认淡入/停留/淡出 1/0/1）；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast an action bar to the given recipients with default timings; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message, Collection<? extends CommandSender> recipients) {
+        return this.broadcastActionBar(message, 1, 0, 1, recipients);
+    }
+
+    /**
+     * 向全体用户频道广播 Action Bar 消息，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast an action bar with custom fade-in/duration/fade-out (in ticks) to the default user channel.
+     */
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut) {
+        return this.broadcastActionBar(message, fadeIn, duration, fadeOut, BROADCAST_CHANNEL_USERS);
+    }
+
+    /**
+     * 按权限频道广播 Action Bar 消息，可自定义淡入/停留/淡出（tick）。
+     * <p>
+     * Broadcast an action bar with custom timings to the subscribers of the given permission channels.
+     */
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, String permissions) {
+        return this.broadcastActionBar(message, fadeIn, duration, fadeOut, getBroadcastRecipients(permissions));
+    }
+
+    /**
+     * 向指定接收者集合广播 Action Bar 消息，可自定义淡入/停留/淡出（tick）；只有 {@link Player} 会显示。
+     * <p>
+     * Broadcast an action bar with custom timings to the given recipients; only {@link Player} recipients display it.
+     *
+     * @return 实际显示 Action Bar 的玩家数 number of players that displayed the action bar
+     */
+    public int broadcastActionBar(String message, int fadeIn, int duration, int fadeOut, Collection<? extends CommandSender> recipients) {
+        int count = 0;
+        for (CommandSender recipient : recipients) {
+            if (recipient instanceof Player player) {
+                player.sendActionBar(message, fadeIn, duration, fadeOut);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int broadcast(String message, String permissions) {
+        Set<CommandSender> recipients = getBroadcastRecipients(permissions);
         for (CommandSender recipient : recipients) {
             recipient.sendMessage(message);
         }
-
         return recipients.size();
     }
 
     public int broadcast(TextContainer message, String permissions) {
-        Set<CommandSender> recipients = new HashSet<>();
-
-        for (String permission : permissions.split(";")) {
-            for (Permissible permissible : this.pluginManager.getPermissionSubscriptions(permission)) {
-                if (permissible instanceof CommandSender && permissible.hasPermission(permission)) {
-                    recipients.add((CommandSender) permissible);
-                }
-            }
-        }
-
+        Set<CommandSender> recipients = getBroadcastRecipients(permissions);
         for (CommandSender recipient : recipients) {
             recipient.sendMessage(message);
         }
-
         return recipients.size();
     }
 
@@ -1083,13 +1268,31 @@ public class Server {
         }
     }
 
+    @Deprecated
     public void batchPackets(Player[] players, DataPacket[] packets) {
-        this.batchingHelper.batchPackets(players, packets);
+        if (players == null || packets == null || players.length == 0 || packets.length == 0) {
+            return;
+        }
+
+        if (this.callBatchPkEv) {
+            BatchPacketsEvent ev = new BatchPacketsEvent(players, packets);
+            ev.call();
+            if (ev.isCancelled()) {
+                return;
+            }
+        }
+
+        for (DataPacket packet : packets) {
+            packet.isEncoded = false; // prevent plugins from being encoded in advance
+            for (Player player : players) {
+                player.dataPacket(packet);
+            }
+        }
     }
 
-    @Deprecated
+    @Deprecated(forRemoval = true)
     public void batchPackets(Player[] players, DataPacket[] packets, boolean forceSync) {
-        this.batchingHelper.batchPackets(players, packets);
+        this.batchPackets(players, packets);
     }
 
     public void enablePlugins(PluginLoadOrder type) {
@@ -1192,11 +1395,10 @@ public class Server {
         if (this.hasStopped) {
             return;
         }
+        this.hasStopped = true;
 
         try {
             isRunning.compareAndSet(true, false);
-
-            this.hasStopped = true;
 
             ServerStopEvent serverStopEvent = new ServerStopEvent();
             pluginManager.callEvent(serverStopEvent);
@@ -1235,16 +1437,11 @@ public class Server {
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
 
-            this.getLogger().debug("Closing BatchingHelper...");
-            this.batchingHelper.shutdown();
-
             this.getLogger().debug("Stopping network interfaces...");
             for (SourceInterface interfaz : this.network.getInterfaces()) {
                 interfaz.shutdown();
                 this.network.unregisterInterface(interfaz);
             }
-
-            this.batchingHelper.shutdown();
 
             if (nameLookup != null) {
                 this.getLogger().debug("Closing name lookup DB...");
@@ -1372,7 +1569,13 @@ public class Server {
 
     public void addOnlinePlayer(Player player) {
         this.playerList.put(player.getUniqueId(), player);
-        player.updatePlayerListData(false);
+        PlayerListPacket.Entry entry = new PlayerListPacket.Entry(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin(), player.getLoginChainData().getXUID(), player.getLocatorBarColor());
+        Player[] viewers = this.playerList.values().stream()
+                .filter(viewer -> !viewer.sentSkins.contains(player.getUniqueId()))
+                .toArray(Player[]::new);
+        if (viewers.length > 0) {
+            this.updatePlayerListData(entry, viewers);
+        }
     }
 
     public void removeOnlinePlayer(Player player) {
@@ -1411,10 +1614,21 @@ public class Server {
     }
 
     public void updatePlayerListData(PlayerListPacket.Entry playerListEntry, Player[] players) {
+        for (Player viewer : players) {
+            if (viewer.getGameVersion().isNetEase() && viewer.sentSkins.contains(playerListEntry.uuid)) {
+                PlayerListPacket remove = new PlayerListPacket();
+                remove.type = PlayerListPacket.TYPE_REMOVE;
+                remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(playerListEntry.uuid)};
+                viewer.dataPacket(remove);
+                viewer.confirmedSkins.remove(playerListEntry.uuid);
+            }
+            viewer.sentSkins.add(playerListEntry.uuid);
+        }
+
         PlayerListPacket pk = new PlayerListPacket();
         pk.type = PlayerListPacket.TYPE_ADD;
         pk.entries = new PlayerListPacket.Entry[]{playerListEntry};
-        this.batchPackets(players, new DataPacket[]{pk}); // This is sent "directly" so it always gets thru before possible TYPE_REMOVE packet for NPCs etc.
+        Server.broadcastPacket(players, pk); // This is sent "directly" so it always gets thru before possible TYPE_REMOVE packet for NPCs etc.
     }
 
     public void removePlayerListData(UUID uuid) {
@@ -1427,6 +1641,8 @@ public class Server {
         pk.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(uuid)};
         for (Player player : players) {
             player.dataPacket(pk);
+            player.sentSkins.remove(uuid);
+            player.confirmedSkins.remove(uuid);
         }
     }
 
@@ -1435,14 +1651,12 @@ public class Server {
     }
 
     public void removePlayerListData(UUID uuid, Player player) {
-        PlayerListPacket pk = new PlayerListPacket();
-        pk.type = PlayerListPacket.TYPE_REMOVE;
-        pk.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(uuid)};
-        player.dataPacket(pk);
+        this.removePlayerListData(uuid, new Player[]{player});
     }
 
     public void sendFullPlayerListData(Player player) {
         PlayerListPacket.Entry[] array = this.playerList.values().stream()
+                .filter(p -> player.sentSkins.add(p.getUniqueId()))
                 .map(p -> new PlayerListPacket.Entry(
                         p.getUniqueId(),
                         p.getId(),
@@ -2335,6 +2549,10 @@ public class Server {
             }
         }
 
+        if (name != null && (name.contains("/") || name.contains("\\"))) {
+            return this.findLevelByPath(this.resolveLevelFile(name));
+        }
+
         return null;
     }
 
@@ -2413,19 +2631,20 @@ public class Server {
             throw new LevelException("Invalid empty level name");
         }
 
-        if (this.isLevelLoaded(name)) {
+        // Canonical path so equivalent spellings (relative/absolute/symlink) match.
+        File resolved = this.resolveLevelFile(name);
+
+        // Raw-name lookup for backwards compat; path check below is authoritative.
+        if (this.isLevelLoaded(name) || this.isLevelPathLoaded(resolved)) {
             return true;
-        } else if (!this.isLevelGenerated(name)) {
-            log.warn(this.baseLang.translateString("nukkit.level.notFound", name));
-            return false;
         }
 
-        String path;
+        String path = resolved.getPath() + '/';
 
-        if (name.contains("/") || name.contains("\\")) {
-            path = name;
-        } else {
-            path = this.dataPath + "worlds/" + name + '/';
+        if (!this.isLevelGenerated(name)) {
+            log.warn(this.baseLang.translateString("nukkit.level.notFound", name));
+            log.warn(this.baseLang.translateString("nukkit.level.notFoundHint", new String[]{path, diagnoseLevelPath(path)}));
+            return false;
         }
 
         Class<? extends LevelProvider> provider = LevelProviderManager.getProvider(path);
@@ -2435,9 +2654,12 @@ public class Server {
             return false;
         }
 
+        // Last path segment keeps folderName clean when a path was passed.
+        String folderName = resolved.getName();
+
         Level level;
         try {
-            level = new Level(this, name, path, provider);
+            level = new Level(this, folderName, path, provider);
         } catch (Exception e) {
             log.error(this.baseLang.translateString("nukkit.level.loadError", new String[]{name, e.getMessage()}));
             return false;
@@ -2451,6 +2673,82 @@ public class Server {
 
         this.pluginManager.callEvent(new LevelLoadEvent(level));
         return true;
+    }
+
+    /**
+     * Resolve a level name or path to a canonical world directory, so
+     * equivalent spellings (plain name, relative/absolute path, symlink)
+     * always match. Falls back to the absolute path on canonicalization
+     * failure to avoid throwing {@link IOException}.
+     */
+    private File resolveLevelFile(String name) {
+        File f = (name.contains("/") || name.contains("\\"))
+                ? new File(name)
+                : new File(this.dataPath + "worlds/" + name);
+        try {
+            return f.getCanonicalFile();
+        } catch (IOException e) {
+            return f.getAbsoluteFile();
+        }
+    }
+
+    /**
+     * Whether a world directory is already loaded, matched by canonical
+     * provider path rather than folderName, so a world loaded by plain
+     * name is recognized when re-requested via an equivalent path.
+     */
+    private boolean isLevelPathLoaded(File resolved) {
+        return this.findLevelByPath(resolved) != null;
+    }
+
+    /**
+     * 按规范化路径匹配已加载的世界，供 loadLevel 去重和 getLevelByName
+     * 的路径回退共用，保证两端用同一套比对逻辑。
+     * <p>Match an already-loaded level by canonical provider path, shared by
+     * loadLevel's dedup check and getLevelByName's path fallback.
+     */
+    private Level findLevelByPath(File resolved) {
+        for (Level level : this.levelArray) {
+            String providerPath;
+            try {
+                providerPath = level.requireProvider().getPath();
+            } catch (Exception ignored) {
+                continue;
+            }
+            File loaded;
+            try {
+                loaded = new File(providerPath).getCanonicalFile();
+            } catch (IOException e) {
+                loaded = new File(providerPath).getAbsoluteFile();
+            }
+            if (loaded.equals(resolved)) {
+                return level;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Explain why a level directory was rejected by the providers, so the
+     * "not found" warning points at the concrete cause (missing dir, missing
+     * level.dat, missing data folder, or unrecognized region files).
+     */
+    private static String diagnoseLevelPath(String path) {
+        File dir = new File(path);
+        if (!dir.exists() || !dir.isDirectory()) {
+            return "directory does not exist";
+        }
+        if (!new File(dir, "level.dat").exists()) {
+            return "missing level.dat";
+        }
+        if (new File(dir, "db").isDirectory()) {
+            return "leveldb folder present but provider rejected it";
+        }
+        File region = new File(dir, "region");
+        if (!region.isDirectory()) {
+            return "missing db/ or region/ data folder";
+        }
+        return "region folder present but no valid .mca files";
     }
 
     /**
@@ -2526,19 +2824,16 @@ public class Server {
             provider = LevelProviderManager.getProviderByName("leveldb");
         }
 
-        String path;
-
-        if (name.contains("/") || name.contains("\\")) {
-            path = name;
-        } else {
-            path = this.dataPath + "worlds/" + name + '/';
-        }
+        // Canonical path: dedupes equivalent spellings and keeps folderName clean.
+        File resolved = this.resolveLevelFile(name);
+        String path = resolved.getPath() + '/';
+        String folderName = resolved.getName();
 
         Level level;
         try {
-            provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, name, seed, generator, options);
+            provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, folderName, seed, generator, options);
 
-            level = new Level(this, name, path, provider);
+            level = new Level(this, folderName, path, provider);
             this.levels.put(level.getId(), level);
 
             level.initLevel();
@@ -2566,14 +2861,7 @@ public class Server {
         }
 
         if (this.getLevelByName(name) == null) {
-            String path;
-
-            if (name.contains("/") || name.contains("\\")) {
-                path = name;
-            } else {
-                path = this.dataPath + "worlds/" + name + '/';
-            }
-
+            String path = this.resolveLevelFile(name).getPath() + '/';
             return LevelProviderManager.getProvider(path) != null;
         }
 
@@ -3153,6 +3441,7 @@ public class Server {
         Entity.registerEntity("MinecartChest", EntityMinecartChest.class);
         Entity.registerEntity("MinecartHopper", EntityMinecartHopper.class);
         Entity.registerEntity("MinecartTnt", EntityMinecartTNT.class);
+        Entity.registerEntity("MinecartCommandBlock", EntityMinecartCommandBlock.class);
         Entity.registerEntity("Boat", EntityBoat.class);
         Entity.registerEntity("ChestBoat", EntityChestBoat.class);
         //Others
@@ -3211,6 +3500,10 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.SHELF, BlockEntityShelf.class);
         BlockEntity.registerBlockEntity(BlockEntity.COPPER_GOLEM_STATUE, BlockEntityCopperGolemStatue.class);
         BlockEntity.registerBlockEntity(BlockEntity.CREAKING_HEART, BlockEntityCreakingHeart.class);
+        BlockEntity.registerBlockEntity(BlockEntity.COMMAND_BLOCK, BlockEntityCommandBlock.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SCULK_SENSOR, BlockEntitySculkSensor.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CALIBRATED_SCULK_SENSOR, BlockEntityCalibratedSculkSensor.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SCULK_SHRIEKER, BlockEntitySculkShrieker.class);
 
         // Persistent container, not on vanilla
         BlockEntity.registerBlockEntity(BlockEntity.PERSISTENT_CONTAINER, PersistentDataContainerBlockEntity.class);
@@ -3326,6 +3619,7 @@ public class Server {
             default -> this.serverAuthoritativeMovementMode = 1; // server-auth
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
+        this.serverAuthoritativeInventory = this.getPropertyBoolean("server-authoritative-inventory", true);
 
         // === Advanced MOT settings from nukkit-mot.yml ===
         ServerConfig config = this.serverConfig;
@@ -3369,6 +3663,7 @@ public class Server {
         this.lightUpdates = config.chunkSettings().lightUpdates();
         this.cacheChunks = config.chunkSettings().cacheChunks();
         this.asyncChunkSending = config.chunkSettings().asyncChunks();
+        this.maxPendingChunkWrites = Math.max(1, config.chunkSettings().maxPendingChunkWrites());
 
         // Entity
         this.spawnEggsEnabled = config.entitySettings().spawnEggs();
@@ -3545,6 +3840,7 @@ public class Server {
 
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
+            put("server-authoritative-inventory", true);
         }
     }
 

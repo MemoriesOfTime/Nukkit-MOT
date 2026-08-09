@@ -208,7 +208,7 @@ public abstract class EntityWalking extends BaseEntity {
                         }
                     }
                     if (this.noRotateTicks <= 0 && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && (this.stayTime <= 0 || Utils.rand()) && diff != 0) {
-                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                        this.lookAt(this.followTarget);
                     }
                 }
 

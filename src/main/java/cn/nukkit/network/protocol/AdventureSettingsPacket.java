@@ -66,6 +66,12 @@ public class AdventureSettingsPacket extends DataPacket {
 
     @Override
     public void decode() {
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.flags = this.getUnsignedVarInt();
+            this.commandPermission = this.getUnsignedVarInt();
+            return;
+        }
+
         this.flags = getUnsignedVarInt();
         this.commandPermission = getUnsignedVarInt();
         if (protocol >= ProtocolInfo.v1_2_0) {
@@ -79,19 +85,23 @@ public class AdventureSettingsPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putUnsignedVarInt(this.flags);
+            this.putUnsignedVarInt(this.commandPermission);
+            return;
+        }
+
         this.putUnsignedVarInt(this.flags);
         this.putUnsignedVarInt(this.commandPermission);
-        if (protocol >= ProtocolInfo.v1_2_0) {
-            this.putUnsignedVarInt(this.flags2);
-            this.putUnsignedVarInt(this.playerPermission);
-            this.putUnsignedVarInt(this.customFlags);
-            this.putLLong(this.entityUniqueId);
-        }
+        this.putUnsignedVarInt(this.flags2);
+        this.putUnsignedVarInt(this.playerPermission);
+        this.putUnsignedVarInt(this.customFlags);
+        this.putLLong(this.entityUniqueId);
     }
 
     public boolean getFlag(int flag) {
         if ((flag & BITFLAG_SECOND_SET) != 0) {
-            return (this.flags2 & flag) != 0;
+            return (this.flags2 & (flag ^ BITFLAG_SECOND_SET)) != 0;
         }
         return (this.flags & flag) != 0;
     }
@@ -101,7 +111,7 @@ public class AdventureSettingsPacket extends DataPacket {
         if (flag <= 0) {
             return;
         }
-        int newFlags2 = (flag & BITFLAG_SECOND_SET);
+        int newFlags2 = (flag & BITFLAG_SECOND_SET) != 0 ? (flag ^ BITFLAG_SECOND_SET) : 0;
 
         if (value) {
             if (newFlags2 != 0) {

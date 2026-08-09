@@ -60,4 +60,8 @@ public class ServerConfig extends OkaeriConfig {
     @Comment({"", "NetEase client support settings"})
     @CustomKey("netease-settings")
     private NeteaseSettings neteaseSettings = new NeteaseSettings();
+
+    @Comment({"", "Custom block settings"})
+    @CustomKey("custom-block-settings")
+    private CustomBlockSettings customBlockSettings = new CustomBlockSettings();
 }

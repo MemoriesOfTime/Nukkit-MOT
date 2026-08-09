@@ -171,6 +171,7 @@ public final class DataPacketManager {
                 ClientToServerHandshakeProcessor.INSTANCE,
                 EmotePacketProcessor.INSTANCE,
                 ItemFrameDropItemProcessor.INSTANCE,
+                InventoryTransactionProcessor.INSTANCE,
                 LevelSoundEventProcessor.INSTANCE,
                 LevelSoundEventProcessorV1.INSTANCE,
                 LevelSoundEventProcessorV2.INSTANCE,
@@ -190,15 +191,18 @@ public final class DataPacketManager {
                 ServerSettingsRequestProcessor.INSTANCE,
                 SetDifficultyProcessor.INSTANCE,
                 SetPlayerGameTypeProcessor.INSTANCE,
-                TextProcessor.INSTANCE
+                TextProcessor.INSTANCE,
+                CommandBlockUpdateProcessor.INSTANCE
         );
 
         registerProcessor(
                 ProtocolInfo.v1_1_0,
                 CommandStepProcessor_v113.INSTANCE,
                 ContainerSetSlotProcessor_v113.INSTANCE,
+                CraftingEventProcessor_v113.INSTANCE,
                 DropItemProcessor_v113.INSTANCE,
                 InteractProcessor_v113.INSTANCE,
+                PlayerActionProcessor_v113.INSTANCE,
                 RemoveBlockProcessor_v113.INSTANCE,
                 UseItemProcessor_v113.INSTANCE
         );
@@ -221,6 +225,11 @@ public final class DataPacketManager {
         registerProcessor(
                 ProtocolInfo.v1_16_200,
                 FilterTextProcessor_v422.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_16_100,
+                ItemStackRequestProcessor.INSTANCE
         );
 
         registerProcessor(

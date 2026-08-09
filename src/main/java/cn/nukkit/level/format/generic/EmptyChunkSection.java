@@ -231,6 +231,12 @@ public class EmptyChunkSection implements ChunkSection {
 
     @Override
     public void writeTo(GameVersion gameVersion, BinaryStream stream, boolean antiXray) {
+        if (gameVersion.getProtocol() >= ProtocolInfo.v1_19_80) {
+            stream.putByte((byte) 9);
+            stream.putByte((byte) 0);
+            stream.putByte((byte) this.y);
+            return;
+        }
         stream.put(this.getBytes(gameVersion));
     }
 

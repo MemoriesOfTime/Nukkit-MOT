@@ -49,7 +49,6 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private Network network;
 
     private final Channel channel;
-    private final ProxyProtocolHandler proxyProtocolHandler;
     private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -58,7 +57,6 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     public RakNetInterface(Server server) {
         this.server = server;
-        this.proxyProtocolHandler = server.enableProxyProtocol ? new ProxyProtocolHandler(server.proxyProtocolWhitelist) : null;
 
         boolean disableNative = Boolean.parseBoolean(System.getProperty("disableNativeEventLoop"));
 
@@ -79,11 +77,19 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)
                 .option(RakChannelOption.RAK_SERVER_COOKIE_MODE, this.server.rakCookieMode)
                 .option(RakChannelOption.RAK_PACKET_LIMIT, this.server.rakPacketLimit)
+                // Nukkit validates, strips, and remaps Proxy Protocol datagrams in ProxyProtocolHandler.
+                // Keep RakNet's built-in handler disabled to avoid decoding the same header twice.
+                .option(RakChannelOption.RAK_PROXY_PROTOCOL, false)
                 .handler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel channel) {
-                        if (proxyProtocolHandler != null) {
-                            channel.parent().pipeline().addFirst("proxy-protocol-handler", proxyProtocolHandler);
+                        if (server.enableProxyProtocol) {
+                            Channel proxyProtocolChannel = channel.parent();
+                            if (proxyProtocolChannel == null) {
+                                log.warn("Proxy Protocol handler is falling back to RakServerChannel pipeline; outbound proxy remapping may be unavailable");
+                                proxyProtocolChannel = channel;
+                            }
+                            proxyProtocolChannel.pipeline().addFirst("proxy-protocol-policy", new ProxyProtocolHandler(server.proxyProtocolWhitelist));
                         }
                         if (server.getPropertyBoolean("enable-query", true)) {
                             channel.pipeline().addLast("query-handler", new SimpleChannelInboundHandler<DatagramPacket>() {
@@ -130,6 +136,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
         while ((session = this.sessionCreationQueue.poll()) != null) {
             this.pendingSessions.remove(session);
             if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
+                this.clearProxyProtocolMapping(session);
                 continue;
             }
             InetSocketAddress address = session.getChannel().remoteAddress();
@@ -164,9 +171,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
                     player.getNetworkSession().disconnect("Internal error");
                     log.error("Exception closing player " + player.getName(), e);
                 }
-                if (this.proxyProtocolHandler != null) {
-                    this.proxyProtocolHandler.clearMappingByRealAddress(player.getSocketAddress());
-                }
+                this.clearProxyProtocolMapping(nukkitSession);
                 iterator.remove();
             } else {
                 nukkitSession.serverTick();
@@ -221,17 +226,17 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     @Override
     public void blockAddress(InetAddress address) {
-        this.channel.pipeline().get(RakServerRateLimiter.class).blockAddress(address, 100, TimeUnit.DAYS);
+        this.channel.pipeline().get(RakServerRateLimiter.class).blockAddress(new InetSocketAddress(address, 0), 100, TimeUnit.DAYS);
     }
 
     @Override
     public void blockAddress(InetAddress address, int timeout) {
-        this.channel.pipeline().get(RakServerRateLimiter.class).blockAddress(address, timeout, TimeUnit.SECONDS);
+        this.channel.pipeline().get(RakServerRateLimiter.class).blockAddress(new InetSocketAddress(address, 0), timeout, TimeUnit.SECONDS);
     }
 
     @Override
     public void unblockAddress(InetAddress address) {
-        this.channel.pipeline().get(RakServerRateLimiter.class).unblockAddress(address);
+        this.channel.pipeline().get(RakServerRateLimiter.class).unblockAddress(new InetSocketAddress(address, 0));
     }
 
     private void expireLoginSessions() {
@@ -241,6 +246,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
         long nowNanos = System.nanoTime();
         this.pendingSessions.removeIf(session -> {
             if (session.getDisconnectReason() != null || !session.getChannel().isOpen()) {
+                this.clearProxyProtocolMapping(session);
                 return true;
             }
             if (timeoutMillis <= 0) {
@@ -252,6 +258,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
             log.warn("Disconnecting timed out pending session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
             session.disconnect("disconnectionScreen.timeout");
+            this.clearProxyProtocolMapping(session);
             return true;
         });
 
@@ -266,6 +273,28 @@ public class RakNetInterface implements AdvancedSourceInterface {
             log.warn("Disconnecting timed out session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
             session.disconnect("disconnectionScreen.timeout");
         }
+    }
+
+    private void clearProxyProtocolMapping(RakNetPlayerSession session) {
+        if (this.channel == null) {
+            return;
+        }
+        ProxyProtocolHandler proxyProtocolHandler = getProxyProtocolHandler(this.channel);
+        if (proxyProtocolHandler == null) {
+            return;
+        }
+        proxyProtocolHandler.clearMappingByRealAddress(session.getChannel().remoteAddress());
+    }
+
+    private static ProxyProtocolHandler getProxyProtocolHandler(Channel channel) {
+        ChannelPipeline pipeline = channel.pipeline();
+        ProxyProtocolHandler proxyProtocolHandler = pipeline != null ? pipeline.get(ProxyProtocolHandler.class) : null;
+        if (proxyProtocolHandler != null || channel.parent() == null) {
+            return proxyProtocolHandler;
+        }
+
+        ChannelPipeline parentPipeline = channel.parent().pipeline();
+        return parentPipeline != null ? parentPipeline.get(ProxyProtocolHandler.class) : null;
     }
 
     @Override

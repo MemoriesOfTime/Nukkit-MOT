@@ -6,6 +6,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.sound.LeverSound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
@@ -70,6 +72,7 @@ public class BlockLever extends BlockFlowable implements Faceable {
 
         this.getLevel().setBlock(this, this, false, true);
         this.getLevel().addSound(new LeverSound(this, this.isPowerOn()));
+        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player != null ? player : this, this.add(0.5, 0.5, 0.5), this.isPowerOn() ? VibrationType.BLOCK_ACTIVATE : VibrationType.BLOCK_DEACTIVATE));
 
         LeverOrientation orientation = LeverOrientation.byMetadata(this.isPowerOn() ? this.getDamage() ^ 0x08 : this.getDamage());
         BlockFace face = orientation.getFacing();

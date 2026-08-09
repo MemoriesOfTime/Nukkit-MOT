@@ -4,6 +4,7 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockEntityHolder;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
@@ -12,6 +13,8 @@ import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.format.leveldb.serializer.EntityNbtAdapter;
+import cn.nukkit.level.format.leveldb.serializer.EntityNbtLoadStatus;
 import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
@@ -25,10 +28,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -62,7 +62,30 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected List<CompoundTag> NBTtiles;
 
+    /**
+     * Raw NBT of tiles that failed to construct at load time (unregistered/unknown id, or a
+     * constructor that threw). Retained verbatim and round-tripped on save so foreign/modded
+     * tile data is not silently destroyed. Keyed by the same packed local index as {@link #tileList}.
+     */
+    protected Long2ObjectNonBlockingMap<CompoundTag> unknownTiles;
+
     protected List<CompoundTag> NBTentities;
+
+    /**
+     * Raw entity NBT that could not be converted into a live Nukkit entity at load time
+     * (unregistered/unknown id, e.g. residual custom entities from a removed plugin).
+     * <p>
+     * 仅在 {@link #initChunk()} 阶段由 {@code PRESERVE_ONLY} 状态填充；Anvil 等不支持
+     * 独立 actor 存储的格式在 {@code toNBT()} 时将其原样回写，避免存档数据在保存周期丢失（issue #800）。
+     */
+    protected List<CompoundTag> preservedEntityNbt = Collections.emptyList();
+
+    /**
+     * 解码阶段(可能在异步线程)解析出的待调度方块更新;坐标/Level 字段在 {@link #initChunk()}(主线程)才设置并调用 scheduleUpdate,避免异步线程触碰 Level 游戏状态
+     * <p>
+     * Block updates parsed during decode (potentially off-thread); position/Level are filled in {@link #initChunk()} (main thread) before scheduleUpdate, so the off-thread path never touches Level game state
+     */
+    protected List<PendingBlockUpdate> pendingBlockUpdates;
 
     protected Map<Integer, Integer> extraData;
 
@@ -134,7 +157,9 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         chunk.tileList = null;
         chunk.NBTentities = null;
         chunk.NBTtiles = null;
+        chunk.unknownTiles = null;
         chunk.extraData = null;
+        chunk.pendingBlockUpdates = null;
         return chunk;
     }
 
@@ -175,8 +200,19 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             boolean changed = this.hasChanged();
             if (this.NBTentities != null) {
                 for (CompoundTag nbt : NBTentities) {
-                    if (!nbt.contains("id")) {
-                        this.setChanged();
+                    // 复用 LevelDB 路径的归一化逻辑：无法识别/无效的实体 NBT 不创建实体
+                    // Reuse the LevelDB normalization: unrecognized/invalid entity NBT does not create a live entity
+                    EntityNbtLoadStatus status = EntityNbtAdapter.normalizeForNukkitLoad(nbt);
+                    if (status != EntityNbtLoadStatus.LOADABLE) {
+                        // PRESERVE_ONLY：保留原始 NBT，让保存周期回写，避免静默丢失存档数据（issue #800）
+                        // PRESERVE_ONLY: retain raw NBT so the save cycle can write it back instead of silently dropping saved data
+                        if (status == EntityNbtLoadStatus.PRESERVE_ONLY) {
+                            if (this.preservedEntityNbt.isEmpty()) {
+                                this.preservedEntityNbt = new ArrayList<>();
+                            }
+                            this.preservedEntityNbt.add(nbt);
+                        }
+                        changed = true;
                         continue;
                     }
                     ListTag<? extends Tag> pos = nbt.getList("Pos");
@@ -205,17 +241,130 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                         }
                         BlockEntity blockEntity = BlockEntity.createBlockEntity(nbt.getString("id").replaceFirst("BlockEntity", ""), this, nbt);
                         if (blockEntity == null) {
-                            changed = true;
+                            // Valid id and coordinates, but the tile type could not be built
+                            // (unregistered/unknown type such as a modded or custom tile, or a
+                            // constructor that threw). Retain the raw NBT so it is round-tripped on
+                            // save instead of being permanently deleted. Do NOT set changed=true:
+                            // force-marking the chunk dirty here is exactly what turned a transient
+                            // load failure into permanent, irreversible data loss.
+                            this.retainUnknownTile(nbt);
                         }
                     }
                 }
                 this.NBTtiles = null;
             }
 
+            this.replayDeferredBlockUpdates();
+
             this.setChanged(changed);
 
             this.isInit = true;
         }
+    }
+
+    /**
+     * 在主线程回放解码阶段暂存的方块更新调度,与 Entity/Tile 的延迟初始化模式对齐
+     * <p>
+     * Replay deferred block-update scheduling on the main thread, mirroring the deferred init pattern used for entities/tiles
+     */
+    public void replayDeferredBlockUpdates() {
+        List<PendingBlockUpdate> updates = this.pendingBlockUpdates;
+        if (updates == null || updates.isEmpty()) {
+            this.pendingBlockUpdates = null;
+            return;
+        }
+        LevelProvider providerTemp = this.provider;
+        Level levelTemp = providerTemp == null ? null : providerTemp.getLevel();
+        if (levelTemp == null) {
+            this.pendingBlockUpdates = null;
+            return;
+        }
+        for (PendingBlockUpdate update : updates) {
+            update.apply(levelTemp);
+        }
+        this.pendingBlockUpdates = null;
+    }
+
+    /**
+     * 供跨包 provider 在解码阶段(可能在异步线程)暂存解析出的方块更新;{@link #initChunk()}(主线程)回放后清空
+     * <p>
+     * Lets a cross-package provider stash parsed block updates at decode time (potentially off-thread); {@link #initChunk()} (main thread) replays and clears them
+     */
+    public void setPendingBlockUpdates(List<PendingBlockUpdate> updates) {
+        this.pendingBlockUpdates = updates;
+    }
+
+    /**
+     * 返回尚未在主线程回放的方块更新。
+     * <p>
+     * Returns block updates that have not yet been replayed on the main thread.
+     */
+    public List<PendingBlockUpdate> getDeferredBlockUpdates() {
+        return this.pendingBlockUpdates;
+    }
+
+    /**
+     * 解码阶段收集的待调度方块更新载体:仅保存方块身份与计时,坐标/Level 字段延迟到主线程回放时设置
+     * <p>
+     * Carrier for a deferred block update captured at decode time: holds only block identity and timing; position/Level are applied during main-thread replay
+     */
+    public static final class PendingBlockUpdate {
+        private final Block block;
+        private final int x;
+        private final int y;
+        private final int z;
+        private final int layer;
+        private final int delay;
+        private final int priority;
+
+        public PendingBlockUpdate(Block block, int x, int y, int z, int delay, int priority) {
+            this(block, x, y, z, 0, delay, priority);
+        }
+
+        public PendingBlockUpdate(Block block, int x, int y, int z, int layer, int delay, int priority) {
+            this.block = block;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.layer = layer;
+            this.delay = delay;
+            this.priority = priority;
+        }
+
+        void apply(Level level) {
+            Block block = this.block;
+            block.x = this.x;
+            block.y = this.y;
+            block.z = this.z;
+            block.layer = this.layer;
+            block.level = level;
+            level.scheduleUpdate(block, block, this.delay, this.priority, false);
+        }
+
+        public Block getBlock() {
+            return this.block;
+        }
+
+        public int getX() {
+            return this.x;
+        }
+
+        public int getY() {
+            return this.y;
+        }
+
+        public int getZ() {
+            return this.z;
+        }
+
+        public int getDelay() {
+            return this.delay;
+        }
+
+        public int getPriority() {
+            return this.priority;
+        }
+
     }
 
     @Override
@@ -545,8 +694,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         this.tiles.put(blockEntity.getId(), blockEntity);
         int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
         int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
+        if (this.unknownTiles != null) {
+            this.unknownTiles.remove(index); // a real tile now occupies this slot
+        }
         var existing = this.tileList.put(index, blockEntity);
-        if (existing != null && !existing.equals(blockEntity)) {
+        if (existing != null && existing != blockEntity) {
             this.tiles.remove(existing.getId());
             existing.onReplacedWith(blockEntity);
             existing.close();
@@ -588,6 +740,68 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public Map<Long, BlockEntity> getBlockEntities() {
         return tiles == null ? Collections.emptyMap() : tiles;
+    }
+
+    /**
+     * Raw NBT of tiles whose type could not be constructed at load time, kept verbatim so the
+     * data survives a load/save round-trip instead of being silently deleted. Consumed by the
+     * disk chunk serializers only; never sent to clients.
+     */
+    public Collection<CompoundTag> getUnknownTiles() {
+        return this.unknownTiles == null ? Collections.emptyList() : this.unknownTiles.values();
+    }
+
+    /**
+     * Returns entity NBT records that could not be turned into live Nukkit entities at load time
+     * (e.g. residual custom entities from a removed plugin). Survives a load/save round-trip on
+     * formats without dedicated actor storage (Anvil) instead of being silently deleted.
+     * <p>
+     * 仅由区块序列化器消费；不会发送给客户端（issue #800）。
+     */
+    public List<CompoundTag> getPreservedEntityNbt() {
+        return this.preservedEntityNbt == null ? Collections.emptyList() : this.preservedEntityNbt;
+    }
+
+    /**
+     * Retain a tile NBT that could not be turned into a {@link BlockEntity} (unknown/unregistered
+     * type or failing constructor) so it is preserved on the next save rather than deleted.
+     */
+    private void retainUnknownTile(CompoundTag nbt) {
+        if (this.getProvider() == null) {
+            return;
+        }
+        int index = ((nbt.getInt("z") & 0x0f) << 16) | ((nbt.getInt("x") & 0x0f) << 12)
+                | (nbt.getInt("y") - this.getProvider().getMinBlockY());
+        if (this.tileList != null && this.tileList.get(index) != null) {
+            return; // a successfully-constructed tile already occupies this slot
+        }
+        if (this.unknownTiles == null) {
+            this.unknownTiles = new Long2ObjectNonBlockingMap<>();
+        }
+        this.unknownTiles.put(index, nbt);
+    }
+
+    /**
+     * Drop a retained unknown-tile NBT (see {@link #retainUnknownTile}) once the block at this
+     * position can no longer host a block entity — e.g. it was broken to air or replaced with a
+     * non-tile block such as stone. Without this, a removed/replaced modded tile would be
+     * resurrected from {@link #unknownTiles} on the next save. Coordinates are chunk-local
+     * (x, z in 0..15; y absolute).
+     */
+    protected void removeInvalidUnknownTile(int x, int y, int z) {
+        if (this.unknownTiles == null || this.getProvider() == null) {
+            return;
+        }
+        int index = ((z & 0x0f) << 16) | ((x & 0x0f) << 12) | (y - this.getProvider().getMinBlockY());
+        if (!this.unknownTiles.containsKey(index)) {
+            return;
+        }
+        // Keep it while the slot can still legitimately hold a block entity: the matching tile may
+        // simply not be constructed yet, and a real tile placed later is deduplicated by
+        // addBlockEntity(). Only drop it when the current block clearly cannot host one.
+        if (!(Block.get(this.getBlockId(x, y, z)) instanceof BlockEntityHolder)) {
+            this.unknownTiles.remove(index);
+        }
     }
 
     @Override

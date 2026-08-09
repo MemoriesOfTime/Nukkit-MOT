@@ -20,11 +20,20 @@ public class EnumNode extends ParamNode<String> {
     @Override
     public void fill(String arg) {
         if (commandEnum.isSoft()) {
+            // 软枚举是自由文本（如 scoreboard objective 名），必须原样保留，不归一化
             this.value = arg;
             return;
         }
-        if (enums.contains(arg)) this.value = arg;
-        else this.error();
+        // 硬枚举：大小写不敏感匹配，并归一化为枚举中定义的原始大小写形式。
+        // 与原版 Bedrock 客户端行为一致，且下游解析（GameRule.parseString、Server.getGamemodeFromString 等）
+        // 普遍已 toLowerCase 兜底，拿到归一化后的稳定键更安全。
+        for (String v : enums) {
+            if (v.equalsIgnoreCase(arg)) {
+                this.value = v;
+                return;
+            }
+        }
+        this.error();
     }
 
     @Override

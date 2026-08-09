@@ -228,14 +228,18 @@ public class InventoryTransaction {
     }
 
     protected boolean callExecuteEvent() {
-        InventoryTransactionEvent ev = new InventoryTransactionEvent(this);
-        this.source.getServer().getPluginManager().callEvent(ev);
+        return callExecuteEvents(this);
+    }
+
+    public static boolean callExecuteEvents(InventoryTransaction transaction) {
+        InventoryTransactionEvent ev = new InventoryTransactionEvent(transaction);
+        transaction.source.getServer().getPluginManager().callEvent(ev);
 
         SlotChangeAction from = null;
         SlotChangeAction to = null;
         Player who = null;
 
-        for (InventoryAction action : this.actions) {
+        for (InventoryAction action : transaction.actions) {
             if (!(action instanceof SlotChangeAction)) {
                 continue;
             }
@@ -258,7 +262,7 @@ public class InventoryTransaction {
             }
 
             InventoryClickEvent ev2 = new InventoryClickEvent(who, from.getInventory(), from.getSlot(), from.getSourceItem(), from.getTargetItem());
-            this.source.getServer().getPluginManager().callEvent(ev2);
+            transaction.source.getServer().getPluginManager().callEvent(ev2);
 
             if (ev2.isCancelled()) {
                 return false;

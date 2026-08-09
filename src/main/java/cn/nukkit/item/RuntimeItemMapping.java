@@ -101,10 +101,20 @@ public class RuntimeItemMapping {
 
         CompoundTag itemComponents = null;
         if (protocolId >= ProtocolInfo.v1_21_60) {
-            try (InputStream inputStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream("ItemComponents/item_components_" + protocolId + ".nbt")) {
+            String componentsFile = "ItemComponents/item_components_" + protocolId + ".nbt";
+            if (gameVersion.isNetEase()) {
+                String neteaseFile = "ItemComponents/item_components_netease_" + protocolId + ".nbt";
+                try (InputStream neteaseStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream(neteaseFile)) {
+                    if (neteaseStream != null) {
+                        componentsFile = neteaseFile;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            try (InputStream inputStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream(componentsFile)) {
                 itemComponents = NBTIO.read(new BufferedInputStream(new GZIPInputStream(inputStream)), ByteOrder.BIG_ENDIAN, false);
             } catch (Exception e) {
-                throw new AssertionError("Error while loading item_components_" + protocolId + ".nbt", e);
+                throw new AssertionError("Error while loading " + componentsFile, e);
             }
         }
 
@@ -300,7 +310,7 @@ public class RuntimeItemMapping {
                 if (Server.getInstance().enableExperimentMode && protocolId >= ProtocolInfo.v1_16_100) {
                     paletteBuffer.putString(entry.getIdentifier());
                     paletteBuffer.putLShort(entry.getRuntimeId());
-                    var def = Item.getCustomItemDefinition().get(entry.getIdentifier());
+                    var def = Item.getCustomItemDefinition(entry.getIdentifier());
                     paletteBuffer.putBoolean(def != null && def.isComponentBased());
                 }
             } else {
@@ -382,6 +392,11 @@ public class RuntimeItemMapping {
             nbtBytes = new byte[0];
         }
 
+        Item stringItem = parseCreativeStringItem(identifier, json, nbtBytes);
+        if (stringItem != null) {
+            return normalizeCreativeItemForTargetVersion(gameVersion, stringItem);
+        }
+
         int legacyId = ItemID.STRING_IDENTIFIED_ITEM;
         if (legacyEntry != null) {
             legacyId = legacyEntry.getLegacyId();
@@ -445,7 +460,28 @@ public class RuntimeItemMapping {
             item.setCount(count);
             item.setCompoundTag(nbtBytes);
         }
+        if (item instanceof ItemBlock) {
+            item.setDamage(item.getBlock().toItem().getDamage());
+        }
         return normalizeCreativeItemForTargetVersion(gameVersion, item);
+    }
+
+    private Item parseCreativeStringItem(String identifier, JsonObject json, byte[] nbtBytes) {
+        if (this.getNetworkIdByNamespaceId(identifier).isEmpty()) {
+            return null;
+        }
+
+        Item item = Item.fromString(identifier);
+        if (item.getId() != Item.STRING_IDENTIFIED_ITEM) {
+            return null;
+        }
+
+        if (json.has("damage")) {
+            item.setDamage(json.get("damage").getAsInt());
+        }
+        item.setCount(json.has("count") ? json.get("count").getAsInt() : 1);
+        item.setCompoundTag(nbtBytes);
+        return item;
     }
 
     private int resolveLegacyFullIdFromBlockState(GameVersion gameVersion, String identifier, byte[] blockStateBytes, boolean ignoreUnknown) {

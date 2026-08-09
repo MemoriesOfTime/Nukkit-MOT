@@ -95,14 +95,17 @@ public class GlobalBlockPalette {
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_80, GameVersion.V1_21_80);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_90, GameVersion.V1_21_90);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_100, GameVersion.V1_21_100);
-        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_110_26, GameVersion.V1_21_110);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_110_26, GameVersion.V1_21_111);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_10, GameVersion.V1_26_10);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_20_26, GameVersion.V1_26_20);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_30, GameVersion.V1_26_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_40, GameVersion.V1_26_40);
 
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_20_50_NETEASE.getProtocol(), GameVersion.V1_20_50_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_2_NETEASE.getProtocol(), GameVersion.V1_21_2_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_50_NETEASE.getProtocol(), GameVersion.V1_21_50_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_93_NETEASE.getProtocol(), GameVersion.V1_21_93_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_124_NETEASE.getProtocol(), GameVersion.V1_21_124_NETEASE);
     }
 
     private static byte[] compiledTable282;
@@ -691,11 +694,13 @@ public class GlobalBlockPalette {
         useHashedBlockNetworkIds = enabled;
     }
 
+    @Deprecated
     public static int getOrCreateRuntimeId(int legacyId) throws NoSuchElementException {
         Server.mvw("GlobalBlockPalette#getOrCreateRuntimeId(int)");
         return getOrCreateRuntimeId(GameVersion.getLastVersion(), legacyId >> 4, legacyId & 0xf);
     }
 
+    @Deprecated
     public static int getLegacyFullId(int runtimeId) {
         Server.mvw("GlobalBlockPalette#getLegacyFullId(int)");
         return getLegacyFullId(GameVersion.getLastVersion(), runtimeId);

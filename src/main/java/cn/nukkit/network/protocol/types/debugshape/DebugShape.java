@@ -60,6 +60,22 @@ public class DebugShape {
         SPHERE,
         CIRCLE,
         TEXT,
-        ARROW
+        ARROW,
+        /**
+         * @since v1_26_30
+         */
+        CYLINDER,
+        /**
+         * @since v1_26_30
+         */
+        PYRAMID,
+        /**
+         * @since v1_26_30
+         */
+        ELLIPSOID,
+        /**
+         * @since v1_26_30
+         */
+        CONE
     }
 }

@@ -2,6 +2,7 @@
 <h3 align="center">Nukkit-MOT</h3>
 <p align="center">
   <a href="https://www.gnu.org/licenses/lgpl-3.0.html"><img alt="许可证: LGPL v3" src="https://img.shields.io/github/license/MemoriesOfTime/Nukkit-MOT"></a>
+  <a href="https://central.sonatype.com/artifact/com.nukkit-mot/nukkit-mot"><img alt="Maven Central" src="https://img.shields.io/maven-central/v/com.nukkit-mot/nukkit-mot?label=maven-central"></a>
   <a href="https://motci.cn/job/Nukkit-MOT/job/master/"><img alt="Jenkins 构建状态" src="https://img.shields.io/jenkins/build?jobUrl=https%3A%2F%2Fmotci.cn%2Fjob%2FNukkit-MOT%2Fjob%2Fmaster%2F&label=jenkins&logo=jenkins"></a>
   <a href="https://discord.gg/pJjQDQC"><img alt="Discord" src="https://img.shields.io/discord/710480168598372354?label=Discord&logo=discord"></a>
 <p align="center">
@@ -17,7 +18,7 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 只想玩新版本？不妨试试 [Lumi](https://github.com/KoshakMineDEV/Lumi) 或 [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 ### Nukkit-MOT 的新特性
-1. 支持 1.2 – 1.26.20 版本（可在配置中设置最低协议版本）
+1. 支持 1.2 – 1.26.40 版本（可在配置中设置最低协议版本）
 2. 支持大多数实体的AI
 3. 支持下界（Nether）和末地（The End）世界
 4. 生成地牢和洞穴
@@ -29,6 +30,19 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 2. 从下方链接下载 `.jar` 文件
 3. 运行命令：`java -jar Nukkit-MOT-SNAPSHOT.jar`（将 `Nukkit-MOT-SNAPSHOT.jar` 替换为你下载的文件名）
 
+### 使用 Docker 运行
+```bash
+docker run -d --name nukkit-mot \
+  -p 19132:19132/udp \
+  -v $(pwd)/data:/data \
+  -e JAVA_OPTS="-Xms2G -Xmx2G" \
+  --restart unless-stopped \
+  memoriesoftime/nukkit-mot:latest
+```
+- `:latest` 和 `:<短SHA>` 是基于 master 分支构建的开发快照。
+- `:1.26.30-R1` 这种 tag 是与 Maven Central 对应的稳定发布版。
+- 所有 worlds、plugins、players、`server.properties` 都存放在 `/data` 卷下。
+
 ## 相关链接
 - __🌐 下载地址: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
 - __💬 交流社区: [Discord](https://discord.gg/pJjQDQC) / [QQ 群](https://jq.qq.com/?_wv=1027&k=5aIuYMH)__
@@ -39,6 +53,7 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 #### Repository:
 ```xml
 <repositories>
+    <!-- 发布版来自 Maven Central；开发版 SNAPSHOT 需要添加 repo.lanink.cn 仓库 -->
     <repository>
         <id>repo-lanink-cn</id>
         <url>https://repo.lanink.cn/repository/maven-public/</url>
@@ -48,6 +63,17 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 
 #### Dependencies:
 ```xml
+<!-- 发布版 -->
+<dependencies>
+    <dependency>
+        <groupId>com.nukkit-mot</groupId>
+        <artifactId>nukkit-mot</artifactId>
+        <version>1.26.30-R1</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+
+<!-- 快照版 -->
 <dependencies>
     <dependency>
         <groupId>cn.nukkit</groupId>
@@ -63,32 +89,89 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 ```kts
 repositories {
     mavenCentral()
+    // 开发版 SNAPSHOT 需要 repo.lanink.cn 仓库
     maven("https://repo.lanink.cn/repository/maven-public/")
 } 
 ```
 
 #### Dependencies:
 ```kts
+// 发布版
+dependencies {
+    compileOnly("com.nukkit-mot:nukkit-mot:1.26.30-R1")
+}
+
+// 开发版 (SNAPSHOT)
 dependencies {
     compileOnly("cn.nukkit:Nukkit:MOT-SNAPSHOT")
 }
 ```
 
 ## 致谢
-[<img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="18"/>]() [Nukkit](https://github.com/CloudburstMC/Nukkit)  
-[<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]() [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
-[<img src="https://avatars.githubusercontent.com/u/20168691?v=4" width="18"/>]() [EaseCation](https://www.easecation.net/) [Nukkit](https://github.com/EaseCation/Nukkit) & [SynapseAPI](https://github.com/EaseCation/SynapseAPI)  
-[<img src="https://docs.powernukkitx.org/img/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
-[<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" width="120"/>](https://jb.gg/OpenSourceSupport)  
-Thanks to [jetbrains](https://jb.gg/OpenSourceSupport) for providing development tools for this project for free!
+### Projects
 
-![YourKit](https://www.yourkit.com/images/yklogo.png)  
-YourKit supports open source projects with innovative and intelligent tools
-for monitoring and profiling Java and .NET applications.
-YourKit is the creator of <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a>,
-<a href="https://www.yourkit.com/dotnet-profiler/">YourKit .NET Profiler</a>,
-and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.
+<table>
+  <tr>
+    <td align="center" width="20%">
+      <a href="https://github.com/CloudburstMC/Nukkit">
+        <img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="50"><br>
+        <b>Nukkit</b>
+      </a>
+    </td>
+    <td align="center" width="20%">
+      <a href="https://github.com/PetteriM1/NukkitPetteriM1Edition">
+        <img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="50"><br>
+        <b>NukkitPetteriM1</b>
+      </a>
+    </td>
+    <td align="center" width="20%">
+      <a href="https://github.com/EaseCation/Nukkit">
+        <img src="https://avatars.githubusercontent.com/u/20168691?v=4" width="50"><br>
+        <b>EaseCation/Nukkit</b>
+      </a>
+    </td>
+    <td align="center" width="20%">
+      <a href="https://github.com/PowerNukkitX/PowerNukkitX">
+        <img src="https://avatars.githubusercontent.com/u/99014792?s=200&v=4" width="50"><br>
+        <b>PowerNukkitX</b>
+      </a>
+    </td>
+    <td align="center" width="20%">
+      <a href="https://github.com/KoshakMineDEV/Lumi">
+        <img src="https://avatars.githubusercontent.com/u/122298065?s=200&v=4" width="50"><br>
+        <b>Lumi</b>
+      </a>
+    </td>
+  </tr>
+</table>
+
+### Sponsors
+
+<table>
+  <tr>
+    <td width="80" align="center">
+      <a href="https://www.yourkit.com/java/profiler/">
+        <img src="https://www.yourkit.com/images/yklogo.png" width="60">
+      </a>
+    </td>
+    <td>
+      YourKit supports open source projects with innovative and intelligent tools
+      for monitoring and profiling Java and .NET applications.<br>
+      <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a> ·
+      <a href="https://www.yourkit.com/dotnet-profiler/">YourKit .NET Profiler</a> ·
+      <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>
+    </td>
+  </tr>
+</table>
+
+## 贡献者
+
+感谢所有为本项目做出贡献的人！
+
+<a href="https://github.com/MemoriesOfTime/Nukkit-MOT/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=MemoriesOfTime/Nukkit-MOT" />
+</a>
 
 ## Star 历史
 
@@ -96,9 +179,9 @@ and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.
 
 <a href="https://www.star-history.com/?repos=MemoriesOfTime%2FNukkit-MOT&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=MemoriesOfTime/Nukkit-MOT&type=date&theme=dark&legend=top-left&sealed_token=rpkJyH7BITcbbVSkLa1y4EhTnURtpmFGTNdSAJUCoXYyj21eOQuti54RMaTfE84DhzWCFg2ZIoJ7cFrvaqRfjhQSvwb5R3kmbth69h6JIOfMgmBr3t0npwoXC8VwBdctTg7Pilu2w6R-GPn-qr3NP3wbSylfcGmGUo13Xqo-NqxUdBFIgVhPXiINQR09" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left&sealed_token=rpkJyH7BITcbbVSkLa1y4EhTnURtpmFGTNdSAJUCoXYyj21eOQuti54RMaTfE84DhzWCFg2ZIoJ7cFrvaqRfjhQSvwb5R3kmbth69h6JIOfMgmBr3t0npwoXC8VwBdctTg7Pilu2w6R-GPn-qr3NP3wbSylfcGmGUo13Xqo-NqxUdBFIgVhPXiINQR09" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left&sealed_token=rpkJyH7BITcbbVSkLa1y4EhTnURtpmFGTNdSAJUCoXYyj21eOQuti54RMaTfE84DhzWCFg2ZIoJ7cFrvaqRfjhQSvwb5R3kmbth69h6JIOfMgmBr3t0npwoXC8VwBdctTg7Pilu2w6R-GPn-qr3NP3wbSylfcGmGUo13Xqo-NqxUdBFIgVhPXiINQR09" />
  </picture>
 </a>
 

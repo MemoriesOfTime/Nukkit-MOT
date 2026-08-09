@@ -119,7 +119,7 @@ public abstract class BlockShelf extends BlockTransparentMeta implements Faceabl
     public int onTouch(@NotNull Vector3 vector, @NotNull Item item, @NotNull BlockFace face, float fx, float fy, float fz,
                        @Nullable Player player, PlayerInteractEvent.Action action) {
         if (action != PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK || player == null || player.isSneaking()
-                || face != this.getBlockFace() || fy <= 0.25f || fy >= 0.75f) {
+                || fy <= 0.25f || fy >= 0.75f || face != this.getBlockFace()) {
             return super.onTouch(vector, item, face, fx, fy, fz, player, action);
         }
 

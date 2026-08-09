@@ -470,11 +470,11 @@ public class BlockWall extends BlockTransparentMeta implements BlockPropertiesHe
 
     public boolean canConnect(Block block) {
         switch (block.getId()) {
-            case GLASS_PANE, IRON_BARS, GLASS -> {
+            case GLASS -> {
                 return true;
             }
             default -> {
-                if (block instanceof BlockGlassStained || block instanceof BlockGlassPaneStained || block instanceof BlockWall) {
+                if (block instanceof BlockThin || block instanceof BlockGlassStained || block instanceof BlockWall) {
                     return true;
                 }
                 if (block instanceof BlockFenceGate fenceGate) {

@@ -34,7 +34,8 @@ public class NetworkChunkSerializer {
 
     private static final int EXTENDED_NEGATIVE_SUB_CHUNKS = 4;
 
-    private static final byte[] negativeSubChunks;
+    private static final byte[] negativeSubChunksV8;
+    private static final byte[] negativeSubChunksV9;
 
     static {
         // Build up 4 SubChunks for the extended negative height
@@ -43,7 +44,15 @@ public class NetworkChunkSerializer {
             stream.putByte((byte) 8); // SubChunk version
             stream.putByte((byte) 0); // 0 layers
         }
-        negativeSubChunks = stream.getBuffer();
+        negativeSubChunksV8 = stream.getBuffer();
+
+        stream = new BinaryStream();
+        for (int i = 0; i < EXTENDED_NEGATIVE_SUB_CHUNKS; i++) {
+            stream.putByte((byte) 9); // SubChunk version
+            stream.putByte((byte) 0); // 0 layers
+            stream.putByte((byte) (-4 + i)); // section y
+        }
+        negativeSubChunksV9 = stream.getBuffer();
     }
 
     @Deprecated
@@ -78,14 +87,17 @@ public class NetworkChunkSerializer {
             } else if (protocolId >= ProtocolInfo.v1_18_0) {
                 serialize1_18_0(stream, chunk, sections, networkChunkData);
             } else {
-                subChunkCount = Math.max(1, subChunkCount - chunk.getSectionOffset());
+                int offset = chunk.getSectionOffset();
+                subChunkCount = Math.max(1, subChunkCount - offset);
+                // Pre-1.18 clients only support 256-block height (16 sub-chunks)
+                int maxSubChunkCount = 16;
+                subChunkCount = Math.min(maxSubChunkCount, subChunkCount);
                 networkChunkData.setChunkSections(subChunkCount);
 
                 if (protocolId < ProtocolInfo.v1_12_0) {
                     stream.putByte((byte) subChunkCount);
                 }
 
-                int offset = chunk.getSectionOffset();
                 for (int i = offset; i < subChunkCount + offset; i++) {
                     if (protocolId < ProtocolInfo.v1_13_0) {
                         stream.putByte((byte) 0);
@@ -96,8 +108,13 @@ public class NetworkChunkSerializer {
                 }
 
                 if (protocolId < ProtocolInfo.v1_12_0) {
+                    // heightMap is stored relative to minBlockY (offset << 4); convert back to absolute Y and clamp to 0-255
+                    int heightOffset = offset << 4;
                     for (short height : chunk.getHeightMapArray()) {
-                        stream.putByte(height & 0xFF);
+                        int clamped = height - heightOffset;
+                        if (clamped < 0) clamped = 0;
+                        if (clamped > 255) clamped = 255;
+                        stream.putByte((byte) clamped);
                     }
                     stream.put(PAD_256);
                 }
@@ -126,7 +143,7 @@ public class NetworkChunkSerializer {
         // Overworld has negative coordinates, But the anvil world does not support it
         int writtenSections = subChunkCount;
         if (dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD && chunk.getSectionOffset() == 0) {
-            stream.put(negativeSubChunks);
+            stream.put(chunkData.getGameVersion().getProtocol() >= ProtocolInfo.v1_19_80 ? negativeSubChunksV9 : negativeSubChunksV8);
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 
@@ -151,7 +168,7 @@ public class NetworkChunkSerializer {
         // Overworld has negative coordinates, But the anvil world does not support it
         int writtenSections = subChunkCount;
         if (dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD && chunk.getSectionOffset() == 0) {
-            stream.put(negativeSubChunks);
+            stream.put(negativeSubChunksV8);
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 

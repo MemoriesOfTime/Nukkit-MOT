@@ -123,6 +123,38 @@ public class NBTIO {
         }
     }
 
+    /**
+     * Reads a compound tag with safe allocation enabled on the underlying stream.
+     * Use this for untrusted (network) NBT payloads so that oversized length/size
+     * values use growing backed lists instead of pre-allocating a single large array.
+     *
+     * @see NBTInputStream#readSafely()
+     */
+    public static CompoundTag readSafely(InputStream inputStream, ByteOrder endianness, boolean network) throws IOException {
+        try (NBTInputStream stream = new NBTInputStream(inputStream, endianness, network).readSafely()) {
+            Tag tag = Tag.readNamedTag(stream);
+            if (tag instanceof CompoundTag) {
+                return (CompoundTag) tag;
+            }
+            throw new IOException("Root tag must be a named compound tag");
+        }
+    }
+
+    public static CompoundTag readSafely(InputStream inputStream, ByteOrder endianness) throws IOException {
+        return readSafely(inputStream, endianness, false);
+    }
+
+    /**
+     * Reads a headerless tag value (no leading type id / name), the counterpart of
+     * {@link #writeValue(Tag, ByteOrder, boolean)}. Used by {@code LevelEventGenericPacket}.
+     * Adapted from PowerNukkitX.
+     */
+    public static CompoundTag readValue(InputStream inputStream, ByteOrder endianness, boolean network) throws IOException {
+        try (NBTInputStream stream = new NBTInputStream(inputStream, endianness, network)) {
+            return stream.readValue(Tag.TAG_Compound);
+        }
+    }
+
     public static Tag readNetwork(InputStream inputStream) throws IOException {
         try (NBTInputStream stream = new NBTInputStream(inputStream, ByteOrder.LITTLE_ENDIAN, true)) {
             return Tag.readNamedTag(stream);
@@ -245,6 +277,20 @@ public class NBTIO {
             Tag.writeNamedTag(tag, stream);
         }
         return baos.toByteArray();
+    }
+
+    /**
+     * Writes a headerless tag value (no leading type id / name), used by
+     * {@code LevelEventGenericPacket}. Unlike {@link #write(CompoundTag, ByteOrder, boolean)} /
+     * {@link #writeNetwork(Tag)}, this omits the root named-tag header the Bedrock client does not
+     * expect for that packet. Adapted from PowerNukkitX ({@code NBTIO.writeValue}).
+     */
+    public static byte[] writeValue(Tag tag, ByteOrder endianness, boolean network) throws IOException {
+        FastByteArrayOutputStream baos = ThreadCache.fbaos.get().reset();
+        try (NBTOutputStream stream = new NBTOutputStream(baos, endianness, network)) {
+            stream.writeValue(tag);
+            return baos.toByteArray();
+        }
     }
 
     public static byte[] writeGZIPCompressed(CompoundTag tag) throws IOException {

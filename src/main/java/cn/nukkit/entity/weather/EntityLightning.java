@@ -8,7 +8,10 @@ import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Utils;
@@ -40,6 +43,8 @@ public class EntityLightning extends Entity implements EntityLightningStrike {
 
         this.state = 2;
         this.liveTime = Utils.random.nextInt(3) + 1;
+
+        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, new Vector3(this.x, this.y, this.z), VibrationType.LIGHTNING_STRIKE));
 
         if (isEffect && this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK) && (this.server.getDifficulty() >= 2)) {
             Block block = this.getLevelBlock();

@@ -27,5 +27,8 @@ public class SetTimePacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putVarInt(this.time);
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.putBoolean(true); //started
+        }
     }
 }

@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import static cn.nukkit.network.encryption.JsonUtils.childAsType;
+import static cn.nukkit.network.encryption.JsonUtils.childAsTypeOrDefault;
 
 @Log4j2
 public final class ChainValidationResult {
@@ -72,7 +73,9 @@ public final class ChainValidationResult {
 
         String displayName = childAsType(extraData, "displayName", String.class);
         String identityString = childAsType(extraData, "identity", String.class);
-        String xuid = childAsType(extraData, "XUID", String.class);
+        // XUID is only present for Xbox-authenticated clients; legacy (e.g. v1.1.0) and offline
+        // clients omit it, so treat it as optional instead of failing the whole login.
+        String xuid = childAsTypeOrDefault(extraData, "XUID", String.class, null);
         Object titleId = extraData.get("titleId");
 
         UUID identity;

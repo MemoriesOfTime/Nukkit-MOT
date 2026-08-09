@@ -42,6 +42,7 @@ public abstract class BlockEntity extends Position {
     public static final String PISTON_ARM = "PistonArm";
     public static final String MOVING_BLOCK = "MovingBlock";
     public static final String COMPARATOR = "Comparator";
+    public static final String COMMAND_BLOCK = "CommandBlock";
     public static final String HOPPER = "Hopper";
     public static final String BED = "Bed";
     public static final String JUKEBOX = "Jukebox";
@@ -66,6 +67,9 @@ public abstract class BlockEntity extends Position {
     public static final String SHELF = "Shelf";
     public static final String CREAKING_HEART = "CreakingHeart";
     public static final String COPPER_GOLEM_STATUE = "CopperGolemStatue";
+    public static final String SCULK_SENSOR = "SculkSensor";
+    public static final String CALIBRATED_SCULK_SENSOR = "CalibratedSculkSensor";
+    public static final String SCULK_SHRIEKER = "SculkShrieker";
 
     // Not a vanilla block entity
     public static final String PERSISTENT_CONTAINER = "PersistentContainer";
@@ -255,9 +259,21 @@ public abstract class BlockEntity extends Position {
         blockEntity.getPersistentDataContainer().setStorage(this.getPersistentDataContainer().getStorage().clone());
     }
 
+    /**
+     * Instance identity. A {@link BlockEntity} is uniquely identified by its runtime instance, not
+     * by class + coordinates — otherwise a tile removed and recreated at the same position would be
+     * treated as the same object by collections (e.g. the sculk vibration listener set), routing
+     * callbacks to the stale, closed instance. Pair with {@link #hashCode()} (identity-based) so
+     * every collection membership check matches actual lifecycle.
+     */
     @Override
     public boolean equals(Object obj) {
-        return obj instanceof BlockEntity && this.getClass().equals(obj.getClass()) && super.equals(obj);
+        return this == obj;
+    }
+
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
     }
 
     public boolean canSaveToStorage() {

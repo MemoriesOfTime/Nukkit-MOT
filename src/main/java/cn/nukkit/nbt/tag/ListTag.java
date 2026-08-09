@@ -52,7 +52,7 @@ public class ListTag<T extends Tag> extends Tag {
         type = dis.readByte();
         int size = dis.readInt();
 
-        list = new ArrayList<>(size);
+        list = new ArrayList<>(dis.isReadSafely() && size > 64 ? 64 : size);
         for (int i = 0; i < size; i++) {
             Tag tag = Tag.newTag(type, null);
             tag.load(dis);
@@ -70,7 +70,7 @@ public class ListTag<T extends Tag> extends Tag {
     public String toString() {
         StringJoiner joiner = new StringJoiner(",\n\t");
         list.forEach(tag -> joiner.add(tag.toString().replace("\n", "\n\t")));
-        return "ListTag '" + this.getName() + "' (" + list.size() + " entries of type " + Tag.getTagName(type) + ") {\n\t" + joiner.toString() + "\n}";
+        return "ListTag '" + this.getName() + "' (" + list.size() + " entries of type " + Tag.getTagName(type) + ") {\n\t" + joiner + "\n}";
     }
 
     @Override

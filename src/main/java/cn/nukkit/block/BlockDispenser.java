@@ -145,18 +145,20 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_SCHEDULED) {
-            this.setTriggered(false);
-            this.level.setBlock(this, this, false, false);
-
             dispense();
             return type;
         }
 
         if (type == Level.BLOCK_UPDATE_NORMAL || type == Level.BLOCK_UPDATE_REDSTONE) {
-            if ((level.isBlockPowered(this) || level.isBlockPowered(this.up())) && !isTriggered()) {
+            boolean powered = level.isBlockPowered(this) || level.isBlockPowered(this.up());
+
+            if (powered && !isTriggered()) {
                 this.setTriggered(true);
                 this.level.setBlock(this, this, false, false);
                 level.scheduleUpdate(this, this, 4);
+            } else if (!powered && isTriggered()) {
+                this.setTriggered(false);
+                this.level.setBlock(this, this, false, false);
             }
 
             return type;

@@ -149,6 +149,13 @@ public abstract class BaseLevelProvider implements LevelProvider {
     }
 
     @Override
+    public BaseFullChunk putChunkIfAbsent(int chunkX, int chunkZ, BaseFullChunk chunk) {
+        chunk.setProvider(this);
+        chunk.setPosition(chunkX, chunkZ);
+        return this.chunks.putIfAbsent(Level.chunkHash(chunkX, chunkZ), chunk);
+    }
+
+    @Override
     public boolean isChunkLoaded(long hash) {
         return this.chunks.containsKey(hash);
     }
@@ -290,7 +297,9 @@ public abstract class BaseLevelProvider implements LevelProvider {
     }
 
     @Override
-    public void doGarbageCollection() {
+    public synchronized void doGarbageCollection() {
+        // synchronized 于 provider:防止关闭正在被异步区块读取(readChunkOffThread)使用的 region 文件
+        // synchronized on the provider: prevents closing a region file currently used by an off-thread chunk read
         int limit = (int) (System.currentTimeMillis() - 50);
         synchronized (regions) {
             if (regions.isEmpty()) {
