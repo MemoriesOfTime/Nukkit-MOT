@@ -20,6 +20,7 @@ import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.event.level.LevelInitEvent;
 import cn.nukkit.event.level.LevelLoadEvent;
+import cn.nukkit.event.server.BatchPacketsEvent;
 import cn.nukkit.event.server.PlayerDataSerializeEvent;
 import cn.nukkit.event.server.QueryRegenerateEvent;
 import cn.nukkit.event.server.ServerStopEvent;
@@ -55,7 +56,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.BatchingHelper;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
@@ -208,6 +208,10 @@ public class Server {
     @NotNull
     private String ip = "0.0.0.0";
     private int port;
+    private boolean ipv6Enabled = false;
+    @NotNull
+    private String ipv6Address = "::";
+    private int ipv6Port = -1;
     private QueryHandler queryHandler;
     private QueryRegenerateEvent queryRegenerateEvent;
     private final UUID serverID;
@@ -269,7 +273,6 @@ public class Server {
     private final DB nameLookup;
     private PlayerDataSerializer playerDataSerializer;
     private SpawnerTask spawnerTask;
-    private final BatchingHelper batchingHelper;
 
     /**
      * The server's MOTD. Remember to call network.setName() when updated.
@@ -736,8 +739,6 @@ public class Server {
 
         this.scheduler = new ServerScheduler();
 
-        this.batchingHelper = new BatchingHelper();
-
         if (this.getPropertyBoolean("enable-rcon", false)) {
             try {
                 String randomPassword = Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13);
@@ -805,6 +806,7 @@ public class Server {
         Potion.init();
         Attribute.init();
         DispenseBehaviorRegister.init();
+        GlobalBlockPalette.setUseHashedBlockNetworkIds(this.serverConfig.customBlockSettings().useHashedBlockNetworkIds());
         CustomBlockManager.init(this);
         GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getLastVersion(), 0, 0);
         BiomeDefinitionListPacket.getCachedPacket(GameVersion.getLastVersion());
@@ -842,6 +844,11 @@ public class Server {
         this.queryRegenerateEvent = new QueryRegenerateEvent(this, 5);
 
         log.info(this.baseLang.translateString("nukkit.server.networkStart", new String[]{this.getIp().isBlank() ? "0.0.0.0" : this.getIp(), String.valueOf(this.getPort())}));
+        if (this.ipv6Enabled) {
+            // IPv6 地址用方括号包裹，与 IPv4 行复用同一本地化文案以保持风格统一
+            String ipv6Host = "[" + (this.ipv6Address.isBlank() ? "::" : this.ipv6Address) + "]";
+            log.info(this.baseLang.translateString("nukkit.server.networkStart", new String[]{ipv6Host, String.valueOf(this.ipv6Port)}));
+        }
         this.network = new Network(this);
         this.network.setName(this.getMotd());
         this.network.setSubName(this.getSubMotd());
@@ -1271,13 +1278,31 @@ public class Server {
         }
     }
 
+    @Deprecated
     public void batchPackets(Player[] players, DataPacket[] packets) {
-        this.batchingHelper.batchPackets(players, packets);
+        if (players == null || packets == null || players.length == 0 || packets.length == 0) {
+            return;
+        }
+
+        if (this.callBatchPkEv) {
+            BatchPacketsEvent ev = new BatchPacketsEvent(players, packets);
+            ev.call();
+            if (ev.isCancelled()) {
+                return;
+            }
+        }
+
+        for (DataPacket packet : packets) {
+            packet.isEncoded = false; // prevent plugins from being encoded in advance
+            for (Player player : players) {
+                player.dataPacket(packet);
+            }
+        }
     }
 
-    @Deprecated
+    @Deprecated(forRemoval = true)
     public void batchPackets(Player[] players, DataPacket[] packets, boolean forceSync) {
-        this.batchingHelper.batchPackets(players, packets);
+        this.batchPackets(players, packets);
     }
 
     public void enablePlugins(PluginLoadOrder type) {
@@ -1422,16 +1447,11 @@ public class Server {
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
 
-            this.getLogger().debug("Closing BatchingHelper...");
-            this.batchingHelper.shutdown();
-
             this.getLogger().debug("Stopping network interfaces...");
             for (SourceInterface interfaz : this.network.getInterfaces()) {
                 interfaz.shutdown();
                 this.network.unregisterInterface(interfaz);
             }
-
-            this.batchingHelper.shutdown();
 
             if (nameLookup != null) {
                 this.getLogger().debug("Closing name lookup DB...");
@@ -1916,6 +1936,19 @@ public class Server {
     @NotNull
     public String getIp() {
         return ip;
+    }
+
+    public boolean isIpv6Enabled() {
+        return ipv6Enabled;
+    }
+
+    @NotNull
+    public String getIpv6Address() {
+        return ipv6Address;
+    }
+
+    public int getIpv6Port() {
+        return ipv6Port;
     }
 
     public UUID getServerUniqueId() {
@@ -3581,6 +3614,24 @@ public class Server {
         this.viewDistance = Math.max(1, this.getPropertyInt("view-distance", 8));
         this.port = this.getPropertyInt("server-port", 19132);
         this.ip = this.getPropertyString("server-ip", "0.0.0.0");
+        this.ipv6Port = this.getPropertyInt("server-ipv6-port", -1);
+        this.ipv6Address = this.getPropertyString("server-ipv6", "::");
+        if (!this.ipv6Address.isBlank()) {
+            try {
+                InetAddress resolved = InetAddress.getByName(this.ipv6Address);
+                if (!(resolved instanceof Inet6Address)) {
+                    throw new IllegalArgumentException("server-ipv6 must be an IPv6 address, got: " + this.ipv6Address + " (resolved to " + resolved.getHostAddress() + ")");
+                }
+                this.ipv6Address = resolved.getHostAddress();
+            } catch (UnknownHostException e) {
+                throw new IllegalArgumentException("Unable to resolve server-ipv6 address: " + this.ipv6Address, e);
+            }
+        }
+        // IPv6 listener: port <= 0 (default -1) disables it; a valid port binds ipv6-address:ipv6-port
+        this.ipv6Enabled = this.ipv6Port > 0 && this.ipv6Port != this.port && !this.ipv6Address.isBlank();
+        if (this.ipv6Port >= 0 && !this.ipv6Enabled) {
+            log.warn("IPv6 listener requested on port {} but it was disabled (port must be > 0, non-blank address, and differ from server-port {})", this.ipv6Port, this.port);
+        }
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
         } catch (NumberFormatException exception) {
@@ -3792,6 +3843,8 @@ public class Server {
             put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
+            put("server-ipv6-port", -1);
+            put("server-ipv6", "::");
             put("view-distance", 8);
             put("max-players", 50);
             put("language", "eng");

@@ -268,7 +268,10 @@ public class LoginPacket extends DataPacket {
                 skin.setGrowthLevel(skinToken.get("GrowthLevel").getAsInt());
             }
             if (skinToken.has("BloomData")) {
-                skin.setBloomData(skinToken.get("BloomData").getAsString());
+                byte[] bloom = Base64.getDecoder().decode(skinToken.get("BloomData").getAsString());
+                if (bloom.length <= skin.getSkinData().data.length) {
+                    skin.setBloomData(bloom);
+                }
             }
         }
     }
