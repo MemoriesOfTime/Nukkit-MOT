@@ -15,8 +15,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollDatagramChannel;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.epoll.EpollIoHandler;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.nio.NioDatagramChannel;
@@ -37,7 +37,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.function.IntFunction;
 
 /**
  * @author MagicDroidX
@@ -65,12 +64,12 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
         Transport transport;
         if (!disableNative && Epoll.isAvailable()) {
-            transport = new Transport(EpollDatagramChannel.class, EpollEventLoopGroup::new);
+            transport = new Transport(EpollDatagramChannel.class, EpollIoHandler.newFactory());
         } else {
-            transport = new Transport(NioDatagramChannel.class, NioEventLoopGroup::new);
+            transport = new Transport(NioDatagramChannel.class, NioIoHandler.newFactory());
         }
 
-        this.eventLoopGroup = transport.eventLoopGroupFactory.apply(Runtime.getRuntime().availableProcessors());
+        this.eventLoopGroup = new MultiThreadIoEventLoopGroup(Runtime.getRuntime().availableProcessors(), transport.ioHandlerFactory);
 
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .channelFactory(RakChannelFactory.server(transport.datagramChannel))
@@ -420,11 +419,11 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private static class Transport {
 
         private final Class<? extends DatagramChannel> datagramChannel;
-        private final IntFunction<EventLoopGroup> eventLoopGroupFactory;
+        private final IoHandlerFactory ioHandlerFactory;
 
-        private Transport(Class<? extends DatagramChannel> datagramChannel, IntFunction<EventLoopGroup> eventLoopGroupFactory) {
+        private Transport(Class<? extends DatagramChannel> datagramChannel, IoHandlerFactory ioHandlerFactory) {
             this.datagramChannel = datagramChannel;
-            this.eventLoopGroupFactory = eventLoopGroupFactory;
+            this.ioHandlerFactory = ioHandlerFactory;
         }
     }
 
