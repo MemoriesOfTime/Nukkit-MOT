@@ -22,6 +22,7 @@ import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.event.level.LevelInitEvent;
 import cn.nukkit.event.level.LevelLoadEvent;
+import cn.nukkit.event.server.BatchPacketsEvent;
 import cn.nukkit.event.server.PlayerDataSerializeEvent;
 import cn.nukkit.event.server.QueryRegenerateEvent;
 import cn.nukkit.event.server.ServerStopEvent;
@@ -57,7 +58,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.BatchingHelper;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
@@ -271,7 +271,6 @@ public class Server {
     private final DB nameLookup;
     private PlayerDataSerializer playerDataSerializer;
     private SpawnerTask spawnerTask;
-    private final BatchingHelper batchingHelper;
 
     /**
      * The server's MOTD. Remember to call network.setName() when updated.
@@ -737,8 +736,6 @@ public class Server {
         Zlib.setProvider(this.serverConfig.networkSettings().zlibProvider());
 
         this.scheduler = new ServerScheduler();
-
-        this.batchingHelper = new BatchingHelper();
 
         if (this.getPropertyBoolean("enable-rcon", false)) {
             try {
@@ -1273,13 +1270,31 @@ public class Server {
         }
     }
 
+    @Deprecated
     public void batchPackets(Player[] players, DataPacket[] packets) {
-        this.batchingHelper.batchPackets(players, packets);
+        if (players == null || packets == null || players.length == 0 || packets.length == 0) {
+            return;
+        }
+
+        if (this.callBatchPkEv) {
+            BatchPacketsEvent ev = new BatchPacketsEvent(players, packets);
+            ev.call();
+            if (ev.isCancelled()) {
+                return;
+            }
+        }
+
+        for (DataPacket packet : packets) {
+            packet.isEncoded = false; // prevent plugins from being encoded in advance
+            for (Player player : players) {
+                player.dataPacket(packet);
+            }
+        }
     }
 
-    @Deprecated
+    @Deprecated(forRemoval = true)
     public void batchPackets(Player[] players, DataPacket[] packets, boolean forceSync) {
-        this.batchingHelper.batchPackets(players, packets);
+        this.batchPackets(players, packets);
     }
 
     public void enablePlugins(PluginLoadOrder type) {
@@ -1424,16 +1439,11 @@ public class Server {
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
 
-            this.getLogger().debug("Closing BatchingHelper...");
-            this.batchingHelper.shutdown();
-
             this.getLogger().debug("Stopping network interfaces...");
             for (SourceInterface interfaz : this.network.getInterfaces()) {
                 interfaz.shutdown();
                 this.network.unregisterInterface(interfaz);
             }
-
-            this.batchingHelper.shutdown();
 
             if (nameLookup != null) {
                 this.getLogger().debug("Closing name lookup DB...");
