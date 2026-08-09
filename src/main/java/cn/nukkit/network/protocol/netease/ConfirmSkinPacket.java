@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol.netease;
 
 import cn.nukkit.api.OnlyNetEase;
+import cn.nukkit.entity.data.Skin;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -72,7 +73,8 @@ public class ConfirmSkinPacket extends DataPacket {
         }
 
         for (SkinEntry entry : entries) {
-            this.putString(entry.geoStr != null ? entry.geoStr : "");
+            String geoStr = entry.geoStr;
+            this.putString(geoStr == null || geoStr.isBlank() ? Skin.STEVE_GEOMETRY : geoStr);
         }
     }
 
@@ -96,7 +98,7 @@ public class ConfirmSkinPacket extends DataPacket {
         }
 
         private static SkinEntry fromUuid(UUID uuid) {
-            return new SkinEntry(true, uuid, new byte[0], "", "");
+            return new SkinEntry(true, uuid, new byte[0], "", Skin.STEVE_GEOMETRY);
         }
 
         public boolean isValid() {
