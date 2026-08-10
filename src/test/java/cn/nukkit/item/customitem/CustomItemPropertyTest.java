@@ -162,6 +162,22 @@ class CustomItemPropertyTest {
         assertEquals(165, helmet.getMaxDurability());
     }
 
+    // ===== 缺失耐久组件（-1 不可损坏约定）测试 =====
+
+    @Test
+    void toolWithoutDurabilityComponentIsUnbreakable() {
+        //定义经 SimpleBuilder 构建（无 minecraft:durability 组件）时须对齐 Item 基类约定返回 -1，
+        //否则 getInt 缺省 0 会导致 damage >= 0 使物品一击即碎。
+        NoDurabilityTool tool = new NoDurabilityTool("test:no_dura_tool", "No Dura Tool");
+        assertEquals(-1, tool.getMaxDurability());
+    }
+
+    @Test
+    void armorWithoutDurabilityComponentIsUnbreakable() {
+        NoDurabilityArmor armor = new NoDurabilityArmor("test:no_dura_armor", "No Dura Armor");
+        assertEquals(-1, armor.getMaxDurability());
+    }
+
     // ===== 最小配置（防递归）测试 =====
 
     @Test
@@ -640,6 +656,34 @@ class CustomItemPropertyTest {
         @Override
         public int getMaxDurability() {
             return 1234;
+        }
+    }
+
+    /** 用 SimpleBuilder（不写 minecraft:durability）构建定义的工具，模拟缺失耐久组件的注册路径。 */
+    private static final class NoDurabilityTool extends ItemCustomTool {
+        NoDurabilityTool(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            return CustomItemDefinition
+                    .customBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .build();
+        }
+    }
+
+    /** 用 SimpleBuilder（不写 minecraft:durability）构建定义的盔甲，模拟缺失耐久组件的注册路径。 */
+    private static final class NoDurabilityArmor extends ItemCustomArmor {
+        NoDurabilityArmor(String id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public CustomItemDefinition getDefinition() {
+            return CustomItemDefinition
+                    .customBuilder(this, CreativeItemCategory.EQUIPMENT)
+                    .build();
         }
     }
 }
