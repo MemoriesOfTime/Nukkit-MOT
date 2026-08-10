@@ -48,14 +48,14 @@ public class ListTag<T extends Tag> extends Tag {
 
     @Override
     @SuppressWarnings("unchecked")
-    void load(NBTInputStream dis) throws IOException {
+    void load(NBTInputStream dis, int nested) throws IOException {
         type = dis.readByte();
         int size = dis.readInt();
 
         list = new ArrayList<>(dis.isReadSafely() && size > 64 ? 64 : size);
         for (int i = 0; i < size; i++) {
             Tag tag = Tag.newTag(type, null);
-            tag.load(dis);
+            tag.load(dis, nested + 1);
             tag.setName("");
             list.add((T) tag);
         }

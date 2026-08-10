@@ -36,7 +36,7 @@ public class ByteArrayTag extends Tag {
     }
 
     @Override
-    void load(NBTInputStream dis) throws IOException {
+    void load(NBTInputStream dis, int nested) throws IOException {
         int length = dis.readInt();
         if (dis.isReadSafely() && length > 64) {
             ByteArrayList list = new ByteArrayList(64);

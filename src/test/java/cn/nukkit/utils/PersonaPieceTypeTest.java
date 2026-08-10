@@ -33,7 +33,7 @@ class PersonaPieceTypeTest {
         assertEquals(PersonaPieceType.BODY, PersonaPieceType.fromName("body"));
         assertEquals(PersonaPieceType.EYES, PersonaPieceType.fromName("eyes"));
         assertEquals(PersonaPieceType.HANDS, PersonaPieceType.fromName("hands"));
-        assertEquals(PersonaPieceType.CLASSIC_SKIN, PersonaPieceType.fromName("classic_skin"));
+        assertEquals(PersonaPieceType.CLASSIC_SKIN, PersonaPieceType.fromName("classicskin"));
         // type（persona_ 前缀）格式
         assertEquals(PersonaPieceType.BODY, PersonaPieceType.fromName("persona_body"));
         assertEquals(PersonaPieceType.EYES, PersonaPieceType.fromName("persona_eyes"));
