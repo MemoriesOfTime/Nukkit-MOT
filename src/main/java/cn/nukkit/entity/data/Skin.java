@@ -356,6 +356,9 @@ public class Skin {
 
     public String getFullSkinId() {
         if (this.fullSkinId == null) {
+            if (this == NO_PERSONA_SKIN) {
+                return this.getSkinId();
+            }
             // 非玩家皮肤（NPC等）追加随机后缀，避免网易 ConfirmSkinPacket 导致隐形
             this.fullSkinId = this.getSkinId() + UUID.randomUUID().toString().substring(0, 8);
             this.noPlayFab = false; // Allow another attempt to generate it using the new id
@@ -370,6 +373,9 @@ public class Skin {
 
     public String getPlayFabId() {
         if (this.noPlayFab) {
+            return "";
+        }
+        if (this == NO_PERSONA_SKIN) {
             return "";
         }
         if ((this.playFabId == null || this.playFabId.isEmpty())) {
