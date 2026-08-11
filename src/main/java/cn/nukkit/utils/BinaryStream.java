@@ -1830,9 +1830,9 @@ public class BinaryStream {
         int protocolId = gameVersion.getProtocol();
         if (item == null || item.getId() == 0) {
             if (protocolId >= ProtocolInfo.v1_26_40) {
-                // v2168 ingredient: VarUInt(type ordinal) + VarInt(aux=32767) + VarInt(count)
+                // v2168 ingredient: VarUInt(type ordinal) + VarInt(aux=0) + VarInt(count)
                 this.putUnsignedVarInt(0); // ItemDescriptorType.INVALID ordinal
-                this.putVarInt(Short.MAX_VALUE);
+                this.putVarInt(0);
             } else if (protocolId >= ProtocolInfo.v1_19_30_23) {
                 this.putByte((byte) 0); //ItemDescriptorType.INVALID
             }
@@ -1864,7 +1864,8 @@ public class BinaryStream {
             this.putUnsignedVarInt(1); // ItemDescriptorType.DEFAULT ordinal
             this.putString("name");
             this.putString(mapping.getNamespacedIdByNetworkId(runtimeId));
-            this.putVarInt(damage);
+            // v2168 客户端不接受 32767 通配符, 无 meta 时归 0 / v2168 rejects 32767 wildcard; write 0 when no meta
+            this.putVarInt(damage == Short.MAX_VALUE ? 0 : damage);
         } else if (protocolId >= ProtocolInfo.v1_19_30_23) {
             this.putByte((byte) 1); //ItemDescriptorType.DEFAULT
             this.putLShort(runtimeId);
@@ -1882,11 +1883,11 @@ public class BinaryStream {
             throw new UnsupportedOperationException("This method is only supported on protocol 553+");
         }
         if (protocolId >= ProtocolInfo.v1_26_40) {
-            // v2168 ingredient: VarUInt(min(ordinal,1)) + serializeName + tag + aux(32767, unused)
+            // v2168 ingredient: VarUInt(min(ordinal,1)) + serializeName + tag + aux(0, unused)
             this.putUnsignedVarInt(1); // ItemDescriptorType.ITEM_TAG ordinal
             this.putString("item_tag");
             this.putString(itemTag);
-            this.putVarInt(Short.MAX_VALUE);
+            this.putVarInt(0);
         } else {
             this.putByte((byte) 3);
             this.putString(itemTag);
