@@ -97,6 +97,23 @@ public class PlayerListPacket extends DataPacket {
                             this.putBoolean(entry.skin != null && entry.skin.isTrusted());
                         }
                     }
+                    if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_20_60) {
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putBoolean(false); //vipFormatNameData
+                        }
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putBoolean(false); //nameTagNameData
+                        }
+                        for (Entry entry : this.entries) {
+                            this.putByteArray(entry.skin != null ? entry.skin.getBloomData() : new byte[0]);
+                        }
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putLInt(0); //growthLevelData
+                        }
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putBoolean(false); //hideUserDataScreenData
+                        }
+                    }
                     break;
                 case TYPE_REMOVE:
                     for (Entry entry : this.entries) {
@@ -122,7 +139,7 @@ public class PlayerListPacket extends DataPacket {
         public Skin skin;
         public String xboxUserId = "";
         public String platformChatId = "";
-        public int buildPlatform = -1;
+        public int buildPlatform = 1;
         public boolean isTeacher;
         public boolean isHost;
         public boolean isSubClient;

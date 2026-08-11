@@ -33,7 +33,7 @@ public class IntArrayTag extends Tag {
     }
 
     @Override
-    void load(NBTInputStream dis) throws IOException {
+    void load(NBTInputStream dis, int nested) throws IOException {
         int length = dis.readInt();
         if (dis.isReadSafely() && length > 64) {
             IntArrayList list = new IntArrayList(64);

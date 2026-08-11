@@ -136,10 +136,11 @@ public abstract class ItemCustomArmor extends ItemArmor implements CustomItem {
         if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
             return super.getMaxDurability();
         }
-        return this.getDefinitionNbt()
+        int maxDurability = this.getDefinitionNbt()
                 .getCompound("components")
                 .getCompound("minecraft:durability")
                 .getInt("max_durability");
+        return maxDurability > 0 ? maxDurability : -1;
     }
 
     @Override
