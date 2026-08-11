@@ -135,7 +135,9 @@ public class CraftingDataPacket extends DataPacket {
                             if (protocol >= 361) {
                                 this.putVarInt(shapeless.getPriority());
                                 if (protocol >= 407) {
-                                    if (protocol >= ProtocolInfo.v1_21_0) {
+                                    boolean isShulkerBox = recipe.getType() == RecipeType.SHULKER_BOX;
+                                    if (protocol >= ProtocolInfo.v1_21_0
+                                            && (!isShulkerBox || protocol >= ProtocolInfo.v1_21_40)) {
                                         this.writeRequirement(shapeless);
                                     }
                                     this.putUnsignedVarInt(shapeless.getNetworkId());

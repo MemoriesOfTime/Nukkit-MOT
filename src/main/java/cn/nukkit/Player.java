@@ -8041,15 +8041,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         TransferPacket pk = new TransferPacket();
         pk.address = hostName;
         pk.port = port;
-        if (!this.dataPacket(pk)) {
-            return;
-        }
-
-        this.server.getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
-            if (this.connected && !this.closed) {
-                this.close("", "transferred", false);
-            }
-        }, 100);
+        pk.reloadWorld = false;
+        this.dataPacket(pk);
     }
 
     /**

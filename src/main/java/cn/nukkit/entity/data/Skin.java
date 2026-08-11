@@ -86,7 +86,7 @@ public class Skin {
     @OnlyNetEase
     private int growthLevel;
     @OnlyNetEase
-    private String bloomData = "";
+    private byte[] bloomData;
 
     public boolean isValid() {
         return isValid(Server.getInstance().doNotLimitSkinGeometry);
@@ -356,6 +356,9 @@ public class Skin {
 
     public String getFullSkinId() {
         if (this.fullSkinId == null) {
+            if (this == NO_PERSONA_SKIN) {
+                return this.getSkinId();
+            }
             // 非玩家皮肤（NPC等）追加随机后缀，避免网易 ConfirmSkinPacket 导致隐形
             this.fullSkinId = this.getSkinId() + UUID.randomUUID().toString().substring(0, 8);
             this.noPlayFab = false; // Allow another attempt to generate it using the new id
@@ -370,6 +373,9 @@ public class Skin {
 
     public String getPlayFabId() {
         if (this.noPlayFab) {
+            return "";
+        }
+        if (this == NO_PERSONA_SKIN) {
             return "";
         }
         if ((this.playFabId == null || this.playFabId.isEmpty())) {
@@ -462,13 +468,14 @@ public class Skin {
     }
 
     @OnlyNetEase
-    public String getBloomData() {
-        return this.bloomData;
+    public byte[] getBloomData() {
+        byte[] bloomData = this.bloomData;
+        return bloomData == null ? new byte[0] : bloomData;
     }
 
     @OnlyNetEase
-    public void setBloomData(String bloomData) {
-        this.bloomData = bloomData == null ? "" : bloomData;
+    public void setBloomData(byte[] bloomData) {
+        this.bloomData = bloomData;
     }
 
     private static SerializedImage parseBufferedImage(BufferedImage image) {

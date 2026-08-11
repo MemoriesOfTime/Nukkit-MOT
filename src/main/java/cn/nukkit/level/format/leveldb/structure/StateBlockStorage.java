@@ -23,6 +23,7 @@ import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.nbt.NBTInputStream;
 import org.cloudburstmc.nbt.NBTOutputStream;
 import org.cloudburstmc.nbt.NbtMap;
+import org.cloudburstmc.nbt.NbtMapBuilder;
 import org.cloudburstmc.nbt.NbtUtils;
 
 import java.io.IOException;
@@ -33,6 +34,14 @@ import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 
 @Log4j2
 public class StateBlockStorage {
+
+    /**
+     * PocketMine-MP writes this private key into every block state it stores. Vanilla palettes
+     * do not contain it and states are matched as whole NBT maps, so a world saved by PMMP
+     * matches nothing at all - down to minecraft:air - and loads as solid info_update.
+     * Dropping the key here keeps everything downstream working with plain vanilla states.
+     */
+    private static final String PMMP_DATA_VERSION = "PMMPDataVersion";
 
     private static final int SECTION_SIZE = 16 * 16 * 16;
 
@@ -136,6 +145,11 @@ public class StateBlockStorage {
             for (int i = 0; i < paletteSize; ++i) {
                 try {
                     NbtMap state = (NbtMap) inputStream.readTag();
+                    if (state.containsKey(PMMP_DATA_VERSION)) {
+                        NbtMapBuilder withoutForeignKeys = state.toBuilder();
+                        withoutForeignKeys.remove(PMMP_DATA_VERSION);
+                        state = withoutForeignKeys.build();
+                    }
                     //noinspection ResultOfMethodCallIgnored
                     state.hashCode(); // cache hashCode
 
