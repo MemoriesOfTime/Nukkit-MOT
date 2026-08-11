@@ -4,6 +4,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
@@ -278,18 +279,34 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         return Position.fromObject(down.up(), portal.getLevel());
     }
 
+    /**
+     * How far, in blocks, an existing portal is looked up on the other side.
+     */
+    private static final int PORTAL_SEARCH_RADIUS = 128;
+
+    /**
+     * Looks up the portal closest to the given position.
+     *
+     * <p>The search walks chunks in rings around the origin and stops at the first portal it
+     * finds, so the result is the nearest one and the cost is paid only until then. Chunks that
+     * are not generated yet are skipped instead of being generated on the spot: a player stepping
+     * into a portal must not pay for generating the whole search box, and the portal is going to
+     * be built next to the mirrored position anyway.
+     */
     public static Position findNearestPortal(Position pos) {
         Level level = pos.getLevel();
-        Position found = null;
+        int originChunkX = pos.getFloorX() >> 4;
+        int originChunkZ = pos.getFloorZ() >> 4;
+        int chunkRadius = (PORTAL_SEARCH_RADIUS >> 4) + 1;
 
-        for (int xx = -128; xx <= 128; xx++) {
-            for (int zz = -128; zz <= 128; zz++) {
-                for (int y = 0; y  < level.getMaxBlockY(); y++) {
-                    int x = pos.getFloorX() + xx, z = pos.getFloorZ() + zz;
-                    if (level.getBlockIdAt(x, y, z) == NETHER_PORTAL) {
-                        found = new Position(x, y, z, level);
-                        break;
+        Position found = null;
+        for (int ring = 0; ring <= chunkRadius && found == null; ring++) {
+            for (int chunkX = originChunkX - ring; chunkX <= originChunkX + ring && found == null; chunkX++) {
+                for (int chunkZ = originChunkZ - ring; chunkZ <= originChunkZ + ring && found == null; chunkZ++) {
+                    if (Math.max(Math.abs(chunkX - originChunkX), Math.abs(chunkZ - originChunkZ)) != ring) {
+                        continue;
                     }
+                    found = findPortalInChunk(level, chunkX, chunkZ);
                 }
             }
         }
@@ -310,6 +327,34 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
             }
         }
         return found;
+    }
+
+    private static Position findPortalInChunk(Level level, int chunkX, int chunkZ) {
+        FullChunk chunk = level.getChunk(chunkX, chunkZ, false);
+        if (chunk == null) {
+            // Load from disk, but never generate: generating here is what made stepping into a
+            // portal take seconds on a fresh nether.
+            if (!level.loadChunk(chunkX, chunkZ, false)) {
+                return null;
+            }
+            chunk = level.getChunk(chunkX, chunkZ, false);
+        }
+        if (chunk == null || !chunk.isGenerated()) {
+            return null;
+        }
+
+        int minY = level.getMinBlockY();
+        int maxY = level.getMaxBlockY();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y < maxY; y++) {
+                    if (chunk.getBlockId(x, y, z) == NETHER_PORTAL) {
+                        return new Position((chunkX << 4) + x, y, (chunkZ << 4) + z, level);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     public static void spawnPortal(Position pos) {
