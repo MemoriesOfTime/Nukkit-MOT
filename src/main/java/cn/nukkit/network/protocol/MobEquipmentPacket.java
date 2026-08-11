@@ -25,11 +25,7 @@ public class MobEquipmentPacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (protocol >= ProtocolInfo.v1_2_0){
-            this.eid = this.getEntityRuntimeId();
-        }else{
-            this.eid = this.getEntityUniqueId();
-        }
+        this.eid = this.getEntityRuntimeId();
         this.item = this.getNetworkItemStackDescriptor(this.gameVersion);
         this.inventorySlot = this.getByte();
         this.hotbarSlot = this.getByte();
@@ -39,11 +35,7 @@ public class MobEquipmentPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.eid);
-        }else{
-            this.putEntityUniqueId(this.eid);
-        }
+        this.putEntityRuntimeId(this.eid);
         this.putNetworkItemStackDescriptor(gameVersion, this.item);
         this.putByte((byte) this.inventorySlot);
         this.putByte((byte) this.hotbarSlot);

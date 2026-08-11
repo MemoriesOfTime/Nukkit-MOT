@@ -98,15 +98,11 @@ public class EntityEventPacket extends DataPacket {
 
     @Override
     public void decode() {
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.eid = this.getEntityRuntimeId();
-        }else{
-            this.eid = this.getEntityUniqueId();
-        }
+        this.eid = this.getEntityRuntimeId();
         this.event = this.getByte();
-        if(this.protocol >= ProtocolInfo.v1_2_0){
+        if (this.protocol >= ProtocolInfo.v1_2_0) {
             this.data = this.getVarInt();
-        }else{
+        } else {
             this.data = (int) this.getUnsignedVarInt();
         }
         if (protocol >= ProtocolInfo.v1_26_20_26) {
@@ -117,11 +113,7 @@ public class EntityEventPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if(this.protocol >= ProtocolInfo.v1_2_0){
-            this.putEntityRuntimeId(this.eid);
-        }else{
-            this.putEntityUniqueId(this.eid);
-        }
+        this.putEntityRuntimeId(this.eid);
         this.putByte((byte) this.event);
         if (this.event == EATING_ITEM && this.originProtocol > 0 && this.originProtocol != this.protocol) {
             // 1.19.63-=  <=> 1.19.70+= 喝药水声音转换
@@ -150,9 +142,9 @@ public class EntityEventPacket extends DataPacket {
                 }
             }
         }
-        if(this.protocol >= ProtocolInfo.v1_2_0){
+        if (this.protocol >= ProtocolInfo.v1_2_0) {
             this.putVarInt(this.data);
-        }else{
+        } else {
             this.putUnsignedVarInt(this.data);
         }
         if (protocol >= ProtocolInfo.v1_26_20_26) {
