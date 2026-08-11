@@ -58,11 +58,7 @@ public class AnimatePacket extends DataPacket {
         } else {
             this.putVarInt(this.action.getId());
         }
-        if (protocol >= ProtocolInfo.v1_2_0) {
-            this.putEntityRuntimeId(this.eid);
-        } else {
-            this.putEntityUniqueId(this.eid);
-        }
+        this.putEntityRuntimeId(this.eid);
         if (this.protocol >= ProtocolInfo.v1_21_120) {
             this.putLFloat(this.data);
         }

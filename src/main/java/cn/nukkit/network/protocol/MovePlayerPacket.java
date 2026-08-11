@@ -39,11 +39,7 @@ public class MovePlayerPacket extends DataPacket {
         this.headYaw = this.getLFloat();
         this.mode = this.getByte();
         this.onGround = this.getBoolean();
-        if (protocol < ProtocolInfo.v1_2_0) {
-            this.ridingEid = this.getEntityUniqueId();
-        } else {
-            this.ridingEid = this.getEntityRuntimeId();
-        }
+        this.ridingEid = this.getEntityRuntimeId();
         if (this.protocol >= ProtocolInfo.v1_26_40) {
             // v2168 wraps the teleport block in a single outer boolean
             if (this.getBoolean()) {
