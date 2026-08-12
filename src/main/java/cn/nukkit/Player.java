@@ -3433,7 +3433,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             Set<Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
                             List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
                             entries.addAll(vanillaItems);
-                            if (this.server.enableExperimentMode && !itemDefinitions.isEmpty()) {
+                            if (!itemDefinitions.isEmpty()) {
                                 for (Entry<String, CustomItemDefinition> entry : itemDefinitions) {
                                     try {
                                         Item item = Item.fromString(entry.getKey());
@@ -3452,7 +3452,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             itemComponentPacket.setEntries(entries);
                         } else {
-                            if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
+                            if (!Item.getCustomItemDefinition().isEmpty()) {
                                 HashMap<String, CustomItemDefinition> itemDefinition = Item.getCustomItemDefinition();
                                 List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(itemDefinition.size());
                                 int i = 0;
