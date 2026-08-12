@@ -23,7 +23,6 @@ import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityHappyGhast;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
-import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
 import cn.nukkit.event.block.WaterFrostEvent;
 import cn.nukkit.event.entity.*;
@@ -8107,28 +8106,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
             if (entity instanceof EntityThrownTrident) {
                 // Check Trident is returning to shooter
-                if (!((EntityThrownTrident) entity).hadCollision) {
-                    if (entity.isNoClip()) {
-                        if (!((EntityProjectile) entity).shootingEntity.equals(this)) {
-                            return false;
-                        }
-                    } else {
+                EntityThrownTrident thrownTrident = (EntityThrownTrident) entity;
+                if (thrownTrident.isNoClip()) {
+                    if (thrownTrident.shootingEntity == null || !thrownTrident.shootingEntity.equals(this)) {
                         return false;
                     }
-                }
-
-                if (!((EntityThrownTrident) entity).isPlayer()) {
+                } else if (!thrownTrident.hadCollision) {
                     return false;
                 }
 
-                Item item = ((EntityThrownTrident) entity).getItem();
+                if (!thrownTrident.isPlayer()) {
+                    return false;
+                }
+
+                Item item = thrownTrident.getItem();
                 if (!this.isCreative() && !this.inventory.canAddItem(item)) {
                     return false;
                 }
 
-                InventoryPickupTridentEvent ev = new InventoryPickupTridentEvent(this.inventory, (EntityThrownTrident) entity);
+                InventoryPickupTridentEvent ev = new InventoryPickupTridentEvent(this.inventory, thrownTrident);
 
-                int pickupMode = ((EntityThrownTrident) entity).getPickupMode();
+                int pickupMode = thrownTrident.getPickupMode();
                 if (pickupMode == EntityThrownTrident.PICKUP_NONE || (pickupMode == EntityThrownTrident.PICKUP_CREATIVE && !this.isCreative())) {
                     ev.setCancelled();
                 }
@@ -8144,9 +8142,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Server.broadcastPacket(entity.getViewers().values(), pk);
                 this.dataPacket(pk);
 
-                if (!((EntityThrownTrident) entity).isCreative()) {
-                    if (inventory.getItem(((EntityThrownTrident) entity).getFavoredSlot()).getId() == Item.AIR) {
-                        inventory.setItem(((EntityThrownTrident) entity).getFavoredSlot(), item.clone());
+                if (!thrownTrident.isCreative()) {
+                    if (inventory.getItem(thrownTrident.getFavoredSlot()).getId() == Item.AIR) {
+                        inventory.setItem(thrownTrident.getFavoredSlot(), item.clone());
                     } else {
                         inventory.addItem(item.clone());
                     }
