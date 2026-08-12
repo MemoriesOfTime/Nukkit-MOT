@@ -5,6 +5,7 @@ import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
 import cn.nukkit.network.protocol.netease.PyRpcPacket;
+import cn.nukkit.network.protocol.netease.SyncSkinPacket;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -792,6 +793,7 @@ public class Network {
             .netEase(true)
             .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
             .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
+            .registerPacket(ProtocolInfo.PACKET_SYNC_SKIN, SyncSkinPacket.class)
             .build();
     }
 

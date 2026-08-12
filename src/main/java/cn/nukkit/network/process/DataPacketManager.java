@@ -5,6 +5,7 @@ import cn.nukkit.network.process.processor.ServerboundDataDrivenScreenClosedProc
 import cn.nukkit.network.process.processor.ServerboundDataStoreProcessor;
 import cn.nukkit.network.process.processor.common.*;
 import cn.nukkit.network.process.processor.netease.PyRpcProcessor;
+import cn.nukkit.network.process.processor.netease.SyncSkinProcessor;
 import cn.nukkit.network.process.processor.v113.*;
 import cn.nukkit.network.process.processor.v137.CommandRequestProcessor_v137;
 import cn.nukkit.network.process.processor.v282.SetLocalPlayerAsInitializedProcessor_v282;
@@ -185,6 +186,7 @@ public final class DataPacketManager {
                 PlayerInputProcessor.INSTANCE,
                 PlayerSkinProcessor.INSTANCE,
                 PyRpcProcessor.INSTANCE,
+                SyncSkinProcessor.INSTANCE,
                 RequestChunkRadiusProcessor.INSTANCE,
                 ResourcePackChunkRequestProcessor.INSTANCE,
                 RespawnProcessor.INSTANCE,
