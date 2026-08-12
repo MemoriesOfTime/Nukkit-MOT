@@ -2226,9 +2226,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (this.server.isNetherAllowed()) {
             if (this.server.vanillaPortals && (this.inPortalTicks == 40 || this.inPortalTicks == 10 && this.gamemode == CREATIVE) && this.portalPos == null) {
-                Position portalPos = this.level.calculatePortalMirror(this);
+                Position portalPos = this.level.calculatePortalMirror(this, this.netherReturnLevel());
                 if (portalPos == null) {
                     return;
+                }
+                if (this.level.getDimension() != Level.DIMENSION_NETHER) {
+                    // Remember which world is being left: the way back has to land here and not in
+                    // whatever world happens to be the default one.
+                    this.namedTag.putString(NETHER_RETURN_WORLD_TAG, this.level.getFolderName());
                 }
 
                 for (int x = -1; x < 2; x++) {
@@ -2265,8 +2270,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             Position foundPortal = BlockNetherPortal.findNearestPortal(portalPos);
                             getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
                                 if (foundPortal == null) {
-                                    BlockNetherPortal.spawnPortal(portalPos);
-                                    teleport(portalPos.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
+                                    // The frame may end up at another height than asked for, so the
+                                    // player follows the frame instead of the mirrored position.
+                                    Position spawnedPortal = BlockNetherPortal.spawnPortal(portalPos);
+                                    teleport(spawnedPortal.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
                                 } else {
                                     teleport(BlockNetherPortal.getSafePortal(foundPortal), TeleportCause.NETHER_PORTAL);
                                 }
@@ -2310,6 +2317,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.getFreezingTicks() == 140 && this.getServer().getTick() % 40 == 0) {
             this.attack(new EntityDamageEvent(this, DamageCause.FREEZING, getFrostbiteInjury()));
         }
+    }
+
+    /**
+     * Player data tag holding the world left through a nether portal.
+     */
+    private static final String NETHER_RETURN_WORLD_TAG = "NetherReturnWorld";
+
+    /**
+     * World the way back from the nether should land in, or {@code null} when it is unknown.
+     *
+     * <p>Without it every way back goes to the default world, which is only ever right on a server
+     * whose single overworld is also the default one. With a hub as the default world the player
+     * returned to a hub coordinate mirrored from the nether - eight times out from the hub build,
+     * in mid-air over ungenerated terrain. The tag lives in the player data, so a relog or a
+     * restart inside the nether does not lose the way home.
+     */
+    private Level netherReturnLevel() {
+        String world = this.namedTag.getString(NETHER_RETURN_WORLD_TAG);
+        if (world == null || world.isEmpty()) {
+            return null;
+        }
+        Level level = this.server.getLevelByName(world);
+        return level != null && level.getDimension() != Level.DIMENSION_NETHER ? level : null;
     }
 
     /**
