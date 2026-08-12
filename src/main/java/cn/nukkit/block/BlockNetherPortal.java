@@ -357,9 +357,26 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         return null;
     }
 
-    public static void spawnPortal(Position pos) {
+    /**
+     * How far up and down a footing for a freshly built portal is looked up.
+     */
+    private static final int PORTAL_GROUND_SEARCH = 96;
+
+    /**
+     * Builds a portal frame around the given position and returns where it ended up.
+     *
+     * <p>The Y that comes in is the one the player entered the portal at on the other side, see
+     * {@link Level#calculatePortalMirror}, and it says nothing about the terrain here: coming back
+     * from the nether at Y=72 built the frame in mid-air and left the player standing on its
+     * obsidian floor high above the ground. The frame is therefore lowered onto the first footing
+     * below the mirrored position, or raised onto the first one above it, and only stays at the
+     * mirrored Y when the whole column is empty.
+     */
+    public static Position spawnPortal(Position pos) {
         Level lvl = pos.level;
-        int x = pos.getFloorX(), y = pos.getFloorY(), z = pos.getFloorZ();
+        int x = pos.getFloorX(), z = pos.getFloorZ();
+        int y = frameHeightFor(lvl, x, pos.getFloorY(), z);
+        Position spawned = new Position(x, y, z, lvl);
 
         for (int xx = -1; xx < 4; xx++) {
             for (int yy = 1; yy < 4; yy++)  {
@@ -406,6 +423,64 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
         lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
         lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
+
+        return spawned;
+    }
+
+    /**
+     * Y the portal floor is laid at for a frame asked for at the given position.
+     */
+    private static int frameHeightFor(Level level, int x, int y, int z) {
+        int minY = level.getMinBlockY() + 1;
+        int maxY = level.getMaxBlockY() - 5;
+        if (level.getDimension() == Level.DIMENSION_NETHER) {
+            // Under the bedrock roof: a frame built into it is walled in and unreachable.
+            maxY = Math.min(maxY, 122);
+        }
+        if (maxY <= minY) {
+            return y;
+        }
+
+        int start = Math.max(minY, Math.min(maxY, y));
+        for (int yy = start; yy >= Math.max(minY, start - PORTAL_GROUND_SEARCH); yy--) {
+            if (hasFooting(level, x, yy, z)) {
+                return yy + 1;
+            }
+        }
+        for (int yy = start + 1; yy <= Math.min(maxY, start + PORTAL_GROUND_SEARCH); yy++) {
+            if (hasFooting(level, x, yy, z)) {
+                return yy + 1;
+            }
+        }
+        return start;
+    }
+
+    /**
+     * Whether a frame standing on top of the given layer has ground under it and room above.
+     *
+     * <p>Only the two columns the portal blocks themselves sit in are checked: the frame clears
+     * the space around it anyway, so demanding a flat 4x3 patch would reject every slope and send
+     * the frame back into mid-air.
+     */
+    private static boolean hasFooting(Level level, int x, int y, int z) {
+        if (!isSolidAt(level, x + 1, y, z + 1) && !isSolidAt(level, x + 2, y, z + 1)) {
+            return false;
+        }
+        for (int yy = 1; yy <= 4; yy++) {
+            if (isSolidAt(level, x + 1, y + yy, z + 1) || isSolidAt(level, x + 2, y + yy, z + 1)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isSolidAt(Level level, int x, int y, int z) {
+        int id = level.getBlockIdAt(x, y, z);
+        if (id == AIR || id == NETHER_PORTAL) {
+            return false;
+        }
+        // Water and lava are not a footing: standing on them means falling through or burning.
+        return Block.isBlockSolidById(id);
     }
 
     @Override
