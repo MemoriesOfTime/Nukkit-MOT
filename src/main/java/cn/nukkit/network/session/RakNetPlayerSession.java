@@ -202,6 +202,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         this.disconnectReason = reason;
         this.state.getLogin().setDisconnectCauseHint(reason);
         this.state.getLogin().setPhase(SessionLoginPhase.DISCONNECTED);
+        if (Nukkit.DEBUG > 1) {
+            log.info("[{}] Disconnecting: {} (protocol={}, gameVersion={})",
+                    this.playerLabel(), reason, this.getBedrockProtocol(),
+                    this.state.getProtocol().getGameVersion());
+        }
         if (this.tickFuture != null) {
             this.tickFuture.cancel(false);
         }
@@ -327,6 +332,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private void sendPackets(Collection<DataPacket> packets) {
         BinaryStream batched = new BinaryStream();
+        int packetCount = 0;
         for (DataPacket packet : packets) {
             if (packet instanceof BatchPacket) {
                 throw new IllegalArgumentException("Cannot batch BatchPacket");
@@ -334,12 +340,21 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             packet.tryEncode();
 
             byte[] buf = packet.getBuffer();
+            if (Nukkit.DEBUG > 1) {
+                log.info("[{}] OUT {}", this.playerLabel(), this.packetDebug(packet, buf));
+            }
             if (batched.getCount() + buf.length > 3145728) { // 3 * 1024 * 1024
                 this.sendPackets(batched);
                 batched = new BinaryStream();
             }
             batched.putUnsignedVarInt(buf.length);
             batched.put(buf);
+            packetCount++;
+        }
+
+        if (Nukkit.DEBUG > 1) {
+            log.info("[{}] OUT-BATCH {} packet(s), {} bytes uncompressed, compressor={}",
+                    this.playerLabel(), packetCount, batched.getCount(), this.compressionOut);
         }
 
         this.sendPackets(batched);
@@ -347,7 +362,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private void sendPackets(BinaryStream batched) {
         try {
-            this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel));
+            byte[] compressed = this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel);
+            if (Nukkit.DEBUG > 1) {
+                log.info("[{}] OUT-COMPRESS {} bytes -> {} bytes, compressor={}",
+                        this.playerLabel(), batched.getCount(), compressed.length, this.compressionOut);
+            }
+            this.sendPacket(compressed);
         } catch (Exception e) {
             log.error("Unable to compress batched packets", e);
         }
@@ -360,6 +380,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private ChannelFuture sendSinglePacketNow(DataPacket packet) throws Exception {
         BinaryStream batched = new BinaryStream();
         byte[] buf = packet.getBuffer();
+        if (Nukkit.DEBUG > 1) {
+            log.info("[{}] OUT-DIRECT {}", this.playerLabel(), this.packetDebug(packet, buf));
+        }
         batched.putUnsignedVarInt(buf.length);
         batched.put(buf);
         return this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel));
@@ -367,6 +390,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
+
+        if (Nukkit.DEBUG > 1) {
+            log.info("[{}] OUT-FRAME {} bytes, prefixed={}, encrypted={}, compressionPrefix=0x{}",
+                    this.playerLabel(), compressedPayload.length, ci, this.encryptionCipher != null,
+                    ci ? Integer.toHexString(this.compressionOut.getPrefix() & 0xFF) : "-");
+        }
 
         ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);
@@ -555,6 +584,19 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private String playerLabel() {
         return this.player == null ? String.valueOf(this.channel.remoteAddress()) : this.player.getName();
+    }
+
+    private String packetDebug(DataPacket packet, byte[] buf) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(packet.getClass().getSimpleName())
+                .append(" pid=0x").append(Integer.toHexString(packet.packetId()))
+                .append(" size=").append(buf.length)
+                .append(" protocol=").append(packet.protocol)
+                .append(" gameVersion=").append(packet.gameVersion);
+        if (Nukkit.DEBUG > 2 && buf.length <= 1024) {
+            sb.append(" data=").append(Binary.bytesToHexString(buf));
+        }
+        return sb.toString();
     }
 
     private boolean processInboundBatch(byte[] packetBuffer, boolean ci) {

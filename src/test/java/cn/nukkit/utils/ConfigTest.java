@@ -267,7 +267,7 @@ public class ConfigTest {
     @Test
     public void testServerConfigRemovesUnknownYamlKeysOnUpdate() throws Exception {
         Path configPath = tempDir.resolve("nukkit-mot.yml");
-        Files.writeString(configPath, """
+        String yamlContent = """
                 unknown-top-level:
                   enabled: true
                 performance-settings:
@@ -276,7 +276,8 @@ public class ConfigTest {
                 network-settings:
                   compression-level: 6
                   unknown-network-setting: stale
-                """, StandardCharsets.UTF_8);
+                """;
+        Files.writeString(configPath, yamlContent, StandardCharsets.UTF_8);
 
         ServerConfig config = ConfigManager.create(ServerConfig.class, it -> {
             it.configure(opt -> {
@@ -284,8 +285,9 @@ public class ConfigTest {
                 opt.bindFile(configPath);
                 opt.removeOrphans(true);
             });
-            it.load(true);
         });
+        config.load(yamlContent);
+        config.save();
 
         String saved = Files.readString(configPath, StandardCharsets.UTF_8);
         Assertions.assertEquals("2", config.performanceSettings().asyncWorkers());
