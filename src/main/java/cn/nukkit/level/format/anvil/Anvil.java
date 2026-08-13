@@ -119,26 +119,40 @@ public class Anvil extends BaseLevelProvider {
         if (this.getServer().asyncChunkSending) {
             final Chunk chunkClone = chunk.cloneForChunkSending();
             this.level.getAsyncChuckExecutor().execute(() -> {
-                NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
-                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
+                try {
+                    NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
+                        getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
+                                timestamp,
+                                x,
+                                z,
+                                networkChunkSerializerCallback.getSubchunks(),
+                                networkChunkSerializerCallback.getStream().getBuffer()
+                        );
+                    }, level.antiXrayEnabled(), getLevel().getDimensionData());
+                } catch (Throwable t) {
+                    getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + x + ", " + z + ")", t);
+                    for (GameVersion gv : protocols) {
+                        getLevel().onAsyncChunkRequestFailed(gv, x, z);
+                    }
+                }
+            });
+        }else {
+            try {
+                NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
+                    this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                             timestamp,
                             x,
                             z,
                             networkChunkSerializerCallback.getSubchunks(),
                             networkChunkSerializerCallback.getStream().getBuffer()
                     );
-                }, level.antiXrayEnabled(), getLevel().getDimensionData());
-            });
-        }else {
-            NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
-                        timestamp,
-                        x,
-                        z,
-                        networkChunkSerializerCallback.getSubchunks(),
-                        networkChunkSerializerCallback.getStream().getBuffer()
-                );
-            }, level.antiXrayEnabled(), this.level.getDimensionData());
+                }, level.antiXrayEnabled(), this.level.getDimensionData());
+            } catch (Throwable t) {
+                getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + x + ", " + z + ")", t);
+                for (GameVersion gv : protocols) {
+                    getLevel().onAsyncChunkRequestFailed(gv, x, z);
+                }
+            }
         }
     }
 

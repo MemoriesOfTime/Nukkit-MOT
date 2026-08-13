@@ -63,7 +63,7 @@ public class PlayerListPacket extends DataPacket {
             switch (type) {
                 case TYPE_ADD:
                     for (Entry entry : this.entries) {
-                        if (protocol >= ProtocolInfo.v1_2_13) {
+                        if (protocol >= ProtocolInfo.v1_2_13 || protocol < ProtocolInfo.v1_2_0) {
                             this.putUUID(entry.uuid);
                         }
                         this.putEntityUniqueId(entry.entityId);
@@ -97,10 +97,27 @@ public class PlayerListPacket extends DataPacket {
                             this.putBoolean(entry.skin != null && entry.skin.isTrusted());
                         }
                     }
+                    if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_20_60) {
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putBoolean(false); //vipFormatNameData
+                        }
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putBoolean(false); //nameTagNameData
+                        }
+                        for (Entry entry : this.entries) {
+                            this.putByteArray(entry.skin != null ? entry.skin.getBloomData() : new byte[0]);
+                        }
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putLInt(0); //growthLevelData
+                        }
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putBoolean(false); //hideUserDataScreenData
+                        }
+                    }
                     break;
                 case TYPE_REMOVE:
                     for (Entry entry : this.entries) {
-                        if (protocol >= ProtocolInfo.v1_2_13) {
+                        if (protocol >= ProtocolInfo.v1_2_13 || protocol < ProtocolInfo.v1_2_0) {
                             this.putUUID(entry.uuid);
                         }
                     }
@@ -122,7 +139,7 @@ public class PlayerListPacket extends DataPacket {
         public Skin skin;
         public String xboxUserId = "";
         public String platformChatId = "";
-        public int buildPlatform = -1;
+        public int buildPlatform = 1;
         public boolean isTeacher;
         public boolean isHost;
         public boolean isSubClient;

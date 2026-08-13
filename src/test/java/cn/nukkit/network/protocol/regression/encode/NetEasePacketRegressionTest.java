@@ -3,6 +3,7 @@ package cn.nukkit.network.protocol.regression.encode;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.entity.Attribute;
+import cn.nukkit.entity.data.Skin;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -238,7 +239,7 @@ public class NetEasePacketRegressionTest {
         assertEquals(uuid, entry.getUuid());
         assertArrayEquals(new byte[0], entry.getSkinBytes());
         assertEquals("", entry.getUidStr());
-        assertEquals("", entry.getGeoStr());
+        assertEquals(Skin.STEVE_GEOMETRY, entry.getGeoStr());
     }
 
     @ParameterizedTest(name = "ConfirmSkinPacket null optional fields v{0}")
@@ -260,7 +261,7 @@ public class NetEasePacketRegressionTest {
         assertEquals(uuid, entry.getUuid());
         assertArrayEquals(new byte[0], entry.getSkinBytes());
         assertEquals("", entry.getUidStr());
-        assertEquals("", entry.getGeoStr());
+        assertEquals(Skin.STEVE_GEOMETRY, entry.getGeoStr());
     }
 
     // ==================== PyRpcPacket ====================

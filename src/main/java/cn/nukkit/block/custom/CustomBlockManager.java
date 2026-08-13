@@ -25,6 +25,7 @@ import cn.nukkit.level.format.leveldb.LevelDBConstants;
 import cn.nukkit.level.format.leveldb.NukkitLegacyMapper;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.BiomeDefinitionListPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.VanillaPaletteDownloader;
 import com.google.gson.*;
@@ -396,6 +397,8 @@ public class CustomBlockManager {
         }
 
         GlobalBlockPalette.compactCaches();
+
+        BiomeDefinitionListPacket.rebuildHashSensitiveCaches();
 
         log.info("Custom block registry closed in {}ms", (System.currentTimeMillis() - startTime));
         this.saveIdMapping();
