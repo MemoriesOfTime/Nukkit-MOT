@@ -1088,9 +1088,14 @@ public abstract class Entity extends Location implements Metadatable {
             return;
         }
 
-        if (cause != null) {
-            Effect oldEffect = this.effects.get(effect.getId());
+        Effect oldEffect = this.effects.get(effect.getId());
 
+        if (oldEffect != null && (oldEffect.getAmplifier() > effect.getAmplifier()
+            || (oldEffect.getAmplifier() == effect.getAmplifier() && oldEffect.getDuration() >= effect.getDuration()))) {
+            return;
+        }
+
+        if (cause != null) {
             EntityPotionEffectEvent event = new EntityPotionEffectEvent(
                     this,
                     oldEffect,
