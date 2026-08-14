@@ -3,25 +3,17 @@ package cn.nukkit.utils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Carries a player's saved data over when their identity UUID changes.
@@ -37,7 +29,8 @@ class PlayerDataMigratorTest {
         writeData(playersDir, PREVIOUS, "xbox-inventory");
         PlayerDataSerializer serializer = new DefaultPlayerDataSerializer(dataDir + File.separator);
 
-        assertFalse(PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, true));
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, true));
 
         assertEquals("xbox-inventory", readData(playersDir, PREVIOUS));
         assertFalse(Files.exists(dataFile(playersDir, CURRENT)));
@@ -48,7 +41,8 @@ class PlayerDataMigratorTest {
         MemoryPlayerDataSerializer serializer = new MemoryPlayerDataSerializer();
         serializer.put(PREVIOUS, "database-inventory");
 
-        assertTrue(PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, false));
+        assertEquals(PlayerDataMigrator.Result.MIGRATED,
+                PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, false));
 
         assertEquals("database-inventory", serializer.get(CURRENT));
         assertEquals("database-inventory", serializer.get(PREVIOUS),
@@ -61,7 +55,8 @@ class PlayerDataMigratorTest {
         serializer.put(PREVIOUS, "stale-database-inventory");
         serializer.put(CURRENT, "live-database-inventory");
 
-        assertFalse(PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, false));
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, false));
 
         assertEquals("live-database-inventory", serializer.get(CURRENT));
     }
@@ -72,7 +67,8 @@ class PlayerDataMigratorTest {
         writeData(playersDir, PREVIOUS, "default-storage-inventory");
         PlayerDataSerializer serializer = new DefaultPlayerDataSerializer(dataDir + File.separator);
 
-        assertTrue(PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, false));
+        assertEquals(PlayerDataMigrator.Result.MIGRATED,
+                PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, false));
 
         assertEquals("default-storage-inventory", readData(playersDir, CURRENT));
         assertFalse(Files.exists(dataFile(playersDir, PREVIOUS)));
@@ -82,7 +78,8 @@ class PlayerDataMigratorTest {
     void migratesPreviousIdentityWhenCurrentDataIsAbsent(@TempDir Path playersDir) throws IOException {
         writeData(playersDir, PREVIOUS, "inventory");
 
-        assertTrue(PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT));
+        assertEquals(PlayerDataMigrator.Result.MIGRATED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT));
 
         assertEquals("inventory", readData(playersDir, CURRENT));
         assertFalse(Files.exists(dataFile(playersDir, PREVIOUS)), "the old file must not linger");
@@ -100,7 +97,8 @@ class PlayerDataMigratorTest {
             return Files.move(source, target, options);
         };
 
-        assertTrue(PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT, mover));
+        assertEquals(PlayerDataMigrator.Result.MIGRATED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT, mover));
 
         assertEquals(2, attempts.get());
         assertEquals("network-volume-inventory", readData(playersDir, CURRENT));
@@ -112,7 +110,8 @@ class PlayerDataMigratorTest {
         writeData(playersDir, PREVIOUS, "stale");
         writeData(playersDir, CURRENT, "live");
 
-        assertFalse(PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT));
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT));
 
         assertEquals("live", readData(playersDir, CURRENT));
     }
@@ -125,10 +124,91 @@ class PlayerDataMigratorTest {
         UUID collapsed = UUID.fromString("3c14031c-69c0-30bb-8339-5ee69712b3e5");
         writeData(playersDir, collapsed, "merged");
 
-        assertFalse(PlayerDataMigrator.migrate(playersDir.toFile(), collapsed, CURRENT));
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), collapsed, CURRENT));
 
         assertFalse(Files.exists(dataFile(playersDir, CURRENT)));
         assertEquals("merged", readData(playersDir, collapsed), "the shared file is left untouched");
+    }
+
+    @Test
+    void reportsFailedMoveAndKeepsSourceIntact(@TempDir Path playersDir) throws IOException {
+        writeData(playersDir, PREVIOUS, "inventory");
+        PlayerDataMigrator.FileMover mover = (source, target, options) -> {
+            throw new IOException("disk full");
+        };
+
+        assertEquals(PlayerDataMigrator.Result.FAILED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT, mover));
+
+        assertEquals("inventory", readData(playersDir, PREVIOUS), "a failed move must leave the old data alone");
+        assertFalse(Files.exists(dataFile(playersDir, CURRENT)), "no half-written target may block the retry");
+    }
+
+    @Test
+    void deletesPartialTargetWhenMoveFailsHalfway(@TempDir Path playersDir) throws IOException {
+        writeData(playersDir, PREVIOUS, "inventory");
+        PlayerDataMigrator.FileMover mover = (source, target, options) -> {
+            Files.write(target, "inv".getBytes(StandardCharsets.UTF_8));
+            throw new IOException("disk full");
+        };
+
+        assertEquals(PlayerDataMigrator.Result.FAILED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT, mover));
+
+        assertEquals("inventory", readData(playersDir, PREVIOUS));
+        assertFalse(Files.exists(dataFile(playersDir, CURRENT)),
+                "a partial target would read as existing data and silently reset the player");
+    }
+
+    @Test
+    void reportsFailedReadThroughCustomSerializer() {
+        PlayerDataSerializer unreachable = new PlayerDataSerializer() {
+            @Override
+            public Optional<InputStream> read(String name, UUID uuid) throws IOException {
+                throw new IOException("database down");
+            }
+
+            @Override
+            public OutputStream write(String name, UUID uuid) throws IOException {
+                throw new AssertionError("must not write");
+            }
+        };
+
+        assertEquals(PlayerDataMigrator.Result.FAILED,
+                PlayerDataMigrator.migrate(unreachable, unreachable, PREVIOUS, CURRENT, false));
+    }
+
+    @Test
+    void reportsFailedWriteThroughCustomSerializerAndKeepsSource() {
+        MemoryPlayerDataSerializer previousSerializer = new MemoryPlayerDataSerializer();
+        previousSerializer.put(PREVIOUS, "database-inventory");
+        PlayerDataSerializer failingWrite = new PlayerDataSerializer() {
+            @Override
+            public Optional<InputStream> read(String name, UUID uuid) {
+                return Optional.empty();
+            }
+
+            @Override
+            public OutputStream write(String name, UUID uuid) {
+                return new OutputStream() {
+                    @Override
+                    public void write(int b) throws IOException {
+                        throw new IOException("disk full");
+                    }
+
+                    @Override
+                    public void write(byte[] b) throws IOException {
+                        throw new IOException("disk full");
+                    }
+                };
+            }
+        };
+
+        assertEquals(PlayerDataMigrator.Result.FAILED,
+                PlayerDataMigrator.migrate(previousSerializer, failingWrite, PREVIOUS, CURRENT, false));
+
+        assertEquals("database-inventory", previousSerializer.get(PREVIOUS));
     }
 
     private static void writeData(Path playersDir, UUID uuid, String content) throws IOException {

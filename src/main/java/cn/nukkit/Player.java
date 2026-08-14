@@ -3151,8 +3151,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (!loginChainData.isXboxAuthed() && !dataFile.exists()) {
                 // The identity of unauthenticated players is no longer taken from the client, so
                 // data saved under their previous UUID has to follow them over.
-                this.server.lookupName(lowerName).ifPresent(previous ->
-                        this.server.migratePlayerData(previous, this.uuid, false));
+                Optional<UUID> previousIdentity = this.server.lookupName(lowerName);
+                if (previousIdentity.isPresent() && this.server.migratePlayerData(previousIdentity.get(), this.uuid)
+                        == PlayerDataMigrator.Result.FAILED) {
+                    this.server.getLogger().warning("Aborted login of " + this.username + ": player data migration from "
+                            + previousIdentity.get() + " to " + this.uuid + " failed and will be retried");
+                    this.close("", "Failed to load your player data, please reconnect");
+                    return;
+                }
             }
             boolean dataFound = dataFile.exists();
             if (!dataFound && legacyDataFile.exists()) {
@@ -3742,6 +3748,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.loginChainData = ClientChainData.read(loginPacket);
                 } catch (ClientChainData.TooBigSkinException ex) {
                     this.close("", "disconnectionScreen.invalidSkin");
+                    return;
+                } catch (IllegalArgumentException | IllegalStateException ex) {
+                    this.server.getLogger().debug("Rejected malformed login chain from "
+                            + this.getAddress() + ": " + ex.getMessage(), ex);
+                    this.close("", "disconnectionScreen.invalidName");
                     return;
                 }
 

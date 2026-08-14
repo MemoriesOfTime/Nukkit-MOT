@@ -93,6 +93,12 @@ class ClientChainDataIdentityTest {
                 "a client we cannot tell apart must be refused, not folded onto a shared identity");
     }
 
+    @Test
+    void legacyChainWithBlankDisplayNameIsRejected() {
+        assertThrows(IllegalStateException.class,
+                () -> ClientChainData.of(legacyChainLogin("", UUID.randomUUID())));
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Login buffer builders
     ///////////////////////////////////////////////////////////////////////////
