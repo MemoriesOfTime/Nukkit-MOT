@@ -428,6 +428,14 @@ public class Level implements ChunkManager, Metadatable {
     private ExecutorService asyncChunkLoadExecutor;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
+    // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
+    // Posted to main thread to clear tasks (tasks isn't thread-safe; async worker can't touch it)
+    private final Queue<FailedChunkRequest> asyncChunkRequestFailedQueue = new ConcurrentLinkedQueue<>();
+
+    // 任务提交 tick,用于超时自愈 / Submit tick for timeout self-healing
+    private final Long2LongOpenHashMap chunkSendTaskStartTick = new Long2LongOpenHashMap();
+    private static final int CHUNK_SEND_TIMEOUT_TICKS = 200;
+
     // 异步区块加载:pending 去重 + 完成队列,主线程 doTick 中挂载 / Async chunk loading: pending dedup + completion queue, mounted on the main thread in doTick
     // 包内可见以便单元测试 / package-private for unit tests
     final ConcurrentHashMap<Long, PendingChunkLoad> pendingChunkLoads = new ConcurrentHashMap<>();
@@ -447,6 +455,18 @@ public class Level implements ChunkManager, Metadatable {
             this.z = z;
             this.hash = hash;
             this.provider = provider;
+        }
+    }
+
+    static final class FailedChunkRequest {
+        final GameVersion protocol;
+        final int x;
+        final int z;
+
+        FailedChunkRequest(GameVersion protocol, int x, int z) {
+            this.protocol = protocol;
+            this.x = x;
+            this.z = z;
         }
     }
 
@@ -1283,6 +1303,16 @@ public class Level implements ChunkManager, Metadatable {
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
                 this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
+            }
+        }
+
+        // 清 tasks 后下 tick 守卫(!contains)重新成立即自动重试
+        // Clearing tasks lets the guard re-accept it next tick
+        if (!this.asyncChunkRequestFailedQueue.isEmpty()) {
+            FailedChunkRequest failed;
+            while ((failed = this.asyncChunkRequestFailedQueue.poll()) != null) {
+                this.getChunkSendTasks(failed.protocol).remove(Level.chunkHash(failed.x, failed.z));
+                this.chunkSendTaskStartTick.remove(Level.chunkHash(failed.x, failed.z));
             }
         }
 
@@ -3995,6 +4025,7 @@ public class Level implements ChunkManager, Metadatable {
         }
         queue.remove(index);
         tasks.remove(index);
+        this.chunkSendTaskStartTick.remove(index);
     }
 
     private void processChunkRequest() {
@@ -4007,6 +4038,14 @@ public class Level implements ChunkManager, Metadatable {
             LongSet tasks = this.getChunkSendTasks(protocolId);
             ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocolId);
             for (long index : pending) {
+                // 超时未回调则强制清除重试 / Force-clear and retry if no callback within timeout
+                long startTick = this.chunkSendTaskStartTick.get(index);
+                if (startTick != 0 && this.server.getTick() - startTick > CHUNK_SEND_TIMEOUT_TICKS
+                        && tasks.contains(index)) {
+                    server.getLogger().warning("Chunk send task timed out for index " + index + " in level " + this.getName() + ", forcing retry");
+                    tasks.remove(index);
+                    this.chunkSendTaskStartTick.remove(index);
+                }
                 if (!tasks.contains(index) && queue.containsKey(index)) {
                     chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
                     tasks.add(index);
@@ -4040,12 +4079,22 @@ public class Level implements ChunkManager, Metadatable {
                 continue;
             }
 
+            this.chunkSendTaskStartTick.put(index, this.server.getTick());
             this.requireProvider().requestChunkTask(protocols, x, z);
         }
     }
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
         this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp, x, z, subChunkCount, payload));
+    }
+
+    /**
+     * async 线程调用,仅入队(主线程 doTick 排空才清 tasks)。
+     * <p>
+     * Async-thread entry; just enqueues (main thread drains & clears tasks).
+     */
+    public void onAsyncChunkRequestFailed(GameVersion protocol, int x, int z) {
+        this.asyncChunkRequestFailedQueue.add(new FailedChunkRequest(protocol, x, z));
     }
 
     @Deprecated
@@ -4083,6 +4132,7 @@ public class Level implements ChunkManager, Metadatable {
 
             queue.remove(index);
             tasks.remove(index);
+            this.chunkSendTaskStartTick.remove(index);
         }
     }
 

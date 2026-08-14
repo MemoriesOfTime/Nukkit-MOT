@@ -328,6 +328,8 @@ public interface ProtocolInfo {
     int PY_RPC_PACKET = 200;
     @OnlyNetEase
     int PACKET_CONFIRM_SKIN = 228;
+    @OnlyNetEase
+    int PACKET_SYNC_SKIN = 236;
 
     int CAMERA_INSTRUCTION_PACKET = 300;
     int COMPRESSED_BIOME_DEFINITIONS_LIST_PACKET = 301;
