@@ -1,9 +1,12 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.*;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -12,8 +15,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Carries a player's saved data over when their identity UUID changes.
@@ -114,6 +116,7 @@ class PlayerDataMigratorTest {
                 PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT));
 
         assertEquals("live", readData(playersDir, CURRENT));
+        assertEquals("stale", readData(playersDir, PREVIOUS));
     }
 
     @Test
@@ -129,6 +132,159 @@ class PlayerDataMigratorTest {
 
         assertFalse(Files.exists(dataFile(playersDir, CURRENT)));
         assertEquals("merged", readData(playersDir, collapsed), "the shared file is left untouched");
+    }
+
+    @Test
+    void refusesToHandOutXboxAuthenticatedMarkerData(@TempDir Path playersDir) throws IOException {
+        writeXuidData(playersDir, PREVIOUS, "xbox-account-inventory", "1234567890");
+
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT));
+
+        assertFalse(Files.exists(dataFile(playersDir, CURRENT)));
+        assertEquals("xbox-account-inventory", readData(playersDir, PREVIOUS),
+                "authenticated account data must stay where it is");
+    }
+
+    @Test
+    void refusesToHandOutXboxAuthenticatedMarkerDataThroughCustomSerializer() {
+        MemoryPlayerDataSerializer serializer = new MemoryPlayerDataSerializer();
+        serializer.put(PREVIOUS, new CompoundTag()
+                .putString("marker", "xbox-account-inventory")
+                .putString("XUID", "1234567890"));
+
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, false));
+
+        assertFalse(serializer.contains(CURRENT));
+        assertEquals("xbox-account-inventory", serializer.get(PREVIOUS));
+    }
+
+    @Test
+    void ignoresNonStringXuidTagsStoredByPlugins(@TempDir Path playersDir) throws IOException {
+        // 插件可能存同名非字符串 tag；只有认证登录写入的字符串 XUID 才是禁用标记
+        // Only the string XUID written by an authenticated login is the handover marker
+        CompoundTag tagged = new CompoundTag()
+                .putString("marker", "inventory")
+                .putCompound("XUID", new CompoundTag().putInt("pluginData", 1));
+        writeNbtFile(dataFile(playersDir, PREVIOUS), tagged);
+
+        assertEquals(PlayerDataMigrator.Result.MIGRATED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT));
+
+        assertEquals("inventory", readData(playersDir, CURRENT));
+    }
+
+    @Test
+    void reportsFailedInspectionWhenTargetReadThrowsUnexpectedly() {
+        PlayerDataSerializer exploding = new PlayerDataSerializer() {
+            @Override
+            public Optional<InputStream> read(String name, UUID uuid) {
+                throw new IllegalStateException("boom");
+            }
+
+            @Override
+            public OutputStream write(String name, UUID uuid) {
+                throw new AssertionError("must not write");
+            }
+        };
+
+        assertEquals(PlayerDataMigrator.Result.FAILED,
+                PlayerDataMigrator.migrate(exploding, exploding, PREVIOUS, CURRENT, false));
+    }
+
+    @Test
+    void skipsSourceWhenParsingFailsUnexpectedly() {
+        InputStream explodingStream = new InputStream() {
+            @Override
+            public int read() {
+                throw new IllegalStateException("boom");
+            }
+        };
+        MemoryPlayerDataSerializer currentSerializer = new MemoryPlayerDataSerializer();
+        PlayerDataSerializer previousSerializer = new PlayerDataSerializer() {
+            @Override
+            public Optional<InputStream> read(String name, UUID uuid) {
+                return Optional.of(explodingStream);
+            }
+
+            @Override
+            public OutputStream write(String name, UUID uuid) {
+                throw new AssertionError("must not write");
+            }
+        };
+
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(previousSerializer, currentSerializer, PREVIOUS, CURRENT, false));
+    }
+
+    @Test
+    void skipsCorruptSourceFile(@TempDir Path playersDir) throws IOException {
+        writeCorruptData(playersDir, PREVIOUS);
+
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT));
+
+        assertTrue(Files.exists(dataFile(playersDir, PREVIOUS)), "corrupt or not, the source is left alone");
+        assertFalse(Files.exists(dataFile(playersDir, CURRENT)));
+    }
+
+    @Test
+    void skipsCorruptSourceInCustomSerializer() {
+        MemoryPlayerDataSerializer serializer = new MemoryPlayerDataSerializer();
+        serializer.putCorrupt(PREVIOUS);
+
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, false));
+
+        assertTrue(serializer.contains(PREVIOUS));
+        assertFalse(serializer.contains(CURRENT));
+    }
+
+    @Test
+    void removesResidueTargetAndMigrates(@TempDir Path playersDir) throws IOException {
+        writeCorruptData(playersDir, CURRENT);
+        writeData(playersDir, PREVIOUS, "inventory");
+
+        assertEquals(PlayerDataMigrator.Result.MIGRATED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT));
+
+        assertEquals("inventory", readData(playersDir, CURRENT));
+        assertFalse(Files.exists(dataFile(playersDir, PREVIOUS)));
+    }
+
+    @Test
+    void removesResidueTargetThroughDeleteContract() {
+        MemoryPlayerDataSerializer serializer = new MemoryPlayerDataSerializer();
+        serializer.putCorrupt(CURRENT);
+        serializer.put(PREVIOUS, "database-inventory");
+
+        assertEquals(PlayerDataMigrator.Result.MIGRATED,
+                PlayerDataMigrator.migrate(serializer, serializer, PREVIOUS, CURRENT, false));
+
+        assertEquals("database-inventory", serializer.get(CURRENT));
+    }
+
+    @Test
+    void skipsUndeletableResidueTargetConservatively() {
+        MemoryPlayerDataSerializer previousSerializer = new MemoryPlayerDataSerializer();
+        previousSerializer.put(PREVIOUS, "database-inventory");
+        PlayerDataSerializer undeletable = new PlayerDataSerializer() {
+            @Override
+            public Optional<InputStream> read(String name, UUID uuid) {
+                return Optional.of(new ByteArrayInputStream("not-nbt".getBytes(StandardCharsets.UTF_8)));
+            }
+
+            @Override
+            public OutputStream write(String name, UUID uuid) {
+                throw new AssertionError("must not write over data it cannot inspect");
+            }
+        };
+
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(previousSerializer, undeletable, PREVIOUS, CURRENT, false));
+
+        assertEquals("database-inventory", previousSerializer.get(PREVIOUS));
     }
 
     @Test
@@ -159,6 +315,22 @@ class PlayerDataMigratorTest {
         assertEquals("inventory", readData(playersDir, PREVIOUS));
         assertFalse(Files.exists(dataFile(playersDir, CURRENT)),
                 "a partial target would read as existing data and silently reset the player");
+    }
+
+    @Test
+    void keepsPartialTargetWhenSourceDisappearedMidMove(@TempDir Path playersDir) throws IOException {
+        writeData(playersDir, PREVIOUS, "inventory");
+        PlayerDataMigrator.FileMover mover = (source, target, options) -> {
+            Files.delete(source);
+            Files.write(target, "inv".getBytes(StandardCharsets.UTF_8));
+            throw new IOException("disk full");
+        };
+
+        assertEquals(PlayerDataMigrator.Result.FAILED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), PREVIOUS, CURRENT, mover));
+
+        assertTrue(Files.exists(dataFile(playersDir, CURRENT)),
+                "with the source gone, the partial target is the only remaining copy and must not be deleted");
     }
 
     @Test
@@ -211,12 +383,30 @@ class PlayerDataMigratorTest {
         assertEquals("database-inventory", previousSerializer.get(PREVIOUS));
     }
 
-    private static void writeData(Path playersDir, UUID uuid, String content) throws IOException {
-        Files.writeString(dataFile(playersDir, uuid), content, StandardCharsets.UTF_8);
+    private static void writeData(Path playersDir, UUID uuid, String marker) throws IOException {
+        writeNbtFile(dataFile(playersDir, uuid), new CompoundTag().putString("marker", marker));
+    }
+
+    private static void writeXuidData(Path playersDir, UUID uuid, String marker, String xuid) throws IOException {
+        writeNbtFile(dataFile(playersDir, uuid), new CompoundTag()
+                .putString("marker", marker)
+                .putString("XUID", xuid));
+    }
+
+    private static void writeCorruptData(Path playersDir, UUID uuid) throws IOException {
+        Files.writeString(dataFile(playersDir, uuid), "not-nbt", StandardCharsets.UTF_8);
+    }
+
+    private static void writeNbtFile(Path file, CompoundTag tag) throws IOException {
+        try (OutputStream out = Files.newOutputStream(file)) {
+            NBTIO.writeGZIPCompressed(tag, out, ByteOrder.BIG_ENDIAN);
+        }
     }
 
     private static String readData(Path playersDir, UUID uuid) throws IOException {
-        return Files.readString(dataFile(playersDir, uuid), StandardCharsets.UTF_8);
+        try (InputStream in = Files.newInputStream(dataFile(playersDir, uuid))) {
+            return NBTIO.readCompressed(in).getString("marker");
+        }
     }
 
     private static Path dataFile(Path playersDir, UUID uuid) {
@@ -226,13 +416,38 @@ class PlayerDataMigratorTest {
     private static final class MemoryPlayerDataSerializer implements PlayerDataSerializer {
         private final Map<String, byte[]> data = new HashMap<>();
 
-        void put(UUID uuid, String value) {
-            data.put(uuid.toString(), value.getBytes(StandardCharsets.UTF_8));
+        void put(UUID uuid, String marker) {
+            put(uuid, new CompoundTag().putString("marker", marker));
+        }
+
+        void put(UUID uuid, CompoundTag tag) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try {
+                NBTIO.writeGZIPCompressed(tag, out, ByteOrder.BIG_ENDIAN);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            data.put(uuid.toString(), out.toByteArray());
+        }
+
+        void putCorrupt(UUID uuid) {
+            data.put(uuid.toString(), "not-nbt".getBytes(StandardCharsets.UTF_8));
         }
 
         String get(UUID uuid) {
             byte[] value = data.get(uuid.toString());
-            return value == null ? null : new String(value, StandardCharsets.UTF_8);
+            if (value == null) {
+                return null;
+            }
+            try (InputStream in = new ByteArrayInputStream(value)) {
+                return NBTIO.readCompressed(in).getString("marker");
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        boolean contains(UUID uuid) {
+            return data.containsKey(uuid.toString());
         }
 
         @Override
@@ -250,6 +465,11 @@ class PlayerDataMigratorTest {
                     super.close();
                 }
             };
+        }
+
+        @Override
+        public boolean delete(String name, UUID uuid) {
+            return data.remove(name) != null;
         }
     }
 }

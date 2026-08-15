@@ -44,4 +44,10 @@ public class DefaultPlayerDataSerializer implements PlayerDataSerializer {
         File file = new File(getPlayersDirectory(), name + ".dat");
         return new FileOutputStream(file);
     }
+
+    @Override
+    public boolean delete(String name, UUID uuid) throws IOException {
+        File file = new File(getPlayersDirectory(), name + ".dat");
+        return file.delete();
+    }
 }

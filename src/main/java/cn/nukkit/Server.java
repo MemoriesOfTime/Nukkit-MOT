@@ -127,6 +127,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 
 /**
@@ -273,6 +274,20 @@ public class Server {
     private final DB nameLookup;
     private PlayerDataSerializer playerDataSerializer;
     private SpawnerTask spawnerTask;
+
+    /**
+     * 玩家数据 IO 的按身份锁，key 为数据路径标识（UUID 字符串或小写名）。
+     * <p>
+     * Per-identity locks for player data IO, keyed by the data path identity (UUID string or
+     * lowercased name).
+     */
+    private final ConcurrentHashMap<String, ReentrantLock> playerDataLocks = new ConcurrentHashMap<>();
+    /**
+     * 已调度未执行的异步保存任务，按身份索引；迁移前同步冲刷。
+     * <p>
+     * Scheduled-but-not-yet-run async save tasks indexed by identity; flushed before a migration.
+     */
+    private final ConcurrentHashMap<String, ArrayDeque<Task>> pendingPlayerDataSaves = new ConcurrentHashMap<>();
 
     /**
      * The server's MOTD. Remember to call network.setName() when updated.
@@ -2179,31 +2194,89 @@ public class Server {
         return Optional.ofNullable(playerList.get(uuid));
     }
 
+    /**
+     * 名称条目的写入来源，用于阻止离线登录认领 Xbox 认证账户的数据。
+     * <p>
+     * Provenance of a name entry, used to keep offline logins from claiming an Xbox
+     * authenticated account's data.
+     */
+    enum NameProvenance {
+        /** 旧版 16 字节条目，无来源记录 Legacy 16-byte entry without a provenance record */
+        LEGACY_UNKNOWN,
+        XBOX_AUTHED,
+        OFFLINE
+    }
+
+    record NameEntry(UUID uuid, NameProvenance provenance) {
+    }
+
+    private static final int NAME_ENTRY_UUID_BYTES = 16;
+    private static final byte PROVENANCE_XBOX_AUTHED = 0x01;
+    private static final byte PROVENANCE_OFFLINE = 0x02;
+
+    static byte[] encodeNameEntry(UUID uuid, NameProvenance provenance) {
+        ByteBuffer buffer = ByteBuffer.allocate(NAME_ENTRY_UUID_BYTES + 1);
+        buffer.putLong(uuid.getMostSignificantBits());
+        buffer.putLong(uuid.getLeastSignificantBits());
+        buffer.put(switch (provenance) {
+            case XBOX_AUTHED -> PROVENANCE_XBOX_AUTHED;
+            case OFFLINE -> PROVENANCE_OFFLINE;
+            case LEGACY_UNKNOWN -> throw new IllegalArgumentException("legacy entries are never written");
+        });
+        return buffer.array();
+    }
+
+    /**
+     * 解码名称条目：17 字节为现行格式（UUID + 来源），16 字节为旧格式（来源未知），其余无效。
+     * <p>
+     * Decodes a name entry: 17 bytes is the current format (UUID + provenance), 16 bytes the
+     * legacy format (unknown provenance); anything else is invalid.
+     */
+    static NameEntry decodeNameEntry(byte[] bytes) {
+        if (bytes == null) {
+            return null;
+        }
+        if (bytes.length == NAME_ENTRY_UUID_BYTES) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            return new NameEntry(new UUID(buffer.getLong(), buffer.getLong()), NameProvenance.LEGACY_UNKNOWN);
+        }
+        if (bytes.length != NAME_ENTRY_UUID_BYTES + 1) {
+            return null;
+        }
+        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        UUID uuid = new UUID(buffer.getLong(), buffer.getLong());
+        return switch (buffer.get()) {
+            case PROVENANCE_XBOX_AUTHED -> new NameEntry(uuid, NameProvenance.XBOX_AUTHED);
+            case PROVENANCE_OFFLINE -> new NameEntry(uuid, NameProvenance.OFFLINE);
+            default -> null;
+        };
+    }
+
     public Optional<UUID> lookupName(String name) {
+        return lookupNameEntry(name).map(NameEntry::uuid);
+    }
+
+    Optional<NameEntry> lookupNameEntry(String name) {
         byte[] nameBytes = name.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
-        byte[] uuidBytes = nameLookup.get(nameBytes);
-        if (uuidBytes == null) {
+        byte[] entryBytes = nameLookup.get(nameBytes);
+        if (entryBytes == null) {
             return Optional.empty();
         }
 
-        if (uuidBytes.length != 16) {
+        NameEntry entry = decodeNameEntry(entryBytes);
+        if (entry == null) {
             log.warn("Invalid uuid in name lookup database detected! Removing...");
             nameLookup.delete(nameBytes);
             return Optional.empty();
         }
 
-        ByteBuffer buffer = ByteBuffer.wrap(uuidBytes);
-        return Optional.of(new UUID(buffer.getLong(), buffer.getLong()));
+        return Optional.of(entry);
     }
 
-    void updateName(UUID uuid, String name) {
+    void updateName(UUID uuid, String name, boolean xboxAuthed) {
         byte[] nameBytes = name.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
-
-        ByteBuffer buffer = ByteBuffer.allocate(16);
-        buffer.putLong(uuid.getMostSignificantBits());
-        buffer.putLong(uuid.getLeastSignificantBits());
-
-        nameLookup.put(nameBytes, buffer.array());
+        nameLookup.put(nameBytes, encodeNameEntry(uuid,
+                xboxAuthed ? NameProvenance.XBOX_AUTHED : NameProvenance.OFFLINE));
     }
 
     public IPlayer getOfflinePlayer(final String name) {
@@ -2247,6 +2320,17 @@ public class Server {
         }
     }
 
+    /**
+     * 按名直读遗留数据文件，不经查找表解析：条目指向认证账户或塌缩身份时，解析会把被守卫的
+     * 数据发给当前登录者。
+     * <p>
+     * Reads the legacy name-keyed file directly, without lookup resolution: resolving would hand
+     * out guarded data when the entry points at an authenticated account or a collapsed identity.
+     */
+    CompoundTag getLegacyPlayerDataByName(String name) {
+        return getOfflinePlayerDataInternal(name, true, false);
+    }
+
     private CompoundTag getOfflinePlayerDataInternal(String name, boolean runEvent, boolean create) {
         Preconditions.checkNotNull(name, "name");
 
@@ -2257,9 +2341,15 @@ public class Server {
 
         Optional<InputStream> dataStream = Optional.empty();
         try {
-            dataStream = event.getSerializer().read(name, event.getUuid().orElse(null));
-            if (dataStream.isPresent()) {
-                return NBTIO.readCompressed(dataStream.get());
+            ReentrantLock dataLock = playerDataLock(name);
+            dataLock.lock();
+            try {
+                dataStream = event.getSerializer().read(name, event.getUuid().orElse(null));
+                if (dataStream.isPresent()) {
+                    return NBTIO.readCompressed(dataStream.get());
+                }
+            } finally {
+                dataLock.unlock();
             }
         } catch (IOException e) {
             log.warn(this.getLanguage().translateString("nukkit.data.playerCorrupted", name));
@@ -2307,13 +2397,92 @@ public class Server {
         return nbt;
     }
 
+    /**
+     * 迁移旧身份数据。仅离线登录可调用（调用方已做认证门控），故 xboxAuthed 恒为 false。
+     * <p>
+     * Migrates the previous identity's data. Only reachable from an offline login (the caller has
+     * already applied the auth gates), so xboxAuthed is always false here.
+     */
     PlayerDataMigrator.Result migratePlayerData(UUID previous, UUID current) {
-        PlayerDataSerializeEvent previousEvent = new PlayerDataSerializeEvent(previous.toString(), playerDataSerializer);
+        String previousKey = previous.toString();
+        String currentKey = current.toString();
+        // 先冲刷旧身份的排队保存，否则任务闭包里的旧路径会在移动后重建孤儿文件
+        // Flush the previous identity's queued saves first, or a task's old path recreates an
+        // orphaned file after the move
+        flushPendingPlayerDataSaves(previousKey);
+
+        PlayerDataSerializeEvent previousEvent = new PlayerDataSerializeEvent(previousKey, playerDataSerializer);
         pluginManager.callEvent(previousEvent);
-        PlayerDataSerializeEvent currentEvent = new PlayerDataSerializeEvent(current.toString(), playerDataSerializer);
+        PlayerDataSerializeEvent currentEvent = new PlayerDataSerializeEvent(currentKey, playerDataSerializer);
         pluginManager.callEvent(currentEvent);
-        return PlayerDataMigrator.migrate(previousEvent.getSerializer(), currentEvent.getSerializer(),
-                previous, current, false);
+
+        // 双身份按字典序获取锁，并发迁移 A→B / B→A 不会互相死锁
+        // Acquire both identities in lexicographic order so concurrent A→B / B→A migrations
+        // cannot deadlock each other
+        ReentrantLock first = playerDataLock(previousKey.compareTo(currentKey) <= 0 ? previousKey : currentKey);
+        ReentrantLock second = playerDataLock(previousKey.compareTo(currentKey) <= 0 ? currentKey : previousKey);
+        first.lock();
+        try {
+            second.lock();
+            try {
+                // 事件在锁外触发，监听器可能刚注册了旧身份的排队写：持锁后再冲刷一次
+                // Events fire outside the locks; flush again in case a listener queued an
+                // old-path save in between
+                flushPendingPlayerDataSaves(previousKey);
+                return PlayerDataMigrator.migrate(previousEvent.getSerializer(), currentEvent.getSerializer(),
+                        previous, current, false);
+            } finally {
+                second.unlock();
+            }
+        } finally {
+            first.unlock();
+        }
+    }
+
+    private ReentrantLock playerDataLock(String key) {
+        return playerDataLocks.computeIfAbsent(key, k -> new ReentrantLock());
+    }
+
+    /**
+     * 在调用线程同步执行排队保存：{@link Task#cancel()} 会内联执行 onCancel 完成落盘，
+     * {@code hasRun} 保证不与池线程的正常执行重复。
+     * <p>
+     * Runs queued saves synchronously on the calling thread: {@link Task#cancel()} executes
+     * onCancel inline; {@code hasRun} keeps it from duplicating a pool-thread run.
+     */
+    private void flushPendingPlayerDataSaves(String name) {
+        ArrayDeque<Task> queued;
+        ReentrantLock lock = playerDataLock(name);
+        lock.lock();
+        try {
+            queued = pendingPlayerDataSaves.remove(name);
+        } finally {
+            lock.unlock();
+        }
+        if (queued == null) {
+            return;
+        }
+        for (Task saveTask : queued) {
+            saveTask.cancel();
+        }
+    }
+
+    private void unregisterPendingSave(String name, Task saveTask) {
+        // 关服的 cancelAllTasks 不持身份锁，注销需自行加锁
+        // Shutdown's cancelAllTasks holds no identity lock, so removal locks by itself
+        ReentrantLock lock = playerDataLock(name);
+        lock.lock();
+        try {
+            ArrayDeque<Task> queue = pendingPlayerDataSaves.get(name);
+            if (queue != null) {
+                queue.remove(saveTask);
+                if (queue.isEmpty()) {
+                    pendingPlayerDataSaves.remove(name, queue);
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     public void saveOfflinePlayerData(UUID uuid, CompoundTag tag) {
@@ -2346,8 +2515,8 @@ public class Server {
             }
 
             if (async) {
-                this.getScheduler().scheduleTask(InternalPlugin.INSTANCE, new Task() {
-                    boolean hasRun = false;
+                Task saveTask = new Task() {
+                    volatile boolean hasRun = false;
 
                     @Override
                     public void onRun(int currentTick) {
@@ -2360,9 +2529,21 @@ public class Server {
                         if (!this.hasRun) {
                             this.hasRun = true;
                             saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
+                            unregisterPendingSave(nameLower, this);
                         }
                     }
-                }, true);
+                };
+                // 同锁调度并注册：冲刷要么看到完整注册的任务，要么看到干净队列，无空窗
+                // Schedule and register under one lock so a flush never sees a
+                // scheduled-but-unregistered task
+                ReentrantLock lock = playerDataLock(nameLower);
+                lock.lock();
+                try {
+                    this.getScheduler().scheduleTask(InternalPlugin.INSTANCE, saveTask, true);
+                    pendingPlayerDataSaves.computeIfAbsent(nameLower, k -> new ArrayDeque<>()).add(saveTask);
+                } finally {
+                    lock.unlock();
+                }
             } else {
                 saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
             }
@@ -2378,10 +2559,16 @@ public class Server {
      * @param uuid player uuid
      */
     private void saveOfflinePlayerDataInternal(PlayerDataSerializer serializer, CompoundTag tag, String name, UUID uuid) {
-        try (OutputStream dataStream = serializer.write(name, uuid)) {
-            NBTIO.writeGZIPCompressed(tag, dataStream, ByteOrder.BIG_ENDIAN);
-        } catch (Exception e) {
-            log.error(this.getLanguage().translateString("nukkit.data.saveError", name, e));
+        ReentrantLock lock = playerDataLock(name);
+        lock.lock();
+        try {
+            try (OutputStream dataStream = serializer.write(name, uuid)) {
+                NBTIO.writeGZIPCompressed(tag, dataStream, ByteOrder.BIG_ENDIAN);
+            } catch (Exception e) {
+                log.error(this.getLanguage().translateString("nukkit.data.saveError", name, e));
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -2427,7 +2614,9 @@ public class Server {
             saveOfflinePlayerData(uuid.toString(), tag, false, false);
 
             // Add name to lookup table
-            updateName(uuid, name);
+            // 遗留按名数据无认证记录：按离线标记，保持可迁移
+            // Legacy name-keyed data carries no auth record: mark it offline so it stays migratable
+            updateName(uuid, name, false);
 
             // Delete legacy data
             if (!legacyData.delete()) {

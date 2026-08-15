@@ -411,6 +411,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
+    /**
+     * onCompletion 有异步派发与资源包流程手动调用两条触发路径，该标记保证 processLogin 只执行一次。
+     * <p>
+     * onCompletion fires both through async collection and a manual call from the pack flow;
+     * this keeps processLogin single-shot.
+     */
+    protected boolean loginDataProcessed = false;
     private final LinkedHashMap<UUID, PendingResourcePack> pendingResourcePacks = new LinkedHashMap<>();
     private boolean resourcePackChunkSendScheduled;
 
@@ -3150,19 +3157,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.server.savePlayerDataByUuid) {
             if (!loginChainData.isXboxAuthed() && !dataFile.exists()) {
                 // The identity of unauthenticated players is no longer taken from the client, so
-                // data saved under their previous UUID has to follow them over.
-                Optional<UUID> previousIdentity = this.server.lookupName(lowerName);
-                if (previousIdentity.isPresent() && this.server.migratePlayerData(previousIdentity.get(), this.uuid)
+                // data saved under their previous UUID has to follow them over — unless the name
+                // was last used by an Xbox authenticated account, whose data must stay with it.
+                Optional<Server.NameEntry> previousIdentity = this.server.lookupNameEntry(lowerName);
+                boolean authedOwner = previousIdentity.isPresent()
+                        && previousIdentity.get().provenance() == Server.NameProvenance.XBOX_AUTHED;
+                if (authedOwner) {
+                    this.server.getLogger().info("Not migrating player data for " + this.username
+                            + ": the name was last used by an Xbox authenticated account");
+                } else if (previousIdentity.isPresent() && this.server.migratePlayerData(previousIdentity.get().uuid(), this.uuid)
                         == PlayerDataMigrator.Result.FAILED) {
                     this.server.getLogger().warning("Aborted login of " + this.username + ": player data migration from "
-                            + previousIdentity.get() + " to " + this.uuid + " failed and will be retried");
+                            + previousIdentity.get().uuid() + " to " + this.uuid + " failed and will be retried");
                     this.close("", "Failed to load your player data, please reconnect");
                     return;
                 }
             }
             boolean dataFound = dataFile.exists();
             if (!dataFound && legacyDataFile.exists()) {
-                nbt = this.server.getOfflinePlayerData(lowerName, false);
+                // 按名直读，不经查找表解析——否则条目指向认证账户或塌缩身份时绕过守卫
+                // Read by name directly; lookup resolution would bypass the migration guards
+                nbt = this.server.getLegacyPlayerDataByName(lowerName);
                 if (!legacyDataFile.delete()) {
                     this.server.getLogger().warning("Could not delete legacy player data for " + this.username);
                 }
@@ -3184,7 +3199,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (loginChainData.isXboxAuthed() || !server.xboxAuth) {
-            server.updateName(this.uuid, this.username);
+            server.updateName(this.uuid, this.username, loginChainData.isXboxAuthed());
         }
 
         this.playedBefore = (nbt.getLong("lastPlayed") - nbt.getLong("firstPlayed")) > 1;
@@ -3268,6 +3283,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         UUID uuid = getUniqueId();
         nbt.putLong("UUIDLeast", uuid.getLeastSignificantBits());
         nbt.putLong("UUIDMost", uuid.getMostSignificantBits());
+        if (loginChainData.isXboxAuthed()) {
+            // 认证账户的存档带 XUID 标记，迁移器拒绝把它移交给离线身份
+            // Authenticated saves carry the XUID marker; the migrator refuses to hand it to an offline identity
+            String xuid = loginChainData.getXUID();
+            nbt.putString("XUID", xuid == null || xuid.isEmpty() ? "authenticated" : xuid);
+        }
 
         if (this.server.getAutoSave()) {
             if (this.server.savePlayerDataByUuid) {
@@ -8548,8 +8569,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (this.event.getLoginResult() == PlayerAsyncPreLoginEvent.LoginResult.KICK) {
+                    // 拒绝发生在数据迁移与查找表变更之前
                     playerInstance.close(this.event.getKickMessage(), this.event.getKickMessage());
-                } else if (playerInstance.shouldLogin) {
+                    return;
+                }
+
+                // processLogin 须先于 shouldLogin 判断执行：资源包信息由它发出，客户端完成后才置
+                // shouldLogin；守卫防止两条触发路径重复执行
+                // processLogin must run ahead of the shouldLogin check (it sends the pack info
+                // the client needs to finish); the guard keeps the two trigger paths single-shot
+                if (!playerInstance.loginDataProcessed) {
+                    playerInstance.loginDataProcessed = true;
+                    playerInstance.processLogin();
+                    if (!playerInstance.connected) {
+                        return;
+                    }
+                }
+
+                if (playerInstance.shouldLogin) {
                     playerInstance.setSkin(this.event.getSkin());
                     playerInstance.completeLoginSequence();
                     for (Consumer<Server> action : this.event.getScheduledActions()) {
@@ -8560,7 +8597,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         };
 
         this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, this.preLoginEventTask);
-        this.processLogin();
     }
 
     static boolean isPreLoginVerifiedPacketAllowed(SessionLoginPhase phase, int packetId) {
