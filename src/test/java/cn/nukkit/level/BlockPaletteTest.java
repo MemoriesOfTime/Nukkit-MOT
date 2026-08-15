@@ -22,6 +22,16 @@ import java.util.zip.GZIPInputStream;
 
 class BlockPaletteTest {
 
+    /**
+     * 最新有专属调色板资源的版本。虚拟协议号（协议号未变的热修复，如 1.26.44 的 2169）
+     * 没有专属资源文件，生产中经 GlobalBlockPalette 的阈值回退复用本版本的调色板。
+     * <p>
+     * The latest version with a dedicated palette resource. Virtual protocols (same-wire hotfixes
+     * like 1.26.44's 2169) ship no resource and reuse this version's palette in production via
+     * GlobalBlockPalette's threshold fallback.
+     */
+    private static final GameVersion LAST_PALETTE_VERSION = GameVersion.V1_26_40;
+
     @BeforeAll
     /**
      * Boots the shared mock server once so palette construction uses initialized registries.
@@ -73,7 +83,7 @@ class BlockPaletteTest {
      * Verifies that crafter states using the triggered bit are mapped instead of falling back to data 0.
      */
     void crafterTriggeredStatesHaveRuntimeMappings() {
-        assertCrafterTriggeredStateMapped(new BlockPalette(GameVersion.getLastVersion()));
+        assertCrafterTriggeredStateMapped(new BlockPalette(LAST_PALETTE_VERSION));
         assertCrafterTriggeredStateMapped(new BlockPalette(GameVersion.V1_21_50_NETEASE));
     }
 
@@ -189,8 +199,8 @@ class BlockPaletteTest {
      * Verifies item frame vertical states use dedicated legacy data so wall map states remain separate.
      */
     void itemFrameVerticalStatesHaveRuntimeMappings() {
-        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.getLastVersion()), Block.ITEM_FRAME_BLOCK);
-        assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.getLastVersion()), Block.GLOW_FRAME);
+        assertItemFrameVerticalStatesMapped(new BlockPalette(LAST_PALETTE_VERSION), Block.ITEM_FRAME_BLOCK);
+        assertItemFrameVerticalStatesMapped(new BlockPalette(LAST_PALETTE_VERSION), Block.GLOW_FRAME);
         assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_20_50_NETEASE), Block.ITEM_FRAME_BLOCK);
         assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_21_2_NETEASE), Block.ITEM_FRAME_BLOCK);
         assertItemFrameVerticalStatesMapped(new BlockPalette(GameVersion.V1_21_50_NETEASE), Block.ITEM_FRAME_BLOCK);
