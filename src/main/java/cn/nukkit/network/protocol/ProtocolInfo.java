@@ -113,7 +113,7 @@ public interface ProtocolInfo {
     int v1_26_40 = 2168;
     int v1_26_44 = 2169;
 
-    int CURRENT_PROTOCOL = Utils.dynamic(v1_26_40);
+    int CURRENT_PROTOCOL = Utils.dynamic(v1_26_44);
 
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
         v1_1_0, v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
