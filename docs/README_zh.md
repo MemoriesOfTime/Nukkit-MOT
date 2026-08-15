@@ -18,7 +18,7 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 只想玩新版本？不妨试试 [Lumi](https://github.com/KoshakMineDEV/Lumi) 或 [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 ### Nukkit-MOT 的新特性
-1. 支持 1.2 – 1.26.40 版本（可在配置中设置最低协议版本）
+1. 支持 1.2 – 1.26.44 版本（可在配置中设置最低协议版本）
 2. 支持大多数实体的AI
 3. 支持下界（Nether）和末地（The End）世界
 4. 生成地牢和洞穴

@@ -111,6 +111,7 @@ public interface ProtocolInfo {
     int v1_26_20 = 975;
     int v1_26_30 = 1001;
     int v1_26_40 = 2168;
+    int v1_26_44 = 2169;
 
     int CURRENT_PROTOCOL = Utils.dynamic(v1_26_40);
 
@@ -123,7 +124,7 @@ public interface ProtocolInfo {
         v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40, v1_20_50, v1_20_60, v1_20_70, v1_20_80,
         v1_21_0, v1_21_2, v1_21_20, v1_21_30, v1_21_40, v1_21_50_26, v1_21_50, v1_21_60, v1_21_70_24, v1_21_70, v1_21_80, v1_21_90, v1_21_93,
         v1_21_100, v1_21_110_26, v1_21_111, v1_21_120, v1_21_124, v1_21_130_28, v1_21_130, v1_26_0, v1_26_10, v1_26_20_26, v1_26_20, v1_26_30,
-        v1_26_40
+        v1_26_40, v1_26_44
     );
 
     String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);

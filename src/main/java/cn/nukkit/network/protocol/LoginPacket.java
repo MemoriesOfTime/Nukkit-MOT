@@ -161,6 +161,11 @@ public class LoginPacket extends DataPacket {
             this.protocol_ = ProtocolInfo.v1_19_63;
         }
 
+        if (this.protocol_ == ProtocolInfo.v1_26_40 &&
+                skinToken.has("GameVersion") && isAtLeastVersion(skinToken.get("GameVersion").getAsString(), 1, 26, 44)) {
+            this.protocol_ = ProtocolInfo.v1_26_44;
+        }
+
         if (skinToken.has("ClientRandomId")) {
             this.clientId = skinToken.get("ClientRandomId").getAsLong();
         }
@@ -319,5 +324,25 @@ public class LoginPacket extends DataPacket {
     }
 
     private static class MapTypeToken extends TypeToken<Map<String, Object>> {
+    }
+
+    /**
+     * 数值比较客户端版本字符串（如 "1.26.44.3"）是否不低于指定版本，无法解析时返回 false。
+     * <p>
+     * Numerically compares a client version string (e.g. "1.26.44.3") against the given version;
+     * returns false when it cannot be parsed.
+     */
+    static boolean isAtLeastVersion(String version, int major, int minor, int patch) {
+        String[] parts = version.split("\\.");
+        if (parts.length < 3) {
+            return false;
+        }
+        try {
+            return Integer.parseInt(parts[0]) > major
+                    || (Integer.parseInt(parts[0]) == major && Integer.parseInt(parts[1]) > minor)
+                    || (Integer.parseInt(parts[0]) == major && Integer.parseInt(parts[1]) == minor && Integer.parseInt(parts[2]) >= patch);
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }
