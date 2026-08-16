@@ -179,6 +179,44 @@ public class NetEasePacketRegressionTest {
         return out.toByteArray();
     }
 
+    // ==================== NeteaseJsonPacket ====================
+
+    @ParameterizedTest(name = "NeteaseJsonPacket SET_LEVEL_GRAVITY v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testNeteaseJsonPacketSetLevelGravity(int protocolVersion) {
+        // Mirrors Player#sendNetEaseLevelGravityReset
+        com.google.gson.JsonObject payload = new com.google.gson.JsonObject();
+        payload.addProperty("eventName", cn.nukkit.network.protocol.netease.NeteaseJsonPacket.EVENT_SET_LEVEL_GRAVITY);
+        payload.addProperty("gravity", -0.08f);
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.NeteaseJsonPacket();
+        nukkitPacket.json = payload.toString();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                dev.mot.protocol.extension.packet.NetEaseJsonPacket.class);
+
+        assertEquals("{\"eventName\":\"SET_LEVEL_GRAVITY\",\"gravity\":-0.08}", cbPacket.getJson());
+    }
+
+    @ParameterizedTest(name = "NeteaseJsonPacket decode v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testNeteaseJsonPacketDecode(int protocolVersion) {
+        var cbPacket = new dev.mot.protocol.extension.packet.NetEaseJsonPacket();
+        cbPacket.setJson("{\"eventName\":\"SET_LEVEL_GRAVITY\",\"gravity\":-0.02}");
+        BedrockCodec codec = NETEASE_CODECS.get(protocolVersion);
+        byte[] buffer = PacketBridgeUtil.cbPacketToNukkitBuffer(
+                cbPacket, codec, codec.createHelper(), ProtocolInfo.NETEASE_JSON_PACKET, protocolVersion);
+
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.NeteaseJsonPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.setBuffer(buffer);
+        nukkitPacket.getUnsignedVarInt();
+        nukkitPacket.decode();
+
+        assertEquals("{\"eventName\":\"SET_LEVEL_GRAVITY\",\"gravity\":-0.02}", nukkitPacket.json);
+    }
+
     // ==================== ConfirmSkinPacket ====================
 
     @ParameterizedTest(name = "ConfirmSkinPacket empty v{0}")

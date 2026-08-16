@@ -72,6 +72,7 @@ import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
 import cn.nukkit.network.protocol.netease.PyRpcPacket;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 import cn.nukkit.network.protocol.types.*;
@@ -102,6 +103,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -1420,6 +1422,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.sendFogStack();
         this.sendCameraPresets();
 
+        if (this.canUseNetEaseModApi()) {
+            this.sendNetEaseLevelGravityReset();
+        }
+
         if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
                 try {
@@ -2724,6 +2730,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         CameraPresetsPacket pk = new CameraPresetsPacket();
         pk.getPresets().addAll(CameraPresetManager.getPresets().values());
+        this.dataPacket(pk);
+    }
+
+    /**
+     * 下发 SET_LEVEL_GRAVITY 消息（NeteaseJsonPacket），将客户端世界重力重置为原版默认 -0.08。
+     * <p>
+     * Sends a SET_LEVEL_GRAVITY message (NeteaseJsonPacket) resetting the client's
+     * level gravity to the vanilla default of -0.08 (negative pulls down).
+     */
+    private void sendNetEaseLevelGravityReset() {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("eventName", NeteaseJsonPacket.EVENT_SET_LEVEL_GRAVITY);
+        payload.addProperty("gravity", -0.08f);
+        NeteaseJsonPacket pk = new NeteaseJsonPacket();
+        pk.json = payload.toString();
         this.dataPacket(pk);
     }
 
