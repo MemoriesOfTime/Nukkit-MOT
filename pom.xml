@@ -46,6 +46,10 @@
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
         <netty.version>4.2.16.Final</netty.version>
         <maven.shade.skip>false</maven.shade.skip>
+        <!-- Воспроизводимая сборка: без фиксированного времени тот же исходник даёт другой jar,
+             потому что записям архива проставляется момент сборки. Мы сверяем ядро по SHA-256,
+             и плавающий хеш останавливал выкатку на каждой пересборке. -->
+        <project.build.outputTimestamp>2026-08-17T00:00:00Z</project.build.outputTimestamp>
     </properties>
 
     <distributionManagement>
@@ -741,6 +745,10 @@
                     <runOnlyOnce>true</runOnlyOnce>
                     <excludeProperties>
                         <excludeProperty>git.user.*</excludeProperty>
+                        <!-- Момент сборки делал jar разным при одном и том же исходнике, а ядро
+                             сверяется по SHA-256. Всё остальное здесь зависит только от коммита. -->
+                        <excludeProperty>git.build.time</excludeProperty>
+                        <excludeProperty>git.build.host</excludeProperty>
                     </excludeProperties>
                     <includeOnlyProperties>
                     </includeOnlyProperties>
