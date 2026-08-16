@@ -2711,7 +2711,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.entries = new Attribute[]{
                 Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getMaxHealth()).setValue(health > 0 ? (health < getMaxHealth() ? health : getMaxHealth()) : 0),
                 Attribute.getAttribute(Attribute.MAX_HUNGER).setValue(this.foodData.getLevel()).setDefaultValue(this.foodData.getMaxLevel()),
-                Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(this.getMovementSpeed()).setDefaultValue(this.getMovementSpeed()),
+                Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(this.speedToSend).setDefaultValue(this.getMovementSpeed()),
                 Attribute.getAttribute(Attribute.EXPERIENCE_LEVEL).setValue(this.expLevel),
                 Attribute.getAttribute(Attribute.EXPERIENCE).setValue(((float) this.exp) / calculateRequireExperience(this.expLevel))
         };
@@ -6906,7 +6906,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.sendData(this);
 
-        this.recalculateMovementSpeed();
+        this.setMovementSpeed(DEFAULT_SPEED);
 
         this.adventureSettings.update();
         this.inventory.sendContents(this);
@@ -7021,6 +7021,41 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.entries = new Attribute[]{attribute};
         pk.entityId = this.id;
         this.dataPacket(pk);
+    }
+
+    @Override
+    public void setMovementSpeed(float speed) {
+        setMovementSpeed(speed, true);
+    }
+
+    /**
+     * 设置玩家基础移动速度，修饰符（疾跑、药水等）叠加在该基础值之上。
+     * <p>
+     * Sets the player's base movement speed; modifiers (sprinting, effects, etc.) apply on top of it.
+     *
+     * @param speed 基础移动速度，默认为 {@link #DEFAULT_SPEED} / Base movement speed, defaults to {@link #DEFAULT_SPEED}
+     * @param send  是否向客户端发送更新后的速度属性 / Whether to send the updated speed attribute to the client
+     */
+    public void setMovementSpeed(float speed, boolean send) {
+        if (speed < 0) {
+            server.getLogger().debug("Invalid setMovementSpeed: " + speed);
+            return;
+        }
+        super.setMovementSpeed(speed);
+        this.speedToSend = this.recalculateMovementSpeedToSend();
+        if (this.spawned && send) {
+            this.sendMovementSpeed();
+        }
+    }
+
+    /**
+     * 仅重算发送给客户端的速度，不改动基础速度字段。
+     * <p>
+     * Recomputes the client-bound speed only, leaving the base speed field untouched.
+     */
+    @Override
+    public void recalculateMovementSpeed() {
+        this.speedToSend = this.recalculateMovementSpeedToSend();
     }
 
     public void sendMovementSpeed() {
@@ -9011,7 +9046,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public float recalculateMovementSpeedToSend() {
-        float newMovementSpeed = DEFAULT_SPEED;
+        float newMovementSpeed = this.getMovementSpeed();
         for (EntityMovementSpeedModifier modifier : this.getMovementSpeedModifiers().values()) {
             if (modifier.isSend()) {
                 float value = modifier.getValue();
