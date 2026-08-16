@@ -577,8 +577,10 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     this.player
             );
             if (!result.success()) {
-                log.warn("[{}] Failed to decode batch packet ({} bytes, prefixed, raknetProtocol={}, legacyFallback={})",
-                        this.playerLabel(), packetBuffer.length, this.channel.config().getProtocolVersion(),
+                log.warn("[{}] Failed to decode batch packet ({} bytes, prefixed, prefix=0x{}, compressionIn={}, raknetProtocol={}, legacyFallback={})",
+                        this.playerLabel(), packetBuffer.length,
+                        packetBuffer.length > 0 ? Integer.toHexString(packetBuffer[0] & 0xFF) : "-",
+                        this.compressionIn, this.channel.config().getProtocolVersion(),
                         this.state.getSecurity().isLegacyInboundGraceWindow());
                 return false;
             }
@@ -656,10 +658,20 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         return nowNanos - childChannelAcceptedNanos >= TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
     }
 
+    /**
+     * Whether one malformed batch justifies blocking the whole address for a minute.
+     *
+     * <p>The block exists to stop a flood that never becomes a player: something sends a login
+     * packet and then garbage. A session that already reached {@link SessionLoginPhase#LOGGED_IN}
+     * is a real player who passed login, resource packs and spawn, so a single undecodable batch
+     * from it is a bug on one of the two sides, not an attack. Blocking that address kicks the
+     * player and then keeps him out for sixty seconds, which reads as a ban he cannot explain.
+     */
     static boolean shouldBlockAddressAfterMalformed(SessionLoginPhase phase, InetAddress address) {
         return address != null
                 && !address.isSiteLocalAddress()
-                && phase.ordinal() >= SessionLoginPhase.LOGIN_RECEIVED.ordinal();
+                && phase.ordinal() >= SessionLoginPhase.LOGIN_RECEIVED.ordinal()
+                && phase.ordinal() < SessionLoginPhase.LOGGED_IN.ordinal();
     }
 
     record InboundBatchDecodeResult(boolean success, CompressionProvider compression, boolean prefixed, List<DataPacket> packets) {
