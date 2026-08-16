@@ -1387,6 +1387,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.spawned = true;
 
+        this.sendMovementSpeed();
+
         if (this.protocol < ProtocolInfo.v1_2_0) {
             this.sendAllInventories();
             this.inventory.sendHeldItemIfNotAir(this);
