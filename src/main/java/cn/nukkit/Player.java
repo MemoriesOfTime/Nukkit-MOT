@@ -3810,16 +3810,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
 
                 this.randomClientId = loginChainData.getClientId();
-
-                this.uuid = loginChainData.getClientUUID(verifiedName);
-                this.rawUUID = Binary.writeUUID(this.uuid);
                 this.minecraftId = loginChainData.getMinecraftId();
 
                 boolean valid = true;
                 String rawVerifiedName = loginChainData.getUsername();
-                int len = rawVerifiedName.length();
+                int len = rawVerifiedName == null ? 0 : rawVerifiedName.length();
                 if (((len > 16 || len < 3) && !gameVersion.isNetEase())
-                        || rawVerifiedName.trim().isEmpty()) {
+                        || rawVerifiedName == null || rawVerifiedName.trim().isEmpty()
+                        || verifiedName == null || verifiedName.isBlank()) {
                     valid = false;
                 }
 
@@ -3843,6 +3841,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.close("", "disconnectionScreen.invalidName");
                     break;
                 }
+
+                // 身份派生须在校验之后：名字清理后为空的登录已在上面被拒绝，派生异常才不会逃逸
+                // Identity derivation must follow validation: names that clean to empty were
+                // rejected above, so the derivation cannot throw past this point
+                this.uuid = loginChainData.getClientUUID(verifiedName);
+                this.rawUUID = Binary.writeUUID(this.uuid);
 
                 if (!loginPacket.skin.isValid()) {
                     this.close("", "disconnectionScreen.invalidSkin");

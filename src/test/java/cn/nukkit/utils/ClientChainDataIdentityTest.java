@@ -63,6 +63,15 @@ class ClientChainDataIdentityTest {
     }
 
     @Test
+    void offlineIdentityIgnoresTheNamesLetterCase() {
+        ClientChainData first = ClientChainData.of(selfSignedTokenLogin("Ranel2220", null, null));
+        ClientChainData second = ClientChainData.of(selfSignedTokenLogin("ranel2220", null, null));
+
+        assertEquals(first.getClientUUID(), second.getClientUUID(),
+                "letter case must not fork one name into two offline identities that evict each other");
+    }
+
+    @Test
     void offlineViaProxyIdentityUsesTheFinalPrefixedUsername() {
         ClientChainData data = ClientChainData.of(selfSignedTokenLogin("Steve", null, null,
                 Map.of("ViaProxyAuthToken", "proxy-token")));

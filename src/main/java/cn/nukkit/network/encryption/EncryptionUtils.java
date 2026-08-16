@@ -386,6 +386,12 @@ public class EncryptionUtils {
      * client generated UUID while the v1.21.90+ token carries none at all. Deriving from the
      * display name is the only value both login formats can agree on, and keeps the identity
      * stable when a player updates their client or reinstalls the game.
+     * <p>
+     * 名字大小写不区分玩家：按小写派生，与查找表键及按名存档路径的大小写约定一致，
+     * 否则同一名字的大小写变体会互踢并来回迁移数据。
+     * The name identifies the player case-insensitively: derive from the lowercase form to match
+     * the lookup table keys and name-keyed data paths, or case variants of one name would evict
+     * each other and ping-pong their data between identities.
      *
      * @param displayName player name reported by the client
      * @return identity UUID
@@ -395,7 +401,7 @@ public class EncryptionUtils {
         if (displayName == null || displayName.isBlank()) {
             throw new IllegalStateException("Unable to derive an identity: the login carries no XUID, no PlayFab id and no name");
         }
-        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + displayName).getBytes(StandardCharsets.UTF_8));
+        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + displayName.toLowerCase(Locale.ROOT)).getBytes(StandardCharsets.UTF_8));
     }
 
     public static byte[] verifyClientData(String clientDataJwt, String identityPublicKey)
