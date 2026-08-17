@@ -72,6 +72,7 @@ import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
 import cn.nukkit.network.protocol.netease.PyRpcPacket;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 import cn.nukkit.network.protocol.types.*;
@@ -102,6 +103,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -1385,6 +1387,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.spawned = true;
 
+        this.sendMovementSpeed();
+
         if (this.protocol < ProtocolInfo.v1_2_0) {
             this.sendAllInventories();
             this.inventory.sendHeldItemIfNotAir(this);
@@ -1419,6 +1423,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.sendFogStack();
         this.sendCameraPresets();
+
+        if (this.canUseNetEaseModApi()) {
+            this.sendNetEaseLevelGravityReset();
+        }
 
         if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
@@ -2705,7 +2713,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.entries = new Attribute[]{
                 Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getMaxHealth()).setValue(health > 0 ? (health < getMaxHealth() ? health : getMaxHealth()) : 0),
                 Attribute.getAttribute(Attribute.MAX_HUNGER).setValue(this.foodData.getLevel()).setDefaultValue(this.foodData.getMaxLevel()),
-                Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(this.getMovementSpeed()).setDefaultValue(this.getMovementSpeed()),
+                Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(this.speedToSend).setDefaultValue(this.getMovementSpeed()),
                 Attribute.getAttribute(Attribute.EXPERIENCE_LEVEL).setValue(this.expLevel),
                 Attribute.getAttribute(Attribute.EXPERIENCE).setValue(((float) this.exp) / calculateRequireExperience(this.expLevel))
         };
@@ -2724,6 +2732,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         CameraPresetsPacket pk = new CameraPresetsPacket();
         pk.getPresets().addAll(CameraPresetManager.getPresets().values());
+        this.dataPacket(pk);
+    }
+
+    /**
+     * 下发 SET_LEVEL_GRAVITY 消息（NeteaseJsonPacket），将客户端世界重力重置为原版默认 -0.08。
+     * <p>
+     * Sends a SET_LEVEL_GRAVITY message (NeteaseJsonPacket) resetting the client's
+     * level gravity to the vanilla default of -0.08 (negative pulls down).
+     */
+    private void sendNetEaseLevelGravityReset() {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("eventName", NeteaseJsonPacket.EVENT_SET_LEVEL_GRAVITY);
+        payload.addProperty("gravity", -0.08f);
+        NeteaseJsonPacket pk = new NeteaseJsonPacket();
+        pk.json = payload.toString();
         this.dataPacket(pk);
     }
 
@@ -6885,7 +6908,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.sendData(this);
 
-        this.recalculateMovementSpeed();
+        this.setMovementSpeed(DEFAULT_SPEED);
 
         this.adventureSettings.update();
         this.inventory.sendContents(this);
@@ -7002,8 +7025,43 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(pk);
     }
 
+    @Override
+    public void setMovementSpeed(float speed) {
+        setMovementSpeed(speed, true);
+    }
+
+    /**
+     * 设置玩家基础移动速度，修饰符（疾跑、药水等）叠加在该基础值之上。
+     * <p>
+     * Sets the player's base movement speed; modifiers (sprinting, effects, etc.) apply on top of it.
+     *
+     * @param speed 基础移动速度，默认为 {@link #DEFAULT_SPEED} / Base movement speed, defaults to {@link #DEFAULT_SPEED}
+     * @param send  是否向客户端发送更新后的速度属性 / Whether to send the updated speed attribute to the client
+     */
+    public void setMovementSpeed(float speed, boolean send) {
+        if (speed < 0 || !Float.isFinite(speed)) {
+            server.getLogger().debug("Invalid setMovementSpeed: " + speed);
+            return;
+        }
+        super.setMovementSpeed(speed);
+        this.speedToSend = this.recalculateMovementSpeedToSend();
+        if (this.spawned && send) {
+            this.sendMovementSpeed();
+        }
+    }
+
+    /**
+     * 仅重算发送给客户端的速度，不改动基础速度字段。
+     * <p>
+     * Recomputes the client-bound speed only, leaving the base speed field untouched.
+     */
+    @Override
+    public void recalculateMovementSpeed() {
+        this.speedToSend = this.recalculateMovementSpeedToSend();
+    }
+
     public void sendMovementSpeed() {
-        Attribute attribute = Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speedToSend);
+        Attribute attribute = Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speedToSend).setDefaultValue(this.getMovementSpeed());
         this.setAttribute(attribute);
     }
 
@@ -8990,7 +9048,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public float recalculateMovementSpeedToSend() {
-        float newMovementSpeed = DEFAULT_SPEED;
+        float newMovementSpeed = this.getMovementSpeed();
         for (EntityMovementSpeedModifier modifier : this.getMovementSpeedModifiers().values()) {
             if (modifier.isSend()) {
                 float value = modifier.getValue();
