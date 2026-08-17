@@ -176,6 +176,18 @@ class PlayerMovementSpeedTest {
     }
 
     @Test
+    void nonFiniteSpeedRejected() throws Exception {
+        // NaN 与 +Inf 通过 < 0 校验：NaN 原样发给客户端，+Inf 会让 sendAttributes 抛异常
+        // NaN and +Inf pass a < 0 check: NaN goes to the client raw, +Inf later throws in sendAttributes
+        player.setMovementSpeed(0.05f);
+        player.setMovementSpeed(Float.NaN);
+        player.setMovementSpeed(Float.POSITIVE_INFINITY);
+
+        assertEquals(0.05f, player.getMovementSpeed(), 1e-6f);
+        assertEquals(0.05f, getSpeedToSend(), 1e-6f);
+    }
+
+    @Test
     void sendMovementSpeedSendsDerivedValue() throws Exception {
         doCallRealMethod().when(player).sendMovementSpeed();
         doReturn(true).when(player).dataPacket(any(DataPacket.class));
@@ -192,6 +204,9 @@ class PlayerMovementSpeedTest {
         for (UpdateAttributesPacket packet : captor.getAllValues()) {
             Attribute sent = findMovementSpeedAttribute(packet);
             assertEquals(0.065f, sent.getValue(), 1e-6f);
+            // defaultValue 须为基础速度，与 sendAttributes 路径一致
+            // defaultValue must be the base speed, matching the sendAttributes path
+            assertEquals(0.05f, sent.getDefaultValue(), 1e-6f);
         }
     }
 

@@ -7039,7 +7039,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param send  是否向客户端发送更新后的速度属性 / Whether to send the updated speed attribute to the client
      */
     public void setMovementSpeed(float speed, boolean send) {
-        if (speed < 0) {
+        if (speed < 0 || !Float.isFinite(speed)) {
             server.getLogger().debug("Invalid setMovementSpeed: " + speed);
             return;
         }
@@ -7061,7 +7061,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void sendMovementSpeed() {
-        Attribute attribute = Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speedToSend);
+        Attribute attribute = Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speedToSend).setDefaultValue(this.getMovementSpeed());
         this.setAttribute(attribute);
     }
 
