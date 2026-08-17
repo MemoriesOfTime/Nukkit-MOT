@@ -17,7 +17,6 @@ public class PlayerDialogRespondedEvent extends PlayerEvent {
     protected FormResponseDialog response;
 
     public PlayerDialogRespondedEvent(Player player, FormWindowDialog dialog, FormResponseDialog response) {
-        this.player = player;
         this.dialog = dialog;
         this.response = response;
     }
