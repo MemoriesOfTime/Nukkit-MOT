@@ -1833,10 +1833,13 @@ public class BinaryStream {
                 // v2168 ingredient: VarUInt(type ordinal) + VarInt(aux=0) + VarInt(count)
                 this.putUnsignedVarInt(0); // ItemDescriptorType.INVALID ordinal
                 this.putVarInt(0);
+                this.putVarInt(item == null ? 0 : item.getCount());
             } else if (protocolId >= ProtocolInfo.v1_19_30_23) {
                 this.putByte((byte) 0); //ItemDescriptorType.INVALID
+                this.putVarInt(item == null ? 0 : item.getCount());
+            } else {
+                this.putVarInt(0);
             }
-            this.putVarInt(item == null ? 0 : item.getCount());
             return;
         }
 

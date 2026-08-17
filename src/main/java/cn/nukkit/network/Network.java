@@ -4,6 +4,7 @@ import cn.nukkit.*;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
+import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
 import cn.nukkit.network.protocol.netease.PyRpcPacket;
 import cn.nukkit.network.protocol.netease.SyncSkinPacket;
 import cn.nukkit.network.protocol.v113.*;
@@ -754,6 +755,7 @@ public class Network {
         this.packetPool137NetEase = this.packetPool137.toBuilder()
             .netEase(true)
             .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
+            .registerPacket(ProtocolInfo.NETEASE_JSON_PACKET, NeteaseJsonPacket.class)
             .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
             .build();
 
@@ -792,6 +794,7 @@ public class Network {
         this.packetPoolCurrentNetEase = this.packetPoolCurrent.toBuilder()
             .netEase(true)
             .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
+            .registerPacket(ProtocolInfo.NETEASE_JSON_PACKET, NeteaseJsonPacket.class)
             .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
             .registerPacket(ProtocolInfo.PACKET_SYNC_SKIN, SyncSkinPacket.class)
             .build();
