@@ -14,6 +14,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackRe
 import lombok.extern.log4j.Log4j2;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -108,6 +109,19 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         if (!validateAutoCraftingRecipe(player, recipe, recipeResult, times, consumedItems)) {
             return context.error();
         }
+
+        if (recipe instanceof CraftingRecipe multiOutput && !multiOutput.getExtraResults().isEmpty()) {
+            if (times != 1) {
+                log.debug("{}: rejected multi-output auto-craft with timesCrafted={}",
+                        player.getName(), times);
+                return context.error();
+            }
+            context.put(CreateActionProcessor.RECIPE_OUTPUTS_KEY,
+                    CraftRecipeActionProcessor.scaleItems(multiOutput.getAllResults(), times));
+            context.put(CreateActionProcessor.CREATED_SLOTS_KEY, new HashSet<>());
+            return context.success();
+        }
+
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
         if (recipe instanceof UserDataShapelessRecipe) {
