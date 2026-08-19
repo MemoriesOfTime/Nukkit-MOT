@@ -2526,10 +2526,21 @@ public class Server {
                     // Doing it like this ensures that the player data will be saved in a server shutdown
                     @Override
                     public void onCancel() {
-                        if (!this.hasRun) {
-                            this.hasRun = true;
-                            saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
-                            unregisterPendingSave(nameLower, this);
+                        // hasRun 的检查与置位必须在身份锁内：池线程置位后、取锁前的空窗里冲刷会空转，
+                        // 迁移移走文件后池线程恢复，把最新存档写回旧路径
+                        // The hasRun check-and-set must sit under the identity lock: in the pool
+                        // thread's flag-to-lock gap a flush no-ops, and the resumed thread then
+                        // writes the newest save to the path the migration already moved
+                        ReentrantLock saveLock = playerDataLock(nameLower);
+                        saveLock.lock();
+                        try {
+                            if (!this.hasRun) {
+                                this.hasRun = true;
+                                saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
+                                unregisterPendingSave(nameLower, this);
+                            }
+                        } finally {
+                            saveLock.unlock();
                         }
                     }
                 };

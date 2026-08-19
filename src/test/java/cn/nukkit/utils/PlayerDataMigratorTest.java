@@ -135,6 +135,35 @@ class PlayerDataMigratorTest {
     }
 
     @Test
+    void refusesToHandOutDataBehindServerDerivedIdentities(@TempDir Path playersDir) throws IOException {
+        // 旧条目无来源记录、旧存档无 XUID 标记，版本 3 UUID 是认证身份唯一的回溯特征
+        // A legacy entry carries no provenance and the save no marker: a v3 UUID is the only
+        // retroactive signal of an authenticated identity
+        UUID authedPrevious = UUID.nameUUIDFromBytes("pocket-auth-1-xuid:2535412345678901".getBytes(StandardCharsets.UTF_8));
+        writeData(playersDir, authedPrevious, "xbox-inventory");
+
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(playersDir.toFile(), authedPrevious, CURRENT));
+
+        assertFalse(Files.exists(dataFile(playersDir, CURRENT)));
+        assertEquals("xbox-inventory", readData(playersDir, authedPrevious),
+                "an authenticated account's legacy data stays where it is");
+    }
+
+    @Test
+    void refusesServerDerivedIdentitiesThroughCustomSerializer() {
+        UUID authedPrevious = UUID.nameUUIDFromBytes("pocket-auth-1-xuid:2535412345678901".getBytes(StandardCharsets.UTF_8));
+        MemoryPlayerDataSerializer serializer = new MemoryPlayerDataSerializer();
+        serializer.put(authedPrevious, "xbox-inventory");
+
+        assertEquals(PlayerDataMigrator.Result.SKIPPED,
+                PlayerDataMigrator.migrate(serializer, serializer, authedPrevious, CURRENT, false));
+
+        assertEquals("xbox-inventory", serializer.get(authedPrevious));
+        assertFalse(serializer.contains(CURRENT));
+    }
+
+    @Test
     void refusesToHandOutXboxAuthenticatedMarkerData(@TempDir Path playersDir) throws IOException {
         writeXuidData(playersDir, PREVIOUS, "xbox-account-inventory", "1234567890");
 
@@ -266,23 +295,67 @@ class PlayerDataMigratorTest {
     }
 
     @Test
-    void skipsUndeletableResidueTargetConservatively() {
+    void overwritesUndeletableResidueTargetThroughWrite() {
+        // 删不掉的残留不再保守跳过——那会让登录静默重置并遗弃源数据
+        // An undeletable residue is no longer skipped: that silently resets the player
+        // and abandons the source data
         MemoryPlayerDataSerializer previousSerializer = new MemoryPlayerDataSerializer();
         previousSerializer.put(PREVIOUS, "database-inventory");
-        PlayerDataSerializer undeletable = new PlayerDataSerializer() {
+        MemoryPlayerDataSerializer currentSerializer = new MemoryPlayerDataSerializer() {
+            @Override
+            public boolean delete(String name, UUID uuid) {
+                return false;
+            }
+        };
+        currentSerializer.putCorrupt(CURRENT);
+
+        assertEquals(PlayerDataMigrator.Result.MIGRATED,
+                PlayerDataMigrator.migrate(previousSerializer, currentSerializer, PREVIOUS, CURRENT, false));
+
+        assertEquals("database-inventory", currentSerializer.get(CURRENT));
+        assertEquals("database-inventory", previousSerializer.get(PREVIOUS));
+    }
+
+    @Test
+    void failsWhenTheResidueTargetCannotBeOverwrittenEither() {
+        MemoryPlayerDataSerializer previousSerializer = new MemoryPlayerDataSerializer();
+        previousSerializer.put(PREVIOUS, "database-inventory");
+        PlayerDataSerializer unoverwritable = new PlayerDataSerializer() {
             @Override
             public Optional<InputStream> read(String name, UUID uuid) {
                 return Optional.of(new ByteArrayInputStream("not-nbt".getBytes(StandardCharsets.UTF_8)));
             }
 
             @Override
-            public OutputStream write(String name, UUID uuid) {
-                throw new AssertionError("must not write over data it cannot inspect");
+            public OutputStream write(String name, UUID uuid) throws IOException {
+                throw new IOException("target exists and cannot be replaced");
             }
         };
 
-        assertEquals(PlayerDataMigrator.Result.SKIPPED,
-                PlayerDataMigrator.migrate(previousSerializer, undeletable, PREVIOUS, CURRENT, false));
+        assertEquals(PlayerDataMigrator.Result.FAILED,
+                PlayerDataMigrator.migrate(previousSerializer, unoverwritable, PREVIOUS, CURRENT, false));
+
+        assertEquals("database-inventory", previousSerializer.get(PREVIOUS), "a failed migration keeps the source");
+    }
+
+    @Test
+    void failsWhenTheFreshlyWrittenTargetDoesNotReadBack() {
+        MemoryPlayerDataSerializer previousSerializer = new MemoryPlayerDataSerializer();
+        previousSerializer.put(PREVIOUS, "database-inventory");
+        PlayerDataSerializer lying = new PlayerDataSerializer() {
+            @Override
+            public Optional<InputStream> read(String name, UUID uuid) {
+                return Optional.of(new ByteArrayInputStream("garbage".getBytes(StandardCharsets.UTF_8)));
+            }
+
+            @Override
+            public OutputStream write(String name, UUID uuid) {
+                return new ByteArrayOutputStream(); // 写入被丢弃，回读到垃圾
+            }
+        };
+
+        assertEquals(PlayerDataMigrator.Result.FAILED,
+                PlayerDataMigrator.migrate(previousSerializer, lying, PREVIOUS, CURRENT, false));
 
         assertEquals("database-inventory", previousSerializer.get(PREVIOUS));
     }
@@ -413,7 +486,7 @@ class PlayerDataMigratorTest {
         return playersDir.resolve(uuid + ".dat");
     }
 
-    private static final class MemoryPlayerDataSerializer implements PlayerDataSerializer {
+    private static class MemoryPlayerDataSerializer implements PlayerDataSerializer {
         private final Map<String, byte[]> data = new HashMap<>();
 
         void put(UUID uuid, String marker) {

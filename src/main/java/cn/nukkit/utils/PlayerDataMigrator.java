@@ -5,11 +5,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.StringTag;
 import lombok.extern.log4j.Log4j2;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.ByteOrder;
 import java.nio.file.*;
 import java.util.Optional;
@@ -97,6 +93,10 @@ public final class PlayerDataMigrator {
             log.warn("Not migrating player data from {}: that identity was shared by every unauthenticated player", previous);
             return Result.SKIPPED;
         }
+        if (isAuthenticatedAccountIdentity(previous)) {
+            log.warn("Not migrating player data from {}: that identity was derived for an authenticated account", previous);
+            return Result.SKIPPED;
+        }
         if (previousSerializer == currentSerializer
                 && previousSerializer instanceof DefaultPlayerDataSerializer defaultSerializer) {
             return migrate(defaultSerializer.getPlayersDirectory(), previous, current);
@@ -105,12 +105,14 @@ public final class PlayerDataMigrator {
         String previousName = previous.toString();
         String currentName = current.toString();
         switch (inspectTarget(currentSerializer, currentName, current)) {
-            case HAS_DATA, UNDELETABLE_RESIDUE -> {
+            case HAS_DATA -> {
                 return Result.SKIPPED;
             }
             case INSPECT_FAILED -> {
                 return Result.FAILED;
             }
+            // 删不掉的残留由随后的写入直接覆盖
+            // An undeletable residue is simply overwritten by the write below
             default -> {
             }
         }
@@ -134,6 +136,11 @@ public final class PlayerDataMigrator {
 
             try (OutputStream output = currentSerializer.write(currentName, current)) {
                 NBTIO.writeGZIPCompressed(tag, output, ByteOrder.BIG_ENDIAN);
+            }
+            if (!isParseableThroughSerializer(currentSerializer, currentName, current)) {
+                log.warn("Not migrating player data from {}: the freshly written target does not read back", previous);
+                deletePartialTarget(currentSerializer, currentName, current);
+                return Result.FAILED;
             }
             log.info("Migrated player data from {} to {} through {}", previous, current,
                     currentSerializer.getClass().getSimpleName());
@@ -162,6 +169,10 @@ public final class PlayerDataMigrator {
         }
         if (COLLAPSED_IDENTITIES.contains(previous)) {
             log.warn("Not migrating player data from {}: that file was shared by every unauthenticated player", previous);
+            return Result.SKIPPED;
+        }
+        if (isAuthenticatedAccountIdentity(previous)) {
+            log.warn("Not migrating player data from {}: that identity was derived for an authenticated account", previous);
             return Result.SKIPPED;
         }
 
@@ -214,10 +225,10 @@ public final class PlayerDataMigrator {
     }
 
     /**
-     * 校验目标存储状态：有效数据不覆盖；无法解析视为失败迁移残留，经删除契约清理，清不掉则保守跳过。
+     * 校验目标存储状态：有效数据不覆盖；无法解析视为失败迁移残留，经删除契约清理，清不掉的由后续写入覆盖。
      * <p>
      * Inspects the target: genuine data is kept; unparseable data is failed-migration residue,
-     * deleted through the serializer's contract or skipped conservatively when undeletable.
+     * deleted through the serializer's contract, and overwritten by the write when undeletable.
      */
     private static TargetState inspectTarget(PlayerDataSerializer serializer, String name, UUID uuid) {
         Optional<InputStream> existing;
@@ -242,8 +253,47 @@ public final class PlayerDataMigrator {
                 log.error("Failed to delete corrupt player data migration target {}", uuid, deleteEx);
                 return TargetState.UNDELETABLE_RESIDUE;
             }
-            log.error("Corrupt player data migration target {} cannot be deleted; skipping migration", uuid);
+            log.error("Corrupt player data migration target {} cannot be deleted; the migration write must overwrite it", uuid);
             return TargetState.UNDELETABLE_RESIDUE;
+        }
+    }
+
+    /**
+     * 认证派生身份（XUID/PlayFab id/塌缩值）恒为 nameUUIDFromBytes 产物（v3），离线客户端上报的为 v4；
+     * 旧存档无 XUID 标记、旧条目无来源记录，版本位是识别认证账户数据的回溯依据。
+     * <p>
+     * Claim-derived identities (XUID/PlayFab id/collapsed) are nameUUIDFromBytes (v3) UUIDs
+     * while client-reported offline ones are v4; with legacy saves carrying no marker, the
+     * version nibble is the retroactive signal of authenticated-account data.
+     */
+    private static boolean isAuthenticatedAccountIdentity(UUID uuid) {
+        return uuid.version() == 3;
+    }
+
+    /**
+     * 回读校验：写入的目标必须可解析，否则下次登录会当作损坏数据静默重置；读到空或读取失败只
+     * 告警放行，避免把异步落盘型实现变成长期无法登录。
+     * <p>
+     * Read-back check: the written target must parse or the next login silently resets on it;
+     * an empty or failing read only warns so async-durable implementations stay usable.
+     */
+    private static boolean isParseableThroughSerializer(PlayerDataSerializer serializer, String name, UUID uuid) {
+        Optional<InputStream> written;
+        try {
+            written = serializer.read(name, uuid);
+        } catch (IOException | RuntimeException e) {
+            log.warn("Cannot verify the freshly written player data of {}: {}", uuid, e.toString());
+            return true;
+        }
+        if (written.isEmpty()) {
+            log.warn("Cannot verify the freshly written player data of {}: the serializer reports none", uuid);
+            return true;
+        }
+        try (InputStream input = written.get()) {
+            NBTIO.readCompressed(input);
+            return true;
+        } catch (IOException | RuntimeException e) {
+            return false;
         }
     }
 
