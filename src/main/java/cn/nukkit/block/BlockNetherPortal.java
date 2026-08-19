@@ -424,7 +424,43 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
         lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
 
+        sealPortalSite(lvl, spawned.getFloorX(), spawned.getFloorY(), spawned.getFloorZ());
+
         return spawned;
+    }
+
+    /**
+     * Makes the ground a fresh frame stands on safe to arrive at.
+     *
+     * <p>The frame itself is only two obsidian blocks wide, so a player coming through steps off
+     * it right away. Over a lava sea, a cave mouth or a cliff that step is a fall, and the frame
+     * may have been carved out of lava that flows straight back in. So the floor under the whole
+     * cleared box is laid solid and the lava touching it is replaced with plain rock.
+     */
+    private static void sealPortalSite(Level level, int x, int y, int z) {
+        for (int xx = -1; xx < 4; xx++) {
+            for (int zz = -1; zz < 3; zz++) {
+                if (!isSolidAt(level, x + xx, y, z + zz)) {
+                    level.setBlockAt(x + xx, y, z + zz, OBSIDIAN);
+                }
+            }
+        }
+
+        // Liquid on the outside of the box turns into rock, liquid inside it into air: draining
+        // the inside alone leaves the sea around it to flow straight back into the frame.
+        int filler = level.getDimension() == Level.DIMENSION_NETHER ? NETHERRACK : STONE;
+        for (int xx = -2; xx < 5; xx++) {
+            for (int zz = -2; zz < 4; zz++) {
+                for (int yy = 0; yy <= 5; yy++) {
+                    int id = level.getBlockIdAt(x + xx, y + yy, z + zz);
+                    if (!Block.isLava(id) && !Block.isWater(id)) {
+                        continue;
+                    }
+                    boolean shell = xx == -2 || xx == 4 || zz == -2 || zz == 3 || yy == 0 || yy == 5;
+                    level.setBlockAt(x + xx, y + yy, z + zz, shell ? filler : AIR);
+                }
+            }
+        }
     }
 
     /**
@@ -467,11 +503,26 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
             return false;
         }
         for (int yy = 1; yy <= 4; yy++) {
-            if (isSolidAt(level, x + 1, y + yy, z + 1) || isSolidAt(level, x + 2, y + yy, z + 1)) {
+            if (isBlockedAt(level, x + 1, y + yy, z + 1) || isBlockedAt(level, x + 2, y + yy, z + 1)) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Whether the given cell keeps a portal frame from standing here.
+     *
+     * <p>Lava counts, and that is the whole point of this method: it is not a footing and it is
+     * not free room either. Treating it as free room is what built frames inside the lava seas of
+     * the nether, so a player stepping through arrived standing in lava.
+     */
+    private static boolean isBlockedAt(Level level, int x, int y, int z) {
+        int id = level.getBlockIdAt(x, y, z);
+        if (id == AIR || id == NETHER_PORTAL) {
+            return false;
+        }
+        return Block.isBlockSolidById(id) || Block.isLava(id) || Block.isWater(id);
     }
 
     private static boolean isSolidAt(Level level, int x, int y, int z) {
