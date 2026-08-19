@@ -136,6 +136,18 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (recipe instanceof CraftingRecipe craftingRecipe && !validateCraftingConsumePlan(player, craftingRecipe, times, context)) {
             return context.error();
         }
+
+        if (recipe instanceof CraftingRecipe multiOutput && !multiOutput.getExtraResults().isEmpty()) {
+            if (times != 1) {
+                log.debug("{}: rejected multi-output craft with numberOfRequestedCrafts={}",
+                        player.getName(), times);
+                return context.error();
+            }
+            context.put(CreateActionProcessor.RECIPE_OUTPUTS_KEY, scaleItems(multiOutput.getAllResults(), times));
+            context.put(CreateActionProcessor.CREATED_SLOTS_KEY, new HashSet<>());
+            return context.success();
+        }
+
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
         if (recipe instanceof UserDataShapelessRecipe) {

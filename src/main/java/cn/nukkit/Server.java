@@ -3973,7 +3973,7 @@ public class Server {
         this.enableExperimentMode = config.gameFeatureSettings().enableExperimentMode();
         this.minimumProtocol = config.gameFeatureSettings().multiversionMinProtocol();
         int maxProto = config.gameFeatureSettings().multiversionMaxProtocol();
-        this.maximumProtocol = maxProto == -1 ? ProtocolInfo.CURRENT_PROTOCOL : maxProto;
+        this.maximumProtocol = maxProto == -1 ? GameVersion.getLastVersion().getProtocol() : maxProto;
         this.enableRawOres = config.gameFeatureSettings().enableRawOres();
         this.enableNewPaintings = config.gameFeatureSettings().enableNewPaintings();
         this.enableNewChickenEggsLaying = config.gameFeatureSettings().enableNewChickenEggsLaying();
