@@ -72,7 +72,8 @@ public class TradeInventory extends BaseInventory {
         // Return input slots, dropping the unplaced remainder so it isn't lost.
         for (int i = 0; i <= 1; i++) {
             Item item = this.getItem(i);
-            if (item.isNull()) {
+            if (item.isNull() || who.isCreative()) {
+                this.clear(i);
                 continue;
             }
             Item[] drops = who.getInventory().addItem(item);

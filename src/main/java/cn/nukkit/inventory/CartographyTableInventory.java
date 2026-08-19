@@ -26,7 +26,8 @@ public class CartographyTableInventory extends FakeBlockUIComponent {
 
         for (int i = 0; i < 2; i++) {
             Item item = this.getItem(i);
-            if (item.isNull()) {
+            if (item.isNull() || who.isCreative()) {
+                this.clear(i);
                 continue;
             }
             Item[] drops = who.getInventory().addItem(item);
