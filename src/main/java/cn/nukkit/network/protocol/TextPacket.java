@@ -2,12 +2,24 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
 import cn.nukkit.api.OnlyNetEase;
+import cn.nukkit.utils.TextFormat;
 import lombok.ToString;
 
 @ToString
 public class TextPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.TEXT_PACKET;
+
+    /**
+     * protocol-docs（TextPacket + TextPacketPayload）约束的字符串字符/code point 上限，解码时强制校验以拒绝超长伪造数据包。
+     * <p>
+     * protocol-docs character / code-point ceilings, enforced on inbound decode to reject forged over-length packets.
+     */
+    private static final int MAX_MESSAGE_CHARS = 65536;
+    private static final int MAX_SOURCE_CHARS = 256;
+    private static final int MAX_XUID_CHARS = 64;
+    private static final int MAX_PLATFORM_CHAT_ID_CHARS = 256;
+    private static final int MAX_PARAMETERS = 4;
 
     @Override
     public byte pid() {
@@ -54,30 +66,33 @@ public class TextPacket extends DataPacket {
             switch (this.getByte()) {
                 case 0: // MessageOnly
                     this.type = (byte) getByte();
-                    this.message = this.getString();
+                    this.message = this.getString(MAX_MESSAGE_CHARS);
                     break;
                 case 1: // AuthorAndMessage
                     this.type = (byte) getByte();
-                    this.source = this.getString();
-                    this.message = this.getString();
+                    this.source = this.getString(MAX_SOURCE_CHARS);
+                    this.message = this.getString(MAX_MESSAGE_CHARS);
                     break;
                 case 2: // MessageAndParams
                     this.type = (byte) getByte();
-                    this.message = this.getString();
+                    this.message = this.getString(MAX_MESSAGE_CHARS);
                     int paramCount = (int) this.getUnsignedVarInt();
-                    this.parameters = new String[Math.min(paramCount, 128)];
+                    if (paramCount > MAX_PARAMETERS) {
+                        throw new IllegalArgumentException("Parameter List maxItems is " + MAX_PARAMETERS);
+                    }
+                    this.parameters = new String[paramCount];
                     for (int i = 0; i < this.parameters.length; i++) {
-                        this.parameters[i] = this.getString();
+                        this.parameters[i] = this.getString(MAX_MESSAGE_CHARS);
                     }
                     break;
                 default:
                     throw new IllegalArgumentException("Not oneOf<MessageOnly, AuthorAndMessage, MessageAndParams>");
             }
 
-            this.xboxUserId = this.getString();
-            this.platformChatId = this.getString();
+            this.xboxUserId = this.getString(MAX_XUID_CHARS);
+            this.platformChatId = this.getString(MAX_PLATFORM_CHAT_ID_CHARS);
             if (this.getBoolean()) {
-                this.filteredMessage = this.getString();
+                this.filteredMessage = this.getString(MAX_MESSAGE_CHARS);
             }
         } else if (this.protocol >= ProtocolInfo.v1_21_130_28) {
             // v898 format
@@ -89,39 +104,39 @@ public class TextPacket extends DataPacket {
                         this.getString();
                     }
                     this.type = (byte) getByte();
-                    this.message = this.getString();
+                    this.message = this.getString(MAX_MESSAGE_CHARS);
                     break;
                 case 1: // AuthorAndMessage
                     for (int i = 0; i < 3; i++) {
                         this.getString();
                     }
                     this.type = (byte) getByte();
-                    this.source = this.getString();
-                    this.message = this.getString();
+                    this.source = this.getString(MAX_SOURCE_CHARS);
+                    this.message = this.getString(MAX_MESSAGE_CHARS);
                     break;
                 case 2: // MessageAndParams
                     for (int i = 0; i < 3; i++) {
                         this.getString();
                     }
                     this.type = (byte) getByte();
-                    this.message = this.getString();
+                    this.message = this.getString(MAX_MESSAGE_CHARS);
                     int paramCount = (int) this.getUnsignedVarInt();
-                    if (paramCount > 4) {
-                        throw new IllegalArgumentException("Parameter List maxItems is 4");
+                    if (paramCount > MAX_PARAMETERS) {
+                        throw new IllegalArgumentException("Parameter List maxItems is " + MAX_PARAMETERS);
                     }
                     this.parameters = new String[paramCount];
                     for (int i = 0; i < this.parameters.length; i++) {
-                        this.parameters[i] = this.getString();
+                        this.parameters[i] = this.getString(MAX_MESSAGE_CHARS);
                     }
                     break;
                 default:
                     throw new IllegalArgumentException("Not oneOf<MessageOnly, AuthorAndMessage, MessageAndParams>");
             }
 
-            this.xboxUserId = this.getString();
-            this.platformChatId = this.getString();
+            this.xboxUserId = this.getString(MAX_XUID_CHARS);
+            this.platformChatId = this.getString(MAX_PLATFORM_CHAT_ID_CHARS);
             if (this.getBoolean()) {
-                this.filteredMessage = this.getString();
+                this.filteredMessage = this.getString(MAX_MESSAGE_CHARS);
             }
         } else {
             // Legacy format
@@ -135,7 +150,7 @@ public class TextPacket extends DataPacket {
                 case TYPE_CHAT:
                 case TYPE_WHISPER:
                 case TYPE_ANNOUNCEMENT:
-                    this.source = this.getString();
+                    this.source = this.getString(MAX_SOURCE_CHARS);
                     if (protocol > 201 && protocol <= 282) {
                         this.getString();
                         this.getVarInt();
@@ -146,25 +161,28 @@ public class TextPacket extends DataPacket {
                 case TYPE_OBJECT:
                 case TYPE_OBJECT_WHISPER:
                 case TYPE_OBJECT_ANNOUNCEMENT:
-                    this.message = this.getString();
+                    this.message = this.getString(MAX_MESSAGE_CHARS);
                     break;
 
                 case TYPE_TRANSLATION:
                 case TYPE_POPUP:
                 case TYPE_JUKEBOX_POPUP:
-                    this.message = this.getString();
+                    this.message = this.getString(MAX_MESSAGE_CHARS);
                     int count = (int) this.getUnsignedVarInt();
-                    this.parameters = new String[Math.min(count, 128)];
+                    if (count > MAX_PARAMETERS) {
+                        throw new IllegalArgumentException("Parameter List maxItems is " + MAX_PARAMETERS);
+                    }
+                    this.parameters = new String[count];
                     for (int i = 0; i < this.parameters.length; i++) {
-                        this.parameters[i] = this.getString();
+                        this.parameters[i] = this.getString(MAX_MESSAGE_CHARS);
                     }
             }
 
             if (protocol >= 223) {
-                this.xboxUserId = this.getString();
-                this.platformChatId = this.getString();
+                this.xboxUserId = this.getString(MAX_XUID_CHARS);
+                this.platformChatId = this.getString(MAX_PLATFORM_CHAT_ID_CHARS);
                 if (protocol >= ProtocolInfo.v1_21_0) {
-                    this.filteredMessage = this.getString();
+                    this.filteredMessage = this.getString(MAX_MESSAGE_CHARS);
                 }
             }
         }
@@ -180,6 +198,9 @@ public class TextPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        this.message = TextFormat.clamp(this.message, MAX_MESSAGE_CHARS);
+        this.source = TextFormat.clamp(this.source, MAX_SOURCE_CHARS);
+        this.filteredMessage = TextFormat.clamp(this.filteredMessage, MAX_MESSAGE_CHARS);
 
         if (this.protocol >= ProtocolInfo.v1_26_0) {
             // v924 format

@@ -117,7 +117,7 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable, BlockEntity
 
         BlockEntityBarrel barrel = (BlockEntityBarrel) blockEntity;
 
-        if (barrel.namedTag.contains("Lock") && barrel.namedTag.get("Lock") instanceof StringTag) {
+        if (barrel.namedTag.get("Lock") instanceof StringTag) {
             if (!barrel.namedTag.getString("Lock").equals(item.getCustomName())) {
                 return true;
             }

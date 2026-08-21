@@ -706,8 +706,14 @@ public class LevelDBChunkSection implements ChunkSection {
 
             int layers = this.hasLayer(1) ? 2 : 1;
 
-            stream.putByte((byte) 8);
-            stream.putByte((byte) layers);
+            if (gameVersion.getProtocol() >= ProtocolInfo.v1_19_80) {
+                stream.putByte((byte) 9);
+                stream.putByte((byte) layers);
+                stream.putByte((byte) this.y);
+            } else {
+                stream.putByte((byte) 8);
+                stream.putByte((byte) layers);
+            }
 
             for (int i = 0; i < layers; i++) {
                 this.storages[i].writeTo(gameVersion, stream, antiXray);

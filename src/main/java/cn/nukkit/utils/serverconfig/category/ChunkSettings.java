@@ -48,7 +48,11 @@ public class ChunkSettings extends OkaeriConfig {
     @CustomKey("cache-chunks")
     private boolean cacheChunks = false;
 
-    @Comment("Use async chunk loading")
+    @Comment("Use async chunk loading, sending and saving")
     @CustomKey("async-chunks")
     private boolean asyncChunks = true;
+
+    @Comment("Max pending chunk writes per world before unloading pauses (backpressure)")
+    @CustomKey("max-pending-chunk-writes")
+    private int maxPendingChunkWrites = 128;
 }

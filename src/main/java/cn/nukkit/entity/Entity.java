@@ -425,6 +425,10 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v975 1.26.20
      */
     public static final int DATA_FLAG_NAMEPLATE_DEPTH_TESTED = 129;
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int DATA_FLAG_NOT_PICKABLE_FROM_INSIDE = 130;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
@@ -1085,9 +1089,14 @@ public abstract class Entity extends Location implements Metadatable {
             return;
         }
 
-        if (cause != null) {
-            Effect oldEffect = this.effects.get(effect.getId());
+        Effect oldEffect = this.effects.get(effect.getId());
 
+        if (oldEffect != null && (oldEffect.getAmplifier() > effect.getAmplifier()
+            || (oldEffect.getAmplifier() == effect.getAmplifier() && oldEffect.getDuration() >= effect.getDuration()))) {
+            return;
+        }
+
+        if (cause != null) {
             EntityPotionEffectEvent event = new EntityPotionEffectEvent(
                     this,
                     oldEffect,
@@ -1727,7 +1736,11 @@ public abstract class Entity extends Location implements Metadatable {
                 && !source.isApplicable(EntityDamageEvent.DamageModifier.CRITICAL)
                 && damageByEntityEvent.getDamager() instanceof Player damager
                 && canCriticalHit(damager)) {
-            source.setDamage(getDamageBeforeTargetReductions(source) * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
+            // vanilla: 暴击基数取护甲前伤害(护甲同时减免暴击);legacy: 取护甲后伤害(5306387d1^ 之前行为)
+            float base = Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction()
+                    ? getDamageBeforeTargetReductions(source)
+                    : source.getFinalDamage();
+            source.setDamage(base * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
         }
     }
 
@@ -1759,7 +1772,8 @@ public abstract class Entity extends Location implements Metadatable {
             return false;
         }
 
-        if (!(this instanceof EntityHumanType)) {
+        // legacy 不重算抗性(保持 ctor 预算值)
+        if (!(this instanceof EntityHumanType) && Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction()) {
             this.recalculateResistanceDamage(source);
         }
 
@@ -2473,7 +2487,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setAbsorption(float absorption) {
-        if (absorption != this.absorption) {
+        if (absorption != this.absorption || (this instanceof Player player && player.protocol >= ProtocolInfo.v1_21_60)) {
             this.absorption = absorption;
             if (this instanceof Player player) player.setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
         }
@@ -3661,7 +3675,7 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if(Objects.equals(property.getIdentifier(), identifier) && property instanceof EnumEntityProperty enumEntityProperty) {
+            if(property instanceof EnumEntityProperty enumEntityProperty && Objects.equals(property.getIdentifier(), identifier)) {
                 int index = enumEntityProperty.findIndex(value);
 
                 if(index >= 0) {
@@ -3678,11 +3692,16 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if (!identifier.equals(property.getIdentifier()) ||
-                    !(property instanceof EnumEntityProperty enumProperty)) {
+            if (!(property instanceof EnumEntityProperty enumProperty) ||
+                    !identifier.equals(property.getIdentifier())) {
                 continue;
             }
-            return enumProperty.getEnums()[intProperties.get(identifier)];
+            String[] values = enumProperty.getEnums();
+            Integer index = intProperties.get(identifier);
+            if (index == null || index < 0 || index >= values.length) {
+                return enumProperty.getDefaultValue();
+            }
+            return values[index];
         }
         return null;
     }

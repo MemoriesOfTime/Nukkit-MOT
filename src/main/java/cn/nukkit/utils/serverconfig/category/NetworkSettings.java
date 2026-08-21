@@ -6,7 +6,6 @@ import eu.okaeri.configs.annotation.CustomKey;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
-import org.cloudburstmc.netty.channel.raknet.RakConstants;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,9 +35,9 @@ public class NetworkSettings extends OkaeriConfig {
     @CustomKey("use-snappy-compression")
     private boolean useSnappyCompression = false;
 
-    @Comment("RakNet packet limit per tick")
+    @Comment("Max RakNet packets per 10ms per IP")
     @CustomKey("rak-packet-limit")
-    private int rakPacketLimit = RakConstants.DEFAULT_PACKET_LIMIT;
+    private int rakPacketLimit = 2000;
 
     @Comment("RakNet cookie mode (active, offloaded, offloaded_psk, off, none, stateless)")
     @CustomKey("rak-cookie-mode")

@@ -1,0 +1,15 @@
+# 资源包配置（以 pack UUID 为键）
+# Resource pack configuration (keyed by pack UUID)
+#
+# 可用选项 / Available options:
+#   cdn: 该资源包的 CDN 下载地址。客户端会优先从该地址下载资源包，
+#        失败时自动降级为服务器分块传输。
+#        The CDN URL for this pack. The client will try downloading from here first,
+#        falling back to server-side chunk transfer on failure.
+#   key: 资源包加密密钥。留空表示不加密。
+#        The encryption key for this pack. Leave empty for no encryption.
+#
+#示例 / Example:
+#"00000000-0000-0000-0000-000000000000":
+#  cdn: "https://cdn.example.com/00000000-0000-0000-0000-000000000000/0.0.1.mcpack"
+#  key: "0123456789abcdefGHIJKLMNOPQRSTUV"

@@ -67,7 +67,11 @@ public enum PlayerActionType {
     /**
      * @since v748
      */
-    START_USING_ITEM
+    START_USING_ITEM,
+    /**
+     * @since v2168 (1.26.40)
+     */
+    INTERNAL_UPDATE
     ;
 
     private static final PlayerActionType[] VALUES = values();

@@ -124,6 +124,27 @@ public class NBTIO {
     }
 
     /**
+     * Reads a compound tag with safe allocation enabled on the underlying stream.
+     * Use this for untrusted (network) NBT payloads so that oversized length/size
+     * values use growing backed lists instead of pre-allocating a single large array.
+     *
+     * @see NBTInputStream#readSafely()
+     */
+    public static CompoundTag readSafely(InputStream inputStream, ByteOrder endianness, boolean network) throws IOException {
+        try (NBTInputStream stream = new NBTInputStream(inputStream, endianness, network).readSafely()) {
+            Tag tag = Tag.readNamedTag(stream);
+            if (tag instanceof CompoundTag) {
+                return (CompoundTag) tag;
+            }
+            throw new IOException("Root tag must be a named compound tag");
+        }
+    }
+
+    public static CompoundTag readSafely(InputStream inputStream, ByteOrder endianness) throws IOException {
+        return readSafely(inputStream, endianness, false);
+    }
+
+    /**
      * Reads a headerless tag value (no leading type id / name), the counterpart of
      * {@link #writeValue(Tag, ByteOrder, boolean)}. Used by {@code LevelEventGenericPacket}.
      * Adapted from PowerNukkitX.

@@ -75,6 +75,7 @@ public class CraftingManager {
     private static BatchPacket packet944;
     private static BatchPacket packet975;
     private static BatchPacket packet1001;
+    private static BatchPacket packet2168;
 
     private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
@@ -90,6 +91,7 @@ public class CraftingManager {
 
     public final Map<Integer, FurnaceRecipe> furnaceRecipes = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, BlastFurnaceRecipe> blastFurnaceRecipes = new Int2ObjectOpenHashMap<>();
+    private final Map<Integer, SmokerRecipe> smokerRecipes = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, BrewingRecipe> brewingRecipes = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, ContainerRecipe> containerRecipes = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, CampfireRecipe> campfireRecipes = new Int2ObjectOpenHashMap<>();
@@ -143,7 +145,7 @@ public class CraftingManager {
         this.registerMultiRecipe(new DecoratedPotRecipe());
 
         Map<String, Object> root = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes.json")).getRootSection();
-        RuntimeItemMapping itemMapping = RuntimeItems.getMapping(GameVersion.getLastVersion());
+        RuntimeItemMapping itemMapping = selectRecipeItemMapping(root);
         Config furnaceXpConfig = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/furnace_xp.json"));
 
         for (Map recipe : (List<Map>) root.get("recipes")) {
@@ -164,7 +166,8 @@ public class CraftingManager {
                         break;
                     case 4: // multi (hardcoded)
                         break;
-                    case 5: // shulker_box
+                    case 5: // shulker_box (UserDataShapelessRecipe): shapeless 结构，但需保留输入 NBT
+                        loadUserDataShapelessRecipe(itemMapping, recipe);
                         break;
                 }
             } catch (Exception e) {
@@ -264,6 +267,20 @@ public class CraftingManager {
         MainLogger.getLogger().debug("Loaded " + this.recipes.size() + " recipes, " + this.stonecutterRecipes.size() + " stonecutter recipes");
     }
 
+    /**
+     * 根据 recipes.json 的 version 字段（dump 时的协议号）选择调色板映射
+     * Picks the runtime item mapping from the protocol version recorded in recipes.json
+     *
+     * @param root recipes.json 根节点 / recipes.json root section
+     * @return 匹配的映射 / the matched mapping
+     */
+    private static RuntimeItemMapping selectRecipeItemMapping(Map<String, Object> root) {
+        if (root.get("version") instanceof Number version && version.intValue() >= 0) {
+            return RuntimeItems.getMapping(GameVersion.byProtocol(version.intValue(), false));
+        }
+        return RuntimeItems.getMapping(GameVersion.getLastVersion());
+    }
+
     @SuppressWarnings("unchecked")
     private void loadShapelessRecipe(RuntimeItemMapping itemMapping, Map recipe) {
         if (!"crafting_table".equals(recipe.get("block"))) {
@@ -319,6 +336,42 @@ public class CraftingManager {
                 this.registerRecipe(new ShapelessRecipe(null, 0, outputItem, sorted));
             }
         }
+    }
+
+    /**
+     * Loads "shulker_box" (type 5) recipes, wrapped in {@link UserDataShapelessRecipe} to preserve input NBT.
+     */
+    @SuppressWarnings("unchecked")
+    private void loadUserDataShapelessRecipe(RuntimeItemMapping itemMapping, Map recipe) {
+        if (!"crafting_table".equals(recipe.get("block"))) {
+            return;
+        }
+
+        Map outputMap = (Map) ((List) recipe.get("output")).get(0);
+        Item outputItem = loadRecipeOutputItem(itemMapping, outputMap);
+        if (outputItem == null || outputItem.isNull()) {
+            log.trace("Unknown shulker_box recipe output: {}", recipe);
+            return;
+        }
+
+        List<Map> input = (List<Map>) recipe.get("input");
+        List<Item> sorted = new ArrayList<>();
+        for (Map<String, Object> ingredient : input) {
+            if (!"default".equals(ingredient.get("type"))) {
+                log.trace("Unsupported shulker_box ingredient type: {}", recipe);
+                return;
+            }
+            Item inputItem = loadRecipeIngredientItem(itemMapping, ingredient);
+            if (inputItem == null || inputItem.isNull()) {
+                log.trace("Unknown shulker_box input: {}", recipe);
+                return;
+            }
+            sorted.add(inputItem);
+        }
+        sorted.sort(recipeComparator);
+
+        int priority = (int) recipe.getOrDefault("priority", 0);
+        this.registerRecipe(new UserDataShapelessRecipe((String) recipe.get("id"), priority, outputItem, sorted));
     }
 
     @SuppressWarnings("unchecked")
@@ -545,7 +598,7 @@ public class CraftingManager {
     @SuppressWarnings("unchecked")
     private void loadSmeltingRecipe(RuntimeItemMapping itemMapping, Map recipe, Config furnaceXpConfig) {
         String smeltingBlock = (String) recipe.get("block");
-        if (!"furnace".equals(smeltingBlock) && !"blast_furnace".equals(smeltingBlock) && !"campfire".equals(smeltingBlock)) {
+        if (!"furnace".equals(smeltingBlock) && !"blast_furnace".equals(smeltingBlock) && !"smoker".equals(smeltingBlock) && !"campfire".equals(smeltingBlock)) {
             return;
         }
 
@@ -590,6 +643,15 @@ public class CraftingManager {
             }
             case "blast_furnace": {
                 BlastFurnaceRecipe furnaceRecipe = new BlastFurnaceRecipe(outputItem, inputItem);
+                double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId() + ":" + inputItem.getDamage(), 0d);
+                if (xp != 0) {
+                    this.setRecipeXp(furnaceRecipe, xp);
+                }
+                this.registerRecipe(furnaceRecipe);
+                break;
+            }
+            case "smoker": {
+                SmokerRecipe furnaceRecipe = new SmokerRecipe(outputItem, inputItem);
                 double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId() + ":" + inputItem.getDamage(), 0d);
                 if (xp != 0) {
                     this.setRecipeXp(furnaceRecipe, xp);
@@ -860,6 +922,16 @@ public class CraftingManager {
                     pk.addFurnaceRecipe(recipe);
                 }
             }
+            for (BlastFurnaceRecipe recipe : this.getBlastFurnaceRecipes().values()) {
+                if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
+                    pk.addFurnaceRecipe(recipe);
+                }
+            }
+            for (SmokerRecipe recipe : this.getSmokerRecipes().values()) {
+                if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
+                    pk.addFurnaceRecipe(recipe);
+                }
+            }
         }
         if (protocol >= ProtocolInfo.v1_13_0) {
             for (BrewingRecipe recipe : this.getBrewingRecipes().values()) {
@@ -890,6 +962,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet2168 = null;
         packet1001 = null;
         packet975 = null;
         packet944 = null;
@@ -995,7 +1068,12 @@ public class CraftingManager {
             }
         }
 
-        if (protocol >= GameVersion.V1_26_30.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_40.getProtocol()) {
+            if (packet2168 == null) {
+                packet2168 = packetFor(GameVersion.V1_26_40);
+            }
+            return packet2168;
+        } else if (protocol >= GameVersion.V1_26_30.getProtocol()) {
             if (packet1001 == null) {
                 packet1001 = packetFor(GameVersion.V1_26_30);
             }
@@ -1259,6 +1337,10 @@ public class CraftingManager {
         return this.blastFurnaceRecipes;
     }
 
+    public Map<Integer, SmokerRecipe> getSmokerRecipes() {
+        return this.smokerRecipes;
+    }
+
     public Map<Integer, ContainerRecipe> getContainerRecipes() {
         return this.containerRecipes;
     }
@@ -1314,6 +1396,16 @@ public class CraftingManager {
         return recipe;
     }
 
+    public FurnaceRecipe matchSmokerRecipe(Item input) {
+        Map<Integer, SmokerRecipe> recipes = this.getSmokerRecipes();
+        if (recipes == null) {
+            return null;
+        }
+        FurnaceRecipe recipe = recipes.get(getItemHash(input));
+        if (recipe == null) recipe = recipes.get(getItemHash(input, 0));
+        return recipe;
+    }
+
     public static UUID getMultiItemHash(Collection<Item> items) {
         BinaryStream stream = new BinaryStream(items.size() * 5);
         for (Item item : items) {
@@ -1332,6 +1424,10 @@ public class CraftingManager {
             this.registerBlastFurnaceRecipe((BlastFurnaceRecipe) recipe);
             return;
         }
+        if (recipe instanceof SmokerRecipe) {
+            this.registerSmokerRecipe((SmokerRecipe) recipe);
+            return;
+        }
         recipe.setId(UUID.randomUUID());
         this.furnaceRecipes.put(getItemHash(recipe.getInput()), recipe);
     }
@@ -1344,6 +1440,11 @@ public class CraftingManager {
     public void registerBlastFurnaceRecipe(BlastFurnaceRecipe recipe) {
         recipe.setId(UUID.randomUUID());
         this.blastFurnaceRecipes.put(getItemHash(recipe.getInput()), recipe);
+    }
+
+    public void registerSmokerRecipe(SmokerRecipe recipe) {
+        recipe.setId(UUID.randomUUID());
+        this.smokerRecipes.put(getItemHash(recipe.getInput()), recipe);
     }
 
     public void registerCampfireRecipe(CampfireRecipe recipe) {

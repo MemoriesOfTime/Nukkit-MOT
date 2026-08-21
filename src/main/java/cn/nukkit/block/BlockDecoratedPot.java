@@ -141,6 +141,10 @@ public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable,
     public Item toItem() {
         Item drop = new ItemBlock(this, 0);
 
+        if (this.level == null) {
+            return drop;
+        }
+
         Optional.ofNullable(getBlockEntity())
                 .map(BlockEntityDecoratedPot::getCleanedNBT)
                 .filter(nbt -> nbt.getList("sherds", StringTag.class).getAll().stream()

@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
 import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.custom.EntityDefinition;
@@ -337,7 +338,11 @@ public class AddEntityPacket extends DataPacket {
             if (entityDefinition != null) {
                 return entityDefinition.getIdentifier();
             }
-            throw new IllegalStateException("Unknown entity with network id " + this.type + " protocol " + this.protocol);
+            // 无法解析实体标识符：返回安全回退标识符，避免单个未知实体阻塞整个发包批次（issue #800）
+            // Unresolvable entity identifier: return a safe fallback so one bad entity does not break the whole packet batch
+            Server.getInstance().getLogger().warning("Unknown entity network id " + this.type
+                    + " (protocol " + this.protocol + "); falling back to minecraft:item");
+            return "minecraft:item";
         }
         return identifier;
     }

@@ -1,5 +1,6 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.Server;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -49,7 +50,7 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
         this.inventory = new PlayerInventory(this);
         this.offhandInventory = new PlayerOffhandInventory(this);
 
-        if (this.namedTag.contains("Inventory") && this.namedTag.get("Inventory") instanceof ListTag) {
+        if (this.namedTag.get("Inventory") instanceof ListTag) {
             ListTag<CompoundTag> inventoryList = this.namedTag.getList("Inventory", CompoundTag.class);
             for (CompoundTag item : inventoryList.getAll()) {
                 int slot = item.getByte("Slot");
@@ -67,7 +68,7 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
 
         this.enderChestInventory = new PlayerEnderChestInventory(this);
 
-        if (this.namedTag.contains("EnderItems") && this.namedTag.get("EnderItems") instanceof ListTag) {
+        if (this.namedTag.get("EnderItems") instanceof ListTag) {
             ListTag<CompoundTag> inventoryList = this.namedTag.getList("EnderItems", CompoundTag.class);
             for (CompoundTag item : inventoryList.getAll()) {
                 this.enderChestInventory.setItem(item.getByte("Slot"), NBTIO.getItemHelper(item));
@@ -148,52 +149,72 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             return false;
         }
 
-        this.applyCriticalHitModifier(source);
+        boolean vanillaArmor = Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction();
+        if (vanillaArmor) {
+            this.applyCriticalHitModifier(source);
+        }
 
-        if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.CUSTOM && source.getCause() != DamageCause.HUNGER) {
-            int breach = 0;
-            if (source instanceof EntityDamageByEntityEvent damageByEntityEvent) {
-                Enchantment[] enchantments = damageByEntityEvent.getWeaponEnchantments();
-                if (enchantments != null) {
-                    for (Enchantment enchantment : enchantments) {
-                        if (enchantment.getId() == Enchantment.ID_BREACH) {
-                            breach = enchantment.getLevel();
-                            break;
-                        }
-                    }
-                }
-            }
-
+        // legacy 额外排除 MAGIC(保护附魔不减免魔法);vanilla 保留以对齐基岩版
+        if (source.getCause() != DamageCause.VOID
+                && source.getCause() != DamageCause.CUSTOM
+                && source.getCause() != DamageCause.HUNGER
+                && (vanillaArmor || source.getCause() != DamageCause.MAGIC)) {
             int armorPoints = 0;
-            int toughness = 0;
             int epf = 0;
 
             for (Item armor : inventory.getArmorContents()) {
                 armorPoints += armor.getArmorPoints();
-                toughness += armor.getToughness();
                 epf += calculateEnchantmentProtectionFactor(armor, source);
             }
 
-            // RESISTANCE 在事件构造函数按 BASE 全量预算,但原版中它在护甲后生效,故护甲输入需排除它,之后再重算
-            // RESISTANCE is pre-computed on full BASE in ctor; vanilla applies it after armor, so exclude it here and recompute below
-            float resistance = source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE);
-            if (source.canBeReducedByArmor()) {
-                float preArmorDamage = getDamageBeforeTargetReductions(source);
-                float armorFraction = calculateArmorReductionFraction(preArmorDamage, armorPoints, toughness, breach);
-                source.setDamage(-preArmorDamage * armorFraction, EntityDamageEvent.DamageModifier.ARMOR);
+            if (vanillaArmor) {
+                int toughness = 0;
+                for (Item armor : inventory.getArmorContents()) {
+                    toughness += armor.getToughness();
+                }
+
+                int breach = 0;
+                if (source instanceof EntityDamageByEntityEvent damageByEntityEvent) {
+                    Enchantment[] enchantments = damageByEntityEvent.getWeaponEnchantments();
+                    if (enchantments != null) {
+                        for (Enchantment enchantment : enchantments) {
+                            if (enchantment.getId() == Enchantment.ID_BREACH) {
+                                breach = enchantment.getLevel();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // RESISTANCE 在 ctor 按 BASE 预算,原版却在护甲后生效,故护甲输入需排除它,之后再重算
+                if (source.canBeReducedByArmor()) {
+                    float preArmorDamage = getDamageBeforeTargetReductions(source);
+                    float armorFraction = calculateArmorReductionFraction(preArmorDamage, armorPoints, toughness, breach);
+                    source.setDamage(-preArmorDamage * armorFraction, EntityDamageEvent.DamageModifier.ARMOR);
+                }
+
+                float preEnchantmentDamage = source.getFinalDamage() - source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE);
+                source.setDamage(-preEnchantmentDamage * (Math.min(epf, 20) / 25f),
+                        EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
+
+                this.recalculateResistanceDamage(source);
+            } else {
+                // legacy: 线性公式,忽略韧性/破甲/抗性重算,EPF 含 50%~100% 随机系数
+                if (source.canBeReducedByArmor()) {
+                    source.setDamage(-source.getFinalDamage() * armorPoints * 0.04f, EntityDamageEvent.DamageModifier.ARMOR);
+                }
+
+                source.setDamage(-source.getFinalDamage() * Math.min(NukkitMath.ceilFloat(Math.min(epf, 25) * ((float) Utils.random.nextInt(50, 100) / 100)), 20) * 0.04f,
+                        EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
             }
-
-            // 原版 EPF 无随机波动,上限 20 / Vanilla EPF is non-random, capped at 20
-            float preEnchantmentDamage = source.getFinalDamage() - source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE);
-            source.setDamage(-preEnchantmentDamage * (Math.min(epf, 20) / 25f),
-                    EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
-
-            // 基于护甲+附魔减免后的伤害重算 RESISTANCE(原版顺序: ARMOR → ENCHANTMENTS → RESISTANCE → ABSORPTION)
-            // Recompute RESISTANCE on post-armor/enchantment damage (vanilla order: ARMOR → ENCHANTMENTS → RESISTANCE → ABSORPTION)
-            this.recalculateResistanceDamage(source);
         }
 
         source.setDamage(-Math.min(this.getAbsorption(), source.getFinalDamage()), EntityDamageEvent.DamageModifier.ABSORPTION);
+
+        // legacy: 暴击须在 ABSORPTION 之后设置(严格复刻 5306387d1^ 之前 Entity.attack 的 CRITICAL 顺序)
+        if (!vanillaArmor) {
+            this.applyCriticalHitModifier(source);
+        }
 
         if (super.attack(source)) {
             Entity damager = null;

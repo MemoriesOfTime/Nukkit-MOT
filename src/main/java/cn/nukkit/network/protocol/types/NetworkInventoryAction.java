@@ -485,7 +485,7 @@ public class NetworkInventoryAction {
                                     Item material = enchant.getItem(1);
                                     // Material to take away.
                                     int toRemove = this.newItem.getCount();
-                                    if (material.getId() != ItemID.DYE && material.getDamage() != 4 &&
+                                    if (material.getId() != ItemID.DYE || material.getDamage() != 4 ||
                                             material.getCount() < toRemove) {
                                         // Invalid material or not enough
                                         return null;

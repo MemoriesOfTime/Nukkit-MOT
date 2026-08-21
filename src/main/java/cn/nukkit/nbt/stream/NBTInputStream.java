@@ -2,6 +2,7 @@ package cn.nukkit.nbt.stream;
 
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.utils.VarInt;
+import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 
 import java.io.DataInput;
 import java.io.DataInputStream;
@@ -24,6 +25,9 @@ public class NBTInputStream implements DataInput, AutoCloseable {
     private final ByteOrder endianness;
     private final boolean network;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    // When true, large allocations (length/size > 64) use growing backed lists
+    // instead of pre-allocating a single big array, mitigating malicious oversized NBT.
+    private boolean readSafely = true;
 
     public NBTInputStream(InputStream stream) {
         this(stream, ByteOrder.BIG_ENDIAN);
@@ -45,6 +49,21 @@ public class NBTInputStream implements DataInput, AutoCloseable {
 
     public boolean isNetwork() {
         return network;
+    }
+
+    public boolean isReadSafely() {
+        return readSafely;
+    }
+
+    /**
+     * Enable safe reading with allocation limits. When enabled, tags with a
+     * declared length/size greater than 64 use growing backed lists instead of
+     * pre-allocating a single large array, mitigating malicious oversized NBT
+     * payloads. Safe mode is on by default.
+     */
+    public NBTInputStream readSafely() {
+        this.readSafely = true;
+        return this;
     }
 
     @Override
@@ -155,9 +174,18 @@ public class NBTInputStream implements DataInput, AutoCloseable {
     @Override
     public String readUTF() throws IOException {
         int length = (int) (network ? VarInt.readUnsignedVarInt(stream) : this.readUnsignedShort());
-        byte[] bytes = new byte[length];
-        this.stream.read(bytes);
-        return new String(bytes, StandardCharsets.UTF_8);
+
+        if (this.readSafely && length > 64) {
+            ByteArrayList list = new ByteArrayList(64);
+            for (int i = 0; i < length; i++) {
+                list.add(this.stream.readByte());
+            }
+            return new String(list.toByteArray(), StandardCharsets.UTF_8);
+        } else {
+            byte[] bytes = new byte[length];
+            this.stream.read(bytes);
+            return new String(bytes, StandardCharsets.UTF_8);
+        }
     }
 
     public Object readTag() throws IOException {
@@ -208,9 +236,17 @@ public class NBTInputStream implements DataInput, AutoCloseable {
                     return new DoubleTag("", readDouble());
                 case Tag.TAG_Byte_Array:
                     arraySize = this.readInt();
-                    byte[] bytes = new byte[arraySize];
-                    this.readFully(bytes);
-                    return new ByteArrayTag("", bytes);
+                    if (this.readSafely && arraySize > 64) {
+                        ByteArrayList byteList = new ByteArrayList(64);
+                        for (int i = 0; i < arraySize; i++) {
+                            byteList.add(this.readByte());
+                        }
+                        return new ByteArrayTag("", byteList.toByteArray());
+                    } else {
+                        byte[] bytes = new byte[arraySize];
+                        this.readFully(bytes);
+                        return new ByteArrayTag("", bytes);
+                    }
                 case Tag.TAG_String:
                     return new StringTag("", this.readUTF());
                 case Tag.TAG_Compound:
@@ -224,7 +260,7 @@ public class NBTInputStream implements DataInput, AutoCloseable {
                 case Tag.TAG_List:
                     int typeId = this.readUnsignedByte();
                     int listLength = this.readInt();
-                    List<Tag> list = new ArrayList<>(listLength);
+                    List<Tag> list = new ArrayList<>(this.readSafely && listLength > 64 ? 64 : listLength);
 
                     for (int i = 0; i < listLength; ++i) {
                         list.add(this.deserialize(typeId, maxDepth - 1));
@@ -232,12 +268,19 @@ public class NBTInputStream implements DataInput, AutoCloseable {
                     return new ListTag<>(typeId, list);
                 case Tag.TAG_Int_Array:
                     arraySize = this.readInt();
-                    int[] ints = new int[arraySize];
-
-                    for (int i = 0; i < arraySize; ++i) {
-                        ints[i] = this.readInt();
+                    if (this.readSafely && arraySize > 64) {
+                        it.unimi.dsi.fastutil.ints.IntArrayList intList = new it.unimi.dsi.fastutil.ints.IntArrayList(64);
+                        for (int i = 0; i < arraySize; i++) {
+                            intList.add(this.readInt());
+                        }
+                        return new IntArrayTag("", intList.toIntArray());
+                    } else {
+                        int[] ints = new int[arraySize];
+                        for (int i = 0; i < arraySize; ++i) {
+                            ints[i] = this.readInt();
+                        }
+                        return new IntArrayTag("", ints);
                     }
-                    return new IntArrayTag("", ints);
                 default:
                     throw new IllegalArgumentException("Unknown type " + type);
             }

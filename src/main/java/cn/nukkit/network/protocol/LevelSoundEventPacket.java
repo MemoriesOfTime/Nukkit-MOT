@@ -945,8 +945,20 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v1001
      */
     public static final int SOUND_GEYSER_CONTINUOUS_ERUPTION_ACTIVE = 610;
+    /**
+     * @since v2168
+     */
+    public static final int SOUND_MOUNT = 611;
+    /**
+     * @since v2168
+     */
+    public static final int SOUND_DISMOUNT = 612;
+    /**
+     * @since v2168
+     */
+    public static final int SOUND_STRAW_BED_BREAK_LEAVE = 613;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(611);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(614);
 
     public int sound;
     public float x;
@@ -1360,10 +1372,10 @@ public class LevelSoundEventPacket extends DataPacket {
             case SOUND_SCULK_SENSOR_POWER_OFF -> "power.off.sculk_sensor";
             case SOUND_BUCKET_FILL_POWDER_SNOW -> "bucket.fill.powder_snow";
             case SOUND_BUCKET_EMPTY_POWDER_SNOW -> "bucket.empty.powder_snow";
-            case SOUND_POINTED_DRIPSTONE_CAULDRON_DRIP_WATER -> "cauldron_drip.lava.pointed_dripstone";
-            case SOUND_POINTED_DRIPSTONE_CAULDRON_DRIP_LAVA -> "cauldron_drip.water.pointed_dripstone";
-            case SOUND_POINTED_DRIPSTONE_DRIP_WATER -> "drip.lava.pointed_dripstone";
-            case SOUND_POINTED_DRIPSTONE_DRIP_LAVA -> "drip.water.pointed_dripstone";
+            case SOUND_POINTED_DRIPSTONE_CAULDRON_DRIP_WATER -> "cauldron_drip.water.pointed_dripstone";
+            case SOUND_POINTED_DRIPSTONE_CAULDRON_DRIP_LAVA -> "cauldron_drip.lava.pointed_dripstone";
+            case SOUND_POINTED_DRIPSTONE_DRIP_WATER -> "drip.water.pointed_dripstone";
+            case SOUND_POINTED_DRIPSTONE_DRIP_LAVA -> "drip.lava.pointed_dripstone";
             case SOUND_CAVE_VINES_PICK_BERRIES -> "pick_berries.cave_vines";
             case SOUND_BIG_DRIPLEAF_TILT_DOWN -> "tilt_down.big_dripleaf";
             case SOUND_BIG_DRIPLEAF_TILT_UP -> "tilt_up.big_dripleaf";
@@ -1598,6 +1610,9 @@ public class LevelSoundEventPacket extends DataPacket {
             case SOUND_BUCKET_EMPTY_LAND_ANIMAL -> "bucket.empty.land_animal";
             case SOUND_GEYSER_CONTINUOUS_ERUPTION_START -> "geyser_continuous_eruption_start";
             case SOUND_GEYSER_CONTINUOUS_ERUPTION_ACTIVE -> "geyser_continuous_eruption_active";
+            case SOUND_MOUNT -> "mount";
+            case SOUND_DISMOUNT -> "dismount";
+            case SOUND_STRAW_BED_BREAK_LEAVE -> "straw_bed.break_leave";
             default -> SOUND_UNDEFINED_NAME;
         };
     }

@@ -132,10 +132,12 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         if (blockEntity instanceof BlockEntityPistonArm arm) {
             boolean powered = this.isPowered();
 
-            if (arm.state % 2 == 0 && arm.powered != powered && this.checkState(powered)) {
-                arm.powered = powered;
-                if (arm.chunk != null) {
-                    arm.chunk.setChanged();
+            if (arm.state % 2 == 0 && arm.powered != powered) {
+                if (this.checkState(powered)) {
+                    arm.powered = powered;
+                    if (arm.chunk != null) {
+                        arm.chunk.setChanged();
+                    }
                 }
             }
         }
@@ -205,6 +207,15 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
         List<BlockVector3> attached = Collections.emptyList();
         if (canMove && (this.sticky || extending)) {
+            List<Block> newBlocks = calculator.getBlocksToMove();
+
+            // Validate before any mutation — a mid-loop return false must not leave side effects.
+            for (Block oldBlock : newBlocks) {
+                if (this.level.getBlock(oldBlock.getLocation()).getId() != oldBlock.getId()) {
+                    return false;
+                }
+            }
+
             List<Block> destroyBlocks = calculator.getBlocksToDestroy();
             for (int i = destroyBlocks.size() - 1; i >= 0; --i) {
                 Block block = destroyBlocks.get(i);
@@ -215,14 +226,11 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                 }
             }
 
-            List<Block> newBlocks = calculator.getBlocksToMove();
             attached = newBlocks.stream().map(Vector3::asBlockVector3).collect(Collectors.toList());
             BlockFace side = extending ? direction : direction.getOpposite();
 
             List<CompoundTag> namedTags = new ArrayList<>();
             for (Block oldBlock : newBlocks){
-                if (this.level.getBlock(oldBlock.getLocation()).getId() != oldBlock.getId()) return false; // The delay between the calculation of blocks and move is small, but it is enough to cancel the action.
-
                 CompoundTag tag = null;
                 BlockEntity blockEntity = this.level.getBlockEntity(oldBlock);
                 if (blockEntity != null && !(blockEntity instanceof BlockEntityMovingBlock)) {

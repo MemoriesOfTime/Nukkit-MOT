@@ -13,6 +13,8 @@ import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.format.leveldb.serializer.EntityNbtAdapter;
+import cn.nukkit.level.format.leveldb.serializer.EntityNbtLoadStatus;
 import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
@@ -68,6 +70,22 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     protected Long2ObjectNonBlockingMap<CompoundTag> unknownTiles;
 
     protected List<CompoundTag> NBTentities;
+
+    /**
+     * Raw entity NBT that could not be converted into a live Nukkit entity at load time
+     * (unregistered/unknown id, e.g. residual custom entities from a removed plugin).
+     * <p>
+     * 仅在 {@link #initChunk()} 阶段由 {@code PRESERVE_ONLY} 状态填充；Anvil 等不支持
+     * 独立 actor 存储的格式在 {@code toNBT()} 时将其原样回写，避免存档数据在保存周期丢失（issue #800）。
+     */
+    protected List<CompoundTag> preservedEntityNbt = Collections.emptyList();
+
+    /**
+     * 解码阶段(可能在异步线程)解析出的待调度方块更新;坐标/Level 字段在 {@link #initChunk()}(主线程)才设置并调用 scheduleUpdate,避免异步线程触碰 Level 游戏状态
+     * <p>
+     * Block updates parsed during decode (potentially off-thread); position/Level are filled in {@link #initChunk()} (main thread) before scheduleUpdate, so the off-thread path never touches Level game state
+     */
+    protected List<PendingBlockUpdate> pendingBlockUpdates;
 
     protected Map<Integer, Integer> extraData;
 
@@ -141,6 +159,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         chunk.NBTtiles = null;
         chunk.unknownTiles = null;
         chunk.extraData = null;
+        chunk.pendingBlockUpdates = null;
         return chunk;
     }
 
@@ -181,8 +200,19 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             boolean changed = this.hasChanged();
             if (this.NBTentities != null) {
                 for (CompoundTag nbt : NBTentities) {
-                    if (!nbt.contains("id")) {
-                        this.setChanged();
+                    // 复用 LevelDB 路径的归一化逻辑：无法识别/无效的实体 NBT 不创建实体
+                    // Reuse the LevelDB normalization: unrecognized/invalid entity NBT does not create a live entity
+                    EntityNbtLoadStatus status = EntityNbtAdapter.normalizeForNukkitLoad(nbt);
+                    if (status != EntityNbtLoadStatus.LOADABLE) {
+                        // PRESERVE_ONLY：保留原始 NBT，让保存周期回写，避免静默丢失存档数据（issue #800）
+                        // PRESERVE_ONLY: retain raw NBT so the save cycle can write it back instead of silently dropping saved data
+                        if (status == EntityNbtLoadStatus.PRESERVE_ONLY) {
+                            if (this.preservedEntityNbt.isEmpty()) {
+                                this.preservedEntityNbt = new ArrayList<>();
+                            }
+                            this.preservedEntityNbt.add(nbt);
+                        }
+                        changed = true;
                         continue;
                     }
                     ListTag<? extends Tag> pos = nbt.getList("Pos");
@@ -224,10 +254,117 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 this.NBTtiles = null;
             }
 
+            this.replayDeferredBlockUpdates();
+
             this.setChanged(changed);
 
             this.isInit = true;
         }
+    }
+
+    /**
+     * 在主线程回放解码阶段暂存的方块更新调度,与 Entity/Tile 的延迟初始化模式对齐
+     * <p>
+     * Replay deferred block-update scheduling on the main thread, mirroring the deferred init pattern used for entities/tiles
+     */
+    public void replayDeferredBlockUpdates() {
+        List<PendingBlockUpdate> updates = this.pendingBlockUpdates;
+        if (updates == null || updates.isEmpty()) {
+            this.pendingBlockUpdates = null;
+            return;
+        }
+        LevelProvider providerTemp = this.provider;
+        Level levelTemp = providerTemp == null ? null : providerTemp.getLevel();
+        if (levelTemp == null) {
+            this.pendingBlockUpdates = null;
+            return;
+        }
+        for (PendingBlockUpdate update : updates) {
+            update.apply(levelTemp);
+        }
+        this.pendingBlockUpdates = null;
+    }
+
+    /**
+     * 供跨包 provider 在解码阶段(可能在异步线程)暂存解析出的方块更新;{@link #initChunk()}(主线程)回放后清空
+     * <p>
+     * Lets a cross-package provider stash parsed block updates at decode time (potentially off-thread); {@link #initChunk()} (main thread) replays and clears them
+     */
+    public void setPendingBlockUpdates(List<PendingBlockUpdate> updates) {
+        this.pendingBlockUpdates = updates;
+    }
+
+    /**
+     * 返回尚未在主线程回放的方块更新。
+     * <p>
+     * Returns block updates that have not yet been replayed on the main thread.
+     */
+    public List<PendingBlockUpdate> getDeferredBlockUpdates() {
+        return this.pendingBlockUpdates;
+    }
+
+    /**
+     * 解码阶段收集的待调度方块更新载体:仅保存方块身份与计时,坐标/Level 字段延迟到主线程回放时设置
+     * <p>
+     * Carrier for a deferred block update captured at decode time: holds only block identity and timing; position/Level are applied during main-thread replay
+     */
+    public static final class PendingBlockUpdate {
+        private final Block block;
+        private final int x;
+        private final int y;
+        private final int z;
+        private final int layer;
+        private final int delay;
+        private final int priority;
+
+        public PendingBlockUpdate(Block block, int x, int y, int z, int delay, int priority) {
+            this(block, x, y, z, 0, delay, priority);
+        }
+
+        public PendingBlockUpdate(Block block, int x, int y, int z, int layer, int delay, int priority) {
+            this.block = block;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.layer = layer;
+            this.delay = delay;
+            this.priority = priority;
+        }
+
+        void apply(Level level) {
+            Block block = this.block;
+            block.x = this.x;
+            block.y = this.y;
+            block.z = this.z;
+            block.layer = this.layer;
+            block.level = level;
+            level.scheduleUpdate(block, block, this.delay, this.priority, false);
+        }
+
+        public Block getBlock() {
+            return this.block;
+        }
+
+        public int getX() {
+            return this.x;
+        }
+
+        public int getY() {
+            return this.y;
+        }
+
+        public int getZ() {
+            return this.z;
+        }
+
+        public int getDelay() {
+            return this.delay;
+        }
+
+        public int getPriority() {
+            return this.priority;
+        }
+
     }
 
     @Override
@@ -612,6 +749,17 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
      */
     public Collection<CompoundTag> getUnknownTiles() {
         return this.unknownTiles == null ? Collections.emptyList() : this.unknownTiles.values();
+    }
+
+    /**
+     * Returns entity NBT records that could not be turned into live Nukkit entities at load time
+     * (e.g. residual custom entities from a removed plugin). Survives a load/save round-trip on
+     * formats without dedicated actor storage (Anvil) instead of being silently deleted.
+     * <p>
+     * 仅由区块序列化器消费；不会发送给客户端（issue #800）。
+     */
+    public List<CompoundTag> getPreservedEntityNbt() {
+        return this.preservedEntityNbt == null ? Collections.emptyList() : this.preservedEntityNbt;
     }
 
     /**

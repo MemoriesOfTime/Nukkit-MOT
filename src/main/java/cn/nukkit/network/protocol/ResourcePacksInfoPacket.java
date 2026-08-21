@@ -94,7 +94,11 @@ public class ResourcePacksInfoPacket extends DataPacket {
     }
 
     private void encodeBehaviourPacks(ResourcePack[] packs) {
-        this.putLShort(packs.length);
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putUnsignedVarInt(packs.length);
+        } else {
+            this.putLShort(packs.length);
+        }
         for (ResourcePack entry : packs) {
             this.putString(entry.getPackId().toString());
             this.putString(entry.getPackVersion());
@@ -110,7 +114,11 @@ public class ResourcePacksInfoPacket extends DataPacket {
     }
 
     private void encodeResourcePacks(ResourcePack[] packs) {
-        this.putLShort(packs.length);
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putUnsignedVarInt(packs.length);
+        } else {
+            this.putLShort(packs.length);
+        }
         for (ResourcePack entry : packs) {
             if (this.protocol >= ProtocolInfo.v1_21_50) {
                 this.putUUID(entry.getPackId());

@@ -8,6 +8,8 @@ import cn.nukkit.event.inventory.EnchantItemEvent;
 import cn.nukkit.event.inventory.SmithingTableEvent;
 import cn.nukkit.event.inventory.StonecutterItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.transaction.CraftingTransaction;
+import cn.nukkit.inventory.transaction.ItemStackRequestCraftingTransaction;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.nbt.NBTIO;
@@ -43,6 +45,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
 
     public static final String RECIPE_NET_ID_KEY = "recipeNetId";
     public static final String ENCH_RECIPE_KEY = "enchRecipe";
+    public static final String TIMES_CRAFTED_KEY = "timesCrafted";
 
     @Override
     public ItemStackRequestActionType getType() {
@@ -77,10 +80,12 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return handleStonecutter(player, stonecutterRecipe, action, context);
         }
 
-        // Fire CraftItemEvent before applying the recipe so plugins can veto SA
-        // manual crafting. Input items come from the open crafting grid (big
-        // workbench if opened, otherwise the 2x2 personal grid).
-        CraftItemEvent craftEvent = new CraftItemEvent(player, collectCraftingInput(player), recipe);
+        // 合成前触发 CraftItemEvent 以供插件拦截。携带只读快照使 getTransaction() 与旧版路径一致
+        // Fire CraftItemEvent with a read-only snapshot so getTransaction() matches the legacy path
+        Item recipeResult = recipe instanceof MultiRecipe ? null : recipe.getResult();
+        CraftingTransaction snapshot = new ItemStackRequestCraftingTransaction(
+                player, collectCraftingInputList(player), recipeResult, recipe);
+        CraftItemEvent craftEvent = new CraftItemEvent(snapshot);
         Server.getInstance().getPluginManager().callEvent(craftEvent);
         if (craftEvent.isCancelled()) {
             return context.error();
@@ -89,6 +94,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
 
         if (recipe instanceof MultiRecipe multiRecipe) {
+            int times = Math.max(1, action.getNumberOfRequestedCrafts());
+            context.put(TIMES_CRAFTED_KEY, times);
             CraftResultsDeprecatedAction resultsAction = findCraftResultsAction(
                     context.getItemStackRequest().getActions(),
                     context.getCurrentActionIndex() + 1
@@ -118,7 +125,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return handleSmithingUpgrade(smithingTransform, player, context);
         }
 
-        Item recipeResult = recipe instanceof MultiRecipe multi ? multi.getResult() : recipe.getResult();
+        // recipeResult 已在上方事件快照处计算
         if (recipeResult == null || recipeResult.isNull()) {
             return null;
         }
@@ -129,8 +136,23 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (recipe instanceof CraftingRecipe craftingRecipe && !validateCraftingConsumePlan(player, craftingRecipe, times, context)) {
             return context.error();
         }
+
+        if (recipe instanceof CraftingRecipe multiOutput && !multiOutput.getExtraResults().isEmpty()) {
+            if (times != 1) {
+                log.debug("{}: rejected multi-output craft with numberOfRequestedCrafts={}",
+                        player.getName(), times);
+                return context.error();
+            }
+            context.put(CreateActionProcessor.RECIPE_OUTPUTS_KEY, scaleItems(multiOutput.getAllResults(), times));
+            context.put(CreateActionProcessor.CREATED_SLOTS_KEY, new HashSet<>());
+            return context.success();
+        }
+
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
+        if (recipe instanceof UserDataShapelessRecipe) {
+            applyInputNbt(output, collectCraftingInputList(player));
+        }
         output.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
 
@@ -220,22 +242,20 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (!player.isCreative()) {
             context.onCommit(() -> player.setExperience(player.getExperience(), player.getExperienceLevel() - finalCost));
         }
+        // Write the enchanted output to CREATED_OUTPUT and return without a response
+        // container. Per the Bedrock SAI contract the client drives the output pickup:
+        // it follows the CraftRecipeAction with its own Consume (reagents/book) and
+        // Place (take the result) actions, each carrying its own prediction. Echoing a
+        // CREATED_OUTPUT slot here makes the NetEase SparseContainerClient look up a
+        // prediction that was never created and assert
+        // ("tried to process a prediction that did not exist"); the standard client
+        // merely tolerates the surplus entry. Mirrors Allay / PowerNukkitX, which both
+        // stage the output in CREATED_OUTPUT and return null here.
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, finalOutput, false);
         context.onCommit(() -> enchantInventory.releasePublishedOption(action.getRecipeNetworkId()));
         context.put(ENCH_RECIPE_KEY, true);
 
-        ItemStackResponseSlot responseSlot = new ItemStackResponseSlot(
-                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
-                PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
-                finalOutput.getCount(), finalOutput.getStackNetId(),
-                finalOutput.hasCustomName() ? finalOutput.getCustomName() : "",
-                finalOutput.getDamage(), ""
-        );
-        return context.success(List.of(new ItemStackResponseContainer(
-                ContainerSlotType.CREATED_OUTPUT,
-                List.of(responseSlot),
-                new FullContainerName(ContainerSlotType.CREATED_OUTPUT, null)
-        )));
+        return null;
     }
 
     private static boolean isApplicableEnchant(Enchantment enchantment, Item input) {
@@ -355,17 +375,6 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         addExpectedConsumeItem(expectedConsumes, item, Math.max(1, item.getCount()) * Math.max(1, times));
     }
 
-    /**
-     * Collects non-empty items from the player's active crafting grid (big
-     * workbench if one is open, otherwise the personal 2x2 grid). Used as the
-     * {@code input} parameter of {@link CraftItemEvent} so plugin listeners can
-     * inspect what the client intends to consume.
-     */
-    private static Item[] collectCraftingInput(Player player) {
-        List<Item> items = collectCraftingInputList(player);
-        return items.toArray(Item.EMPTY_ARRAY);
-    }
-
     static List<Item> collectCraftingInputList(Player player) {
         CraftingGrid grid = getActiveCraftingGrid(player);
         int size = grid.getSize();
@@ -377,6 +386,18 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             }
         }
         return items;
+    }
+
+    /**
+     * Copies the NBT of the first NBT-carrying input onto the output, so {@link UserDataShapelessRecipe} dyeing keeps container contents.
+     */
+    static void applyInputNbt(Item output, List<Item> inputs) {
+        for (Item inputItem : inputs) {
+            if (inputItem != null && !inputItem.isNull() && inputItem.hasCompoundTag()) {
+                output.setCompoundTag(inputItem.getCompoundTag());
+                return;
+            }
+        }
     }
 
     private static CraftingGrid getActiveCraftingGrid(Player player) {
