@@ -285,6 +285,14 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
     private static final int PORTAL_SEARCH_RADIUS = 128;
 
     /**
+     * How far the search may pull inactive chunks from disk.
+     *
+     * <p>Scaling a portal coordinate loses at most seven blocks, so the frame used for the trip
+     * is always in the same or an adjacent chunk on the way back.
+     */
+    private static final int PORTAL_DISK_LOAD_CHUNK_RADIUS = 1;
+
+    /**
      * Looks up the portal closest to the given position.
      *
      * <p>The search walks chunks in rings around the origin and stops at the first portal it
@@ -306,7 +314,8 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
                     if (Math.max(Math.abs(chunkX - originChunkX), Math.abs(chunkZ - originChunkZ)) != ring) {
                         continue;
                     }
-                    found = findPortalInChunk(level, chunkX, chunkZ);
+                    found = findPortalInChunk(
+                            level, chunkX, chunkZ, ring <= PORTAL_DISK_LOAD_CHUNK_RADIUS);
                 }
             }
         }
@@ -329,12 +338,13 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         return found;
     }
 
-    private static Position findPortalInChunk(Level level, int chunkX, int chunkZ) {
+    private static Position findPortalInChunk(
+            Level level, int chunkX, int chunkZ, boolean mayLoadFromDisk) {
         FullChunk chunk = level.getChunk(chunkX, chunkZ, false);
         if (chunk == null) {
-            // Load from disk, but never generate: generating here is what made stepping into a
-            // portal take seconds on a fresh nether.
-            if (!level.loadChunk(chunkX, chunkZ, false)) {
+            // A cold far chunk is not worth blocking the transfer for. The mirror will get a new
+            // frame if no nearby portal exists; already loaded chunks still use the full radius.
+            if (!mayLoadFromDisk || !level.loadChunk(chunkX, chunkZ, false)) {
                 return null;
             }
             chunk = level.getChunk(chunkX, chunkZ, false);
