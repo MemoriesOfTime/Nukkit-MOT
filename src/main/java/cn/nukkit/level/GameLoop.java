@@ -28,6 +28,8 @@ public final class GameLoop {
     private volatile int ringIndex;
     // volatile: getTick() 会被主线程读取（如 stopLevelThread），而 tick++ 在 loop 线程 / volatile so getTick() reads from the main thread see the latest value
     private volatile long tick;
+    // volatile: Watchdog 从监控线程读取，用于检测世界线程卡死 / read by the Watchdog thread to detect a hung level thread
+    private volatile long lastTickStartMillis;
 
     private GameLoop(Runnable onStart, GameLoopTickCallback onTick,
                      Runnable onIdle, Runnable onStop,
@@ -57,6 +59,7 @@ public final class GameLoop {
         long idealNanoPerTick = 1_000_000_000L / loopCountPerSec;
         while (running.get()) {
             long startTime = System.nanoTime();
+            lastTickStartMillis = System.currentTimeMillis();
             long elapsedNanos = -1;
             try {
                 elapsedNanos = (long) onTickCallback.onTick(this, startTime);
@@ -83,6 +86,7 @@ public final class GameLoop {
                 nanoSleepTime -= System.nanoTime() - sleepStart;
             }
         }
+        lastTickStartMillis = 0L;
         loopThread = null;
         onStop.run();
     }
@@ -105,6 +109,10 @@ public final class GameLoop {
 
     public long getTick() {
         return tick;
+    }
+
+    public long getLastTickStartMillis() {
+        return lastTickStartMillis;
     }
 
     public float getTPS() {

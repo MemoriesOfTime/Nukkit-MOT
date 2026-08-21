@@ -6,21 +6,12 @@ import cn.nukkit.Player;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.proxy.ProxyProtocolHandler;
-import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
-import cn.nukkit.network.protocol.DataPacket;
-import cn.nukkit.network.protocol.LecternUpdatePacket;
-import cn.nukkit.network.protocol.MoveEntityAbsolutePacket;
-import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
-import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoop;
+import io.netty.channel.*;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
 import org.junit.jupiter.api.BeforeAll;
@@ -348,10 +339,25 @@ class RakNetPlayerSessionTest {
     }
 
     @Test
-    void levelSyncPacketWhitelistIncludesLecternAndLegacyVehiclePackets() throws Exception {
-        assertTrue(invokeIsLevelSyncPacket(new LecternUpdatePacket()));
-        assertTrue(invokeIsLevelSyncPacket(new MoveEntityAbsolutePacket()));
-        assertFalse(invokeIsLevelSyncPacket(new ClientToServerHandshakePacket()));
+    void levelSyncPacketWhitelistIncludesLecternAndLegacyVehiclePackets() {
+        assertTrue(new LecternUpdatePacket().isLevelSyncPacket());
+        assertTrue(new MoveEntityAbsolutePacket().isLevelSyncPacket());
+        assertFalse(new ClientToServerHandshakePacket().isLevelSyncPacket());
+    }
+
+    @Test
+    void levelSyncPacketWhitelistIncludesStateMutatingPackets() {
+        assertTrue(new CommandRequestPacket().isLevelSyncPacket());
+        assertTrue(new TextPacket().isLevelSyncPacket());
+        assertTrue(new PlayerHotbarPacket().isLevelSyncPacket());
+        assertTrue(new BookEditPacket().isLevelSyncPacket());
+        assertTrue(new ModalFormResponsePacket().isLevelSyncPacket());
+        assertTrue(new NPCRequestPacket().isLevelSyncPacket());
+        assertTrue(new CommandBlockUpdatePacket().isLevelSyncPacket());
+        assertTrue(new ToggleCrafterSlotRequestPacket().isLevelSyncPacket());
+        assertTrue(new SetPlayerGameTypePacket().isLevelSyncPacket());
+        assertTrue(new AdventureSettingsPacket().isLevelSyncPacket());
+        assertFalse(new PlayerSkinPacket().isLevelSyncPacket());
     }
 
     private static SessionFixture createSession(boolean executeImmediately) {
@@ -402,12 +408,6 @@ class RakNetPlayerSessionTest {
         Method method = RakNetPlayerSession.class.getDeclaredMethod("networkTick");
         method.setAccessible(true);
         method.invoke(session);
-    }
-
-    private static boolean invokeIsLevelSyncPacket(DataPacket packet) throws Exception {
-        Method method = RakNetPlayerSession.class.getDeclaredMethod("isLevelSyncPacket", DataPacket.class);
-        method.setAccessible(true);
-        return (boolean) method.invoke(null, packet);
     }
 
     private static RakNetInterface createRakNetInterface(cn.nukkit.Server server, Queue<RakNetPlayerSession> sessionCreationQueue,

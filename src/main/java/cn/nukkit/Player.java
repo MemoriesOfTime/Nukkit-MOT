@@ -203,7 +203,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected final NetworkPlayerSession networkSession;
 
     public boolean playedBefore;
-    public boolean spawned = false;
+    // volatile: spawned 由主线程在 doFirstSpawn 置位，并行世界线程读取该标志决定是否接管 checkNetwork / 包处理
+    // volatile: set by the primary thread in doFirstSpawn; level threads read it to decide when to take over checkNetwork / packet handling
+    public volatile boolean spawned = false;
     public boolean loggedIn = false;
     protected boolean loginVerified = false;
     private int unverifiedPackets;

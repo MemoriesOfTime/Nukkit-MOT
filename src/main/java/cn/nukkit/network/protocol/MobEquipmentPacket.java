@@ -41,4 +41,9 @@ public class MobEquipmentPacket extends DataPacket {
         this.putByte((byte) this.hotbarSlot);
         this.putByte((byte) this.windowId);
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

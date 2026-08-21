@@ -1434,6 +1434,21 @@ public class Server {
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
         this.allowLevelThreadsAndStartExisting();
+        // /reload 可能经由玩家命令在世界线程上执行，该线程此刻仍在退出、重启会被跳过；稍后重试一次
+        // /reload may run on a level thread via a player command; that thread is still exiting so its restart is skipped - retry once shortly after
+        this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, this::restartStoppedLevelThreads, 40);
+    }
+
+    private void restartStoppedLevelThreads() {
+        if (!this.parallelLevelTick || !this.levelThreadsStartAllowed) {
+            return;
+        }
+        for (Level level : this.levelArray) {
+            Thread thread = level.getLevelThread();
+            if (thread == null || !thread.isAlive()) {
+                level.startLevelThread();
+            }
+        }
     }
 
     public void shutdown() {
@@ -1744,6 +1759,11 @@ public class Server {
     private void checkTickUpdates(int currentTick) {
         if (this.alwaysTickPlayers) {
             for (Player p : new ArrayList<>(this.players.values())) {
+                // 并行世界线程已通过 updateEntities tick 该玩家，主线程跳过避免双线程并发 onUpdate
+                // Parallel-ticked players are already updated via updateEntities on their level thread; skip here to avoid concurrent onUpdate
+                if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled()) {
+                    continue;
+                }
                 p.onUpdate(currentTick);
             }
         }
@@ -1809,7 +1829,20 @@ public class Server {
         if (this.autoSave) {
             for (Player player : new ArrayList<>(this.players.values())) {
                 if (player.isOnline()) {
-                    player.save(true);
+                    // 快照须在世界线程上生成，避免与合成/移动并发
+                    // Snapshot on the level thread so it does not race crafting/movement
+                    Level playerLevel = player.getLevel();
+                    if (this.parallelLevelTick && playerLevel != null && playerLevel.isParallelTickEnabled()) {
+                        playerLevel.scheduleSyncTask(() -> {
+                            // 投递后玩家可能已断线（closed 的 save 会抛异常）
+                            // The player may have disconnected while the task was queued (save throws on closed players)
+                            if (player.isOnline()) {
+                                player.save(true);
+                            }
+                        });
+                    } else {
+                        player.save(true);
+                    }
                 } else if (!player.isConnected()) {
                     this.removePlayer(player);
                 }
@@ -1857,7 +1890,9 @@ public class Server {
         this.checkTickUpdates(this.tickCounter);
 
         for (Player player : new ArrayList<>(this.players.values())) {
-            if (this.parallelLevelTick && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
+            // 未完成出生的玩家留在主线程驱动登录序列，出生后由世界线程接管 checkNetwork
+            // Pre-spawn players stay on the primary thread for their login sequence; after spawn the level thread takes over
+            if (this.parallelLevelTick && player.spawned && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
                 continue;
             }
             player.checkNetwork();

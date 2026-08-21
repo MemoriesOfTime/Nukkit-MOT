@@ -788,7 +788,9 @@ public abstract class Entity extends Location implements Metadatable {
 
             this.chunk.addEntity(this);
             this.level.addEntity(this);
-            this.lastUpdate = this.server.getTick();
+            // 并行世界使用 GameLoop tick 初始化，避免与服务器 tick 漂移造成首个 tickDiff 跳变
+            // Initialize with the GameLoop tick in parallel worlds, so clock drift cannot skew the first tickDiff
+            this.lastUpdate = (int) this.level.getTickForEntityInit();
             this.published = true;
 
             this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));

@@ -8,7 +8,10 @@ import cn.nukkit.level.Level;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
-import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.BatchPacket;
+import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.DisconnectPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.session.login.NetworkSessionState;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.plugin.InternalPlugin;
@@ -316,7 +319,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         while ((packet = this.inbound.poll()) != null) {
             try {
                 Level level = this.player.getLevel();
-                if (level != null && level.isParallelTickEnabled() && isLevelSyncPacket(packet)) {
+                if (level != null && level.isParallelTickEnabled() && packet.isLevelSyncPacket()) {
                     level.addSyncPacketToQueue(this.player, packet);
                 } else {
                     this.player.handleDataPacket(packet);
@@ -326,35 +329,6 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                         new Object[]{packet.getClass().getSimpleName(), this.player.getName()}, e));
             }
         }
-    }
-
-    /**
-     * Packets that modify level block/entity state and must be serialized
-     * with the level tick loop to avoid concurrent modification.
-     * <p>
-     * Uses a whitelist model: only explicitly listed packets are routed to
-     * the level thread. All other packets remain on the primary thread for safety.
-     * New or unknown packet types default to the primary thread.
-     */
-    private static boolean isLevelSyncPacket(DataPacket packet) {
-        return packet instanceof PlayerAuthInputPacket       // movement, block actions
-            || packet instanceof MovePlayerPacket            // player position
-            || packet instanceof InventoryTransactionPacket  // block/entity transactions
-            || packet instanceof InteractPacket              // entity interaction
-            || packet instanceof PlayerActionPacket          // break start/stop, etc.
-            || packet instanceof AnimatePacket               // animation broadcast
-            || packet instanceof LevelSoundEventPacket       // sound events
-            || packet instanceof MobEquipmentPacket          // held item change
-            || packet instanceof ItemStackRequestPacket      // crafting/container operations
-            || packet instanceof BlockPickRequestPacket      // block picking
-            || packet instanceof EntityPickRequestPacket     // entity picking
-            || packet instanceof ContainerClosePacket        // container close
-            || packet instanceof RequestChunkRadiusPacket    // chunk loading
-            || packet instanceof ItemFrameDropItemPacket     // item frame interaction
-            || packet instanceof BlockEntityDataPacket      // sign/command block editing
-            || packet instanceof LecternUpdatePacket        // lectern page turn / drop book
-            || packet instanceof MoveEntityAbsolutePacket   // legacy vehicle movement
-            || packet instanceof PlayerInputPacket;         // vehicle input
     }
 
     private void sendPackets(Collection<DataPacket> packets) {
