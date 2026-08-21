@@ -68,7 +68,7 @@ docker run -d --name nukkit-mot \
     <dependency>
         <groupId>com.nukkit-mot</groupId>
         <artifactId>nukkit-mot</artifactId>
-        <version>1.26.30-R1</version>
+        <version>1.26.40-R1</version>
         <scope>provided</scope>
     </dependency>
 </dependencies>
@@ -98,7 +98,7 @@ repositories {
 ```kts
 // 发布版
 dependencies {
-    compileOnly("com.nukkit-mot:nukkit-mot:1.26.30-R1")
+    compileOnly("com.nukkit-mot:nukkit-mot:1.26.40-R1")
 }
 
 // 开发版 (SNAPSHOT)
