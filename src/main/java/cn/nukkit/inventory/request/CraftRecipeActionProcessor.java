@@ -46,6 +46,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
     public static final String RECIPE_NET_ID_KEY = "recipeNetId";
     public static final String ENCH_RECIPE_KEY = "enchRecipe";
     public static final String TIMES_CRAFTED_KEY = "timesCrafted";
+    public static final String EVENT_AUTHORED_MULTI_OUTPUT_KEY = "eventAuthoredMultiOutput";
 
     @Override
     public ItemStackRequestActionType getType() {
@@ -80,15 +81,17 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return handleStonecutter(player, stonecutterRecipe, action, context);
         }
 
-        // 合成前触发 CraftItemEvent 以供插件拦截。携带只读快照使 getTransaction() 与旧版路径一致
-        // Fire CraftItemEvent with a read-only snapshot so getTransaction() matches the legacy path
+        // MultiRecipe output is dynamic and is handled after the client result is
+        // server-validated below. Never expose a null primary output to listeners.
         Item recipeResult = recipe instanceof MultiRecipe ? null : recipe.getResult();
-        CraftingTransaction snapshot = new ItemStackRequestCraftingTransaction(
-                player, collectCraftingInputList(player), recipeResult, recipe);
-        CraftItemEvent craftEvent = new CraftItemEvent(snapshot);
-        Server.getInstance().getPluginManager().callEvent(craftEvent);
-        if (craftEvent.isCancelled()) {
-            return context.error();
+        if (recipeResult != null) {
+            if (recipe instanceof UserDataShapelessRecipe) {
+                applyInputNbt(recipeResult, collectCraftingInputList(player));
+            }
+            recipeResult = fireCraftItemEvent(player, recipe, recipeResult);
+            if (recipeResult == null) {
+                return context.error();
+            }
         }
 
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
@@ -113,6 +116,11 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             if (!validateMultiRecipeConsumePlan(player, multiRecipe, output, context)) {
                 return context.error();
             }
+            Item authoritativeOutput = fireCraftItemEvent(player, recipe, output);
+            if (authoritativeOutput == null) {
+                return context.error();
+            }
+            context.put(EVENT_AUTHORED_MULTI_OUTPUT_KEY, authoritativeOutput);
             return context.success();
         }
 
@@ -143,16 +151,17 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
                         player.getName(), times);
                 return context.error();
             }
-            context.put(CreateActionProcessor.RECIPE_OUTPUTS_KEY, scaleItems(multiOutput.getAllResults(), times));
+            List<Item> outputs = scaleItems(multiOutput.getAllResults(), times);
+            Item authoritativePrimary = recipeResult.clone();
+            authoritativePrimary.setCount(authoritativePrimary.getCount() * times);
+            outputs.set(0, authoritativePrimary);
+            context.put(CreateActionProcessor.RECIPE_OUTPUTS_KEY, outputs);
             context.put(CreateActionProcessor.CREATED_SLOTS_KEY, new HashSet<>());
             return context.success();
         }
 
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
-        if (recipe instanceof UserDataShapelessRecipe) {
-            applyInputNbt(output, collectCraftingInputList(player));
-        }
         output.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
 
@@ -237,6 +246,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         }
 
         Item finalOutput = event.getNewItem();
+        if (finalOutput == null || finalOutput.isNull()) {
+            return context.error();
+        }
         int finalCost = event.getXpCost();
 
         if (!player.isCreative()) {
@@ -260,6 +272,21 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
 
     private static boolean isApplicableEnchant(Enchantment enchantment, Item input) {
         return input.getId() == Item.BOOK || enchantment.canEnchant(input);
+    }
+
+    private static Item fireCraftItemEvent(Player player, Recipe recipe, Item output) {
+        if (output == null || output.isNull()) {
+            return null;
+        }
+        CraftingTransaction snapshot = new ItemStackRequestCraftingTransaction(
+                player, collectCraftingInputList(player), output, recipe);
+        CraftItemEvent craftEvent = new CraftItemEvent(snapshot);
+        Server.getInstance().getPluginManager().callEvent(craftEvent);
+        if (craftEvent.isCancelled()) {
+            return null;
+        }
+        Item eventOutput = snapshot.getPrimaryOutput();
+        return eventOutput == null || eventOutput.isNull() ? null : eventOutput.clone();
     }
 
     private ActionResponse handleTrade(CraftRecipeAction action, Player player, ItemStackRequestContext context) {
@@ -644,7 +671,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (!validateSmithingConsumePlan(player, context, equipment, ingredient, template)) {
             return context.error();
         }
-        if (!fireSmithingEvent(smithingInventory, result, player)) {
+        result = fireSmithingEvent(smithingInventory, result, player);
+        if (result == null) {
             return context.error();
         }
         result.autoAssignStackNetworkId();
@@ -670,7 +698,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
                 smithingInventory.getEquipment(), smithingInventory.getIngredient(), smithingInventory.getTemplate())) {
             return context.error();
         }
-        if (!fireSmithingEvent(smithingInventory, result, player)) {
+        result = fireSmithingEvent(smithingInventory, result, player);
+        if (result == null) {
             return context.error();
         }
         result.autoAssignStackNetworkId();
@@ -690,9 +719,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
     /**
      * Mirror {@code SmithingTransaction.execute()}: plugins receive the full set
      * of input slots + projected output so they can veto smithing-table usage.
-     * Returns {@code false} when the event is cancelled.
+     * Returns the event-authoritative result, or {@code null} when cancelled.
      */
-    private static boolean fireSmithingEvent(SmithingInventory inventory, Item result, Player player) {
+    private static Item fireSmithingEvent(SmithingInventory inventory, Item result, Player player) {
         SmithingTableEvent event = new SmithingTableEvent(
                 inventory,
                 inventory.getEquipment().clone(),
@@ -702,7 +731,10 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
                 player
         );
         Server.getInstance().getPluginManager().callEvent(event);
-        return !event.isCancelled();
+        Item eventOutput = event.getResultItem();
+        return event.isCancelled() || eventOutput == null || eventOutput.isNull()
+                ? null
+                : eventOutput.clone();
     }
 
     /**
@@ -741,6 +773,11 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (event.isCancelled()) {
             return context.error();
         }
+        Item eventOutput = event.getOutputItem();
+        if (eventOutput == null || eventOutput.isNull()) {
+            return context.error();
+        }
+        output = eventOutput.clone();
 
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
         output.autoAssignStackNetworkId();
