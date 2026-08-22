@@ -34,6 +34,11 @@ public class RequestAbilityPacket extends DataPacket {
     }
 
     @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
+
+    @Override
     public byte pid() {
         return ProtocolInfo.REQUEST_ABILITY_PACKET;
     }

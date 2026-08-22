@@ -121,10 +121,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -191,6 +188,11 @@ public class Server {
     private int autoTickRateLimit;
     private boolean alwaysTickPlayers;
     private int baseTickRate;
+    private boolean parallelLevelTick;
+    private volatile boolean levelThreadsStartAllowed;
+    // 受管并行世界线程注册表：区分"世界线程"与真正危险的异步上下文（RCON/异步池等）
+    // Registry of managed parallel level threads: distinguishes them from genuinely unsafe async contexts (RCON/async pools)
+    private final Set<Thread> levelThreads = ConcurrentHashMap.newKeySet();
     private int difficulty;
     private int defaultGameMode = Integer.MAX_VALUE;
     int c_s_spawnThreshold;
@@ -218,8 +220,8 @@ public class Server {
     private final Config properties;
     private volatile ServerConfig serverConfig;
 
-    private final Map<InetSocketAddress, Player> players = new HashMap<>();
-    final Map<UUID, Player> playerList = new HashMap<>();
+    private final Map<InetSocketAddress, Player> players = new ConcurrentHashMap<>();
+    final Map<UUID, Player> playerList = new ConcurrentHashMap<>();
 
     /**
      * Worlds where automatic mob spawning is disabled.
@@ -264,7 +266,8 @@ public class Server {
         }
     };
 
-    private Level[] levelArray = new Level[0];
+    // volatile 保证并行世界线程能及时看到 levelArray 的更新 / volatile so level threads observe the latest array reference
+    private volatile Level[] levelArray = new Level[0];
     private final ServiceManager serviceManager = new NKServiceManager();
     private Level defaultLevel;
     private final Thread currentThread;
@@ -612,7 +615,8 @@ public class Server {
     /**
      * Temporary disable world saving to allow safe backup of leveldb worlds.
      */
-    public boolean holdWorldSave;
+    // volatile: 主线程命令置位，并行世界线程在 save 时读取 / set by a main-thread command, read by parallel level threads during save
+    public volatile boolean holdWorldSave;
     /**
      * RakNet cookie mode
      */
@@ -954,6 +958,7 @@ public class Server {
         if (loadPlugins) {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
+        this.allowLevelThreadsAndStartExisting();
 
         EntityProperty.buildPacket();
         EntityProperty.buildPlayerProperty();
@@ -1317,6 +1322,27 @@ public class Server {
         }
     }
 
+    private void allowLevelThreadsAndStartExisting() {
+        this.levelThreadsStartAllowed = true;
+        this.startDeferredLevelThreads();
+    }
+
+    private void startDeferredLevelThreads() {
+        if (!this.parallelLevelTick || !this.levelThreadsStartAllowed) {
+            return;
+        }
+
+        for (Level level : this.levelArray) {
+            level.startLevelThread();
+        }
+    }
+
+    private void startLevelThreadIfReady(Level level) {
+        if (this.parallelLevelTick && this.levelThreadsStartAllowed) {
+            level.startLevelThread();
+        }
+    }
+
     public void enablePlugin(Plugin plugin) {
         this.pluginManager.enablePlugin(plugin);
     }
@@ -1327,7 +1353,9 @@ public class Server {
 
     public boolean dispatchCommand(CommandSender sender, String commandLine) throws ServerException {
         // First we need to check if this command is on the main thread or not, if not, warn the user
-        if (!this.isPrimaryThread()) {
+        // 世界线程上的命令派发是并行 tick 的受管路径，与该世界 tick 串行，不属于危险异步
+        // Commands on a managed level thread are the intended parallel-tick path, serialized with that world's tick
+        if (!this.isPrimaryThread() && !this.isLevelThread()) {
             getLogger().warning("Command Dispatched Async: " + commandLine);
         }
         if (sender == null) {
@@ -1350,8 +1378,28 @@ public class Server {
 
         log.info("Saving levels...");
 
+        List<CompletableFuture<java.lang.Void>> saveFutures = new ArrayList<>();
         for (Level level : this.levelArray) {
-            level.save();
+            if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                saveFutures.add(level.scheduleSyncTaskAndWait(() -> level.save()));
+            } else {
+                level.save();
+            }
+        }
+        for (CompletableFuture<java.lang.Void> future : saveFutures) {
+            try {
+                future.get(30, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                log.error("Failed to wait for level save during reload", e);
+            }
+        }
+
+        this.levelThreadsStartAllowed = false;
+
+        // Stop all level threads before clearing plugins to prevent
+        // concurrent event firing and command dispatch during reload
+        for (Level level : this.levelArray) {
+            level.stopLevelThread();
         }
 
         this.pluginManager.clearPlugins();
@@ -1391,6 +1439,22 @@ public class Server {
         }
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
+        this.allowLevelThreadsAndStartExisting();
+        // /reload 可能经由玩家命令在世界线程上执行，该线程此刻仍在退出、重启会被跳过；稍后重试一次
+        // /reload may run on a level thread via a player command; that thread is still exiting so its restart is skipped - retry once shortly after
+        this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, this::restartStoppedLevelThreads, 40);
+    }
+
+    private void restartStoppedLevelThreads() {
+        if (!this.parallelLevelTick || !this.levelThreadsStartAllowed) {
+            return;
+        }
+        for (Level level : this.levelArray) {
+            Thread thread = level.getLevelThread();
+            if (thread == null || !thread.isAlive()) {
+                level.startLevelThread();
+            }
+        }
     }
 
     public void shutdown() {
@@ -1412,6 +1476,13 @@ public class Server {
 
             ServerStopEvent serverStopEvent = new ServerStopEvent();
             pluginManager.callEvent(serverStopEvent);
+
+            // 先停世界线程再关玩家/插件：player.close 内含存档，须与所属世界 tick 串行
+            // Stop level threads before closing players/plugins: player.close() saves, which must be serialized with its level's tick
+            this.levelThreadsStartAllowed = false;
+            for (Level level : this.levelArray) {
+                level.stopLevelThread();
+            }
 
             if (this.holdWorldSave) {
                 this.getLogger().warning("World save hold was not released! Any backup currently being taken may be invalid");
@@ -1541,7 +1612,12 @@ public class Server {
                                 offset = (i + lastLevelGC) % levelArray.length;
                                 Level level = levelArray[offset];
                                 if (!level.isBeingConverted) {
-                                    level.doGarbageCollection(allocated - 1);
+                                    if (level.isParallelTickEnabled()) {
+                                        final long alloc = allocated - 1;
+                                        level.scheduleSyncTask(() -> level.doGarbageCollection(alloc));
+                                    } else {
+                                        level.doGarbageCollection(allocated - 1);
+                                    }
                                 }
                                 allocated = next - System.currentTimeMillis();
                                 if (allocated <= 0) break;
@@ -1696,6 +1772,11 @@ public class Server {
     private void checkTickUpdates(int currentTick) {
         if (this.alwaysTickPlayers) {
             for (Player p : new ArrayList<>(this.players.values())) {
+                // 并行世界线程已通过 updateEntities tick 该玩家，主线程跳过避免双线程并发 onUpdate
+                // Parallel-ticked players are already updated via updateEntities on their level thread; skip here to avoid concurrent onUpdate
+                if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled()) {
+                    continue;
+                }
                 p.onUpdate(currentTick);
             }
         }
@@ -1706,7 +1787,17 @@ public class Server {
 
         // Do level ticks
         for (Level level : this.levelArray) {
-            if (level.isBeingConverted || (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0)) {
+            if (level.isBeingConverted) {
+                continue;
+            }
+
+            // Parallel tick: skip levels that have their own thread
+            if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                // Level ticks in its own GameLoop thread; autoTickRate is not applicable
+                continue;
+            }
+
+            if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
                 continue;
             }
 
@@ -1751,7 +1842,21 @@ public class Server {
         if (this.autoSave) {
             for (Player player : new ArrayList<>(this.players.values())) {
                 if (player.isOnline()) {
-                    player.save(true);
+                    // 快照须在世界线程上生成，避免与合成/移动并发
+                    // Snapshot on the level thread so it does not race crafting/movement
+                    Level playerLevel = player.getLevel();
+                    if (this.parallelLevelTick && playerLevel != null && playerLevel.isParallelTickEnabled()) {
+                        playerLevel.scheduleSyncTask(() -> {
+                            // 投递后玩家可能已断线（closed 的 save 会抛异常）或已切世界（应由新世界线程保存，下次自动保存补上）
+                            // The player may have disconnected while queued (save throws on closed), or changed level
+                            // (then its new level's thread owns the save; the next auto-save covers it)
+                            if (player.isOnline() && player.getLevel() == playerLevel) {
+                                player.save(true);
+                            }
+                        });
+                    } else {
+                        player.save(true);
+                    }
                 } else if (!player.isConnected()) {
                     this.removePlayer(player);
                 }
@@ -1759,7 +1864,11 @@ public class Server {
 
             for (Level level : this.levelArray) {
                 if (!nonAutoSaveWorlds.contains(level.getName())) {
-                    level.save();
+                    if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                        level.scheduleSyncTask(() -> level.save());
+                    } else {
+                        level.save();
+                    }
                 }
             }
         }
@@ -1795,6 +1904,11 @@ public class Server {
         this.checkTickUpdates(this.tickCounter);
 
         for (Player player : new ArrayList<>(this.players.values())) {
+            // 未完成出生的玩家留在主线程驱动登录序列，出生后由世界线程接管 checkNetwork
+            // Pre-spawn players stay on the primary thread for their login sequence; after spawn the level thread takes over
+            if (this.parallelLevelTick && player.spawned && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
+                continue;
+            }
             player.checkNetwork();
         }
 
@@ -1827,7 +1941,11 @@ public class Server {
         if (this.tickCounter % 100 == 0) {
             for (Level level : this.levelArray) {
                 if (!level.isBeingConverted) {
-                    level.doChunkGarbageCollection();
+                    if (level.isParallelTickEnabled()) {
+                        level.scheduleSyncTask(level::doChunkGarbageCollection);
+                    } else {
+                        level.doChunkGarbageCollection();
+                    }
                 }
             }
         }
@@ -2695,6 +2813,8 @@ public class Server {
         level.setTickRate(this.baseTickRate);
 
         this.pluginManager.callEvent(new LevelLoadEvent(level));
+        this.startLevelThreadIfReady(level);
+
         return true;
     }
 
@@ -2869,6 +2989,8 @@ public class Server {
 
         this.pluginManager.callEvent(new LevelInitEvent(level));
         this.pluginManager.callEvent(new LevelLoadEvent(level));
+        this.startLevelThreadIfReady(level);
+
         return true;
     }
 
@@ -3324,6 +3446,18 @@ public class Server {
         return (Thread.currentThread() == currentThread);
     }
 
+    public void registerLevelThread(Thread thread) {
+        this.levelThreads.add(thread);
+    }
+
+    public void unregisterLevelThread(Thread thread) {
+        this.levelThreads.remove(thread);
+    }
+
+    public boolean isLevelThread() {
+        return this.levelThreads.contains(Thread.currentThread());
+    }
+
     /**
      * Get server's primary thread
      *
@@ -3672,6 +3806,11 @@ public class Server {
         this.autoTickRateLimit = config.performanceSettings().autoTickRateLimit();
         this.alwaysTickPlayers = config.performanceSettings().alwaysTickPlayers();
         this.baseTickRate = config.performanceSettings().baseTickRate();
+        this.parallelLevelTick = config.performanceSettings().parallelLevelTick();
+        if (this.parallelLevelTick) {
+            log.warn("Parallel level ticking is enabled (experimental). " +
+                    "Plugins expecting main-thread event execution may behave unexpectedly.");
+        }
         this.doLevelGC = config.performanceSettings().doLevelGc();
         this.enableSpark = config.performanceSettings().enableSpark();
         this.levelDbCache = config.performanceSettings().leveldbCacheMb();

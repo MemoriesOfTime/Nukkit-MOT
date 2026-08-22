@@ -5,6 +5,12 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.utils.TextFormat;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * Created on 2015/11/11 by xtypr.
  * Package cn.nukkit.command.defaults in project Nukkit .
@@ -29,14 +35,41 @@ public class GarbageCollectorCommand extends VanillaCommand {
         long memory = Runtime.getRuntime().freeMemory();
 
         for (Level level : sender.getServer().getLevels().values()) {
-            int chunksCount = level.getChunks().size();
-            int entitiesCount = level.getEntities().length;
-            int tilesCount = level.getBlockEntities().size();
-            level.doChunkGarbageCollection();
-            level.unloadChunks(true);
-            chunksCollected += chunksCount - level.getChunks().size();
-            entitiesCollected += entitiesCount - level.getEntities().length;
-            tilesCollected += tilesCount - level.getBlockEntities().size();
+            // 并行世界的区块卸载须在其世界线程执行；等待结果以保持统计数字准确
+            // Chunk unloading for parallel levels must run on their level thread; wait for the result to keep stats accurate
+            int[] stats = new int[3];
+            AtomicBoolean executed = new AtomicBoolean(false);
+            Runnable collection = () -> {
+                if (!executed.compareAndSet(false, true)) {
+                    return;
+                }
+                int chunksCount = level.getChunks().size();
+                int entitiesCount = level.getEntities().length;
+                int tilesCount = level.getBlockEntities().size();
+                level.doChunkGarbageCollection();
+                level.unloadChunks(true);
+                stats[0] = chunksCount - level.getChunks().size();
+                stats[1] = entitiesCount - level.getEntities().length;
+                stats[2] = tilesCount - level.getBlockEntities().size();
+            };
+            if (level.isParallelTickEnabled()) {
+                CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(collection);
+                try {
+                    future.get(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    collection.run();
+                } catch (ExecutionException e) {
+                    sender.getServer().getLogger().logException(e.getCause());
+                } catch (TimeoutException e) {
+                    collection.run();
+                }
+            } else {
+                collection.run();
+            }
+            chunksCollected += stats[0];
+            entitiesCollected += stats[1];
+            tilesCollected += stats[2];
         }
 
         System.gc();

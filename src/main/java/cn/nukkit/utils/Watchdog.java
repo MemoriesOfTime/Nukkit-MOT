@@ -1,20 +1,27 @@
 package cn.nukkit.utils;
 
 import cn.nukkit.Server;
+import cn.nukkit.level.Level;
 import cn.nukkit.utils.bugreport.BugReportGenerator;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MonitorInfo;
 import java.lang.management.ThreadInfo;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Watchdog monitors the server's main thread and kills the server if it gets frozen.
+ * <p>
+ * Also monitors parallel level threads; a hung level thread only affects its own
+ * world, so it is reported with a stack dump instead of killing the server.
  */
 public class Watchdog extends Thread {
 
     private final Server server;
     private final long time;
     private boolean responding = true;
+    private final Set<String> hungLevelThreads = new HashSet<>();
     /**
      * Watchdog running
      */
@@ -73,6 +80,7 @@ public class Watchdog extends Thread {
                     this.server.forceShutdown("\u00A7cServer stopped responding");
                 }
             }
+            checkLevelThreads();
             try {
                 sleep(Math.max(time >> 2, 1000));
             } catch (InterruptedException ignore) {
@@ -82,6 +90,37 @@ public class Watchdog extends Thread {
             }
         }
         server.getLogger().warning("Watchdog has been stopped");
+    }
+
+    /**
+     * 监控并行世界线程是否卡死：告警并转储线程栈，不强制关闭服务器
+     * Detect hung parallel level threads: warn and dump the stack, without killing the server.
+     */
+    private void checkLevelThreads() {
+        long now = System.currentTimeMillis();
+        Set<String> stillHanging = new HashSet<>();
+        for (Level level : this.server.getLevels().values()) {
+            long lastTick = level.getLevelThreadLastTickMillis();
+            if (!level.isParallelTickEnabled() || lastTick == 0 || now - lastTick <= this.time) {
+                continue;
+            }
+            String name = level.getName();
+            stillHanging.add(name);
+            // 每次卡死事件只告警一次，恢复后重新布防 / warn once per hang episode, re-arm after recovery
+            if (hungLevelThreads.add(name)) {
+                MainLogger logger = this.server.getLogger();
+                StringBuilder log = new StringBuilder();
+                print("--------- Level thread '" + name + "' stopped responding ---------", logger, log);
+                print("Last tick " + Math.round((now - lastTick) / 1000d) + " seconds ago; this world is frozen but the server keeps running", logger, log);
+                Thread thread = level.getLevelThread();
+                if (thread != null) {
+                    print("---------------- Level thread ----------------", logger, log);
+                    dumpThread(ManagementFactory.getThreadMXBean().getThreadInfo(thread.getId(), Integer.MAX_VALUE), logger, log);
+                }
+                print("-----------------------------------------------", logger, log);
+            }
+        }
+        hungLevelThreads.retainAll(stillHanging);
     }
 
     /**

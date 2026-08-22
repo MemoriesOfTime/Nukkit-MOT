@@ -137,4 +137,9 @@ public class AnimatePacket extends DataPacket {
             return BY_NAME.get(name);
         }
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

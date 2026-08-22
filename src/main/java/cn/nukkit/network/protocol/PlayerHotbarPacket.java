@@ -34,4 +34,9 @@ public class PlayerHotbarPacket extends DataPacket {
         }
         this.putBoolean(this.selectHotbarSlot);
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

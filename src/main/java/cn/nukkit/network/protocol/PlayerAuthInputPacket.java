@@ -2,11 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.inventory.transaction.data.UseItemData;
-import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.BlockVector3;
-import cn.nukkit.math.Vector2;
-import cn.nukkit.math.Vector2f;
-import cn.nukkit.math.Vector3f;
+import cn.nukkit.math.*;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import lombok.Getter;
@@ -315,5 +311,10 @@ public class PlayerAuthInputPacket extends DataPacket {
     @Override
     public void encode() {
         this.encodeUnsupported();
+    }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
     }
 }

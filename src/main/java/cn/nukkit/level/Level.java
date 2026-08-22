@@ -72,8 +72,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.*;
@@ -88,6 +86,7 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.ref.SoftReference;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
@@ -300,9 +299,13 @@ public class Level implements ChunkManager, Metadatable {
      */
     public final ReentrantReadWriteLock providerLock = new ReentrantReadWriteLock();
 
-    private final Int2ObjectOpenHashMap<ChunkLoader> loaders = new Int2ObjectOpenHashMap<>();
+    // 并发：register/unregister 可来自主线程（预生成登录/断线/传送），而 tickChunks 在世界线程迭代 loaders
+    // Concurrent: register/unregister may run on the primary thread (pre-spawn login/disconnect/teleport) while tickChunks iterates loaders on the level thread
+    private final Map<Integer, ChunkLoader> loaders = new ConcurrentHashMap<>();
 
-    private final Int2IntMap loaderCounter = new Int2IntOpenHashMap();
+    private final Map<Integer, Integer> loaderCounter = new ConcurrentHashMap<>();
+
+    private final Object chunkLoaderRegistryLock = new Object();
 
     private final Map<Long, Map<Integer, ChunkLoader>> chunkLoaders = new ConcurrentHashMap<>();
 
@@ -333,9 +336,9 @@ public class Level implements ChunkManager, Metadatable {
     private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
     private final Map<Long, Set<Integer>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
 
-    private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
-    private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
-    private final Object2ObjectMap<GameVersion, LongSet> pendingChunkRequests = new Object2ObjectOpenHashMap<>();
+    private final Map<GameVersion, ConcurrentMap<Long, Map<Integer, Player>>> chunkSendQueues = new ConcurrentHashMap<>();
+    private final Map<GameVersion, Set<Long>> chunkSendTasks = new ConcurrentHashMap<>();
+    private final Map<GameVersion, Set<Long>> pendingChunkRequests = new ConcurrentHashMap<>();
 
     private final Cache<Long, Boolean> entityNearbyCacheDirty = Caffeine.newBuilder()
             .maximumSize(512)
@@ -347,9 +350,9 @@ public class Level implements ChunkManager, Metadatable {
             .expireAfterWrite(700, TimeUnit.MILLISECONDS)
             .build();
 
-    private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
-    private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
-    private final Long2ObjectOpenHashMap<Boolean> chunkGenerationQueue = new Long2ObjectOpenHashMap<>();
+    private final Long2ObjectNonBlockingMap<Boolean> chunkPopulationQueue = new Long2ObjectNonBlockingMap<>();
+    private final Long2ObjectNonBlockingMap<Boolean> chunkPopulationLock = new Long2ObjectNonBlockingMap<>();
+    private final Long2ObjectNonBlockingMap<Boolean> chunkGenerationQueue = new Long2ObjectNonBlockingMap<>();
     private final int chunkGenerationQueueSize;
     private final int chunkPopulationQueueSize;
 
@@ -360,7 +363,7 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     @Setter
     private boolean saveOnUnloadEnabled = true;
-    public boolean isBeingConverted;
+    public volatile boolean isBeingConverted;
 
     private BlockMetadataStore blockMetadata;
 
@@ -379,9 +382,9 @@ public class Level implements ChunkManager, Metadatable {
 
     private static final int LCG_CONSTANT = 1013904223;
 
-    private int tickRate;
-    public int tickRateTime = 0;
-    public int tickRateCounter = 0;
+    private volatile int tickRate;
+    public volatile int tickRateTime = 0;
+    public volatile int tickRateCounter = 0;
 
     // Notice: These shouldn't be used in the internal methods
     // Check the dimension id instead
@@ -415,7 +418,7 @@ public class Level implements ChunkManager, Metadatable {
     private boolean thundering;
     private int thunderTime;
 
-    private long levelCurrentTick;
+    private volatile long levelCurrentTick;
 
     private DimensionData dimensionData;
 
@@ -473,6 +476,20 @@ public class Level implements ChunkManager, Metadatable {
     private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
 
     private final boolean antiXray;
+
+    // === Parallel level tick fields ===
+    private volatile boolean parallelTickEnabled;
+    // volatile: 标记当前 GameLoop 是否被主动停止；按代隔离，防止卡死旧线程晚退出误判 / marks the CURRENT loop's stop as intentional; per-generation so a late-exiting stale thread can't be misjudged
+    private volatile AtomicBoolean currentIntentionalStop;
+    // volatile: addSyncPacketToQueue/scheduleSyncTask 可从其他线程读取 gameLoop / readable from other threads via scheduleSyncTask/addSyncPacketToQueue
+    private volatile GameLoop gameLoop;
+    private volatile Thread levelThread;
+    private volatile long nextLevelThreadTick;
+    private final Queue<Runnable> syncTaskQueue = new ConcurrentLinkedQueue<>();
+    private final Queue<SyncPacketEntry> syncPacketQueue = new ConcurrentLinkedQueue<>();
+    private static final int QUEUE_WARN_THRESHOLD = 1000;
+    private static final int QUEUE_CHECK_INTERVAL = 200;
+    private int queueCheckCounter;
 
     // 用于实现世界监听的回调，参数为 (previousBlock, newBlock) / Callbacks for world listening, params (previousBlock, newBlock)
     private static final AtomicInteger callbackIdCounter = new AtomicInteger();
@@ -687,7 +704,332 @@ public class Level implements ChunkManager, Metadatable {
         return this.levelId;
     }
 
+    // === Parallel level tick methods ===
+
+    public void startLevelThread() {
+        // 避免与仍在退出的旧线程形成两个并发 doTick 循环
+        // Avoid a second doTick loop racing the still-exiting old thread
+        if (this.levelThread != null && this.levelThread.isAlive()) {
+            server.getLogger().warning("Level thread for '" + this.getName() + "' is still running; not starting a new one");
+            return;
+        }
+        this.parallelTickEnabled = true;
+        // 首次启动对齐服务器 tick（与主线程路径同起点）；重启从自身上次 tick 续跑。
+        // 不与服务器 tick 取 max：滞后世界积累的差值会在重启时一次性前跳，实体首个 tickDiff 突变
+        // First start aligns with the server tick (same origin as the main-thread path); restarts resume
+        // from the level's own last tick. No max(serverTick, ..): a lagging level's accumulated gap would
+        // otherwise jump forward at once on restart, spiking entities' first tickDiff
+        long initialTick = this.nextLevelThreadTick > 0 ? this.nextLevelThreadTick : (long) server.getTick();
+        this.nextLevelThreadTick = initialTick;
+        AtomicBoolean intentionalStop = new AtomicBoolean(false);
+        this.currentIntentionalStop = intentionalStop;
+        this.gameLoop = GameLoop.builder()
+                .currentTick(initialTick)
+                .onStart(() -> server.getLogger().info("Level thread started: " + this.getName()))
+                .onTick((loop, startNanos) -> this.levelThreadTick((int) loop.getTick(), startNanos))
+                .onIdle(this::handleSyncPackets)
+                .onStop(() -> {
+                    server.unregisterLevelThread(Thread.currentThread());
+                    // 仅当退出的是当前线程时才清状态，防止卡死旧线程晚退出覆盖重启后的状态
+                    // Only clear state if the exiting thread is the current one, so a late-exiting stale thread cannot clobber a restarted loop
+                    if (Thread.currentThread() == this.levelThread) {
+                        this.parallelTickEnabled = false;
+                    }
+                    if (!intentionalStop.get()) {
+                        server.getLogger().error("Level thread for '" + this.getName()
+                                + "' stopped unexpectedly! This world is no longer ticking.");
+                    } else {
+                        server.getLogger().info("Level thread stopped: " + this.getName());
+                    }
+                })
+                .build();
+        this.levelThread = new Thread(gameLoop::startLoop, "Level Thread - " + this.getName());
+        this.levelThread.setDaemon(true);
+        server.registerLevelThread(this.levelThread);
+        this.levelThread.start();
+    }
+
+    public void stopLevelThread() {
+        GameLoop loop = this.gameLoop;
+        if (loop == null) {
+            return;
+        }
+        Thread thread = this.levelThread;
+        boolean selfCall = thread == Thread.currentThread();
+        if (thread != null && thread.isAlive()) {
+            AtomicBoolean intentionalStop = this.currentIntentionalStop;
+            if (intentionalStop != null) {
+                intentionalStop.set(true);
+            }
+            loop.stop();
+            if (!selfCall) {
+                try {
+                    thread.join(5000);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                if (thread.isAlive()) {
+                    server.getLogger().error("Level thread for '" + this.getName()
+                            + "' did not stop within 5s; interrupting. It may be stuck; remaining queued work is abandoned.");
+                    thread.interrupt();
+                }
+            }
+        }
+        if (selfCall || thread == null || !thread.isAlive()) {
+            this.nextLevelThreadTick = Math.max(this.nextLevelThreadTick, loop.getTick());
+            // 无条件排空（线程已死或自身调用）：避免遗留任务延迟到下次启动才执行
+            // Drain unconditionally (thread dead or self-call): avoids stale tasks lingering into a restart
+            processScheduledTasks();
+            // Discard orphaned packets - they are no longer valid after thread stop
+            this.syncPacketQueue.clear();
+        }
+        // 兜底注销：Error 跳过 onStop 时也能移除注册（幂等，与 onStop 的注销重合）
+        // Belt-and-braces unregister: also removes the entry when an Error skipped onStop (idempotent with onStop's removal)
+        if (thread != null) {
+            server.unregisterLevelThread(thread);
+        }
+    }
+
+    /**
+     * @return elapsed nanoseconds if tick executed, or -1 if skipped (tick rate limiting)
+     */
+    private long levelThreadTick(int currentTick, long startNanos) {
+        processScheduledTasks();
+        handleSyncPackets(); // Process queued packets at tick start; GameLoop onIdle also calls this to reduce latency
+
+        // Periodic queue monitoring (runs even during tick rate limiting)
+        if (++queueCheckCounter % QUEUE_CHECK_INTERVAL == 0) {
+            checkQueueSizes();
+        }
+
+        // 快速路径：避免世界关闭后 checkNetwork/doTick 继续在关闭中的世界上执行
+        // Fast path so checkNetwork/doTick never run on a closing level
+        if (this.getProvider() == null) {
+            this.gameLoop.stop();
+            return -1;
+        }
+
+        // Handle player chunk network on level thread to avoid concurrent chunk state modification
+        for (Player player : new ArrayList<>(this.getPlayers().values())) {
+            // 未完成出生的玩家由主线程驱动登录序列（processLogin/doFirstSpawn），避免并发操作 chunk 发送状态
+            // Pre-spawn players are driven by the primary thread (processLogin/doFirstSpawn) to avoid racing chunk-send state
+            if (!player.spawned) {
+                continue;
+            }
+            // 其他线程发起的传送可能使快照残留已离开本世界的玩家，跳过避免与接管线程并发 checkNetwork
+            // A teleport handled on another thread may leave stale entries in this snapshot; skip to avoid concurrent checkNetwork
+            if (player.getLevel() != this) {
+                continue;
+            }
+            player.checkNetwork();
+        }
+
+        // 转换期间暂停 tick（与主线程路径一致），队列任务/包仍会处理
+        // Pause ticking while being converted (matches the main-thread path); queued tasks/packets still drain
+        if (this.isBeingConverted) {
+            return -1;
+        }
+
+        // Tick rate limiting
+        if (this.tickRate > 1 && --this.tickRateCounter > 0) {
+            return -1;
+        }
+        if (this.tickRate > 1) {
+            this.tickRateCounter = this.tickRate;
+        }
+
+        this.providerLock.readLock().lock();
+        try {
+            if (this.getProvider() == null) {
+                this.gameLoop.stop();
+                return -1;
+            }
+            long start = System.currentTimeMillis();
+            this.doTick(currentTick);
+            this.nextLevelThreadTick = currentTick + 1L;
+            this.tickRateTime = (int) (System.currentTimeMillis() - start);
+        } finally {
+            this.providerLock.readLock().unlock();
+        }
+        return System.nanoTime() - startNanos;
+    }
+
+    private void processScheduledTasks() {
+        Runnable task;
+        while ((task = syncTaskQueue.poll()) != null) {
+            try {
+                task.run();
+            } catch (Exception e) {
+                server.getLogger().logException(e);
+            }
+        }
+    }
+
+    public void addSyncPacketToQueue(Player player, DataPacket packet) {
+        if (!levelThreadAcceptingWork()) {
+            // 线程已死时兜底为调用线程直接处理，避免丢包
+            // Caller-thread fallback when the level thread is dead, so packets are not dropped
+            try {
+                player.handleDataPacket(packet);
+            } catch (Throwable t) {
+                server.getLogger().error("Error while handling sync packet for player " + player.getName(), t);
+            }
+            return;
+        }
+        this.syncPacketQueue.offer(new SyncPacketEntry(player, packet));
+        if (this.gameLoop != null) this.gameLoop.wakeUp();
+    }
+
+    protected void handleSyncPackets() {
+        SyncPacketEntry entry;
+        while ((entry = this.syncPacketQueue.poll()) != null) {
+            Player player = entry.player();
+            if (!player.isConnected()) {
+                continue;
+            }
+            if (player.level != this) {
+                // 转发而非丢弃，避免传送瞬间丢包
+                // Forward instead of dropping, so packets are not lost mid-teleport
+                forwardSyncPacket(player, entry.packet());
+                continue;
+            }
+            if (!player.spawned) {
+                // 登录序列期间由主线程处理，与单线程语义一致，避免与 processLogin/doFirstSpawn 并发
+                // During the login sequence defer to the primary thread, matching single-thread semantics and avoiding races with processLogin/doFirstSpawn
+                DataPacket packet = entry.packet();
+                this.server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                    if (player.isConnected()) {
+                        player.handleDataPacket(packet);
+                    }
+                });
+                continue;
+            }
+
+            try {
+                player.handleDataPacket(entry.packet());
+            } catch (Throwable t) {
+                server.getLogger().error("Error while handling sync packet in world " + this.getName()
+                        + " for player " + player.getName(), t);
+            }
+        }
+    }
+
+    private void forwardSyncPacket(Player player, DataPacket packet) {
+        Level targetLevel = player.getLevel();
+        if (targetLevel == null) {
+            return;
+        }
+        if (targetLevel.isParallelTickEnabled()) {
+            targetLevel.addSyncPacketToQueue(player, packet);
+        } else {
+            // 目标世界非并行：转回主线程处理，保持单线程语义
+            // Target not parallel-ticked: defer to the primary thread to preserve single-thread semantics
+            this.server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                if (player.isConnected()) {
+                    player.handleDataPacket(packet);
+                }
+            });
+        }
+    }
+
+    public void scheduleSyncTask(Runnable task) {
+        if (levelThreadAcceptingWork()) {
+            syncTaskQueue.offer(task);
+            if (gameLoop != null) gameLoop.wakeUp();
+        } else {
+            // 避免线程死亡后任务被静默丢弃
+            // Run inline so tasks are not silently dropped after thread death
+            task.run();
+        }
+    }
+
+    /**
+     * Schedule a task on this level's thread and wait for completion.
+     * <p>
+     * WARNING: Do not call from the main thread if the task may indirectly
+     * require the main thread (e.g. via synchronized blocks), as this can
+     * cause a deadlock. Callers should use a timeout on the returned future.
+     */
+    public CompletableFuture<Void> scheduleSyncTaskAndWait(Runnable task) {
+        if (Thread.currentThread() == this.levelThread || !levelThreadAcceptingWork()) {
+            task.run();
+            return CompletableFuture.completedFuture(null);
+        }
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        syncTaskQueue.offer(() -> {
+            try {
+                task.run();
+                future.complete(null);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        if (gameLoop != null) gameLoop.wakeUp();
+        return future;
+    }
+
+    public boolean isOwnThread() {
+        if (isParallelTickEnabled()) {
+            return Thread.currentThread() == this.levelThread;
+        }
+        return this.server.isPrimaryThread();
+    }
+
+    public boolean isParallelTickEnabled() {
+        // 感知线程存活：线程异常死亡（如 Error 导致 onStop 未执行）时自动回落主线程路径
+        // Liveness-aware: if the thread died abnormally (Error skipping onStop), routing falls back to primary-thread paths
+        return parallelTickEnabled && levelThread != null && levelThread.isAlive();
+    }
+
+    private boolean levelThreadAcceptingWork() {
+        Thread t = this.levelThread;
+        return t != null && t.isAlive();
+    }
+
+    public Thread getLevelThread() {
+        return this.levelThread;
+    }
+
+    /**
+     * @return 世界线程未运行时为 0 / 0 when the level thread is not running
+     */
+    public long getLevelThreadLastTickMillis() {
+        GameLoop loop = this.gameLoop;
+        return loop != null ? loop.getLastTickStartMillis() : 0L;
+    }
+
+    /**
+     * @return 新实体 lastUpdate 应使用的 tick：并行模式为 GameLoop tick，否则为服务器 tick
+     *         Tick used to initialize a new entity's lastUpdate: the GameLoop tick when parallel, otherwise the server tick
+     */
+    public long getTickForEntityInit() {
+        GameLoop loop = this.gameLoop;
+        return loop != null && this.isParallelTickEnabled() ? loop.getTick() : this.server.getTick();
+    }
+
+    public float getLevelTPS() {
+        return gameLoop != null ? gameLoop.getTPS() : -1;
+    }
+
+    public float getLevelMSPT() {
+        return gameLoop != null ? gameLoop.getMSPT() : -1;
+    }
+
+    private void checkQueueSizes() {
+        int taskSize = syncTaskQueue.size();
+        int packetSize = syncPacketQueue.size();
+        if (taskSize > QUEUE_WARN_THRESHOLD) {
+            server.getLogger().warning("Sync task queue for world '" + this.getName()
+                    + "' is large (" + taskSize + "), server may be overloaded");
+        }
+        if (packetSize > QUEUE_WARN_THRESHOLD) {
+            server.getLogger().warning("Sync packet queue for world '" + this.getName()
+                    + "' is large (" + packetSize + "), server may be overloaded");
+        }
+    }
+
     public void close() {
+        stopLevelThread();
         boolean interrupted = false;
         this.providerLock.writeLock().lock();
         try {
@@ -1079,33 +1421,22 @@ public class Level implements ChunkManager, Metadatable {
         int loaderId = loader.getLoaderId();
         long chunkHash = Level.chunkHash(chunkX, chunkZ);
 
-        Map<Integer, ChunkLoader> map = this.chunkLoaders.get(chunkHash);
-        if (map == null) {
-            Map<Integer, ChunkLoader> newChunkLoader = new HashMap<>();
-            newChunkLoader.put(loaderId, loader);
-            this.chunkLoaders.put(chunkHash, newChunkLoader);
-            Map<Integer, Player> newPlayerLoader = new HashMap<>();
-            if (loader instanceof Player) {
-                newPlayerLoader.put(loaderId, (Player) loader);
+        // loadChunk 可能触发磁盘 IO，放在锁外避免拖慢并发的注销
+        // loadChunk may hit disk IO, so it stays outside the lock to avoid stalling concurrent unregistration
+        synchronized (this.chunkLoaderRegistryLock) {
+            Map<Integer, ChunkLoader> map = this.chunkLoaders.computeIfAbsent(chunkHash, k -> new ConcurrentHashMap<>());
+            if (map.putIfAbsent(loaderId, loader) != null) {
+                return;
             }
-            this.playerLoaders.put(chunkHash, newPlayerLoader);
-        } else if (map.containsKey(loaderId)) {
-            return;
-        } else {
-            map.put(loaderId, loader);
             if (loader instanceof Player) {
-                this.playerLoaders.get(chunkHash).put(loaderId, (Player) loader);
+                this.playerLoaders.computeIfAbsent(chunkHash, k -> new ConcurrentHashMap<>()).put(loaderId, (Player) loader);
             }
-        }
 
-        if (!this.loaders.containsKey(loaderId)) {
-            this.loaderCounter.put(loaderId, 1);
             this.loaders.put(loaderId, loader);
-        } else {
-            this.loaderCounter.put(loaderId, this.loaderCounter.get(loaderId) + 1);
-        }
+            this.loaderCounter.merge(loaderId, 1, Integer::sum);
 
-        this.cancelUnloadChunkRequest(chunkHash);
+            this.cancelUnloadChunkRequest(chunkHash);
+        }
 
         if (autoLoad) {
             this.loadChunk(chunkX, chunkZ);
@@ -1115,26 +1446,29 @@ public class Level implements ChunkManager, Metadatable {
     public void unregisterChunkLoader(ChunkLoader loader, int chunkX, int chunkZ) {
         int hash = loader.getLoaderId();
         long index = Level.chunkHash(chunkX, chunkZ);
-        Map<Integer, ChunkLoader> chunkLoadersIndex = this.chunkLoaders.get(index);
-        if (chunkLoadersIndex != null) {
-            ChunkLoader oldLoader = chunkLoadersIndex.remove(hash);
-            if (oldLoader != null) {
-                if (chunkLoadersIndex.isEmpty()) {
-                    this.chunkLoaders.remove(index);
-                    this.playerLoaders.remove(index);
-                    this.invalidatePendingChunkLoad(index);
-                    this.unloadChunkRequest(chunkX, chunkZ, true);
-                } else {
-                    Map<Integer, Player> playerLoadersIndex = this.playerLoaders.get(index);
-                    playerLoadersIndex.remove(hash);
-                }
+        // 拆除须与注册互斥：unloadChunkRequest 留在锁内，保证与注册侧 cancelUnloadChunkRequest 的先后顺序
+        // Teardown must exclude registration: unloadChunkRequest stays inside the lock to keep its ordering against cancelUnloadChunkRequest
+        synchronized (this.chunkLoaderRegistryLock) {
+            Map<Integer, ChunkLoader> chunkLoadersIndex = this.chunkLoaders.get(index);
+            if (chunkLoadersIndex != null) {
+                ChunkLoader oldLoader = chunkLoadersIndex.remove(hash);
+                if (oldLoader != null) {
+                    if (chunkLoadersIndex.isEmpty()) {
+                        this.chunkLoaders.remove(index, chunkLoadersIndex);
+                        this.playerLoaders.remove(index);
+                        this.invalidatePendingChunkLoad(index);
+                        this.unloadChunkRequest(chunkX, chunkZ, true);
+                    } else {
+                        Map<Integer, Player> playerLoadersIndex = this.playerLoaders.get(index);
+                        if (playerLoadersIndex != null) {
+                            playerLoadersIndex.remove(hash);
+                        }
+                    }
 
-                int count = this.loaderCounter.get(hash);
-                if (--count == 0) {
-                    this.loaderCounter.remove(hash);
-                    this.loaders.remove(hash);
-                } else {
-                    this.loaderCounter.put(hash, count);
+                    this.loaderCounter.compute(hash, (k, count) -> count == null || count <= 1 ? null : count - 1);
+                    if (!this.loaderCounter.containsKey(hash)) {
+                        this.loaders.remove(hash);
+                    }
                 }
             }
         }
@@ -3537,10 +3871,12 @@ public class Level implements ChunkManager, Metadatable {
         BaseFullChunk chunk = this.requireProvider().getLoadedChunk(index);
         if (chunk == null) {
             chunk = this.forceLoadChunk(index, chunkX, chunkZ, create);
-        } else if (this.server.isPrimaryThread()) {
+        } else if (this.isOwnThread()) {
             // Provider-direct loads bypass Level mounting; replay only their deferred ticks here
             // without changing entity initialization or ChunkLoadEvent lifecycle semantics.
-            // provider 直载绕过 Level 挂载;这里只回放延迟方块刻,不改变实体初始化与事件生命周期
+            // provider 直载绕过 Level 挂载;这里只回放延迟方块刻,不改变实体初始化与事件生命周期。
+            // isOwnThread 而非 isPrimaryThread：并行世界的延迟刻由其世界线程回放（主线程门会漏放）
+            // isOwnThread, not isPrimaryThread: parallel levels replay on their level thread (a primary-thread gate would never fire)
             chunk.replayDeferredBlockUpdates();
         }
         return chunk;
@@ -3553,6 +3889,19 @@ public class Level implements ChunkManager, Metadatable {
 
     public void generateChunkCallback(int x, int z, BaseFullChunk chunk) {
         generateChunkCallback(x, z, chunk, true);
+    }
+
+    /**
+     * 生成任务完成回调入口：并行世界投递到其世界线程执行（挂载与 tick 串行），否则主线程直调
+     * Entry point for generation-task completion: hop to the level thread when parallel-ticked
+     * (mount serialized with the tick); otherwise run directly on the calling thread.
+     */
+    public void handleGenerationCallback(int x, int z, BaseFullChunk chunk, boolean isPopulated) {
+        if (isParallelTickEnabled()) {
+            scheduleSyncTask(() -> this.generateChunkCallback(x, z, chunk, isPopulated));
+        } else {
+            this.generateChunkCallback(x, z, chunk, isPopulated);
+        }
     }
 
     public final void generateChunkCallback(final int x, final int z, BaseFullChunk chunk, final boolean isPopulated) {
@@ -4001,7 +4350,7 @@ public class Level implements ChunkManager, Metadatable {
         long index = Level.chunkHash(x, z);
 
         this.getChunkSendQueue(player.getGameVersion()).computeIfAbsent(index, k ->
-                new Int2ObjectOpenHashMap<>()).put(player.getLoaderId(), player);
+                new ConcurrentHashMap<>()).put(player.getLoaderId(), player);
         this.getPendingChunkRequests(player.getGameVersion()).add(index);
     }
 
@@ -4012,12 +4361,12 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void sendChunkInternal(int x, int z, long index, DataPacket packet, GameVersion protocol) {
-        LongSet tasks = this.getChunkSendTasks(protocol);
+        Set<Long> tasks = this.getChunkSendTasks(protocol);
         if (!tasks.contains(index)) {
             return;
         }
 
-        ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
+        ConcurrentMap<Long, Map<Integer, Player>> queue = this.getChunkSendQueue(protocol);
         for (Player player : queue.get(index).values()) {
             if (player.isConnected() && player.usedChunks.containsKey(index)) {
                 player.sendChunk(x, z, packet);
@@ -4031,12 +4380,12 @@ public class Level implements ChunkManager, Metadatable {
     private void processChunkRequest() {
         Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = new Long2ObjectOpenHashMap<>();
         for (GameVersion protocolId : this.pendingChunkRequests.keySet()) {
-            LongSet pending = this.getPendingChunkRequests(protocolId);
+            Set<Long> pending = this.getPendingChunkRequests(protocolId);
             if (pending.isEmpty()) {
                 continue;
             }
-            LongSet tasks = this.getChunkSendTasks(protocolId);
-            ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocolId);
+            Set<Long> tasks = this.getChunkSendTasks(protocolId);
+            ConcurrentMap<Long, Map<Integer, Player>> queue = this.getChunkSendQueue(protocolId);
             for (long index : pending) {
                 // 超时未回调则强制清除重试 / Force-clear and retry if no callback within timeout
                 long startTick = this.chunkSendTaskStartTick.get(index);
@@ -4116,9 +4465,9 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
-        LongSet tasks = this.getChunkSendTasks(protocol);
+        Set<Long> tasks = this.getChunkSendTasks(protocol);
         if (tasks.contains(index)) {
-            ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
+            ConcurrentMap<Long, Map<Integer, Player>> queue = this.getChunkSendQueue(protocol);
 
             if (queue.containsKey(index)) {
                 for (Player player : queue.get(index).values()) {
@@ -4208,7 +4557,8 @@ public class Level implements ChunkManager, Metadatable {
         LevelProvider levelProvider = this.requireProvider();
         if (levelProvider.isChunkLoaded(index)) {
             BaseFullChunk chunk = levelProvider.getLoadedChunk(index);
-            if (chunk != null && this.server.isPrimaryThread()) {
+            // 同 getChunk：由世界 tick 归属线程回放延迟方块刻 / Same as getChunk: deferred ticks replay on the level's owning thread
+            if (chunk != null && this.isOwnThread()) {
                 chunk.replayDeferredBlockUpdates();
             }
             return chunk != null;
@@ -4586,8 +4936,7 @@ public class Level implements ChunkManager, Metadatable {
             }
 
             if (populate) {
-                if (!this.chunkPopulationQueue.containsKey(index)) {
-                    this.chunkPopulationQueue.put(index, Boolean.TRUE);
+                if (this.chunkPopulationQueue.putIfAbsent(index, Boolean.TRUE) == null) {
                     for (int xx = -1; xx <= 1; ++xx) {
                         for (int zz = -1; zz <= 1; ++zz) {
                             this.chunkPopulationLock.put(Level.chunkHash(x + xx, z + zz), Boolean.TRUE);
@@ -4613,8 +4962,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         long index = Level.chunkHash(x, z);
-        if (!this.chunkGenerationQueue.containsKey(index)) {
-            this.chunkGenerationQueue.put(index, Boolean.TRUE);
+        if (this.chunkGenerationQueue.putIfAbsent(index, Boolean.TRUE) == null) {
             GenerationTask task = new GenerationTask(this, this.getChunk(x, z, true));
             this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, task);
         }
@@ -5584,19 +5932,19 @@ public class Level implements ChunkManager, Metadatable {
         return blockEntity != null && blockEntity.hasPersistentDataContainer();
     }
 
-    private ConcurrentMap<Long, Int2ObjectMap<Player>> getChunkSendQueue(GameVersion protocol) {
+    private ConcurrentMap<Long, Map<Integer, Player>> getChunkSendQueue(GameVersion protocol) {
         GameVersion protocolId = this.getChunkProtocol(protocol);
         return this.chunkSendQueues.computeIfAbsent(protocolId, i -> new ConcurrentHashMap<>());
     }
 
-    private LongSet getChunkSendTasks(GameVersion protocol) {
+    private Set<Long> getChunkSendTasks(GameVersion protocol) {
         GameVersion protocolId = this.getChunkProtocol(protocol);
-        return this.chunkSendTasks.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
+        return this.chunkSendTasks.computeIfAbsent(protocolId, i -> ConcurrentHashMap.newKeySet());
     }
 
-    private LongSet getPendingChunkRequests(GameVersion protocol) {
+    private Set<Long> getPendingChunkRequests(GameVersion protocol) {
         GameVersion protocolId = this.getChunkProtocol(protocol);
-        return this.pendingChunkRequests.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
+        return this.pendingChunkRequests.computeIfAbsent(protocolId, i -> ConcurrentHashMap.newKeySet());
     }
 
     private GameVersion getChunkProtocol(GameVersion version) {
@@ -5797,4 +6145,6 @@ public class Level implements ChunkManager, Metadatable {
         private Block block;
         private BlockFace neighbor;
     }
+
+    private record SyncPacketEntry(Player player, DataPacket packet) {}
 }

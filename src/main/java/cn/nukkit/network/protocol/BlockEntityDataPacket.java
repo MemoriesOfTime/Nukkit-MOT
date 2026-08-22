@@ -37,4 +37,8 @@ public class BlockEntityDataPacket extends DataPacket {
         this.putBlockVector3(this.x, this.y, this.z);
         this.put(this.namedTag);
     }
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }
