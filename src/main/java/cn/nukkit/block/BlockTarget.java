@@ -174,7 +174,7 @@ public class BlockTarget extends BlockSolid implements BlockEntityHolder<BlockEn
             return;
         }
 
-        Vector3 hitVector = intercept.hitVector.subtract(x*2, y*2, z*2);
+        Vector3 hitVector = intercept.hitVector.subtract(x, y, z);
         List<Axis> axes = new ArrayList<>(Arrays.asList(Axis.values()));
         axes.remove(faceHit.getAxis());
 
