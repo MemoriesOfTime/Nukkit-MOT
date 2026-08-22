@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.types.ScorerType;
 import lombok.ToString;
 
@@ -64,7 +65,9 @@ public class SetScorePacket extends DataPacket {
                         boolean present = objectiveId != null && !objectiveId.isEmpty();
                         this.putBoolean(present);
                         if (present) {
-                            if (this.protocol >= ProtocolInfo.v1_26_44) {
+                            // 1.26.44 独有：objectiveName 为 Double optional（wire 协议号未提升，仍 2168）；1.26.45 已回滚
+                            // 1.26.44 only: objectiveName is double-optional (wire protocol not bumped); reverted in 1.26.45
+                            if (this.gameVersion == GameVersion.V1_26_44) {
                                 this.putBoolean(true);
                             }
                             this.putString(objectiveId);

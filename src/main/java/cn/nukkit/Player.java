@@ -3678,14 +3678,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 LoginPacket loginPacket = (LoginPacket) packet;
 
                 this.protocol = loginPacket.getProtocol();
-                if (this.gameVersion == null) {
-                    // 低版本仅兼容国际版，高于554的版本在RequestNetworkSettingsProcessor_v554中处理
-                    this.gameVersion = GameVersion.byProtocol(this.protocol, false);
-                    this.syncGameVersion(this.gameVersion);
-                } else if (this.protocol != this.gameVersion.getProtocol()) {
-                    // LoginPacket.decode() 可能修改协议号（如将1.19.62的567修正为1.19.63的568），
-                    // 需要重新同步gameVersion以保持protocol和gameVersion一致，
-                    this.gameVersion = GameVersion.byProtocol(this.protocol, this.gameVersion.isNetEase());
+                if (this.gameVersion != loginPacket.getGameVersion()) {
+                    this.gameVersion = loginPacket.getGameVersion();
                     this.syncGameVersion(this.gameVersion);
                 }
 

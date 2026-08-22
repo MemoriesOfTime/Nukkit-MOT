@@ -23,12 +23,12 @@ import java.util.zip.GZIPInputStream;
 class BlockPaletteTest {
 
     /**
-     * 最新有专属调色板资源的版本。虚拟协议号（协议号未变的热修复，如 1.26.44 的 2169）
+     * 最新有专属调色板资源的版本。协议号未变的热修复版本（如 1.26.44/1.26.45 相对 1.26.40）
      * 没有专属资源文件，生产中经 GlobalBlockPalette 的阈值回退复用本版本的调色板。
      * <p>
-     * The latest version with a dedicated palette resource. Virtual protocols (same-wire hotfixes
-     * like 1.26.44's 2169) ship no resource and reuse this version's palette in production via
-     * GlobalBlockPalette's threshold fallback.
+     * The latest version with a dedicated palette resource. Same-wire hotfix versions
+     * (e.g. 1.26.44/1.26.45 over 1.26.40) ship no resource and reuse this version's
+     * palette in production via GlobalBlockPalette's threshold fallback.
      */
     private static final GameVersion LAST_PALETTE_VERSION = GameVersion.V1_26_40;
 

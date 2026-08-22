@@ -80,7 +80,7 @@ class CustomBlockDefinitionSerializerTest {
 
     @Test
     void latestProtocolsConvertAmbientOcclusionToFloat() {
-        for (int protocol : new int[]{ProtocolInfo.v1_26_20, ProtocolInfo.v1_26_40, ProtocolInfo.v1_26_44, ProtocolInfo.CURRENT_PROTOCOL}) {
+        for (int protocol : new int[]{ProtocolInfo.v1_26_20, ProtocolInfo.v1_26_40, ProtocolInfo.v1_26_45, ProtocolInfo.CURRENT_PROTOCOL}) {
             CompoundTag star = material(CustomBlockDefinitionSerializer.serialize(buildNbt(), protocol), "components", "*");
             assertInstanceOf(FloatTag.class, star.get("ambient_occlusion"), "protocol " + protocol);
         }
