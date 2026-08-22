@@ -130,6 +130,7 @@ import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -1107,10 +1108,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     /**
      * 断线时的区块卸载：usedChunks/loadQueue 非并发，须与其世界线程的 checkNetwork/sendNextChunk 串行；
-     * 超时回落调用线程执行（幂等，世界线程后续重跑为空操作）。
+     * 超时回落调用线程执行，CAS 保证只执行一次（排队任务在线程恢复后不会并发重跑）。
      * Chunk teardown on disconnect: usedChunks/loadQueue are not concurrent, so this must serialize
-     * with the level thread's checkNetwork/sendNextChunk; falls back to the calling thread on timeout
-     * (idempotent - a late level-thread rerun iterates an already-empty set).
+     * with the level thread's checkNetwork/sendNextChunk; falls back to the calling thread on timeout,
+     * with a CAS guard so the still-queued task cannot re-run it concurrently after the thread recovers.
      */
     private void unloadChunksOnLevelThread() {
         Level level = this.getLevel();
@@ -1118,14 +1119,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.unloadChunks(false);
             return;
         }
-        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(() -> this.unloadChunks(false));
+        AtomicBoolean unloaded = new AtomicBoolean(false);
+        Runnable unload = () -> {
+            if (unloaded.compareAndSet(false, true)) {
+                this.unloadChunks(false);
+            }
+        };
+        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(unload);
         try {
             future.get(5, TimeUnit.SECONDS);
         } catch (TimeoutException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            this.unloadChunks(false);
+            unload.run();
         } catch (ExecutionException e) {
             this.server.getLogger().logException(e.getCause());
         }
@@ -6540,8 +6547,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     /**
      * 断线保存：并行世界时投递到其世界线程执行，避免快照与 tick 并发；等待超时回落当前线程。
+     * CAS 保证 save 只执行一次：超时回落后排队任务仍在线程队列中，线程恢复时不得与回落保存并发双写。
      * Disconnect save: hop to the player's level thread when parallel-ticked so the snapshot
-     * cannot race the tick; falls back to the calling thread if the wait times out.
+     * cannot race the tick; falls back to the calling thread if the wait times out. The CAS makes
+     * save run exactly once: the still-queued task must not run it again concurrently after recovery.
      */
     private void saveSerializedWithLevelThread() {
         Level level = this.getLevel();
@@ -6549,24 +6558,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.save();
             return;
         }
-        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(() -> {
-            if (!this.closed) {
+        AtomicBoolean saved = new AtomicBoolean(false);
+        Runnable saveOnce = () -> {
+            if (!this.closed && saved.compareAndSet(false, true)) {
                 this.save();
             }
-        });
+        };
+        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(saveOnce);
         try {
             future.get(5, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             this.server.getLogger().warning("Level thread for '" + level.getName()
                     + "' did not save player " + this.getName() + " within 5s; saving on current thread");
-            if (!this.closed) {
-                this.save();
-            }
+            saveOnce.run();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            if (!this.closed) {
-                this.save();
-            }
+            saveOnce.run();
         } catch (ExecutionException e) {
             this.server.getLogger().logException(e.getCause());
         }

@@ -305,6 +305,8 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Map<Integer, Integer> loaderCounter = new ConcurrentHashMap<>();
 
+    private final Object chunkLoaderRegistryLock = new Object();
+
     private final Map<Long, Map<Integer, ChunkLoader>> chunkLoaders = new ConcurrentHashMap<>();
 
     private final Map<Long, Map<Integer, Player>> playerLoaders = new ConcurrentHashMap<>();
@@ -361,7 +363,7 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     @Setter
     private boolean saveOnUnloadEnabled = true;
-    public boolean isBeingConverted;
+    public volatile boolean isBeingConverted;
 
     private BlockMetadataStore blockMetadata;
 
@@ -712,7 +714,12 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
         this.parallelTickEnabled = true;
-        long initialTick = Math.max(this.nextLevelThreadTick, (long) server.getTick());
+        // 首次启动对齐服务器 tick（与主线程路径同起点）；重启从自身上次 tick 续跑。
+        // 不与服务器 tick 取 max：滞后世界积累的差值会在重启时一次性前跳，实体首个 tickDiff 突变
+        // First start aligns with the server tick (same origin as the main-thread path); restarts resume
+        // from the level's own last tick. No max(serverTick, ..): a lagging level's accumulated gap would
+        // otherwise jump forward at once on restart, spiking entities' first tickDiff
+        long initialTick = this.nextLevelThreadTick > 0 ? this.nextLevelThreadTick : (long) server.getTick();
         this.nextLevelThreadTick = initialTick;
         AtomicBoolean intentionalStop = new AtomicBoolean(false);
         this.currentIntentionalStop = intentionalStop;
@@ -722,6 +729,7 @@ public class Level implements ChunkManager, Metadatable {
                 .onTick((loop, startNanos) -> this.levelThreadTick((int) loop.getTick(), startNanos))
                 .onIdle(this::handleSyncPackets)
                 .onStop(() -> {
+                    server.unregisterLevelThread(Thread.currentThread());
                     // 仅当退出的是当前线程时才清状态，防止卡死旧线程晚退出覆盖重启后的状态
                     // Only clear state if the exiting thread is the current one, so a late-exiting stale thread cannot clobber a restarted loop
                     if (Thread.currentThread() == this.levelThread) {
@@ -737,6 +745,7 @@ public class Level implements ChunkManager, Metadatable {
                 .build();
         this.levelThread = new Thread(gameLoop::startLoop, "Level Thread - " + this.getName());
         this.levelThread.setDaemon(true);
+        server.registerLevelThread(this.levelThread);
         this.levelThread.start();
     }
 
@@ -773,6 +782,11 @@ public class Level implements ChunkManager, Metadatable {
             processScheduledTasks();
             // Discard orphaned packets - they are no longer valid after thread stop
             this.syncPacketQueue.clear();
+        }
+        // 兜底注销：Error 跳过 onStop 时也能移除注册（幂等，与 onStop 的注销重合）
+        // Belt-and-braces unregister: also removes the entry when an Error skipped onStop (idempotent with onStop's removal)
+        if (thread != null) {
+            server.unregisterLevelThread(thread);
         }
     }
 
@@ -1407,18 +1421,22 @@ public class Level implements ChunkManager, Metadatable {
         int loaderId = loader.getLoaderId();
         long chunkHash = Level.chunkHash(chunkX, chunkZ);
 
-        Map<Integer, ChunkLoader> map = this.chunkLoaders.computeIfAbsent(chunkHash, k -> new ConcurrentHashMap<>());
-        if (map.putIfAbsent(loaderId, loader) != null) {
-            return;
-        }
-        if (loader instanceof Player) {
-            this.playerLoaders.computeIfAbsent(chunkHash, k -> new ConcurrentHashMap<>()).put(loaderId, (Player) loader);
-        }
+        // loadChunk 可能触发磁盘 IO，放在锁外避免拖慢并发的注销
+        // loadChunk may hit disk IO, so it stays outside the lock to avoid stalling concurrent unregistration
+        synchronized (this.chunkLoaderRegistryLock) {
+            Map<Integer, ChunkLoader> map = this.chunkLoaders.computeIfAbsent(chunkHash, k -> new ConcurrentHashMap<>());
+            if (map.putIfAbsent(loaderId, loader) != null) {
+                return;
+            }
+            if (loader instanceof Player) {
+                this.playerLoaders.computeIfAbsent(chunkHash, k -> new ConcurrentHashMap<>()).put(loaderId, (Player) loader);
+            }
 
-        this.loaders.put(loaderId, loader);
-        this.loaderCounter.merge(loaderId, 1, Integer::sum);
+            this.loaders.put(loaderId, loader);
+            this.loaderCounter.merge(loaderId, 1, Integer::sum);
 
-        this.cancelUnloadChunkRequest(chunkHash);
+            this.cancelUnloadChunkRequest(chunkHash);
+        }
 
         if (autoLoad) {
             this.loadChunk(chunkX, chunkZ);
@@ -1428,25 +1446,29 @@ public class Level implements ChunkManager, Metadatable {
     public void unregisterChunkLoader(ChunkLoader loader, int chunkX, int chunkZ) {
         int hash = loader.getLoaderId();
         long index = Level.chunkHash(chunkX, chunkZ);
-        Map<Integer, ChunkLoader> chunkLoadersIndex = this.chunkLoaders.get(index);
-        if (chunkLoadersIndex != null) {
-            ChunkLoader oldLoader = chunkLoadersIndex.remove(hash);
-            if (oldLoader != null) {
-                if (chunkLoadersIndex.isEmpty()) {
-                    this.chunkLoaders.remove(index, chunkLoadersIndex);
-                    this.playerLoaders.remove(index);
-                    this.invalidatePendingChunkLoad(index);
-                    this.unloadChunkRequest(chunkX, chunkZ, true);
-                } else {
-                    Map<Integer, Player> playerLoadersIndex = this.playerLoaders.get(index);
-                    if (playerLoadersIndex != null) {
-                        playerLoadersIndex.remove(hash);
+        // 拆除须与注册互斥：unloadChunkRequest 留在锁内，保证与注册侧 cancelUnloadChunkRequest 的先后顺序
+        // Teardown must exclude registration: unloadChunkRequest stays inside the lock to keep its ordering against cancelUnloadChunkRequest
+        synchronized (this.chunkLoaderRegistryLock) {
+            Map<Integer, ChunkLoader> chunkLoadersIndex = this.chunkLoaders.get(index);
+            if (chunkLoadersIndex != null) {
+                ChunkLoader oldLoader = chunkLoadersIndex.remove(hash);
+                if (oldLoader != null) {
+                    if (chunkLoadersIndex.isEmpty()) {
+                        this.chunkLoaders.remove(index, chunkLoadersIndex);
+                        this.playerLoaders.remove(index);
+                        this.invalidatePendingChunkLoad(index);
+                        this.unloadChunkRequest(chunkX, chunkZ, true);
+                    } else {
+                        Map<Integer, Player> playerLoadersIndex = this.playerLoaders.get(index);
+                        if (playerLoadersIndex != null) {
+                            playerLoadersIndex.remove(hash);
+                        }
                     }
-                }
 
-                this.loaderCounter.compute(hash, (k, count) -> count == null || count <= 1 ? null : count - 1);
-                if (!this.loaderCounter.containsKey(hash)) {
-                    this.loaders.remove(hash);
+                    this.loaderCounter.compute(hash, (k, count) -> count == null || count <= 1 ? null : count - 1);
+                    if (!this.loaderCounter.containsKey(hash)) {
+                        this.loaders.remove(hash);
+                    }
                 }
             }
         }

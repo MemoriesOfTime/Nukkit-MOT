@@ -7,6 +7,7 @@ import cn.nukkit.utils.TextFormat;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created on 2015/11/11 by xtypr.
@@ -35,7 +36,11 @@ public class GarbageCollectorCommand extends VanillaCommand {
             // 并行世界的区块卸载须在其世界线程执行；等待结果以保持统计数字准确
             // Chunk unloading for parallel levels must run on their level thread; wait for the result to keep stats accurate
             int[] stats = new int[3];
+            AtomicBoolean executed = new AtomicBoolean(false);
             Runnable collection = () -> {
+                if (!executed.compareAndSet(false, true)) {
+                    return;
+                }
                 int chunksCount = level.getChunks().size();
                 int entitiesCount = level.getEntities().length;
                 int tilesCount = level.getBlockEntities().size();

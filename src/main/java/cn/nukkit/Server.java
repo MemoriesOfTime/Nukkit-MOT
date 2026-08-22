@@ -190,6 +190,9 @@ public class Server {
     private int baseTickRate;
     private boolean parallelLevelTick;
     private volatile boolean levelThreadsStartAllowed;
+    // 受管并行世界线程注册表：区分"世界线程"与真正危险的异步上下文（RCON/异步池等）
+    // Registry of managed parallel level threads: distinguishes them from genuinely unsafe async contexts (RCON/async pools)
+    private final Set<Thread> levelThreads = ConcurrentHashMap.newKeySet();
     private int difficulty;
     private int defaultGameMode = Integer.MAX_VALUE;
     int c_s_spawnThreshold;
@@ -1350,7 +1353,9 @@ public class Server {
 
     public boolean dispatchCommand(CommandSender sender, String commandLine) throws ServerException {
         // First we need to check if this command is on the main thread or not, if not, warn the user
-        if (!this.isPrimaryThread()) {
+        // 世界线程上的命令派发是并行 tick 的受管路径，与该世界 tick 串行，不属于危险异步
+        // Commands on a managed level thread are the intended parallel-tick path, serialized with that world's tick
+        if (!this.isPrimaryThread() && !this.isLevelThread()) {
             getLogger().warning("Command Dispatched Async: " + commandLine);
         }
         if (sender == null) {
@@ -3439,6 +3444,18 @@ public class Server {
      */
     public boolean isPrimaryThread() {
         return (Thread.currentThread() == currentThread);
+    }
+
+    public void registerLevelThread(Thread thread) {
+        this.levelThreads.add(thread);
+    }
+
+    public void unregisterLevelThread(Thread thread) {
+        this.levelThreads.remove(thread);
+    }
+
+    public boolean isLevelThread() {
+        return this.levelThreads.contains(Thread.currentThread());
     }
 
     /**
