@@ -376,4 +376,55 @@ class CharacterCreatorLoginJwtTest {
         assertEquals(0, pkt.skin.getGrowthLevel(), "GrowthLevel default");
         assertArrayEquals(new byte[0], pkt.skin.getBloomData(), "BloomData default");
     }
+
+    /**
+     * LoginPacket 必须在 decode() 后解析出客户端最终 GameVersion（非空）：
+     * - 1.26.44（与 1.26.40 同为 2168）→ V1_26_44，协议号保持真实值
+     * - 1.26.40 → V1_26_40（无检出，按协议号推断）
+     * - 1.19.62（与 1.19.60 同为 567）→ V1_19_63，协议号同时重写为 568（皮肤解码依赖）
+     * - NetEase 上下文：批量解码阶段预设的 NetEase gameVersion 决定 byProtocol 的分支
+     * <p>
+     * LoginPacket must resolve the client's final (non-null) GameVersion after decode():
+     * 1.26.44 (shares 2168 with 1.26.40) yields V1_26_44 with the wire protocol kept
+     * truthful; 1.26.40 yields V1_26_40 (no detection, inferred by protocol); 1.19.62
+     * (shares 567 with 1.19.60) yields V1_19_63 with the protocol rewritten to 568 for
+     * skin decoding; the NetEase context preset during batch decoding selects the
+     * byProtocol branch.
+     */
+    @Test
+    void clientGameVersionResolutionCoversSameWireProtocolClients() {
+        // 1.26.44 客户端（wire 2168）
+        JsonObject v44 = buildPersonaSkinPayload();
+        v44.addProperty("GameVersion", "1.26.44.3");
+        LoginPacket pkt44 = decode(buildLoginPacketBuffer(2168, v44));
+        assertEquals(GameVersion.V1_26_44, pkt44.getGameVersion());
+        assertEquals(2168, pkt44.getProtocol());
+
+        // 1.26.40 客户端（wire 2168，无检出，按协议号推断）
+        LoginPacket pkt40 = decode(buildLoginPacketBuffer(2168, buildPersonaSkinPayload()));
+        assertEquals(GameVersion.V1_26_40, pkt40.getGameVersion());
+        assertEquals(2168, pkt40.getProtocol());
+
+        // 1.19.62 客户端（wire 567，协议号重写 + 检出）
+        JsonObject v62 = buildPersonaSkinPayload();
+        v62.addProperty("GameVersion", "1.19.62");
+        LoginPacket pkt62 = decode(buildLoginPacketBuffer(567, v62));
+        assertEquals(GameVersion.V1_19_63, pkt62.getGameVersion());
+        assertEquals(568, pkt62.getProtocol());
+    }
+
+    @Test
+    void clientGameVersionResolutionKeepsNetEaseContext() {
+        // 860 同时是标准 V1_21_124 与网易 V1_21_124_NETEASE 的协议号；
+        // 批量解码阶段预设的 NetEase gameVersion（模拟 RequestNetworkSettings 协商结果）
+        // 必须让解析落到网易分支
+        // 860 is shared by standard V1_21_124 and NetEase V1_21_124_NETEASE; the NetEase
+        // gameVersion preset during batch decoding (mirroring the RNS negotiation) must
+        // select the NetEase branch
+        LoginPacket pkt = new LoginPacket();
+        pkt.gameVersion = GameVersion.V1_21_124_NETEASE;
+        pkt.setBuffer(buildLoginPacketBuffer(860, buildPersonaSkinPayload()), 0);
+        pkt.decode();
+        assertEquals(GameVersion.V1_21_124_NETEASE, pkt.getGameVersion());
+    }
 }
