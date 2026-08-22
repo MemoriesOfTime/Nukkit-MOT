@@ -72,8 +72,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.*;
@@ -301,9 +299,11 @@ public class Level implements ChunkManager, Metadatable {
      */
     public final ReentrantReadWriteLock providerLock = new ReentrantReadWriteLock();
 
-    private final Int2ObjectOpenHashMap<ChunkLoader> loaders = new Int2ObjectOpenHashMap<>();
+    // 并发：register/unregister 可来自主线程（预生成登录/断线/传送），而 tickChunks 在世界线程迭代 loaders
+    // Concurrent: register/unregister may run on the primary thread (pre-spawn login/disconnect/teleport) while tickChunks iterates loaders on the level thread
+    private final Map<Integer, ChunkLoader> loaders = new ConcurrentHashMap<>();
 
-    private final Int2IntMap loaderCounter = new Int2IntOpenHashMap();
+    private final Map<Integer, Integer> loaderCounter = new ConcurrentHashMap<>();
 
     private final Map<Long, Map<Integer, ChunkLoader>> chunkLoaders = new ConcurrentHashMap<>();
 
@@ -334,9 +334,9 @@ public class Level implements ChunkManager, Metadatable {
     private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
     private final Map<Long, Set<Integer>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
 
-    private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
-    private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
-    private final Object2ObjectMap<GameVersion, LongSet> pendingChunkRequests = new Object2ObjectOpenHashMap<>();
+    private final Map<GameVersion, ConcurrentMap<Long, Map<Integer, Player>>> chunkSendQueues = new ConcurrentHashMap<>();
+    private final Map<GameVersion, Set<Long>> chunkSendTasks = new ConcurrentHashMap<>();
+    private final Map<GameVersion, Set<Long>> pendingChunkRequests = new ConcurrentHashMap<>();
 
     private final Cache<Long, Boolean> entityNearbyCacheDirty = Caffeine.newBuilder()
             .maximumSize(512)
@@ -348,9 +348,9 @@ public class Level implements ChunkManager, Metadatable {
             .expireAfterWrite(700, TimeUnit.MILLISECONDS)
             .build();
 
-    private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
-    private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
-    private final Long2ObjectOpenHashMap<Boolean> chunkGenerationQueue = new Long2ObjectOpenHashMap<>();
+    private final Long2ObjectNonBlockingMap<Boolean> chunkPopulationQueue = new Long2ObjectNonBlockingMap<>();
+    private final Long2ObjectNonBlockingMap<Boolean> chunkPopulationLock = new Long2ObjectNonBlockingMap<>();
+    private final Long2ObjectNonBlockingMap<Boolean> chunkGenerationQueue = new Long2ObjectNonBlockingMap<>();
     private final int chunkGenerationQueueSize;
     private final int chunkPopulationQueueSize;
 
@@ -802,6 +802,11 @@ public class Level implements ChunkManager, Metadatable {
             if (!player.spawned) {
                 continue;
             }
+            // 其他线程发起的传送可能使快照残留已离开本世界的玩家，跳过避免与接管线程并发 checkNetwork
+            // A teleport handled on another thread may leave stale entries in this snapshot; skip to avoid concurrent checkNetwork
+            if (player.getLevel() != this) {
+                continue;
+            }
             player.checkNetwork();
         }
 
@@ -950,8 +955,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean isOwnThread() {
-        if (!parallelTickEnabled) return true;
-        return Thread.currentThread() == this.levelThread;
+        if (isParallelTickEnabled()) {
+            return Thread.currentThread() == this.levelThread;
+        }
+        return this.server.isPrimaryThread();
     }
 
     public boolean isParallelTickEnabled() {
@@ -1400,31 +1407,16 @@ public class Level implements ChunkManager, Metadatable {
         int loaderId = loader.getLoaderId();
         long chunkHash = Level.chunkHash(chunkX, chunkZ);
 
-        Map<Integer, ChunkLoader> map = this.chunkLoaders.get(chunkHash);
-        if (map == null) {
-            Map<Integer, ChunkLoader> newChunkLoader = new HashMap<>();
-            newChunkLoader.put(loaderId, loader);
-            this.chunkLoaders.put(chunkHash, newChunkLoader);
-            Map<Integer, Player> newPlayerLoader = new HashMap<>();
-            if (loader instanceof Player) {
-                newPlayerLoader.put(loaderId, (Player) loader);
-            }
-            this.playerLoaders.put(chunkHash, newPlayerLoader);
-        } else if (map.containsKey(loaderId)) {
+        Map<Integer, ChunkLoader> map = this.chunkLoaders.computeIfAbsent(chunkHash, k -> new ConcurrentHashMap<>());
+        if (map.putIfAbsent(loaderId, loader) != null) {
             return;
-        } else {
-            map.put(loaderId, loader);
-            if (loader instanceof Player) {
-                this.playerLoaders.get(chunkHash).put(loaderId, (Player) loader);
-            }
+        }
+        if (loader instanceof Player) {
+            this.playerLoaders.computeIfAbsent(chunkHash, k -> new ConcurrentHashMap<>()).put(loaderId, (Player) loader);
         }
 
-        if (!this.loaders.containsKey(loaderId)) {
-            this.loaderCounter.put(loaderId, 1);
-            this.loaders.put(loaderId, loader);
-        } else {
-            this.loaderCounter.put(loaderId, this.loaderCounter.get(loaderId) + 1);
-        }
+        this.loaders.put(loaderId, loader);
+        this.loaderCounter.merge(loaderId, 1, Integer::sum);
 
         this.cancelUnloadChunkRequest(chunkHash);
 
@@ -1441,21 +1433,20 @@ public class Level implements ChunkManager, Metadatable {
             ChunkLoader oldLoader = chunkLoadersIndex.remove(hash);
             if (oldLoader != null) {
                 if (chunkLoadersIndex.isEmpty()) {
-                    this.chunkLoaders.remove(index);
+                    this.chunkLoaders.remove(index, chunkLoadersIndex);
                     this.playerLoaders.remove(index);
                     this.invalidatePendingChunkLoad(index);
                     this.unloadChunkRequest(chunkX, chunkZ, true);
                 } else {
                     Map<Integer, Player> playerLoadersIndex = this.playerLoaders.get(index);
-                    playerLoadersIndex.remove(hash);
+                    if (playerLoadersIndex != null) {
+                        playerLoadersIndex.remove(hash);
+                    }
                 }
 
-                int count = this.loaderCounter.get(hash);
-                if (--count == 0) {
-                    this.loaderCounter.remove(hash);
+                this.loaderCounter.compute(hash, (k, count) -> count == null || count <= 1 ? null : count - 1);
+                if (!this.loaderCounter.containsKey(hash)) {
                     this.loaders.remove(hash);
-                } else {
-                    this.loaderCounter.put(hash, count);
                 }
             }
         }
@@ -3858,10 +3849,12 @@ public class Level implements ChunkManager, Metadatable {
         BaseFullChunk chunk = this.requireProvider().getLoadedChunk(index);
         if (chunk == null) {
             chunk = this.forceLoadChunk(index, chunkX, chunkZ, create);
-        } else if (this.server.isPrimaryThread()) {
+        } else if (this.isOwnThread()) {
             // Provider-direct loads bypass Level mounting; replay only their deferred ticks here
             // without changing entity initialization or ChunkLoadEvent lifecycle semantics.
-            // provider 直载绕过 Level 挂载;这里只回放延迟方块刻,不改变实体初始化与事件生命周期
+            // provider 直载绕过 Level 挂载;这里只回放延迟方块刻,不改变实体初始化与事件生命周期。
+            // isOwnThread 而非 isPrimaryThread：并行世界的延迟刻由其世界线程回放（主线程门会漏放）
+            // isOwnThread, not isPrimaryThread: parallel levels replay on their level thread (a primary-thread gate would never fire)
             chunk.replayDeferredBlockUpdates();
         }
         return chunk;
@@ -3874,6 +3867,19 @@ public class Level implements ChunkManager, Metadatable {
 
     public void generateChunkCallback(int x, int z, BaseFullChunk chunk) {
         generateChunkCallback(x, z, chunk, true);
+    }
+
+    /**
+     * 生成任务完成回调入口：并行世界投递到其世界线程执行（挂载与 tick 串行），否则主线程直调
+     * Entry point for generation-task completion: hop to the level thread when parallel-ticked
+     * (mount serialized with the tick); otherwise run directly on the calling thread.
+     */
+    public void handleGenerationCallback(int x, int z, BaseFullChunk chunk, boolean isPopulated) {
+        if (isParallelTickEnabled()) {
+            scheduleSyncTask(() -> this.generateChunkCallback(x, z, chunk, isPopulated));
+        } else {
+            this.generateChunkCallback(x, z, chunk, isPopulated);
+        }
     }
 
     public final void generateChunkCallback(final int x, final int z, BaseFullChunk chunk, final boolean isPopulated) {
@@ -4322,7 +4328,7 @@ public class Level implements ChunkManager, Metadatable {
         long index = Level.chunkHash(x, z);
 
         this.getChunkSendQueue(player.getGameVersion()).computeIfAbsent(index, k ->
-                new Int2ObjectOpenHashMap<>()).put(player.getLoaderId(), player);
+                new ConcurrentHashMap<>()).put(player.getLoaderId(), player);
         this.getPendingChunkRequests(player.getGameVersion()).add(index);
     }
 
@@ -4333,12 +4339,12 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void sendChunkInternal(int x, int z, long index, DataPacket packet, GameVersion protocol) {
-        LongSet tasks = this.getChunkSendTasks(protocol);
+        Set<Long> tasks = this.getChunkSendTasks(protocol);
         if (!tasks.contains(index)) {
             return;
         }
 
-        ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
+        ConcurrentMap<Long, Map<Integer, Player>> queue = this.getChunkSendQueue(protocol);
         for (Player player : queue.get(index).values()) {
             if (player.isConnected() && player.usedChunks.containsKey(index)) {
                 player.sendChunk(x, z, packet);
@@ -4352,12 +4358,12 @@ public class Level implements ChunkManager, Metadatable {
     private void processChunkRequest() {
         Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = new Long2ObjectOpenHashMap<>();
         for (GameVersion protocolId : this.pendingChunkRequests.keySet()) {
-            LongSet pending = this.getPendingChunkRequests(protocolId);
+            Set<Long> pending = this.getPendingChunkRequests(protocolId);
             if (pending.isEmpty()) {
                 continue;
             }
-            LongSet tasks = this.getChunkSendTasks(protocolId);
-            ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocolId);
+            Set<Long> tasks = this.getChunkSendTasks(protocolId);
+            ConcurrentMap<Long, Map<Integer, Player>> queue = this.getChunkSendQueue(protocolId);
             for (long index : pending) {
                 // 超时未回调则强制清除重试 / Force-clear and retry if no callback within timeout
                 long startTick = this.chunkSendTaskStartTick.get(index);
@@ -4437,9 +4443,9 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
-        LongSet tasks = this.getChunkSendTasks(protocol);
+        Set<Long> tasks = this.getChunkSendTasks(protocol);
         if (tasks.contains(index)) {
-            ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
+            ConcurrentMap<Long, Map<Integer, Player>> queue = this.getChunkSendQueue(protocol);
 
             if (queue.containsKey(index)) {
                 for (Player player : queue.get(index).values()) {
@@ -4529,7 +4535,8 @@ public class Level implements ChunkManager, Metadatable {
         LevelProvider levelProvider = this.requireProvider();
         if (levelProvider.isChunkLoaded(index)) {
             BaseFullChunk chunk = levelProvider.getLoadedChunk(index);
-            if (chunk != null && this.server.isPrimaryThread()) {
+            // 同 getChunk：由世界 tick 归属线程回放延迟方块刻 / Same as getChunk: deferred ticks replay on the level's owning thread
+            if (chunk != null && this.isOwnThread()) {
                 chunk.replayDeferredBlockUpdates();
             }
             return chunk != null;
@@ -4907,8 +4914,7 @@ public class Level implements ChunkManager, Metadatable {
             }
 
             if (populate) {
-                if (!this.chunkPopulationQueue.containsKey(index)) {
-                    this.chunkPopulationQueue.put(index, Boolean.TRUE);
+                if (this.chunkPopulationQueue.putIfAbsent(index, Boolean.TRUE) == null) {
                     for (int xx = -1; xx <= 1; ++xx) {
                         for (int zz = -1; zz <= 1; ++zz) {
                             this.chunkPopulationLock.put(Level.chunkHash(x + xx, z + zz), Boolean.TRUE);
@@ -4934,8 +4940,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         long index = Level.chunkHash(x, z);
-        if (!this.chunkGenerationQueue.containsKey(index)) {
-            this.chunkGenerationQueue.put(index, Boolean.TRUE);
+        if (this.chunkGenerationQueue.putIfAbsent(index, Boolean.TRUE) == null) {
             GenerationTask task = new GenerationTask(this, this.getChunk(x, z, true));
             this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, task);
         }
@@ -5905,19 +5910,19 @@ public class Level implements ChunkManager, Metadatable {
         return blockEntity != null && blockEntity.hasPersistentDataContainer();
     }
 
-    private ConcurrentMap<Long, Int2ObjectMap<Player>> getChunkSendQueue(GameVersion protocol) {
+    private ConcurrentMap<Long, Map<Integer, Player>> getChunkSendQueue(GameVersion protocol) {
         GameVersion protocolId = this.getChunkProtocol(protocol);
         return this.chunkSendQueues.computeIfAbsent(protocolId, i -> new ConcurrentHashMap<>());
     }
 
-    private LongSet getChunkSendTasks(GameVersion protocol) {
+    private Set<Long> getChunkSendTasks(GameVersion protocol) {
         GameVersion protocolId = this.getChunkProtocol(protocol);
-        return this.chunkSendTasks.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
+        return this.chunkSendTasks.computeIfAbsent(protocolId, i -> ConcurrentHashMap.newKeySet());
     }
 
-    private LongSet getPendingChunkRequests(GameVersion protocol) {
+    private Set<Long> getPendingChunkRequests(GameVersion protocol) {
         GameVersion protocolId = this.getChunkProtocol(protocol);
-        return this.pendingChunkRequests.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
+        return this.pendingChunkRequests.computeIfAbsent(protocolId, i -> ConcurrentHashMap.newKeySet());
     }
 
     private GameVersion getChunkProtocol(GameVersion version) {

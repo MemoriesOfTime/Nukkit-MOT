@@ -98,14 +98,15 @@ import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
 import cn.nukkit.scoreboard.scorer.PlayerScorer;
 import cn.nukkit.utils.*;
+import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Maps;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -128,10 +129,7 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -228,7 +226,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected int windowCnt = MINIMUM_OTHER_WINDOW_ID;
 
-    protected final BiMap<Inventory, Integer> windows = HashBiMap.create();
+    protected final BiMap<Inventory, Integer> windows = Maps.synchronizedBiMap(HashBiMap.create());
     protected final BiMap<Integer, Inventory> windowIndex = windows.inverse();
     protected final Set<Integer> permanentWindows = new IntOpenHashSet();
     // Most recently opened non-permanent window; getTopWindow() is deterministic
@@ -262,7 +260,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected int lastTeleportTick = -1;
 
-    protected boolean connected = true;
+    protected volatile boolean connected = true;
     protected final InetSocketAddress rawSocketAddress;
     protected InetSocketAddress socketAddress;
     protected boolean removeFormat = true;
@@ -296,7 +294,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private final int loaderId;
 
-    public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
+    public final Map<Long, Boolean> usedChunks = new Long2ObjectNonBlockingMap<>();
 
     private int chunksSent = 0;
     private boolean hasSpawnChunks;
@@ -309,7 +307,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     // 借鉴 PNX,默认 100° / Adapted from PNX, default 100°
     private static final double FOV_DEGREES = 100.0;
 
-    protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
+    protected final Map<UUID, Player> hiddenPlayers = new ConcurrentHashMap<>();
 
     /**
      * 已向本观察者下发 PlayerList(ADD) 的玩家型实体 UUID，用于去重防网易客户端隐形；
@@ -406,10 +404,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private boolean canPickupXP = true;
 
     protected int formWindowCount = 0;
-    public Map<Integer, FormWindow> formWindows = new Int2ObjectOpenHashMap<>();
-    protected Map<Integer, FormWindow> serverSettings = new Int2ObjectOpenHashMap<>();
+    public Map<Integer, FormWindow> formWindows = new ConcurrentHashMap<>();
+    protected Map<Integer, FormWindow> serverSettings = new ConcurrentHashMap<>();
 
-    protected Map<Long, DummyBossBar> dummyBossBars = new Long2ObjectLinkedOpenHashMap<>();
+    protected Map<Long, DummyBossBar> dummyBossBars = new ConcurrentHashMap<>();
 
     protected Cache<String, FormWindowDialog> dialogWindows = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
@@ -1105,6 +1103,32 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         level.unregisterChunkLoader(this, x, z);
         this.loadQueue.remove(index);
+    }
+
+    /**
+     * 断线时的区块卸载：usedChunks/loadQueue 非并发，须与其世界线程的 checkNetwork/sendNextChunk 串行；
+     * 超时回落调用线程执行（幂等，世界线程后续重跑为空操作）。
+     * Chunk teardown on disconnect: usedChunks/loadQueue are not concurrent, so this must serialize
+     * with the level thread's checkNetwork/sendNextChunk; falls back to the calling thread on timeout
+     * (idempotent - a late level-thread rerun iterates an already-empty set).
+     */
+    private void unloadChunksOnLevelThread() {
+        Level level = this.getLevel();
+        if (level == null || !level.isParallelTickEnabled()) {
+            this.unloadChunks(false);
+            return;
+        }
+        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(() -> this.unloadChunks(false));
+        try {
+            future.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            this.unloadChunks(false);
+        } catch (ExecutionException e) {
+            this.server.getLogger().logException(e.getCause());
+        }
     }
 
     private void unloadChunks(boolean online) {
@@ -4835,7 +4859,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.inventoryOpen = false;
 
                         if (this.craftingType == CRAFTING_SMALL) {
-                            for (Entry<Inventory, Integer> open : new ArrayList<>(this.windows.entrySet())) {
+                            for (Entry<Inventory, Integer> open : this.snapshotWindows()) {
                                 if (open.getKey() instanceof ContainerInventory || open.getKey() instanceof PlayerEnderChestInventory) {
                                     this.server.getPluginManager().callEvent(new InventoryCloseEvent(open.getKey(), this));
                                     this.closingWindowId = Integer.MAX_VALUE;
@@ -6417,7 +6441,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     if (this.loggedIn && (ev == null || ev.getAutoSave())) {
                         try {
-                            this.save();
+                            this.saveSerializedWithLevelThread();
                         } catch (Throwable t) {
                             this.server.getLogger().logException(t);
                         }
@@ -6447,7 +6471,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 DataDrivenScreen.removeActiveScreen(this);
 
-                this.unloadChunks(false);
+                this.unloadChunksOnLevelThread();
 
                 try {
                     super.close();
@@ -6512,6 +6536,40 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.loggedIn = false;
         }
         this.newPosition = null;
+    }
+
+    /**
+     * 断线保存：并行世界时投递到其世界线程执行，避免快照与 tick 并发；等待超时回落当前线程。
+     * Disconnect save: hop to the player's level thread when parallel-ticked so the snapshot
+     * cannot race the tick; falls back to the calling thread if the wait times out.
+     */
+    private void saveSerializedWithLevelThread() {
+        Level level = this.getLevel();
+        if (level == null || !level.isParallelTickEnabled()) {
+            this.save();
+            return;
+        }
+        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(() -> {
+            if (!this.closed) {
+                this.save();
+            }
+        });
+        try {
+            future.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            this.server.getLogger().warning("Level thread for '" + level.getName()
+                    + "' did not save player " + this.getName() + " within 5s; saving on current thread");
+            if (!this.closed) {
+                this.save();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            if (!this.closed) {
+                this.save();
+            }
+        } catch (ExecutionException e) {
+            this.server.getLogger().logException(e.getCause());
+        }
     }
 
     /**
@@ -7676,7 +7734,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         // Re-scan if the tracked reference is stale (e.g. removed outside removeWindow).
         Inventory fallback = null;
-        for (Entry<Inventory, Integer> entry : this.windows.entrySet()) {
+        for (Entry<Inventory, Integer> entry : this.snapshotWindows()) {
             if (!this.permanentWindows.contains(entry.getValue())) {
                 fallback = entry.getKey();
                 break;
@@ -7703,7 +7761,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void sendAllInventories() {
-        for (Inventory inv : this.windows.keySet()) {
+        for (Inventory inv : this.snapshotWindowKeys()) {
             inv.sendContents(this);
 
             if (inv instanceof PlayerInventory) {
@@ -7736,7 +7794,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public TradeInventory getTradeInventory() {
-        for (Inventory inv : this.windows.keySet()) {
+        for (Inventory inv : this.snapshotWindowKeys()) {
             if (inv instanceof TradeInventory) {
                 return (TradeInventory) inv;
             }
@@ -7801,6 +7859,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             for (Item drop : drops) {
                 this.level.dropItem(this, drop);
             }
+        }
+    }
+
+    /**
+     * windows 为 synchronizedBiMap，迭代须持锁快照（集合视图的迭代器不受方法级同步保护）
+     * windows is a synchronizedBiMap; iteration must snapshot under its lock (collection-view iterators are not method-synchronized)
+     */
+    private List<Entry<Inventory, Integer>> snapshotWindows() {
+        synchronized (this.windows) {
+            return new ArrayList<>(this.windows.entrySet());
+        }
+    }
+
+    private List<Inventory> snapshotWindowKeys() {
+        synchronized (this.windows) {
+            return new ArrayList<>(this.windows.keySet());
         }
     }
 

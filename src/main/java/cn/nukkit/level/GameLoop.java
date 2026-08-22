@@ -57,38 +57,43 @@ public final class GameLoop {
         onStart.run();
         long nanoSleepTime = 0;
         long idealNanoPerTick = 1_000_000_000L / loopCountPerSec;
-        while (running.get()) {
-            long startTime = System.nanoTime();
-            lastTickStartMillis = System.currentTimeMillis();
-            long elapsedNanos = -1;
-            try {
-                elapsedNanos = (long) onTickCallback.onTick(this, startTime);
-            } catch (Exception e) {
-                log.error("Exception in game loop tick " + tick, e);
-            }
-            if (elapsedNanos >= 0) {
-                tick++;
-                updateTPS(elapsedNanos);
-                updateMSPT(elapsedNanos);
-                nanoSleepTime += idealNanoPerTick - elapsedNanos;
-            } else {
-                // Skipped or errored tick - still account for actual elapsed time
-                nanoSleepTime += idealNanoPerTick - (System.nanoTime() - startTime);
-            }
-            // Limit catch-up to 1 tick to prevent burst after lag spikes
-            nanoSleepTime = Math.max(nanoSleepTime, -idealNanoPerTick);
-            while (nanoSleepTime > 0 && running.get()) {
-                long sleepStart = System.nanoTime();
-                LockSupport.parkNanos(nanoSleepTime);
-                if (onIdle != null && running.get()) {
-                    onIdle.run();
+        try {
+            while (running.get()) {
+                long startTime = System.nanoTime();
+                lastTickStartMillis = System.currentTimeMillis();
+                long elapsedNanos = -1;
+                try {
+                    elapsedNanos = (long) onTickCallback.onTick(this, startTime);
+                } catch (Exception e) {
+                    log.error("Exception in game loop tick " + tick, e);
                 }
-                nanoSleepTime -= System.nanoTime() - sleepStart;
+                if (elapsedNanos >= 0) {
+                    tick++;
+                    updateTPS(elapsedNanos);
+                    updateMSPT(elapsedNanos);
+                    nanoSleepTime += idealNanoPerTick - elapsedNanos;
+                } else {
+                    // Skipped or errored tick - still account for actual elapsed time
+                    nanoSleepTime += idealNanoPerTick - (System.nanoTime() - startTime);
+                }
+                // Limit catch-up to 1 tick to prevent burst after lag spikes
+                nanoSleepTime = Math.max(nanoSleepTime, -idealNanoPerTick);
+                while (nanoSleepTime > 0 && running.get()) {
+                    long sleepStart = System.nanoTime();
+                    LockSupport.parkNanos(nanoSleepTime);
+                    if (onIdle != null && running.get()) {
+                        onIdle.run();
+                    }
+                    nanoSleepTime -= System.nanoTime() - sleepStart;
+                }
             }
+        } finally {
+            // finally 而非顺序执行：tick 抛出 Error（onTick 的 catch 不覆盖）时也要清状态、触发 onStop
+            // finally rather than fall-through: an Error escaping onTick's catch must still reset state and run onStop
+            lastTickStartMillis = 0L;
+            loopThread = null;
+            onStop.run();
         }
-        lastTickStartMillis = 0L;
-        loopThread = null;
-        onStop.run();
     }
 
     public void wakeUp() {

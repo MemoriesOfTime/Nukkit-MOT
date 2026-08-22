@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import org.jetbrains.annotations.ApiStatus;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author MagicDroidX
@@ -42,7 +43,7 @@ public abstract class BaseInventory implements Inventory {
 
     public final Map<Integer, Item> slots = new HashMap<>();
 
-    protected final Set<Player> viewers = new HashSet<>();
+    protected final Set<Player> viewers = ConcurrentHashMap.newKeySet();
 
     protected InventoryHolder holder;
 

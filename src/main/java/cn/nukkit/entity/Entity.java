@@ -556,7 +556,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     public double highestPosition;
 
-    public boolean closed = false;
+    public volatile boolean closed = false;
 
     public boolean noClip = false;
 

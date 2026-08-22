@@ -86,7 +86,7 @@ public abstract class BlockEntity extends Position {
 
     public final AtomicBoolean scheduledForBlockEntityUpdate = new AtomicBoolean(false);
 
-    public boolean closed = false;
+    public volatile boolean closed = false;
     public CompoundTag namedTag;
     protected Server server;
 

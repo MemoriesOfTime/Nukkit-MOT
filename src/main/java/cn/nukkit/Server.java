@@ -217,8 +217,8 @@ public class Server {
     private final Config properties;
     private volatile ServerConfig serverConfig;
 
-    private final Map<InetSocketAddress, Player> players = new HashMap<>();
-    final Map<UUID, Player> playerList = new HashMap<>();
+    private final Map<InetSocketAddress, Player> players = new ConcurrentHashMap<>();
+    final Map<UUID, Player> playerList = new ConcurrentHashMap<>();
 
     /**
      * Worlds where automatic mob spawning is disabled.
@@ -612,7 +612,8 @@ public class Server {
     /**
      * Temporary disable world saving to allow safe backup of leveldb worlds.
      */
-    public boolean holdWorldSave;
+    // volatile: 主线程命令置位，并行世界线程在 save 时读取 / set by a main-thread command, read by parallel level threads during save
+    public volatile boolean holdWorldSave;
     /**
      * RakNet cookie mode
      */
@@ -1471,6 +1472,13 @@ public class Server {
             ServerStopEvent serverStopEvent = new ServerStopEvent();
             pluginManager.callEvent(serverStopEvent);
 
+            // 先停世界线程再关玩家/插件：player.close 内含存档，须与所属世界 tick 串行
+            // Stop level threads before closing players/plugins: player.close() saves, which must be serialized with its level's tick
+            this.levelThreadsStartAllowed = false;
+            for (Level level : this.levelArray) {
+                level.stopLevelThread();
+            }
+
             if (this.holdWorldSave) {
                 this.getLogger().warning("World save hold was not released! Any backup currently being taken may be invalid");
             }
@@ -1834,9 +1842,10 @@ public class Server {
                     Level playerLevel = player.getLevel();
                     if (this.parallelLevelTick && playerLevel != null && playerLevel.isParallelTickEnabled()) {
                         playerLevel.scheduleSyncTask(() -> {
-                            // 投递后玩家可能已断线（closed 的 save 会抛异常）
-                            // The player may have disconnected while the task was queued (save throws on closed players)
-                            if (player.isOnline()) {
+                            // 投递后玩家可能已断线（closed 的 save 会抛异常）或已切世界（应由新世界线程保存，下次自动保存补上）
+                            // The player may have disconnected while queued (save throws on closed), or changed level
+                            // (then its new level's thread owns the save; the next auto-save covers it)
+                            if (player.isOnline() && player.getLevel() == playerLevel) {
                                 player.save(true);
                             }
                         });

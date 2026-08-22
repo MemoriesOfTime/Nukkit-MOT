@@ -357,6 +357,8 @@ class RakNetPlayerSessionTest {
         assertTrue(new ToggleCrafterSlotRequestPacket().isLevelSyncPacket());
         assertTrue(new SetPlayerGameTypePacket().isLevelSyncPacket());
         assertTrue(new AdventureSettingsPacket().isLevelSyncPacket());
+        assertTrue(new RequestAbilityPacket().isLevelSyncPacket());
+        assertTrue(new EntityEventPacket().isLevelSyncPacket());
         assertFalse(new PlayerSkinPacket().isLevelSyncPacket());
     }
 
