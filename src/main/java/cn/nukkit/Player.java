@@ -7879,6 +7879,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    private List<Entry<Integer, Inventory>> snapshotWindowIndex() {
+        synchronized (this.windows) {
+            return new ArrayList<>(this.windowIndex.entrySet());
+        }
+    }
+
     /**
      * Remove all windows
      */
@@ -7892,7 +7898,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param permanent remove permanent windows
      */
     public void removeAllWindows(boolean permanent) {
-        for (Entry<Integer, Inventory> entry : new ArrayList<>(this.windowIndex.entrySet())) {
+        for (Entry<Integer, Inventory> entry : this.snapshotWindowIndex()) {
             if (!permanent && this.permanentWindows.contains(entry.getKey())) {
                 continue;
             }

@@ -6,7 +6,9 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.utils.TextFormat;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -57,9 +59,9 @@ public class GarbageCollectorCommand extends VanillaCommand {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     collection.run();
-                } catch (Exception e) {
-                    // 线程卡死等异常时回落调用线程执行，与旧版行为一致
-                    // Fall back to the calling thread (legacy behavior) when the level thread is stuck
+                } catch (ExecutionException e) {
+                    sender.getServer().getLogger().logException(e.getCause());
+                } catch (TimeoutException e) {
                     collection.run();
                 }
             } else {
