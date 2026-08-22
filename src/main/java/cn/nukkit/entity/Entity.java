@@ -48,11 +48,12 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
 import static cn.nukkit.utils.Utils.dynamic;
@@ -433,8 +434,39 @@ public abstract class Entity extends Location implements Metadatable {
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
 
-    // 使用 AtomicLong 防止并行世界线程并发分配实体 ID 导致重复 / Use AtomicLong to prevent duplicate entity IDs when levels tick in parallel
-    public static final AtomicLong entityCount = new AtomicLong(1);
+    public static volatile long entityCount = 1;
+    private static final VarHandle ENTITY_COUNT = getEntityCountHandle();
+
+    private static VarHandle getEntityCountHandle() {
+        try {
+            return MethodHandles.lookup().findStaticVarHandle(Entity.class, "entityCount", long.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    /**
+     * 原子分配下一个实体 ID；网易模式下跳过 2^31 - 2^33 的 uid 预留区间。
+     * Atomically take the next entity id, skipping the 2^31 - 2^33 NetEase uid range in netease mode.
+     *
+     * @return 分配出的 ID，同时 entityCount 推进到下一可用值 / the assigned id; entityCount is advanced past it
+     */
+    public static long nextEntityId() {
+        Server server = Server.getInstance();
+        boolean netEase = server != null && server.netEaseMode;
+        long prev, id, next;
+        do {
+            prev = entityCount;
+            if (netEase && prev >= Integer.MAX_VALUE && prev < Integer.MAX_VALUE * 4L) {
+                id = Integer.MAX_VALUE * 4L;
+                next = id + 1;
+            } else {
+                id = prev;
+                next = prev + 1;
+            }
+        } while (!ENTITY_COUNT.compareAndSet(prev, next));
+        return id;
+    }
 
     private static final Map<String, Class<? extends Entity>> knownEntities = new HashMap<>();
     private static final Map<String, String> shortNames = new HashMap<>();
@@ -700,20 +732,12 @@ public abstract class Entity extends Location implements Metadatable {
         this.collisionHelper = new CollisionHelper(this);
         this.temporalVector = new Vector3();
 
-        if (Server.getInstance().netEaseMode) {
-            // 2^31 - 2^33 给网易uid预留使用
-            if (entityCount.get() >= Integer.MAX_VALUE && entityCount.get() < Integer.MAX_VALUE * 4L) {
-                entityCount.set(Integer.MAX_VALUE * 4L);
-            }
-
-            if (this instanceof Player player) {
-                long uid = player.getLoginChainData().getNetEaseUID();
-                this.id = uid > Integer.MAX_VALUE ? uid : entityCount.getAndIncrement();
-            } else {
-                this.id = entityCount.getAndIncrement();
-            }
+        if (Server.getInstance().netEaseMode && this instanceof Player player) {
+            long uid = player.getLoginChainData().getNetEaseUID();
+            // uid 型玩家 id 取自 2^31-2^33 预留区间，不消耗计数器 / uid players take ids from the reserved range without consuming the counter
+            this.id = uid > Integer.MAX_VALUE ? uid : nextEntityId();
         } else {
-            this.id = entityCount.getAndIncrement();
+            this.id = nextEntityId();
         }
 
         this.justCreated = true;
