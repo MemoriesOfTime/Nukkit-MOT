@@ -35,8 +35,7 @@ public class GarbageCollectorCommand extends VanillaCommand {
         long memory = Runtime.getRuntime().freeMemory();
 
         for (Level level : sender.getServer().getLevels().values()) {
-            // 并行世界的区块卸载须在其世界线程执行；等待结果以保持统计数字准确
-            // Chunk unloading for parallel levels must run on their level thread; wait for the result to keep stats accurate
+            // 并行世界的区块卸载须在其世界线程执行，等待结果以保持统计准确
             int[] stats = new int[3];
             AtomicBoolean executed = new AtomicBoolean(false);
             Runnable collection = () -> {
@@ -62,7 +61,9 @@ public class GarbageCollectorCommand extends VanillaCommand {
                 } catch (ExecutionException e) {
                     sender.getServer().getLogger().logException(e.getCause());
                 } catch (TimeoutException e) {
-                    collection.run();
+                    // GC 为维护性操作：超时放弃该世界本轮，排队任务在线程恢复后自行执行
+                    sender.getServer().getLogger().error("Level thread for '" + level.getName()
+                            + "' did not run garbage collection within 5s; skipping GC for this level");
                 }
             } else {
                 collection.run();

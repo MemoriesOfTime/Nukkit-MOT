@@ -124,6 +124,8 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
@@ -151,7 +153,7 @@ public class Server {
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
 
-    private int tickCounter;
+    private volatile int tickCounter;
     private long nextTick;
     private final float[] tickAverage = {20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20};
     private final float[] useAverage = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -191,9 +193,8 @@ public class Server {
     private boolean parallelLevelTick;
     private volatile boolean levelThreadsStartAllowed;
     // 受管并行世界线程注册表：区分"世界线程"与真正危险的异步上下文（RCON/异步池等）
-    // Registry of managed parallel level threads: distinguishes them from genuinely unsafe async contexts (RCON/async pools)
     private final Set<Thread> levelThreads = ConcurrentHashMap.newKeySet();
-    private int difficulty;
+    private volatile int difficulty;
     private int defaultGameMode = Integer.MAX_VALUE;
     int c_s_spawnThreshold;
 
@@ -243,30 +244,116 @@ public class Server {
 
     private static final Pattern uuidPattern = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}.dat$");
 
+    // 串化 levels 变更与 levelArray 快照重建
+    private final Object levelArrayLock = new Object();
     private final Map<Integer, Level> levels = new ConcurrentHashMap<>() {
         @Override
         public Level put(@NotNull Integer key, @NotNull Level value) {
-            Level result = super.put(key, value);
-            levelArray = levels.values().toArray(new Level[0]);
-            return result;
+            synchronized (levelArrayLock) {
+                Level result = super.put(key, value);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
         }
 
         @Override
         public boolean remove(Object key, Object value) {
-            boolean result = super.remove(key, value);
-            levelArray = levels.values().toArray(new Level[0]);
-            return result;
+            synchronized (levelArrayLock) {
+                boolean result = super.remove(key, value);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
         }
 
         @Override
         public Level remove(@NotNull Object key) {
-            Level result = super.remove(key);
-            levelArray = levels.values().toArray(new Level[0]);
-            return result;
+            synchronized (levelArrayLock) {
+                Level result = super.remove(key);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level putIfAbsent(Integer key, Level value) {
+            synchronized (levelArrayLock) {
+                Level result = super.putIfAbsent(key, value);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public boolean replace(Integer key, Level oldValue, Level newValue) {
+            synchronized (levelArrayLock) {
+                boolean result = super.replace(key, oldValue, newValue);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level replace(Integer key, Level value) {
+            synchronized (levelArrayLock) {
+                Level result = super.replace(key, value);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level computeIfAbsent(Integer key, @NotNull Function<? super Integer, ? extends Level> mappingFunction) {
+            synchronized (levelArrayLock) {
+                Level result = super.computeIfAbsent(key, mappingFunction);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level computeIfPresent(Integer key, @NotNull BiFunction<? super Integer, ? super Level, ? extends Level> remappingFunction) {
+            synchronized (levelArrayLock) {
+                Level result = super.computeIfPresent(key, remappingFunction);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level compute(Integer key, @NotNull BiFunction<? super Integer, ? super Level, ? extends Level> remappingFunction) {
+            synchronized (levelArrayLock) {
+                Level result = super.compute(key, remappingFunction);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level merge(Integer key, Level value, @NotNull BiFunction<? super Level, ? super Level, ? extends Level> remappingFunction) {
+            synchronized (levelArrayLock) {
+                Level result = super.merge(key, value, remappingFunction);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public void putAll(@NotNull Map<? extends Integer, ? extends Level> m) {
+            synchronized (levelArrayLock) {
+                super.putAll(m);
+                levelArray = levels.values().toArray(new Level[0]);
+            }
+        }
+
+        @Override
+        public void clear() {
+            synchronized (levelArrayLock) {
+                super.clear();
+                levelArray = levels.values().toArray(new Level[0]);
+            }
         }
     };
 
-    // volatile 保证并行世界线程能及时看到 levelArray 的更新 / volatile so level threads observe the latest array reference
     private volatile Level[] levelArray = new Level[0];
     private final ServiceManager serviceManager = new NKServiceManager();
     private Level defaultLevel;
@@ -615,7 +702,6 @@ public class Server {
     /**
      * Temporary disable world saving to allow safe backup of leveldb worlds.
      */
-    // volatile: 主线程命令置位，并行世界线程在 save 时读取 / set by a main-thread command, read by parallel level threads during save
     public volatile boolean holdWorldSave;
     /**
      * RakNet cookie mode
@@ -1298,7 +1384,8 @@ public class Server {
         }
 
         for (DataPacket packet : packets) {
-            packet.isEncoded = false; // prevent plugins from being encoded in advance
+            // isEncoded 随克隆继承，置 false 强制每个克隆各自重新编码（历史行为，保持不变）
+            packet.isEncoded = false;
             for (Player player : players) {
                 player.dataPacket(packet);
             }
@@ -1351,18 +1438,50 @@ public class Server {
         this.pluginManager.disablePlugins();
     }
 
+    // 必须主线程执行的全局生命周期/权限封禁命令（operators/whitelist 为非并发 Config，ban 踢出可能跨世界）
+    private static final Set<String> PRIMARY_THREAD_COMMANDS = Set.of(
+            "reload", "stop", "world", "genworld",
+            "op", "deop", "ban", "ban-ip", "banlist", "pardon", "pardon-ip", "whitelist");
+
     public boolean dispatchCommand(CommandSender sender, String commandLine) throws ServerException {
         // First we need to check if this command is on the main thread or not, if not, warn the user
         // 世界线程上的命令派发是并行 tick 的受管路径，与该世界 tick 串行，不属于危险异步
-        // Commands on a managed level thread are the intended parallel-tick path, serialized with that world's tick
         if (!this.isPrimaryThread() && !this.isLevelThread()) {
             getLogger().warning("Command Dispatched Async: " + commandLine);
         }
         if (sender == null) {
             throw new ServerException("CommandSender is not valid");
         }
+        if (!this.isPrimaryThread() && isPrimaryThreadCommand(commandLine)) {
+            this.scheduler.scheduleTask(InternalPlugin.INSTANCE, () -> {
+                try {
+                    this.dispatchCommand(sender, commandLine);
+                } catch (Exception e) {
+                    log.error("Failed to dispatch primary-thread command: " + commandLine, e);
+                }
+            });
+            return true;
+        }
 
         return this.commandMap.dispatch(sender, commandLine);
+    }
+
+    private boolean isPrimaryThreadCommand(String commandLine) {
+        String name = commandLine == null ? "" : commandLine.trim();
+        if (name.startsWith("/")) {
+            name = name.substring(1);
+        }
+        int space = name.indexOf(' ');
+        if (space >= 0) {
+            name = name.substring(0, space);
+        }
+        if (name.isEmpty()) {
+            return false;
+        }
+        // 经注册表解析别名后比对，插件为这些命令注册的别名同样受主线程约束
+        Command command = this.commandMap.getCommand(name);
+        String resolved = command != null ? command.getName() : name;
+        return PRIMARY_THREAD_COMMANDS.contains(resolved.toLowerCase(Locale.ROOT));
     }
 
     public ConsoleCommandSender getConsoleSender() {
@@ -1386,20 +1505,26 @@ public class Server {
                 level.save();
             }
         }
-        for (CompletableFuture<java.lang.Void> future : saveFutures) {
-            try {
-                future.get(30, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                log.error("Failed to wait for level save during reload", e);
-            }
+        // 并发保存汇总为单次 30s 上限，避免逐个等待冻住主线程
+        try {
+            CompletableFuture.allOf(saveFutures.toArray(new CompletableFuture[0])).get(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("Timed out or failed waiting for level saves during reload; continuing", e);
         }
 
         this.levelThreadsStartAllowed = false;
 
         // Stop all level threads before clearing plugins to prevent
-        // concurrent event firing and command dispatch during reload
+        // concurrent event firing and command dispatch during reload.
+        // 并发停止（join 各自有界 5s），避免串行 N×5s 冻住主线程
+        List<CompletableFuture<java.lang.Void>> stops = new ArrayList<>();
         for (Level level : this.levelArray) {
-            level.stopLevelThread();
+            stops.add(CompletableFuture.runAsync(level::stopLevelThread));
+        }
+        try {
+            CompletableFuture.allOf(stops.toArray(new CompletableFuture[0])).get(35, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("Timed out or failed stopping level threads during reload; continuing", e);
         }
 
         this.pluginManager.clearPlugins();
@@ -1440,8 +1565,7 @@ public class Server {
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
         this.allowLevelThreadsAndStartExisting();
-        // /reload 可能经由玩家命令在世界线程上执行，该线程此刻仍在退出、重启会被跳过；稍后重试一次
-        // /reload may run on a level thread via a player command; that thread is still exiting so its restart is skipped - retry once shortly after
+        // /reload 可能经玩家命令在世界线程上执行，其重启会被跳过；稍后重试一次
         this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, this::restartStoppedLevelThreads, 40);
     }
 
@@ -1477,8 +1601,7 @@ public class Server {
             ServerStopEvent serverStopEvent = new ServerStopEvent();
             pluginManager.callEvent(serverStopEvent);
 
-            // 先停世界线程再关玩家/插件：player.close 内含存档，须与所属世界 tick 串行
-            // Stop level threads before closing players/plugins: player.close() saves, which must be serialized with its level's tick
+            // 先停世界线程再关玩家/插件（player.close 含存档）
             this.levelThreadsStartAllowed = false;
             for (Level level : this.levelArray) {
                 level.stopLevelThread();
@@ -1772,8 +1895,7 @@ public class Server {
     private void checkTickUpdates(int currentTick) {
         if (this.alwaysTickPlayers) {
             for (Player p : new ArrayList<>(this.players.values())) {
-                // 并行世界线程已通过 updateEntities tick 该玩家，主线程跳过避免双线程并发 onUpdate
-                // Parallel-ticked players are already updated via updateEntities on their level thread; skip here to avoid concurrent onUpdate
+                // 并行世界的玩家已由其世界线程 tick，主线程跳过
                 if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled()) {
                     continue;
                 }
@@ -1782,6 +1904,10 @@ public class Server {
         }
 
         for (Player p : this.getOnlinePlayers().values()) {
+            // 已出生的并行世界玩家由其世界线程 drain 发送计数器（与写入方同线程），主线程跳过
+            if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled() && p.spawned) {
+                continue;
+            }
             p.resetPacketCounters();
         }
 
@@ -1842,14 +1968,11 @@ public class Server {
         if (this.autoSave) {
             for (Player player : new ArrayList<>(this.players.values())) {
                 if (player.isOnline()) {
-                    // 快照须在世界线程上生成，避免与合成/移动并发
-                    // Snapshot on the level thread so it does not race crafting/movement
+                    // 快照须在世界线程上生成
                     Level playerLevel = player.getLevel();
                     if (this.parallelLevelTick && playerLevel != null && playerLevel.isParallelTickEnabled()) {
                         playerLevel.scheduleSyncTask(() -> {
-                            // 投递后玩家可能已断线（closed 的 save 会抛异常）或已切世界（应由新世界线程保存，下次自动保存补上）
-                            // The player may have disconnected while queued (save throws on closed), or changed level
-                            // (then its new level's thread owns the save; the next auto-save covers it)
+                            // 投递后玩家可能已断线或已切世界
                             if (player.isOnline() && player.getLevel() == playerLevel) {
                                 player.save(true);
                             }
@@ -1904,8 +2027,7 @@ public class Server {
         this.checkTickUpdates(this.tickCounter);
 
         for (Player player : new ArrayList<>(this.players.values())) {
-            // 未完成出生的玩家留在主线程驱动登录序列，出生后由世界线程接管 checkNetwork
-            // Pre-spawn players stay on the primary thread for their login sequence; after spawn the level thread takes over
+            // 未出生玩家的登录序列留在主线程，出生后由世界线程接管 checkNetwork
             if (this.parallelLevelTick && player.spawned && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
                 continue;
             }
@@ -2806,9 +2928,21 @@ public class Server {
             return false;
         }
 
+        // 先完成初始化再发布；失败须关闭防泄漏
+        try {
+            level.initLevel();
+        } catch (Exception e) {
+            log.error(this.baseLang.translateString("nukkit.level.loadError", new String[]{name, e.getMessage()}));
+            try {
+                // 失败的世界不做自动存档（半初始化数据会覆盖正常世界文件），仅释放资源
+                level.setAutoSave(false);
+                level.close();
+            } catch (Exception closeEx) {
+                log.error("Error closing failed level: " + name, closeEx);
+            }
+            return false;
+        }
         this.levels.put(level.getId(), level);
-
-        level.initLevel();
 
         level.setTickRate(this.baseTickRate);
 
@@ -2972,18 +3106,27 @@ public class Server {
         String path = resolved.getPath() + '/';
         String folderName = resolved.getName();
 
-        Level level;
+        Level level = null;
         try {
             provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, folderName, seed, generator, options);
 
             level = new Level(this, folderName, path, provider);
-            this.levels.put(level.getId(), level);
-
+            // 先初始化再发布（与 loadLevel 同理，见其注释）/ initialize before publishing (see loadLevel)
             level.initLevel();
+            this.levels.put(level.getId(), level);
 
             level.setTickRate(this.baseTickRate);
         } catch (Exception e) {
             log.error(this.baseLang.translateString("nukkit.level.generationError", new String[]{name, Utils.getExceptionMessage(e)}));
+            // 构造成功但初始化/发布失败：关闭释放 provider/执行器，不做自动存档
+            if (level != null) {
+                try {
+                    level.setAutoSave(false);
+                    level.close();
+                } catch (Exception closeEx) {
+                    log.error("Error closing failed level: " + name, closeEx);
+                }
+            }
             return false;
         }
 

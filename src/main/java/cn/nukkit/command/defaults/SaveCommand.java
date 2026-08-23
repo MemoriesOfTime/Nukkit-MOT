@@ -57,8 +57,7 @@ public class SaveCommand extends VanillaCommand {
 
         broadcastCommandMessage(sender, new TranslationContainer("commands.save.start"));
 
-        // 保存须与所属世界的 tick 串行：并行世界的玩家/世界保存投递到其世界线程
-        // Saves must be serialized with the owning level's tick: hop parallel-level saves to their level threads
+        // 并行世界的玩家/世界保存投递到其世界线程执行
         for (Player player : sender.getServer().getOnlinePlayers().values()) {
             Level playerLevel = player.getLevel();
             if (playerLevel != null && playerLevel.isParallelTickEnabled()) {

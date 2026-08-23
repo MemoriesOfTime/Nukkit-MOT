@@ -31,7 +31,7 @@ public class EntityMetadata {
         return this.getOrDefault(id, null);
     }
 
-    public EntityData getOrDefault(int id, EntityData defaultValue) {
+    public synchronized EntityData getOrDefault(int id, EntityData defaultValue) {
         try {
             return this.map.getOrDefault(id, defaultValue).setId(id);
         } catch (Exception e) {
@@ -42,11 +42,11 @@ public class EntityMetadata {
         }
     }
 
-    public boolean exists(int id) {
+    public synchronized boolean exists(int id) {
         return this.map.containsKey(id);
     }
 
-    public EntityMetadata put(EntityData data) {
+    public synchronized EntityMetadata put(EntityData data) {
         // 确保 LongEntityData 的 dataVersions 被正确初始化
         if (data instanceof LongEntityData longData) {
             int id = data.getId();
@@ -60,7 +60,7 @@ public class EntityMetadata {
         return this;
     }
 
-    public EntityData remove(int id) {
+    public synchronized EntityData remove(int id) {
         return this.map.remove(id);
     }
 
@@ -192,12 +192,12 @@ public class EntityMetadata {
         return this.put(new StringEntityData(id, value));
     }
 
-    public Map<Integer, EntityData> getMap() {
+    public synchronized Map<Integer, EntityData> getMap() {
         return new TreeMap<>(this.map); // Ordered
     }
 
     @Override
-    public EntityMetadata clone() {
+    public synchronized EntityMetadata clone() {
         return new EntityMetadata(new Int2ObjectOpenHashMap<>(this.map));
     }
 }

@@ -51,8 +51,6 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private final Channel channel;
     private final Channel ipv6Channel;
     private final EventLoopGroup eventLoopGroup;
-    // ConcurrentHashMap：世界线程 kick→close→interfaz.close 的 remove 与主线程 process 迭代并发
-    // ConcurrentHashMap: level-thread kick→close→interfaz.close removal races main-thread process iteration
     private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new ConcurrentHashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());

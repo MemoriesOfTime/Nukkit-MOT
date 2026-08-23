@@ -107,8 +107,10 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             int len = buffer.readableBytes();
             if (len > 12582912) {
                 Server.getInstance().getLogger().error("Received too big packet: " + len);
-                if (this.player != null) {
-                    this.player.close("Too big packet");
+                Player player = this.player;
+                if (player != null) {
+                    // close 可能等待/停止世界线程长达 ~20s，不能阻塞事件循环；转投主线程
+                    Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> player.close("Too big packet"));
                 }
                 return;
             }

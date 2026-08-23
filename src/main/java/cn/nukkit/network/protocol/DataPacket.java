@@ -35,12 +35,8 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     public abstract void encode();
 
     /**
-     * 该包的处理是否会修改世界/实体/背包状态，需与所属世界的并行 tick 线程串行执行
-     * Whether handling this packet mutates level/entity/inventory state and must be
-     * serialized with the owning level's parallel tick thread.
-     * <p>
-     * 默认 false（主线程处理）；状态修改型包覆写为 true
-     * Defaults to false (primary-thread handling); state-mutating packets override to true.
+     * 该包的处理是否会修改世界/实体/背包状态，需与所属世界的并行 tick 线程串行执行。
+     * Whether handling this packet mutates level/entity/inventory state and must be serialized with the owning level's tick thread.
      */
     public boolean isLevelSyncPacket() {
         return false;
@@ -51,7 +47,7 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
         super.writeFullContainerName(fullContainerName, this.gameVersion);
     }
 
-    public final void tryEncode() {
+    public final synchronized void tryEncode() {
         if (!this.isEncoded) {
             this.isEncoded = true;
             this.encode();

@@ -359,7 +359,17 @@ class RakNetPlayerSessionTest {
         assertTrue(new AdventureSettingsPacket().isLevelSyncPacket());
         assertTrue(new RequestAbilityPacket().isLevelSyncPacket());
         assertTrue(new EntityEventPacket().isLevelSyncPacket());
-        assertFalse(new PlayerSkinPacket().isLevelSyncPacket());
+        assertTrue(new EmotePacket().isLevelSyncPacket());
+        assertTrue(new PlayerSkinPacket().isLevelSyncPacket());
+        assertTrue(new MapInfoRequestPacket().isLevelSyncPacket());
+        assertTrue(new CraftingEventPacket().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.DropItemPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.RemoveBlockPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.UseItemPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.CommandStepPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.netease.SyncSkinPacket().isLevelSyncPacket());
+        assertFalse(new ClientToServerHandshakePacket().isLevelSyncPacket());
     }
 
     private static SessionFixture createSession(boolean executeImmediately) {

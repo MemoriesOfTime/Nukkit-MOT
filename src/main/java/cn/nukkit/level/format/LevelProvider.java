@@ -146,6 +146,18 @@ public interface LevelProvider {
 
     Map<Long, ? extends FullChunk> getLoadedChunks();
 
+    /**
+     * 遍历已加载区块；实现可在自有监视器内回调，action 须短小且不得回调 provider 写方法。
+     * <p>
+     * Iterates loaded chunks; implementations may invoke the action under their own monitor,
+     * so it must stay cheap and must not call back into mutating provider methods.
+     */
+    default void forEachLoadedChunk(java.util.function.ObjLongConsumer<? super FullChunk> action) {
+        for (Map.Entry<Long, ? extends FullChunk> entry : this.getLoadedChunks().entrySet()) {
+            action.accept(entry.getValue(), entry.getKey());
+        }
+    }
+
     void doGarbageCollection();
 
     default void doGarbageCollection(long time) {

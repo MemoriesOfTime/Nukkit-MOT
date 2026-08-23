@@ -24,11 +24,8 @@ public final class GameLoop {
     private final int loopCountPerSec;
     private final float[] tickSummary;
     private final float[] msptSummary;
-    // volatile: 保证 getTPS/getMSPT 读取时能看到最新的 ringIndex / visible to getTPS/getMSPT callers on other threads
     private volatile int ringIndex;
-    // volatile: getTick() 会被主线程读取（如 stopLevelThread），而 tick++ 在 loop 线程 / volatile so getTick() reads from the main thread see the latest value
     private volatile long tick;
-    // volatile: Watchdog 从监控线程读取，用于检测世界线程卡死 / read by the Watchdog thread to detect a hung level thread
     private volatile long lastTickStartMillis;
 
     private GameLoop(Runnable onStart, GameLoopTickCallback onTick,
@@ -67,8 +64,9 @@ public final class GameLoop {
                 } catch (Exception e) {
                     log.error("Exception in game loop tick " + tick, e);
                 }
+                // 逻辑时间每次迭代都推进（对齐旧主循环语义），跳过的迭代后实体 tickDiff 才能补上
+                tick++;
                 if (elapsedNanos >= 0) {
-                    tick++;
                     updateTPS(elapsedNanos);
                     updateMSPT(elapsedNanos);
                     nanoSleepTime += idealNanoPerTick - elapsedNanos;
@@ -88,8 +86,7 @@ public final class GameLoop {
                 }
             }
         } finally {
-            // finally 而非顺序执行：tick 抛出 Error（onTick 的 catch 不覆盖）时也要清状态、触发 onStop
-            // finally rather than fall-through: an Error escaping onTick's catch must still reset state and run onStop
+            // finally 兜底：tick 抛 Error 时也清状态、触发 onStop
             lastTickStartMillis = 0L;
             loopThread = null;
             onStop.run();

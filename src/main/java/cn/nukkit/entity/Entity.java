@@ -447,9 +447,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     /**
      * 原子分配下一个实体 ID；网易模式下跳过 2^31 - 2^33 的 uid 预留区间。
-     * Atomically take the next entity id, skipping the 2^31 - 2^33 NetEase uid range in netease mode.
-     *
-     * @return 分配出的 ID，同时 entityCount 推进到下一可用值 / the assigned id; entityCount is advanced past it
+     * Atomically take the next entity id, skipping the reserved NetEase uid range.
      */
     public static long nextEntityId() {
         Server server = Server.getInstance();
@@ -812,8 +810,7 @@ public abstract class Entity extends Location implements Metadatable {
 
             this.chunk.addEntity(this);
             this.level.addEntity(this);
-            // 并行世界使用 GameLoop tick 初始化，避免与服务器 tick 漂移造成首个 tickDiff 跳变
-            // Initialize with the GameLoop tick in parallel worlds, so clock drift cannot skew the first tickDiff
+            // 并行世界使用 GameLoop tick 初始化
             this.lastUpdate = (int) this.level.getTickForEntityInit();
             this.published = true;
 

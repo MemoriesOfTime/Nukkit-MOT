@@ -28,4 +28,9 @@ public class DropItemPacket_v113 extends DataPacket_v113 {
         return NETWORK_ID;
     }
 
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
+
 }
