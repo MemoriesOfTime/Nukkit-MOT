@@ -327,10 +327,12 @@ public abstract class BaseInventory implements Inventory {
         int count = item.getCount();
         boolean checkDamage = item.hasMeta();
         boolean checkTag = item.getCompoundTag() != null;
+        // The stack limit of the item being added, not of whatever occupies the slot right now:
+        // an empty slot holds air, and air stacks to 64 even when the incoming item does not.
+        int maxStackSize = Math.min(item.getMaxStackSize(), this.getMaxStackSize());
         int i1 = this.getSize();
         for (int i = 0; i < i1; ++i) {
             Item slot = this.getItemFast(i);
-            int maxStackSize = Math.min(slot.getMaxStackSize(), this.getMaxStackSize());
             if (item.equals(slot, checkDamage, checkTag)) {
                 int diff;
                 if ((diff = maxStackSize - slot.getCount()) > 0) {
