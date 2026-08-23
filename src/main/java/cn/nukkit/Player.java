@@ -3450,9 +3450,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.syncLoginPhase(SessionLoginPhase.RESOURCE_PACK);
     }
 
+    private boolean rejectIfServerFull() {
+        return this.server.getOnlinePlayers().size() >= this.server.getMaxPlayers()
+                && this.kick(PlayerKickEvent.Reason.SERVER_FULL, "disconnectionScreen.serverFull", false);
+    }
+
     protected void completeLoginSequence() {
         if (this.loggedIn) {
             this.server.getLogger().debug("(BUG) Tried to call completeLoginSequence but player is already logged in");
+            return;
+        }
+
+        if (this.rejectIfServerFull()) {
             return;
         }
 
@@ -3857,7 +3866,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                if (this.server.getOnlinePlayers().size() >= this.server.getMaxPlayers() && this.kick(PlayerKickEvent.Reason.SERVER_FULL, "disconnectionScreen.serverFull", false)) {
+                if (this.rejectIfServerFull()) {
                     return;
                 }
 
