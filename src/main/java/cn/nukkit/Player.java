@@ -203,6 +203,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public boolean playedBefore;
     public volatile boolean spawned = false;
+    // doFirstSpawn 尾部才置位（晚于 spawned），世界线程据此接管 tick 与包路由
+    private volatile boolean spawnInitCompleted = false;
+    private final AtomicBoolean closeTeardownExecuted = new AtomicBoolean(false);
     // 登录期同步包延迟队列：入队与 doFirstSpawn 的排空/置位共用此锁，保持与出生后直达包的全序
     private final Object preSpawnPacketLock = new Object();
     private final ArrayDeque<DataPacket> preSpawnDeferredPackets = new ArrayDeque<>();
@@ -1375,12 +1378,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
-     * 世界线程入队登录期延迟包；锁内复查 spawned，出生刚完成则返回 false（调用方按出生后语义路由）。
-     * Returns false when spawn just completed so the caller routes the packet post-spawn instead.
+     * 世界线程入队登录期延迟包；锁内复查出生收尾，刚完成则返回 false（调用方按出生后语义路由）。
      */
     public boolean deferPreSpawnPacket(DataPacket packet) {
         synchronized (this.preSpawnPacketLock) {
-            if (this.spawned) {
+            if (this.spawnInitCompleted) {
                 return false;
             }
             this.preSpawnDeferredPackets.add(packet);
@@ -1564,6 +1566,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             });
         }
+
+        // 同上方 spawned 发布协议：排空出生体期间延迟到达的包后再置位，此后直达路由
+        while (true) {
+            this.drainPreSpawnPackets();
+            synchronized (this.preSpawnPacketLock) {
+                if (this.preSpawnDeferredPackets.isEmpty()) {
+                    this.spawnInitCompleted = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    public boolean isSpawnInitCompleted() {
+        return this.spawnInitCompleted;
     }
 
     protected boolean orderChunks() {
@@ -2870,8 +2887,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public boolean onUpdate(int currentTick) {
-        if (!this.loggedIn) {
-            // 登录未完成：保持注册但不执行游戏逻辑
+        if (!this.loggedIn || !this.spawnInitCompleted) {
+            // 出生收尾前不 tick（doFirstSpawn 仍在主线程）；lastUpdate 照常推进，防止收尾后首个 tickDiff 累积烧掉按刻状态
+            this.lastUpdate = currentTick;
             return true;
         }
 
@@ -6526,7 +6544,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             this.connected = false;
+            // QuitEvent 处理器可能重入 close 提前执行 teardown 置 spawned=false，须先捕获
+            final boolean wasSpawned = this.spawned;
             PlayerQuitEvent ev = null;
+            boolean broadcastQuit;
             try {
                 if (this.username != null && !this.username.isEmpty()) {
                     try {
@@ -6537,13 +6558,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (this.loggedIn && (ev == null || ev.getAutoSave())) {
                         try {
                             this.saveSerializedWithLevelThread();
-                        } catch (Throwable t) {
-                            this.server.getLogger().logException(t);
-                        }
-                    }
-                    if (this.fishing != null) {
-                        try {
-                            this.stopFishing(false);
                         } catch (Throwable t) {
                             this.server.getLogger().logException(t);
                         }
@@ -6560,21 +6574,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.hiddenPlayers.clear();
                 }
 
-                try {
-                    this.removeAllWindows(true);
-                } catch (Throwable t) {
-                    this.server.getLogger().logException(t);
-                }
+                broadcastQuit = ev != null && wasSpawned && !Objects.equals(this.username, "")
+                        && !Objects.equals(ev.getQuitMessage().toString(), "");
 
-                DataDrivenScreen.removeActiveScreen(this);
-
-                this.unloadChunksOnLevelThread(false);
-
-                try {
-                    super.close();
-                } catch (Throwable t) {
-                    this.server.getLogger().logException(t);
-                }
+                this.teardownOnLevelThread();
             } finally {
                 this.interfaz.close(this, notify ? reason : "");
 
@@ -6593,27 +6596,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            if (broadcastQuit) {
                 this.server.broadcastMessage(ev.getQuitMessage());
             }
 
             this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
-            this.spawned = false;
             this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logOut",
                     TextFormat.AQUA + (this.getName() == null ? this.unverifiedUsername : this.getName()) + TextFormat.WHITE,
                     this.getAddress(),
                     String.valueOf(this.getPort()),
                     this.getServer().getLanguage().translateString(reason)));
-            this.windows.clear();
-            this.topWindow = null;
-            this.hasSpawned.clear();
-            this.spawnPosition = null;
-
-            if (this.riding instanceof EntityRideable) {
-                this.riding.passengers.remove(this);
-            }
-
-            this.riding = null;
+        } else {
+            // 重复 close：teardown 幂等（CAS 只执行一次）
+            this.teardownOnLevelThread();
         }
 
         if (this.perm != null) {
@@ -6621,17 +6616,103 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.perm = null;
         }
 
-        this.inventory = null;
-        this.chunk = null;
-
-        this.server.removePlayer(this);
-
         if (this.loggedIn) {
             this.server.getLogger().warning("(BUG) Player still logged in");
             this.interfaz.close(this, notify ? reason : "");
             this.server.removeOnlinePlayer(this);
             this.loggedIn = false;
         }
+    }
+
+    /**
+     * 断线状态拆除投递到所属世界线程（与 onUpdate 串行）；超时回落策略同存档。
+     * <p>
+     * Disconnect teardown hopped to the owning level's thread; same fallback policy as save.
+     */
+    private void teardownOnLevelThread() {
+        if (this.closeTeardownExecuted.get()) {
+            return;
+        }
+        Level level = this.getLevel();
+        if (level == null || !level.isParallelTickEnabled()) {
+            this.performCloseTeardown();
+            return;
+        }
+        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(this::performCloseTeardown);
+        try {
+            future.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+                runAfterLevelThreadStops(level, "teardown player " + this.getName(), this::performCloseTeardown);
+            } else if (levelThreadUnresponsive(future, level)) {
+                runAfterLevelThreadStops(level, "teardown player " + this.getName(), this::performCloseTeardown);
+            }
+        } catch (ExecutionException e) {
+            this.server.getLogger().logException(e.getCause());
+        }
+    }
+
+    /**
+     * close() 的状态拆除段，须与所属世界线程串行执行。
+     * <p>
+     * State-teardown of close(); must be serialized with the owning level thread.
+     */
+    private void performCloseTeardown() {
+        if (!this.closeTeardownExecuted.compareAndSet(false, true)) {
+            return;
+        }
+
+        if (this.fishing != null) {
+            try {
+                this.stopFishing(false);
+            } catch (Throwable t) {
+                this.server.getLogger().logException(t);
+            }
+        }
+
+        try {
+            this.removeAllWindows(true);
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        // 各步异常隔离，保证末尾注销必然执行（否则玩家泄漏在 Server.players）
+        try {
+            DataDrivenScreen.removeActiveScreen(this);
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        try {
+            this.unloadChunks(false);
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        try {
+            super.close();
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        this.spawned = false;
+        this.spawnInitCompleted = false;
+        this.windows.clear();
+        this.topWindow = null;
+        this.hasSpawned.clear();
+        this.spawnPosition = null;
+
+        if (this.riding instanceof EntityRideable) {
+            this.riding.passengers.remove(this);
+        }
+
+        this.riding = null;
+
+        this.inventory = null;
+        this.chunk = null;
+
+        this.server.removePlayer(this);
         this.newPosition = null;
     }
 

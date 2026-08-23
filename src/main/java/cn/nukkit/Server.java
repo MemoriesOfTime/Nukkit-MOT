@@ -1438,9 +1438,9 @@ public class Server {
         this.pluginManager.disablePlugins();
     }
 
-    // 必须主线程执行的全局生命周期/权限封禁命令（operators/whitelist 为非并发 Config，ban 踢出可能跨世界）
+    // 必须主线程执行的全局生命周期/权限封禁命令（operators/whitelist/difficulty 写非并发 Config，作用面跨全部世界）
     private static final Set<String> PRIMARY_THREAD_COMMANDS = Set.of(
-            "reload", "stop", "world", "genworld",
+            "reload", "stop", "world", "genworld", "difficulty",
             "op", "deop", "ban", "ban-ip", "banlist", "pardon", "pardon-ip", "whitelist");
 
     public boolean dispatchCommand(CommandSender sender, String commandLine) throws ServerException {
@@ -1905,7 +1905,7 @@ public class Server {
 
         for (Player p : this.getOnlinePlayers().values()) {
             // 已出生的并行世界玩家由其世界线程 drain 发送计数器（与写入方同线程），主线程跳过
-            if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled() && p.spawned) {
+            if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled() && p.isSpawnInitCompleted()) {
                 continue;
             }
             p.resetPacketCounters();
@@ -2027,8 +2027,8 @@ public class Server {
         this.checkTickUpdates(this.tickCounter);
 
         for (Player player : new ArrayList<>(this.players.values())) {
-            // 未出生玩家的登录序列留在主线程，出生后由世界线程接管 checkNetwork
-            if (this.parallelLevelTick && player.spawned && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
+            // 出生初始化收尾前的登录序列留在主线程，收尾后由世界线程接管 checkNetwork
+            if (this.parallelLevelTick && player.isSpawnInitCompleted() && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
                 continue;
             }
             player.checkNetwork();

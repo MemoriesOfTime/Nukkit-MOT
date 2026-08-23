@@ -727,9 +727,10 @@ public class Level implements ChunkManager, Metadatable {
             this.nextLevelThreadTick = initialTick;
             AtomicBoolean intentionalStop = new AtomicBoolean(false);
             this.currentIntentionalStop = intentionalStop;
-            // 重启前丢弃上一代滞留任务：接纳自上次 stop 起已关闭，重放无意义
+            // 兜底卡死-死亡（跳过排空）的滞留任务
             this.syncTaskQueue.clear();
-            this.syncPacketQueue.clear();
+            // 滞留包可能是停线程窗口内的活包，转投而非丢弃
+            this.forwardQueuedSyncPacketsToPrimary();
             this.gameLoop = GameLoop.builder()
                     .currentTick(initialTick)
                     .onStart(() -> server.getLogger().info("Level thread started: " + this.getName()))
@@ -770,8 +771,11 @@ public class Level implements ChunkManager, Metadatable {
             }
             thread = this.levelThread;
             selfCall = thread == Thread.currentThread();
-            // 关闭接纳：与生产者的判定+入队互斥，drain 后不可能再有新入队
-            this.acceptingWork = false;
+            if (selfCall) {
+                // 无法 join 自己：立即关接纳
+                this.acceptingWork = false;
+            }
+            // 非 selfCall 延迟到 join 后再关接纳，避免生产者回落主线程与仍在 tick 的旧线程双写
         }
         // try/finally 兜底：stop/drain 抛 Error 也完成清理与注销
         try {
@@ -794,13 +798,20 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
             }
-            if (selfCall || thread == null || !thread.isAlive()) {
-                this.nextLevelThreadTick = Math.max(this.nextLevelThreadTick, loop.getTick());
-                // 无条件排空（线程已死或自身调用）：遗留任务不留到下次启动，任务的 Error 也不跳过包队列清理
-                try {
-                    processScheduledTasks();
-                } finally {
-                    this.syncPacketQueue.clear();
+            // join 后持锁关接纳（与生产者判定+入队互斥）并代际校验排空，防误关/误清并发 startLevelThread 已开的新代
+            synchronized (lifecycleLock) {
+                boolean sameGeneration = this.gameLoop == loop && thread == this.levelThread;
+                if (sameGeneration) {
+                    this.acceptingWork = false;
+                }
+                if (sameGeneration && (selfCall || thread == null || !thread.isAlive())) {
+                    this.nextLevelThreadTick = Math.max(this.nextLevelThreadTick, loop.getTick());
+                    // 排空：遗留任务不留到下次启动
+                    try {
+                        processScheduledTasks();
+                    } finally {
+                        this.forwardQueuedSyncPacketsToPrimary();
+                    }
                 }
             }
         } finally {
@@ -809,6 +820,27 @@ public class Level implements ChunkManager, Metadatable {
             if (thread != null) {
                 server.unregisterLevelThread(thread);
             }
+        }
+    }
+
+    /**
+     * 残留同步包转投主线程，等价于接纳关闭后的逐包回落路径，避免停线程窗口内的包被丢弃。
+     * <p>
+     * Forward queued sync packets to the primary thread instead of dropping them.
+     */
+    private void forwardQueuedSyncPacketsToPrimary() {
+        // 须在 lifecycleLock 内调用（无并发 offer 循环终止）；经调度器转投，避免持锁内联处理包
+        SyncPacketEntry entry;
+        while ((entry = this.syncPacketQueue.poll()) != null) {
+            Player player = entry.player();
+            DataPacket packet = entry.packet();
+            server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                try {
+                    player.handleDataPacket(packet);
+                } catch (Throwable t) {
+                    server.getLogger().error("Error while handling sync packet for player " + player.getName(), t);
+                }
+            });
         }
     }
 
@@ -832,8 +864,8 @@ public class Level implements ChunkManager, Metadatable {
 
         // Handle player chunk network on level thread to avoid concurrent chunk state modification
         for (Player player : new ArrayList<>(this.getPlayers().values())) {
-            // 未出生玩家的登录序列由主线程驱动
-            if (!player.spawned) {
+            // 出生初始化未收尾的玩家登录序列由主线程驱动（doFirstSpawn 尾部才发布接管）
+            if (!player.isSpawnInitCompleted()) {
                 continue;
             }
             // 传送后已离开本世界的玩家由接管线程负责
@@ -915,11 +947,11 @@ public class Level implements ChunkManager, Metadatable {
                 forwardSyncPacket(player, entry.packet());
                 continue;
             }
-            if (!player.spawned) {
-                // 登录期包经每玩家延迟队列转主线程处理（与 processLogin/doFirstSpawn 串行且保持全序）
+            if (!player.isSpawnInitCompleted()) {
+                // 出生收尾前的登录期包经每玩家延迟队列转主线程处理（与 processLogin/doFirstSpawn 串行且保持全序）
                 DataPacket packet = entry.packet();
                 if (!player.deferPreSpawnPacket(packet)) {
-                    // 竞态败给 doFirstSpawn（出生刚完成）：按出生后语义转发
+                    // 竞态败给 doFirstSpawn（出生收尾刚完成）：按出生后语义转发
                     this.forwardSyncPacket(player, packet);
                 }
                 continue;
@@ -4566,22 +4598,37 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         Set<Long> tasks = this.getChunkSendTasks(protocol);
-        if (tasks.contains(index)) {
-            ConcurrentMap<Long, Map<Integer, Player>> queue = this.getChunkSendQueue(protocol);
-
-            if (queue.containsKey(index)) {
-                for (Player player : queue.get(index).values()) {
-                    if (player.isConnected() && player.usedChunks.containsKey(index)) {
-                        if (matchMVChunkProtocol(protocol, player.getGameVersion())) {
-                            player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
-                        }
+        if (!tasks.contains(index)) {
+            return;
+        }
+        ConcurrentMap<Long, Map<Integer, Player>> queue = this.getChunkSendQueue(protocol);
+        // 同 sendChunkInternal 协议：逐玩家移除、"仅当为空"才删键，并发新入队请求不丢
+        while (true) {
+            Map<Integer, Player> requests = queue.get(index);
+            if (requests == null) {
+                // 无请求可丢，仅清守卫
+                tasks.remove(index);
+                this.chunkSendTaskStartTick.remove(index);
+                return;
+            }
+            for (Iterator<Map.Entry<Integer, Player>> it = requests.entrySet().iterator(); it.hasNext(); ) {
+                Player player = it.next().getValue();
+                it.remove();
+                try {
+                    if (player.isConnected() && player.usedChunks.containsKey(index)
+                            && matchMVChunkProtocol(protocol, player.getGameVersion())) {
+                        player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                     }
+                } catch (Exception e) {
+                    // 单个玩家失败不中断整批，该玩家经 orderChunks 周期自愈
+                    server.getLogger().error("Failed to send chunk " + x + ", " + z + " to " + player.getName(), e);
                 }
             }
-
-            queue.remove(index);
-            tasks.remove(index);
-            this.chunkSendTaskStartTick.remove(index);
+            if (queue.remove(index, Collections.emptyMap())) {
+                tasks.remove(index);
+                this.chunkSendTaskStartTick.remove(index);
+                return;
+            }
         }
     }
 

@@ -352,6 +352,8 @@ class RakNetPlayerSessionTest {
         assertTrue(new PlayerHotbarPacket().isLevelSyncPacket());
         assertTrue(new BookEditPacket().isLevelSyncPacket());
         assertTrue(new ModalFormResponsePacket().isLevelSyncPacket());
+        assertTrue(new ServerboundDataStorePacket().isLevelSyncPacket());
+        assertTrue(new ServerboundDataDrivenScreenClosedPacket().isLevelSyncPacket());
         assertTrue(new NPCRequestPacket().isLevelSyncPacket());
         assertTrue(new CommandBlockUpdatePacket().isLevelSyncPacket());
         assertTrue(new ToggleCrafterSlotRequestPacket().isLevelSyncPacket());

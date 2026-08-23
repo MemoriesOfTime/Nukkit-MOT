@@ -54,9 +54,11 @@ public interface LevelProvider {
     }
 
     /**
-     * 在非主线程读取并解码区块;返回 null 表示磁盘不存在;必须支持并发调用
+     * 在非主线程读取并解码区块;返回 null 表示磁盘不存在;必须支持并发调用，且须自行与 close() 互斥
+     * （Level 关闭的有界排空超时后可能在读取进行中拆除底层存储）。
      * <p>
-     * Read and decode a chunk off the main thread; null means absent on disk; must be safe for concurrent calls
+     * Read and decode a chunk off the main thread; null means absent on disk; must be safe for concurrent
+     * calls and exclude close() itself (Level's bounded drain may time out mid-read).
      */
     @Nullable
     default BaseFullChunk readChunkOffThread(int chunkX, int chunkZ) {

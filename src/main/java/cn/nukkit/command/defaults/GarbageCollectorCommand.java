@@ -56,8 +56,11 @@ public class GarbageCollectorCommand extends VanillaCommand {
                 try {
                     future.get(5, TimeUnit.SECONDS);
                 } catch (InterruptedException e) {
+                    // 中断（通常为关服）：不内联跨 owner 执行，放弃本轮并跳过剩余世界
                     Thread.currentThread().interrupt();
-                    collection.run();
+                    sender.getServer().getLogger().warning("Interrupted while waiting for level GC; skipping GC for '"
+                            + level.getName() + "' and remaining levels");
+                    break;
                 } catch (ExecutionException e) {
                     sender.getServer().getLogger().logException(e.getCause());
                 } catch (TimeoutException e) {
