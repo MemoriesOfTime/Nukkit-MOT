@@ -340,8 +340,35 @@ public class Level implements ChunkManager, Metadatable {
     // Sentinel marking "too many changes, resend the whole chunk"; never populated, so never test it via size()
     private final Int2ObjectOpenHashMap<Object> changeBlocksFullMap = new Int2ObjectOpenHashMap<>();
 
+    /**
+     * Hard ceiling on how many normal block updates one tick is allowed to perform.
+     *
+     * <p>The normal update queue is re-entrant: an update performed while draining it can push
+     * more updates into the very same drain, so a runaway cascade (liquids, falling blocks,
+     * redstone loops, a huge fill) keeps the main thread busy for as long as it produces work -
+     * until the watchdog kills the server and the worlds are saved from whatever state they were
+     * in. The ceiling turns that freeze into a stutter: the remainder simply stays in the queue
+     * and is performed by the next tick, so nothing is lost. Ordinary play never reaches it.
+     */
+    private static final int MAX_NORMAL_UPDATES_PER_TICK =
+            Math.max(1024, Integer.getInteger("nukkit.maxBlockUpdatesPerTick", 200_000));
+
+    /** Block update work slower than this gets a line in the server log. */
+    private static final long SLOW_BLOCK_UPDATE_NANOS =
+            Math.max(1L, Long.getLong("nukkit.slowBlockUpdateMillis", 50L)) * 1_000_000L;
+
+    /** At most one block update report per level per this many milliseconds. */
+    private static final long BLOCK_UPDATE_REPORT_INTERVAL_MS = 10_000L;
+
     private final BlockUpdateScheduler updateQueue;
     private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
+    /** Size of {@link #normalUpdateQueue}: the queue itself only counts in linear time. */
+    private final AtomicInteger normalUpdateQueueSize = new AtomicInteger();
+    private int normalBlockUpdatesLastTick;
+    private int scheduledBlockUpdatesLastTick;
+    private long blockUpdateNanosLastTick;
+    private long blockUpdateFuseTrips;
+    private long lastBlockUpdateReport;
     private final Map<Long, Set<Integer>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
 
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
@@ -1279,10 +1306,14 @@ public class Level implements ChunkManager, Metadatable {
             this.unloadChunks();
         }
 
-        this.updateQueue.tick(this.levelCurrentTick);
+        long blockUpdateStart = System.nanoTime();
+        this.scheduledBlockUpdatesLastTick = this.updateQueue.tick(this.levelCurrentTick);
 
+        int performed = 0;
         QueuedUpdate queuedUpdate;
-        while ((queuedUpdate = this.normalUpdateQueue.poll()) != null) {
+        while (performed < MAX_NORMAL_UPDATES_PER_TICK && (queuedUpdate = this.normalUpdateQueue.poll()) != null) {
+            this.normalUpdateQueueSize.decrementAndGet();
+            performed++;
             Block block = getBlock(queuedUpdate.block, queuedUpdate.block.layer);
             BlockUpdateEvent event = new BlockUpdateEvent(block);
             this.server.getPluginManager().callEvent(event);
@@ -1293,6 +1324,17 @@ public class Level implements ChunkManager, Metadatable {
                     block.onNeighborChange(queuedUpdate.neighbor.getOpposite());
                 }
             }
+        }
+
+        this.normalBlockUpdatesLastTick = performed;
+        this.blockUpdateNanosLastTick = System.nanoTime() - blockUpdateStart;
+
+        boolean fuseTripped = performed >= MAX_NORMAL_UPDATES_PER_TICK && !this.normalUpdateQueue.isEmpty();
+        if (fuseTripped) {
+            this.blockUpdateFuseTrips++;
+        }
+        if (fuseTripped || this.blockUpdateNanosLastTick > SLOW_BLOCK_UPDATE_NANOS) {
+            this.reportBlockUpdateLoad(fuseTripped);
         }
 
         if (!this.updateEntities.isEmpty()) {
@@ -1836,8 +1878,13 @@ public class Level implements ChunkManager, Metadatable {
     public void updateAround(Vector3 pos, int layer) {
         Block block = getBlock(pos);
         for (BlockFace face : BlockFace.values()) {
-            normalUpdateQueue.add(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
+            this.queueNormalUpdate(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
         }
+    }
+
+    private void queueNormalUpdate(QueuedUpdate update) {
+        this.normalUpdateQueue.add(update);
+        this.normalUpdateQueueSize.incrementAndGet();
     }
 
     @Deprecated
@@ -1928,6 +1975,67 @@ public class Level implements ChunkManager, Metadatable {
 
     public Set<BlockUpdateEntry> getPendingBlockUpdates(AxisAlignedBB boundingBox) {
         return updateQueue.getPendingBlockUpdates(boundingBox);
+    }
+
+    /**
+     * Normal block updates waiting for the next tick. A backlog that keeps growing means this
+     * level produces block update work faster than the tick can perform it.
+     */
+    public int getNormalBlockUpdateBacklog() {
+        return this.normalUpdateQueueSize.get();
+    }
+
+    /** Scheduled block updates waiting for their tick. */
+    public int getScheduledBlockUpdateBacklog() {
+        return this.updateQueue.getPendingCount();
+    }
+
+    /** Normal block updates performed by the last tick of this level. */
+    public int getNormalBlockUpdatesLastTick() {
+        return this.normalBlockUpdatesLastTick;
+    }
+
+    /** Scheduled block updates performed by the last tick of this level. */
+    public int getScheduledBlockUpdatesLastTick() {
+        return this.scheduledBlockUpdatesLastTick;
+    }
+
+    /** How long the last tick spent on both block update queues, in nanoseconds. */
+    public long getBlockUpdateNanosLastTick() {
+        return this.blockUpdateNanosLastTick;
+    }
+
+    /**
+     * How many times the per-tick ceiling deferred normal block updates to the next tick. Anything
+     * above zero is a cascade worth looking at: ordinary play never reaches the ceiling.
+     */
+    public long getBlockUpdateFuseTrips() {
+        return this.blockUpdateFuseTrips;
+    }
+
+    /** The per-tick ceiling on normal block updates currently in force. */
+    public static int getMaxNormalBlockUpdatesPerTick() {
+        return MAX_NORMAL_UPDATES_PER_TICK;
+    }
+
+    private void reportBlockUpdateLoad(boolean fuseTripped) {
+        long now = System.currentTimeMillis();
+        if (now - this.lastBlockUpdateReport < BLOCK_UPDATE_REPORT_INTERVAL_MS) {
+            return;
+        }
+        this.lastBlockUpdateReport = now;
+
+        String load = "Block updates in level " + this.getFolderName()
+                + ": normal " + this.normalBlockUpdatesLastTick + " done, " + this.normalUpdateQueueSize.get() + " queued"
+                + "; scheduled " + this.scheduledBlockUpdatesLastTick + " done, " + this.updateQueue.getPendingCount() + " queued"
+                + "; took " + (this.blockUpdateNanosLastTick / 1_000_000L) + "ms";
+
+        if (fuseTripped) {
+            this.server.getLogger().warning(load + "; hit the per-tick ceiling of " + MAX_NORMAL_UPDATES_PER_TICK
+                    + ", the rest waits for the next tick (ceiling hit " + this.blockUpdateFuseTrips + " time(s) so far)");
+        } else {
+            this.server.getLogger().info(load);
+        }
     }
 
     /**
