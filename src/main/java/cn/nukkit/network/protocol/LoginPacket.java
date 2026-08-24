@@ -123,9 +123,8 @@ public class LoginPacket extends DataPacket {
             return;
         }
 
-        this.protocol = this.protocol_ = this.getInt();
-
         if(this.protocol < ProtocolInfo.v1_2_0){
+            this.protocol = this.protocol_ = this.getInt();
             if(this.protocol >= ProtocolInfo.v_0_16_0){
                 byte gameEdition = (byte) this.getByte();
             }
