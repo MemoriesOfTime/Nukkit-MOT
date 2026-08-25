@@ -428,6 +428,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public EntityFishingHook fishing = null;
     public boolean formOpen;
     public boolean locallyInitialized;
+    // v1001+（1.26.30）客户端是否已收到世界时钟注册表（InitializeRegistryData），由 Level.sendTime 首次同步时置位
+    public boolean worldClockSynced;
     private boolean foodEnabled = true;
     private int failedTransactions;
     protected int failedMobEquipmentPacket;

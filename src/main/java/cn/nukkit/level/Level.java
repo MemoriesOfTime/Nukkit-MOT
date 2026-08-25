@@ -62,6 +62,7 @@ import cn.nukkit.metadata.Metadatable;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.types.clock.*;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
@@ -118,6 +119,16 @@ public class Level implements ChunkManager, Metadatable {
     public static final int TIME_SUNRISE = 23000;
 
     public static final int TIME_FULL = 24000;
+
+    // 客户端内置的主世界时钟 ID 与时间标记 ID，值需与原版客户端一致
+    private static final long OVERWORLD_CLOCK_ID = 7194480507151251734L;
+    private static final List<TimeMarkerData> OVERWORLD_TIME_MARKERS = List.of(
+            new TimeMarkerData(2625810911898139949L, "minecraft:sunrise", TIME_SUNRISE, TIME_FULL),
+            new TimeMarkerData(4918950784056990566L, "minecraft:night", TIME_NIGHT, TIME_FULL),
+            new TimeMarkerData(6827470627776846754L, "minecraft:noon", TIME_NOON, TIME_FULL),
+            new TimeMarkerData(-7184653752370368672L, "minecraft:midnight", TIME_MIDNIGHT, TIME_FULL),
+            new TimeMarkerData(-4807795260250801598L, "minecraft:day", TIME_DAY, TIME_FULL),
+            new TimeMarkerData(-1781951082890426794L, "minecraft:sunset", TIME_SUNSET, TIME_FULL));
 
     public static final int DIMENSION_OVERWORLD = 0;
     public static final int DIMENSION_NETHER = 1;
@@ -1147,14 +1158,60 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void sendTime(Player... players) {
-        SetTimePacket pk = new SetTimePacket();
-        pk.time = this.time;
-
-        Server.broadcastPacket(players, pk);
+        List<Player> legacyPlayers = null;
+        List<Player> initPlayers = null;
+        List<Player> syncPlayers = null;
+        for (Player player : players) {
+            if (player.protocol < ProtocolInfo.v1_26_30) {
+                if (legacyPlayers == null) {
+                    legacyPlayers = new ArrayList<>();
+                }
+                legacyPlayers.add(player);
+            } else if (player.worldClockSynced) {
+                if (syncPlayers == null) {
+                    syncPlayers = new ArrayList<>();
+                }
+                syncPlayers.add(player);
+            } else {
+                if (initPlayers == null) {
+                    initPlayers = new ArrayList<>();
+                }
+                initPlayers.add(player);
+            }
+        }
+        if (legacyPlayers != null) {
+            SetTimePacket pk = new SetTimePacket();
+            pk.time = this.time;
+            Server.broadcastPacket(legacyPlayers.toArray(Player.EMPTY_ARRAY), pk);
+        }
+        if (initPlayers != null) {
+            // InitializeRegistryData 本身携带 time/paused，首次同步即完成注册表初始化
+            SyncWorldClocksPacket pk = new SyncWorldClocksPacket();
+            pk.data = new InitializeRegistryData(List.of(new WorldClockData(
+                    OVERWORLD_CLOCK_ID, "minecraft:overworld", this.time, this.isWorldClockPaused(), OVERWORLD_TIME_MARKERS)));
+            for (Player player : initPlayers) {
+                player.worldClockSynced = true;
+            }
+            Server.broadcastPacket(initPlayers.toArray(Player.EMPTY_ARRAY), pk);
+        }
+        if (syncPlayers != null) {
+            SyncWorldClocksPacket pk = new SyncWorldClocksPacket();
+            pk.data = new SyncStateData(List.of(new SyncWorldClockStateData(OVERWORLD_CLOCK_ID, this.time, this.isWorldClockPaused())));
+            Server.broadcastPacket(syncPlayers.toArray(Player.EMPTY_ARRAY), pk);
+        }
     }
 
     public void sendTime() {
         sendTime(this.players.values().toArray(Player.EMPTY_ARRAY));
+    }
+
+    /**
+     * 世界时钟是否暂停，语义与 {@link #checkTime()} 的时间推进条件保持一致。
+     * <p>
+     * Whether the world clock is paused, matching the time-advance condition in {@link #checkTime()}.
+     */
+    public boolean isWorldClockPaused() {
+        return this.stopTime || !this.gameRules.getBoolean(GameRule.DO_DAYLIGHT_CYCLE);
     }
 
     public GameRules getGameRules() {
