@@ -39,8 +39,8 @@ public enum GameVersion {
     V1_16_100_51(410, false, "1.16.100.51"),
     V1_16_100_52(411, false, "1.16.100.52"),
     V1_16_100(419, false, "1.16.100"),
-    V1_16_200(422, false, "1.16.200"),
     V1_16_200_51(420, false, "1.16.200.51"),
+    V1_16_200(422, false, "1.16.200"),
     V1_16_210_50(423, false, "1.16.210.50"),
     V1_16_210_53(424, false, "1.16.210.53"),
     V1_16_210(428, false, "1.16.210"),
@@ -110,7 +110,8 @@ public enum GameVersion {
     V1_26_20(975, false, "1.26.20"),
     V1_26_30(1001, false, "1.26.30"),
     V1_26_40(2168, false, "1.26.40"),
-    V1_26_44(2169, false, "1.26.44"),
+    V1_26_44(2168, false, "1.26.44"), // 与 V1_26_40 同 wire 协议号（未提升，仅 SetScore 不同）；不进 BY_PROTOCOL，仅直接引用/byName 可达
+    V1_26_45(2169, false, "1.26.45"),
 
     V1_20_50_NETEASE(630, true, "1.20.50_NetEase"),
     V1_21_2_NETEASE(686, true, "1.21.2_NetEase"),
@@ -120,7 +121,7 @@ public enum GameVersion {
     ;
 
     private static GameVersion FEATURE_VERSION = GameVersion.V1_26_10;
-    private static final GameVersion LAST_VERSION = GameVersion.V1_26_44; //TODO MultiVersion
+    private static final GameVersion LAST_VERSION = GameVersion.V1_26_45; //TODO MultiVersion
     private static final GameVersion LAST_NETEASE_VERSION = GameVersion.V1_21_124_NETEASE; //TODO MultiVersion
 
     private final int protocol;
@@ -184,7 +185,12 @@ public enum GameVersion {
                     mapping[i] = previous;
                 }
             }
-            previous = version;
+            // 同协议号条目（如 V1_26_44 与 V1_26_40 同为 2168）不推进 previous，
+            // 不参与 BY_PROTOCOL 填充与后续 gap 回填
+            // Duplicate-protocol entries never advance previous and stay out of BY_PROTOCOL
+            if (previous == null || version.protocol > previous.protocol) {
+                previous = version;
+            }
         }
 
         if (previous != null) {

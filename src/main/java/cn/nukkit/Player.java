@@ -435,6 +435,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public EntityFishingHook fishing = null;
     public boolean formOpen;
     public boolean locallyInitialized;
+    // v1001+（1.26.30）客户端是否已收到世界时钟注册表（InitializeRegistryData），由 Level.sendTime 首次同步时置位
+    public boolean worldClockSynced;
     private boolean foodEnabled = true;
     private int failedTransactions;
     protected int failedMobEquipmentPacket;
@@ -3370,9 +3372,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.syncLoginPhase(SessionLoginPhase.RESOURCE_PACK);
     }
 
+    private boolean rejectIfServerFull() {
+        return this.server.getOnlinePlayers().size() >= this.server.getMaxPlayers()
+                && this.kick(PlayerKickEvent.Reason.SERVER_FULL, "disconnectionScreen.serverFull", false);
+    }
+
     protected void completeLoginSequence() {
         if (this.loggedIn) {
             this.server.getLogger().debug("(BUG) Tried to call completeLoginSequence but player is already logged in");
+            return;
+        }
+
+        if (this.rejectIfServerFull()) {
             return;
         }
 
@@ -3717,14 +3728,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 LoginPacket loginPacket = (LoginPacket) packet;
 
                 this.protocol = loginPacket.getProtocol();
-                if (this.gameVersion == null) {
-                    // 低版本仅兼容国际版，高于554的版本在RequestNetworkSettingsProcessor_v554中处理
-                    this.gameVersion = GameVersion.byProtocol(this.protocol, false);
-                    this.syncGameVersion(this.gameVersion);
-                } else if (this.protocol != this.gameVersion.getProtocol()) {
-                    // LoginPacket.decode() 可能修改协议号（如将1.19.62的567修正为1.19.63的568），
-                    // 需要重新同步gameVersion以保持protocol和gameVersion一致，
-                    this.gameVersion = GameVersion.byProtocol(this.protocol, this.gameVersion.isNetEase());
+                if (this.gameVersion != loginPacket.getGameVersion()) {
+                    this.gameVersion = loginPacket.getGameVersion();
                     this.syncGameVersion(this.gameVersion);
                 }
 
@@ -3784,7 +3789,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                if (this.server.getOnlinePlayers().size() >= this.server.getMaxPlayers() && this.kick(PlayerKickEvent.Reason.SERVER_FULL, "disconnectionScreen.serverFull", false)) {
+                if (this.rejectIfServerFull()) {
                     return;
                 }
 

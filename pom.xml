@@ -33,7 +33,7 @@
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <log4j2.version>2.26.0</log4j2.version>
+        <log4j2.version>2.26.1</log4j2.version>
         <lombok.version>1.18.46</lombok.version>
         <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -108,7 +108,7 @@
         <dependency>
             <groupId>dev.mot.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.1.0.CR1-20260728.035926-4</version>
+            <version>1.1.0.CR1-20260822.064033-5</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
