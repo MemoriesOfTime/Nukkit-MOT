@@ -1070,6 +1070,25 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             Item item;
 
             if (c == null) {
+                // A block id above 255 is not an item id. The item form of such a block is its
+                // negative alias (255 - blockId) -- that is the one the network item palette
+                // knows. Without this a block that hands out Item.get(BlockID.X) as its drop
+                // (quartz bricks, chiseled and cracked nether bricks, resin bricks, soul soil)
+                // produces an item nothing can encode: every getNamespaceId() on it throws
+                // "Unknown legacy2Runtime mapping", and the same broken id comes back from NBT
+                // on every load.
+                Class<?> blockClass = null;
+                if (id > 255) {
+                    if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+                        CustomBlockManager custom = CustomBlockManager.get();
+                        blockClass = custom == null ? null : custom.getClassType(id);
+                    } else if (id < Block.list.length) {
+                        blockClass = Block.list[id];
+                    }
+                }
+                if (blockClass != null) {
+                    return get(255 - id, meta, count, tags);
+                }
                 item = new Item(id, meta, count);
             } else if (id < 256 && id != 166) {
                 if (meta >= 0) {
