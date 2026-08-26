@@ -2069,9 +2069,7 @@ public class Server {
     }
 
     public String getSubMotd() {
-        String sub = this.getPropertyString("sub-motd", "Powered by Nukkit-MOT");
-        if (sub.isEmpty()) sub = "Powered by Nukkit";
-        return sub;
+        return this.getPropertyString("sub-motd", "Powered by Nukkit-MOT");
     }
 
     public boolean getForceResources() {
