@@ -71,6 +71,12 @@ public class PlayerActionPacket extends DataPacket {
      * @since v622 1.20.40
      */
     public static final int ACTION_RECEIVED_SERVER_DATA = 36;
+    /**
+     * @since v748 1.21.40. Official Bedrock starts hold-to-use from this action
+     * when movement is not server-authoritative. MOT previously had no constant
+     * and the PlayerAction default cleared {@code setUsingItem(false)}.
+     */
+    public static final int ACTION_START_USING_ITEM = 37;
 
     public long entityId;
     public int action;

@@ -155,6 +155,10 @@ tasks {
         )
     }
 
+    compileTestJava {
+        options.encoding = "UTF-8"
+    }
+
     test {
         useJUnitPlatform()
         jvmArgumentProviders.add(
