@@ -2069,9 +2069,9 @@ public class Server {
     }
 
     public String getSubMotd() {
-        String sub = this.getPropertyString("sub-motd", "Powered by Nukkit-MOT");
-        if (sub.isEmpty()) sub = "Powered by Nukkit";
-        return sub;
+        // An empty value is an explicit choice: the second Bedrock server-list line is left out.
+        // Substituting a default here made that choice unreachable.
+        return this.getPropertyString("sub-motd", "Powered by Nukkit-MOT");
     }
 
     public boolean getForceResources() {
