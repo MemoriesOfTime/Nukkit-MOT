@@ -89,6 +89,61 @@ public final class PlayerEntitySkinSender {
     }
 
     /**
+     * Registers a player-like entity for a client that applies the skin straight from the
+     * player-list entry: ADD carries the real skin, and the entry is removed after
+     * {@link #DELAYED_REMOVE_TICKS}.
+     * <p>
+     * The V860 handshake cannot be used here: its ADD entry carries a blank skin and relies on a
+     * follow-up {@link PlayerSkinPacket}, which international clients ignore for an entity that has
+     * not spawned yet, leaving the doll with the default player skin.
+     */
+    public static boolean sendSkinnedEntryIfAbsent(Player viewer, UUID uuid, long entityId,
+                                                   String name, Skin skin, String xboxUserId) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(uuid, "uuid");
+        Objects.requireNonNull(skin, "skin");
+
+        if (!viewer.sentSkins.add(uuid)) {
+            return true;
+        }
+
+        PlayerListPacket add = new PlayerListPacket();
+        add.type = PlayerListPacket.TYPE_ADD;
+        add.entries = new PlayerListPacket.Entry[]{
+                new PlayerListPacket.Entry(uuid, entityId, name, skin, xboxUserId)
+        };
+        if (!viewer.dataPacket(add)) {
+            unregister(viewer, uuid);
+            return false;
+        }
+
+        currentGeneration(viewer, uuid).incrementAndGet();
+        scheduleDelayedRemove(viewer, uuid);
+        return true;
+    }
+
+    /**
+     * Sends the real skin of a player-like entity right after its spawn packet.
+     * <p>
+     * The player-list entry only reserves the identity; the client applies a skin to an entity it
+     * already knows about, so this update has to travel after AddPlayerPacket.
+     */
+    public static void sendSkinAfterSpawn(Player viewer, UUID uuid, Skin skin) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(uuid, "uuid");
+        if (skin == null || !skin.isValid()) {
+            return;
+        }
+
+        PlayerSkinPacket update = new PlayerSkinPacket();
+        update.uuid = uuid;
+        update.skin = skin;
+        update.newSkinName = skin.getSkinId();
+        update.oldSkinName = "";
+        viewer.dataPacket(update);
+    }
+
+    /**
      * 以 REMOVE → ADD 原子顺序替换已注册的 V860 玩家列表项。
      * <p>
      * Replaces a registered V860 player-list entry using the safe REMOVE → ADD order.
