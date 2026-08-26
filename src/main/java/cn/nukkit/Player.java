@@ -3157,6 +3157,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         for (Player p : new ArrayList<>(this.server.playerList.values())) {
             if (p != this && p.username != null) {
                 if (p.username.equalsIgnoreCase(this.username) || this.getUniqueId().equals(p.getUniqueId())) {
+                    if (this.server.isDuplicateLoginKeepingExistingSession()) {
+                        // The session that is already in the world stays, and the newcomer is the
+                        // one that is refused: closing the older session hands the world to
+                        // whoever knocks last, so a player carrying loot loses it to a stranger
+                        // reusing the nickname. A stale session still times out by itself.
+                        this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        return;
+                    }
                     p.close("", "disconnectionScreen.loggedinOtherLocation");
                     break;
                 }

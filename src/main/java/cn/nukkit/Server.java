@@ -330,6 +330,12 @@ public class Server {
      * Xbox authentication enabled.
      */
     public boolean xboxAuth;
+
+    /**
+     * When true a duplicate login refuses the newcomer instead of closing the session that is
+     * already in the world. Defaults to false, the historical behaviour.
+     */
+    private boolean keepExistingSessionOnDuplicateLogin;
     /**
      * Spawn eggs enabled.
      */
@@ -3175,6 +3181,10 @@ public class Server {
      * @param name player name
      * @return is whitelisted or whitelist is not enabled
      */
+    public boolean isDuplicateLoginKeepingExistingSession() {
+        return this.keepExistingSessionOnDuplicateLogin;
+    }
+
     public boolean isWhitelisted(String name) {
         return !this.hasWhitelist() || this.operators.exists(name, true) || this.whitelist.exists(name, true);
     }
@@ -3645,6 +3655,7 @@ public class Server {
         this.flyChecks = this.getPropertyBoolean("allow-flight", false);
         this.spawnRadius = this.getPropertyInt("spawn-protection", 10);
         this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
+        this.keepExistingSessionOnDuplicateLogin = this.getPropertyBoolean("keep-existing-session-on-duplicate-login", false);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
         if (!this.encryptionEnabled) {
             log.warn("Encryption is not enabled. For better security, it's recommended to enable it if you don't use a proxy software.");
@@ -3866,6 +3877,7 @@ public class Server {
             put("white-list", false);
             put("whitelist-reason", "§cServer is white-listed");
             put("xbox-auth", true);
+            put("keep-existing-session-on-duplicate-login", false);
             put("encryption", true);
 
             put("force-resources", false);
