@@ -6824,7 +6824,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (!ev.getKeepInventory() && this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
                 for (Item item : ev.getDrops()) {
                     if (!item.hasEnchantment(Enchantment.ID_VANISHING_CURSE)) {
-                        this.level.dropItem(this, item, null, true, 40);
+                        this.dropDeathItem(item);
                     }
                 }
 
@@ -6905,6 +6905,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.dataPacket(healthPk);
             }
         }
+    }
+
+    /**
+     * Drops one inventory stack with the regular compact item motion.
+     *
+     * <p>The wide-scatter variant is for visibly throwing items and sends a death inventory far
+     * across a PvP arena. The longer death pickup delay stays unchanged; only travel is compact.
+     */
+    void dropDeathItem(Item item) {
+        this.getLevel().dropItem(this, item, null, false, 40);
     }
 
     protected boolean handleRespawnRequest() {
