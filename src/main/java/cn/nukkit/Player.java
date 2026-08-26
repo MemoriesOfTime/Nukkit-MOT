@@ -4248,7 +4248,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     if (authPacket.getInputData().contains(AuthInputAction.START_FLYING)) {
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Refused, never punished: the client keeps asking to fly for a while
+                            // after the server has taken the permission away (game mode change, a
+                            // plugin revoking flight), and a stale request is not a cheat. Resending
+                            // the adventure settings puts the client back on the ground; someone who
+                            // really rises without permission still meets the movement check.
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
@@ -4562,7 +4567,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case PlayerActionPacket.ACTION_START_FLYING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput() || protocol < ProtocolInfo.v1_20_30_24) break;
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Refused, not punished: see START_FLYING above.
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
