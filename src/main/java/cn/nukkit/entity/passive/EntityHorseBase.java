@@ -141,6 +141,15 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
+        if (player.isSneaking() && !this.isBaby() && this.horseInventory != null
+                && !this.isFeedItem(item) && item.getId() != Item.SADDLE
+                && !item.isHorseArmor() && item.getId() != Item.CHEST) {
+            // Crouch and use opens the horse screen, the way vanilla Bedrock does. An item the
+            // horse itself accepts keeps its own meaning: a crouching player still saddles,
+            // feeds and armors the animal by tapping it.
+            player.addWindow(this.horseInventory);
+            return false;
+        }
         if (this.isFeedItem(item) && !this.isInLoveCooldown()) {
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
             this.level.addParticle(new ItemBreakParticle(this.add(0, this.getMountedYOffset(), 0), Item.get(item.getId(), 0, 1)));
@@ -252,6 +261,16 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
                 item.getId() == Item.SUGAR ||
                 item.getId() == Item.BREAD ||
                 item.getId() == Item.GOLDEN_CARROT;
+    }
+
+    @Override
+    public void close() {
+        if (this.horseInventory != null) {
+            for (Player viewer : new ArrayList<>(this.horseInventory.getViewers())) {
+                viewer.removeWindow(this.horseInventory);
+            }
+        }
+        super.close();
     }
 
     @Override

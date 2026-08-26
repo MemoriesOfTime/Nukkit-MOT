@@ -21,6 +21,7 @@ import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityHappyGhast;
+import cn.nukkit.entity.passive.EntityHorseBase;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
@@ -4620,6 +4621,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 if (this.protocol >= ProtocolInfo.v1_19_0) {
                                     this.addWindow(((InventoryHolder) targetEntity).getInventory());
                                 }
+                            } else if (this.riding instanceof EntityHorseBase horseRide
+                                    && (targetEntity == null || targetEntity == this.riding)) {
+                                // Bedrock has no other way to reach the saddle and armor slots:
+                                // the rider presses the inventory button and expects the horse
+                                // screen, not their own bag.
+                                this.addWindow(horseRide.getInventory());
                             } else if (this.protocol >= 407) {
                                 if (this.inventory.open(this)) {
                                     this.inventoryOpen = true;
