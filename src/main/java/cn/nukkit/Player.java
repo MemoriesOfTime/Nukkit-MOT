@@ -969,6 +969,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void setSkin(Skin skin) {
+        if (skin.isFullyTransparent()) {
+            skin = Skin.NO_PERSONA_SKIN;
+        }
         Skin previousSkin = this.getSkin();
         super.setSkin(skin);
         if (!this.spawned) {
