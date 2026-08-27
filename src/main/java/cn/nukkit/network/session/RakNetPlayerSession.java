@@ -263,6 +263,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     return;
                 }else if(oldPacketId == ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_15_10).get(BatchPacket.class)){
                     packetBuffer = new byte[buffer.readableBytes()];
+                    buffer.markReaderIndex();
                     buffer.readBytes(packetBuffer);
                     BatchPacket pk = new BatchPacket();
                     pk.setBuffer(packetBuffer, 1);
@@ -283,8 +284,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                             for (DataPacket p1 : packets) {
                                 inbound.offer(p1);
                             }
+                            return;
+                        }else if(packets == null){
+                            buffer.resetReaderIndex();
+                        }else{
+                            return;
                         }
-                        return;
                     }else{
                         if (this.player != null && this.player.confirmProtocol) {
                             pk.protocol = this.player.protocol;

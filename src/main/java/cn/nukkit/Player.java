@@ -3618,7 +3618,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if(packet.protocol < ProtocolInfo.v1_2_0){
+        if(packet.protocol < ProtocolInfo.v1_1_0){
             handleDataPacketFromMCPE(packet);
             return;
         }
@@ -5843,6 +5843,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+//        SessionLoginPhase loginPhase = this.getCurrentLoginPhase();
+//        if (!loginVerified && !isPreLoginVerifiedPacketAllowed(loginPhase, pid)) {
+//            server.getLogger().warning("Ignoring " + packet.getClass().getSimpleName() + " from " + getAddress() + " due to player not verified yet");
+//            if (unverifiedPackets++ > 100) {
+//                this.close("", "Too many failed login attempts");
+//            }
+//            return;
+//        }
+//
+//        if (!loggedIn && !isPreLoginPacketAllowed(loginPhase, pid)) {
+//            server.getLogger().warning("Ignoring " + packet.getClass().getSimpleName() + " from " + username + " due to player not logged in yet");
+//            return;
+//        }
+
         oldpacketswitch:
         switch(packet.getName()){
             case "LoginPacket" -> {
@@ -7641,6 +7655,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.server.addOnlinePlayer_old(this);
         this.loggedIn = true;
+        this.syncLoginPhase(SessionLoginPhase.LOGGED_IN);
 
         if (this.isCreative()) {
             this.inventory.setHeldItemSlot(0);

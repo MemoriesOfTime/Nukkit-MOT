@@ -857,6 +857,7 @@ public interface ProtocolInfo {
         .put(v_0_13_0, ProtocolInfo.ProtocolInfo70)
         .put(v_0_13_2, ProtocolInfo.ProtocolInfo70)
         .put(v_0_14_0, ProtocolInfo.ProtocolInfo70)
+        .put(46, ProtocolInfo.ProtocolInfo70)
         .put(v_0_14_3, ProtocolInfo.ProtocolInfo70)
         .put(v_0_15_10, ProtocolInfo.ProtocolInfo84)
         .put(v_0_16_0, ProtocolInfo.ProtocolInfo90)

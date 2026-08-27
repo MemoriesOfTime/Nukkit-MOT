@@ -4,6 +4,7 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.block.Block;
 import cn.nukkit.inventory.CommandBlockMinecartInventory;
 import cn.nukkit.level.Level;
@@ -153,7 +154,7 @@ public class EntityMinecartCommandBlockSaveTest {
         EntityMinecartCommandBlock reloaded = new EntityMinecartCommandBlock(chunk, cloneCompound(original.namedTag));
 
         // Entity.DATA_COMMAND_BLOCK_COMMAND = 71 = Bedrock COMMAND_BLOCK_NAME (modern)
-        assertEquals("say hello", reloaded.getDataPropertyString(71),
+        assertEquals("say hello", reloaded.getDataPropertyString(GameVersion.getLastVersion().getProtocol(), 71),
                 "COMMAND_BLOCK_NAME (index 71) must carry the loaded command so the client GUI can show it");
     }
 
@@ -222,7 +223,7 @@ public class EntityMinecartCommandBlockSaveTest {
         }
 
         private DataPacket createAddEntityPacketForTest() {
-            return super.createAddEntityPacket();
+            return super.createAddEntityPacket(GameVersion.getLastVersion().getProtocol());
         }
     }
 }

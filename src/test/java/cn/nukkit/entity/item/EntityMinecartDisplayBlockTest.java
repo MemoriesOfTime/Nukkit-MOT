@@ -1,5 +1,6 @@
 package cn.nukkit.entity.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -103,12 +104,12 @@ public class EntityMinecartDisplayBlockTest {
 
         // DATA_HAS_DISPLAY must be 1 (otherwise the client uses the entity's default
         // texture, which for NETWORK_ID 100 is the orange pulse block).
-        assertEquals(1, minecart.getDataPropertyByte(Entity.DATA_HAS_DISPLAY),
+        assertEquals(1, minecart.getDataPropertyByte(GameVersion.getLastVersion().getProtocol(), Entity.DATA_HAS_DISPLAY),
                 "Command block minecart must report a display block on spawn");
 
         // DATA_DISPLAY_ITEM is packed as legacyId | (meta << 16); for a normal
         // command block that is exactly Block.COMMAND_BLOCK (137).
-        int display = minecart.getDataPropertyInt(Entity.DATA_DISPLAY_ITEM);
+        int display = minecart.getDataPropertyInt(GameVersion.getLastVersion().getProtocol(), Entity.DATA_DISPLAY_ITEM);
         int expected = Block.COMMAND_BLOCK;
         assertEquals(expected, display,
                 "Display item should be command_block (137), was " + display);
@@ -128,9 +129,9 @@ public class EntityMinecartDisplayBlockTest {
 
         EntityMinecartAbstract minecart = new EntityMinecartCommandBlock(chunk, nbt);
 
-        assertEquals(1, minecart.getDataPropertyByte(Entity.DATA_HAS_DISPLAY));
-        assertEquals(Block.COMMAND_BLOCK, minecart.getDataPropertyInt(Entity.DATA_DISPLAY_ITEM));
+        assertEquals(1, minecart.getDataPropertyByte(GameVersion.getLastVersion().getProtocol(), Entity.DATA_HAS_DISPLAY));
+        assertEquals(Block.COMMAND_BLOCK, minecart.getDataPropertyInt(GameVersion.getLastVersion().getProtocol() ,Entity.DATA_DISPLAY_ITEM));
         // Persisted offset must be honored, not the default 6.
-        assertEquals(8, minecart.getDataPropertyInt(Entity.DATA_DISPLAY_OFFSET));
+        assertEquals(8, minecart.getDataPropertyInt(GameVersion.getLastVersion().getProtocol(), Entity.DATA_DISPLAY_OFFSET));
     }
 }
