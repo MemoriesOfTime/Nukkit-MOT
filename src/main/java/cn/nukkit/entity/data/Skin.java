@@ -159,6 +159,7 @@ public class Skin {
     public void generateSkinId(String name) {
         byte[] data = Binary.appendBytes(getSkinData().data, getSkinResourcePatch().getBytes(StandardCharsets.UTF_8));
         this.skinId = UUID.nameUUIDFromBytes(data) + "." + name;
+        this.cachedFingerprint = null;
     }
 
     public void setSkinData(byte[] skinData) {
@@ -191,12 +192,10 @@ public class Skin {
             this.isLegacySlim = true;
         }
 
-        if (geometryName.trim().isEmpty()) {
-            this.skinResourcePatch = GEOMETRY_CUSTOM;
-            return;
-        }
-
-        this.skinResourcePatch = "{\"geometry\" : {\"default\" : \"" + geometryName + "\"}}";
+        // 经 setSkinResourcePatch 落盘以继承指纹缓存失效（skinResourcePatch 是被哈希字段）
+        setSkinResourcePatch(geometryName.trim().isEmpty()
+                ? null
+                : "{\"geometry\" : {\"default\" : \"" + geometryName + "\"}}");
     }
 
     public String getSkinResourcePatch() {
@@ -422,11 +421,16 @@ public class Skin {
      * deliveries carry the same skin.
      * <p>
      * 结果缓存：指纹在热路径被反复计算（一次换装事件的准入/等待/信任比对，广播时每个观察者
-     * 一次，4D 皮肤数百 KB 全量哈希会阻塞主线程）。影响摘要的六个 setter 会清除缓存。
+     * 一次，4D 皮肤数百 KB 全量哈希会阻塞主线程）。影响摘要的 setter 负责清除缓存；
+     * {@code generateSkinId} 内部改写 skinId 时同样清除。
+     * <p>
+     * 契约：{@link SerializedImage#data} 按引用共享（与协议层一致），指纹假设字节在计入摘要后
+     * 不被原地改写——需要换内容请走 setter 使缓存失效。
      */
     public String getContentFingerprint() {
-        if (cachedFingerprint != null) {
-            return cachedFingerprint;
+        String cached = this.cachedFingerprint;
+        if (cached != null) {
+            return cached;
         }
         MessageDigest digest;
         try {
@@ -440,8 +444,9 @@ public class Skin {
         updateFingerprint(digest, this.getCapeId());
         updateFingerprint(digest, this.getSkinData());
         updateFingerprint(digest, this.getCapeData());
-        cachedFingerprint = HexFormat.of().formatHex(digest.digest());
-        return cachedFingerprint;
+        cached = HexFormat.of().formatHex(digest.digest());
+        this.cachedFingerprint = cached;
+        return cached;
     }
 
     private static void updateFingerprint(MessageDigest digest, String value) {
