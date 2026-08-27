@@ -28,19 +28,27 @@ public class CraftItemEvent extends Event implements Cancellable {
 
     private CraftingTransaction transaction;
 
+    private final int repetitions;
+
     public CraftItemEvent(CraftingTransaction transaction) {
+        this(transaction, 1);
+    }
+
+    public CraftItemEvent(CraftingTransaction transaction, int repetitions) {
         this.transaction = transaction;
         this.player = transaction.getSource();
         this.input = transaction.getInputList().toArray(Item.EMPTY_ARRAY);
         // 取宽类型 transactionRecipe，使 MultiRecipe 等非 CraftingRecipe 能透传到事件
         // Use the wide-typed transactionRecipe so non-CraftingRecipe types (e.g. MultiRecipe) survive
         this.recipe = transaction.getTransactionRecipe();
+        this.repetitions = Math.max(1, repetitions);
     }
 
     public CraftItemEvent(Player player, Item[] input, Recipe recipe) {
         this.player = player;
         this.input = input;
         this.recipe = recipe;
+        this.repetitions = 1;
     }
 
     public CraftingTransaction getTransaction() {
@@ -57,5 +65,10 @@ public class CraftItemEvent extends Event implements Cancellable {
 
     public Player getPlayer() {
         return this.player;
+    }
+
+    /** Number of recipe executions represented by this event, not the output stack size. */
+    public int getRepetitions() {
+        return repetitions;
     }
 }
