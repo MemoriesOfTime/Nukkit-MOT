@@ -2566,7 +2566,12 @@ public class BinaryStream {
                 case 1: // DEFAULT
                     String idName = getString();
                     int auxValue = getVarInt();
-                    int itemId = cn.nukkit.item.Item.fromString(idName).getId();
+                    // 客户端可能发送服务端无法解析的标识符；此处返回 null 会让整批数据解码失败。
+                    // The client may name an item the server cannot resolve. Failing here fails the
+                    // whole batch, so an unknown identifier decodes as air and the request is judged
+                    // by the handler instead.
+                    cn.nukkit.item.Item descriptorItem = cn.nukkit.item.Item.fromString(idName);
+                    int itemId = descriptorItem == null ? cn.nukkit.item.Item.AIR : descriptorItem.getId();
                     descriptor = new DefaultDescriptor(itemId, auxValue);
                     break;
                 case 2: // MOLANG
