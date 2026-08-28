@@ -65,8 +65,8 @@ public class EntityBoat extends EntityVehicle {
     public EntityBoat(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
 
-        this.setMaxHealth(40);
-        this.setHealth(40);
+        this.setMaxHealth(4);
+        this.setHealth(4);
     }
 
     @Override
