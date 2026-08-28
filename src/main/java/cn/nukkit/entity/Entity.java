@@ -2557,6 +2557,7 @@ public abstract class Entity extends Location implements Metadatable {
                 int floor = down.getId();
 
                 EntityFallEvent event = new EntityFallEvent(this, down, fallDistance);
+                this.server.getPluginManager().callEvent(event);
                 if (event.isCancelled()) {
                     return;
                 }
