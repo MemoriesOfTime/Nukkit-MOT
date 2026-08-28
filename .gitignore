@@ -27,6 +27,9 @@ ops.txt
 server.log
 server.properties
 white-list.txt
+nukkit-mot.yml
+cache
+cache/*
 worlds
 worlds/*
 plugins
