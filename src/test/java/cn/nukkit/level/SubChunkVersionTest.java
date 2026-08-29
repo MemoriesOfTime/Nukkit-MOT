@@ -8,6 +8,7 @@ import cn.nukkit.utils.BinaryStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -83,5 +84,35 @@ class SubChunkVersionTest {
         assertEquals(9, buf[0] & 0xFF, "empty sub-chunk must use version 9 on 1.19.80+");
         assertEquals(0, buf[1] & 0xFF, "empty sub-chunk must declare 0 layers");
         assertEquals(3, (byte) buf[2], "empty sub-chunk must carry the signed section-Y byte");
+    }
+
+    @Test
+    void emptySubChunkV8LayoutMatchesRealEmptySection() {
+        // v8（1.13 ~ 1.19.70）空段必须是合法调色板编码且语义为全空气：
+        // 2 层（与 fresh section 一致）、V2 runtime 头、words 全零、palette 仅一条空气
+        // v8 empty sub-chunk must be a valid all-air palette encoding: 2 layers (matching
+        // fresh sections), V2 runtime header, all-zero words, single air palette entry
+        var sharedEmpty = new cn.nukkit.level.format.generic.EmptyChunkSection(3);
+
+        for (int protocol : new int[]{ProtocolInfo.v1_13_0, ProtocolInfo.v1_16_0, ProtocolInfo.v1_18_30}) {
+            GameVersion version = GameVersion.byProtocol(protocol, false);
+            BinaryStream actual = new BinaryStream();
+            sharedEmpty.writeTo(version, actual, false);
+
+            BinaryStream expected = new BinaryStream();
+            expected.putByte((byte) 8);
+            expected.putByte((byte) 2);
+            for (int layer = 0; layer < 2; layer++) {
+                expected.putByte((byte) 5); // V2 + runtime palette header
+                for (int i = 0; i < 256; i++) {
+                    expected.putLInt(0);
+                }
+                expected.putVarInt(1); // palette size
+                expected.putVarInt(cn.nukkit.level.GlobalBlockPalette.getOrCreateRuntimeId(version, cn.nukkit.block.Block.AIR, 0));
+            }
+
+            assertArrayEquals(expected.getBuffer(), actual.getBuffer(),
+                    "empty v8 sub-chunk encoding mismatch on protocol " + protocol);
+        }
     }
 }
