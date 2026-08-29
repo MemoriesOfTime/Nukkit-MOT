@@ -4079,6 +4079,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                         }
                     }
+                } else if (this.riding instanceof EntityControllable controllable
+                        && this.protocol >= ProtocolInfo.v1_21_80) {
+                    // Since 1.21.80 the client stopped sending PlayerInputPacket, so
+                    // PlayerInputProcessor never runs any more and every controllable ride
+                    // except the boat, the minecart and the happy ghast lost its input: a
+                    // saddled horse could be mounted and then stood still forever. The move
+                    // vector lives in the auth input packet now, and it drives the very same
+                    // EntityControllable hook the legacy packet used to drive.
+                    double moveVecX = NukkitMath.clamp(authPacket.getMotion().getX(), -1, 1);
+                    double moveVecY = NukkitMath.clamp(authPacket.getMotion().getY(), -1, 1);
+                    if (moveVecX != 0 || moveVecY != 0) {
+                        controllable.onPlayerInput(this, moveVecX, moveVecY);
+                    }
                 }
 
                 if (authPacket.getInputData().contains(AuthInputAction.START_SPRINTING)) {
