@@ -116,6 +116,11 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
     }
 
     @Override
+    public boolean isBreedingItem(Item item) {
+        return this.isFeedItem(item);
+    }
+
+    @Override
     public boolean isFriendly() {
         return true;
     }
