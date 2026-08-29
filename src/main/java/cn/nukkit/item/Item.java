@@ -990,7 +990,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         // Register custom item in all RuntimeItemMappings
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+        for (RuntimeItemMapping mapping : RuntimeItems.values()) {
             mapping.registerCustomItem(customItem);
         }
 
@@ -1014,7 +1014,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             PENDING_CREATIVE_ITEMS.remove(namespaceId);
 
             // Remove from all RuntimeItemMappings
-            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+            for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                 mapping.deleteCustomItem((CustomItem) customItem);
             }
 

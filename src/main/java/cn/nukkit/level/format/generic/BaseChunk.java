@@ -53,6 +53,21 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         return chunk;
     }
 
+    /**
+     * 写入共享空 section 时物化真实 section 的工厂；默认走 provider 反射，子类可直接覆写避免反射。
+     * <p>
+     * Factory that materializes a real section when writing into a shared empty
+     * section; defaults to provider reflection, subclasses may override directly.
+     */
+    protected ChunkSection materializeSection(int sectionY) {
+        try {
+            return (ChunkSection) this.providerClass.getMethod("createChunkSection", int.class).invoke(this.providerClass, sectionY);
+        } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            Server.getInstance().getLogger().logException(e);
+            return null;
+        }
+    }
+
     private void removeInvalidTile(int x, int y, int z) {
         BlockEntity entity = getTile(x, y, z);
         if (entity != null && !entity.isBlockEntityValid()) {
@@ -100,10 +115,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             setChanged();
             return this.getSection(Y).getAndSetBlock(x, y & 0x0f, z, layer, block);
         } catch (ChunkException e) {
-            try {
-                this.setInternalSection(Y, (ChunkSection) this.providerClass.getMethod("createChunkSection", int.class).invoke(this.providerClass, Y));
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e1) {
-                Server.getInstance().getLogger().logException(e1);
+            ChunkSection materialized = this.materializeSection(Y);
+            if (materialized != null) {
+                this.setInternalSection(Y, materialized);
             }
             return this.getSection(Y).getAndSetBlock(x, y & 0x0f, z, layer, block);
         } finally {
@@ -123,10 +137,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             setChanged();
             return this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
         } catch (ChunkException e) {
-            try {
-                this.setInternalSection(Y, (ChunkSection) this.providerClass.getMethod("createChunkSection", int.class).invoke(this.providerClass, Y));
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e1) {
-                Server.getInstance().getLogger().logException(e1);
+            ChunkSection materialized = this.materializeSection(Y);
+            if (materialized != null) {
+                this.setInternalSection(Y, materialized);
             }
             return this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
         } finally {
@@ -146,10 +159,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             setChanged();
             return this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
         } catch (ChunkException e) {
-            try {
-                this.setInternalSection(Y, (ChunkSection) this.providerClass.getMethod("createChunkSection", int.class).invoke(this.providerClass, Y));
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e1) {
-                Server.getInstance().getLogger().logException(e1);
+            ChunkSection materialized = this.materializeSection(Y);
+            if (materialized != null) {
+                this.setInternalSection(Y, materialized);
             }
             return this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
         } finally {
@@ -169,10 +181,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockId(x, y & 0x0f, z, layer, id);
             setChanged();
         } catch (ChunkException e) {
-            try {
-                this.setInternalSection(Y, (ChunkSection) this.providerClass.getMethod("createChunkSection", int.class).invoke(this.providerClass, Y));
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e1) {
-                Server.getInstance().getLogger().logException(e1);
+            ChunkSection materialized = this.materializeSection(Y);
+            if (materialized != null) {
+                this.setInternalSection(Y, materialized);
             }
             this.getSection(Y).setBlockId(x, y & 0x0f, z, layer, id);
         } finally {
@@ -212,10 +223,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockData(x, y & 0x0f, z, layer, data);
             setChanged();
         } catch (ChunkException e) {
-            try {
-                this.setInternalSection(Y, (ChunkSection) this.providerClass.getMethod("createChunkSection", int.class).invoke(this.providerClass, Y));
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e1) {
-                Server.getInstance().getLogger().logException(e1);
+            ChunkSection materialized = this.materializeSection(Y);
+            if (materialized != null) {
+                this.setInternalSection(Y, materialized);
             }
             this.getSection(Y).setBlockData(x, y & 0x0f, z, layer, data);
         } finally {
@@ -235,10 +245,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockSkyLight(x, y & 0x0f, z, level);
             setChanged();
         } catch (ChunkException e) {
-            try {
-                this.setInternalSection(Y, (ChunkSection) this.providerClass.getMethod("createChunkSection", int.class).invoke(this.providerClass, Y));
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e1) {
-                Server.getInstance().getLogger().logException(e1);
+            ChunkSection materialized = this.materializeSection(Y);
+            if (materialized != null) {
+                this.setInternalSection(Y, materialized);
             }
             this.getSection(Y).setBlockSkyLight(x, y & 0x0f, z, level);
         }
@@ -256,10 +265,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockLight(x, y & 0x0f, z, level);
             setChanged();
         } catch (ChunkException e) {
-            try {
-                this.setInternalSection(Y, (ChunkSection) this.providerClass.getMethod("createChunkSection", int.class).invoke(this.providerClass, Y));
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e1) {
-                Server.getInstance().getLogger().logException(e1);
+            ChunkSection materialized = this.materializeSection(Y);
+            if (materialized != null) {
+                this.setInternalSection(Y, materialized);
             }
             this.getSection(Y).setBlockLight(x, y & 0x0f, z, level);
         }
@@ -349,10 +357,8 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
 
     @Override
     public boolean setSection(float fY, ChunkSection section) {
-        byte[] emptyIdArray = new byte[4096];
-        byte[] emptyDataArray = new byte[2048];
         if (Arrays.equals(emptyIdArray, section.getIdArray()) && Arrays.equals(emptyDataArray, section.getDataArray())) {
-            this.sections[this.getSectionOffset() + (int) fY] = EmptyChunkSection.EMPTY[(int) fY];
+            this.sections[this.getSectionOffset() + (int) fY] = EmptyChunkSection.bySectionY((int) fY);
         } else {
             this.sections[this.getSectionOffset() + (int) fY] = section;
         }

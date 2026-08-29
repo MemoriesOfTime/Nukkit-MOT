@@ -293,6 +293,21 @@ public final class ClientChainData implements LoginChainData {
         bs.setBuffer(buffer, 0);
         decodeChainData();
         decodeSkinData();
+        normalizeOfflineIdentity();
+    }
+
+    /**
+     * Replace the identity of unauthenticated players with a name derived UUID.
+     * <p>
+     * Must run after {@link #decodeSkinData()} because that is where proxied logins
+     * (WaterdogPE) flip {@link #xboxAuthed} on: their single entry chain is unsigned but still
+     * carries a genuine Mojang identity that must be preserved.
+     */
+    private void normalizeOfflineIdentity() {
+        if (xboxAuthed) {
+            return;
+        }
+        this.clientUUID = EncryptionUtils.deriveOfflineIdentity(username);
     }
 
     @Override
