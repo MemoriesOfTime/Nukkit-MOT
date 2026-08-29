@@ -215,8 +215,9 @@ public class ItemSupportedOnTest {
     }
 
     private static List<MappingContext> collectMappingContexts() throws IllegalAccessException {
-        List<MappingContext> contexts = new ArrayList<>(RuntimeItems.VALUES.length);
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+        RuntimeItemMapping[] mappings = RuntimeItems.values();
+        List<MappingContext> contexts = new ArrayList<>(mappings.length);
+        for (RuntimeItemMapping mapping : mappings) {
             contexts.add(new MappingContext(mapping, (GameVersion) gameVersionField.get(mapping)));
         }
         contexts.sort(Comparator.comparingInt(context -> context.gameVersion().getProtocol()));

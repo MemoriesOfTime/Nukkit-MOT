@@ -4154,10 +4154,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (chestplate == null || chestplate.getId() != ItemID.ELYTRA || chestplate.getDamage() >= chestplate.getMaxDurability()) {
                         withoutElytra = true;
                     }
-                    if (withoutElytra && !server.getAllowFlight()) {
-                        this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, MSG_FLYING_NOT_ENABLED, true);
-                        return;
-                    }
+                    // A glide request without elytra is refused, never punished: the client asks
+                    // for it whenever the player double taps jump, which happens all the time when
+                    // a plugin takes the elytra off. Cancelling resyncs the client, and a player who
+                    // keeps rising without wings is still caught by the movement check below.
                     PlayerToggleGlideEvent playerToggleGlideEvent = new PlayerToggleGlideEvent(this, true);
                     if (this.riding != null || this.sleeping != null || withoutElytra) {
                         playerToggleGlideEvent.setCancelled(true);
@@ -4471,10 +4471,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (chestplate == null || chestplate.getId() != ItemID.ELYTRA || chestplate.getDamage() >= chestplate.getMaxDurability()) {
                             withoutElytra = true;
                         }
-                        if (withoutElytra && !server.getAllowFlight()) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, MSG_FLYING_NOT_ENABLED, true);
-                            return;
-                        }
+                        // Refused, not punished: see ACTION_START_GLIDING above.
                         PlayerToggleGlideEvent playerToggleGlideEvent = new PlayerToggleGlideEvent(this, true);
                         if (this.riding != null || this.sleeping != null || withoutElytra) {
                             playerToggleGlideEvent.setCancelled(true);
