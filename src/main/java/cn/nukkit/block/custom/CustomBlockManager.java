@@ -274,7 +274,7 @@ public class CustomBlockManager {
                             meta = finalProperties.setValue(meta, name, states.get(name));
                         }
 
-                        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                        for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                             mapping.registerCustomBlockItem(identifier, itemId, meta);
                         }
 
@@ -288,7 +288,7 @@ public class CustomBlockManager {
                         this.legacy2CustomState.put(state.getLegacyId(), state);
                     });
         } else {
-            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+            for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                 mapping.registerCustomBlockItem(identifier, itemId, 0);
             }
         }
