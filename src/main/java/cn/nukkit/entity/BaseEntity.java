@@ -797,6 +797,34 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return null;
     }
 
+    /**
+     * Насколько градусов за такт разрешено поворачивать тело сущности с ИИ.
+     *
+     * <p>Мгновенный разворот на произвольный угол клиент показывает рывком: он не сглаживает
+     * поворот, а рисует то, что пришло. Живая цель поворачивается плавно сама, а вот случайная
+     * точка блуждания и узел пути меняются скачком, и каждая такая смена читалась как дёрганье.
+     */
+    private static final double MAX_BODY_TURN_PER_TICK = 30.0D;
+
+    /**
+     * Повернуть тело к заданному направлению не более чем на {@link #MAX_BODY_TURN_PER_TICK}.
+     */
+    protected void turnBodyTowards(double yaw) {
+        double delta = yaw - this.yaw;
+        while (delta < -180.0D) {
+            delta += 360.0D;
+        }
+        while (delta > 180.0D) {
+            delta -= 360.0D;
+        }
+        if (delta > MAX_BODY_TURN_PER_TICK) {
+            delta = MAX_BODY_TURN_PER_TICK;
+        } else if (delta < -MAX_BODY_TURN_PER_TICK) {
+            delta = -MAX_BODY_TURN_PER_TICK;
+        }
+        this.setBothYaw(this.yaw + delta);
+    }
+
     protected boolean isInTickingRange() {
         return this.isInTickingRange(6400); // 80 blocks
     }

@@ -65,12 +65,10 @@ public abstract class EntitySwimming extends BaseEntity {
 
         int x, z;
         if (this.stayTime > 0) {
-            if (Utils.rand(1, 100) > 5) {
-                return;
-            }
-            x = Utils.rand(10, 30);
-            z = Utils.rand(10, 30);
-            this.target = this.add(Utils.rand() ? x : -x, Utils.rand(-20.0, 20.0) / 10, Utils.rand() ? z : -z);
+            // Тот же дефект, что у ходячих: отдых с вероятностью 5% каждый такт брал новую
+            // случайную точку и разворачивал сущность в произвольную сторону. Отдых означает
+            // отдых, а новая цель выбирается, когда он кончится.
+            return;
         } else if (Utils.rand(1, 100) == 1) {
             x = Utils.rand(10, 30);
             z = Utils.rand(10, 30);
@@ -112,8 +110,8 @@ public abstract class EntitySwimming extends BaseEntity {
                         this.motionX = this.getSpeed() * 0.1 * (x / diff);
                         this.motionZ = this.getSpeed() * 0.1 * (z / diff);
                     }
-                    if ((this.stayTime <= 0 || Utils.rand()) && diff != 0) {
-                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                    if (this.stayTime <= 0 && diff != 0) {
+                        this.turnBodyTowards(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                     return this.followTarget;
                 }
@@ -132,8 +130,8 @@ public abstract class EntitySwimming extends BaseEntity {
                         this.motionX = this.getSpeed() * 0.15 * (x / diff);
                         this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                     }
-                    if ((this.stayTime <= 0 || Utils.rand()) && diff != 0) {
-                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                    if (this.stayTime <= 0 && diff != 0) {
+                        this.turnBodyTowards(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
             }

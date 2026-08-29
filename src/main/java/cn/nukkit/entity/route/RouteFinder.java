@@ -113,7 +113,13 @@ public abstract class RouteFinder {
             if (node != null) {
                 Vector3 cur = node.getVector3();
                 if (cur != null && this.hasNext()) {
-                    return vec.getX() == cur.getX() && vec.getZ() == cur.getZ();
+                    // Точное равенство координат не наступает никогда: узел стоит в целочисленной
+                    // клетке, а сущность движется дробными шагами и останавливается рядом. Из-за
+                    // этого путь никогда не переключался на следующий узел здесь, и единственным
+                    // способом сдвинуться оставался повторный поиск раз в десять тактов.
+                    double dx = vec.getX() - cur.getX();
+                    double dz = vec.getZ() - cur.getZ();
+                    return dx * dx + dz * dz < 1.0D;
                 }
             }
             return false;

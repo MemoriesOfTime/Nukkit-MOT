@@ -73,13 +73,15 @@ public abstract class EntityWalking extends BaseEntity {
         }
 
         if (this.stayTime > 0) {
-            if (Utils.rand(1, 100) > 5) {
-                return;
-            }
-            this.target = this.add(Utils.rand(-30, 30), Utils.rand(-20.0, 20.0) / 10, Utils.rand(-30, 30));
+            // Отдых означает отдых. Прежний код с вероятностью 5% КАЖДЫЙ такт брал новую случайную
+            // точку в тридцати блоках: стоящая на месте сущность примерно раз в секунду
+            // разворачивалась в произвольную сторону, и со стороны это выглядело дрожью.
+            return;
         } else if (Utils.rand(1, 100) == 1) {
             this.stayTime = Utils.rand(80, 200);
-            this.target = this.add(Utils.rand(-30, 30), Utils.rand(-20.0, 20.0) / 10, Utils.rand(-30, 30));
+            int wanderX = Utils.rand(4, 10);
+            int wanderZ = Utils.rand(4, 10);
+            this.target = this.add(Utils.rand() ? wanderX : -wanderX, Utils.rand(-20.0, 20.0) / 10, Utils.rand() ? wanderZ : -wanderZ);
         } else if (this.moveTime <= 0 || this.target == null) {
             this.stayTime = 0;
             this.moveTime = Utils.rand(80, 200);
@@ -88,8 +90,10 @@ public abstract class EntityWalking extends BaseEntity {
             int attempts = 0;
             boolean inWater = true;
             while (attempts++ < 10 && inWater) {
-                tx = this.x + Utils.rand(-30, 30);
-                tz = this.z + Utils.rand(-30, 30);
+                int wanderX = Utils.rand(4, 10);
+                int wanderZ = Utils.rand(4, 10);
+                tx = this.x + (Utils.rand() ? wanderX : -wanderX);
+                tz = this.z + (Utils.rand() ? wanderZ : -wanderZ);
                 int txFloor = NukkitMath.floorDouble(tx);
                 int tzFloor = NukkitMath.floorDouble(tz);
                 inWater = Block.isWater(level.getBlockIdAt(chunk, txFloor, level.getHighestBlockAt(txFloor, tzFloor), tzFloor));
@@ -149,10 +153,11 @@ public abstract class EntityWalking extends BaseEntity {
 
         if (!isImmobile()) {
             if (this.age % 10 == 0 && this.route != null && !this.route.isSearching()) {
+                // Только запуск поиска. Прежний код тут же брал следующий узел, а поиск идёт в
+                // другом потоке и начинает с обнуления списка: сущность получала узел свежего
+                // пути под номером один, то есть точку рядом с собой, и раз в десять тактов
+                // отворачивала назад. Это и был бег туда-сюда.
                 RouteFinderThreadPool.executeRouteFinderThread(new RouteFinderSearchTask(this.route));
-                if (this.route.hasNext()) {
-                    this.target = this.route.next();
-                }
             }
 
             if (this.isKnockback()) {
@@ -207,7 +212,7 @@ public abstract class EntityWalking extends BaseEntity {
                             this.motionZ = this.getSpeed() * moveMultiplier * 0.1 * (z / diff);
                         }
                     }
-                    if (this.noRotateTicks <= 0 && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && (this.stayTime <= 0 || Utils.rand()) && diff != 0) {
+                    if (this.noRotateTicks <= 0 && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && this.stayTime <= 0 && diff != 0) {
                         this.lookAt(this.followTarget);
                     }
                 }
@@ -246,8 +251,8 @@ public abstract class EntityWalking extends BaseEntity {
                             this.motionZ = this.getSpeed() * moveMultiplier * 0.15 * (z / diff);
                         }
                     }
-                    if (this.noRotateTicks <= 0 && !distance && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && (this.stayTime <= 0 || Utils.rand()) && diff > 0.001) {
-                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                    if (this.noRotateTicks <= 0 && !distance && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && this.stayTime <= 0 && diff > 0.001) {
+                        this.turnBodyTowards(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
             }
@@ -292,7 +297,7 @@ public abstract class EntityWalking extends BaseEntity {
 
             this.updateMovement();
 
-            if (this.route != null) {
+            if (this.route != null && !this.route.isSearching()) {
                 if (this.route.hasCurrentNode() && this.route.hasArrivedNode(this)) {
                     if (this.route.hasNext()) {
                         this.target = this.route.next();
