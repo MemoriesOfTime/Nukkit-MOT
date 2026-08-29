@@ -867,7 +867,7 @@ public class Server {
 
         try {
             if (CustomBlockManager.get().closeRegistry()) {
-                for (RuntimeItemMapping runtimeItemMapping : RuntimeItems.VALUES) {
+                for (RuntimeItemMapping runtimeItemMapping : RuntimeItems.values()) {
                     runtimeItemMapping.generatePalette();
                 }
             }
