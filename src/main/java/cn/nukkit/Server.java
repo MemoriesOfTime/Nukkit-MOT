@@ -882,7 +882,7 @@ public class Server {
 
         try {
             if (CustomBlockManager.get().closeRegistry()) {
-                for (RuntimeItemMapping runtimeItemMapping : RuntimeItems.VALUES) {
+                for (RuntimeItemMapping runtimeItemMapping : RuntimeItems.values()) {
                     runtimeItemMapping.generatePalette();
                 }
             }
@@ -2084,9 +2084,7 @@ public class Server {
     }
 
     public String getSubMotd() {
-        String sub = this.getPropertyString("sub-motd", "Powered by Nukkit-MOT");
-        if (sub.isEmpty()) sub = "Powered by Nukkit";
-        return sub;
+        return this.getPropertyString("sub-motd", "Powered by Nukkit-MOT");
     }
 
     public boolean getForceResources() {

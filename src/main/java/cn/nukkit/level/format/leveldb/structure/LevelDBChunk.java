@@ -4,6 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
@@ -57,14 +58,18 @@ public class LevelDBChunk extends BaseChunk {
         this.dimensionData = provider == null ? DimensionData.LEGACY_DIMENSION : provider.getLevel().getDimensionData();
         int minSectionY = this.dimensionData.getMinSectionY();
         int maxSectionY = this.dimensionData.getMaxSectionY();
-        this.sections = new LevelDBChunkSection[this.dimensionData.getHeight() >> 4];
+        this.sections = new ChunkSection[this.dimensionData.getHeight() >> 4];
         for (int i = minSectionY; i <= maxSectionY; i++) {
             int sectionsY = i + this.dimensionData.getSectionOffset();
             if (sectionsY >= sections.length || sections[sectionsY] == null) {
-                this.sections[sectionsY] = new LevelDBChunkSection(this, i);
+                // 缺失 sub-chunk 用共享空单例，首次写入经 BaseChunk 的 ChunkException 路径物化为真实 section
+                // Missing sub-chunks share an empty singleton; first write materializes a real section via BaseChunk's ChunkException path
+                this.sections[sectionsY] = EmptyChunkSection.bySectionY(i);
             } else {
                 ChunkSection section = sections[sectionsY];
-                ((LevelDBChunkSection) section).setParent(this);
+                if (section instanceof LevelDBChunkSection levelDBSection) {
+                    levelDBSection.setParent(this);
+                }
                 this.sections[sectionsY] = section;
             }
         }
@@ -368,7 +373,16 @@ public class LevelDBChunk extends BaseChunk {
     public int getBlockSkyLight(int x, int y, int z) {
         ChunkSection section0 = this.getSection(y >> 4);
         if (!(section0 instanceof LevelDBChunkSection)) {
-            return section0.getBlockSkyLight(x, y & 0x0f, z);
+            // 共享空 section 无灯光数据：无天光维度为 0，主世界按高度图推导（地上 15）
+            // Shared empty singleton holds no light: 0 in sky-less dimensions, heightmap-derived in the overworld
+            if (this.dimensionData.getDimensionId() != Level.DIMENSION_OVERWORLD) {
+                return 0;
+            }
+            int height = this.getHighestBlockAt(x, z);
+            if (height < y) {
+                return 15;
+            }
+            return height == y && Block.isBlockTransparentById(this.getBlockId(x, y, z)) ? 15 : 0;
         }
 
         LevelDBChunkSection section = (LevelDBChunkSection) section0;
@@ -638,7 +652,9 @@ public class LevelDBChunk extends BaseChunk {
             if (section == null) {
                 continue;
             }
-            ((LevelDBChunkSection) section).setParent(chunk);
+            if (section instanceof LevelDBChunkSection levelDBSection) {
+                levelDBSection.setParent(chunk);
+            }
         }
 
         if (this.has3dBiomes()) {
@@ -661,7 +677,9 @@ public class LevelDBChunk extends BaseChunk {
             if (section == null) {
                 continue;
             }
-            ((LevelDBChunkSection) section).setParent(chunk);
+            if (section instanceof LevelDBChunkSection levelDBSection) {
+                levelDBSection.setParent(chunk);
+            }
         }
 
         if (this.has3dBiomes()) {
@@ -701,6 +719,14 @@ public class LevelDBChunk extends BaseChunk {
         if (section instanceof LevelDBChunkSection) {
             ((LevelDBChunkSection) section).setParent(this);
         }
+    }
+
+    @Override
+    protected ChunkSection materializeSection(int sectionY) {
+        // 空 section 首写物化：无需 provider，天光语义与磁盘加载路径一致
+        // Materialize on first write into an empty section: no provider needed,
+        // sky-light semantics matching the disk-loaded path
+        return new LevelDBChunkSection(sectionY, null, this.dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD);
     }
 
     public Lock writeLock() {
