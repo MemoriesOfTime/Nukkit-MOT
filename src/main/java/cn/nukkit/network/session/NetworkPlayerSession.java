@@ -12,6 +12,10 @@ public interface NetworkPlayerSession {
 
     enum ImmediatePacketMode {
         QUEUED_FLUSH,
+        /**
+         * 直接写事件循环，会与已排队包乱序；仅限登录期（队列空、主线程调用）使用。
+         * Direct write on the event loop; login-phase only.
+         */
         DIRECT_WRITE
     }
 

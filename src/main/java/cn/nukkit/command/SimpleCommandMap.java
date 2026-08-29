@@ -15,6 +15,7 @@ import io.netty.util.internal.EmptyArrays;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -23,7 +24,7 @@ import java.util.stream.Collectors;
  */
 public class SimpleCommandMap implements CommandMap {
 
-    protected final Map<String, Command> knownCommands = new HashMap<>();
+    protected final Map<String, Command> knownCommands = new ConcurrentHashMap<>();
 
     private final Server server;
 

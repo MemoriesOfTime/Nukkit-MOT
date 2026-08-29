@@ -4,6 +4,7 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.level.Level;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
@@ -108,8 +109,10 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             int len = buffer.readableBytes();
             if (len > 12582912) {
                 Server.getInstance().getLogger().error("Received too big packet: " + len);
-                if (this.player != null) {
-                    this.player.close("Too big packet");
+                Player player = this.player;
+                if (player != null) {
+                    // close 可能等待/停止世界线程长达 ~20s，不能阻塞事件循环；转投主线程
+                    Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> player.close("Too big packet"));
                 }
                 return;
             }
@@ -352,7 +355,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         DataPacket packet;
         while ((packet = this.inbound.poll()) != null) {
             try {
-                this.player.handleDataPacket(packet);
+                Level level = this.player.getLevel();
+                if (level != null && level.isParallelTickEnabled() && packet.isLevelSyncPacket()) {
+                    level.addSyncPacketToQueue(this.player, packet);
+                } else {
+                    this.player.handleDataPacket(packet);
+                }
             } catch (Throwable e) {
                 log.error(new FormattedMessage("An error occurred whilst handling {} for {}",
                         new Object[]{packet.getClass().getSimpleName(), this.player.getName()}, e));

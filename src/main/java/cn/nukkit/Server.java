@@ -121,12 +121,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
@@ -154,7 +153,7 @@ public class Server {
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
 
-    private int tickCounter;
+    private volatile int tickCounter;
     private long nextTick;
     private final float[] tickAverage = {20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20};
     private final float[] useAverage = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -191,7 +190,11 @@ public class Server {
     private int autoTickRateLimit;
     private boolean alwaysTickPlayers;
     private int baseTickRate;
-    private int difficulty;
+    private boolean parallelLevelTick;
+    private volatile boolean levelThreadsStartAllowed;
+    // 受管并行世界线程注册表：区分"世界线程"与真正危险的异步上下文（RCON/异步池等）
+    private final Set<Thread> levelThreads = ConcurrentHashMap.newKeySet();
+    private volatile int difficulty;
     private int defaultGameMode = Integer.MAX_VALUE;
     int c_s_spawnThreshold;
 
@@ -218,8 +221,8 @@ public class Server {
     private final Config properties;
     private volatile ServerConfig serverConfig;
 
-    private final Map<InetSocketAddress, Player> players = new HashMap<>();
-    final Map<UUID, Player> playerList = new HashMap<>();
+    private final Map<InetSocketAddress, Player> players = new ConcurrentHashMap<>();
+    final Map<UUID, Player> playerList = new ConcurrentHashMap<>();
 
     /**
      * Worlds where automatic mob spawning is disabled.
@@ -241,30 +244,117 @@ public class Server {
 
     private static final Pattern uuidPattern = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}.dat$");
 
+    // 串化 levels 变更与 levelArray 快照重建
+    private final Object levelArrayLock = new Object();
     private final Map<Integer, Level> levels = new ConcurrentHashMap<>() {
         @Override
         public Level put(@NotNull Integer key, @NotNull Level value) {
-            Level result = super.put(key, value);
-            levelArray = levels.values().toArray(new Level[0]);
-            return result;
+            synchronized (levelArrayLock) {
+                Level result = super.put(key, value);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
         }
 
         @Override
         public boolean remove(Object key, Object value) {
-            boolean result = super.remove(key, value);
-            levelArray = levels.values().toArray(new Level[0]);
-            return result;
+            synchronized (levelArrayLock) {
+                boolean result = super.remove(key, value);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
         }
 
         @Override
         public Level remove(@NotNull Object key) {
-            Level result = super.remove(key);
-            levelArray = levels.values().toArray(new Level[0]);
-            return result;
+            synchronized (levelArrayLock) {
+                Level result = super.remove(key);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level putIfAbsent(Integer key, Level value) {
+            synchronized (levelArrayLock) {
+                Level result = super.putIfAbsent(key, value);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public boolean replace(Integer key, Level oldValue, Level newValue) {
+            synchronized (levelArrayLock) {
+                boolean result = super.replace(key, oldValue, newValue);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level replace(Integer key, Level value) {
+            synchronized (levelArrayLock) {
+                Level result = super.replace(key, value);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level computeIfAbsent(Integer key, @NotNull Function<? super Integer, ? extends Level> mappingFunction) {
+            synchronized (levelArrayLock) {
+                Level result = super.computeIfAbsent(key, mappingFunction);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level computeIfPresent(Integer key, @NotNull BiFunction<? super Integer, ? super Level, ? extends Level> remappingFunction) {
+            synchronized (levelArrayLock) {
+                Level result = super.computeIfPresent(key, remappingFunction);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level compute(Integer key, @NotNull BiFunction<? super Integer, ? super Level, ? extends Level> remappingFunction) {
+            synchronized (levelArrayLock) {
+                Level result = super.compute(key, remappingFunction);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public Level merge(Integer key, Level value, @NotNull BiFunction<? super Level, ? super Level, ? extends Level> remappingFunction) {
+            synchronized (levelArrayLock) {
+                Level result = super.merge(key, value, remappingFunction);
+                levelArray = levels.values().toArray(new Level[0]);
+                return result;
+            }
+        }
+
+        @Override
+        public void putAll(@NotNull Map<? extends Integer, ? extends Level> m) {
+            synchronized (levelArrayLock) {
+                super.putAll(m);
+                levelArray = levels.values().toArray(new Level[0]);
+            }
+        }
+
+        @Override
+        public void clear() {
+            synchronized (levelArrayLock) {
+                super.clear();
+                levelArray = levels.values().toArray(new Level[0]);
+            }
         }
     };
 
-    private Level[] levelArray = new Level[0];
+    private volatile Level[] levelArray = new Level[0];
     private final ServiceManager serviceManager = new NKServiceManager();
     private Level defaultLevel;
     private final Thread currentThread;
@@ -612,7 +702,7 @@ public class Server {
     /**
      * Temporary disable world saving to allow safe backup of leveldb worlds.
      */
-    public boolean holdWorldSave;
+    public volatile boolean holdWorldSave;
     /**
      * RakNet cookie mode
      */
@@ -954,6 +1044,7 @@ public class Server {
         if (loadPlugins) {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
+        this.allowLevelThreadsAndStartExisting();
 
         EntityProperty.buildPacket();
         EntityProperty.buildPlayerProperty();
@@ -1293,7 +1384,8 @@ public class Server {
         }
 
         for (DataPacket packet : packets) {
-            packet.isEncoded = false; // prevent plugins from being encoded in advance
+            // isEncoded 随克隆继承，置 false 强制每个克隆各自重新编码（历史行为，保持不变）
+            packet.isEncoded = false;
             for (Player player : players) {
                 player.dataPacket(packet);
             }
@@ -1317,6 +1409,27 @@ public class Server {
         }
     }
 
+    private void allowLevelThreadsAndStartExisting() {
+        this.levelThreadsStartAllowed = true;
+        this.startDeferredLevelThreads();
+    }
+
+    private void startDeferredLevelThreads() {
+        if (!this.parallelLevelTick || !this.levelThreadsStartAllowed) {
+            return;
+        }
+
+        for (Level level : this.levelArray) {
+            level.startLevelThread();
+        }
+    }
+
+    private void startLevelThreadIfReady(Level level) {
+        if (this.parallelLevelTick && this.levelThreadsStartAllowed) {
+            level.startLevelThread();
+        }
+    }
+
     public void enablePlugin(Plugin plugin) {
         this.pluginManager.enablePlugin(plugin);
     }
@@ -1325,16 +1438,50 @@ public class Server {
         this.pluginManager.disablePlugins();
     }
 
+    // 必须主线程执行的全局生命周期/权限封禁命令（operators/whitelist/difficulty 写非并发 Config，作用面跨全部世界）
+    private static final Set<String> PRIMARY_THREAD_COMMANDS = Set.of(
+            "reload", "stop", "world", "genworld", "difficulty",
+            "op", "deop", "ban", "ban-ip", "banlist", "pardon", "pardon-ip", "whitelist");
+
     public boolean dispatchCommand(CommandSender sender, String commandLine) throws ServerException {
         // First we need to check if this command is on the main thread or not, if not, warn the user
-        if (!this.isPrimaryThread()) {
+        // 世界线程上的命令派发是并行 tick 的受管路径，与该世界 tick 串行，不属于危险异步
+        if (!this.isPrimaryThread() && !this.isLevelThread()) {
             getLogger().warning("Command Dispatched Async: " + commandLine);
         }
         if (sender == null) {
             throw new ServerException("CommandSender is not valid");
         }
+        if (!this.isPrimaryThread() && isPrimaryThreadCommand(commandLine)) {
+            this.scheduler.scheduleTask(InternalPlugin.INSTANCE, () -> {
+                try {
+                    this.dispatchCommand(sender, commandLine);
+                } catch (Exception e) {
+                    log.error("Failed to dispatch primary-thread command: " + commandLine, e);
+                }
+            });
+            return true;
+        }
 
         return this.commandMap.dispatch(sender, commandLine);
+    }
+
+    private boolean isPrimaryThreadCommand(String commandLine) {
+        String name = commandLine == null ? "" : commandLine.trim();
+        if (name.startsWith("/")) {
+            name = name.substring(1);
+        }
+        int space = name.indexOf(' ');
+        if (space >= 0) {
+            name = name.substring(0, space);
+        }
+        if (name.isEmpty()) {
+            return false;
+        }
+        // 经注册表解析别名后比对，插件为这些命令注册的别名同样受主线程约束
+        Command command = this.commandMap.getCommand(name);
+        String resolved = command != null ? command.getName() : name;
+        return PRIMARY_THREAD_COMMANDS.contains(resolved.toLowerCase(Locale.ROOT));
     }
 
     public ConsoleCommandSender getConsoleSender() {
@@ -1350,8 +1497,34 @@ public class Server {
 
         log.info("Saving levels...");
 
+        List<CompletableFuture<java.lang.Void>> saveFutures = new ArrayList<>();
         for (Level level : this.levelArray) {
-            level.save();
+            if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                saveFutures.add(level.scheduleSyncTaskAndWait(() -> level.save()));
+            } else {
+                level.save();
+            }
+        }
+        // 并发保存汇总为单次 30s 上限，避免逐个等待冻住主线程
+        try {
+            CompletableFuture.allOf(saveFutures.toArray(new CompletableFuture[0])).get(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("Timed out or failed waiting for level saves during reload; continuing", e);
+        }
+
+        this.levelThreadsStartAllowed = false;
+
+        // Stop all level threads before clearing plugins to prevent
+        // concurrent event firing and command dispatch during reload.
+        // 并发停止（join 各自有界 5s），避免串行 N×5s 冻住主线程
+        List<CompletableFuture<java.lang.Void>> stops = new ArrayList<>();
+        for (Level level : this.levelArray) {
+            stops.add(CompletableFuture.runAsync(level::stopLevelThread));
+        }
+        try {
+            CompletableFuture.allOf(stops.toArray(new CompletableFuture[0])).get(35, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("Timed out or failed stopping level threads during reload; continuing", e);
         }
 
         this.pluginManager.clearPlugins();
@@ -1391,6 +1564,21 @@ public class Server {
         }
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
+        this.allowLevelThreadsAndStartExisting();
+        // /reload 可能经玩家命令在世界线程上执行，其重启会被跳过；稍后重试一次
+        this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, this::restartStoppedLevelThreads, 40);
+    }
+
+    private void restartStoppedLevelThreads() {
+        if (!this.parallelLevelTick || !this.levelThreadsStartAllowed) {
+            return;
+        }
+        for (Level level : this.levelArray) {
+            Thread thread = level.getLevelThread();
+            if (thread == null || !thread.isAlive()) {
+                level.startLevelThread();
+            }
+        }
     }
 
     public void shutdown() {
@@ -1412,6 +1600,12 @@ public class Server {
 
             ServerStopEvent serverStopEvent = new ServerStopEvent();
             pluginManager.callEvent(serverStopEvent);
+
+            // 先停世界线程再关玩家/插件（player.close 含存档）
+            this.levelThreadsStartAllowed = false;
+            for (Level level : this.levelArray) {
+                level.stopLevelThread();
+            }
 
             if (this.holdWorldSave) {
                 this.getLogger().warning("World save hold was not released! Any backup currently being taken may be invalid");
@@ -1541,7 +1735,12 @@ public class Server {
                                 offset = (i + lastLevelGC) % levelArray.length;
                                 Level level = levelArray[offset];
                                 if (!level.isBeingConverted) {
-                                    level.doGarbageCollection(allocated - 1);
+                                    if (level.isParallelTickEnabled()) {
+                                        final long alloc = allocated - 1;
+                                        level.scheduleSyncTask(() -> level.doGarbageCollection(alloc));
+                                    } else {
+                                        level.doGarbageCollection(allocated - 1);
+                                    }
                                 }
                                 allocated = next - System.currentTimeMillis();
                                 if (allocated <= 0) break;
@@ -1696,17 +1895,35 @@ public class Server {
     private void checkTickUpdates(int currentTick) {
         if (this.alwaysTickPlayers) {
             for (Player p : new ArrayList<>(this.players.values())) {
+                // 并行世界的玩家已由其世界线程 tick，主线程跳过
+                if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled()) {
+                    continue;
+                }
                 p.onUpdate(currentTick);
             }
         }
 
         for (Player p : this.getOnlinePlayers().values()) {
+            // 已出生的并行世界玩家由其世界线程 drain 发送计数器（与写入方同线程），主线程跳过
+            if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled() && p.isSpawnInitCompleted()) {
+                continue;
+            }
             p.resetPacketCounters();
         }
 
         // Do level ticks
         for (Level level : this.levelArray) {
-            if (level.isBeingConverted || (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0)) {
+            if (level.isBeingConverted) {
+                continue;
+            }
+
+            // Parallel tick: skip levels that have their own thread
+            if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                // Level ticks in its own GameLoop thread; autoTickRate is not applicable
+                continue;
+            }
+
+            if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
                 continue;
             }
 
@@ -1751,7 +1968,18 @@ public class Server {
         if (this.autoSave) {
             for (Player player : new ArrayList<>(this.players.values())) {
                 if (player.isOnline()) {
-                    player.save(true);
+                    // 快照须在世界线程上生成
+                    Level playerLevel = player.getLevel();
+                    if (this.parallelLevelTick && playerLevel != null && playerLevel.isParallelTickEnabled()) {
+                        playerLevel.scheduleSyncTask(() -> {
+                            // 投递后玩家可能已断线或已切世界
+                            if (player.isOnline() && player.getLevel() == playerLevel) {
+                                player.save(true);
+                            }
+                        });
+                    } else {
+                        player.save(true);
+                    }
                 } else if (!player.isConnected()) {
                     this.removePlayer(player);
                 }
@@ -1759,7 +1987,11 @@ public class Server {
 
             for (Level level : this.levelArray) {
                 if (!nonAutoSaveWorlds.contains(level.getName())) {
-                    level.save();
+                    if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                        level.scheduleSyncTask(() -> level.save());
+                    } else {
+                        level.save();
+                    }
                 }
             }
         }
@@ -1795,6 +2027,10 @@ public class Server {
         this.checkTickUpdates(this.tickCounter);
 
         for (Player player : new ArrayList<>(this.players.values())) {
+            // 出生初始化收尾前的登录序列留在主线程，收尾后由世界线程接管 checkNetwork
+            if (this.parallelLevelTick && player.isSpawnInitCompleted() && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
+                continue;
+            }
             player.checkNetwork();
         }
 
@@ -1827,7 +2063,11 @@ public class Server {
         if (this.tickCounter % 100 == 0) {
             for (Level level : this.levelArray) {
                 if (!level.isBeingConverted) {
-                    level.doChunkGarbageCollection();
+                    if (level.isParallelTickEnabled()) {
+                        level.scheduleSyncTask(level::doChunkGarbageCollection);
+                    } else {
+                        level.doChunkGarbageCollection();
+                    }
                 }
             }
         }
@@ -2686,13 +2926,27 @@ public class Server {
             return false;
         }
 
+        // 先完成初始化再发布；失败须关闭防泄漏
+        try {
+            level.initLevel();
+        } catch (Exception e) {
+            log.error(this.baseLang.translateString("nukkit.level.loadError", new String[]{name, e.getMessage()}));
+            try {
+                // 失败的世界不做自动存档（半初始化数据会覆盖正常世界文件），仅释放资源
+                level.setAutoSave(false);
+                level.close();
+            } catch (Exception closeEx) {
+                log.error("Error closing failed level: " + name, closeEx);
+            }
+            return false;
+        }
         this.levels.put(level.getId(), level);
-
-        level.initLevel();
 
         level.setTickRate(this.baseTickRate);
 
         this.pluginManager.callEvent(new LevelLoadEvent(level));
+        this.startLevelThreadIfReady(level);
+
         return true;
     }
 
@@ -2850,23 +3104,34 @@ public class Server {
         String path = resolved.getPath() + '/';
         String folderName = resolved.getName();
 
-        Level level;
+        Level level = null;
         try {
             provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, folderName, seed, generator, options);
 
             level = new Level(this, folderName, path, provider);
-            this.levels.put(level.getId(), level);
-
+            // 先初始化再发布（与 loadLevel 同理，见其注释）/ initialize before publishing (see loadLevel)
             level.initLevel();
+            this.levels.put(level.getId(), level);
 
             level.setTickRate(this.baseTickRate);
         } catch (Exception e) {
             log.error(this.baseLang.translateString("nukkit.level.generationError", new String[]{name, Utils.getExceptionMessage(e)}));
+            // 构造成功但初始化/发布失败：关闭释放 provider/执行器，不做自动存档
+            if (level != null) {
+                try {
+                    level.setAutoSave(false);
+                    level.close();
+                } catch (Exception closeEx) {
+                    log.error("Error closing failed level: " + name, closeEx);
+                }
+            }
             return false;
         }
 
         this.pluginManager.callEvent(new LevelInitEvent(level));
         this.pluginManager.callEvent(new LevelLoadEvent(level));
+        this.startLevelThreadIfReady(level);
+
         return true;
     }
 
@@ -3322,6 +3587,18 @@ public class Server {
         return (Thread.currentThread() == currentThread);
     }
 
+    public void registerLevelThread(Thread thread) {
+        this.levelThreads.add(thread);
+    }
+
+    public void unregisterLevelThread(Thread thread) {
+        this.levelThreads.remove(thread);
+    }
+
+    public boolean isLevelThread() {
+        return this.levelThreads.contains(Thread.currentThread());
+    }
+
     /**
      * Get server's primary thread
      *
@@ -3670,6 +3947,11 @@ public class Server {
         this.autoTickRateLimit = config.performanceSettings().autoTickRateLimit();
         this.alwaysTickPlayers = config.performanceSettings().alwaysTickPlayers();
         this.baseTickRate = config.performanceSettings().baseTickRate();
+        this.parallelLevelTick = config.performanceSettings().parallelLevelTick();
+        if (this.parallelLevelTick) {
+            log.warn("Parallel level ticking is enabled (experimental). " +
+                    "Plugins expecting main-thread event execution may behave unexpectedly.");
+        }
         this.doLevelGC = config.performanceSettings().doLevelGc();
         this.enableSpark = config.performanceSettings().enableSpark();
         this.levelDbCache = config.performanceSettings().leveldbCacheMb();

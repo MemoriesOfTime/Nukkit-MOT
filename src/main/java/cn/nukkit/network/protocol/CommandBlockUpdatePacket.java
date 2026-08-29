@@ -83,4 +83,9 @@ public class CommandBlockUpdatePacket extends DataPacket {
             this.putBoolean(this.executingOnFirstTick);
         }
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

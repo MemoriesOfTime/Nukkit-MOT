@@ -48,6 +48,8 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -432,7 +434,37 @@ public abstract class Entity extends Location implements Metadatable {
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
 
-    public static long entityCount = 1;
+    public static volatile long entityCount = 1;
+    private static final VarHandle ENTITY_COUNT = getEntityCountHandle();
+
+    private static VarHandle getEntityCountHandle() {
+        try {
+            return MethodHandles.lookup().findStaticVarHandle(Entity.class, "entityCount", long.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    /**
+     * 原子分配下一个实体 ID；网易模式下跳过 2^31 - 2^33 的 uid 预留区间。
+     * Atomically take the next entity id, skipping the reserved NetEase uid range.
+     */
+    public static long nextEntityId() {
+        Server server = Server.getInstance();
+        boolean netEase = server != null && server.netEaseMode;
+        long prev, id, next;
+        do {
+            prev = entityCount;
+            if (netEase && prev >= Integer.MAX_VALUE && prev < Integer.MAX_VALUE * 4L) {
+                id = Integer.MAX_VALUE * 4L;
+                next = id + 1;
+            } else {
+                id = prev;
+                next = prev + 1;
+            }
+        } while (!ENTITY_COUNT.compareAndSet(prev, next));
+        return id;
+    }
 
     private static final Map<String, Class<? extends Entity>> knownEntities = new HashMap<>();
     private static final Map<String, String> shortNames = new HashMap<>();
@@ -554,7 +586,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     public double highestPosition;
 
-    public boolean closed = false;
+    public volatile boolean closed = false;
 
     public boolean noClip = false;
 
@@ -698,21 +730,12 @@ public abstract class Entity extends Location implements Metadatable {
         this.collisionHelper = new CollisionHelper(this);
         this.temporalVector = new Vector3();
 
-        if (Server.getInstance().netEaseMode) {
-            // 2^31 - 2^33 给网易uid预留使用
-            if (entityCount >= Integer.MAX_VALUE && entityCount < Integer.MAX_VALUE * 4L) {
-                entityCount = Integer.MAX_VALUE * 4L;
-            }
-
-            if (this instanceof Player player) {
-                long uid = player.getLoginChainData().getNetEaseUID();
-                this.id = uid > Integer.MAX_VALUE ? uid : entityCount;
-            } else {
-                this.id = entityCount;
-            }
-            entityCount++;
+        if (Server.getInstance().netEaseMode && this instanceof Player player) {
+            long uid = player.getLoginChainData().getNetEaseUID();
+            // uid 型玩家 id 取自 2^31-2^33 预留区间，不消耗计数器 / uid players take ids from the reserved range without consuming the counter
+            this.id = uid > Integer.MAX_VALUE ? uid : nextEntityId();
         } else {
-            this.id = entityCount++;
+            this.id = nextEntityId();
         }
 
         this.justCreated = true;
@@ -787,7 +810,8 @@ public abstract class Entity extends Location implements Metadatable {
 
             this.chunk.addEntity(this);
             this.level.addEntity(this);
-            this.lastUpdate = this.server.getTick();
+            // 并行世界使用 GameLoop tick 初始化
+            this.lastUpdate = (int) this.level.getTickForEntityInit();
             this.published = true;
 
             this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));

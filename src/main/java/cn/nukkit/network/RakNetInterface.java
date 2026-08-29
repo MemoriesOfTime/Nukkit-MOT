@@ -51,7 +51,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private final Channel channel;
     private final Channel ipv6Channel;
     private final EventLoopGroup eventLoopGroup;
-    private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
+    private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new ConcurrentHashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 

@@ -17,7 +17,7 @@ import java.util.Set;
  */
 public class Position extends Vector3 {
 
-    public Level level;
+    public volatile Level level;
 
     public Position() {
         this(0, 0, 0, null);

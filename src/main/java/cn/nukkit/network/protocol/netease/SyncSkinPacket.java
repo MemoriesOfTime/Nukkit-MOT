@@ -125,4 +125,9 @@ public class SyncSkinPacket extends DataPacket {
         public String string3 = "";
         public String string4 = "";
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

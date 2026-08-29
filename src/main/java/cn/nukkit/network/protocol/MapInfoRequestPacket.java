@@ -57,4 +57,9 @@ public class MapInfoRequestPacket extends DataPacket {
          */
         int index;
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }
