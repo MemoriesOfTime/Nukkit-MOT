@@ -25,9 +25,6 @@ public abstract class PopulatorCount extends Populator {
 
     /**
      * How many objects this populator always places in a chunk.
-     *
-     * <p>Without a getter the amount can only ever be overwritten, never adjusted: a server that
-     * wants half the trees of a biome has no way to learn how many that biome asked for.
      */
     public final int getBaseAmount() {
         return this.baseAmount;
