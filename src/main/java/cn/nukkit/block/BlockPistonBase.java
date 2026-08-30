@@ -219,11 +219,10 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             List<Block> destroyBlocks = calculator.getBlocksToDestroy();
             for (int i = destroyBlocks.size() - 1; i >= 0; --i) {
                 Block block = destroyBlocks.get(i);
-                this.level.useBreakOn(block, null, null, true);
-
                 if (Server.getInstance().dropSpawners && block instanceof BlockMobSpawner){
-                    this.level.dropItem(block.add(0.5, 0.5, 0.5), Item.get(Item.MONSTER_SPAWNER, 0, 1));
+                    this.level.dropItemFromAutomaticBlock(block, Item.get(Item.MONSTER_SPAWNER, 0, 1));
                 }
+                this.level.useBreakOn(block, null, null, true);
             }
 
             attached = newBlocks.stream().map(Vector3::asBlockVector3).collect(Collectors.toList());

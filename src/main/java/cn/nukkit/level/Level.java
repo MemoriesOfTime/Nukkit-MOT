@@ -17,6 +17,7 @@ import cn.nukkit.entity.mob.EntitySnowGolem;
 import cn.nukkit.entity.passive.EntityIronGolem;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.weather.EntityLightning;
+import cn.nukkit.event.block.AutomaticBlockDropsEvent;
 import cn.nukkit.event.block.BlockBreakEvent;
 import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.block.BlockUpdateEvent;
@@ -489,6 +490,7 @@ public class Level implements ChunkManager, Metadatable {
     private static final AtomicInteger callbackIdCounter = new AtomicInteger();
     private final Int2ObjectMap<BiConsumer<Block, Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<BiConsumer<Long, DataPacket>> callbackChunkPacketSend = new Int2ObjectOpenHashMap<>();
+    private final AutomaticBlockBreakTrace automaticBlockBreakTrace = new AutomaticBlockBreakTrace();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
@@ -2471,6 +2473,8 @@ public class Level implements ChunkManager, Metadatable {
         blockPrevious.level = this;
         blockPrevious.layer = layer;
 
+        automaticBlockBreakTrace.record(blockPrevious, block);
+
         try {
             for (BiConsumer<Block, Block> callback : this.callbackBlockSet.values()) {
                 callback.accept(blockPrevious, block);
@@ -2677,6 +2681,42 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void dropItem(Vector3 source, Item item, Vector3 motion, boolean dropAround, int delay) {
+        Block automaticSource = null;
+        if (automaticBlockBreakTrace.isActive()) {
+            automaticSource =
+                    automaticBlockBreakTrace.directDropSource(
+                            this.getBlock(
+                                    source.getFloorX(),
+                                    source.getFloorY(),
+                                    source.getFloorZ()));
+        }
+        this.dropItem(source, item, motion, dropAround, delay, automaticSource);
+    }
+
+    /** Drops an item explicitly caused by an automatic block removal outside Block.onBreak. */
+    public void dropItemFromAutomaticBlock(Block source, Item item) {
+        this.dropItem(source.add(0.5, 0.5, 0.5), item, null, false, 10, source);
+    }
+
+    private void dropItem(
+            Vector3 source,
+            Item item,
+            Vector3 motion,
+            boolean dropAround,
+            int delay,
+            Block automaticSource) {
+        Item[] drops = new Item[] {item};
+        if (automaticSource != null) {
+            drops = fireAutomaticBlockDrops(
+                    automaticSource, drops, Block.EMPTY_ARRAY, false);
+        }
+        for (Item drop : drops) {
+            this.spawnDroppedItem(source, drop, motion, dropAround, delay);
+        }
+    }
+
+    private void spawnDroppedItem(
+            Vector3 source, Item item, Vector3 motion, boolean dropAround, int delay) {
         if (item.getId() != 0 && item.getCount() > 0) {
             if (motion == null) {
                 if (dropAround) {
@@ -2708,6 +2748,16 @@ public class Level implements ChunkManager, Metadatable {
 
             itemEntity.spawnToAll();
         }
+    }
+
+    private Item[] fireAutomaticBlockDrops(
+            Block source, Item[] drops, Block[] changedBlocks, boolean outermostBreak) {
+        AutomaticBlockDropsEvent event =
+                new AutomaticBlockDropsEvent(source, drops, changedBlocks, outermostBreak);
+        this.server.getPluginManager().callEvent(event);
+        return event.isCancelled() || event.getDrops() == null
+                ? new Item[0]
+                : event.getDrops();
     }
 
     public EntityItem dropAndGetItem(Vector3 source, Item item) {
@@ -2863,21 +2913,49 @@ public class Level implements ChunkManager, Metadatable {
             this.addParticle(new DestroyBlockParticle(target.add(0.5), target), players.values());
         }
 
-        BlockEntity blockEntity = this.getBlockEntity(target);
-        if (blockEntity != null) {
-            blockEntity.onBreak();
-            blockEntity.close();
+        AutomaticBlockBreakTrace.Scope automaticBreak = automaticBlockBreakTrace.enter();
+        try {
+            BlockEntity blockEntity = this.getBlockEntity(target);
+            if (blockEntity != null) {
+                automaticBlockBreakTrace.enterBlockEntityDrops();
+                try {
+                    blockEntity.onBreak();
+                } finally {
+                    automaticBlockBreakTrace.leaveBlockEntityDrops();
+                }
+                blockEntity.close();
 
-            this.updateComparatorOutputLevel(target);
+                this.updateComparatorOutputLevel(target);
+            }
+
+            target.onBreak(item, player);
+        } finally {
+            automaticBreak.close();
         }
-
-        target.onBreak(item, player);
 
         item.useOn(target);
         if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
             this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
             this.addParticle(new ItemBreakParticle(target, item));
             item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+        }
+
+        if (player == null) {
+            drops = fireAutomaticBlockDrops(
+                    target,
+                    drops,
+                    automaticBreak.changedBlocks(),
+                    automaticBreak.isOutermost());
+        } else {
+            // BlockBreakEvent has already filtered the player's primary drop batch. The empty
+            // terminal event only completes durable provenance for every secondary cell changed
+            // by Block.onBreak; direct secondary dropItem calls were filtered while the trace was
+            // active.
+            fireAutomaticBlockDrops(
+                    target,
+                    Item.EMPTY_ARRAY,
+                    automaticBreak.changedBlocks(),
+                    automaticBreak.isOutermost());
         }
 
         if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)
@@ -3438,7 +3516,19 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
+        Block previous = automaticBlockBreakTrace.isActive()
+                ? this.getBlock(x, y, z, layer)
+                : null;
         this.getChunk(x >> 4, z >> 4, true).setBlockId(x & 0x0f, y, z & 0x0f, layer, id & Block.ID_MASK);
+        if (previous != null) {
+            Block current = Block.get(id, previous.getDamage());
+            current.x = x;
+            current.y = y;
+            current.z = z;
+            current.level = this;
+            current.layer = layer;
+            automaticBlockBreakTrace.record(previous, current);
+        }
         addBlockChange(x, y, z);
         temporalVector.setComponents(x, y, z);
         for (ChunkLoader loader : this.getChunkLoaders(x >> 4, z >> 4)) {
@@ -3458,9 +3548,22 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         BaseFullChunk chunk = this.getChunk(x >> 4, z >> 4, true);
+        Block previous = automaticBlockBreakTrace.isActive()
+                ? this.getBlock(x, y, z, layer)
+                : null;
         boolean changed = chunk.setBlockAtLayer(x & 0x0f, y, z & 0x0f, layer, id & Block.ID_MASK, data & Block.DATA_MASK);
         if (!changed) {
             return false;
+        }
+
+        if (previous != null) {
+            Block current = Block.get(id, data);
+            current.x = x;
+            current.y = y;
+            current.z = z;
+            current.level = this;
+            current.layer = layer;
+            automaticBlockBreakTrace.record(previous, current);
         }
 
         addBlockChange(x, y, z);
