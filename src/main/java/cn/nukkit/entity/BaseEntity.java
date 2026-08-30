@@ -488,17 +488,11 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     /**
-     * Does feeding this item to this entity start breeding.
-     *
-     * <p>Every breeder in the tree already knows the answer and every one of them keeps it
-     * somewhere else: {@link cn.nukkit.entity.passive.EntityWalkingAnimal} exposes
-     * {@code isFeedItem}, {@link cn.nukkit.entity.mob.EntityWolf} has its own
-     * {@code isBreedingItem}, and the rabbit and the dolphin compare item ids inline inside
-     * {@code onInteract}. A server that wants to refuse breeding has nothing to ask, so it either
-     * copies those three lists and lets them drift, or refuses too late - after the food is gone.
-     *
-     * <p>One question on the common ancestor makes {@code PlayerInteractEntityEvent} enough: the
-     * intent is visible while the item is still in the player's hand.
+     * 判断手持该物品与本实体交互是否会触发繁殖（进入求爱期）。
+     * 仅回答物品是否匹配，幼年、求爱冷却等前置状态由调用方自行判断。
+     * <p>
+     * Whether interacting with this entity using the given item starts breeding (love mode).
+     * Only answers the item match; preconditions like baby or love cooldown are up to the caller.
      */
     public boolean isBreedingItem(Item item) {
         return false;

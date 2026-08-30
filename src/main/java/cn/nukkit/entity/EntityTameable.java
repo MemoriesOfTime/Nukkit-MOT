@@ -26,13 +26,10 @@ public interface EntityTameable {
     void setSitting(boolean sitting);
 
     /**
-     * Does using this item on this entity tame it.
-     *
-     * <p>The item lives inside {@code onInteract} of every tameable entity, so a server can only
-     * learn that a wild animal has just become a pet after it already happened. Asking here lets
-     * it decide while the item is still in the player's hand, the same way
-     * {@code BaseEntity#isBreedingItem} does for breeding. Whether the entity is free to be tamed
-     * at all - it has no owner, it is not angry - stays with the caller.
+     * 判断该物品是否为本实体的驯服物品；是否满足驯服前提（无主人、未愤怒等）由调用方判断。
+     * <p>
+     * Whether using this item tames this entity. Taming preconditions (no owner, not angry)
+     * are up to the caller.
      */
     default boolean isTamingItem(Item item) {
         return false;
