@@ -24,7 +24,6 @@ import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
 import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemTotem;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
@@ -1763,6 +1762,12 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
+    static boolean isTotem(Item item) {
+        // The numeric id is what survives inventory serialization. A plugin-created or restored
+        // stack may therefore be a plain Item even though it is the canonical vanilla totem.
+        return item != null && item.getId() == Item.TOTEM && item.getCount() > 0;
+    }
+
     public boolean attack(EntityDamageEvent source) {
         if (hasEffect(Effect.FIRE_RESISTANCE)
                 && (source.getCause() == DamageCause.FIRE
@@ -1833,10 +1838,10 @@ public abstract class Entity extends Location implements Metadatable {
             if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.SUICIDE) {
                 boolean totem = false;
                 boolean isOffhand = false;
-                if (p.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                if (isTotem(p.getOffhandInventory().getItemFast(0))) {
                     totem = true;
                     isOffhand = true;
-                } else if (p.getInventory().getItemInHandFast() instanceof ItemTotem) {
+                } else if (isTotem(p.getInventory().getItemInHandFast())) {
                     totem = true;
                 }
                 if (totem) {
@@ -1857,15 +1862,15 @@ public abstract class Entity extends Location implements Metadatable {
                     p.dataPacket(pk);
 
                     if (isOffhand) {
-                        p.getOffhandInventory().clear(0);
+                        p.getOffhandInventory().decreaseCount(0);
                     } else {
-                        p.getInventory().clear(p.getInventory().getHeldItemIndex());
+                        p.getInventory().decreaseCount(p.getInventory().getHeldItemIndex());
                     }
 
                     source.setCancelled(true);
                     return false;
                 }
-            } else if (p.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+            } else if (isTotem(p.getOffhandInventory().getItemFast(0))) {
                 // This damage bypasses the totem (SUICIDE/VOID) and will kill the player. Hide the
                 // offhand totem before the death/damage signal reaches the client to prevent its
                 // local auto-revival creating a "ghost" state; the real item is left untouched.
