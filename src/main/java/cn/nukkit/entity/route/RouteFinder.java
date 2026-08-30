@@ -113,10 +113,8 @@ public abstract class RouteFinder {
             if (node != null) {
                 Vector3 cur = node.getVector3();
                 if (cur != null && this.hasNext()) {
-                    // Точное равенство координат не наступает никогда: узел стоит в целочисленной
-                    // клетке, а сущность движется дробными шагами и останавливается рядом. Из-за
-                    // этого путь никогда не переключался на следующий узел здесь, и единственным
-                    // способом сдвинуться оставался повторный поиск раз в десять тактов.
+                    // Exact equality never happens (nodes are grid-aligned, entity coords are
+                    // fractional), so node advancement never fired. Accept arrival within 1 block.
                     double dx = vec.getX() - cur.getX();
                     double dz = vec.getZ() - cur.getZ();
                     return dx * dx + dz * dz < 1.0D;

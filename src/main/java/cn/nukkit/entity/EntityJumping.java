@@ -66,9 +66,7 @@ public abstract class EntityJumping extends BaseEntity {
 
         int x, z;
         if (this.stayTime > 0) {
-            // Тот же дефект, что у ходячих: отдых с вероятностью 5% каждый такт брал новую
-            // случайную точку и разворачивал сущность в произвольную сторону. Отдых означает
-            // отдых, а новая цель выбирается, когда он кончится.
+            // Rest means rest; a new wander target is picked only after it ends.
             return;
         } else if (Utils.rand(1, 100) == 1) {
             x = Utils.rand(10, 30);

@@ -798,16 +798,13 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     /**
-     * Насколько градусов за такт разрешено поворачивать тело сущности с ИИ.
-     *
-     * <p>Мгновенный разворот на произвольный угол клиент показывает рывком: он не сглаживает
-     * поворот, а рисует то, что пришло. Живая цель поворачивается плавно сама, а вот случайная
-     * точка блуждания и узел пути меняются скачком, и каждая такая смена читалась как дёрганье.
+     * Max body yaw change per tick. Clients render yaw exactly as sent, so instant snaps
+     * to a new wander point or path node read as jitter.
      */
     private static final double MAX_BODY_TURN_PER_TICK = 30.0D;
 
     /**
-     * Повернуть тело к заданному направлению не более чем на {@link #MAX_BODY_TURN_PER_TICK}.
+     * Turns the body towards the given yaw, clamped to {@link #MAX_BODY_TURN_PER_TICK} per tick.
      */
     protected void turnBodyTowards(double yaw) {
         double delta = yaw - this.yaw;

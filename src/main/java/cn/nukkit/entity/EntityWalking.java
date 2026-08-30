@@ -73,9 +73,7 @@ public abstract class EntityWalking extends BaseEntity {
         }
 
         if (this.stayTime > 0) {
-            // Отдых означает отдых. Прежний код с вероятностью 5% КАЖДЫЙ такт брал новую случайную
-            // точку в тридцати блоках: стоящая на месте сущность примерно раз в секунду
-            // разворачивалась в произвольную сторону, и со стороны это выглядело дрожью.
+            // Rest means rest; the old 5%-per-tick re-roll made standing entities twitch their facing.
             return;
         } else if (Utils.rand(1, 100) == 1) {
             this.stayTime = Utils.rand(80, 200);
@@ -153,10 +151,8 @@ public abstract class EntityWalking extends BaseEntity {
 
         if (!isImmobile()) {
             if (this.age % 10 == 0 && this.route != null && !this.route.isSearching()) {
-                // Только запуск поиска. Прежний код тут же брал следующий узел, а поиск идёт в
-                // другом потоке и начинает с обнуления списка: сущность получала узел свежего
-                // пути под номером один, то есть точку рядом с собой, и раз в десять тактов
-                // отворачивала назад. Это и был бег туда-сюда.
+                // Only start the search: reading next() here raced with the async rebuild and
+                // returned the fresh path's first node, a point right beside the entity.
                 RouteFinderThreadPool.executeRouteFinderThread(new RouteFinderSearchTask(this.route));
             }
 
