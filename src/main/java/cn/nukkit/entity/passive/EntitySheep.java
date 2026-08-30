@@ -84,7 +84,7 @@ public class EntitySheep extends EntityWalkingAnimal {
         if (item.getId() == Item.DYE) {
             this.setColor(((ItemDye) item).getDyeColor().getWoolData());
             return true;
-        } else if (item.getId() == Item.WHEAT && !this.isBaby() && !this.isInLoveCooldown()) {
+        } else if (this.isBreedingItem(item) && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
             this.level.addParticle(new ItemBreakParticle(this.add(0, this.getMountedYOffset(), 0), Item.get(Item.WHEAT)));
@@ -113,6 +113,11 @@ public class EntitySheep extends EntityWalkingAnimal {
     @Override
     public boolean isFeedItem(Item item) {
         return item.getId() == Item.WHEAT;
+    }
+
+    @Override
+    public boolean isBreedingItem(Item item) {
+        return this.isFeedItem(item);
     }
 
     @Override
