@@ -99,6 +99,23 @@ public class Skin {
         return isValidSkin(doNotLimitSkinGeometry) && isValidResourcePatch();
     }
 
+    /**
+     * Returns whether every pixel in this skin is completely transparent.
+     * Empty and malformed images are left to the regular skin validation path.
+     */
+    public boolean isFullyTransparent() {
+        byte[] data = getSkinData().data;
+        if (data.length < PIXEL_SIZE || data.length % PIXEL_SIZE != 0) {
+            return false;
+        }
+        for (int alpha = PIXEL_SIZE - 1; alpha < data.length; alpha += PIXEL_SIZE) {
+            if (data[alpha] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private boolean isValidSkin() {
         return isValidSkin(Server.getInstance().doNotLimitSkinGeometry);
     }
