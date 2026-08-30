@@ -158,7 +158,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta13-20260801.140213-6</version>
+            <version>3.0.0.Beta13-26.50</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -516,7 +516,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>bedrock-codec</artifactId>
-            <version>3.0.0.Beta13-20260801.140213-6</version>
+            <version>3.0.0.Beta13-26.50</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>

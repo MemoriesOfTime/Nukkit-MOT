@@ -80,8 +80,12 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         }
 
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50;
             this.entityDiagnostics = new ArrayList<>();
-            this.getArray(this.entityDiagnostics, bs -> new EntityDiagnosticTimingInfo(bs.getString(), bs.getString(), bs.getLLong(), (byte) bs.getByte()));
+            this.getArray(this.entityDiagnostics, bs -> new EntityDiagnosticTimingInfo(bs.getString(), bs.getString(), bs.getLLong(), (byte) bs.getByte(),
+                    // v2192 尾部新增 position + dimension / trailing position + dimension added in v2192
+                    v2192 ? bs.getVector3f() : null,
+                    v2192 ? bs.getString() : null));
 
             this.systemDiagnostics = new ArrayList<>();
             this.getArray(this.systemDiagnostics, bs -> new SystemDiagnosticTimingInfo(bs.getString(), bs.getLLong(), bs.getLLong(), (byte) bs.getByte()));
@@ -125,11 +129,17 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         }
 
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50;
             this.putArray(this.entityDiagnostics, info -> {
                 this.putString(info.displayName);
                 this.putString(info.entity);
                 this.putLLong(info.timeInNs);
                 this.putByte(info.percentOfTotal);
+                if (v2192) {
+                    // v2192 尾部新增 position + dimension / trailing position + dimension added in v2192
+                    this.putVector3f(info.position);
+                    this.putString(info.dimension != null ? info.dimension : "");
+                }
             });
 
             this.putArray(this.systemDiagnostics, info -> {
@@ -190,6 +200,14 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         public String entity;
         public long timeInNs;
         public byte percentOfTotal;
+        /**
+         * @since v2192 v1_26_50
+         */
+        public cn.nukkit.math.Vector3f position;
+        /**
+         * @since v2192 v1_26_50
+         */
+        public String dimension;
     }
 
     /**

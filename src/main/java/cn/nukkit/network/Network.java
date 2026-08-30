@@ -789,6 +789,9 @@ public class Network {
             .registerPacket(ProtocolInfo.CLIENTBOUND_UPDATE_SOUND_DATA_PACKET, ClientboundUpdateSoundDataPacket.class)
             .registerPacket(ProtocolInfo.SEND_PARTY_DESTINATION_COOKIE_PACKET, SendPartyDestinationCookiePacket.class)
             .registerPacket(ProtocolInfo.PARTY_DESTINATION_COOKIE_RESPONSE_PACKET, PartyDestinationCookieResponsePacket.class)
+            // v2192 packets
+            .registerPacket(ProtocolInfo.SET_PLAYER_FURNACE_OPTIONS_PACKET, SetPlayerFurnaceOptionsPacket.class)
+            .registerPacket(ProtocolInfo.RECORD_STARTED_PACKET, RecordStartedPacket.class)
             .build();
 
         this.packetPoolCurrentNetEase = this.packetPoolCurrent.toBuilder()

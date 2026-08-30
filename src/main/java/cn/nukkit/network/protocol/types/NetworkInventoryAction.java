@@ -76,10 +76,12 @@ public class NetworkInventoryAction {
         this.sourceType = (int) packet.getUnsignedVarInt();
 
         if (useV1001InventoryTransactionShape) {
-            if (packet.getBoolean() && packet.getBoolean()) {
+            // v2192 起每对 bool 仅剩存在性内层 bool / since v2192 only the presence bool remains
+            boolean singleBool = packet.protocol >= ProtocolInfo.v1_26_50;
+            if (singleBool ? packet.getBoolean() : packet.getBoolean() && packet.getBoolean()) {
                 this.windowId = packet.getSingedByte();
             }
-            if (packet.getBoolean() && packet.getBoolean()) {
+            if (singleBool ? packet.getBoolean() : packet.getBoolean() && packet.getBoolean()) {
                 this.flags = packet.getUnsignedVarInt();
             }
             updateTransactionPartFlags(packet);
@@ -121,24 +123,46 @@ public class NetworkInventoryAction {
         packet.putUnsignedVarInt(this.sourceType);
 
         if (packet.protocol >= ProtocolInfo.v1_26_30) {
-            packet.putBoolean(true);
-            switch (this.sourceType) {
-                case SOURCE_CONTAINER:
-                case SOURCE_TODO:
-                    packet.putBoolean(true);
-                    packet.putByte((byte) this.windowId);
-                    break;
-                default:
-                    packet.putBoolean(false);
-                    break;
-            }
+            boolean v2192 = packet.protocol >= ProtocolInfo.v1_26_50;
+            if (v2192) {
+                // v2192：单存在性 bool / single presence bool
+                switch (this.sourceType) {
+                    case SOURCE_CONTAINER:
+                    case SOURCE_TODO:
+                        packet.putBoolean(true);
+                        packet.putByte((byte) this.windowId);
+                        break;
+                    default:
+                        packet.putBoolean(false);
+                        break;
+                }
 
-            packet.putBoolean(true);
-            if (this.sourceType == SOURCE_WORLD) {
-                packet.putBoolean(true);
-                packet.putUnsignedVarInt(this.flags);
+                if (this.sourceType == SOURCE_WORLD) {
+                    packet.putBoolean(true);
+                    packet.putUnsignedVarInt(this.flags);
+                } else {
+                    packet.putBoolean(false);
+                }
             } else {
-                packet.putBoolean(false);
+                packet.putBoolean(true);
+                switch (this.sourceType) {
+                    case SOURCE_CONTAINER:
+                    case SOURCE_TODO:
+                        packet.putBoolean(true);
+                        packet.putByte((byte) this.windowId);
+                        break;
+                    default:
+                        packet.putBoolean(false);
+                        break;
+                }
+
+                packet.putBoolean(true);
+                if (this.sourceType == SOURCE_WORLD) {
+                    packet.putBoolean(true);
+                    packet.putUnsignedVarInt(this.flags);
+                } else {
+                    packet.putBoolean(false);
+                }
             }
         } else {
             switch (this.sourceType) {

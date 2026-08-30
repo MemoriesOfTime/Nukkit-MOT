@@ -101,8 +101,11 @@ public class PlayerAuthInputPacket extends DataPacket {
         this.headYaw = this.getLFloat();
 
         boolean v2168 = this.protocol >= ProtocolInfo.v1_26_40;
+        boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50;
         if (v2168) {
-            this.getBoolean(); // 外层 true，丢弃 / outer true, discarded
+            if (!v2192) {
+                this.getBoolean(); // v2168~v2169 外层 true，丢弃；v2192 起移除 / outer true, discarded; removed in v2192
+            }
             int count = (int) this.getUnsignedVarInt();
             for (int i = 0; i < Math.min(count, 256); i++) {
                 int ordinal = this.getVarInt();
@@ -152,23 +155,25 @@ public class PlayerAuthInputPacket extends DataPacket {
         }
 
         if (v2168) {
-            if (this.getBoolean() && this.getBoolean()) {
+            // v2192 起各可选段仅一个 bool（v2168~v2169 为恒 true 外层 + 内层双 bool）
+            // Since v2192 each optional section has a single bool (v2168~v2169 used a constant outer + inner bool pair)
+            if (this.optSectionPresent(v2192)) {
                 this.itemUseTransaction = this.readItemUseTransaction();
             }
-            if (this.getBoolean() && this.getBoolean()) {
+            if (this.optSectionPresent(v2192)) {
                 this.itemStackRequest = this.readItemStackRequest(this.gameVersion);
             }
-            if (this.getBoolean() && this.getBoolean()) {
+            if (this.optSectionPresent(v2192)) {
                 int arraySize = (int) this.getUnsignedVarInt();
                 if (arraySize > 256) {
                     throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
                 }
                 this.decodeBlockActions(arraySize, true);
             }
-            if (this.getBoolean() && this.getBoolean()) {
+            if (this.optSectionPresent(v2192)) {
                 this.vehicleRotation = this.getVector2f();
             }
-            if (this.getBoolean() && this.getBoolean()) {
+            if (this.optSectionPresent(v2192)) {
                 this.predictedVehicle = this.getVarLong();
             }
         } else {
@@ -208,6 +213,16 @@ public class PlayerAuthInputPacket extends DataPacket {
                 this.rawMoveVector = this.getVector2f();
             }
         }
+    }
+
+    /**
+     * v2192 起可选段仅一个存在性 bool；v2168~v2169 为「恒 true 外层 + 内层」双 bool。
+     * <p>
+     * Since v2192 an optional section carries a single presence bool; v2168~v2169 used a
+     * constant-true outer bool plus an inner bool.
+     */
+    private boolean optSectionPresent(boolean v2192) {
+        return v2192 ? this.getBoolean() : this.getBoolean() && this.getBoolean();
     }
 
     /**
@@ -258,6 +273,7 @@ public class PlayerAuthInputPacket extends DataPacket {
         packet.setOffset(this.getOffset());
 
         boolean v2168Shape = packet.protocol >= ProtocolInfo.v1_26_40;
+        boolean v2192Shape = packet.protocol >= ProtocolInfo.v1_26_50;
         packet.legacyRequestId = packet.getVarInt();
         boolean hasLegacySlots = v2168Shape
                 ? packet.getBoolean() && packet.legacyRequestId < -1 && (packet.legacyRequestId & 1) == 0
@@ -271,7 +287,8 @@ public class PlayerAuthInputPacket extends DataPacket {
             }
         }
 
-        if (v2168Shape) {
+        if (v2168Shape && !v2192Shape) {
+            // v2168~v2169 actions 前有双 bool；v2192 起移除 / double bool before actions, removed in v2192
             if (!(packet.getBoolean() && packet.getBoolean())) {
                 throw new IllegalStateException("Expected InventoryActionData");
             }

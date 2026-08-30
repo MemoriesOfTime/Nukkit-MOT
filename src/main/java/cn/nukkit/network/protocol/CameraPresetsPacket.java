@@ -143,6 +143,11 @@ public class CameraPresetsPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_80) {
             this.putOptionalNull(preset.getControlScheme(), (controlScheme) -> this.putByte((byte) controlScheme.ordinal()));
         }
+        if (this.protocol >= ProtocolInfo.v1_26_50) {
+            // v2192 尾部新增 / trailing fields added in v2192
+            this.putBoolean(preset.isApplyInheritedStartingRotation());
+            this.putOptionalNull(preset.getStartingRotation(), startingRotation -> this.putVector2f(startingRotation));
+        }
     }
 
     protected void putCameraAimAssist(CameraAimAssistPreset aimAssist) {
@@ -214,10 +219,16 @@ public class CameraPresetsPacket extends DataPacket {
             controlScheme = this.getOptional(null, b -> ControlScheme.values()[b.getByte()]);
         }
 
-        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, minYawLimit, maxYawLimit,
+        CameraPreset preset = new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, minYawLimit, maxYawLimit,
                 listener, effects, rotationSpeed, snapToTarget, entityOffset, horizontalRotationLimit, verticalRotationLimit,
                 continueTargeting, alignTargetAndCameraForward, blockListeningRadius, aimAssist, controlScheme
         );
+        if (this.protocol >= ProtocolInfo.v1_26_50) {
+            // v2192 尾部新增 / trailing fields added in v2192
+            preset.setApplyInheritedStartingRotation(this.getBoolean());
+            preset.setStartingRotation(this.getOptional(null, BinaryStream::getVector2f));
+        }
+        return preset;
     }
 
     protected CameraAimAssistPreset getCameraAimAssist() {

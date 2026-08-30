@@ -62,6 +62,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping975;
     private static RuntimeItemMapping mapping1001;
     private static RuntimeItemMapping mapping2168;
+    private static RuntimeItemMapping mapping2192;
 
     private static RuntimeItemMapping mapping_netease_630;
     private static RuntimeItemMapping mapping_netease_686;
@@ -166,6 +167,7 @@ public class RuntimeItems {
         mapping975 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_26_20);
         mapping1001 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_26_30);
         mapping2168 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_26_40);
+        mapping2192 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_26_50);
 
         mapping_netease_630 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_50_NETEASE);
         mapping_netease_686 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_2_NETEASE);
@@ -213,6 +215,7 @@ public class RuntimeItems {
                 mapping975,
                 mapping1001,
                 mapping2168,
+                mapping2192,
                 // NetEase
                 mapping_netease_630,
                 mapping_netease_686,
@@ -232,7 +235,9 @@ public class RuntimeItems {
         if (gameVersion.isNetEase()) {
             return getMappingNetEase(protocolId);
         }
-        if (protocolId >= ProtocolInfo.v1_26_40) {
+        if (protocolId >= ProtocolInfo.v1_26_50) {
+            return mapping2192;
+        } else if (protocolId >= ProtocolInfo.v1_26_40) {
             return mapping2168;
         } else if (protocolId >= ProtocolInfo.v1_26_30) {
             return mapping1001;

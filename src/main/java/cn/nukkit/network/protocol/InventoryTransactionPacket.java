@@ -112,14 +112,15 @@ public class InventoryTransactionPacket extends DataPacket {
             }
         }
 
-        if (this.protocol >= ProtocolInfo.v1_26_30) {
+        // v2192 起不再写 transactionType / actions 前的恒 true bool / constant-true bools dropped in v2192
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_50) {
             this.putBoolean(true);
         }
         this.putUnsignedVarInt(this.transactionType);
         if (protocol >= 407 && protocol < ProtocolInfo.v1_16_220) {
             this.putBoolean(this.hasNetworkIds);
         }
-        if (this.protocol >= ProtocolInfo.v1_26_30) {
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_50) {
             this.putBoolean(true);
         }
         this.putUnsignedVarInt(this.actions.length);
@@ -150,6 +151,9 @@ public class InventoryTransactionPacket extends DataPacket {
                     this.putBlockFace(useItemData.face);
                 }
                 this.putVarInt(useItemData.hotbarSlot);
+                if (this.protocol >= ProtocolInfo.v1_26_50) {
+                    this.putUnsignedVarInt(0); // 主手 / main hand; off-hand not supported yet
+                }
                 if (this.protocol >= ProtocolInfo.v1_26_30) {
                     this.putNetworkItemStackDescriptor(gameVersion, useItemData.itemInHand);
                 } else {
@@ -215,7 +219,8 @@ public class InventoryTransactionPacket extends DataPacket {
             }
         }
 
-        if (this.protocol >= ProtocolInfo.v1_26_30 && !this.getBoolean()) {
+        // v2192 起移除 transactionType / actions 前的恒 true bool / constant-true bools before type/actions removed in v2192
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_50 && !this.getBoolean()) {
             throw new IllegalStateException("Expected InventoryTransactionType");
         }
         this.transactionType = (int) this.getUnsignedVarInt();
@@ -224,7 +229,7 @@ public class InventoryTransactionPacket extends DataPacket {
             this.hasNetworkIds = this.getBoolean();
         }
 
-        if (this.protocol >= ProtocolInfo.v1_26_30 && !this.getBoolean()) {
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_50 && !this.getBoolean()) {
             throw new IllegalStateException("Expected InventoryActionData");
         }
         this.actions = new NetworkInventoryAction[Math.min((int) this.getUnsignedVarInt(), 4096)];
@@ -247,6 +252,10 @@ public class InventoryTransactionPacket extends DataPacket {
                 itemData.blockPos = this.getBlockVector3(this.gameVersion);
                 itemData.face = this.protocol >= ProtocolInfo.v1_26_30 ? BlockFace.fromIndex(this.getByte() & 0xff) : this.getBlockFace();
                 itemData.hotbarSlot = this.getVarInt();
+                if (this.protocol >= ProtocolInfo.v1_26_50) {
+                    // v2192 新增手持位置（主/副手）/ hand (main/off-hand), new in v2192
+                    this.getUnsignedVarInt();
+                }
                 itemData.itemInHand = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
                 itemData.playerPos = this.getVector3f().asVector3();
                 itemData.clickPos = this.getVector3f();

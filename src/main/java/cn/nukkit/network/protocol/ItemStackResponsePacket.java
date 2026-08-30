@@ -24,10 +24,13 @@ public class ItemStackResponsePacket extends DataPacket {
             this.putByte((byte) r.getResult().ordinal());
             this.putVarInt(r.getRequestId());
             if (this.protocol >= ProtocolInfo.v1_26_40) {
-                this.putBoolean(true);
                 if (r.getContainers().isEmpty()) {
                     this.putBoolean(false);
                     return;
+                }
+                // v2192 起容器段仅一个存在性 bool / single presence bool for containers since v2192
+                if (this.protocol < ProtocolInfo.v1_26_50) {
+                    this.putBoolean(true);
                 }
                 this.putBoolean(true);
             } else {
@@ -46,8 +49,11 @@ public class ItemStackResponsePacket extends DataPacket {
                     this.putByte((byte) item.getHotbarSlot());
                     this.putByte((byte) item.getCount());
                     if (this.protocol >= ProtocolInfo.v1_26_40) {
-                        // v2168 wraps netId in two booleans (has-entry + present); always write both
-                        this.putBoolean(true);
+                        // v2168~v2169 netId 外包双 bool（has-entry + present）；v2192 起仅 present
+                        // v2168~v2169 wrap netId in two booleans; only the presence bool remains since v2192
+                        if (this.protocol < ProtocolInfo.v1_26_50) {
+                            this.putBoolean(true);
+                        }
                         boolean present = item.getStackNetworkId() != 0;
                         this.putBoolean(present);
                         if (present) {
@@ -57,10 +63,10 @@ public class ItemStackResponsePacket extends DataPacket {
                         this.putVarInt(item.getStackNetworkId());
                     }
                     if (this.protocol >= ProtocolInfo.v1_16_200) {
-                        this.putString(item.getCustomName());
+                        this.putString(item.getCustomName() != null ? item.getCustomName() : "");
                     }
                     if (this.protocol >= ProtocolInfo.v1_21_50) {
-                        this.putString(item.getFilteredCustomName());
+                        this.putString(item.getFilteredCustomName() != null ? item.getFilteredCustomName() : "");
                     }
                     if (this.protocol >= ProtocolInfo.v1_16_210) {
                         this.putVarInt(item.getDurabilityCorrection());

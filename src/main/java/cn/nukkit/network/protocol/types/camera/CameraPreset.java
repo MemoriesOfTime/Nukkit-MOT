@@ -91,6 +91,15 @@ public final class CameraPreset implements NamedDefinition {
      */
     @Nullable
     private ControlScheme controlScheme;
+    /**
+     * @since v2192 v1_26_50
+     */
+    private boolean applyInheritedStartingRotation;
+    /**
+     * @since v2192 v1_26_50
+     */
+    @Nullable
+    private Vector2f startingRotation;
 
     private int runtimeId;
 

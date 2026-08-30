@@ -11,6 +11,12 @@ public class EnvironmentAttributeData {
     public CameraEase easing;
     public int localTransitionTicks;
     public boolean noiseTransition;
+    /**
+     * v2192 尾部新增；服务器不使用噪声过渡，写默认值。
+     * <p>
+     * Trailing field added in v2192; unused server-side, written as default.
+     */
+    public NoiseAlignment noiseAlignment;
 
     public EnvironmentAttributeData(String attributeName, AttributeData from, AttributeData attribute, AttributeData to, int currentTransitionTicks, int totalTransitionTicks, CameraEase easing) {
         this(attributeName, from, attribute, to, currentTransitionTicks, totalTransitionTicks, easing, 0, false);
@@ -55,6 +61,16 @@ public class EnvironmentAttributeData {
                 }
             }
             return LINEAR;
+        }
+    }
+
+    /**
+     * v2192 噪声对齐（当前仅一个枚举值）/ noise alignment introduced in v2192 (single enum value for now)
+     */
+    public record NoiseAlignment(Type type, int value) {
+
+        public enum Type {
+            MIN_LOCAL_TRANSITION_END
         }
     }
 }

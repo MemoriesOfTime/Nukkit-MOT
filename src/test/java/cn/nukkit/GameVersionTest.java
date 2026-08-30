@@ -35,19 +35,25 @@ class GameVersionTest {
     }
 
     @Test
-    void lastVersionIsV1_26_45() {
-        assertEquals(GameVersion.V1_26_45, GameVersion.getLastVersion());
+    void byProtocolResolvesV1_26_50() {
+        assertEquals(GameVersion.V1_26_50, GameVersion.byProtocol(ProtocolInfo.v1_26_50, false));
+    }
+
+    @Test
+    void lastVersionIsV1_26_50() {
+        assertEquals(GameVersion.V1_26_50, GameVersion.getLastVersion());
     }
 
     @Test
     void supportedProtocolsContainWireNumbersOnly() {
         assertTrue(ProtocolInfo.SUPPORTED_PROTOCOLS.contains(ProtocolInfo.v1_26_40));
         assertTrue(ProtocolInfo.SUPPORTED_PROTOCOLS.contains(ProtocolInfo.v1_26_45));
+        assertTrue(ProtocolInfo.SUPPORTED_PROTOCOLS.contains(ProtocolInfo.v1_26_50));
     }
 
     @Test
-    void currentProtocolIsV1_26_45() {
-        // Utils.dynamic 允许测试属性覆盖；默认应解析到 1.26.45 的版本字符串
-        assertEquals("1.26.45", cn.nukkit.utils.Utils.getVersionByProtocol(ProtocolInfo.CURRENT_PROTOCOL));
+    void currentProtocolIsV1_26_50() {
+        // Utils.dynamic 允许测试属性覆盖；默认应解析到 1.26.50 的版本字符串
+        assertEquals("1.26.50", cn.nukkit.utils.Utils.getVersionByProtocol(ProtocolInfo.CURRENT_PROTOCOL));
     }
 }
