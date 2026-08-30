@@ -39,6 +39,15 @@ public class RuntimeItems {
     private static boolean initialized;
 
     private static RuntimeItemMapping of(GameVersion anchor) {
+        if (!initialized) {
+            // 懒加载会把当时的 mappingEntries 永久缓存：init() 之前调用则缓存空表，
+            // 此后每个物品都查不到，且再无第二次机会。
+            //
+            // A lazily built mapping caches whatever mappingEntries held at that moment, so a
+            // call made before init() caches an EMPTY table: every item lookup misses from then
+            // on, and nothing ever rebuilds it. Fail loudly instead of poisoning the cache.
+            throw new IllegalStateException("RuntimeItems are not initialized yet");
+        }
         return MAPPINGS.computeIfAbsent(anchor, gv -> new RuntimeItemMapping(mappingEntries, gv));
     }
 
