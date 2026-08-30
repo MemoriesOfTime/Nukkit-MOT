@@ -640,6 +640,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.adventureSettings.get(Type.ALLOW_FLIGHT);
     }
 
+    /**
+     * Scale the packet and tick movement sanity limits for an authorized player who is actually
+     * flying faster than vanilla. The limits are squared distances, so the speed ratio must be
+     * squared as well. Everyone else keeps the original limits unchanged.
+     */
+    double movementSanityLimitSquared(double vanillaLimitSquared) {
+        if (this.adventureSettings == null
+                || !this.adventureSettings.get(Type.ALLOW_FLIGHT)
+                || !this.adventureSettings.get(Type.FLYING)) {
+            return vanillaLimitSquared;
+        }
+
+        float configuredFlySpeed = this.getFlySpeed();
+        if (!Float.isFinite(configuredFlySpeed) || configuredFlySpeed <= DEFAULT_FLY_SPEED) {
+            return vanillaLimitSquared;
+        }
+
+        double speedRatio = (double) configuredFlySpeed / DEFAULT_FLY_SPEED;
+        return vanillaLimitSquared * speedRatio * speedRatio;
+    }
+
     public void setAllowModifyWorld(boolean value) {
         this.adventureSettings.set(Type.WORLD_IMMUTABLE, !value);
         this.adventureSettings.set(Type.MINE, value);
@@ -2390,9 +2411,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         boolean revert = false;
 
         // Extreme distance check
-        if (distanceSquared / tickDiffSq > 225) {
+        double extremeDistanceLimitSquared = movementSanityLimitSquared(225);
+        if (distanceSquared / tickDiffSq > extremeDistanceLimitSquared) {
             revert = true;
-            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > 225 * tickDiffSq=" + (225 * tickDiffSq));
+            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > "
+                    + extremeDistanceLimitSquared + " * tickDiffSq=" + (extremeDistanceLimitSquared * tickDiffSq));
         } else {
             // Chunk generation check
             if (this.chunk == null || !this.chunk.isGenerated()) {
@@ -3987,10 +4010,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                if (dis > 100) {
+                double legacyMoveDistanceLimitSquared = movementSanityLimitSquared(100);
+                if (dis > legacyMoveDistanceLimitSquared) {
                     if (this.lastTeleportTick + 30 < this.server.getTick()) {
                         this.sendPosition(this.getLocation(), MovePlayerPacket.MODE_RESET);
-                        log.debug("{}: move {} > 100", username, dis);
+                        log.debug("{}: move {} > {}", username, dis, legacyMoveDistanceLimitSquared);
                     }
                     break;
                 }
@@ -4392,9 +4416,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                if (distSqrt > 100) {
+                double authInputDistanceLimitSquared = movementSanityLimitSquared(100);
+                if (distSqrt > authInputDistanceLimitSquared) {
                     this.sendPosition(this.getLocation(), MovePlayerPacket.MODE_RESET);
-                    log.debug("{}: move {} > 100", username, distSqrt);
+                    log.debug("{}: move {} > {}", username, distSqrt, authInputDistanceLimitSquared);
                     return;
                 }
 
