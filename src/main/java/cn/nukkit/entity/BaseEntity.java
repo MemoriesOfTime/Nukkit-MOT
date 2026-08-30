@@ -488,6 +488,17 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     /**
+     * 判断手持该物品与本实体交互是否会触发繁殖（进入求爱期）。
+     * 仅回答物品是否匹配，幼年、求爱冷却等前置状态由调用方自行判断。
+     * <p>
+     * Whether interacting with this entity using the given item starts breeding (love mode).
+     * Only answers the item match; preconditions like baby or love cooldown are up to the caller.
+     */
+    public boolean isBreedingItem(Item item) {
+        return false;
+    }
+
+    /**
      * Check if the entity can swim in the block
      *
      * @param block block id
