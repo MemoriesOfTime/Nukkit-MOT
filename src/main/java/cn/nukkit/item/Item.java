@@ -1652,7 +1652,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public int getMaxStackSize() {
-        return 64;
+        return id == TOTEM ? 1 : 64;
     }
 
     final public Short getFuelTime() {

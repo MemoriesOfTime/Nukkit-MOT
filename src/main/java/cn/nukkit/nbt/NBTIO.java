@@ -83,7 +83,11 @@ public class NBTIO {
             item.setCount(count);
         }
 
-        if (item.count > item.getMaxStackSize()) {
+        // Old direct container writes could persist two totems in one slot. Keep their exact
+        // count until the host migration can split them into separate slots; clamping here
+        // silently deletes the paid or looted tail before any inventory code can see it.
+        // Other malformed stacks keep the original defensive clamp.
+        if (item.count > item.getMaxStackSize() && item.getId() != Item.TOTEM) {
             item.count = item.getMaxStackSize();
             tag.putByte("Count", item.getMaxStackSize());
         }
