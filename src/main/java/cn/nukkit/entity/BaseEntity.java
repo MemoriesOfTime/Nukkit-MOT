@@ -808,6 +808,31 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return null;
     }
 
+    /**
+     * Max body yaw change per tick. Clients render yaw exactly as sent, so instant snaps
+     * to a new wander point or path node read as jitter.
+     */
+    private static final double MAX_BODY_TURN_PER_TICK = 30.0D;
+
+    /**
+     * Turns the body towards the given yaw, clamped to {@link #MAX_BODY_TURN_PER_TICK} per tick.
+     */
+    protected void turnBodyTowards(double yaw) {
+        double delta = yaw - this.yaw;
+        while (delta < -180.0D) {
+            delta += 360.0D;
+        }
+        while (delta > 180.0D) {
+            delta -= 360.0D;
+        }
+        if (delta > MAX_BODY_TURN_PER_TICK) {
+            delta = MAX_BODY_TURN_PER_TICK;
+        } else if (delta < -MAX_BODY_TURN_PER_TICK) {
+            delta = -MAX_BODY_TURN_PER_TICK;
+        }
+        this.setBothYaw(this.yaw + delta);
+    }
+
     protected boolean isInTickingRange() {
         return this.isInTickingRange(6400); // 80 blocks
     }
