@@ -2485,10 +2485,21 @@ public abstract class Entity extends Location implements Metadatable {
         return absorption;
     }
 
+    static Attribute clientAbsorptionAttribute(float absorption, int protocol) {
+        Attribute attribute = Attribute.getAttribute(Attribute.ABSORPTION);
+        if (protocol >= ProtocolInfo.v1_26_0) {
+            // Bedrock 1.26 builds one HUD heart slot per advertised capacity point. Sending the
+            // server-side Float.MAX_VALUE range therefore freezes mobile clients. Preserve
+            // custom values above vanilla's 16 absorption points instead of clipping them.
+            attribute.setMaxValue(Math.max(16.0f, absorption));
+        }
+        return attribute.setValue(absorption);
+    }
+
     public void setAbsorption(float absorption) {
         if (absorption != this.absorption || (this instanceof Player player && player.protocol >= ProtocolInfo.v1_21_60)) {
             this.absorption = absorption;
-            if (this instanceof Player player) player.setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
+            if (this instanceof Player player) player.setAttribute(clientAbsorptionAttribute(absorption, player.protocol));
         }
     }
 
