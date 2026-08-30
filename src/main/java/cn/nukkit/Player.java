@@ -4232,7 +4232,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     } else {
                         this.setSprinting(true);
                         if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
-                                this.isUsingItem(), authHoldToUse, authStartUsingItem)) {
+                                authHoldToUse, authStartUsingItem)) {
                             this.setUsingItem(false);
                         }
                     }
@@ -4722,11 +4722,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.getAdventureSettings().set(Type.FLYING, playerToggleFlightEvent.isFlying());
                         }
                         break packetswitch;
-                    case PlayerActionPacket.ACTION_START_ITEM_USE_ON:
                     case PlayerActionPacket.ACTION_START_USING_ITEM:
                         this.tryStartUsingHeldItem(this.inventory.getItemInHand());
                         break packetswitch;
+                    case PlayerActionPacket.ACTION_START_ITEM_USE_ON:
                     case PlayerActionPacket.ACTION_STOP_ITEM_USE_ON:
+                        // Block item-use-on: skip default setUsingItem(false), do not start hold-to-use.
                         break packetswitch;
                 }
 

@@ -25,7 +25,7 @@ public final class UsingItemReceiveProbe {
         PlayerAuthInputPacket packet = decodeNetEase860StartUsingItem();
         boolean decodedStart = UsingItemReceive.authInputStartsUsingItem(packet);
         boolean wouldStart = UsingItemReceive.shouldStartUsingFromAuthInput(true, false, false, true, decodedStart);
-        boolean keepSprint = UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, true, decodedStart);
+        boolean keepSprint = UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, decodedStart);
         boolean startActionKept = !UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_START_USING_ITEM);
         boolean useOnKept = !UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_START_ITEM_USE_ON);
         if (!decodedStart || !wouldStart || !keepSprint || !startActionKept || !useOnKept) {

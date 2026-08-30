@@ -11,10 +11,14 @@ import cn.nukkit.network.protocol.types.AuthInputAction;
  * Shared receive-side rules for {@code Player.setUsingItem}.
  * <p>
  * Official Bedrock / Java-via-ViaBedrock start hold-to-use from AuthInput
- * {@link AuthInputAction#START_USING_ITEM} (and, on older movement, PlayerAction
- * {@link PlayerActionPacket#ACTION_START_ITEM_USE_ON} / {@link PlayerActionPacket#ACTION_START_USING_ITEM}).
- * MOT previously parsed those bits and then ignored them, so eating/drawing never
- * set {@code DATA_FLAG_ACTION} and other players never saw the animation.
+ * {@link AuthInputAction#START_USING_ITEM} (and, on older client-authoritative
+ * movement, PlayerAction {@link PlayerActionPacket#ACTION_START_USING_ITEM}).
+ * PlayerAction {@link PlayerActionPacket#ACTION_START_ITEM_USE_ON} /
+ * {@link PlayerActionPacket#ACTION_STOP_ITEM_USE_ON} are block item-use-on
+ * (client-auth mobile food+block interact) and must not start the hold; they
+ * only skip the default {@code setUsingItem(false)} fallthrough.
+ * MOT previously parsed those start bits and then ignored them, so eating/drawing
+ * never set {@code DATA_FLAG_ACTION} and other players never saw the animation.
  * <p>
  * This helper is package-visible from {@code Player} and unit-tested without a live
  * session so the many cancel paths (equalsFast, second CLICK_AIR, sprint, default
@@ -87,31 +91,36 @@ public final class UsingItemReceive {
     }
 
     /**
-     * START_SPRINTING used to always {@code setUsingItem(false)}. Java eat/draw cancels
-     * sprint on the same tick Via emits StartUsingItem; if MOT still sees both bits,
-     * keep using and skip the sprint cancel.
+     * START_SPRINTING used to always {@code setUsingItem(false)}. Java eat/draw can
+     * cancel sprint on the same tick Via emits StartUsingItem; if MOT still sees
+     * both bits, keep using. A later START_SPRINTING while already eating still
+     * cancels the hold, matching vanilla sprint-cancel-eat.
      */
-    public static boolean shouldKeepUsingDespiteStartSprinting(boolean alreadyUsing, boolean holdToUse,
+    public static boolean shouldKeepUsingDespiteStartSprinting(boolean holdToUse,
                                                                boolean startUsingItemFlag) {
-        return alreadyUsing && holdToUse || startUsingItemFlag && holdToUse;
+        return startUsingItemFlag && holdToUse;
     }
 
     public static boolean isStartUsingPlayerAction(int action) {
-        return action == PlayerActionPacket.ACTION_START_ITEM_USE_ON
-                || action == PlayerActionPacket.ACTION_START_USING_ITEM;
+        return action == PlayerActionPacket.ACTION_START_USING_ITEM;
     }
 
-    public static boolean isStopUsingPlayerAction(int action) {
-        return action == PlayerActionPacket.ACTION_STOP_ITEM_USE_ON;
+    /**
+     * Block item-use-on (PlayerAction 28/29). Not a hold-to-use start; skip the
+     * default {@code setUsingItem(false)} fallthrough only.
+     */
+    public static boolean isItemUseOnPlayerAction(int action) {
+        return action == PlayerActionPacket.ACTION_START_ITEM_USE_ON
+                || action == PlayerActionPacket.ACTION_STOP_ITEM_USE_ON;
     }
 
     /**
      * Unknown PlayerAction values used to fall through to {@code setUsingItem(false)}.
-     * Keep that for real interrupts, but START/STOP item-use-on and START_USING_ITEM
+     * Keep that for real interrupts, but START_USING_ITEM and START/STOP item-use-on
      * must not.
      */
     public static boolean shouldClearUsingOnUnhandledPlayerAction(int action) {
-        return !isStartUsingPlayerAction(action) && !isStopUsingPlayerAction(action);
+        return !isStartUsingPlayerAction(action) && !isItemUseOnPlayerAction(action);
     }
 
     /**

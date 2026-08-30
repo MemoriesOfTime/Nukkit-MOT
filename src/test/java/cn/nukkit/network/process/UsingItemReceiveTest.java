@@ -18,9 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * MOT previously parsed AuthInput START_USING_ITEM / PlayerAction 28/29/37 and then
+ * MOT previously parsed AuthInput START_USING_ITEM / PlayerAction 37 and then
  * ignored them (default {@code setUsingItem(false)}). Java clients animate locally,
- * so other players never saw eat/draw. These cases lock the receive-side rules.
+ * so other players never saw eat/draw. PlayerAction 28/29 skip that clear but do
+ * not start the hold. These cases lock the receive-side rules.
  */
 class UsingItemReceiveTest {
 
@@ -90,19 +91,20 @@ class UsingItemReceiveTest {
     }
 
     @Test
-    void keepUsingWhenSprintArrivesWithStartUsingItem() {
-        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, true, true));
-        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, false));
-        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, false, true));
-        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, true, false));
+    void keepUsingOnlyWhenSprintArrivesWithStartUsingItem() {
+        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true));
+        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, false));
+        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, true));
     }
 
     @Test
     void playerActionStartUsingDoesNotFallThroughToClear() {
-        assertTrue(UsingItemReceive.isStartUsingPlayerAction(PlayerActionPacket.ACTION_START_ITEM_USE_ON));
+        assertFalse(UsingItemReceive.isStartUsingPlayerAction(PlayerActionPacket.ACTION_START_ITEM_USE_ON));
         assertTrue(UsingItemReceive.isStartUsingPlayerAction(PlayerActionPacket.ACTION_START_USING_ITEM));
         assertEquals(37, PlayerActionPacket.ACTION_START_USING_ITEM);
-        assertTrue(UsingItemReceive.isStopUsingPlayerAction(PlayerActionPacket.ACTION_STOP_ITEM_USE_ON));
+        assertTrue(UsingItemReceive.isItemUseOnPlayerAction(PlayerActionPacket.ACTION_START_ITEM_USE_ON));
+        assertTrue(UsingItemReceive.isItemUseOnPlayerAction(PlayerActionPacket.ACTION_STOP_ITEM_USE_ON));
+        assertFalse(UsingItemReceive.isItemUseOnPlayerAction(PlayerActionPacket.ACTION_START_USING_ITEM));
         assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_START_ITEM_USE_ON));
         assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_STOP_ITEM_USE_ON));
         assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_START_USING_ITEM));
