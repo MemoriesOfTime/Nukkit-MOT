@@ -348,7 +348,9 @@ public class Network {
                         if (log.isTraceEnabled()) {
                             log.trace("Dumping Packet\n{}", ByteBufUtil.prettyHexDump(Unpooled.wrappedBuffer(buf)));
                         }
-                        throw new IllegalStateException("Unable to decode " + pk.getClass().getSimpleName(), e);
+                        throw new IllegalStateException("Unable to decode " + pk.getClass().getSimpleName()
+                                + " (protocol " + pk.protocol + ", " + buf.length + " bytes: "
+                                + ByteBufUtil.hexDump(Arrays.copyOf(buf, Math.min(256, buf.length))) + ")", e);
                     }
 
                     packets.add(pk);
@@ -358,8 +360,8 @@ public class Network {
             }
         } catch (Exception e) {
             if (warnOnFailure) {
-                log.warn("Error whilst decoding batch packet (decoded {} packets, compression={}, decompressed={} bytes): {}",
-                        count, compression, data.length, e.toString());
+                log.warn("Error whilst decoding batch packet (decoded {} packets, compression={}, decompressed={} bytes)",
+                        count, compression, data.length, e);
             } else if (log.isDebugEnabled()) {
                 log.debug("Error whilst decoding batch packet (decoded {} packets, compression={}, decompressed={} bytes)",
                         count, compression, data.length, e);
