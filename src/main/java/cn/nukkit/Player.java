@@ -430,6 +430,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private double lastRightClickTime = 0.0;
     private long lastClickAirTime = 0;
     private BlockVector3 lastRightClickPos = null;
+    // Bedrock sends trailing CLICK_AIR packets after a crossbow becomes charged. Keep extending
+    // this window while that tail continues, so only the next click after a quiet gap can shoot.
+    private static final int CROSSBOW_INPUT_TAIL_TICKS = 12;
+    private int crossbowInputTailUntilTick = Integer.MIN_VALUE;
+    private int crossbowInputSlot = -1;
     private final IntOpenHashSet processedItemStackRequestIds = new IntOpenHashSet();
     private int processedItemStackRequestTick = Integer.MIN_VALUE;
     public EntityFishingHook fishing = null;
@@ -5565,9 +5570,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             item = this.inventory.getItemInHand();
-                            if (item instanceof ItemCrossbow && (this.isSpectator() || !item.onClickAir(this, directionVector))) {
-                                return;
-                            }
 
                             if (!item.equalsFast(useItemData.itemInHand)) {
                                 this.needSendHeldItem = true;
@@ -5582,6 +5584,47 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             if (interactEvent.isCancelled()) {
                                 this.needSendHeldItem = true;
+                                break;
+                            }
+
+                            if (item instanceof ItemCrossbow crossbow) {
+                                int currentTick = this.server.getTick();
+                                int heldSlot = this.inventory.getHeldItemIndex();
+                                boolean sameInputSlot = this.crossbowInputSlot == heldSlot;
+                                CrossbowClickDecision decision = decideCrossbowClick(
+                                        crossbow.isLoaded(),
+                                        this.isUsingItem(),
+                                        currentTick,
+                                        this.crossbowInputTailUntilTick,
+                                        sameInputSlot);
+                                if (!sameInputSlot) {
+                                    this.resetCrossbowInputState();
+                                    this.crossbowInputSlot = heldSlot;
+                                }
+                                switch (decision) {
+                                    case START_LOADING:
+                                        this.crossbowInputTailUntilTick = Integer.MIN_VALUE;
+                                        this.setUsingItem(true);
+                                        this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_CROSSBOW_LOADING_START);
+                                        break;
+                                    case FINISH_LOADING:
+                                        int ticksUsed = currentTick - this.startAction;
+                                        this.setUsingItem(false);
+                                        if (!crossbow.onUse(this, ticksUsed)) {
+                                            this.inventory.sendContents(this);
+                                        }
+                                        if (crossbow.isLoaded()) {
+                                            this.crossbowInputTailUntilTick = currentTick + CROSSBOW_INPUT_TAIL_TICKS;
+                                        }
+                                        break;
+                                    case IGNORE_TAIL:
+                                        this.crossbowInputTailUntilTick = currentTick + CROSSBOW_INPUT_TAIL_TICKS;
+                                        break;
+                                    case SHOOT:
+                                        crossbow.launchArrow(this);
+                                        this.resetCrossbowInputState();
+                                        break;
+                                }
                                 break;
                             }
 
@@ -5828,6 +5871,46 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.needSendInventory = true;
             }
         }
+    }
+
+    enum CrossbowClickDecision {
+        START_LOADING,
+        FINISH_LOADING,
+        IGNORE_TAIL,
+        SHOOT
+    }
+
+    /**
+     * Crossbows have three input phases, unlike bows: start loading, finish loading, then shoot.
+     * A charged-item tail packet must not be interpreted as a new shot or charge cycle.
+     */
+    static CrossbowClickDecision decideCrossbowClick(
+            boolean loaded, boolean usingItem, int currentTick, int tailUntilTick,
+            boolean sameInputSlot) {
+        if (!sameInputSlot) {
+            usingItem = false;
+            tailUntilTick = Integer.MIN_VALUE;
+        }
+        if (!loaded) {
+            return usingItem
+                    ? CrossbowClickDecision.FINISH_LOADING
+                    : CrossbowClickDecision.START_LOADING;
+        }
+        return currentTick <= tailUntilTick
+                ? CrossbowClickDecision.IGNORE_TAIL
+                : CrossbowClickDecision.SHOOT;
+    }
+
+    /**
+     * Crossbow input belongs to the selected hotbar slot. Switching slots must not carry a
+     * half-finished charge or the client-tail suppression window into another crossbow.
+     */
+    public void resetCrossbowInputState() {
+        if (this.crossbowInputSlot >= 0) {
+            this.setUsingItem(false);
+        }
+        this.crossbowInputSlot = -1;
+        this.crossbowInputTailUntilTick = Integer.MIN_VALUE;
     }
 
     private boolean shouldRejectLegacyInventoryUiTransaction(InventoryTransactionPacket packet) {
