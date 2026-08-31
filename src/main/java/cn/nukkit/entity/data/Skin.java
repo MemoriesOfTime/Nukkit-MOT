@@ -125,6 +125,8 @@ public class Skin {
         return skinId != null && skinId.length() < 100 && !skinId.trim().isEmpty() && //skinId
                 skinData != null && skinData.width >= 64 && skinData.height >= 32 &&
                 skinData.data.length >= SINGLE_SKIN_SIZE && (doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE) && //skinData
+                // 像素长度必须与宽高一致：尺寸不符的皮肤会被客户端渲染为隐身（Nukkit-EC 2467b155e 的隐身修复）
+                skinData.data.length == skinData.width * skinData.height * PIXEL_SIZE &&
                 ((geometryData != null && !geometryData.isEmpty()) &&
                         (doNotLimitSkinGeometry || geometryData.getBytes(StandardCharsets.UTF_8).length <= MAX_DATA_SIZE)) && //geometryData
                 (capeData == null || doNotLimitSkinGeometry || capeData.data.length <= MAX_DATA_SIZE) && //capeData

@@ -7007,6 +7007,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.offhandInventory.sendContents(this);
 
         this.spawnToAll();
+
+        // 观察者死亡期间 spawnTo 被存活守卫跳过且客户端实体已被移除，重生后补驱视野内实体
+        for (long index : this.usedChunks.keySet()) {
+            int chunkX = Level.getHashX(index);
+            int chunkZ = Level.getHashZ(index);
+            for (Entity entity : this.level.getChunkEntities(chunkX, chunkZ, false).values()) {
+                if (this != entity && !entity.closed && entity.isAlive()) {
+                    entity.spawnTo(this);
+                }
+            }
+        }
+
         this.scheduleUpdate();
     }
 
