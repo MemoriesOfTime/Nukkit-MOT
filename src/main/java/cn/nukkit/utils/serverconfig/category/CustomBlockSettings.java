@@ -19,4 +19,12 @@ public class CustomBlockSettings extends OkaeriConfig {
         "If disabled, you must manually prepare the files in the bin/ folder."})
     @CustomKey("auto-download-vanilla-palette")
     private boolean autoDownloadVanillaPalette = true;
+
+    @Comment({"",
+        "Send hashed block network IDs (blockNetworkIdsHashed) to 1.19.80+ clients,",
+        "including NetEase clients, instead of legacy runtime IDs. Enabled by default",
+        "even without custom blocks; hashed IDs are persistent across versions.",
+        "No effect on protocol < 1.19.80. Always forced on when custom blocks are registered."})
+    @CustomKey("use-hashed-block-network-ids")
+    private boolean useHashedBlockNetworkIds = true;
 }

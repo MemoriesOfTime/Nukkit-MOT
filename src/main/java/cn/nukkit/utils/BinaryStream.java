@@ -414,12 +414,16 @@ public class BinaryStream {
             }
             if (useSteve) {
                 this.putByteArray(steveSkinDecoded != null ? steveSkinDecoded : (steveSkinDecoded = Base64.getDecoder().decode(Skin.STEVE_SKIN)));
-                this.putByteArray(skin.getCapeData().data);
+                if (protocol >= ProtocolInfo.v1_2_13) {
+                    this.putByteArray(skin.getCapeData().data);
+                }
                 this.putString("geometry.humanoid.custom");
                 this.putString(Skin.STEVE_GEOMETRY_OLD);
             } else {
                 this.putByteArray(skin.getSkinData().data);
-                this.putByteArray(skin.getCapeData().data);
+                if (protocol >= ProtocolInfo.v1_2_13) {
+                    this.putByteArray(skin.getCapeData().data);
+                }
                 this.putString(skin.isLegacySlim ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom");
                 this.putString(skin.getGeometryData());
             }
@@ -438,10 +442,16 @@ public class BinaryStream {
             }
             for (SkinAnimation animation : animations) {
                 this.putImage(animation.image);
-                this.putLInt(animation.type);
-                this.putLFloat(animation.frames);
-                if (protocol >= ProtocolInfo.v1_16_100) {
-                    this.putLInt(animation.expression);
+                if (protocol >= ProtocolInfo.v1_26_40) {
+                    this.putUnsignedVarInt(animation.type);
+                    this.putLFloat(animation.frames);
+                    this.putUnsignedVarInt(animation.expression);
+                } else {
+                    this.putLInt(animation.type);
+                    this.putLFloat(animation.frames);
+                    if (protocol >= ProtocolInfo.v1_16_100) {
+                        this.putLInt(animation.expression);
+                    }
                 }
             }
 
@@ -480,11 +490,11 @@ public class BinaryStream {
                 for (PersonaPiece piece : pieces) {
                     this.putString(piece.id);
                     if (v2168) {
-                        this.putLInt(personaPieceTypeToOrdinal(piece.type));
-                        this.putUUID(parsePackIdUUID(piece.packId));
+                        this.putLInt(piece.type.ordinal());
+                        this.putUUID(piece.packId);
                     } else {
-                        this.putString(piece.type);
-                        this.putString(piece.packId);
+                        this.putString(piece.type.getSerializeName());
+                        this.putString(piece.packId.toString());
                     }
                     this.putBoolean(piece.isDefault);
                     this.putString(piece.productId);
@@ -497,7 +507,7 @@ public class BinaryStream {
                     this.putLInt(tints.size());
                 }
                 for (PersonaPieceTint tint : tints) {
-                    this.putString(tint.pieceType);
+                    this.putString(tint.pieceType.getSerializeName());
                     if (v2168) {
                         for (int i = 0; i < 4; i++) {
                             this.putLInt(i < tint.colors.size() ? skinColorToInt(tint.colors.get(i)) : 0);
@@ -562,71 +572,6 @@ public class BinaryStream {
         return String.format("#%08X", argb);
     }
 
-    // PersonaPieceType 序数（与参考库 v2168 枚举顺序对齐 / aligned with reference PersonaPieceType enum order）
-    // 参考枚举：0=UNKNOWN, 1=SKELETON(persona_skeleton), 2=BODY, 3=SKIN, 4=BOTTOM, 5=FEET, 6=DRESS,
-    // 7=TOP, 8=HIGH_PANTS, 9=HANDS(persona_hand), 10=OUTERWEAR, 11=FACIAL_HAIR, 12=MOUTH, 13=EYES,
-    // 14=HAIR, 15=HOOD, 16=BACK, 17=FACE_ACCESSORY, 18=HEAD, 19=LEGS, 20=LEFT_LEG, 21=RIGHT_LEG,
-    // 22=ARMS, 23=LEFT_ARM, 24=RIGHT_ARM, 25=CAPES, 26=CLASSIC_SKIN, 27=EMOTE, 28=UNSUPPORTED
-    private static int personaPieceTypeToOrdinal(String type) {
-        if (type == null) return 0;
-        switch (type) {
-            case "persona_skeleton": return 1;
-            case "persona_body": return 2;
-            case "persona_skin": return 3;
-            case "persona_bottom": return 4;
-            case "persona_feet": return 5;
-            case "persona_dress": return 6;
-            case "persona_top": return 7;
-            case "persona_high_pants": return 8;
-            case "persona_hand": return 9;
-            case "persona_outerwear": return 10;
-            case "persona_facial_hair": return 11;
-            case "persona_mouth": return 12;
-            case "persona_eyes": return 13;
-            case "persona_hair": return 14;
-            case "persona_hood": return 15;
-            case "persona_back": return 16;
-            case "persona_face_accessory": return 17;
-            case "persona_head": return 18;
-            case "persona_legs": return 19;
-            case "persona_left_leg": return 20;
-            case "persona_right_leg": return 21;
-            case "persona_arms": return 22;
-            case "persona_left_arm": return 23;
-            case "persona_right_arm": return 24;
-            case "persona_capes": return 25;
-            case "persona_classic_skin": return 26;
-            case "persona_emote": return 27;
-            case "unsupported": return 28;
-            default: return 0; // UNKNOWN
-        }
-    }
-
-    private static String ordinalToPersonaPieceType(int ordinal) {
-        // 返回参考枚举的 type 字符串（参考 fromName 同时接受 serializeName 与 type）
-        // Returns the reference enum's type string (fromName accepts both serializeName and type)
-        String[] types = {
-                "unknown", "persona_skeleton", "persona_body", "persona_skin", "persona_bottom",
-                "persona_feet", "persona_dress", "persona_top", "persona_high_pants", "persona_hand",
-                "persona_outerwear", "persona_facial_hair", "persona_mouth", "persona_eyes",
-                "persona_hair", "persona_hood", "persona_back", "persona_face_accessory",
-                "persona_head", "persona_legs", "persona_left_leg", "persona_right_leg",
-                "persona_arms", "persona_left_arm", "persona_right_arm", "persona_capes",
-                "persona_classic_skin", "persona_emote", "unsupported"
-        };
-        if (ordinal < 0 || ordinal >= types.length) return "unknown";
-        return types[ordinal];
-    }
-
-    private static UUID parsePackIdUUID(String packId) {
-        if (packId == null || packId.isEmpty()) return new UUID(0, 0);
-        try {
-            return UUID.fromString(packId);
-        } catch (IllegalArgumentException ignored) {
-            return new UUID(0, 0);
-        }
-    }
-
     public SerializedImage getImage() {
         int width = this.getLInt();
         int height = this.getLInt();
@@ -659,9 +604,18 @@ public class BinaryStream {
         int animationCount = protocol >= ProtocolInfo.v1_26_40 ? (int) this.getUnsignedVarInt() : this.getLInt();
         for (int i = 0; i < Math.min(animationCount, 1024); i++) {
             SerializedImage image = this.getImage(Skin.SKIN_128_128_SIZE);
-            int type = this.getLInt();
-            float frames = this.getLFloat();
-            int expression = protocol >= ProtocolInfo.v1_16_100 ? this.getLInt() : 0;
+            int type;
+            float frames;
+            int expression;
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                type = (int) this.getUnsignedVarInt();
+                frames = this.getLFloat();
+                expression = (int) this.getUnsignedVarInt();
+            } else {
+                type = this.getLInt();
+                frames = this.getLFloat();
+                expression = protocol >= ProtocolInfo.v1_16_100 ? this.getLInt() : 0;
+            }
             skin.getAnimations().add(new SkinAnimation(image, type, frames, expression));
         }
 
@@ -694,7 +648,7 @@ public class BinaryStream {
                 String pieceType;
                 String packId;
                 if (v2168) {
-                    pieceType = ordinalToPersonaPieceType(this.getLInt());
+                    pieceType = PersonaPieceType.fromOrdinal(this.getLInt()).getSerializeName();
                     packId = this.getUUID().toString();
                 } else {
                     pieceType = this.getString();
@@ -825,7 +779,7 @@ public class BinaryStream {
             for (int i = 0; i < nbtTagCount; i++) {
                 try {
                     // TODO: 05/02/2019 This hack is necessary because we keep the raw NBT tag. Try to remove it.
-                    CompoundTag tag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN, true);
+                    CompoundTag tag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN, true);
                     // Hack for tool damage
                     if (tag.contains("Damage")) {
                         boolean isOriginStringItem = id != null
@@ -1006,11 +960,11 @@ public class BinaryStream {
                 int nbtSize = stream.readShort();
                 CompoundTag compoundTag = null;
                 if (nbtSize > 0) {
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                    compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
                 } else if (nbtSize == -1) {
                     int tagCount = stream.readUnsignedByte();
                     if (tagCount != 1) throw new IllegalArgumentException("Expected 1 tag but got " + tagCount);
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                    compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
                 }
                 if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {
                     item.setCompoundTag(NBTIO.write(compoundTag, ByteOrder.LITTLE_ENDIAN));
@@ -1095,11 +1049,11 @@ public class BinaryStream {
 
             CompoundTag compoundTag = null;
             if (nbtSize > 0) {
-                compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
             } else if (nbtSize == -1) {
                 int tagCount = stream.readUnsignedByte();
                 if (tagCount != 1) throw new IllegalArgumentException("Expected 1 tag but got " + tagCount);
-                compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
             }
 
             if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {
@@ -1761,7 +1715,11 @@ public class BinaryStream {
             }
         }
 
-        this.putUnsignedVarInt(getBlockRuntimeId(gameVersion, item));
+        if (instanceItem) {
+            this.putVarInt(getBlockRuntimeId(gameVersion, item));
+        } else {
+            this.putUnsignedVarInt(getBlockRuntimeId(gameVersion, item));
+        }
 
         if (id == Item.AIR) {
             this.putUnsignedVarInt(0);
@@ -1830,7 +1788,12 @@ public class BinaryStream {
 
         Integer id = null;
         String stringId = null;
-        short runtimeId = (short) this.getLShort();
+        int runtimeId;
+        if (instanceItem) {
+            runtimeId = this.getVarInt();
+        } else {
+            runtimeId = (short) this.getLShort();
+        }
         int count = this.getLShort();
         int damage = (int) this.getUnsignedVarInt();
         int stackNetId = 0;
@@ -1865,7 +1828,7 @@ public class BinaryStream {
             id = 0;
         }
 
-        if (this.getBoolean()) {
+        if (!instanceItem && this.getBoolean()) {
             // v2168: 移除 NetId variant VarUInt（仅保留 boolean + 可选 VarInt netId）
             // v2168: NetId variant VarUInt removed (only boolean + optional VarInt netId)
             if (protocolId < ProtocolInfo.v1_26_40) {
@@ -1877,7 +1840,12 @@ public class BinaryStream {
             }
         }
 
-        int blockRuntimeId = (int) this.getUnsignedVarInt();
+        int blockRuntimeId;
+        if (instanceItem) {
+            blockRuntimeId = this.getVarInt();
+        } else {
+            blockRuntimeId = (int) this.getUnsignedVarInt();
+        }
 
         byte[] nbt = new byte[0];
         String[] canPlace = null;
@@ -1894,11 +1862,11 @@ public class BinaryStream {
 
                 CompoundTag compoundTag = null;
                 if (nbtSize > 0) {
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                    compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
                 } else if (nbtSize == -1) {
                     int tagCount = stream.readUnsignedByte();
                     if (tagCount != 1) throw new IllegalArgumentException("Expected 1 tag but got " + tagCount);
-                    compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                    compoundTag = NBTIO.readSafely(stream, ByteOrder.LITTLE_ENDIAN);
                 }
 
                 if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {
@@ -2050,13 +2018,16 @@ public class BinaryStream {
         int protocolId = gameVersion.getProtocol();
         if (item == null || item.getId() == 0) {
             if (protocolId >= ProtocolInfo.v1_26_40) {
-                // v2168 ingredient: VarUInt(type ordinal) + VarInt(aux=32767) + VarInt(count)
+                // v2168 ingredient: VarUInt(type ordinal) + VarInt(aux=0) + VarInt(count)
                 this.putUnsignedVarInt(0); // ItemDescriptorType.INVALID ordinal
-                this.putVarInt(Short.MAX_VALUE);
+                this.putVarInt(0);
+                this.putVarInt(item == null ? 0 : item.getCount());
             } else if (protocolId >= ProtocolInfo.v1_19_30_23) {
                 this.putByte((byte) 0); //ItemDescriptorType.INVALID
+                this.putVarInt(item == null ? 0 : item.getCount());
+            } else {
+                this.putVarInt(0);
             }
-            this.putVarInt(item == null ? 0 : item.getCount());
             return;
         }
 
@@ -2084,7 +2055,8 @@ public class BinaryStream {
             this.putUnsignedVarInt(1); // ItemDescriptorType.DEFAULT ordinal
             this.putString("name");
             this.putString(mapping.getNamespacedIdByNetworkId(runtimeId));
-            this.putVarInt(damage);
+            // v2168 客户端不接受 32767 通配符, 无 meta 时归 0 / v2168 rejects 32767 wildcard; write 0 when no meta
+            this.putVarInt(damage == Short.MAX_VALUE ? 0 : damage);
         } else if (protocolId >= ProtocolInfo.v1_19_30_23) {
             this.putByte((byte) 1); //ItemDescriptorType.DEFAULT
             this.putLShort(runtimeId);
@@ -2102,11 +2074,11 @@ public class BinaryStream {
             throw new UnsupportedOperationException("This method is only supported on protocol 553+");
         }
         if (protocolId >= ProtocolInfo.v1_26_40) {
-            // v2168 ingredient: VarUInt(min(ordinal,1)) + serializeName + tag + aux(32767, unused)
+            // v2168 ingredient: VarUInt(min(ordinal,1)) + serializeName + tag + aux(0, unused)
             this.putUnsignedVarInt(1); // ItemDescriptorType.ITEM_TAG ordinal
             this.putString("item_tag");
             this.putString(itemTag);
-            this.putVarInt(Short.MAX_VALUE);
+            this.putVarInt(0);
         } else {
             this.putByte((byte) 3);
             this.putString(itemTag);
@@ -2156,6 +2128,27 @@ public class BinaryStream {
 
     public String getString() {
         return new String(this.getByteArray(), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 读取 UTF-8 字符串，code point 数超过 {@code maxChars} 时抛出 {@link IllegalArgumentException}，
+     * 用于解码阶段按 protocol-docs / JSON Schema 的 maxLength 字符语义拒绝超长伪造数据包。
+     * <p>
+     * Reads a length-prefixed UTF-8 string, throwing {@link IllegalArgumentException} if the code point
+     * count exceeds {@code maxChars} (protocol-docs / JSON-Schema maxLength character semantics). A
+     * byte-level fast-fail guard (≤ {@code maxChars * 4}) rejects oversized forged packets before the
+     * payload is allocated. {@code maxChars <= 0} disables the check.
+     */
+    public String getString(int maxChars) {
+        // Fast-fail on the varint length prefix first: 4 bytes is the largest UTF-8 encoding of one
+        // code point, so maxChars code points fit in at most maxChars*4 bytes.
+        byte[] raw = this.getByteArray(maxChars <= 0 ? 0 : maxChars * 4);
+        String s = new String(raw, StandardCharsets.UTF_8);
+        if (maxChars > 0 && Character.codePointCount(s, 0, s.length()) > maxChars) {
+            throw new IllegalArgumentException(
+                    "String length " + Character.codePointCount(s, 0, s.length()) + " exceeds maximum " + maxChars);
+        }
+        return s;
     }
 
     public String getString_old(){

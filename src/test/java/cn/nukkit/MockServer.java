@@ -3,6 +3,7 @@ package cn.nukkit;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.custom.CustomBlockManager;
+import cn.nukkit.entity.Attribute;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -94,6 +95,7 @@ public final class MockServer {
         GlobalBlockPalette.init();
         RuntimeItems.init();
         Item.init();
+        Attribute.init();
         initCustomBlockManager();
     }
 

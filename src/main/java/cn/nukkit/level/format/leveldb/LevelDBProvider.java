@@ -496,26 +496,40 @@ public class LevelDBProvider implements LevelProvider {
         if (this.getServer().asyncChunkSending) {
             final BaseChunk chunkClone = chunk.cloneForChunkSending();
             this.level.getAsyncChuckExecutor().execute(() -> {
-                NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
-                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
+                try {
+                    NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
+                        getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
+                                timestamp,
+                                chunkX,
+                                chunkZ,
+                                networkChunkSerializerCallback.getSubchunks(),
+                                networkChunkSerializerCallback.getStream().getBuffer()
+                        );
+                    }, level.antiXrayEnabled(), getLevel().getDimensionData());
+                } catch (Throwable t) {
+                    getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
+                    for (GameVersion gv : protocols) {
+                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                    }
+                }
+            });
+        }else {
+            try {
+                NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
+                    this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                             timestamp,
                             chunkX,
                             chunkZ,
                             networkChunkSerializerCallback.getSubchunks(),
                             networkChunkSerializerCallback.getStream().getBuffer()
                     );
-                }, level.antiXrayEnabled(), getLevel().getDimensionData());
-            });
-        }else {
-            NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
-                        timestamp,
-                        chunkX,
-                        chunkZ,
-                        networkChunkSerializerCallback.getSubchunks(),
-                        networkChunkSerializerCallback.getStream().getBuffer()
-                );
-            }, level.antiXrayEnabled(), this.level.getDimensionData());
+                }, level.antiXrayEnabled(), this.level.getDimensionData());
+            } catch (Throwable t) {
+                getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
+                for (GameVersion gv : protocols) {
+                    getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                }
+            }
         }
     }
 

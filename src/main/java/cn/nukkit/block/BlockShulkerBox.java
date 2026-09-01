@@ -59,7 +59,7 @@ public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntity
 
     @Override
     public double getHardness() {
-        return 2.5;
+        return 2;
     }
 
     @Override
@@ -90,6 +90,10 @@ public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntity
     @Override
     public Item toItem() {
         ItemBlock item = new ItemBlock(this, this.getDamage(), 1);
+
+        if (this.level == null) {
+            return item;
+        }
 
         BlockEntityShulkerBox t = (BlockEntityShulkerBox) this.getLevel().getBlockEntity(this);
 

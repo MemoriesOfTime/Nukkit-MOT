@@ -8,6 +8,8 @@ import cn.nukkit.event.inventory.EnchantItemEvent;
 import cn.nukkit.event.inventory.SmithingTableEvent;
 import cn.nukkit.event.inventory.StonecutterItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.transaction.CraftingTransaction;
+import cn.nukkit.inventory.transaction.ItemStackRequestCraftingTransaction;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.nbt.NBTIO;
@@ -78,10 +80,12 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return handleStonecutter(player, stonecutterRecipe, action, context);
         }
 
-        // Fire CraftItemEvent before applying the recipe so plugins can veto SA
-        // manual crafting. Input items come from the open crafting grid (big
-        // workbench if opened, otherwise the 2x2 personal grid).
-        CraftItemEvent craftEvent = new CraftItemEvent(player, collectCraftingInput(player), recipe);
+        // 合成前触发 CraftItemEvent 以供插件拦截。携带只读快照使 getTransaction() 与旧版路径一致
+        // Fire CraftItemEvent with a read-only snapshot so getTransaction() matches the legacy path
+        Item recipeResult = recipe instanceof MultiRecipe ? null : recipe.getResult();
+        CraftingTransaction snapshot = new ItemStackRequestCraftingTransaction(
+                player, collectCraftingInputList(player), recipeResult, recipe);
+        CraftItemEvent craftEvent = new CraftItemEvent(snapshot);
         Server.getInstance().getPluginManager().callEvent(craftEvent);
         if (craftEvent.isCancelled()) {
             return context.error();
@@ -121,7 +125,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return handleSmithingUpgrade(smithingTransform, player, context);
         }
 
-        Item recipeResult = recipe instanceof MultiRecipe multi ? multi.getResult() : recipe.getResult();
+        // recipeResult 已在上方事件快照处计算
         if (recipeResult == null || recipeResult.isNull()) {
             return null;
         }
@@ -132,6 +136,18 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (recipe instanceof CraftingRecipe craftingRecipe && !validateCraftingConsumePlan(player, craftingRecipe, times, context)) {
             return context.error();
         }
+
+        if (recipe instanceof CraftingRecipe multiOutput && !multiOutput.getExtraResults().isEmpty()) {
+            if (times != 1) {
+                log.debug("{}: rejected multi-output craft with numberOfRequestedCrafts={}",
+                        player.getName(), times);
+                return context.error();
+            }
+            context.put(CreateActionProcessor.RECIPE_OUTPUTS_KEY, scaleItems(multiOutput.getAllResults(), times));
+            context.put(CreateActionProcessor.CREATED_SLOTS_KEY, new HashSet<>());
+            return context.success();
+        }
+
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
         if (recipe instanceof UserDataShapelessRecipe) {
@@ -357,17 +373,6 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return;
         }
         addExpectedConsumeItem(expectedConsumes, item, Math.max(1, item.getCount()) * Math.max(1, times));
-    }
-
-    /**
-     * Collects non-empty items from the player's active crafting grid (big
-     * workbench if one is open, otherwise the personal 2x2 grid). Used as the
-     * {@code input} parameter of {@link CraftItemEvent} so plugin listeners can
-     * inspect what the client intends to consume.
-     */
-    private static Item[] collectCraftingInput(Player player) {
-        List<Item> items = collectCraftingInputList(player);
-        return items.toArray(Item.EMPTY_ARRAY);
     }
 
     static List<Item> collectCraftingInputList(Player player) {

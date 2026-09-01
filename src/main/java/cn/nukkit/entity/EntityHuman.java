@@ -293,8 +293,8 @@ public class EntityHuman extends EntityHumanType {
                 ListTag<CompoundTag> piecesTag = new ListTag<>("PersonaPieces");
                 for (PersonaPiece piece : personaPieces) {
                     piecesTag.add(new CompoundTag().putString("PieceId", piece.id)
-                            .putString("PieceType", piece.type)
-                            .putString("PackId", piece.packId)
+                            .putString("PieceType", piece.type.getSerializeName())
+                            .putString("PackId", piece.packId.toString())
                             .putBoolean("IsDefault", piece.isDefault)
                             .putString("ProductId", piece.productId));
                 }
@@ -307,7 +307,7 @@ public class EntityHuman extends EntityHumanType {
                     ListTag<StringTag> colors = new ListTag<>("Colors");
                     colors.setAll(tint.colors.stream().map(s -> new StringTag("", s)).collect(Collectors.toList()));
                     tintsTag.add(new CompoundTag()
-                            .putString("PieceType", tint.pieceType)
+                            .putString("PieceType", tint.pieceType.getSerializeName())
                             .putList(colors));
                 }
             }
@@ -341,10 +341,10 @@ public class EntityHuman extends EntityHumanType {
             boolean retainNpcListEntry = !(this instanceof Player)
                     && PlayerEntitySkinSender.requiresRetainedEntry(player);
             if (this instanceof Player && player.protocol >= ProtocolInfo.v_0_12_1) {
-                // 仅在该观察者尚未收到本玩家列表项时下发 ADD，避免重复下发导致网易客户端隐形。
+                // 仅在该观察者尚未收到本玩家列表项时下发 ADD，避免重复下发导致网易客户端!player.sentSkins.contains(this.uuid)隐形。
                 // Send the PlayerList ADD only when this viewer hasn't received it yet;
                 // resending ADD hides the entity on NetEase clients.
-                if (player.sentSkins.add(this.uuid)) {
+                if (!player.sentSkins.contains(this.uuid)) {
                     String xboxUserId = ((Player) this).protocol <= ProtocolInfo.v_1_0_0 ? "" : ((Player) this).getLoginChainData().getXUID();
                     this.server.updatePlayerListData(
                             new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), xboxUserId, ((Player) this).getLocatorBarColor()),
@@ -352,7 +352,8 @@ public class EntityHuman extends EntityHumanType {
                 }
             } else if (retainNpcListEntry) {
                 if (!PlayerEntitySkinSender.sendInitialSkinIfAbsent(
-                        player, this.uuid, this.getId(), this.getName(), this.getSkin(), "")) {
+                        player, this.uuid, this.getId(), this.getName(), this.getSkin(), "",
+                        this::getSkin)) {
                     this.hasSpawned.remove(player.getLoaderId());
                     return;
                 }

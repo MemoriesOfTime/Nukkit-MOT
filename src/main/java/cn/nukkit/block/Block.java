@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.AdventureSettings;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.custom.CustomBlockManager;
@@ -884,7 +885,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public double calculateBreakTime(@NotNull Item item, Player player) {
         double seconds = this.calculateBreakTimeNotInAir(item, player);
 
-        if (player != null) {
+        if (player != null && !player.getAdventureSettings().get(AdventureSettings.Type.FLYING)) {
+            // A flying player mines at normal speed on Bedrock: the in-air penalty is for
+            // jumping and falling only, and the client never applies it while flight is on.
             //玩家距离上次在空中过去5tick之后，才认为玩家是在地上挖掘。
             //如果单纯用onGround检测，这个方法返回的时间将会不连续。
             if (player.getServer().getTick() - player.getLastInAirTick() < 5) {

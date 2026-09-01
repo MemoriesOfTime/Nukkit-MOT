@@ -70,10 +70,11 @@ public abstract class ItemCustomTool extends StringItemToolBase implements ItemD
         if (CustomItemDefinition.isBuilding(this.getNamespaceId())) {
             return super.getMaxDurability();
         }
-        return this.getDefinitionNbt()
+        int maxDurability = this.getDefinitionNbt()
                 .getCompound("components")
                 .getCompound("minecraft:durability")
                 .getInt("max_durability");
+        return maxDurability > 0 ? maxDurability : -1;
     }
 
     @Override

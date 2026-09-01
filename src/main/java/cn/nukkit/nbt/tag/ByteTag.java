@@ -38,7 +38,7 @@ public class ByteTag extends NumberTag<Integer> {
     }
 
     @Override
-    void load(NBTInputStream dis) throws IOException {
+    void load(NBTInputStream dis, int nested) throws IOException {
         data = dis.readByte();
     }
 

@@ -1031,7 +1031,7 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         shapeless.setId(UUID.randomUUID());
         nukkitPacket.addShapelessRecipe(shapeless);
 
-        // furnace + blast furnace (no longer crash: FurnaceRecipe must not be cast to ShapelessRecipe)
+        // furnace + blast furnace + smoker (no longer crash: FurnaceRecipe must not be cast to ShapelessRecipe)
         var furnace = new cn.nukkit.inventory.FurnaceRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT),
                 cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL));
         furnace.setId(UUID.randomUUID());
@@ -1040,6 +1040,10 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
                 cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL));
         blast.setId(UUID.randomUUID());
         nukkitPacket.addFurnaceRecipe(blast);
+        var smoker = new cn.nukkit.inventory.SmokerRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COOKED_BEEF),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.RAW_BEEF));
+        smoker.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(smoker);
 
         nukkitPacket.encode();
 
@@ -1048,9 +1052,10 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
                 helperWithItemDefinitions());
 
         assertEquals(1, cbPacket.getShapedData().size());
-        assertEquals(3, cbPacket.getShapelessData().size(), "shapeless + 2 furnace recipes");
+        assertEquals(4, cbPacket.getShapelessData().size(), "shapeless + 3 furnace recipes");
         assertEquals("furnace", cbPacket.getShapelessData().get(1).getTag());
         assertEquals("blast_furnace", cbPacket.getShapelessData().get(2).getTag());
+        assertEquals("smoker", cbPacket.getShapelessData().get(3).getTag());
         assertEquals(1, cbPacket.getShapelessData().get(1).getIngredients().size(), "furnace ingredient");
         assertEquals(2, cbPacket.getShapedData().get(0).getIngredients().size(),
                 "shaped ingredients must match width*height incl. the empty slot");
@@ -1073,6 +1078,43 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
             helper.setBlockDefinitions(org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
                     .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder().build());
         };
+    }
+
+    // ==================== CraftingDataPacket blast/smoker (all versions) ====================
+
+    /**
+     * 烟熏炉/高炉配方编码在所有协议版本上都不能崩溃 / Smoker & blast furnace
+     * recipe encoding must not crash on any protocol version.
+     * <p>
+     * 低版本走 legacy furnace 编码（tag 固定 CRAFTING_TAG_FURNACE），
+     * v1_26_20_26+ 走 shapeless tag 区分，v2168 走 encodeV2168。
+     */
+    @ParameterizedTest(name = "CraftingDataPacket blast+smoker v{0}")
+    @MethodSource("allVersions")
+    void testCraftingDataPacketBlastSmokerAllVersions(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.CraftingDataPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+
+        var furnace = new cn.nukkit.inventory.FurnaceRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT));
+        furnace.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(furnace);
+
+        var blast = new cn.nukkit.inventory.BlastFurnaceRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT));
+        blast.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(blast);
+
+        var smoker = new cn.nukkit.inventory.SmokerRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COOKED_BEEF),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.RAW_BEEF));
+        smoker.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(smoker);
+
+        // 仅验证编码不抛异常；跨版本解码需要每版本物品定义注册表，此处不覆盖。
+        // Encoding must not throw; cross-version decode needs per-version item-definition
+        // registries and is intentionally not covered here.
+        assertDoesNotThrow(nukkitPacket::encode, "CraftingDataPacket with blast+smoker recipes must encode on protocol " + protocolVersion);
     }
 
     // ==================== CameraInstructionPacket ====================

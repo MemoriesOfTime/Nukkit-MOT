@@ -596,7 +596,9 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
         var nukkitPacket = new CreativeContentPacket();
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.gameVersion = gameVersion;
-        nukkitPacket.entries = new Item[]{Item.AIR_ITEM};
+        // Use a real block item: v2168 ItemInstance encodes blockRuntimeId as a zigzag VarInt,
+        // while the descriptor form uses a VarUInt. AIR (blockRuntimeId=0) cannot tell them apart.
+        nukkitPacket.entries = new Item[]{Item.get(cn.nukkit.block.Block.STONE)};
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -607,6 +609,13 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
         if (protocolVersion >= ProtocolInfo.v1_21_60) {
             assertEquals(1, cbPacket.getGroups().size());
             assertEquals(0, readCreativeItemGroupId(cbPacket.getContents().get(0)));
+        }
+        if (protocolVersion >= ProtocolInfo.v1_26_40) {
+            org.cloudburstmc.protocol.bedrock.data.inventory.ItemData itemData =
+                    cbPacket.getContents().get(0).getItem();
+            assertEquals(cn.nukkit.level.GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, cn.nukkit.block.Block.STONE, 0),
+                    itemData.getBlockDefinition().getRuntimeId(),
+                    "v2168 ItemInstance blockRuntimeId must be a zigzag VarInt (CB readItemInstance)");
         }
     }
 
@@ -719,6 +728,10 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
             helper.setItemDefinitions(itemDefinitions.build());
             helper.setBlockDefinitions(SimpleDefinitionRegistry
                     .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder()
+                    .add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                            "minecraft:stone",
+                            cn.nukkit.level.GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, cn.nukkit.block.Block.STONE, 0),
+                            org.cloudburstmc.nbt.NbtMap.EMPTY))
                     .build());
         };
     }

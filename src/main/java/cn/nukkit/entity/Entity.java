@@ -1169,9 +1169,14 @@ public abstract class Entity extends Location implements Metadatable {
             return;
         }
 
-        if (cause != null) {
-            Effect oldEffect = this.effects.get(effect.getId());
+        Effect oldEffect = this.effects.get(effect.getId());
 
+        if (oldEffect != null && (oldEffect.getAmplifier() > effect.getAmplifier()
+            || (oldEffect.getAmplifier() == effect.getAmplifier() && oldEffect.getDuration() >= effect.getDuration()))) {
+            return;
+        }
+
+        if (cause != null) {
             EntityPotionEffectEvent event = new EntityPotionEffectEvent(
                     this,
                     oldEffect,
@@ -2591,7 +2596,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setAbsorption(float absorption) {
-        if (absorption != this.absorption) {
+        if (absorption != this.absorption || (this instanceof Player player && player.protocol >= ProtocolInfo.v1_21_60)) {
             this.absorption = absorption;
             if (this instanceof Player player) player.setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
         }
@@ -2825,7 +2830,7 @@ public abstract class Entity extends Location implements Metadatable {
         this.level.addEntity(this);
         this.chunk = null;
 
-        if (this instanceof Player) {
+        if (this instanceof Player player && player.isOnline()) {
             this.afterSwitchLevel();
         }
         return true;
@@ -3208,7 +3213,7 @@ public abstract class Entity extends Location implements Metadatable {
                 this.z = pos.z;
 
                 // Dimension change
-                if (this instanceof Player player && newLevel.getDimension() != oldLevel.getDimension()) {
+                if (this instanceof Player player && player.isOnline() && newLevel.getDimension() != oldLevel.getDimension()) {
                     player.setDimension(newLevel.getDimension());
                 }
 

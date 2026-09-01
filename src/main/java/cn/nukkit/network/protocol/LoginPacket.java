@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.entity.data.Skin;
 import cn.nukkit.network.encryption.EncryptionUtils;
@@ -34,6 +35,12 @@ public class LoginPacket extends DataPacket {
 
     public String username;
     private int protocol_;
+    private GameVersion gameVersion_;
+    /**
+     * Best effort identity read straight off the wire, before the chain is validated.
+     * Not authoritative: unauthenticated logins are reconciled later, use
+     * {@link cn.nukkit.utils.LoginChainData#getClientUUID(String)} for the identity the server uses.
+     */
     public UUID clientUUID;
     public String minecraftId;
     public long clientId;
@@ -172,6 +179,9 @@ public class LoginPacket extends DataPacket {
             decodeChainData();
             decodeSkinData();
         }
+        if (this.gameVersion_ == null) {
+            this.gameVersion_ = GameVersion.byProtocol(this.protocol_, this.gameVersion.isNetEase());
+        }
     }
 
     @Override
@@ -181,6 +191,10 @@ public class LoginPacket extends DataPacket {
 
     public int getProtocol() {
         return protocol_;
+    }
+
+    public GameVersion getGameVersion() {
+        return gameVersion_;
     }
 
     protected AuthPayload readAuthJwt(String authJwt) {
@@ -313,8 +327,8 @@ public class LoginPacket extends DataPacket {
                 JwtClaims claims = context.getJwtClaims();
                 String xuid = claims.getClaimValueAsString("xid");
                 this.username = claims.getClaimValueAsString("xname");
-                this.clientUUID = UUID.nameUUIDFromBytes(("pocket-auth-1-xuid:" + xuid).getBytes(StandardCharsets.UTF_8));
                 this.minecraftId = claims.getClaimValueAsString("mid");
+                this.clientUUID = EncryptionUtils.deriveIdentity(xuid, this.minecraftId, this.username);
             } else {
                 throw new IllegalArgumentException("Unsupported AuthPayload type: " + this.authPayload.getClass().getName());
             }
@@ -333,10 +347,21 @@ public class LoginPacket extends DataPacket {
         JsonObject skinToken = decodeToken(new String(this.get(size), StandardCharsets.UTF_8));
         if (skinToken == null) throw new RuntimeException("Invalid null skin token");
 
-        // 将1.19.62按1.19.63版本处理 修复1.19.62皮肤修改问题
+        // 将1.19.62按1.19.63版本处理 修复1.19.62皮肤修改问题；
+        // 协议号重写供后续皮肤解码使用，检出版本经 clientGameVersion 带出
+        // Treat 1.19.62 as 1.19.63 to fix 1.19.62 skin issues; the protocol rewrite feeds the
+        // skin decoding below while the detected version is carried via clientGameVersion
         if (this.protocol_ == ProtocolInfo.v1_19_60 &&
                 skinToken.has("GameVersion") && !skinToken.get("GameVersion").getAsString().startsWith("1.19.60")) {
             this.protocol_ = ProtocolInfo.v1_19_63;
+            this.gameVersion_ = GameVersion.V1_19_63;
+        }
+
+        // 1.26.44 的 wire 协议号未提升（仍 2168），protocol_ 保持真实值，检出结果经 clientGameVersion 带出
+        // 1.26.44 kept wire protocol 2168; protocol_ stays truthful and the detection is carried via clientGameVersion
+        if (this.protocol_ == ProtocolInfo.v1_26_40 &&
+                skinToken.has("GameVersion") && isAtLeastVersion(skinToken.get("GameVersion").getAsString(), 1, 26, 44)) {
+            this.gameVersion_ = GameVersion.V1_26_44;
         }
 
         if (skinToken.has("ClientRandomId")) {
@@ -438,6 +463,19 @@ public class LoginPacket extends DataPacket {
                     skin.getTintColors().add(getTint(object.getAsJsonObject()));
                 }
             }
+
+            if (skinToken.has("SkinIID")) {
+                skin.setSkinIID(skinToken.get("SkinIID").getAsString());
+            }
+            if (skinToken.has("GrowthLevel")) {
+                skin.setGrowthLevel(skinToken.get("GrowthLevel").getAsInt());
+            }
+            if (skinToken.has("BloomData")) {
+                byte[] bloom = Base64.getDecoder().decode(skinToken.get("BloomData").getAsString());
+                if (bloom.length <= skin.getSkinData().data.length) {
+                    skin.setBloomData(bloom);
+                }
+            }
         }
     }
 
@@ -484,5 +522,25 @@ public class LoginPacket extends DataPacket {
     }
 
     private static class MapTypeToken extends TypeToken<Map<String, Object>> {
+    }
+
+    /**
+     * 数值比较客户端版本字符串（如 "1.26.44.3"）是否不低于指定版本，无法解析时返回 false。
+     * <p>
+     * Numerically compares a client version string (e.g. "1.26.44.3") against the given version;
+     * returns false when it cannot be parsed.
+     */
+    static boolean isAtLeastVersion(String version, int major, int minor, int patch) {
+        String[] parts = version.split("\\.");
+        if (parts.length < 3) {
+            return false;
+        }
+        try {
+            return Integer.parseInt(parts[0]) > major
+                    || (Integer.parseInt(parts[0]) == major && Integer.parseInt(parts[1]) > minor)
+                    || (Integer.parseInt(parts[0]) == major && Integer.parseInt(parts[1]) == minor && Integer.parseInt(parts[2]) >= patch);
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }

@@ -62,6 +62,7 @@ import cn.nukkit.metadata.Metadatable;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.types.clock.*;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
@@ -118,6 +119,16 @@ public class Level implements ChunkManager, Metadatable {
     public static final int TIME_SUNRISE = 23000;
 
     public static final int TIME_FULL = 24000;
+
+    // 客户端内置的主世界时钟 ID 与时间标记 ID，值需与原版客户端一致
+    private static final long OVERWORLD_CLOCK_ID = 7194480507151251734L;
+    private static final List<TimeMarkerData> OVERWORLD_TIME_MARKERS = List.of(
+            new TimeMarkerData(2625810911898139949L, "minecraft:sunrise", TIME_SUNRISE, TIME_FULL),
+            new TimeMarkerData(4918950784056990566L, "minecraft:night", TIME_NIGHT, TIME_FULL),
+            new TimeMarkerData(6827470627776846754L, "minecraft:noon", TIME_NOON, TIME_FULL),
+            new TimeMarkerData(-7184653752370368672L, "minecraft:midnight", TIME_MIDNIGHT, TIME_FULL),
+            new TimeMarkerData(-4807795260250801598L, "minecraft:day", TIME_DAY, TIME_FULL),
+            new TimeMarkerData(-1781951082890426794L, "minecraft:sunset", TIME_SUNSET, TIME_FULL));
 
     public static final int DIMENSION_OVERWORLD = 0;
     public static final int DIMENSION_NETHER = 1;
@@ -428,6 +439,14 @@ public class Level implements ChunkManager, Metadatable {
     private ExecutorService asyncChunkLoadExecutor;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
+    // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
+    // Posted to main thread to clear tasks (tasks isn't thread-safe; async worker can't touch it)
+    private final Queue<FailedChunkRequest> asyncChunkRequestFailedQueue = new ConcurrentLinkedQueue<>();
+
+    // 任务提交 tick,用于超时自愈 / Submit tick for timeout self-healing
+    private final Long2LongOpenHashMap chunkSendTaskStartTick = new Long2LongOpenHashMap();
+    private static final int CHUNK_SEND_TIMEOUT_TICKS = 200;
+
     // 异步区块加载:pending 去重 + 完成队列,主线程 doTick 中挂载 / Async chunk loading: pending dedup + completion queue, mounted on the main thread in doTick
     // 包内可见以便单元测试 / package-private for unit tests
     final ConcurrentHashMap<Long, PendingChunkLoad> pendingChunkLoads = new ConcurrentHashMap<>();
@@ -447,6 +466,18 @@ public class Level implements ChunkManager, Metadatable {
             this.z = z;
             this.hash = hash;
             this.provider = provider;
+        }
+    }
+
+    static final class FailedChunkRequest {
+        final GameVersion protocol;
+        final int x;
+        final int z;
+
+        FailedChunkRequest(GameVersion protocol, int x, int z) {
+            this.protocol = protocol;
+            this.x = x;
+            this.z = z;
         }
     }
 
@@ -1127,14 +1158,60 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void sendTime(Player... players) {
-        SetTimePacket pk = new SetTimePacket();
-        pk.time = this.time;
-
-        Server.broadcastPacket(players, pk);
+        List<Player> legacyPlayers = null;
+        List<Player> initPlayers = null;
+        List<Player> syncPlayers = null;
+        for (Player player : players) {
+            if (player.protocol < ProtocolInfo.v1_26_30) {
+                if (legacyPlayers == null) {
+                    legacyPlayers = new ArrayList<>();
+                }
+                legacyPlayers.add(player);
+            } else if (player.worldClockSynced) {
+                if (syncPlayers == null) {
+                    syncPlayers = new ArrayList<>();
+                }
+                syncPlayers.add(player);
+            } else {
+                if (initPlayers == null) {
+                    initPlayers = new ArrayList<>();
+                }
+                initPlayers.add(player);
+            }
+        }
+        if (legacyPlayers != null) {
+            SetTimePacket pk = new SetTimePacket();
+            pk.time = this.time;
+            Server.broadcastPacket(legacyPlayers.toArray(Player.EMPTY_ARRAY), pk);
+        }
+        if (initPlayers != null) {
+            // InitializeRegistryData 本身携带 time/paused，首次同步即完成注册表初始化
+            SyncWorldClocksPacket pk = new SyncWorldClocksPacket();
+            pk.data = new InitializeRegistryData(List.of(new WorldClockData(
+                    OVERWORLD_CLOCK_ID, "minecraft:overworld", this.time, this.isWorldClockPaused(), OVERWORLD_TIME_MARKERS)));
+            for (Player player : initPlayers) {
+                player.worldClockSynced = true;
+            }
+            Server.broadcastPacket(initPlayers.toArray(Player.EMPTY_ARRAY), pk);
+        }
+        if (syncPlayers != null) {
+            SyncWorldClocksPacket pk = new SyncWorldClocksPacket();
+            pk.data = new SyncStateData(List.of(new SyncWorldClockStateData(OVERWORLD_CLOCK_ID, this.time, this.isWorldClockPaused())));
+            Server.broadcastPacket(syncPlayers.toArray(Player.EMPTY_ARRAY), pk);
+        }
     }
 
     public void sendTime() {
         sendTime(this.players.values().toArray(Player.EMPTY_ARRAY));
+    }
+
+    /**
+     * 世界时钟是否暂停，语义与 {@link #checkTime()} 的时间推进条件保持一致。
+     * <p>
+     * Whether the world clock is paused, matching the time-advance condition in {@link #checkTime()}.
+     */
+    public boolean isWorldClockPaused() {
+        return this.stopTime || !this.gameRules.getBoolean(GameRule.DO_DAYLIGHT_CYCLE);
     }
 
     public GameRules getGameRules() {
@@ -1283,6 +1360,16 @@ public class Level implements ChunkManager, Metadatable {
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
                 this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
+            }
+        }
+
+        // 清 tasks 后下 tick 守卫(!contains)重新成立即自动重试
+        // Clearing tasks lets the guard re-accept it next tick
+        if (!this.asyncChunkRequestFailedQueue.isEmpty()) {
+            FailedChunkRequest failed;
+            while ((failed = this.asyncChunkRequestFailedQueue.poll()) != null) {
+                this.getChunkSendTasks(failed.protocol).remove(Level.chunkHash(failed.x, failed.z));
+                this.chunkSendTaskStartTick.remove(Level.chunkHash(failed.x, failed.z));
             }
         }
 
@@ -3996,6 +4083,7 @@ public class Level implements ChunkManager, Metadatable {
         }
         queue.remove(index);
         tasks.remove(index);
+        this.chunkSendTaskStartTick.remove(index);
     }
 
     private void processChunkRequest() {
@@ -4008,6 +4096,14 @@ public class Level implements ChunkManager, Metadatable {
             LongSet tasks = this.getChunkSendTasks(protocolId);
             ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocolId);
             for (long index : pending) {
+                // 超时未回调则强制清除重试 / Force-clear and retry if no callback within timeout
+                long startTick = this.chunkSendTaskStartTick.get(index);
+                if (startTick != 0 && this.server.getTick() - startTick > CHUNK_SEND_TIMEOUT_TICKS
+                        && tasks.contains(index)) {
+                    server.getLogger().warning("Chunk send task timed out for index " + index + " in level " + this.getName() + ", forcing retry");
+                    tasks.remove(index);
+                    this.chunkSendTaskStartTick.remove(index);
+                }
                 if (!tasks.contains(index) && queue.containsKey(index)) {
                     chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
                     tasks.add(index);
@@ -4041,12 +4137,22 @@ public class Level implements ChunkManager, Metadatable {
                 continue;
             }
 
+            this.chunkSendTaskStartTick.put(index, this.server.getTick());
             this.requireProvider().requestChunkTask(protocols, x, z);
         }
     }
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
         this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp, x, z, subChunkCount, payload));
+    }
+
+    /**
+     * async 线程调用,仅入队(主线程 doTick 排空才清 tasks)。
+     * <p>
+     * Async-thread entry; just enqueues (main thread drains & clears tasks).
+     */
+    public void onAsyncChunkRequestFailed(GameVersion protocol, int x, int z) {
+        this.asyncChunkRequestFailedQueue.add(new FailedChunkRequest(protocol, x, z));
     }
 
     @Deprecated
@@ -4116,6 +4222,7 @@ public class Level implements ChunkManager, Metadatable {
 
             queue.remove(index);
             tasks.remove(index);
+            this.chunkSendTaskStartTick.remove(index);
         }
     }
 

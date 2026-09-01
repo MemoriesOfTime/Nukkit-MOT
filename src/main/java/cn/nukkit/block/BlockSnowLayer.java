@@ -3,8 +3,9 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemSnowball;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
@@ -87,7 +88,7 @@ public class BlockSnowLayer extends BlockFallableMeta {
             if (this.level.getBlockIdAt(this.getFloorX(), this.getFloorY(), this.getFloorZ()) == SNOW_LAYER && !this.canSurvive()) {
                 this.level.useBreakOn(this, null, null, true);
                 if (this.level.getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
-                    this.level.dropItem(this, this.toItem());
+                    this.level.dropItem(this, Item.get(Item.SNOWBALL));
                 }
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
@@ -105,13 +106,13 @@ public class BlockSnowLayer extends BlockFallableMeta {
 
     @Override
     public Item toItem() {
-        return new ItemSnowball();
+        return new ItemBlock(Block.get(this.getId(), 0), 0);
     }
 
     @Override
     public Item[] getDrops(Item item) {
         if (item.isShovel() && item.getTier() >= ItemTool.TIER_WOODEN) {
-            Item drop = this.toItem();
+            Item drop = item.hasEnchantment(Enchantment.ID_SILK_TOUCH) ? this.toItem() : Item.get(Item.SNOWBALL);
             int height = this.getDamage() & 0x7;
             drop.setCount(height < 3 ? 1 : height < 5 ? 2 : height == 7 ? 4 : 3);
             return new Item[]{drop};

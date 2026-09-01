@@ -20,6 +20,7 @@ import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.event.level.LevelInitEvent;
 import cn.nukkit.event.level.LevelLoadEvent;
+import cn.nukkit.event.server.BatchPacketsEvent;
 import cn.nukkit.event.server.PlayerDataSerializeEvent;
 import cn.nukkit.event.server.QueryRegenerateEvent;
 import cn.nukkit.event.server.ServerStopEvent;
@@ -55,7 +56,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.BatchingHelper;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
@@ -127,6 +127,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 
 /**
@@ -149,7 +150,7 @@ public class Server {
     private final Config whitelist;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
-    private boolean hasStopped;
+    private volatile boolean hasStopped;
 
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
@@ -208,6 +209,10 @@ public class Server {
     @NotNull
     private String ip = "0.0.0.0";
     private int port;
+    private boolean ipv6Enabled = false;
+    @NotNull
+    private String ipv6Address = "::";
+    private int ipv6Port = -1;
     private QueryHandler queryHandler;
     private QueryRegenerateEvent queryRegenerateEvent;
     private final UUID serverID;
@@ -269,7 +274,20 @@ public class Server {
     private final DB nameLookup;
     private PlayerDataSerializer playerDataSerializer;
     private SpawnerTask spawnerTask;
-    private final BatchingHelper batchingHelper;
+
+    /**
+     * 玩家数据 IO 的按身份锁，key 为数据路径标识（UUID 字符串或小写名）。
+     * <p>
+     * Per-identity locks for player data IO, keyed by the data path identity (UUID string or
+     * lowercased name).
+     */
+    private final ConcurrentHashMap<String, ReentrantLock> playerDataLocks = new ConcurrentHashMap<>();
+    /**
+     * 已调度未执行的异步保存任务，按身份索引；迁移前同步冲刷。
+     * <p>
+     * Scheduled-but-not-yet-run async save tasks indexed by identity; flushed before a migration.
+     */
+    private final ConcurrentHashMap<String, ArrayDeque<Task>> pendingPlayerDataSaves = new ConcurrentHashMap<>();
 
     /**
      * The server's MOTD. Remember to call network.setName() when updated.
@@ -736,8 +754,6 @@ public class Server {
 
         this.scheduler = new ServerScheduler();
 
-        this.batchingHelper = new BatchingHelper();
-
         if (this.getPropertyBoolean("enable-rcon", false)) {
             try {
                 String randomPassword = Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13);
@@ -805,6 +821,7 @@ public class Server {
         Potion.init();
         Attribute.init();
         DispenseBehaviorRegister.init();
+        GlobalBlockPalette.setUseHashedBlockNetworkIds(this.serverConfig.customBlockSettings().useHashedBlockNetworkIds());
         CustomBlockManager.init(this);
         GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getLastVersion(), 0, 0);
         BiomeDefinitionListPacket.getCachedPacket(GameVersion.getLastVersion());
@@ -842,6 +859,11 @@ public class Server {
         this.queryRegenerateEvent = new QueryRegenerateEvent(this, 5);
 
         log.info(this.baseLang.translateString("nukkit.server.networkStart", new String[]{this.getIp().isBlank() ? "0.0.0.0" : this.getIp(), String.valueOf(this.getPort())}));
+        if (this.ipv6Enabled) {
+            // IPv6 地址用方括号包裹，与 IPv4 行复用同一本地化文案以保持风格统一
+            String ipv6Host = "[" + (this.ipv6Address.isBlank() ? "::" : this.ipv6Address) + "]";
+            log.info(this.baseLang.translateString("nukkit.server.networkStart", new String[]{ipv6Host, String.valueOf(this.ipv6Port)}));
+        }
         this.network = new Network(this);
         this.network.setName(this.getMotd());
         this.network.setSubName(this.getSubMotd());
@@ -860,7 +882,7 @@ public class Server {
 
         try {
             if (CustomBlockManager.get().closeRegistry()) {
-                for (RuntimeItemMapping runtimeItemMapping : RuntimeItems.VALUES) {
+                for (RuntimeItemMapping runtimeItemMapping : RuntimeItems.values()) {
                     runtimeItemMapping.generatePalette();
                 }
             }
@@ -1272,13 +1294,31 @@ public class Server {
         }
     }
 
+    @Deprecated
     public void batchPackets(Player[] players, DataPacket[] packets) {
-        this.batchingHelper.batchPackets(players, packets);
+        if (players == null || packets == null || players.length == 0 || packets.length == 0) {
+            return;
+        }
+
+        if (this.callBatchPkEv) {
+            BatchPacketsEvent ev = new BatchPacketsEvent(players, packets);
+            ev.call();
+            if (ev.isCancelled()) {
+                return;
+            }
+        }
+
+        for (DataPacket packet : packets) {
+            packet.isEncoded = false; // prevent plugins from being encoded in advance
+            for (Player player : players) {
+                player.dataPacket(packet);
+            }
+        }
     }
 
-    @Deprecated
+    @Deprecated(forRemoval = true)
     public void batchPackets(Player[] players, DataPacket[] packets, boolean forceSync) {
-        this.batchingHelper.batchPackets(players, packets);
+        this.batchPackets(players, packets);
     }
 
     public void enablePlugins(PluginLoadOrder type) {
@@ -1381,11 +1421,10 @@ public class Server {
         if (this.hasStopped) {
             return;
         }
+        this.hasStopped = true;
 
         try {
             isRunning.compareAndSet(true, false);
-
-            this.hasStopped = true;
 
             ServerStopEvent serverStopEvent = new ServerStopEvent();
             pluginManager.callEvent(serverStopEvent);
@@ -1424,16 +1463,11 @@ public class Server {
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
 
-            this.getLogger().debug("Closing BatchingHelper...");
-            this.batchingHelper.shutdown();
-
             this.getLogger().debug("Stopping network interfaces...");
             for (SourceInterface interfaz : this.network.getInterfaces()) {
                 interfaz.shutdown();
                 this.network.unregisterInterface(interfaz);
             }
-
-            this.batchingHelper.shutdown();
 
             if (nameLookup != null) {
                 this.getLogger().debug("Closing name lookup DB...");
@@ -1617,6 +1651,7 @@ public class Server {
                 remove.type = PlayerListPacket.TYPE_REMOVE;
                 remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(playerListEntry.uuid)};
                 viewer.dataPacket(remove);
+                viewer.confirmedSkins.remove(playerListEntry.uuid);
             }
             viewer.sentSkins.add(playerListEntry.uuid);
         }
@@ -1638,6 +1673,7 @@ public class Server {
         for (Player player : players) {
             player.dataPacket(pk);
             player.sentSkins.remove(uuid);
+            player.confirmedSkins.remove(uuid);
         }
     }
 
@@ -1935,6 +1971,19 @@ public class Server {
         return ip;
     }
 
+    public boolean isIpv6Enabled() {
+        return ipv6Enabled;
+    }
+
+    @NotNull
+    public String getIpv6Address() {
+        return ipv6Address;
+    }
+
+    public int getIpv6Port() {
+        return ipv6Port;
+    }
+
     public UUID getServerUniqueId() {
         return this.serverID;
     }
@@ -2053,9 +2102,7 @@ public class Server {
     }
 
     public String getSubMotd() {
-        String sub = this.getPropertyString("sub-motd", "Powered by Nukkit-MOT");
-        if (sub.isEmpty()) sub = "Powered by Nukkit";
-        return sub;
+        return this.getPropertyString("sub-motd", "Powered by Nukkit-MOT");
     }
 
     public boolean getForceResources() {
@@ -2163,31 +2210,89 @@ public class Server {
         return Optional.ofNullable(playerList.get(uuid));
     }
 
+    /**
+     * 名称条目的写入来源，用于阻止离线登录认领 Xbox 认证账户的数据。
+     * <p>
+     * Provenance of a name entry, used to keep offline logins from claiming an Xbox
+     * authenticated account's data.
+     */
+    enum NameProvenance {
+        /** 旧版 16 字节条目，无来源记录 Legacy 16-byte entry without a provenance record */
+        LEGACY_UNKNOWN,
+        XBOX_AUTHED,
+        OFFLINE
+    }
+
+    record NameEntry(UUID uuid, NameProvenance provenance) {
+    }
+
+    private static final int NAME_ENTRY_UUID_BYTES = 16;
+    private static final byte PROVENANCE_XBOX_AUTHED = 0x01;
+    private static final byte PROVENANCE_OFFLINE = 0x02;
+
+    static byte[] encodeNameEntry(UUID uuid, NameProvenance provenance) {
+        ByteBuffer buffer = ByteBuffer.allocate(NAME_ENTRY_UUID_BYTES + 1);
+        buffer.putLong(uuid.getMostSignificantBits());
+        buffer.putLong(uuid.getLeastSignificantBits());
+        buffer.put(switch (provenance) {
+            case XBOX_AUTHED -> PROVENANCE_XBOX_AUTHED;
+            case OFFLINE -> PROVENANCE_OFFLINE;
+            case LEGACY_UNKNOWN -> throw new IllegalArgumentException("legacy entries are never written");
+        });
+        return buffer.array();
+    }
+
+    /**
+     * 解码名称条目：17 字节为现行格式（UUID + 来源），16 字节为旧格式（来源未知），其余无效。
+     * <p>
+     * Decodes a name entry: 17 bytes is the current format (UUID + provenance), 16 bytes the
+     * legacy format (unknown provenance); anything else is invalid.
+     */
+    static NameEntry decodeNameEntry(byte[] bytes) {
+        if (bytes == null) {
+            return null;
+        }
+        if (bytes.length == NAME_ENTRY_UUID_BYTES) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            return new NameEntry(new UUID(buffer.getLong(), buffer.getLong()), NameProvenance.LEGACY_UNKNOWN);
+        }
+        if (bytes.length != NAME_ENTRY_UUID_BYTES + 1) {
+            return null;
+        }
+        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        UUID uuid = new UUID(buffer.getLong(), buffer.getLong());
+        return switch (buffer.get()) {
+            case PROVENANCE_XBOX_AUTHED -> new NameEntry(uuid, NameProvenance.XBOX_AUTHED);
+            case PROVENANCE_OFFLINE -> new NameEntry(uuid, NameProvenance.OFFLINE);
+            default -> null;
+        };
+    }
+
     public Optional<UUID> lookupName(String name) {
+        return lookupNameEntry(name).map(NameEntry::uuid);
+    }
+
+    Optional<NameEntry> lookupNameEntry(String name) {
         byte[] nameBytes = name.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
-        byte[] uuidBytes = nameLookup.get(nameBytes);
-        if (uuidBytes == null) {
+        byte[] entryBytes = nameLookup.get(nameBytes);
+        if (entryBytes == null) {
             return Optional.empty();
         }
 
-        if (uuidBytes.length != 16) {
+        NameEntry entry = decodeNameEntry(entryBytes);
+        if (entry == null) {
             log.warn("Invalid uuid in name lookup database detected! Removing...");
             nameLookup.delete(nameBytes);
             return Optional.empty();
         }
 
-        ByteBuffer buffer = ByteBuffer.wrap(uuidBytes);
-        return Optional.of(new UUID(buffer.getLong(), buffer.getLong()));
+        return Optional.of(entry);
     }
 
-    void updateName(UUID uuid, String name) {
+    void updateName(UUID uuid, String name, boolean xboxAuthed) {
         byte[] nameBytes = name.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
-
-        ByteBuffer buffer = ByteBuffer.allocate(16);
-        buffer.putLong(uuid.getMostSignificantBits());
-        buffer.putLong(uuid.getLeastSignificantBits());
-
-        nameLookup.put(nameBytes, buffer.array());
+        nameLookup.put(nameBytes, encodeNameEntry(uuid,
+                xboxAuthed ? NameProvenance.XBOX_AUTHED : NameProvenance.OFFLINE));
     }
 
     public IPlayer getOfflinePlayer(final String name) {
@@ -2231,6 +2336,17 @@ public class Server {
         }
     }
 
+    /**
+     * 按名直读遗留数据文件，不经查找表解析：条目指向认证账户或塌缩身份时，解析会把被守卫的
+     * 数据发给当前登录者。
+     * <p>
+     * Reads the legacy name-keyed file directly, without lookup resolution: resolving would hand
+     * out guarded data when the entry points at an authenticated account or a collapsed identity.
+     */
+    CompoundTag getLegacyPlayerDataByName(String name) {
+        return getOfflinePlayerDataInternal(name, true, false);
+    }
+
     private CompoundTag getOfflinePlayerDataInternal(String name, boolean runEvent, boolean create) {
         Preconditions.checkNotNull(name, "name");
 
@@ -2241,9 +2357,15 @@ public class Server {
 
         Optional<InputStream> dataStream = Optional.empty();
         try {
-            dataStream = event.getSerializer().read(name, event.getUuid().orElse(null));
-            if (dataStream.isPresent()) {
-                return NBTIO.readCompressed(dataStream.get());
+            ReentrantLock dataLock = playerDataLock(name);
+            dataLock.lock();
+            try {
+                dataStream = event.getSerializer().read(name, event.getUuid().orElse(null));
+                if (dataStream.isPresent()) {
+                    return NBTIO.readCompressed(dataStream.get());
+                }
+            } finally {
+                dataLock.unlock();
             }
         } catch (IOException e) {
             log.warn(this.getLanguage().translateString("nukkit.data.playerCorrupted", name));
@@ -2291,6 +2413,94 @@ public class Server {
         return nbt;
     }
 
+    /**
+     * 迁移旧身份数据。仅离线登录可调用（调用方已做认证门控），故 xboxAuthed 恒为 false。
+     * <p>
+     * Migrates the previous identity's data. Only reachable from an offline login (the caller has
+     * already applied the auth gates), so xboxAuthed is always false here.
+     */
+    PlayerDataMigrator.Result migratePlayerData(UUID previous, UUID current) {
+        String previousKey = previous.toString();
+        String currentKey = current.toString();
+        // 先冲刷旧身份的排队保存，否则任务闭包里的旧路径会在移动后重建孤儿文件
+        // Flush the previous identity's queued saves first, or a task's old path recreates an
+        // orphaned file after the move
+        flushPendingPlayerDataSaves(previousKey);
+
+        PlayerDataSerializeEvent previousEvent = new PlayerDataSerializeEvent(previousKey, playerDataSerializer);
+        pluginManager.callEvent(previousEvent);
+        PlayerDataSerializeEvent currentEvent = new PlayerDataSerializeEvent(currentKey, playerDataSerializer);
+        pluginManager.callEvent(currentEvent);
+
+        // 双身份按字典序获取锁，并发迁移 A→B / B→A 不会互相死锁
+        // Acquire both identities in lexicographic order so concurrent A→B / B→A migrations
+        // cannot deadlock each other
+        ReentrantLock first = playerDataLock(previousKey.compareTo(currentKey) <= 0 ? previousKey : currentKey);
+        ReentrantLock second = playerDataLock(previousKey.compareTo(currentKey) <= 0 ? currentKey : previousKey);
+        first.lock();
+        try {
+            second.lock();
+            try {
+                // 事件在锁外触发，监听器可能刚注册了旧身份的排队写：持锁后再冲刷一次
+                // Events fire outside the locks; flush again in case a listener queued an
+                // old-path save in between
+                flushPendingPlayerDataSaves(previousKey);
+                return PlayerDataMigrator.migrate(previousEvent.getSerializer(), currentEvent.getSerializer(),
+                        previous, current, false);
+            } finally {
+                second.unlock();
+            }
+        } finally {
+            first.unlock();
+        }
+    }
+
+    private ReentrantLock playerDataLock(String key) {
+        return playerDataLocks.computeIfAbsent(key, k -> new ReentrantLock());
+    }
+
+    /**
+     * 在调用线程同步执行排队保存：{@link Task#cancel()} 会内联执行 onCancel 完成落盘，
+     * {@code hasRun} 保证不与池线程的正常执行重复。
+     * <p>
+     * Runs queued saves synchronously on the calling thread: {@link Task#cancel()} executes
+     * onCancel inline; {@code hasRun} keeps it from duplicating a pool-thread run.
+     */
+    private void flushPendingPlayerDataSaves(String name) {
+        ArrayDeque<Task> queued;
+        ReentrantLock lock = playerDataLock(name);
+        lock.lock();
+        try {
+            queued = pendingPlayerDataSaves.remove(name);
+        } finally {
+            lock.unlock();
+        }
+        if (queued == null) {
+            return;
+        }
+        for (Task saveTask : queued) {
+            saveTask.cancel();
+        }
+    }
+
+    private void unregisterPendingSave(String name, Task saveTask) {
+        // 关服的 cancelAllTasks 不持身份锁，注销需自行加锁
+        // Shutdown's cancelAllTasks holds no identity lock, so removal locks by itself
+        ReentrantLock lock = playerDataLock(name);
+        lock.lock();
+        try {
+            ArrayDeque<Task> queue = pendingPlayerDataSaves.get(name);
+            if (queue != null) {
+                queue.remove(saveTask);
+                if (queue.isEmpty()) {
+                    pendingPlayerDataSaves.remove(name, queue);
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public void saveOfflinePlayerData(UUID uuid, CompoundTag tag) {
         this.saveOfflinePlayerData(uuid, tag, false);
     }
@@ -2321,8 +2531,8 @@ public class Server {
             }
 
             if (async) {
-                this.getScheduler().scheduleTask(InternalPlugin.INSTANCE, new Task() {
-                    boolean hasRun = false;
+                Task saveTask = new Task() {
+                    volatile boolean hasRun = false;
 
                     @Override
                     public void onRun(int currentTick) {
@@ -2332,12 +2542,35 @@ public class Server {
                     // Doing it like this ensures that the player data will be saved in a server shutdown
                     @Override
                     public void onCancel() {
-                        if (!this.hasRun) {
-                            this.hasRun = true;
-                            saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
+                        // hasRun 的检查与置位必须在身份锁内：池线程置位后、取锁前的空窗里冲刷会空转，
+                        // 迁移移走文件后池线程恢复，把最新存档写回旧路径
+                        // The hasRun check-and-set must sit under the identity lock: in the pool
+                        // thread's flag-to-lock gap a flush no-ops, and the resumed thread then
+                        // writes the newest save to the path the migration already moved
+                        ReentrantLock saveLock = playerDataLock(nameLower);
+                        saveLock.lock();
+                        try {
+                            if (!this.hasRun) {
+                                this.hasRun = true;
+                                saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
+                                unregisterPendingSave(nameLower, this);
+                            }
+                        } finally {
+                            saveLock.unlock();
                         }
                     }
-                }, true);
+                };
+                // 同锁调度并注册：冲刷要么看到完整注册的任务，要么看到干净队列，无空窗
+                // Schedule and register under one lock so a flush never sees a
+                // scheduled-but-unregistered task
+                ReentrantLock lock = playerDataLock(nameLower);
+                lock.lock();
+                try {
+                    this.getScheduler().scheduleTask(InternalPlugin.INSTANCE, saveTask, true);
+                    pendingPlayerDataSaves.computeIfAbsent(nameLower, k -> new ArrayDeque<>()).add(saveTask);
+                } finally {
+                    lock.unlock();
+                }
             } else {
                 saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
             }
@@ -2353,10 +2586,16 @@ public class Server {
      * @param uuid player uuid
      */
     private void saveOfflinePlayerDataInternal(PlayerDataSerializer serializer, CompoundTag tag, String name, UUID uuid) {
-        try (OutputStream dataStream = serializer.write(name, uuid)) {
-            NBTIO.writeGZIPCompressed(tag, dataStream, ByteOrder.BIG_ENDIAN);
-        } catch (Exception e) {
-            log.error(this.getLanguage().translateString("nukkit.data.saveError", name, e));
+        ReentrantLock lock = playerDataLock(name);
+        lock.lock();
+        try {
+            try (OutputStream dataStream = serializer.write(name, uuid)) {
+                NBTIO.writeGZIPCompressed(tag, dataStream, ByteOrder.BIG_ENDIAN);
+            } catch (Exception e) {
+                log.error(this.getLanguage().translateString("nukkit.data.saveError", name, e));
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -2402,7 +2641,9 @@ public class Server {
             saveOfflinePlayerData(uuid.toString(), tag, false, false);
 
             // Add name to lookup table
-            updateName(uuid, name);
+            // 遗留按名数据无认证记录：按离线标记，保持可迁移
+            // Legacy name-keyed data carries no auth record: mark it offline so it stays migratable
+            updateName(uuid, name, false);
 
             // Delete legacy data
             if (!legacyData.delete()) {
@@ -2556,6 +2797,10 @@ public class Server {
             }
         }
 
+        if (name != null && (name.contains("/") || name.contains("\\"))) {
+            return this.findLevelByPath(this.resolveLevelFile(name));
+        }
+
         return null;
     }
 
@@ -2701,6 +2946,16 @@ public class Server {
      * name is recognized when re-requested via an equivalent path.
      */
     private boolean isLevelPathLoaded(File resolved) {
+        return this.findLevelByPath(resolved) != null;
+    }
+
+    /**
+     * 按规范化路径匹配已加载的世界，供 loadLevel 去重和 getLevelByName
+     * 的路径回退共用，保证两端用同一套比对逻辑。
+     * <p>Match an already-loaded level by canonical provider path, shared by
+     * loadLevel's dedup check and getLevelByName's path fallback.
+     */
+    private Level findLevelByPath(File resolved) {
         for (Level level : this.levelArray) {
             String providerPath;
             try {
@@ -2715,10 +2970,10 @@ public class Server {
                 loaded = new File(providerPath).getAbsoluteFile();
             }
             if (loaded.equals(resolved)) {
-                return true;
+                return level;
             }
         }
-        return false;
+        return null;
     }
 
     /**
@@ -3584,6 +3839,24 @@ public class Server {
         this.viewDistance = Math.max(1, this.getPropertyInt("view-distance", 8));
         this.port = this.getPropertyInt("server-port", 19132);
         this.ip = this.getPropertyString("server-ip", "0.0.0.0");
+        this.ipv6Port = this.getPropertyInt("server-ipv6-port", -1);
+        this.ipv6Address = this.getPropertyString("server-ipv6", "::");
+        if (!this.ipv6Address.isBlank()) {
+            try {
+                InetAddress resolved = InetAddress.getByName(this.ipv6Address);
+                if (!(resolved instanceof Inet6Address)) {
+                    throw new IllegalArgumentException("server-ipv6 must be an IPv6 address, got: " + this.ipv6Address + " (resolved to " + resolved.getHostAddress() + ")");
+                }
+                this.ipv6Address = resolved.getHostAddress();
+            } catch (UnknownHostException e) {
+                throw new IllegalArgumentException("Unable to resolve server-ipv6 address: " + this.ipv6Address, e);
+            }
+        }
+        // IPv6 listener: port <= 0 (default -1) disables it; a valid port binds ipv6-address:ipv6-port
+        this.ipv6Enabled = this.ipv6Port > 0 && this.ipv6Port != this.port && !this.ipv6Address.isBlank();
+        if (this.ipv6Port >= 0 && !this.ipv6Enabled) {
+            log.warn("IPv6 listener requested on port {} but it was disabled (port must be > 0, non-blank address, and differ from server-port {})", this.ipv6Port, this.port);
+        }
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
         } catch (NumberFormatException exception) {
@@ -3716,7 +3989,7 @@ public class Server {
         this.enableExperimentMode = config.gameFeatureSettings().enableExperimentMode();
         this.minimumProtocol = config.gameFeatureSettings().multiversionMinProtocol();
         int maxProto = config.gameFeatureSettings().multiversionMaxProtocol();
-        this.maximumProtocol = maxProto == -1 ? ProtocolInfo.CURRENT_PROTOCOL : maxProto;
+        this.maximumProtocol = maxProto == -1 ? GameVersion.getLastVersion().getProtocol() : maxProto;
         this.enableRawOres = config.gameFeatureSettings().enableRawOres();
         this.enableNewPaintings = config.gameFeatureSettings().enableNewPaintings();
         this.enableNewChickenEggsLaying = config.gameFeatureSettings().enableNewChickenEggsLaying();
@@ -3795,6 +4068,8 @@ public class Server {
             put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
+            put("server-ipv6-port", -1);
+            put("server-ipv6", "::");
             put("view-distance", 8);
             put("max-players", 50);
             put("language", "eng");

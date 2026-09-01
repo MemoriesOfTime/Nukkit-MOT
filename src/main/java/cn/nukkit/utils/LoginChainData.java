@@ -1,5 +1,7 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.api.OnlyNetEase;
+import cn.nukkit.network.encryption.EncryptionUtils;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
 
@@ -15,6 +17,18 @@ public interface LoginChainData {
     String getUsername();
 
     UUID getClientUUID();
+
+    /**
+     * Resolve the identity used by the server after applying username normalization such as a
+     * ViaProxy prefix. Authenticated identities remain account-derived; unauthenticated identities
+     * must follow the final server-visible name to avoid sharing data with another player.
+     *
+     * @param normalizedUsername final username accepted by the server
+     * @return identity UUID used for duplicate-login checks and player data
+     */
+    default UUID getClientUUID(String normalizedUsername) {
+        return isXboxAuthed() ? getClientUUID() : EncryptionUtils.deriveOfflineIdentity(normalizedUsername);
+    }
 
     /**
      * @return the player's Minecraft PlayFab ID
@@ -103,5 +117,14 @@ public interface LoginChainData {
 
     default String getNetEaseEnv() {
         return "";
+    }
+
+    /**
+     * 网易客户端是否为断线重连。
+     * <p>Whether the NetEase client is reconnecting after a disconnect.
+     */
+    @OnlyNetEase
+    default boolean isNetEaseReconnect() {
+        return false;
     }
 }

@@ -5,6 +5,7 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDispenser;
 import cn.nukkit.dispenser.DispenseBehavior;
 import cn.nukkit.dispenser.DispenseBehaviorRegister;
+import cn.nukkit.event.block.BlockDispenseEvent;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.Item;
@@ -202,6 +203,17 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
             pk.data = 1200;
 
             level.addChunkPacket(getChunkX(), getChunkZ(), pk.clone());
+            return;
+        }
+
+        // A dispenser fires with nobody behind it, so land guards never see a break or a place
+        // event for what it does. Ask before the behavior runs: cancelling here consumes nothing
+        // and stays silent, which is exactly how a dispenser with an empty slot behaves.
+        BlockDispenseEvent dispenseEvent =
+                new BlockDispenseEvent(this, facing, this.getSide(facing), original.clone());
+        this.level.getServer().getPluginManager().callEvent(dispenseEvent);
+
+        if (dispenseEvent.isCancelled()) {
             return;
         }
 

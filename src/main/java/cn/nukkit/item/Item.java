@@ -986,11 +986,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static OK<?> registerCustomItem(@NotNull Class<? extends CustomItem> clazz, boolean addCreativeItem) {
-        if (!Server.getInstance().enableExperimentMode) {
-            Server.getInstance().getLogger().warning("The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-            return new OK<>(false, "The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-        }
-
         CustomItem customItem;
         Supplier<Item> supplier;
 
@@ -1028,7 +1023,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         // Register custom item in all RuntimeItemMappings
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+        for (RuntimeItemMapping mapping : RuntimeItems.values()) {
             mapping.registerCustomItem(customItem);
         }
 
@@ -1052,7 +1047,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             PENDING_CREATIVE_ITEMS.remove(namespaceId);
 
             // Remove from all RuntimeItemMappings
-            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+            for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                 mapping.deleteCustomItem((CustomItem) customItem);
             }
 

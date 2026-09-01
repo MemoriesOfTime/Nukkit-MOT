@@ -124,6 +124,10 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_SCHEDULED) {
+            // Make sure the block still exists to prevent item duplication
+            if (this.level.getBlockIdAt((int) this.x, (int) this.y, (int) this.z) != this.getId()) {
+                return 0;
+            }
             RedstoneUpdateEvent ev = new RedstoneUpdateEvent(this);
             PluginManager pluginManager = level.getServer().getPluginManager();
             pluginManager.callEvent(ev);

@@ -2,13 +2,26 @@ package cn.nukkit.utils;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
+import cn.nukkit.block.Block;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItems;
+import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import io.netty.buffer.Unpooled;
+import org.cloudburstmc.nbt.NbtMap;
+import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
+import org.cloudburstmc.protocol.bedrock.codec.v2168.Bedrock_v2168;
+import org.cloudburstmc.protocol.bedrock.data.definitions.ItemDefinition;
+import org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition;
+import org.cloudburstmc.protocol.bedrock.data.definitions.SimpleItemDefinition;
+import org.cloudburstmc.protocol.bedrock.data.inventory.ItemData;
+import org.cloudburstmc.protocol.common.SimpleDefinitionRegistry;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -80,6 +93,96 @@ class BinaryStreamSlotV2168Test {
         Item item = decodeSlot(userData);
         assertEquals(Item.DIAMOND_SWORD, item.getId());
         assertEquals(1, item.getCount());
+    }
+
+    // ==================== CB Protocol cross-validation ====================
+
+    /**
+     * v2168 ItemInstance（putSlot crafting=true）必须与 CB {@code BedrockCodecHelper_v2168.readItemInstance}
+     * 兼容：blockRuntimeId 是 zigzag VarInt（非 VarUInt）。方块物品（blockRuntimeId != 0）此前编码错误，
+     * 导致 1.26.40 客户端解析 CreativeContent/CraftingData 错位崩溃。
+     * <p>
+     * v2168 ItemInstance (putSlot crafting=true) must round-trip through the CB
+     * {@code BedrockCodecHelper_v2168.readItemInstance}: blockRuntimeId is a zigzag VarInt (not VarUInt).
+     * Block items (blockRuntimeId != 0) used to be encoded wrong, making 1.26.40 clients
+     * desynchronize while parsing CreativeContent/CraftingData.
+     */
+    @Test
+    void itemInstanceBlockRuntimeIdCrossDecodesWithCbProtocol() {
+        Item input = Item.get(Block.STONE);
+        input.setCount(3);
+        int expectedBlockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(V2168, Block.STONE, 0);
+        assertTrue(expectedBlockRuntimeId != 0, "stone should have a non-zero block runtime id in v2168");
+
+        BinaryStream encoded = new BinaryStream();
+        encoded.putSlot(V2168, input, true);
+
+        BedrockCodecHelper helper = Bedrock_v2168.CODEC.createHelper();
+        registerCbDefinitions(helper, expectedBlockRuntimeId);
+
+        ItemData decoded = helper.readItemInstance(Unpooled.wrappedBuffer(encoded.getBuffer()));
+        assertEquals(3, decoded.getCount());
+        assertEquals("minecraft:stone", decoded.getDefinition().getIdentifier());
+        assertEquals(expectedBlockRuntimeId, decoded.getBlockDefinition().getRuntimeId());
+    }
+
+    /**
+     * v2168 ItemInstance 的 AIR 分支（blockRuntimeId=0）与 CB 兼容。
+     * <p>
+     * The v2168 ItemInstance AIR branch (blockRuntimeId=0) stays CB compatible.
+     */
+    @Test
+    void itemInstanceAirCrossDecodesWithCbProtocol() {
+        BinaryStream encoded = new BinaryStream();
+        encoded.putSlot(V2168, Item.AIR_ITEM, true);
+
+        BedrockCodecHelper helper = Bedrock_v2168.CODEC.createHelper();
+        registerCbDefinitions(helper, 0);
+
+        ItemData decoded = helper.readItemInstance(Unpooled.wrappedBuffer(encoded.getBuffer()));
+        assertEquals(ItemDefinition.AIR, decoded.getDefinition());
+        assertEquals(0, decoded.getCount());
+    }
+
+    /**
+     * v2168 描述符（putSlot crafting=false）的 blockRuntimeId 是 VarUInt，与 CB
+     * {@code readNetworkItemStackDescriptor} 兼容。回归保护：确保描述符路径不被 ItemInstance 修复误伤。
+     * <p>
+     * The v2168 descriptor (putSlot crafting=false) blockRuntimeId stays a VarUInt and must remain
+     * CB compatible with {@code readNetworkItemStackDescriptor}. Guards the descriptor path against
+     * regressions from the ItemInstance fix.
+     */
+    @Test
+    void descriptorBlockRuntimeIdCrossDecodesWithCbProtocol() {
+        Item input = Item.get(Block.STONE);
+        input.setCount(3);
+        int expectedBlockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(V2168, Block.STONE, 0);
+
+        BinaryStream encoded = new BinaryStream();
+        encoded.putSlot(V2168, input);
+
+        BedrockCodecHelper helper = Bedrock_v2168.CODEC.createHelper();
+        registerCbDefinitions(helper, expectedBlockRuntimeId);
+
+        ItemData decoded = helper.readNetworkItemStackDescriptor(Unpooled.wrappedBuffer(encoded.getBuffer()));
+        assertEquals(3, decoded.getCount());
+        assertEquals(expectedBlockRuntimeId, decoded.getBlockDefinition().getRuntimeId());
+        assertFalse(decoded.isUsingNetId());
+    }
+
+    private static void registerCbDefinitions(BedrockCodecHelper helper, int blockRuntimeId) {
+        var itemDefinitions = SimpleDefinitionRegistry.<org.cloudburstmc.protocol.bedrock.data.definitions.ItemDefinition>builder();
+        Set<Integer> seen = new HashSet<>();
+        for (var entry : RuntimeItems.getMapping(V2168).getItemPaletteEntries()) {
+            if (seen.add(entry.getRuntimeId())) {
+                itemDefinitions.add(new SimpleItemDefinition(entry.getIdentifier(), entry.getRuntimeId(), false));
+            }
+        }
+        helper.setItemDefinitions(itemDefinitions.build());
+        helper.setBlockDefinitions(SimpleDefinitionRegistry
+                .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder()
+                .add(new SimpleBlockDefinition("minecraft:stone", blockRuntimeId, NbtMap.EMPTY))
+                .build());
     }
 
     private static Item decodeSlot(BinaryStream userData) {

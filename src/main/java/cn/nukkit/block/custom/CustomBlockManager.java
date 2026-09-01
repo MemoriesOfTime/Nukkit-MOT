@@ -25,6 +25,7 @@ import cn.nukkit.level.format.leveldb.LevelDBConstants;
 import cn.nukkit.level.format.leveldb.NukkitLegacyMapper;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.BiomeDefinitionListPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.VanillaPaletteDownloader;
 import com.google.gson.*;
@@ -273,7 +274,7 @@ public class CustomBlockManager {
                             meta = finalProperties.setValue(meta, name, states.get(name));
                         }
 
-                        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                        for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                             mapping.registerCustomBlockItem(identifier, itemId, meta);
                         }
 
@@ -287,7 +288,7 @@ public class CustomBlockManager {
                         this.legacy2CustomState.put(state.getLegacyId(), state);
                     });
         } else {
-            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+            for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                 mapping.registerCustomBlockItem(identifier, itemId, 0);
             }
         }
@@ -396,6 +397,8 @@ public class CustomBlockManager {
         }
 
         GlobalBlockPalette.compactCaches();
+
+        BiomeDefinitionListPacket.rebuildHashSensitiveCaches();
 
         log.info("Custom block registry closed in {}ms", (System.currentTimeMillis() - startTime));
         this.saveIdMapping();

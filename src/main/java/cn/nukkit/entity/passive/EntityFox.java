@@ -46,7 +46,7 @@ public class EntityFox extends EntityWalkingAnimal {
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.SWEET_BERRIES && !this.isBaby() && !this.isInLoveCooldown()) {
+        if (this.isBreedingItem(item) && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
             this.level.addParticle(new ItemBreakParticle(this.add(0, this.getMountedYOffset(), 0), Item.get(Item.SWEET_BERRIES)));
@@ -59,6 +59,11 @@ public class EntityFox extends EntityWalkingAnimal {
     @Override
     public boolean isFeedItem(Item item) {
         return item.getId() == Item.SWEET_BERRIES;
+    }
+
+    @Override
+    public boolean isBreedingItem(Item item) {
+        return this.isFeedItem(item);
     }
 
     @Override
