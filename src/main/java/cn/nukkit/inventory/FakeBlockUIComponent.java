@@ -25,6 +25,10 @@ public class FakeBlockUIComponent extends PlayerUIComponent {
         return (FakeBlockMenu) this.holder;
     }
 
+    public InventoryType getFakeBlockType() {
+        return this.type;
+    }
+
     @Override
     public boolean open(Player who) {
         InventoryOpenEvent ev = new InventoryOpenEvent(this, who);

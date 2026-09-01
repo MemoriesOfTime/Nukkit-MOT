@@ -28,55 +28,100 @@ public class PlayerListPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putByte(this.type);
-        this.putUnsignedVarInt(this.entries.length);
-        switch (type) {
-            case TYPE_ADD:
-                for (Entry entry : this.entries) {
-                    if (protocol >= ProtocolInfo.v1_2_13) {
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putUnsignedVarInt(this.entries.length);
+            for (Entry entry : this.entries) {
+                this.putUnsignedVarInt(this.type == TYPE_ADD ? 1 : 0);
+                this.putByte(this.type);
+                switch (type) {
+                    case TYPE_ADD:
                         this.putUUID(entry.uuid);
-                    }
-                    this.putVarLong(entry.entityId);
-                    this.putString(entry.name);
-                    if (protocol >= ProtocolInfo.v1_2_13 && protocol <= ProtocolInfo.v1_6_0) {
-                        this.putString("");
-                        this.putVarInt(0);
-                    }
-                    if (protocol < ProtocolInfo.v1_13_0) {
-                        this.putSkin(protocol, entry.skin);
-                        if (protocol < ProtocolInfo.v1_2_13) {
-                            this.putByteArray(new byte[0]);
-                        }
-                    }
-                    this.putString(entry.xboxUserId);
-                    if (protocol >= ProtocolInfo.v1_2_13) {
+                        this.putEntityUniqueId(entry.entityId);
+                        this.putString(entry.name);
+                        this.putString(entry.xboxUserId);
                         this.putString(entry.platformChatId);
-                        if (protocol >= 388) {
-                            this.putLInt(entry.buildPlatform);
-                            this.putSkin(protocol, entry.skin);
-                            this.putBoolean(entry.isTeacher);
-                            this.putBoolean(entry.isHost);
-                            if (protocol >= ProtocolInfo.v1_20_60) {
-                                this.putBoolean(entry.isSubClient);
-                                if (protocol >= ProtocolInfo.v1_21_80) {
-                                    this.putLInt(entry.color.getRGB());
+                        this.putLInt(entry.buildPlatform);
+                        this.putSkin(this.gameVersion, entry.skin);
+                        this.putBoolean(entry.isTeacher);
+                        this.putBoolean(entry.isHost);
+                        this.putBoolean(entry.isSubClient);
+                        this.putLInt(entry.color.getRGB());
+                        break;
+                    case TYPE_REMOVE:
+                        this.putUUID(entry.uuid);
+                        break;
+                }
+            }
+            if (type == TYPE_ADD && protocol >= ProtocolInfo.v1_14_60 && protocol < ProtocolInfo.v1_26_40) {
+                for (Entry entry : this.entries) { // WTF Mojang
+                    this.putBoolean(entry.skin != null && entry.skin.isTrusted());
+                }
+            }
+        } else {
+            this.putByte(this.type);
+            this.putUnsignedVarInt(this.entries.length);
+            switch (type) {
+                case TYPE_ADD:
+                    for (Entry entry : this.entries) {
+                        if (protocol >= ProtocolInfo.v1_2_13 || protocol < ProtocolInfo.v1_2_0) {
+                            this.putUUID(entry.uuid);
+                        }
+                        this.putEntityUniqueId(entry.entityId);
+                        this.putString(entry.name);
+                        if (protocol >= ProtocolInfo.v1_2_13 && protocol <= ProtocolInfo.v1_6_0) {
+                            this.putString("");
+                            this.putVarInt(0);
+                        }
+                        if (protocol < ProtocolInfo.v1_13_0) {
+                            this.putSkin(this.gameVersion, entry.skin);
+                        }
+                        this.putString(entry.xboxUserId);
+                        if (protocol >= ProtocolInfo.v1_2_13) {
+                            this.putString(entry.platformChatId);
+                            if (protocol >= 388) {
+                                this.putLInt(entry.buildPlatform);
+                                this.putSkin(this.gameVersion, entry.skin);
+                                this.putBoolean(entry.isTeacher);
+                                this.putBoolean(entry.isHost);
+                                if (protocol >= ProtocolInfo.v1_20_60) {
+                                    this.putBoolean(entry.isSubClient);
+                                    if (protocol >= ProtocolInfo.v1_21_80) {
+                                        this.putLInt(entry.color.getRGB());
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                if (protocol >= ProtocolInfo.v1_14_60) {
-                    for (Entry entry : this.entries) { // WTF Mojang
-                        this.putBoolean(entry.skin != null && entry.skin.isTrusted());
+                    if (protocol >= ProtocolInfo.v1_14_60) {
+                        for (Entry entry : this.entries) { // WTF Mojang
+                            this.putBoolean(entry.skin != null && entry.skin.isTrusted());
+                        }
                     }
-                }
-                break;
-            case TYPE_REMOVE:
-                for (Entry entry : this.entries) {
-                    if (protocol >= ProtocolInfo.v1_2_13) {
-                        this.putUUID(entry.uuid);
+                    if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_20_60) {
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putBoolean(false); //vipFormatNameData
+                        }
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putBoolean(false); //nameTagNameData
+                        }
+                        for (Entry entry : this.entries) {
+                            this.putByteArray(entry.skin != null ? entry.skin.getBloomData() : new byte[0]);
+                        }
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putLInt(0); //growthLevelData
+                        }
+                        for (int i = 0; i < this.entries.length; i++) {
+                            this.putBoolean(false); //hideUserDataScreenData
+                        }
                     }
-                }
+                    break;
+                case TYPE_REMOVE:
+                    for (Entry entry : this.entries) {
+                        if (protocol >= ProtocolInfo.v1_2_13 || protocol < ProtocolInfo.v1_2_0) {
+                            this.putUUID(entry.uuid);
+                        }
+                    }
+            }
         }
     }
 
@@ -94,7 +139,7 @@ public class PlayerListPacket extends DataPacket {
         public Skin skin;
         public String xboxUserId = "";
         public String platformChatId = "";
-        public int buildPlatform = -1;
+        public int buildPlatform = 1;
         public boolean isTeacher;
         public boolean isHost;
         public boolean isSubClient;

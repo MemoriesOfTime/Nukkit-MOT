@@ -5,6 +5,7 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDispenser;
 import cn.nukkit.dispenser.DispenseBehavior;
 import cn.nukkit.dispenser.DispenseBehaviorRegister;
+import cn.nukkit.event.block.BlockDispenseEvent;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.Item;
@@ -145,18 +146,20 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_SCHEDULED) {
-            this.setTriggered(false);
-            this.level.setBlock(this, this, false, false);
-
             dispense();
             return type;
         }
 
-        if (type == Level.BLOCK_UPDATE_REDSTONE) {
-            if ((level.isBlockPowered(this) || level.isBlockPowered(this.up())) && !isTriggered()) {
+        if (type == Level.BLOCK_UPDATE_NORMAL || type == Level.BLOCK_UPDATE_REDSTONE) {
+            boolean powered = level.isBlockPowered(this) || level.isBlockPowered(this.up());
+
+            if (powered && !isTriggered()) {
                 this.setTriggered(true);
                 this.level.setBlock(this, this, false, false);
                 level.scheduleUpdate(this, this, 4);
+            } else if (!powered && isTriggered()) {
+                this.setTriggered(false);
+                this.level.setBlock(this, this, false, false);
             }
 
             return type;
@@ -203,6 +206,17 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
             return;
         }
 
+        // A dispenser fires with nobody behind it, so land guards never see a break or a place
+        // event for what it does. Ask before the behavior runs: cancelling here consumes nothing
+        // and stays silent, which is exactly how a dispenser with an empty slot behaves.
+        BlockDispenseEvent dispenseEvent =
+                new BlockDispenseEvent(this, facing, this.getSide(facing), original.clone());
+        this.level.getServer().getPluginManager().callEvent(dispenseEvent);
+
+        if (dispenseEvent.isCancelled()) {
+            return;
+        }
+
         pk.evid = LevelEventPacket.EVENT_SOUND_CLICK;
         pk.data = 1000;
 
@@ -215,7 +229,7 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
         Item origin = original;
         original = original.clone();
 
-        DispenseBehavior behavior = DispenseBehaviorRegister.getBehavior(original.getId());
+        DispenseBehavior behavior = DispenseBehaviorRegister.getBehavior(original);
         Item result = behavior.dispense(this, facing, original);
 
         pk.evid = LevelEventPacket.EVENT_SOUND_CLICK;

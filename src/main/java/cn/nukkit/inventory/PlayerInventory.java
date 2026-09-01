@@ -15,9 +15,11 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.ContainerType;
-import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
-import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
+import cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -299,6 +301,10 @@ public class PlayerInventory extends BaseInventory {
             item = ev.getNewItem();
         }
 
+        if (item instanceof cn.nukkit.item.ItemBundle bundle) {
+            ensureUniqueBundleId(index, bundle);
+        }
+
         Item old = this.getItem(index);
         this.slots.put(index, item.clone());
         this.onSlotChange(index, old, send);
@@ -381,12 +387,14 @@ public class PlayerInventory extends BaseInventory {
             if (player.equals(this.getHolder())) {
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     InventoryContentPacket pk2 = new InventoryContentPacket();
-                    pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
+                    int id = InventoryContentPacket.SPECIAL_ARMOR;
+                    pk2.inventoryId = id;
                     pk2.slots = armor;
+                    pk2.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, id);
                     player.dataPacket(pk2);
                 } else {
-                    ContainerSetContentPacketV113 pk2 = new ContainerSetContentPacketV113();
-                    pk2.windowid = ContainerSetContentPacketV113.SPECIAL_ARMOR;
+                    ContainerSetContentPacket_v113 pk2 = new ContainerSetContentPacket_v113();
+                    pk2.windowid = ContainerSetContentPacket_v113.SPECIAL_ARMOR;
                     pk2.eid = player.getId();
                     pk2.slots = armor;
                     player.dataPacket(pk2);
@@ -446,13 +454,15 @@ public class PlayerInventory extends BaseInventory {
             if (player.equals(this.getHolder())) {
                 if (player.protocol >= ProtocolInfo.v1_2_0) {
                     InventorySlotPacket pk2 = new InventorySlotPacket();
-                    pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
+                    int id = InventoryContentPacket.SPECIAL_ARMOR;
+                    pk2.inventoryId = id;
                     pk2.slot = index - this.getSize();
                     pk2.item = this.getItem(index);
+                    pk2.containerNameData = new FullContainerName(ContainerSlotType.ARMOR, id);
                     player.dataPacket(pk2);
                 } else {
-                    ContainerSetSlotPacketV113 pk3 = new ContainerSetSlotPacketV113();
-                    pk3.windowid = ContainerSetContentPacketV113.SPECIAL_ARMOR;
+                    ContainerSetSlotPacket_v113 pk3 = new ContainerSetSlotPacket_v113();
+                    pk3.windowid = ContainerSetContentPacket_v113.SPECIAL_ARMOR;
                     pk3.slot = index - this.getSize();
                     pk3.item = this.getItem(index);
                     player.dataPacket(pk3);
@@ -486,7 +496,7 @@ public class PlayerInventory extends BaseInventory {
         }
 
         if (Server.getInstance().minimumProtocol <= ProtocolInfo.v1_1_0) {
-            ContainerSetContentPacketV113 pk2 = new ContainerSetContentPacketV113();
+            ContainerSetContentPacket_v113 pk2 = new ContainerSetContentPacket_v113();
             pk2.slots = Arrays.copyOf(pk.slots.clone(), pk.slots.length + 9);
             for(int i = this.getSize(); i < this.getSize() + 9; ++i){
                 pk2.slots[i] = new ItemBlock(new BlockAir());
@@ -523,6 +533,7 @@ public class PlayerInventory extends BaseInventory {
                 continue;
             }
             pk.inventoryId = id;
+            pk.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR_AND_INVENTORY, id);
             player.dataPacket(pk.clone());
         }
     }
@@ -546,38 +557,50 @@ public class PlayerInventory extends BaseInventory {
             }
         }
 
+        Item item = this.getItem(index);
+
         InventorySlotPacket pk = new InventorySlotPacket();
         pk.slot = index;
-        pk.item = this.getItem(index).clone();
+        pk.item = item;
 
-        ContainerSetSlotPacketV113 pk2 = new ContainerSetSlotPacketV113();
-        pk2.slot = index;
-        pk2.item = pk.item.clone();
+        ContainerSetSlotPacket_v113 pk2 = null;
 
         for (Player player : players) {
+            int id;
             if (player.equals(this.getHolder())) {
-                pk.inventoryId = ContainerIds.INVENTORY;
-                pk2.windowid = 0;
-                if (player.protocol >= ProtocolInfo.v1_2_0) {
-                    player.dataPacket(pk);
-                } else {
-                    player.dataPacket(pk2);
-                }
+                id = ContainerIds.INVENTORY;
             } else {
-                int id = player.getWindowId(this);
+                id = player.getWindowId(this);
                 if (id == -1) {
                     this.close(player);
                     continue;
                 }
+            }
+
+            if (player.protocol >= ProtocolInfo.v1_2_0) {
                 pk.inventoryId = id;
-                pk2.windowid = id;
-                if (player.protocol >= ProtocolInfo.v1_2_0) {
-                    player.dataPacket(pk.clone());
-                } else {
-                    player.dataPacket(pk2.clone());
+                pk.containerNameData = resolvePlayerSlotContainerName(index, id);
+                player.dataPacket(pk);
+            } else {
+                if (pk2 == null) {
+                    pk2 = new ContainerSetSlotPacket_v113();
+                    pk2.slot = index;
+                    pk2.item = item.clone();
                 }
+                pk2.windowid = id;
+                player.dataPacket(pk2);
             }
         }
+    }
+
+    private FullContainerName resolvePlayerSlotContainerName(int index, int dynamicId) {
+        if (index < 9) {
+            return new FullContainerName(ContainerSlotType.HOTBAR, dynamicId);
+        }
+        if (index < 36) {
+            return new FullContainerName(ContainerSlotType.INVENTORY, dynamicId);
+        }
+        return new FullContainerName(ContainerSlotType.ARMOR, dynamicId);
     }
 
     public void sendCreativeContents() {
@@ -588,8 +611,8 @@ public class PlayerInventory extends BaseInventory {
 
         if (p.protocol < 407) {
             if (p.protocol < ProtocolInfo.v1_2_0) {
-                ContainerSetContentPacketV113 pk = new ContainerSetContentPacketV113();
-                pk.windowid = ContainerSetContentPacketV113.SPECIAL_CREATIVE;
+                ContainerSetContentPacket_v113 pk = new ContainerSetContentPacket_v113();
+                pk.windowid = ContainerSetContentPacket_v113.SPECIAL_CREATIVE;
                 pk.eid = p.getId();
                 if (!p.isSpectator()) {
                     pk.slots = Item.getCreativeItems(p.getGameVersion()).toArray(Item.EMPTY_ARRAY);

@@ -242,7 +242,15 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
     }
 
     private static final IntSet ALLOWED_EFFECTS = new IntOpenHashSet(new int[]{Effect.SPEED, Effect.HASTE, Effect.DAMAGE_RESISTANCE, Effect.JUMP, Effect.STRENGTH, Effect.REGENERATION});
-    private static final IntSet ITEMS = new IntOpenHashSet(new int[]{Item.AIR, ItemID.NETHERITE_INGOT, ItemID.EMERALD, ItemID.DIAMOND, ItemID.GOLD_INGOT, ItemID. IRON_INGOT});
+    private static final IntSet PAYMENT_ITEMS = new IntOpenHashSet(new int[]{ItemID.NETHERITE_INGOT, ItemID.EMERALD, ItemID.DIAMOND, ItemID.GOLD_INGOT, ItemID.IRON_INGOT});
+
+    public static boolean isAllowedEffect(int effectId) {
+        return effectId == 0 || ALLOWED_EFFECTS.contains(effectId);
+    }
+
+    public static boolean isPaymentItem(int itemId) {
+        return PAYMENT_ITEMS.contains(itemId);
+    }
 
     @Override
     public boolean updateCompoundTag(CompoundTag nbt, Player player) {
@@ -262,7 +270,7 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
             }
 
             int material = beaconInventory.useMaterial();
-            if (!ITEMS.contains(material)) {
+            if (!isPaymentItem(material)) {
                 Server.getInstance().getLogger().debug(player.getName() + " tried to set effect but there's no payment in beacon inventory");
                 return false;
             }
@@ -273,14 +281,14 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
         }
 
         int primary = nbt.getInt("primary");
-        if (ALLOWED_EFFECTS.contains(primary)) {
+        if (isAllowedEffect(primary)) {
             this.setPrimaryPower(primary);
         } else {
             Server.getInstance().getLogger().debug(player.getName() + " tried to set an invalid primary effect to a beacon: " + primary);
         }
 
         int secondary = nbt.getInt("secondary");
-        if (ALLOWED_EFFECTS.contains(secondary)) {
+        if (isAllowedEffect(secondary)) {
             this.setSecondaryPower(secondary);
         } else {
             Server.getInstance().getLogger().debug(player.getName() + " tried to set an invalid secondary effect to a beacon: " + secondary);

@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
 import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.custom.EntityDefinition;
@@ -210,6 +211,31 @@ public class AddEntityPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.entityUniqueId);
+            this.putEntityUniqueId(this.entityRuntimeId);
+            this.putUnsignedVarInt(this.type);
+            this.putVector3f(this.x, this.y, this.z);
+            this.putVector3f(this.speedX, this.speedY, this.speedZ);
+            this.putLFloat(this.pitch * (256f / 360f));
+            this.putLFloat(this.yaw * (256f / 360f));
+            this.putUnsignedVarInt(this.attributes.length);
+            for (Attribute attribute : this.attributes) {
+                this.putString(attribute.getName());
+                this.putLFloat(attribute.getMinValue());
+                this.putLFloat(attribute.getValue());
+                this.putLFloat(attribute.getMaxValue());
+            }
+            this.put(Binary.writeMetadata(gameVersion, this.metadata));
+            this.putUnsignedVarInt(this.links.length);
+            for (EntityLink link : links) {
+                this.putEntityUniqueId(link.fromEntityUniquieId);
+                this.putEntityUniqueId(link.toEntityUniquieId);
+                this.putByte(link.type);
+            }
+            return;
+        }
+
         this.putEntityUniqueId(this.entityUniqueId);
         this.putEntityRuntimeId(this.entityRuntimeId);
         if (this.protocol < ProtocolInfo.v1_8_0) {
@@ -312,7 +338,11 @@ public class AddEntityPacket extends DataPacket {
             if (entityDefinition != null) {
                 return entityDefinition.getIdentifier();
             }
-            throw new IllegalStateException("Unknown entity with network id " + this.type + " protocol " + this.protocol);
+            // 无法解析实体标识符：返回安全回退标识符，避免单个未知实体阻塞整个发包批次（issue #800）
+            // Unresolvable entity identifier: return a safe fallback so one bad entity does not break the whole packet batch
+            Server.getInstance().getLogger().warning("Unknown entity network id " + this.type
+                    + " (protocol " + this.protocol + "); falling back to minecraft:item");
+            return "minecraft:item";
         }
         return identifier;
     }

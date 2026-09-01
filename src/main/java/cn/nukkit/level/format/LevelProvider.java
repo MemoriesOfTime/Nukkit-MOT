@@ -10,6 +10,7 @@ import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 
+import javax.annotation.Nullable;
 import java.util.Map;
 
 /**
@@ -42,6 +43,44 @@ public interface LevelProvider {
     BaseFullChunk getChunk(int X, int Z);
 
     BaseFullChunk getChunk(int X, int Z, boolean create);
+
+    /**
+     * 是否支持在非主线程安全读取区块(纯解码,不修改区块缓存)
+     * <p>
+     * Whether chunks can be safely read and decoded off the main thread (pure decode, no cache mutation)
+     */
+    default boolean isOffThreadChunkReadSupported() {
+        return false;
+    }
+
+    /**
+     * 在非主线程读取并解码区块;返回 null 表示磁盘不存在;必须支持并发调用
+     * <p>
+     * Read and decode a chunk off the main thread; null means absent on disk; must be safe for concurrent calls
+     */
+    @Nullable
+    default BaseFullChunk readChunkOffThread(int chunkX, int chunkZ) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * 主线程挂载解码结果:仅当缓存中无此区块时放入;返回 null 表示成功放入,否则返回已存在的区块
+     * <p>
+     * Mount a decoded chunk on the main thread: only inserted if absent; returns null on success, or the existing chunk
+     */
+    @Nullable
+    default BaseFullChunk putChunkIfAbsent(int chunkX, int chunkZ, BaseFullChunk chunk) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * 挂起区块写是否积压(用于卸载削峰:积压时 Level 本 tick 暂停继续卸载脏区块)
+     * <p>
+     * Whether pending chunk writes are backlogged (throttles unloading: Level pauses further dirty-chunk unloads this tick)
+     */
+    default boolean isChunkSaveBacklogged() {
+        return false;
+    }
 
     BaseFullChunk getEmptyChunk(int chunkX, int chunkZ);
 

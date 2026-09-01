@@ -149,7 +149,11 @@ public enum AuthInputAction {
     /**
      * @since v766
      */
-    SNEAK_CURRENT_RAW
+    SNEAK_CURRENT_RAW,
+    /**
+     * @since v2168 1.26.40
+     */
+    INTERNAL_UPDATE
     ;
 
     private static final AuthInputAction[] VALUES = values();

@@ -1,5 +1,6 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.Server;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -49,7 +50,7 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
         this.inventory = new PlayerInventory(this);
         this.offhandInventory = new PlayerOffhandInventory(this);
 
-        if (this.namedTag.contains("Inventory") && this.namedTag.get("Inventory") instanceof ListTag) {
+        if (this.namedTag.get("Inventory") instanceof ListTag) {
             ListTag<CompoundTag> inventoryList = this.namedTag.getList("Inventory", CompoundTag.class);
             for (CompoundTag item : inventoryList.getAll()) {
                 int slot = item.getByte("Slot");
@@ -67,7 +68,7 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
 
         this.enderChestInventory = new PlayerEnderChestInventory(this);
 
-        if (this.namedTag.contains("EnderItems") && this.namedTag.get("EnderItems") instanceof ListTag) {
+        if (this.namedTag.get("EnderItems") instanceof ListTag) {
             ListTag<CompoundTag> inventoryList = this.namedTag.getList("EnderItems", CompoundTag.class);
             for (CompoundTag item : inventoryList.getAll()) {
                 this.enderChestInventory.setItem(item.getByte("Slot"), NBTIO.getItemHelper(item));
@@ -148,7 +149,16 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             return false;
         }
 
-        if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.CUSTOM && source.getCause() != DamageCause.MAGIC && source.getCause() != DamageCause.HUNGER) {
+        boolean vanillaArmor = Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction();
+        if (vanillaArmor) {
+            this.applyCriticalHitModifier(source);
+        }
+
+        // legacy 额外排除 MAGIC(保护附魔不减免魔法);vanilla 保留以对齐基岩版
+        if (source.getCause() != DamageCause.VOID
+                && source.getCause() != DamageCause.CUSTOM
+                && source.getCause() != DamageCause.HUNGER
+                && (vanillaArmor || source.getCause() != DamageCause.MAGIC)) {
             int armorPoints = 0;
             int epf = 0;
 
@@ -157,22 +167,54 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
                 epf += calculateEnchantmentProtectionFactor(armor, source);
             }
 
-            //float originalDamage = source.getDamage();
-            //float r = (source.getDamage(EntityDamageEvent.DamageModifier.ARMOR) - (originalDamage - originalDamage * (1 - Math.max(armorPoints / 5, armorPoints - originalDamage / 2) / 25)));
-            //originalDamage += r;
-            //epf = Math.min(20, epf);
-            //source.setDamage(r, EntityDamageEvent.DamageModifier.ARMOR);
-            //source.setDamage(source.getDamage(EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS) - (originalDamage - originalDamage * (1 - epf / 25f)), EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
+            if (vanillaArmor) {
+                int toughness = 0;
+                for (Item armor : inventory.getArmorContents()) {
+                    toughness += armor.getToughness();
+                }
 
-            if (source.canBeReducedByArmor()) {
-                source.setDamage(-source.getFinalDamage() * armorPoints * 0.04f, EntityDamageEvent.DamageModifier.ARMOR);
+                int breach = 0;
+                if (source instanceof EntityDamageByEntityEvent damageByEntityEvent) {
+                    Enchantment[] enchantments = damageByEntityEvent.getWeaponEnchantments();
+                    if (enchantments != null) {
+                        for (Enchantment enchantment : enchantments) {
+                            if (enchantment.getId() == Enchantment.ID_BREACH) {
+                                breach = enchantment.getLevel();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // RESISTANCE 在 ctor 按 BASE 预算,原版却在护甲后生效,故护甲输入需排除它,之后再重算
+                if (source.canBeReducedByArmor()) {
+                    float preArmorDamage = getDamageBeforeTargetReductions(source);
+                    float armorFraction = calculateArmorReductionFraction(preArmorDamage, armorPoints, toughness, breach);
+                    source.setDamage(-preArmorDamage * armorFraction, EntityDamageEvent.DamageModifier.ARMOR);
+                }
+
+                float preEnchantmentDamage = source.getFinalDamage() - source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE);
+                source.setDamage(-preEnchantmentDamage * (Math.min(epf, 20) / 25f),
+                        EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
+
+                this.recalculateResistanceDamage(source);
+            } else {
+                // legacy: 线性公式,忽略韧性/破甲/抗性重算,EPF 含 50%~100% 随机系数
+                if (source.canBeReducedByArmor()) {
+                    source.setDamage(-source.getFinalDamage() * armorPoints * 0.04f, EntityDamageEvent.DamageModifier.ARMOR);
+                }
+
+                source.setDamage(-source.getFinalDamage() * Math.min(NukkitMath.ceilFloat(Math.min(epf, 25) * ((float) Utils.random.nextInt(50, 100) / 100)), 20) * 0.04f,
+                        EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
             }
-
-            source.setDamage(-source.getFinalDamage() * Math.min(NukkitMath.ceilFloat(Math.min(epf, 25) * ((float) Utils.random.nextInt(50, 100) / 100)), 20) * 0.04f,
-                    EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
         }
 
         source.setDamage(-Math.min(this.getAbsorption(), source.getFinalDamage()), EntityDamageEvent.DamageModifier.ABSORPTION);
+
+        // legacy: 暴击须在 ABSORPTION 之后设置(严格复刻 5306387d1^ 之前 Entity.attack 的 CRITICAL 顺序)
+        if (!vanillaArmor) {
+            this.applyCriticalHitModifier(source);
+        }
 
         if (super.attack(source)) {
             Entity damager = null;
@@ -249,6 +291,26 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
         }
 
         return epf ;
+    }
+
+    /**
+     * 计算护甲减免比例(基岩版 1.18.30+ 公式),破甲每级降低 15%,护甲/韧性按属性上限截断。
+     * <p>
+     * Computes armor reduction fraction (Bedrock 1.18.30+ formula); Breach reduces 15% per level, armor/toughness are capped by attributes.
+     * 参考 / See: <a href="https://minecraft.wiki/w/Armor#Damage_reduction">Minecraft Wiki - Armor</a>
+     */
+    protected static float calculateArmorReductionFraction(float damage, int armorPoints, int toughness, int breach) {
+        armorPoints = NukkitMath.clamp(armorPoints, 0, 30);
+        toughness = NukkitMath.clamp(toughness, 0, 20);
+        float armorFraction = NukkitMath.clamp(
+                armorPoints - damage / (2f + toughness / 4f),
+                armorPoints * 0.2f, // 有效护甲下界 / effective armor floor
+                20
+        ) / 25f;
+        if (breach > 0) {
+            armorFraction = Math.max(armorFraction - breach * 0.15f, 0);
+        }
+        return armorFraction;
     }
 
     @Override

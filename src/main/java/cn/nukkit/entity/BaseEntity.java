@@ -488,6 +488,17 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     /**
+     * 判断手持该物品与本实体交互是否会触发繁殖（进入求爱期）。
+     * 仅回答物品是否匹配，幼年、求爱冷却等前置状态由调用方自行判断。
+     * <p>
+     * Whether interacting with this entity using the given item starts breeding (love mode).
+     * Only answers the item match; preconditions like baby or love cooldown are up to the caller.
+     */
+    public boolean isBreedingItem(Item item) {
+        return false;
+    }
+
+    /**
      * Check if the entity can swim in the block
      *
      * @param block block id
@@ -778,7 +789,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
      * @return 是否满足
      */
     public boolean isMeetAttackConditions(Vector3 target) {
-        return this.getServer().getMobAiEnabled() && target instanceof Entity;
+        return target instanceof Entity && this.getServer().getMobAiEnabled();
     }
 
     /**
@@ -795,6 +806,31 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             }
         }
         return null;
+    }
+
+    /**
+     * Max body yaw change per tick. Clients render yaw exactly as sent, so instant snaps
+     * to a new wander point or path node read as jitter.
+     */
+    private static final double MAX_BODY_TURN_PER_TICK = 30.0D;
+
+    /**
+     * Turns the body towards the given yaw, clamped to {@link #MAX_BODY_TURN_PER_TICK} per tick.
+     */
+    protected void turnBodyTowards(double yaw) {
+        double delta = yaw - this.yaw;
+        while (delta < -180.0D) {
+            delta += 360.0D;
+        }
+        while (delta > 180.0D) {
+            delta -= 360.0D;
+        }
+        if (delta > MAX_BODY_TURN_PER_TICK) {
+            delta = MAX_BODY_TURN_PER_TICK;
+        } else if (delta < -MAX_BODY_TURN_PER_TICK) {
+            delta = -MAX_BODY_TURN_PER_TICK;
+        }
+        this.setBothYaw(this.yaw + delta);
     }
 
     protected boolean isInTickingRange() {

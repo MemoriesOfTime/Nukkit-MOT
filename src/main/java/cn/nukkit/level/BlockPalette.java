@@ -213,25 +213,6 @@ public class BlockPalette {
         int stateHash = Hash.hashBlock(blockState);
         this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
-
-        // Hack: Map IDs for item frame up & down states
-        if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
-            if (data == 7) {
-                int offset = 5;
-
-                runtimeId = runtimeId + offset;
-                legacyId = blockId << Block.DATA_BITS | 5; // Up
-                this.legacyToRuntimeId.put(legacyId, runtimeId);
-                this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-
-                int offset2 = 0;
-
-                runtimeId = runtimeId + offset + offset2;
-                legacyId = blockId << Block.DATA_BITS | 4; // Down
-                this.legacyToRuntimeId.put(legacyId, runtimeId);
-                this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-            }
-        }
     }
 
     public void lock() {
@@ -369,7 +350,7 @@ public class BlockPalette {
     }
 
     private void logMissingRuntimeIdMapping(String message, Object... args) {
-        if (this.gameVersion == GameVersion.getLastVersion() || this.gameVersion == GameVersion.V1_21_93_NETEASE) {
+        if (this.gameVersion == GameVersion.getLastVersion() || this.gameVersion == GameVersion.getLastNetEaseVersion()) {
             log.info(message, args);
             return;
         }

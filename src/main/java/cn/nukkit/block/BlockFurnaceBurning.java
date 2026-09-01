@@ -117,7 +117,7 @@ public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, Blo
         if (player != null) {
             BlockEntityFurnace furnace = this.getOrCreateBlockEntity();
 
-            if (furnace.namedTag.contains("Lock") && furnace.namedTag.get("Lock") instanceof StringTag) {
+            if (furnace.namedTag.get("Lock") instanceof StringTag) {
                 if (!furnace.namedTag.getString("Lock").equals(item.getCustomName())) {
                     return true;
                 }

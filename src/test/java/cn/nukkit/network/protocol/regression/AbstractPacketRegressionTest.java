@@ -2,6 +2,7 @@ package cn.nukkit.network.protocol.regression;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import io.netty.buffer.ByteBuf;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
@@ -122,7 +123,7 @@ public abstract class AbstractPacketRegressionTest {
         nukkitPacket.setBuffer(buffer);
         // Skip the packet ID header (same as what the server does when receiving)
         if (protocolVersion <= 274) {
-            if (protocolVersion >= 113) { // v1_2_0
+            if (protocolVersion >= ProtocolInfo.v1_2_0) {
                 nukkitPacket.getByte();
                 nukkitPacket.getShort();
             } else {

@@ -123,6 +123,10 @@ public enum TextFormat {
      */
     MATERIAL_RESIN('v', 0x27),
     /**
+     * Represents party blue.
+     */
+    PARTY_BLUE('w', 0x28),
+    /**
      * Makes the text obfuscated.
      */
     OBFUSCATED('k', 0x10, true),
@@ -157,7 +161,7 @@ public enum TextFormat {
      */
     public static final char ESCAPE = '\u00A7';
 
-    private static final Pattern CLEAN_PATTERN = Pattern.compile("(?i)" + ESCAPE + "[0-9A-V]");
+    private static final Pattern CLEAN_PATTERN = Pattern.compile("(?i)" + ESCAPE + "[0-9A-W]");
     private final static Map<Integer, TextFormat> BY_ID = Maps.newTreeMap();
     private final static Map<Character, TextFormat> BY_CHAR = new HashMap<>();
 
@@ -238,6 +242,64 @@ public enum TextFormat {
             return clean(result, true);
         }
         return result;
+    }
+
+    /**
+     * 按 code point 数截断字符串（对应 protocol-docs / JSON Schema 的 maxLength 字符语义），
+     * 格式化码对（{@code §X}）作为原子单元，不会在边界留下孤立的 {@code §}。
+     * <p>
+     * Truncates the string to at most {@code maxChars} code points (matching protocol-docs /
+     * JSON-Schema maxLength character semantics), treating a {@code §X} format pair as atomic so the
+     * result never ends on a dangling {@code §}.
+     */
+    public static String clamp(String input, int maxChars) {
+        if (input == null) {
+            return null;
+        }
+        if (maxChars <= 0) {
+            return "";
+        }
+        int len = input.length();
+        // Fast path: char count ≤ maxChars ⇒ code point count ≤ maxChars (a surrogate pair counts 2 chars, 1 cp).
+        if (len <= maxChars) {
+            return stripTrailingLoneEscape(input);
+        }
+
+        StringBuilder out = new StringBuilder(maxChars + 2);
+        int cps = 0;
+        for (int i = 0; i < len; ) {
+            char c = input.charAt(i);
+            int step;
+            int unitCps;
+            if (c == ESCAPE && i < len - 1) {
+                // § + next char is atomic: kept or dropped together, never split.
+                // § + 下一字符为原子单元：整体保留或丢弃，绝不拆分。
+                // It still counts as 2 code points toward the limit (§ and X are both real cps).
+                step = 2;
+                unitCps = 2;
+            } else if (Character.isHighSurrogate(c) && i < len - 1 && Character.isLowSurrogate(input.charAt(i + 1))) {
+                step = 2; // One supplementary code point.
+                unitCps = 1;
+            } else {
+                step = 1;
+                unitCps = 1;
+            }
+            if (cps + unitCps > maxChars) {
+                break; // Next unit would exceed the code-point budget.
+            }
+            out.append(input, i, i + step);
+            cps += unitCps;
+            i += step;
+        }
+        // Drop a lone trailing § so the result never ends on a dangling format-code prefix.
+        return stripTrailingLoneEscape(out.toString());
+    }
+
+    private static String stripTrailingLoneEscape(String s) {
+        if (s.isEmpty() || s.charAt(s.length() - 1) != ESCAPE) {
+            return s;
+        }
+        return s.substring(0, s.length() - 1);
     }
 
     /**

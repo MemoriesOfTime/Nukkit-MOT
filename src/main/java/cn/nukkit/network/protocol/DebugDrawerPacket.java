@@ -94,6 +94,30 @@ public class DebugDrawerPacket extends DataPacket {
                         this.putBoolean(text.isShowTextBackface());
                     }
                     break;
+                case CYLINDER:
+                    DebugCylinder cylinder = (DebugCylinder) shape;
+                    this.putVector2f(cylinder.getRadiusX());
+                    this.putVector2f(cylinder.getRadiusZ());
+                    this.putLFloat(cylinder.getHeight());
+                    this.putByte((byte) cylinder.getSegments());
+                    break;
+                case PYRAMID:
+                    DebugPyramid pyramid = (DebugPyramid) shape;
+                    this.putLFloat(pyramid.getWidth());
+                    this.putOptionalNull(pyramid.getDepth(), this::putLFloat);
+                    this.putLFloat(pyramid.getHeight());
+                    break;
+                case ELLIPSOID:
+                    DebugEllipsoid ellipsoid = (DebugEllipsoid) shape;
+                    this.putVector3f(ellipsoid.getRadii());
+                    this.putByte((byte) ellipsoid.getSegments());
+                    break;
+                case CONE:
+                    DebugCone cone = (DebugCone) shape;
+                    this.putVector2f(cone.getRadii());
+                    this.putLFloat(cone.getHeight());
+                    this.putByte((byte) cone.getSegments());
+                    break;
             }
         }
     }
@@ -173,7 +197,10 @@ public class DebugDrawerPacket extends DataPacket {
             case BOX -> 3;
             case LINE -> 4;
             case SPHERE, CIRCLE -> 5;
-            default -> throw new IllegalStateException("Unknown debug shape type");
+            case CYLINDER -> 6;
+            case PYRAMID -> 7;
+            case ELLIPSOID -> 8;
+            case CONE -> 9;
         };
     }
 

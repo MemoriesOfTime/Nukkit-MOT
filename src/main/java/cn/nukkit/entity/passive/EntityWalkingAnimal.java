@@ -99,7 +99,7 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         if (!this.isInLove() && creature instanceof Player player) {
-            return player.isAlive() && !player.closed && this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 49;
+            return player.isAlive() && !player.closed && distance <= 49 && this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast());
         }
         return super.targetOption(creature, distance);
     }
@@ -111,6 +111,12 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
                 && entity.canBeFollowed();
     }
 
+    /**
+     * 判断玩家手持该物品时本实体是否会被吸引跟随（诱饵语义，与 {@link #isBreedingItem} 不是同一概念）。
+     * <p>
+     * Whether this entity follows a player holding the item (lure semantics; a different notion
+     * from {@link #isBreedingItem}).
+     */
     public boolean isFeedItem(Item item) {
         return false;
     }

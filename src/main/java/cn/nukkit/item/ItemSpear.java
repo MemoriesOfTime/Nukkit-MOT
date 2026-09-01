@@ -99,8 +99,15 @@ public abstract class ItemSpear extends StringItemToolBase {
         modifiers.put(EntityDamageEvent.DamageModifier.BASE, damage);
 
         Enchantment[] enchantments = this.getEnchantments();
+
+        float knockBack = 0.3f;
+        Enchantment knockBackEnchantment = this.getEnchantment(Enchantment.ID_KNOCKBACK);
+        if (knockBackEnchantment != null) {
+            knockBack += knockBackEnchantment.getLevel() * 0.1f;
+        }
+
         EntityDamageByEntityEvent event = new EntityDamageByEntityEvent(player, target,
-                EntityDamageEvent.DamageCause.ENTITY_ATTACK, modifiers, 0.3f, enchantments);
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK, modifiers, knockBack, enchantments);
         if (!this.prepareStabAttack(player, target, event)) {
             return false;
         }

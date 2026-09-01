@@ -8,7 +8,6 @@ import org.jose4j.jwt.JwtClaims;
 import org.jose4j.jwt.consumer.JwtContext;
 import org.jose4j.lang.JoseException;
 
-import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
@@ -18,6 +17,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import static cn.nukkit.network.encryption.JsonUtils.childAsType;
+import static cn.nukkit.network.encryption.JsonUtils.childAsTypeOrDefault;
 
 @Log4j2
 public final class ChainValidationResult {
@@ -72,7 +72,9 @@ public final class ChainValidationResult {
 
         String displayName = childAsType(extraData, "displayName", String.class);
         String identityString = childAsType(extraData, "identity", String.class);
-        String xuid = childAsType(extraData, "XUID", String.class);
+        // XUID is only present for Xbox-authenticated clients; legacy (e.g. v1.1.0) and offline
+        // clients omit it, so treat it as optional instead of failing the whole login.
+        String xuid = childAsTypeOrDefault(extraData, "XUID", String.class, null);
         Object titleId = extraData.get("titleId");
 
         UUID identity;
@@ -120,7 +122,7 @@ public final class ChainValidationResult {
         String displayName = claims.getClaimValueAsString("xname");
         String xuid = claims.getClaimValueAsString("xid");
         String minecraftId = claims.getClaimValueAsString("mid");
-        UUID identity = UUID.nameUUIDFromBytes(("pocket-auth-1-xuid:" + xuid).getBytes(StandardCharsets.UTF_8));
+        UUID identity = EncryptionUtils.deriveIdentity(xuid, minecraftId, displayName);
 
         return new IdentityClaims(
                 new IdentityData(displayName, identity, xuid, null, minecraftId,

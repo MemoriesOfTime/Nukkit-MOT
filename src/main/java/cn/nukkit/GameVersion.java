@@ -39,8 +39,8 @@ public enum GameVersion {
     V1_16_100_51(410, false, "1.16.100.51"),
     V1_16_100_52(411, false, "1.16.100.52"),
     V1_16_100(419, false, "1.16.100"),
-    V1_16_200(422, false, "1.16.200"),
     V1_16_200_51(420, false, "1.16.200.51"),
+    V1_16_200(422, false, "1.16.200"),
     V1_16_210_50(423, false, "1.16.210.50"),
     V1_16_210_53(424, false, "1.16.210.53"),
     V1_16_210(428, false, "1.16.210"),
@@ -99,7 +99,7 @@ public enum GameVersion {
     V1_21_93(819, false, "1.21.93"),
     V1_21_100(827, false, "1.21.100"),
     V1_21_110_26(843, false, "1.21.110"),
-    V1_21_110(844, false, "1.21.110"),
+    V1_21_111(844, false, "1.21.111"),
     V1_21_120(859, false, "1.21.120"),
     V1_21_124(860, false, "1.21.124"),
     V1_21_130_28(897, false, "1.21.130_28"),
@@ -108,15 +108,21 @@ public enum GameVersion {
     V1_26_10(944, false, "1.26.10"),
     V1_26_20_26(974, false, "1.26.20"),
     V1_26_20(975, false, "1.26.20"),
+    V1_26_30(1001, false, "1.26.30"),
+    V1_26_40(2168, false, "1.26.40"),
+    V1_26_44(2168, false, "1.26.44"), // 与 V1_26_40 同 wire 协议号（未提升，仅 SetScore 不同）；不进 BY_PROTOCOL，仅直接引用/byName 可达
+    V1_26_45(2169, false, "1.26.45"),
 
     V1_20_50_NETEASE(630, true, "1.20.50_NetEase"),
     V1_21_2_NETEASE(686, true, "1.21.2_NetEase"),
     V1_21_50_NETEASE(766, true, "1.21.50_NetEase"),
     V1_21_93_NETEASE(819, true, "1.21.93_NetEase"),
+    V1_21_124_NETEASE(860, true, "1.21.124_NetEase"),
     ;
 
     private static GameVersion FEATURE_VERSION = GameVersion.V1_26_10;
-    private static final GameVersion LAST_VERSION = GameVersion.V1_26_20; //TODO MultiVersion
+    private static final GameVersion LAST_VERSION = GameVersion.V1_26_45; //TODO MultiVersion
+    private static final GameVersion LAST_NETEASE_VERSION = GameVersion.V1_21_124_NETEASE; //TODO MultiVersion
 
     private final int protocol;
     private final boolean isNetEase;
@@ -179,7 +185,12 @@ public enum GameVersion {
                     mapping[i] = previous;
                 }
             }
-            previous = version;
+            // 同协议号条目（如 V1_26_44 与 V1_26_40 同为 2168）不推进 previous，
+            // 不参与 BY_PROTOCOL 填充与后续 gap 回填
+            // Duplicate-protocol entries never advance previous and stay out of BY_PROTOCOL
+            if (previous == null || version.protocol > previous.protocol) {
+                previous = version;
+            }
         }
 
         if (previous != null) {
@@ -230,5 +241,9 @@ public enum GameVersion {
 
     public static GameVersion getLastVersion() {
         return LAST_VERSION;
+    }
+
+    public static GameVersion getLastNetEaseVersion() {
+        return LAST_NETEASE_VERSION;
     }
 }

@@ -9,6 +9,7 @@ import cn.nukkit.utils.Utils;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -45,7 +46,11 @@ public class JavaPluginLoader implements PluginLoader {
             }
 
             String className = description.getMain();
-            PluginClassLoader classLoader = new PluginClassLoader(this, this.getClass().getClassLoader(), file);
+            // 解析 plugin.yml 的 libraries（含传递依赖）注入该插件自己的 ClassLoader。
+            URL[] libUrls = description.getLibraries().isEmpty()
+                    ? new URL[0]
+                    : LibraryLoader.resolve(description.getLibraries(), description.getRepositories(), this.server.getLogger());
+            PluginClassLoader classLoader = new PluginClassLoader(this, this.getClass().getClassLoader(), file, libUrls);
             this.classLoaders.put(description.getName(), classLoader);
             PluginBase plugin;
             try {

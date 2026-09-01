@@ -131,9 +131,6 @@ public class Utils {
         if (content == null) {
             throw new IllegalArgumentException("content must not be null");
         }
-        if (!file.exists()) {
-            file.createNewFile();
-        }
         try (FileOutputStream stream = new FileOutputStream(file)) {
             byte[] buffer = new byte[1024];
             int length;
@@ -530,13 +527,17 @@ public class Utils {
             case ProtocolInfo.v1_21_90 -> "1.21.90";
             case ProtocolInfo.v1_21_93 -> "1.21.93";
             case ProtocolInfo.v1_21_100 -> "1.21.100";
-            case ProtocolInfo.v1_21_110_26, ProtocolInfo.v1_21_110 -> "1.21.110";
+            case ProtocolInfo.v1_21_110_26 -> "1.21.110";
+            case ProtocolInfo.v1_21_111 -> "1.21.111";
             case ProtocolInfo.v1_21_120 -> "1.21.120";
             case ProtocolInfo.v1_21_124 -> "1.21.124";
             case ProtocolInfo.v1_21_130_28, ProtocolInfo.v1_21_130 -> "1.21.130";
             case ProtocolInfo.v1_26_0 -> "1.26.0";
             case ProtocolInfo.v1_26_10 -> "1.26.10";
             case ProtocolInfo.v1_26_20_26, ProtocolInfo.v1_26_20 -> "1.26.20";
+            case ProtocolInfo.v1_26_30 -> "1.26.30";
+            case ProtocolInfo.v1_26_40 -> "1.26.40";
+            case ProtocolInfo.v1_26_45 -> "1.26.45";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };

@@ -10,6 +10,7 @@ import java.util.List;
 public class SubChunkRequestPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.SUB_CHUNK_REQUEST_PACKET;
+    private static final int MAX_POSITION_OFFSETS_V1_26_30 = 8192;
 
     public int dimension;
     public BlockVector3 subChunkPosition;
@@ -28,11 +29,22 @@ public class SubChunkRequestPacket extends DataPacket {
     @Override
     public void decode() {
         this.dimension = this.getVarInt();
-        this.subChunkPosition = this.getSignedBlockPosition();
-        if (this.protocol >= ProtocolInfo.v1_18_10) {
-            int count = this.getLInt();
+        if (this.protocol >= ProtocolInfo.v1_26_30) {
+            int count = (int) this.getUnsignedVarInt();
+            if (count > MAX_POSITION_OFFSETS_V1_26_30) {
+                throw new IllegalArgumentException("Too many sub chunk position offsets: " + count);
+            }
             for (int i = 0; i < count; i++) {
-                this.positionOffsets.add(new BlockVector3(this.getByte(), this.getByte(), this.getByte()));
+                this.positionOffsets.add(new BlockVector3((byte) this.getByte(), (byte) this.getByte(), (byte) this.getByte()));
+            }
+            this.subChunkPosition = new BlockVector3(this.getLInt(), this.getLInt(), this.getLInt());
+        } else {
+            this.subChunkPosition = this.getSignedBlockPosition();
+            if (this.protocol >= ProtocolInfo.v1_18_10) {
+                int count = this.getLInt();
+                for (int i = 0; i < count; i++) {
+                    this.positionOffsets.add(new BlockVector3((byte) this.getByte(), (byte) this.getByte(), (byte) this.getByte()));
+                }
             }
         }
     }

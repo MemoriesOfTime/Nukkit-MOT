@@ -90,6 +90,7 @@ public class ItemPotion extends Item {
             potion.setSplash(false);
             potion.applyPotion(player);
         }
+        player.getLevel().getVibrationManager().callVibrationEvent(new cn.nukkit.level.vibration.VibrationEvent(player, player.add(0, player.getEyeHeight()), cn.nukkit.level.vibration.VibrationType.DRINK));
         return true;
     }
 

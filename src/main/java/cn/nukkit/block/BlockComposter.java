@@ -133,8 +133,10 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
             return false;
         }
 
-        if (player != null &&!player.isCreative()) {
-            item.setCount(item.getCount() - 1);
+        if (player != null) {
+            if (player.isSurvival()) {
+                item.setCount(item.getCount() - 1);
+            }
         }
 
         if (event.isSuccess()) {

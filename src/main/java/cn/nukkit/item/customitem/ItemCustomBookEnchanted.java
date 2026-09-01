@@ -20,6 +20,11 @@ public abstract class ItemCustomBookEnchanted extends ItemBookEnchanted implemen
     }
 
     @Override
+    public boolean canBePutInOffhandSlot() {
+        return CustomItem.isAllowedInOffHand(this);
+    }
+
+    @Override
     public String getNamespaceId() {
         return id;
     }

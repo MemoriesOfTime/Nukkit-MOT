@@ -150,7 +150,7 @@ public class BlockLadder extends BlockTransparentMeta implements Faceable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (!this.getSide(BlockFace.fromIndex(faces[this.getDamage()])).isSolid()) {
+            if (!this.getSide(BlockFace.fromIndex(faces[this.getDamage() >= faces.length ? 0 : this.getDamage()])).isSolid()) {
                 this.getLevel().useBreakOn(this);
                 return Level.BLOCK_UPDATE_NORMAL;
             }

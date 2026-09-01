@@ -13,6 +13,8 @@ public abstract class AbstractResourcePack implements ResourcePack {
 
     private int protocol = 0;
     private SupportType supportType = SupportType.UNIVERSAL;
+    private String cdnUrl = "";
+    protected String encryptionKey = "";
 
     protected boolean verifyManifest() {
         if (this.manifest.has("format_version") && this.manifest.has("header") && this.manifest.has("modules")) {
@@ -69,6 +71,26 @@ public abstract class AbstractResourcePack implements ResourcePack {
     @Override
     public SupportType getSupportType() {
         return this.supportType;
+    }
+
+    @Override
+    public String getCDNUrl() {
+        return this.cdnUrl;
+    }
+
+    @Override
+    public void setCDNUrl(String cdnUrl) {
+        this.cdnUrl = cdnUrl != null ? cdnUrl : "";
+    }
+
+    @Override
+    public String getEncryptionKey() {
+        return this.encryptionKey;
+    }
+
+    @Override
+    public void setEncryptionKey(String key) {
+        this.encryptionKey = key != null ? key : "";
     }
 
     @Override

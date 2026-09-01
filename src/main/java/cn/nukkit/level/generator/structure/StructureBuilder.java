@@ -79,7 +79,7 @@ public class StructureBuilder {
     public void setBlockDownward(final BlockVector3 pos, final int id, final int meta) {
         final BlockVector3 vec = translate(pos);
         int y = vec.y;
-        while (!Block.solid[level.getBlockIdAt(vec.x, y, vec.z)] && y > 1) {
+        while (y > 1 && !Block.isBlockSolidById(level.getBlockIdAt(vec.x, y, vec.z))) {
             level.setBlockAt(vec.x, y, vec.z, id, meta);
             y--;
         }
