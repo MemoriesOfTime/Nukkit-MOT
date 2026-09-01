@@ -21,6 +21,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -271,11 +272,12 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
 
     // ==================== RecordStartedPacket（新包 352，S→C） ====================
 
-    @Test
-    void recordStartedPacketRoundTrip() {
+    @ParameterizedTest(name = "RecordStartedPacket v{0}")
+    @ValueSource(ints = {V2192})
+    void recordStartedPacketRoundTrip(int protocol) {
         RecordStartedPacket nk = new RecordStartedPacket();
-        nk.protocol = V2192;
-        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.protocol = protocol;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(protocol, false);
         nk.blockPos = new BlockVector3(10, 64, -20);
         nk.serverSoundHandle = 0x1122334455667788L;
 
@@ -288,8 +290,9 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
 
     // ==================== SetPlayerFurnaceOptionsPacket（新包 351，C→S） ====================
 
-    @Test
-    void setPlayerFurnaceOptionsDecode() {
+    @ParameterizedTest(name = "SetPlayerFurnaceOptionsPacket v{0}")
+    @ValueSource(ints = {V2192})
+    void setPlayerFurnaceOptionsDecode(int protocol) {
         var cb = new org.cloudburstmc.protocol.bedrock.packet.SetPlayerFurnaceOptionsPacket();
         cb.setType(org.cloudburstmc.protocol.bedrock.packet.SetPlayerFurnaceOptionsPacket.FurnaceType.BLAST_FURNACE);
         cb.setOptions(new org.cloudburstmc.protocol.bedrock.data.FurnaceOptions(
@@ -297,11 +300,122 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
                 true,
                 org.cloudburstmc.protocol.bedrock.data.FurnaceOptions.FurnaceLayout.INVENTORY_ONLY));
 
-        SetPlayerFurnaceOptionsPacket nk = crossEncode(cb, SetPlayerFurnaceOptionsPacket::new, V2192);
+        SetPlayerFurnaceOptionsPacket nk = crossEncode(cb, SetPlayerFurnaceOptionsPacket::new, protocol);
 
         assertEquals(SetPlayerFurnaceOptionsPacket.FurnaceType.BLAST_FURNACE, nk.type);
         assertEquals(SetPlayerFurnaceOptionsPacket.FurnaceLeftTabIndex.RECIPE_FOOD, nk.leftTabIndex);
         assertTrue(nk.filtering);
         assertEquals(SetPlayerFurnaceOptionsPacket.FurnaceLayout.INVENTORY_ONLY, nk.layout);
+    }
+
+    // ==================== v2192 尾部追加字段的其余包 ====================
+
+    @Test
+    void cameraPresetsV2192TrailingFields() {
+        var nk = new cn.nukkit.network.protocol.CameraPresetsPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        var preset = new cn.nukkit.network.protocol.types.camera.CameraPreset();
+        preset.setIdentifier("minecraft:free");
+        preset.setParentPreset("");
+        preset.setApplyInheritedStartingRotation(true);
+        preset.setStartingRotation(new cn.nukkit.math.Vector2f(30f, 60f));
+        nk.getPresets().add(preset);
+        nk.encode();
+
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.CameraPresetsPacket.class);
+
+        var cbPreset = cb.getPresets().get(0);
+        assertEquals("minecraft:free", cbPreset.getIdentifier());
+        assertTrue(cbPreset.isApplyInheritedStartingRotation());
+        assertEquals(30f, cbPreset.getStartingRotation().getX());
+        assertEquals(60f, cbPreset.getStartingRotation().getY());
+    }
+
+    @Test
+    void dimensionDataV2192DefaultBiome() {
+        var nk = new cn.nukkit.network.protocol.DimensionDataPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.definitions.add(new cn.nukkit.network.protocol.types.DimensionDefinition(
+                "minecraft:test_dim", 320, -64, 1, 0, new java.util.UUID(0, 0), "minecraft:plains"));
+        nk.encode();
+
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.DimensionDataPacket.class);
+
+        var def = cb.getDefinitions().get(0);
+        assertEquals("minecraft:test_dim", def.getId());
+        assertEquals("minecraft:plains", def.getDefaultBiome());
+    }
+
+    @Test
+    void attributeLayerSyncV2192NoiseAlignment() {
+        var nk = new cn.nukkit.network.protocol.ClientboundAttributeLayerSyncPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        var env = new cn.nukkit.network.protocol.types.attributelayer.EnvironmentAttributeData(
+                "fog_density", null,
+                new cn.nukkit.network.protocol.types.attributelayer.FloatAttributeData(
+                        0.5f, cn.nukkit.network.protocol.types.attributelayer.FloatAttributeData.Operation.OVERRIDE, null, null),
+                null, 10, 20,
+                cn.nukkit.network.protocol.types.attributelayer.EnvironmentAttributeData.CameraEase.LINEAR, 5, false);
+        env.noiseAlignment = new cn.nukkit.network.protocol.types.attributelayer.EnvironmentAttributeData.NoiseAlignment(
+                cn.nukkit.network.protocol.types.attributelayer.EnvironmentAttributeData.NoiseAlignment.Type.MIN_LOCAL_TRANSITION_END, 7);
+        nk.data = new cn.nukkit.network.protocol.types.attributelayer.UpdateEnvironmentAttributesData(
+                "test_layer", 0, List.of(env));
+        nk.encode();
+
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.ClientboundAttributeLayerSyncPacket.class);
+
+        var payload = assertInstanceOf(
+                org.cloudburstmc.protocol.bedrock.data.attributelayer.UpdateEnvironmentAttributesData.class, cb.getData());
+        var attr = payload.getAttributes().get(0);
+        assertEquals("fog_density", attr.getAttributeName());
+        var na = attr.getNoiseAlignment();
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.attributelayer.NoiseAlignment.Type.MIN_LOCAL_TRANSITION_END, na.getType());
+        assertEquals(7, na.getValue());
+    }
+
+    @Test
+    void debugDrawerV2192LineGapHeight() {
+        var nk = new cn.nukkit.network.protocol.DebugDrawerPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.shapes.add(new cn.nukkit.network.protocol.types.debugshape.DebugText(
+                1L, 0, null, null, null, null, null, null, "hello", true, java.awt.Color.RED, 1.5f, true, false, true));
+        nk.encode();
+
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.DebugDrawerPacket.class);
+
+        var text = assertInstanceOf(org.cloudburstmc.protocol.bedrock.data.debugshape.DebugText.class, cb.getShapes().get(0));
+        assertEquals("hello", text.getText());
+        assertTrue(text.isUseRotation());
+        assertEquals(1.5f, text.getLineGapHeight());
+        assertTrue(text.isDepthTest());
+        assertFalse(text.isShowBackface());
+        assertTrue(text.isShowTextBackface());
+    }
+
+    @Test
+    void serverboundDiagnosticsV2192TrailingFields() {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerboundDiagnosticsPacket();
+        cb.setAvgFps(60f);
+        cb.getEntityDiagnostics().add(new org.cloudburstmc.protocol.bedrock.data.diagnostics.EntityDiagnosticTimingInfo(
+                "pig", "minecraft:pig", 123L, (byte) 50,
+                org.cloudburstmc.math.vector.Vector3f.from(1f, 2f, 3f), "minecraft:overworld"));
+
+        cn.nukkit.network.protocol.ServerboundDiagnosticsPacket nk = crossEncode(cb, cn.nukkit.network.protocol.ServerboundDiagnosticsPacket::new, V2192);
+
+        assertEquals(60f, nk.avgFps);
+        assertEquals(1, nk.entityDiagnostics.size());
+        var info = nk.entityDiagnostics.get(0);
+        assertEquals("pig", info.displayName);
+        assertEquals("minecraft:pig", info.entity);
+        assertEquals(123L, info.timeInNs);
+        assertEquals((byte) 50, info.percentOfTotal);
+        assertEquals(1f, info.position.x);
+        assertEquals(2f, info.position.y);
+        assertEquals(3f, info.position.z);
+        assertEquals("minecraft:overworld", info.dimension);
     }
 }

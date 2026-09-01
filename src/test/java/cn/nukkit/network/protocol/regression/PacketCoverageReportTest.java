@@ -80,9 +80,9 @@ public class PacketCoverageReportTest {
 
         // 3. Auto-detect tested packets from @ParameterizedTest annotations (split by direction)
         Set<String> encodeTestedPackets = scanTestedPacketsFromAnnotations(
-                standardPacketNames, "cn.nukkit.network.protocol.regression.encode");
+                standardPacketNames, "cn.nukkit.network.protocol.regression.encode", "cn.nukkit.network.protocol.regression.decode");
         Set<String> decodeTestedPackets = scanTestedPacketsFromAnnotations(
-                standardPacketNames, "cn.nukkit.network.protocol.regression.decode");
+                standardPacketNames, "cn.nukkit.network.protocol.regression.decode", "cn.nukkit.network.protocol.regression.encode");
 
         // 4. Detect not-applicable packets per direction
         Map<String, Class<?>> classLookup = new HashMap<>();
@@ -361,12 +361,17 @@ public class PacketCoverageReportTest {
     }
 
     /**
-     * Scans test classes in the specified package for {@code @ParameterizedTest} annotations
+     * Scans test classes in the specified packages for {@code @ParameterizedTest} annotations
      * and extracts tested packet names from their {@code name} attribute.
+     * Both direction packages are scanned because mixed test classes (e.g. V2192PacketRegressionTest)
+     * may cover encode and decode directions together; not-applicable sets filter direction noise.
      */
-    private static Set<String> scanTestedPacketsFromAnnotations(Set<String> knownPacketNames, String testPackage) {
+    private static Set<String> scanTestedPacketsFromAnnotations(Set<String> knownPacketNames, String... testPackages) {
         Set<String> tested = new HashSet<>();
-        List<Class<?>> testClasses = scanClassesInPackage(testPackage);
+        List<Class<?>> testClasses = new ArrayList<>();
+        for (String testPackage : testPackages) {
+            testClasses.addAll(scanClassesInPackage(testPackage));
+        }
 
         for (Class<?> testClass : testClasses) {
             if (testClass == PacketCoverageReportTest.class) {
