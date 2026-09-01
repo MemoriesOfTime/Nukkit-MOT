@@ -155,7 +155,14 @@ public class PacketCoverageReportTest {
         Set<String> effectiveTestable = new TreeSet<>(testablePackets);
         effectiveTestable.removeAll(notApplicable);
 
-        int testedCount = testedPackets.size();
+        // 双向扫描会把 N/A 方向的测试也计入 tested 集合（如 C→S 包的 decode 测试算进 encode tested），
+        // 统计与 TESTED 列表只保留真正可测方向内的包。
+        // Cross-package scanning counts N/A-direction tests into the tested set (e.g. a C->S
+        // packet's decode test lands in encode tested); keep only packets testable in this direction.
+        Set<String> effectiveTested = new TreeSet<>(testedPackets);
+        effectiveTested.retainAll(effectiveTestable);
+
+        int testedCount = effectiveTested.size();
         int effectiveTestableCount = effectiveTestable.size();
         double overallPct = allPackets.isEmpty() ? 0 : (testedCount * 100.0 / allPackets.size());
         double testablePct = effectiveTestableCount == 0 ? 0 : (testedCount * 100.0 / effectiveTestableCount);
@@ -173,7 +180,7 @@ public class PacketCoverageReportTest {
         Collections.sort(naList);
 
         for (String name : allPackets) {
-            if (testedPackets.contains(name)) {
+            if (effectiveTested.contains(name)) {
                 tested.add(name);
             } else if (effectiveTestable.contains(name)) {
                 testableUntested.add(name);
