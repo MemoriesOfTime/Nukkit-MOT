@@ -36,6 +36,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
 
+    @org.junit.jupiter.api.BeforeAll
+    static void setUp() {
+        cn.nukkit.MockServer.init();
+    }
+
     private static final int V2192 = cn.nukkit.network.protocol.ProtocolInfo.v1_26_50;
 
     // ==================== PlayerAuthInputPacket：可选段单 bool 化 ====================
