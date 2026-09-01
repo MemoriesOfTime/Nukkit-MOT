@@ -1269,4 +1269,19 @@ public enum Sound {
     public String getSound() {
         return this.sound;
     }
+
+    /**
+     * Get the sound enum by its sound definition name (e.g. "note.harp")
+     *
+     * @param name sound definition name
+     * @return the matching sound, or {@code null} if not found
+     */
+    public static Sound fromName(String name) {
+        for (Sound sound : values()) {
+            if (sound.sound.equals(name)) {
+                return sound;
+            }
+        }
+        return null;
+    }
 }
