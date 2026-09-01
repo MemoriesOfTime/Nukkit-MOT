@@ -17,6 +17,13 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * 处理网易客户端 C→S SyncSkinPacket（皮肤变更通知）。反汇编证实该包无确认语义
+ * （300s 超时仅日志+丢弃条目），故不回显——应用皮肤并经 setSkin 广播即可。
+ * <p>
+ * Handles the NetEase C→S SyncSkinPacket. Disassembly shows no ack semantics (the
+ * 300s timeout only logs and drops the entry), so no echo — apply and let setSkin broadcast.
+ */
 @OnlyNetEase
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SyncSkinProcessor extends DataPacketProcessor<SyncSkinPacket> {
@@ -29,8 +36,8 @@ public class SyncSkinProcessor extends DataPacketProcessor<SyncSkinPacket> {
         Skin skin = pk.skin;
 
         if (!skin.isValid()) {
-            player.getServer().getLogger().warning(playerHandle.getUsername() + ": SyncSkinPacket with invalid skin");
-            player.close("", "disconnectionScreen.invalidSkin");
+            // 软丢弃而非断开：线格式异常不应踢掉换肤玩家
+            player.getServer().getLogger().warning(playerHandle.getUsername() + ": SyncSkinPacket with invalid skin, ignored");
             return;
         }
 
@@ -41,26 +48,10 @@ public class SyncSkinProcessor extends DataPacketProcessor<SyncSkinPacket> {
         }
         player.getServer().getPluginManager().callEvent(playerChangeSkinEvent);
 
-        Skin appliedSkin = skin;
-        if (playerChangeSkinEvent.isCancelled()) {
-            appliedSkin = player.getSkin();
-        } else {
+        if (!playerChangeSkinEvent.isCancelled()) {
             player.lastSkinChange = System.currentTimeMillis();
             player.setSkin(skin.isPersona() && !player.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
         }
-
-        this.sendSelfSyncSkin(player, appliedSkin);
-    }
-
-    private void sendSelfSyncSkin(Player sender, Skin skin) {
-        SyncSkinPacket echo = new SyncSkinPacket();
-        echo.setSkin(skin);
-        SyncSkinPacket.SyncSkinEntry entry = new SyncSkinPacket.SyncSkinEntry();
-        entry.flag = true;
-        entry.uuid = sender.getUniqueId();
-        echo.addEntry(entry);
-        sender.dataPacket(echo);
-        sender.getServer().getLogger().debug("[SyncSkin] echoed SyncSkinPacket to self sender=" + sender.getName());
     }
 
     @Override
@@ -75,6 +66,7 @@ public class SyncSkinProcessor extends DataPacketProcessor<SyncSkinPacket> {
 
     @Override
     public boolean isSupported(int protocol) {
-        return protocol == GameVersion.V1_21_124_NETEASE.getProtocol();
+        return protocol == GameVersion.V1_21_124_NETEASE.getProtocol()
+                || protocol == GameVersion.V1_21_93_NETEASE.getProtocol();
     }
 }
