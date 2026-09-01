@@ -2633,12 +2633,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.resetClientMovement();
     }
 
+    static final int MAX_FROST_WALKER_LEVEL = 2;
+
+    static int frostWalkerRadius(int level) {
+        return 2 + Math.min(Math.max(level, 1), MAX_FROST_WALKER_LEVEL);
+    }
+
     protected void handleEnchantmentInMove() {
         Item boots = this.inventory.getBootsFast();
 
         Enchantment frostWalker = boots.getEnchantment(Enchantment.ID_FROST_WALKER);
         if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
-            int radius = 2 + frostWalker.getLevel();
+            int radius = frostWalkerRadius(frostWalker.getLevel());
             for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
                 for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
                     Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
