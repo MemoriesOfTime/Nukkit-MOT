@@ -66,7 +66,13 @@ public class ItemStackResponsePacket extends DataPacket {
                         this.putString(item.getCustomName() != null ? item.getCustomName() : "");
                     }
                     if (this.protocol >= ProtocolInfo.v1_21_50) {
-                        this.putString(item.getFilteredCustomName() != null ? item.getFilteredCustomName() : "");
+                        if (this.protocol >= ProtocolInfo.v1_26_40) {
+                            // v2168 起 filteredCustomName 为可选 string（CB 修复 6d903898）
+                            // filteredCustomName became optional since v2168 (CB fix 6d903898)
+                            this.putOptionalNull(item.getFilteredCustomName(), name -> this.putString(name));
+                        } else {
+                            this.putString(item.getFilteredCustomName() != null ? item.getFilteredCustomName() : "");
+                        }
                     }
                     if (this.protocol >= ProtocolInfo.v1_16_210) {
                         this.putVarInt(item.getDurabilityCorrection());

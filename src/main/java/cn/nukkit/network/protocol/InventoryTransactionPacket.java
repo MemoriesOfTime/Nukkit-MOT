@@ -152,7 +152,7 @@ public class InventoryTransactionPacket extends DataPacket {
                 }
                 this.putVarInt(useItemData.hotbarSlot);
                 if (this.protocol >= ProtocolInfo.v1_26_50) {
-                    this.putUnsignedVarInt(0); // 主手 / main hand; off-hand not supported yet
+                    this.putByte((byte) 0); // 主手，单字节 / main hand, single byte
                 }
                 if (this.protocol >= ProtocolInfo.v1_26_30) {
                     this.putNetworkItemStackDescriptor(gameVersion, useItemData.itemInHand);
@@ -253,8 +253,9 @@ public class InventoryTransactionPacket extends DataPacket {
                 itemData.face = this.protocol >= ProtocolInfo.v1_26_30 ? BlockFace.fromIndex(this.getByte() & 0xff) : this.getBlockFace();
                 itemData.hotbarSlot = this.getVarInt();
                 if (this.protocol >= ProtocolInfo.v1_26_50) {
-                    // v2192 新增手持位置（主/副手）/ hand (main/off-hand), new in v2192
-                    this.getUnsignedVarInt();
+                    // v2192 新增手持位置（主/副手），单字节（CB #355 修正，非 VarUInt）
+                    // hand (main/off-hand) added in v2192, single byte (corrected by CB #355, not VarUInt)
+                    this.getByte();
                 }
                 itemData.itemInHand = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
                 itemData.playerPos = this.getVector3f().asVector3();

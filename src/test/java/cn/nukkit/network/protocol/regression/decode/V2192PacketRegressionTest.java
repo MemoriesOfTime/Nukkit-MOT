@@ -21,6 +21,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -94,6 +95,53 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(cn.nukkit.network.protocol.types.NetworkInventoryAction.SOURCE_CONTAINER, nk.actions[0].sourceType);
         assertEquals(12, nk.actions[0].windowId);
         assertEquals(3, nk.actions[0].inventorySlot);
+    }
+
+    /**
+     * v2192 ITEM_USE 在 hotbarSlot 后新增 hand 单字节（CB #355 修正类型，非 VarUInt），
+     * 副手(hand=1)时后续字段不得错位。
+     * <p>
+     * v2192 ITEM_USE inserts a single hand byte after hotbarSlot (type corrected by CB #355,
+     * not VarUInt); off-hand (hand=1) must not shift the remaining fields.
+     */
+    @Test
+    void inventoryTransactionV2192ItemUseHandByte() {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket();
+        cb.setLegacyRequestId(-1);
+        cb.setTransactionType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType.ITEM_USE);
+        cb.setActionType(0);
+        cb.setTriggerType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.TriggerType.PLAYER_INPUT);
+        cb.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(10, 64, -20));
+        cb.setBlockFace(1);
+        cb.setHotbarSlot(3);
+        cb.setHand(1); // 副手 / off-hand
+        cb.setItemInHand(org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR);
+        cb.setPlayerPosition(org.cloudburstmc.math.vector.Vector3f.from(10.5f, 65f, -19.5f));
+        cb.setClickPosition(org.cloudburstmc.math.vector.Vector3f.from(0.25f, 0.5f, 0.75f));
+        cb.setBlockDefinition(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                "test:block_55", 55, org.cloudburstmc.nbt.NbtMap.EMPTY));
+        cb.setClientInteractPrediction(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.PredictedResult.SUCCESS);
+        cb.setClientCooldownState(2);
+
+        InventoryTransactionPacket nk = crossEncode(cb, InventoryTransactionPacket::new, V2192, helper -> {
+            var builder = org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                    .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder();
+            builder.add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                    "test:block_55", 55, org.cloudburstmc.nbt.NbtMap.EMPTY));
+            helper.setBlockDefinitions(builder.build());
+        });
+
+        var use = assertInstanceOf(cn.nukkit.inventory.transaction.data.UseItemData.class, nk.transactionData);
+        assertEquals(0, use.actionType);
+        assertEquals(1, use.triggerType);
+        assertEquals(10, use.blockPos.x);
+        assertEquals(64, use.blockPos.y);
+        assertEquals(-20, use.blockPos.z);
+        assertEquals(1, use.face.getIndex());
+        assertEquals(3, use.hotbarSlot);
+        assertEquals(55, use.blockRuntimeId);
+        assertEquals(1, use.clientInteractPrediction);
+        assertEquals((byte) 2, use.clientCooldownState);
     }
 
     // ==================== ItemStackResponsePacket：容器/stackNetworkId 单 bool ====================
