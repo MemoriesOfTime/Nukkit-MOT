@@ -6,7 +6,9 @@ import cn.nukkit.blockentity.BlockEntityEnchantTable;
 import cn.nukkit.inventory.EnchantInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
@@ -67,6 +69,11 @@ public class BlockEnchantingTable extends BlockTransparent implements BlockEntit
     @Override
     public int getLightLevel() {
         return 7;
+    }
+
+    @Override
+    protected AxisAlignedBB recalculateBoundingBox() {
+        return new SimpleAxisAlignedBB(x, y, z, x + 1d, y + 12d / 16d, z + 1d);
     }
 
     @Override

@@ -1150,6 +1150,15 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return collidesWithBB(bb, false);
     }
 
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        if (this.collidesWithBB(bb)) {
+            AxisAlignedBB boundingBox = this.getBoundingBox();
+            if (boundingBox != null) {
+                collidingBoxes.add(boundingBox);
+            }
+        }
+    }
+
     public boolean collidesWithBB(AxisAlignedBB bb, boolean collisionBB) {
         AxisAlignedBB bb1 = collisionBB ? this.getCollisionBoundingBox() : this.getBoundingBox();
         return bb1 != null && bb.intersectsWith(bb1);
