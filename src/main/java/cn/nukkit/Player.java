@@ -188,9 +188,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int TRADE_WINDOW_ID = 500;
 
     public static final float DEFAULT_SPEED = 0.1f;
-    public static final float MAXIMUM_SPEED = 0.5f;
+    public static final float MAXIMUM_SPEED = 6f;
     public static final float DEFAULT_FLY_SPEED = 0.05f;
     public static final float DEFAULT_VERTICAL_FLY_SPEED = 1.0f;
+    private static final double SWIM_POSE_HITBOX_HEIGHT = 0.6;
     private static final int SERVER_MOTION_ALLOWANCE_TICKS = 10;
     private static final double SERVER_MOTION_EPSILON = 1.0E-6;
 
@@ -2464,37 +2465,59 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (!revert) {
-            // Anti-noclip: keep horizontal tolerance, but validate the full destination height.
-            AxisAlignedBB destinationBox = this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, 0, 0.1);
-            if (this.isSpectator() || !this.level.hasCollision(this, destinationBox, false)) {
+            // Anti-noclip 软拒绝：目的地碰撞时服务器不采纳该坐标、不发矫正包也不惩罚；
+            // 持续穿墙会不断拉大客户端-服务器位移差，最终由上方速度检查兜底回弹。
+            // 对骑乘/创造/旁观者完全跳过碰撞验证（骑乘坐标由载具客户端预测）。
+            // <p>
+            // Anti-noclip soft rejection: on destination collision the server simply keeps its
+            // own position and sends nothing; sustained phasing grows the client-server delta until the speed
+            // check above reverts it. skips collision validation entirely for passengers/creative/spectator.
+            boolean acceptPosition = true;
+            if (!this.isSpectator() && !this.isCreative() && this.riding == null) {
+                AxisAlignedBB offsetBox = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
+                // 站立判定盒：水平缩 0.05、垂直两侧各缩 stepHeight，楼梯/台阶上行过渡帧不误判
+                AxisAlignedBB standingBox = offsetBox.shrink(0.05, this.getStepHeight(), 0.05);
+                // 匍匐判定盒：游泳/爬行客户端 hitbox 仅 0.6 高，低矮空间（1 格缝隙）按实际姿态放行
+                AxisAlignedBB swimPoseBox = offsetBox.shrink(0.05, 0, 0.05);
+                swimPoseBox.setMaxY(swimPoseBox.getMinY() + SWIM_POSE_HITBOX_HEIGHT);
+
+                if (this.level.hasCollision(this, standingBox, false) && this.level.hasCollision(this, swimPoseBox, false)) {
+                    List<Block> colliding = CollisionHelper.getCollisionBlocks(
+                            this.level, standingBox, this, false, false,
+                            block -> !block.canPassThrough());
+                    // 脚手架允许站入与穿越（原版行为）
+                    acceptPosition = !colliding.isEmpty() && colliding.stream().allMatch(block -> block.getId() == BlockID.SCAFFOLDING);
+                }
+            }
+
+            if (acceptPosition) {
                 this.x = clientPos.x;
                 this.y = clientPos.y;
                 this.z = clientPos.z;
                 this.boundingBox.setBounds(this.x - 0.3, this.y, this.z - 0.3, this.x + 0.3, this.y + this.getHeight(), this.z + 0.3);
-                this.checkChunks();
+            }
 
-                // Ground check
-                if (!this.isSpectator() && (!this.onGround || dy != 0)) {
-                    AxisAlignedBB bb = this.boundingBox.clone();
-                    bb.setMinY(bb.getMinY() - 0.75);
+            this.checkChunks();
 
-                    // Hack: fix fall damage from walls while falling
-                    if (Math.abs(dy) > 0.01) {
-                        bb.setMinX(bb.getMinX() + 0.1);
-                        bb.setMaxX(bb.getMaxX() - 0.1);
-                        bb.setMinZ(bb.getMinZ() + 0.1);
-                        bb.setMaxZ(bb.getMaxZ() - 0.1);
-                    }
+            // Ground check
+            if (!this.isSpectator() && (!this.onGround || dy != 0)) {
+                AxisAlignedBB bb = this.boundingBox.clone();
+                bb.setMinY(bb.getMinY() - 0.75);
 
-                    this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+                // Hack: fix fall damage from walls while falling
+                if (Math.abs(dy) > 0.01) {
+                    bb.setMinX(bb.getMinX() + 0.1);
+                    bb.setMaxX(bb.getMaxX() - 0.1);
+                    bb.setMinZ(bb.getMinZ() + 0.1);
+                    bb.setMaxZ(bb.getMaxZ() - 0.1);
                 }
 
-                this.isCollided = this.onGround;
-                this.updateFallState(this.onGround);
-                this.checkSwimmingState();
-            } else {
-                revert = true;
+                this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
             }
+
+            this.isCollided = this.onGround;
+            this.updateFallState(this.onGround);
+            this.checkSwimmingState();
         }
 
         Location from = new Location(
@@ -2731,7 +2754,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return false;
     }
 
-    private void setServerMotionAllowance(Vector3 motion) {
+    /**
+     * 为服务端施加、但未通过 setMotion 下发给客户端的冲量（如爆炸击退）登记反速测配额，
+     * 避免由此产生的客户端位移被判为超速。注意：这不是 motion setter（设置速度请用
+     * {@link #setMotion} / {@link #setMotionLocally}），参数应传本次施加的冲量增量。
+     * <p>
+     * Credits the anti-speed-hack allowance for server-applied impulses not sent to the client via
+     * setMotion (e.g. explosion knockback), so the resulting client displacement is not flagged.
+     * This is not a motion setter (use {@link #setMotion} / {@link #setMotionLocally}); pass the
+     * impulse applied this time, not the accumulated motion.
+     */
+    public void setServerMotionAllowance(Vector3 motion) {
         this.serverMotionAllowanceX = motion.x;
         this.serverMotionAllowanceZ = motion.z;
         this.serverMotionAllowanceTicks = SERVER_MOTION_ALLOWANCE_TICKS;
