@@ -640,6 +640,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.adventureSettings.get(Type.ALLOW_FLIGHT);
     }
 
+    /**
+     * Scale the packet and tick movement sanity limits for an authorized player who is actually
+     * flying faster than vanilla. The limits are squared distances, so the speed ratio must be
+     * squared as well. Everyone else keeps the original limits unchanged.
+     */
+    double movementSanityLimitSquared(double vanillaLimitSquared) {
+        if (this.adventureSettings == null
+                || !this.adventureSettings.get(Type.ALLOW_FLIGHT)
+                || !this.adventureSettings.get(Type.FLYING)) {
+            return vanillaLimitSquared;
+        }
+
+        float configuredFlySpeed = this.getFlySpeed();
+        if (!Float.isFinite(configuredFlySpeed) || configuredFlySpeed <= DEFAULT_FLY_SPEED) {
+            return vanillaLimitSquared;
+        }
+
+        double speedRatio = (double) configuredFlySpeed / DEFAULT_FLY_SPEED;
+        return vanillaLimitSquared * speedRatio * speedRatio;
+    }
+
     public void setAllowModifyWorld(boolean value) {
         this.adventureSettings.set(Type.WORLD_IMMUTABLE, !value);
         this.adventureSettings.set(Type.MINE, value);
@@ -969,6 +990,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void setSkin(Skin skin) {
+        if (skin.isFullyTransparent()) {
+            skin = Skin.NO_PERSONA_SKIN;
+        }
         Skin previousSkin = this.getSkin();
         super.setSkin(skin);
         if (!this.spawned) {
@@ -2387,9 +2411,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         boolean revert = false;
 
         // Extreme distance check
-        if (distanceSquared / tickDiffSq > 225) {
+        double extremeDistanceLimitSquared = movementSanityLimitSquared(225);
+        if (distanceSquared / tickDiffSq > extremeDistanceLimitSquared) {
             revert = true;
-            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > 225 * tickDiffSq=" + (225 * tickDiffSq));
+            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > "
+                    + extremeDistanceLimitSquared + " * tickDiffSq=" + (extremeDistanceLimitSquared * tickDiffSq));
         } else {
             // Chunk generation check
             if (this.chunk == null || !this.chunk.isGenerated()) {
@@ -3984,10 +4010,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                if (dis > 100) {
+                double legacyMoveDistanceLimitSquared = movementSanityLimitSquared(100);
+                if (dis > legacyMoveDistanceLimitSquared) {
                     if (this.lastTeleportTick + 30 < this.server.getTick()) {
                         this.sendPosition(this.getLocation(), MovePlayerPacket.MODE_RESET);
-                        log.debug("{}: move {} > 100", username, dis);
+                        log.debug("{}: move {} > {}", username, dis, legacyMoveDistanceLimitSquared);
                     }
                     break;
                 }
@@ -4309,7 +4336,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     if (authPacket.getInputData().contains(AuthInputAction.START_FLYING)) {
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Stale request: the client keeps asking after permission is revoked; refuse and
+                            // resync, real flight is still caught by the movement check
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
@@ -4389,9 +4418,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                if (distSqrt > 100) {
+                double authInputDistanceLimitSquared = movementSanityLimitSquared(100);
+                if (distSqrt > authInputDistanceLimitSquared) {
                     this.sendPosition(this.getLocation(), MovePlayerPacket.MODE_RESET);
-                    log.debug("{}: move {} > 100", username, distSqrt);
+                    log.debug("{}: move {} > {}", username, distSqrt, authInputDistanceLimitSquared);
                     return;
                 }
 
@@ -4620,7 +4650,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case PlayerActionPacket.ACTION_START_FLYING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput() || protocol < ProtocolInfo.v1_20_30_24) break;
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Stale request, handled as START_FLYING above
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
@@ -6979,6 +7010,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.offhandInventory.sendContents(this);
 
         this.spawnToAll();
+
+        // 观察者死亡期间 spawnTo 被存活守卫跳过且客户端实体已被移除，重生后补驱视野内实体
+        for (long index : this.usedChunks.keySet()) {
+            int chunkX = Level.getHashX(index);
+            int chunkZ = Level.getHashZ(index);
+            for (Entity entity : this.level.getChunkEntities(chunkX, chunkZ, false).values()) {
+                if (this != entity && !entity.closed && entity.isAlive()) {
+                    entity.spawnTo(this);
+                }
+            }
+        }
+
         this.scheduleUpdate();
     }
 
