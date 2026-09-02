@@ -2726,7 +2726,7 @@ public abstract class Entity extends Location implements Metadatable {
         this.level.addEntity(this);
         this.chunk = null;
 
-        if (this instanceof Player) {
+        if (this instanceof Player player && player.isOnline()) {
             this.afterSwitchLevel();
         }
         return true;
@@ -3109,7 +3109,7 @@ public abstract class Entity extends Location implements Metadatable {
                 this.z = pos.z;
 
                 // Dimension change
-                if (this instanceof Player player && newLevel.getDimension() != oldLevel.getDimension()) {
+                if (this instanceof Player player && player.isOnline() && newLevel.getDimension() != oldLevel.getDimension()) {
                     player.setDimension(newLevel.getDimension());
                 }
 

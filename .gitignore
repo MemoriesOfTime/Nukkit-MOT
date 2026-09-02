@@ -28,6 +28,7 @@ server.log
 server.properties
 white-list.txt
 nukkit-mot.yml
+scoreboard.json
 cache
 cache/*
 worlds
