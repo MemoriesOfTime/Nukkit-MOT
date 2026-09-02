@@ -63,6 +63,37 @@ class BlockCollisionShapeTest {
     }
 
     @Test
+    void stonecutterIsNinePixelsHigh() {
+        Block stonecutter = Block.get(BlockID.STONECUTTER_BLOCK);
+        stonecutter.setComponents(10d, 20d, 30d);
+
+        assertEquals(20d + 9d / 16d, stonecutter.getBoundingBox().getMaxY(), 1e-12);
+    }
+
+    @Test
+    void hopperHasABowlAndARim() {
+        Block hopper = Block.get(BlockID.HOPPER_BLOCK);
+        hopper.setComponents(0d, 0d, 0d);
+        AxisAlignedBB bowl = new SimpleAxisAlignedBB(0.3d, 10d / 16d + 0.001d, 0.3d,
+                0.7d, 0.95d, 0.7d);
+        AxisAlignedBB rim = new SimpleAxisAlignedBB(0.01d, 10d / 16d + 0.001d, 0.4d,
+                0.1d, 0.95d, 0.6d);
+
+        assertFalse(hopper.collidesWithBB(bowl));
+        assertTrue(hopper.collidesWithBB(rim));
+    }
+
+    @Test
+    void snowLayerGrowsTwoPixelsPerLayer() {
+        for (int layers = 0; layers < 8; layers++) {
+            Block snow = Block.get(BlockID.SNOW_LAYER, layers);
+            snow.setComponents(0d, 0d, 0d);
+
+            assertEquals(layers / 8d, snow.getMaxY(), 1e-12);
+        }
+    }
+
+    @Test
     void cauldronHasAFreeCavityAndSolidBottomAndRim() {
         Block cauldron = Block.get(BlockID.CAULDRON_BLOCK, 6);
         cauldron.setComponents(0d, 0d, 0d);
