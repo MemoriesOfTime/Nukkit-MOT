@@ -662,6 +662,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return vanillaLimitSquared * speedRatio * speedRatio;
     }
 
+    static boolean shouldProbeCreativeDownwardCollision(
+            boolean creative, boolean noClip, boolean riding, double dy) {
+        return creative && !noClip && !riding && dy < -1.0E-7;
+    }
+
     public void setAllowModifyWorld(boolean value) {
         this.adventureSettings.set(Type.WORLD_IMMUTABLE, !value);
         this.adventureSettings.set(Type.MINE, value);
@@ -2436,6 +2441,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double dx = clientPos.x - this.x;
         double dy = clientPos.y - this.y;
         double dz = clientPos.z - this.z;
+
+        // Creative clients predict an instant break before the authoritative block update
+        // arrives. Probe the intended lower floor before fastMove: when allow-flight is enabled
+        // globally, fastMove intentionally bypasses collision checks and cannot be the signal.
+        if (!revert
+                && shouldProbeCreativeDownwardCollision(
+                        this.isCreative(), this.noClip, this.riding != null, dy)) {
+            AxisAlignedBB targetFeet = this.boundingBox
+                    .getOffsetBoundingBox(dx, dy, dz)
+                    .shrink(0.05, 0, 0.05);
+            targetFeet.setMinY(targetFeet.getMinY() + 1.0E-7);
+            targetFeet.setMaxY(targetFeet.getMinY() + 0.05);
+            revert = this.level.hasCollision(this, targetFeet, false);
+        }
 
         // fastMove collision resolution + speed check on server correction amount (EC pattern)
         if (!revert) {
