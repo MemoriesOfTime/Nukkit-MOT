@@ -51,6 +51,7 @@ import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.item.enchantment.EnchantmentFrostWalker;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.lang.CommandOutputContainer;
 import cn.nukkit.lang.LangCode;
@@ -2633,18 +2634,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.resetClientMovement();
     }
 
-    static final int MAX_FROST_WALKER_LEVEL = 2;
-
-    static int frostWalkerRadius(int level) {
-        return 2 + Math.min(Math.max(level, 1), MAX_FROST_WALKER_LEVEL);
-    }
-
     protected void handleEnchantmentInMove() {
         Item boots = this.inventory.getBootsFast();
 
         Enchantment frostWalker = boots.getEnchantment(Enchantment.ID_FROST_WALKER);
-        if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
-            int radius = frostWalkerRadius(frostWalker.getLevel());
+        int frostWalkerLevel = frostWalker == null ? 0 : frostWalker.getLevel();
+        if (frostWalkerLevel > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
+            // Take the min before adding 2 so a malformed high level cannot overflow 2 + level negative
+            int radius = 2 + Math.min(frostWalkerLevel, EnchantmentFrostWalker.MAX_FREEZE_RADIUS - 2);
             for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
                 for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
                     Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
