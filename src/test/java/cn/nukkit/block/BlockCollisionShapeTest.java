@@ -52,6 +52,17 @@ class BlockCollisionShapeTest {
     }
 
     @Test
+    void loneGlassPaneStaysACentrePost() {
+        Block pane = Block.get(BlockID.GLASS_PANE);
+        pane.setComponents(0d, 0d, 0d);
+
+        assertEquals(7d / 16d, pane.getBoundingBox().getMinX(), 1e-12);
+        assertEquals(9d / 16d, pane.getBoundingBox().getMaxX(), 1e-12);
+        assertEquals(7d / 16d, pane.getBoundingBox().getMinZ(), 1e-12);
+        assertEquals(9d / 16d, pane.getBoundingBox().getMaxZ(), 1e-12);
+    }
+
+    @Test
     void cauldronHasAFreeCavityAndSolidBottomAndRim() {
         Block cauldron = Block.get(BlockID.CAULDRON_BLOCK, 6);
         cauldron.setComponents(0d, 0d, 0d);
