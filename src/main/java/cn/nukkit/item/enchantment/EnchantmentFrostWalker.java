@@ -2,6 +2,13 @@ package cn.nukkit.item.enchantment;
 
 public class EnchantmentFrostWalker extends Enchantment {
 
+    /**
+     * 原版冻结半径上限：clamp(2 + level, 0, 16)
+     * <p>
+     * Vanilla cap on the freeze radius: clamp(2 + level, 0, 16)
+     */
+    public static final int MAX_FREEZE_RADIUS = 16;
+
     protected EnchantmentFrostWalker() {
         super(ID_FROST_WALKER, "frostwalker", Rarity.RARE, EnchantmentType.ARMOR_FEET);
     }
