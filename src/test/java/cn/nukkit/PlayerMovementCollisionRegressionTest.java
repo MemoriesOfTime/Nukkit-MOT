@@ -67,8 +67,24 @@ class PlayerMovementCollisionRegressionTest {
 
         assertNotNull(player.forceMovement, "sustained phasing must eventually trigger the speed check revert");
         assertEquals(0, player.x, 0.000001);
-        assertEquals(MovePlayerPacket.MODE_NORMAL, player.lastSendMode);
+        assertEquals(MovePlayerPacket.MODE_RESET, player.lastSendMode, "revert correction must use MODE_RESET so the client accepts it");
         assertTrue(player.invalidMoveEvents > 0);
+    }
+
+    @Test
+    void verticalPhasingCaughtByExtremeDistanceCheck() {
+        Level level = mockingLevel();
+        Mockito.when(level.hasCollision(Mockito.any(), Mockito.any(), Mockito.eq(false))).thenReturn(true);
+
+        TestPlayer player = createPlayer(level, generatedChunk());
+        player.moveTo(0, 64, 0);
+
+        // 软拒绝冻结服务器位置后垂直穿地板下落：全轴极限距离检查兜底（垂直位移不经过水平速度检查）
+        player.driveHandleMovement(new Vector3(0, 55, 0), 1);
+
+        assertNotNull(player.forceMovement, "vertical-only divergence must be caught by the all-axis extreme distance check");
+        assertEquals(64, player.y, 0.000001);
+        assertEquals(MovePlayerPacket.MODE_RESET, player.lastSendMode);
     }
 
     @Test
@@ -89,6 +105,27 @@ class PlayerMovementCollisionRegressionTest {
         player.driveHandleMovement(new Vector3(0.4, 64, 0), 1);
 
         assertEquals(0.4, player.x, 0.000001, "standing inside scaffolding is vanilla-legal and must be accepted");
+        assertNull(player.forceMovement);
+    }
+
+    @Test
+    void powderSnowCollisionIsAccepted() {
+        Level level = mockingLevel();
+        Mockito.when(level.hasCollision(Mockito.any(), Mockito.any(), Mockito.eq(false))).thenReturn(true);
+
+        Block powderSnow = Mockito.mock(Block.class);
+        Mockito.when(powderSnow.getId()).thenReturn(BlockID.POWDER_SNOW);
+        Mockito.when(powderSnow.canPassThrough()).thenReturn(false);
+        Mockito.when(powderSnow.collidesWithBB(Mockito.any())).thenReturn(true);
+        Mockito.when(level.getBlock(Mockito.any(BaseFullChunk.class), Mockito.anyInt(), Mockito.anyInt(),
+                Mockito.anyInt(), Mockito.anyInt(), Mockito.anyBoolean())).thenReturn(powderSnow);
+
+        TestPlayer player = createPlayer(level, generatedChunk());
+        player.moveTo(0, 64, 0);
+
+        player.driveHandleMovement(new Vector3(0.4, 64, 0), 1);
+
+        assertEquals(0.4, player.x, 0.000001, "sinking into powder snow is vanilla-legal and must be accepted");
         assertNull(player.forceMovement);
     }
 

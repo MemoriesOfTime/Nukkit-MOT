@@ -2417,8 +2417,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double tickDiffSq = (double) tickDiff * tickDiff;
         boolean revert = false;
 
-        // Extreme distance check
-        double extremeDistanceLimitSquared = movementSanityLimitSquared(225);
+        // 全轴极限距离检查：软拒绝后客户端-服务器分歧（含垂直穿墙）的兜底回弹阈值，量级对齐 PM1E 的 maxDist；
+        // 合法终端下落 3.9 格/tick（平方 15.2）不会触发
+        double extremeDistanceLimitSquared = movementSanityLimitSquared(49);
         if (distanceSquared / tickDiffSq > extremeDistanceLimitSquared) {
             revert = true;
             server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > "
@@ -2485,8 +2486,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     List<Block> colliding = CollisionHelper.getCollisionBlocks(
                             this.level, standingBox, this, false, false,
                             block -> !block.canPassThrough());
-                    // 脚手架允许站入与穿越（原版行为）
-                    acceptPosition = !colliding.isEmpty() && colliding.stream().allMatch(block -> block.getId() == BlockID.SCAFFOLDING);
+                    // 脚手架/细雪允许进入（原版行为：可站入脚手架、可沉入细雪）
+                    acceptPosition = !colliding.isEmpty() && colliding.stream().allMatch(block -> {
+                        int id = block.getId();
+                        return id == BlockID.SCAFFOLDING || id == BlockID.POWDER_SNOW;
+                    });
                 }
             }
 
@@ -2593,7 +2597,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.firstMove = false;
         }
 
-        // Unified revert handling (EC pattern: MODE_NORMAL for softer correction)
         if (revert) {
             this.clearServerMotionAllowance();
             this.x = from.x;
@@ -2610,7 +2613,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.needSendRotation = false;
             Location correction = from.add(0, 0.00001, 0);
-            this.sendPosition(correction, MovePlayerPacket.MODE_NORMAL);
+            this.sendPosition(correction, MovePlayerPacket.MODE_RESET);
             this.forceMovement = correction;
 
             if (this.speed == null) {
