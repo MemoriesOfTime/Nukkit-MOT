@@ -55,6 +55,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     protected int attackTime = 0;
     protected int knockBackTime = 0;
 
+    /**
+     * Vanilla Bedrock knock-back force. Both the horizontal push and the vertical cap use it.
+     */
+    public static final double DEFAULT_KNOCKBACK = 0.4;
+
     protected float movementSpeed = 0.1f;
 
     protected int turtleTicks = 0;
@@ -202,7 +207,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public void knockBack(Entity attacker, double damage, double x, double z) {
-        this.knockBack(attacker, damage, x, z, 0.3);
+        this.knockBack(attacker, damage, x, z, DEFAULT_KNOCKBACK);
     }
 
     public void knockBack(Entity attacker, double damage, double x, double z, double base) {
