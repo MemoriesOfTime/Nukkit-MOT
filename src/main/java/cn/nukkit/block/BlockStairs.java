@@ -8,6 +8,8 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
@@ -64,6 +66,45 @@ public abstract class BlockStairs extends BlockSolidMeta implements Faceable {
         Item item = super.toItem();
         item.setDamage(0);
         return item;
+    }
+
+    @Override
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        for (AxisAlignedBB part : this.collisionParts()) {
+            if (bb.intersectsWith(part)) {
+                collidingBoxes.add(part);
+            }
+        }
+    }
+
+    /** Обе половины ступеньки: плита снизу (или сверху) и сам подъём. */
+    private AxisAlignedBB[] collisionParts() {
+        int damage = this.getDamage();
+        int side = damage & 0x03;
+        double f = 0;
+        double f1 = 0.5;
+        double f2 = 0.5;
+        double f3 = 1;
+        if ((damage & 0x04) > 0) {
+            f = 0.5;
+            f1 = 1;
+            f2 = 0;
+            f3 = 0.5;
+        }
+
+        AxisAlignedBB slab = new SimpleAxisAlignedBB(
+                this.x, this.y + f, this.z, this.x + 1, this.y + f1, this.z + 1);
+        AxisAlignedBB step = switch (side) {
+            case 0 -> new SimpleAxisAlignedBB(
+                    this.x + 0.5, this.y + f2, this.z, this.x + 1, this.y + f3, this.z + 1);
+            case 1 -> new SimpleAxisAlignedBB(
+                    this.x, this.y + f2, this.z, this.x + 0.5, this.y + f3, this.z + 1);
+            case 2 -> new SimpleAxisAlignedBB(
+                    this.x, this.y + f2, this.z + 0.5, this.x + 1, this.y + f3, this.z + 1);
+            default -> new SimpleAxisAlignedBB(
+                    this.x, this.y + f2, this.z, this.x + 1, this.y + f3, this.z + 0.5);
+        };
+        return new AxisAlignedBB[] {slab, step};
     }
 
     @Override
