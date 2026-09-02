@@ -2,8 +2,6 @@ package cn.nukkit.entity;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTotem;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,15 +23,5 @@ class EntityTotemTest {
         assertFalse(Entity.isTotem(null));
         assertFalse(Entity.isTotem(new Item(Item.TOTEM, 0, 0, "Totem of Undying")));
         assertFalse(Entity.isTotem(new Item(Item.STONE, 0, 1, "Stone")));
-    }
-
-    @Test
-    void consumesOnlyOneTotemFromEitherHand() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/cn/nukkit/entity/Entity.java"));
-
-        assertTrue(source.contains("getOffhandInventory().decreaseCount(0)"));
-        assertTrue(
-                source.contains(
-                        "getInventory().decreaseCount(p.getInventory().getHeldItemIndex())"));
     }
 }

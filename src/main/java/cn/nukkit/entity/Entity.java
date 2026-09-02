@@ -42,6 +42,7 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.*;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -1762,9 +1763,14 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    static boolean isTotem(Item item) {
-        // The numeric id is what survives inventory serialization. A plugin-created or restored
-        // stack may therefore be a plain Item even though it is the canonical vanilla totem.
+    /**
+     * 判断是否为不死图腾：按数字 id 而非 instanceof，插件直构的 plain Item 也能识别。
+     * <p>
+     * Whether the item is a totem, matched by numeric id so plugin-created plain
+     * {@code Item} stacks are recognized as well as typed {@code ItemTotem}s.
+     */
+    @ApiStatus.Internal
+    public static boolean isTotem(Item item) {
         return item != null && item.getId() == Item.TOTEM && item.getCount() > 0;
     }
 
