@@ -28,6 +28,30 @@ class BlockCollisionShapeTest {
     }
 
     @Test
+    void grassPathIsFifteenPixelsHigh() {
+        Block path = Block.get(BlockID.GRASS_PATH);
+        path.setComponents(10d, 20d, 30d);
+
+        assertEquals(20d + 15d / 16d, path.getBoundingBox().getMaxY(), 1e-12);
+    }
+
+    @Test
+    void farmlandIsFifteenPixelsHigh() {
+        Block farmland = Block.get(BlockID.FARMLAND);
+        farmland.setComponents(10d, 20d, 30d);
+
+        assertEquals(20d + 15d / 16d, farmland.getBoundingBox().getMaxY(), 1e-12);
+    }
+
+    @Test
+    void soulSandIsFourteenPixelsHigh() {
+        Block soulSand = Block.get(BlockID.SOUL_SAND);
+        soulSand.setComponents(10d, 20d, 30d);
+
+        assertEquals(20d + 14d / 16d, soulSand.getBoundingBox().getMaxY(), 1e-12);
+    }
+
+    @Test
     void cauldronHasAFreeCavityAndSolidBottomAndRim() {
         Block cauldron = Block.get(BlockID.CAULDRON_BLOCK, 6);
         cauldron.setComponents(0d, 0d, 0d);
