@@ -61,6 +61,11 @@ public class EntityMooshroom extends EntityWalkingAnimal {
     }
 
     @Override
+    public boolean isBreedingItem(Item item) {
+        return this.isFeedItem(item);
+    }
+
+    @Override
     public Item[] getDrops() {
         List<Item> drops = new ArrayList<>();
 
@@ -102,7 +107,7 @@ public class EntityMooshroom extends EntityWalkingAnimal {
             }
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_MILK);
             return false;
-        } else if (item.getId() == Item.WHEAT && !this.isBaby() && !this.isInLoveCooldown()) {
+        } else if (this.isBreedingItem(item) && !this.isBaby() && !this.isInLoveCooldown()) {
             if (!player.isCreative()) {
                 player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             }

@@ -34,6 +34,11 @@ public class LoginPacket extends DataPacket {
     public String username;
     private int protocol_;
     private GameVersion gameVersion_;
+    /**
+     * Best effort identity read straight off the wire, before the chain is validated.
+     * Not authoritative: unauthenticated logins are reconciled later, use
+     * {@link cn.nukkit.utils.LoginChainData#getClientUUID(String)} for the identity the server uses.
+     */
     public UUID clientUUID;
     public String minecraftId;
     public long clientId;
@@ -144,8 +149,8 @@ public class LoginPacket extends DataPacket {
                 JwtClaims claims = context.getJwtClaims();
                 String xuid = claims.getClaimValueAsString("xid");
                 this.username = claims.getClaimValueAsString("xname");
-                this.clientUUID = UUID.nameUUIDFromBytes(("pocket-auth-1-xuid:" + xuid).getBytes(StandardCharsets.UTF_8));
                 this.minecraftId = claims.getClaimValueAsString("mid");
+                this.clientUUID = EncryptionUtils.deriveIdentity(xuid, this.minecraftId, this.username);
             } else {
                 throw new IllegalArgumentException("Unsupported AuthPayload type: " + this.authPayload.getClass().getName());
             }

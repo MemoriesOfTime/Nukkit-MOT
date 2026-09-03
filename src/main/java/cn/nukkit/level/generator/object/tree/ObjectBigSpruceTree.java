@@ -116,7 +116,7 @@ public class ObjectBigSpruceTree extends ObjectSpruceTree {
                         }
                     }
 
-                    if (!isTrunk && !Block.solid[level.getBlockIdAt(xx, yyy, zz)]) {
+                    if (!isTrunk && !Block.isBlockSolidById(level.getBlockIdAt(xx, yyy, zz))) {
                         level.setBlockAt(xx, yyy, zz, this.getLeafBlock(), this.getType());
                     }
                 }
@@ -152,7 +152,7 @@ public class ObjectBigSpruceTree extends ObjectSpruceTree {
                         continue;
                     }
 
-                    if (!Block.solid[level.getBlockIdAt(xx, yyy, zz)]) {
+                    if (!Block.isBlockSolidById(level.getBlockIdAt(xx, yyy, zz))) {
                         level.setBlockAt(xx, yyy, zz, this.getLeafBlock(), this.getType());
                     }
                 }
