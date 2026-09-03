@@ -332,7 +332,8 @@ public class EntityHuman extends EntityHumanType {
                 }
             } else if (retainNpcListEntry) {
                 if (!PlayerEntitySkinSender.sendInitialSkinIfAbsent(
-                        player, this.uuid, this.getId(), this.getName(), this.getSkin(), "")) {
+                        player, this.uuid, this.getId(), this.getName(), this.getSkin(), "",
+                        this::getSkin)) {
                     this.hasSpawned.remove(player.getLoaderId());
                     return;
                 }

@@ -51,6 +51,7 @@ import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.item.enchantment.EnchantmentFrostWalker;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.lang.CommandOutputContainer;
 import cn.nukkit.lang.LangCode;
@@ -2638,8 +2639,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         Item boots = this.inventory.getBootsFast();
 
         Enchantment frostWalker = boots.getEnchantment(Enchantment.ID_FROST_WALKER);
-        if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
-            int radius = 2 + frostWalker.getLevel();
+        int frostWalkerLevel = frostWalker == null ? 0 : frostWalker.getLevel();
+        if (frostWalkerLevel > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
+            // Take the min before adding 2 so a malformed high level cannot overflow 2 + level negative
+            int radius = 2 + Math.min(frostWalkerLevel, EnchantmentFrostWalker.MAX_FREEZE_RADIUS - 2);
             for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
                 for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
                     Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
@@ -4389,7 +4392,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     if (authPacket.getInputData().contains(AuthInputAction.START_FLYING)) {
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Stale request: the client keeps asking after permission is revoked; refuse and
+                            // resync, real flight is still caught by the movement check
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
@@ -4701,7 +4706,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case PlayerActionPacket.ACTION_START_FLYING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput() || protocol < ProtocolInfo.v1_20_30_24) break;
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Stale request, handled as START_FLYING above
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
@@ -6952,7 +6958,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             } else {
                 // 发包给客户端清除不死图腾，防止影响自杀等操作
-                if (this.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                if (Entity.isTotem(this.getOffhandInventory().getItemFast(0))) {
                     InventorySlotPacket pk = new InventorySlotPacket();
                     pk.slot = 0;
                     pk.item = Item.AIR_ITEM;
@@ -6966,7 +6972,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 int id = this.getWindowId(this.getInventory());
                 if (id != -1) {
                     for (Entry<Integer, Item> entry : this.getInventory().getContents().entrySet()) {
-                        if (entry.getValue() instanceof ItemTotem) {
+                        if (Entity.isTotem(entry.getValue())) {
                             InventorySlotPacket pk = new InventorySlotPacket();
                             pk.slot = entry.getKey();
                             pk.item = Item.AIR_ITEM;
@@ -7092,6 +7098,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.offhandInventory.sendContents(this);
 
         this.spawnToAll();
+
+        // 观察者死亡期间 spawnTo 被存活守卫跳过且客户端实体已被移除，重生后补驱视野内实体
+        for (long index : this.usedChunks.keySet()) {
+            int chunkX = Level.getHashX(index);
+            int chunkZ = Level.getHashZ(index);
+            for (Entity entity : this.level.getChunkEntities(chunkX, chunkZ, false).values()) {
+                if (this != entity && !entity.closed && entity.isAlive()) {
+                    entity.spawnTo(this);
+                }
+            }
+        }
+
         this.scheduleUpdate();
     }
 
