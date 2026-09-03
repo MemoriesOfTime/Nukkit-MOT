@@ -113,6 +113,16 @@ class UsingItemReceiveTest {
     }
 
     @Test
+    void neverRetainUsingOnEarlyJavaRelease() {
+        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, true, true, 0));
+        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, true, true, 1));
+        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, true, true, 32));
+        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(false, true, true, 0));
+        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, false, true, 0));
+        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, true, false, 0));
+    }
+
+    @Test
     void keepUsingOnClickBlockOnlyForJavaClient() {
         assertTrue(UsingItemReceive.shouldKeepUsingOnClickBlock(true, true, true, false));
         assertFalse(UsingItemReceive.shouldKeepUsingOnClickBlock(false, true, true, false));

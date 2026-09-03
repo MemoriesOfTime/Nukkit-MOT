@@ -114,15 +114,20 @@ public final class UsingItemReceive {
      * MobEquipment always cleared using, including the same-slot confirmation Java sends
      * before CLICK_AIR. Only a real hotbar switch is an interrupt for ViaProxy Java.
      * Native Bedrock retains the old unconditional clear behavior.
-     * <p>
-     * A Java hotbar change is already an interrupt in {@code shouldClearUsingOnMobEquipment}.
-     * Duplicate Java CLICK_AIR on the first two ticks is handled by
-     * {@code shouldIgnoreDuplicateClickAirStart}. Early Java RELEASE_USE_ITEM is a
-     * real interrupt and must not be retained here.
      */
     public static boolean shouldClearUsingOnMobEquipment(boolean javaClient, boolean alreadyUsing,
                                                          int currentHeldIndex, int packetHotbarSlot) {
         return alreadyUsing && (!javaClient || currentHeldIndex != packetHotbarSlot);
+    }
+
+    /**
+     * Early Java {@code TYPE_RELEASE_ITEM} is a real interrupt, including on the first
+     * tick. Duplicate Java CLICK_AIR is ignored by {@link #shouldIgnoreDuplicateClickAirStart};
+     * this path must still clear using-state.
+     */
+    public static boolean shouldRetainUsingOnEarlyJavaRelease(boolean javaClient, boolean alreadyUsing,
+                                                              boolean holdToUse, int ticksUsed) {
+        return false;
     }
 
     /**

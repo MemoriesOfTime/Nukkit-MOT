@@ -5855,7 +5855,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     if (!item.onRelease(this, ticksUsed)) {
                                         this.inventory.sendContents(this);
                                     }
-                                    this.setUsingItem(false);
+                                    if (!UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(
+                                            this.isJavaClient(),
+                                            true,
+                                            UsingItemReceive.isHoldToUseItem(item),
+                                            ticksUsed)) {
+                                        this.setUsingItem(false);
+                                    }
                                 } else {
                                     this.inventory.sendContents(this);
                                 }
