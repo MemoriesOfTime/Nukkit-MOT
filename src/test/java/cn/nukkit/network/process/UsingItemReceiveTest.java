@@ -51,17 +51,6 @@ class UsingItemReceiveTest {
     }
 
     @Test
-    void rewriteClickAirWhenEqualsFastWouldFail() {
-        Item apple = Item.get(ItemID.APPLE);
-        Item mismatch = Item.get(ItemID.APPLE);
-        mismatch.setDamage(1);
-        assertTrue(UsingItemReceive.shouldRewriteClickAirHeldItem(mismatch, apple));
-        assertTrue(UsingItemReceive.shouldRewriteClickAirHeldItem(null, apple));
-        assertFalse(UsingItemReceive.shouldRewriteClickAirHeldItem(apple.clone(), apple));
-        assertFalse(UsingItemReceive.shouldRewriteClickAirHeldItem(Item.get(ItemID.STICK), Item.get(ItemID.STICK)));
-    }
-
-    @Test
     void ignoreOnlyImmediateDuplicateClickAir() {
         assertTrue(UsingItemReceive.shouldIgnoreDuplicateClickAirStart(true, true, 0));
         assertTrue(UsingItemReceive.shouldIgnoreDuplicateClickAirStart(true, true, 1));
@@ -91,10 +80,11 @@ class UsingItemReceiveTest {
     }
 
     @Test
-    void keepUsingOnlyWhenSprintArrivesWithStartUsingItem() {
-        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true));
-        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, false));
-        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, true));
+    void keepUsingOnlyForJavaSprintAndStartUsingItem() {
+        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, true));
+        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, false));
+        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, true, true));
+        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, false, true));
     }
 
     @Test
@@ -105,36 +95,32 @@ class UsingItemReceiveTest {
         assertTrue(UsingItemReceive.isItemUseOnPlayerAction(PlayerActionPacket.ACTION_START_ITEM_USE_ON));
         assertTrue(UsingItemReceive.isItemUseOnPlayerAction(PlayerActionPacket.ACTION_STOP_ITEM_USE_ON));
         assertFalse(UsingItemReceive.isItemUseOnPlayerAction(PlayerActionPacket.ACTION_START_USING_ITEM));
-        assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_START_ITEM_USE_ON));
-        assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_STOP_ITEM_USE_ON));
-        assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_START_USING_ITEM));
-        assertTrue(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_ABORT_BREAK));
-        assertTrue(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(99));
+        assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(true, PlayerActionPacket.ACTION_START_ITEM_USE_ON));
+        assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(true, PlayerActionPacket.ACTION_STOP_ITEM_USE_ON));
+        assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(true, PlayerActionPacket.ACTION_START_USING_ITEM));
+        assertTrue(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(true, PlayerActionPacket.ACTION_ABORT_BREAK));
+        assertTrue(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(false, PlayerActionPacket.ACTION_START_ITEM_USE_ON));
+        assertTrue(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(false, PlayerActionPacket.ACTION_START_USING_ITEM));
+        assertTrue(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(false, 99));
     }
 
     @Test
-    void sameSlotMobEquipmentKeepsUsing() {
-        assertFalse(UsingItemReceive.shouldClearUsingOnMobEquipment(true, 0, 0));
-        assertTrue(UsingItemReceive.shouldClearUsingOnMobEquipment(true, 0, 1));
-        assertFalse(UsingItemReceive.shouldClearUsingOnMobEquipment(false, 0, 1));
+    void sameSlotMobEquipmentKeepsUsingOnlyForJavaClient() {
+        assertFalse(UsingItemReceive.shouldClearUsingOnMobEquipment(true, true, 0, 0));
+        assertTrue(UsingItemReceive.shouldClearUsingOnMobEquipment(true, true, 0, 1));
+        assertTrue(UsingItemReceive.shouldClearUsingOnMobEquipment(false, true, 0, 0));
+        assertFalse(UsingItemReceive.shouldClearUsingOnMobEquipment(true, false, 0, 1));
     }
 
     @Test
-    void keepUsingWhenClickBlockArrivesDuringHold() {
-        assertTrue(UsingItemReceive.shouldKeepUsingOnClickBlock(true, true));
-        assertFalse(UsingItemReceive.shouldKeepUsingOnClickBlock(false, true));
-        assertFalse(UsingItemReceive.shouldKeepUsingOnClickBlock(true, false));
+    void keepUsingOnClickBlockOnlyForJavaClient() {
+        assertTrue(UsingItemReceive.shouldKeepUsingOnClickBlock(true, true, true, false));
+        assertFalse(UsingItemReceive.shouldKeepUsingOnClickBlock(false, true, true, false));
+        assertFalse(UsingItemReceive.shouldKeepUsingOnClickBlock(true, false, true, false));
+        assertFalse(UsingItemReceive.shouldKeepUsingOnClickBlock(true, true, false, false));
+        assertFalse(UsingItemReceive.shouldKeepUsingOnClickBlock(true, true, true, true));
     }
 
-    @Test
-    void keepUsingOnReleaseOnlyForTheFirstTicks() {
-        assertTrue(UsingItemReceive.shouldKeepUsingOnEarlyRelease(true, true, 0));
-        assertTrue(UsingItemReceive.shouldKeepUsingOnEarlyRelease(true, true, 1));
-        assertFalse(UsingItemReceive.shouldKeepUsingOnEarlyRelease(true, true, 2));
-        assertFalse(UsingItemReceive.shouldKeepUsingOnEarlyRelease(true, true, 31));
-        assertFalse(UsingItemReceive.shouldKeepUsingOnEarlyRelease(false, true, 0));
-        assertFalse(UsingItemReceive.shouldKeepUsingOnEarlyRelease(true, false, 0));
-    }
 
     @Test
     void netease860AuthInputStartUsingItemDecodesAndWouldSetUsingItem() {

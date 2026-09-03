@@ -25,9 +25,9 @@ public final class UsingItemReceiveProbe {
         PlayerAuthInputPacket packet = decodeNetEase860StartUsingItem();
         boolean decodedStart = UsingItemReceive.authInputStartsUsingItem(packet);
         boolean wouldStart = UsingItemReceive.shouldStartUsingFromAuthInput(true, false, false, true, decodedStart);
-        boolean keepSprint = UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, decodedStart);
-        boolean startActionKept = !UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_START_USING_ITEM);
-        boolean useOnKept = !UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(PlayerActionPacket.ACTION_START_ITEM_USE_ON);
+        boolean keepSprint = UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, decodedStart);
+        boolean startActionKept = !UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(true, PlayerActionPacket.ACTION_START_USING_ITEM);
+        boolean useOnKept = !UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(true, PlayerActionPacket.ACTION_START_ITEM_USE_ON);
         if (!decodedStart || !wouldStart || !keepSprint || !startActionKept || !useOnKept) {
             throw new IllegalStateException("UsingItem receive probe failed: decodedStart=" + decodedStart
                     + " wouldStart=" + wouldStart

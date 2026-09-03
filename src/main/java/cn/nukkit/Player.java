@@ -4235,7 +4235,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     } else {
                         this.setSprinting(true);
                         if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
-                                authHoldToUse, authStartUsingItem)) {
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem)) {
                             this.setUsingItem(false);
                         }
                     }
@@ -4733,11 +4733,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break packetswitch;
                     case PlayerActionPacket.ACTION_START_ITEM_USE_ON:
                     case PlayerActionPacket.ACTION_STOP_ITEM_USE_ON:
-                        // Block item-use-on: skip default setUsingItem(false), do not start hold-to-use.
-                        break packetswitch;
+                        // ViaProxy Java uses these as block-interaction compatibility markers.
+                        if (this.isJavaClient()) {
+                            break packetswitch;
+                        }
+                        break;
                 }
 
-                if (UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(playerActionPacket.action)) {
+                if (UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(this.isJavaClient(), playerActionPacket.action)) {
                     this.setUsingItem(false);
                 }
                 break;
@@ -5489,7 +5492,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
-                    if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
+                    boolean heldSlotChanged = inventory.getHeldItemIndex() != useItemData.hotbarSlot;
+                    if (heldSlotChanged) {
                         inventory.equipItem(useItemData.hotbarSlot);
                     }
 
@@ -5509,7 +5513,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             Item clickBlockHeld = this.inventory.getItemInHand();
-                            if (UsingItemReceive.shouldKeepUsingOnClickBlock(this.isUsingItem(), UsingItemReceive.isHoldToUseItem(clickBlockHeld))) {
+                            if (UsingItemReceive.shouldKeepUsingOnClickBlock(
+                                    this.isJavaClient(),
+                                    this.isUsingItem(),
+                                    UsingItemReceive.isHoldToUseItem(clickBlockHeld),
+                                    heldSlotChanged)) {
                                 return;
                             }
                             this.setUsingItem(false);
@@ -5634,14 +5642,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             item = this.inventory.getItemInHand();
-                            if (UsingItemReceive.shouldRewriteClickAirHeldItem(useItemData.itemInHand, item)) {
-                                useItemData.itemInHand = item.clone();
-                            }
                             if (item instanceof ItemCrossbow && (this.isSpectator() || !item.onClickAir(this, directionVector))) {
                                 return;
                             }
 
-                            if (!item.equalsFast(useItemData.itemInHand)) {
+                            if (useItemData.itemInHand == null || !item.equalsFast(useItemData.itemInHand)) {
+                                server.getLogger().debug(this.username + ": CLICK_AIR held item mismatch, server="
+                                        + item + ", client=" + useItemData.itemInHand);
                                 this.needSendHeldItem = true;
                                 break;
                             }
@@ -5845,10 +5852,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 if (this.isUsingItem()) {
                                     item = this.inventory.getItemInHand();
                                     int ticksUsed = this.server.getTick() - this.startAction;
-                                    if (UsingItemReceive.shouldKeepUsingOnEarlyRelease(
-                                            true, UsingItemReceive.isHoldToUseItem(item), ticksUsed)) {
-                                        return;
-                                    }
                                     if (!item.onRelease(this, ticksUsed)) {
                                         this.inventory.sendContents(this);
                                     }
@@ -5899,12 +5902,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 break;
                         }
                     } finally {
-                        Item heldAfterRelease = this.inventory != null ? this.inventory.getItemInHandFast() : null;
-                        int ticksUsedAfterRelease = this.startAction >= 0 ? this.server.getTick() - this.startAction : -1;
-                        if (!UsingItemReceive.shouldKeepUsingOnEarlyRelease(
-                                this.isUsingItem(), UsingItemReceive.isHoldToUseItem(heldAfterRelease), ticksUsedAfterRelease)) {
-                            this.setUsingItem(false);
-                        }
+                        this.setUsingItem(false);
                     }
                     break;
                 default:

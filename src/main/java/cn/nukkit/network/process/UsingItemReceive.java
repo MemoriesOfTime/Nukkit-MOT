@@ -44,19 +44,6 @@ public final class UsingItemReceive {
     }
 
     /**
-     * MOT {@code equalsFast} is id+meta (and custom namespace). A Via encode that still
-     * decodes to a different runtime/legacy pair would otherwise drop the start and never
-     * {@code setUsingItem}. Rewrite the packet stack to the server held item so the native
-     * CLICK_AIR path can run.
-     */
-    public static boolean shouldRewriteClickAirHeldItem(Item packetItem, Item serverItem) {
-        if (!isHoldToUseItem(serverItem)) {
-            return false;
-        }
-        return packetItem == null || !packetItem.equalsFast(serverItem);
-    }
-
-    /**
      * A second CLICK_AIR while already using is treated as {@code onUse(ticksUsed)} and
      * always {@code setUsingItem(false)}. Keep that as the duration-ready finish, but
      * ignore an immediate duplicate start so Java USE_ITEM + USE_ITEM_ON cannot abort
@@ -96,9 +83,9 @@ public final class UsingItemReceive {
      * both bits, keep using. A later START_SPRINTING while already eating still
      * cancels the hold, matching vanilla sprint-cancel-eat.
      */
-    public static boolean shouldKeepUsingDespiteStartSprinting(boolean holdToUse,
+    public static boolean shouldKeepUsingDespiteStartSprinting(boolean javaClient, boolean holdToUse,
                                                                boolean startUsingItemFlag) {
-        return startUsingItemFlag && holdToUse;
+        return javaClient && startUsingItemFlag && holdToUse;
     }
 
     public static boolean isStartUsingPlayerAction(int action) {
@@ -116,41 +103,35 @@ public final class UsingItemReceive {
 
     /**
      * Unknown PlayerAction values used to fall through to {@code setUsingItem(false)}.
-     * Keep that for real interrupts, but START_USING_ITEM and START/STOP item-use-on
-     * must not.
+     * ViaProxy Java clients send START_USING_ITEM and START/STOP item-use-on as
+     * compatibility packets that must not trigger that legacy fallthrough.
      */
-    public static boolean shouldClearUsingOnUnhandledPlayerAction(int action) {
-        return !isStartUsingPlayerAction(action) && !isItemUseOnPlayerAction(action);
+    public static boolean shouldClearUsingOnUnhandledPlayerAction(boolean javaClient, int action) {
+        return !javaClient || (!isStartUsingPlayerAction(action) && !isItemUseOnPlayerAction(action));
     }
 
     /**
      * MobEquipment always cleared using, including the same-slot confirmation Java sends
-     * before CLICK_AIR. Only a real hotbar switch is an interrupt.
+     * before CLICK_AIR. Only a real hotbar switch is an interrupt for ViaProxy Java.
+     * Native Bedrock retains the old unconditional clear behavior.
+     * <p>
+     * A Java hotbar change is already an interrupt in {@code shouldClearUsingOnMobEquipment}.
+     * Duplicate Java CLICK_AIR on the first two ticks is handled by
+     * {@code shouldIgnoreDuplicateClickAirStart}. Early Java RELEASE_USE_ITEM is a
+     * real interrupt and must not be retained here.
      */
-    public static boolean shouldClearUsingOnMobEquipment(boolean alreadyUsing, int currentHeldIndex,
-                                                         int packetHotbarSlot) {
-        return alreadyUsing && currentHeldIndex != packetHotbarSlot;
+    public static boolean shouldClearUsingOnMobEquipment(boolean javaClient, boolean alreadyUsing,
+                                                         int currentHeldIndex, int packetHotbarSlot) {
+        return alreadyUsing && (!javaClient || currentHeldIndex != packetHotbarSlot);
     }
 
     /**
-     * MOT {@code USE_ITEM} CLICK_BLOCK always called {@code setUsingItem(false)} before
-     * {@code Level.useItemOn}. Java Fabric keeps sending {@code USE_ITEM_ON} at the
-     * crosshair while chewing/drawing, so that packet would abort auto-complete after
-     * 1 tick. Keep using and skip the block use; a later empty-hand / non-hold click
-     * still places/activates.
+     * ViaProxy Java emits CLICK_BLOCK while the client-side use animation is active.
+     * Native Bedrock must continue through the normal Level.useItemOn path. A changed
+     * hotbar slot always ends the old use session before the block action is handled.
      */
-    public static boolean shouldKeepUsingOnClickBlock(boolean alreadyUsing, boolean holdToUse) {
-        return alreadyUsing && holdToUse;
-    }
-
-    /**
-     * MOT {@code TYPE_RELEASE_ITEM} has a {@code finally} that always cleared using.
-     * Java may emit {@code RELEASE_USE_ITEM} on the next tick (look-at-block, NBT
-     * mismatch cancel, or local animation edge). Food/bow auto-complete from
-     * {@code processAutoCompletion()} / a duration-ready second CLICK_AIR; an early
-     * release is not a real interrupt.
-     */
-    public static boolean shouldKeepUsingOnEarlyRelease(boolean alreadyUsing, boolean holdToUse, int ticksUsed) {
-        return alreadyUsing && holdToUse && ticksUsed < 2;
+    public static boolean shouldKeepUsingOnClickBlock(boolean javaClient, boolean alreadyUsing,
+                                                       boolean holdToUse, boolean heldSlotChanged) {
+        return javaClient && alreadyUsing && holdToUse && !heldSlotChanged;
     }
 }
