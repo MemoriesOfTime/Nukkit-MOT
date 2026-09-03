@@ -1,7 +1,9 @@
 package cn.nukkit.resourcepacks.loader;
 
+import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.resourcepacks.ResourcePack;
+import cn.nukkit.utils.Config;
 import cn.nukkit.resourcepacks.ZippedResourcePack;
 import com.google.common.io.Files;
 import lombok.extern.log4j.Log4j2;
@@ -73,7 +75,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
     public List<ResourcePack> loadPacks() {
         var baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
-        for (File pack : path.listFiles()) {
+        for (File pack : orderedPackFiles()) {
             if (shouldIgnoreFile(pack.getName())) {
                 continue;
             }
@@ -101,6 +103,58 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
             }
         }
         return loadedResourcePacks;
+    }
+
+    /**
+     * Order the packs the way the server owner declared them, not the way the filesystem
+     * happened to list them.
+     *
+     * <p>{@link File#listFiles()} returns directory order, so the resource pack stack sent to
+     * every client depended on inode order: the same packs could be applied in a different
+     * priority after a redeploy, silently swapping which pack wins for a shared texture atlas
+     * key. Servers migrated from other server software already carry a {@code resource_packs.yml}
+     * with an explicit {@code resource_stack} list, so it is read here as the intended order.
+     * The first entry keeps the highest priority, matching the client stack order.
+     *
+     * <p>A pack present on disk but missing from the list is still loaded — removing it would
+     * silently drop content — but it is appended after every declared pack and reported, so an
+     * unexpected leftover archive can no longer outrank the packs that were listed on purpose.
+     */
+    protected File[] orderedPackFiles() {
+        File[] packs = this.path.listFiles();
+        if (packs == null) {
+            return new File[0];
+        }
+        List<String> declared = declaredStack();
+        File[] ordered = packs.clone();
+        Arrays.sort(ordered, Comparator
+                .comparingInt((File pack) -> {
+                    int index = declared.indexOf(pack.getName());
+                    return index < 0 ? declared.size() : index;
+                })
+                .thenComparing(File::getName));
+        if (!declared.isEmpty()) {
+            for (File pack : ordered) {
+                if (!shouldIgnoreFile(pack.getName()) && !declared.contains(pack.getName())) {
+                    log.warn("Resource pack {} is not listed in resource_packs.yml; it is applied "
+                            + "below every declared pack", pack.getName());
+                }
+            }
+        }
+        return ordered;
+    }
+
+    protected List<String> declaredStack() {
+        File config = new File(Nukkit.DATA_PATH, "resource_packs.yml");
+        if (!config.isFile()) {
+            return Collections.emptyList();
+        }
+        try {
+            return new Config(config, Config.YAML).getStringList("resource_stack");
+        } catch (RuntimeException e) {
+            log.warn("Failed to read resource_packs.yml; packs are ordered by name", e);
+            return Collections.emptyList();
+        }
     }
 
     protected static File loadDirectoryPack(File directory) {
