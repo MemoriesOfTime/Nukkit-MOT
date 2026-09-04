@@ -24,6 +24,12 @@ import java.util.List;
 
 public abstract class EntityHumanType extends EntityCreature implements InventoryHolder {
 
+    private static final String POCKETMINE_OFFHAND = "OffHandItem";
+    private static final String POCKETMINE_ENDER_CHEST = "EnderChestInventory";
+    /** Host-side durable storage must acknowledge the imported ender chest before clearing this. */
+    public static final String POCKETMINE_ENDER_IMPORT_PENDING =
+            "NukkitPocketMineEnderImportPending";
+
     protected PlayerInventory inventory;
     protected PlayerEnderChestInventory enderChestInventory;
     protected PlayerOffhandInventory offhandInventory;
@@ -47,6 +53,8 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
 
     @Override
     protected void initEntity() {
+        importPocketMineInventories(this.namedTag);
+
         this.inventory = new PlayerInventory(this);
         this.offhandInventory = new PlayerOffhandInventory(this);
 
@@ -76,6 +84,144 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
         }
 
         super.initEntity();
+    }
+
+    /**
+     * Converts the inventory tags written by PocketMine-MP to Nukkit's player-data layout.
+     *
+     * <p>PocketMine stores the offhand as a standalone {@code OffHandItem} compound and the
+     * ender chest as {@code EnderChestInventory}. Nukkit stores the same data in inventory slot
+     * {@code -106} and {@code EnderItems}. Ignoring the legacy tags makes both inventories appear
+     * empty on the first login after moving a world from PocketMine.
+     *
+     * <p>Existing Nukkit items always win their slots. A colliding legacy item is moved to the
+     * first empty slot; when no slot is available its legacy tag is retained for a later login.
+     * Successfully imported tags are removed, making the conversion idempotent.
+     */
+    static void importPocketMineInventories(CompoundTag playerData) {
+        importPocketMineOffhand(playerData);
+        if (importPocketMineEnderChest(playerData)) {
+            playerData.putBoolean(POCKETMINE_ENDER_IMPORT_PENDING, true);
+        }
+    }
+
+    private static void importPocketMineOffhand(CompoundTag playerData) {
+        if (!playerData.contains(POCKETMINE_OFFHAND, CompoundTag.class)) {
+            return;
+        }
+
+        CompoundTag legacyItem = playerData.getCompound(POCKETMINE_OFFHAND);
+        if (!containsItem(legacyItem)) {
+            playerData.remove(POCKETMINE_OFFHAND);
+            return;
+        }
+
+        ListTag<CompoundTag> inventory = playerData.contains("Inventory", ListTag.class)
+                ? playerData.getList("Inventory", CompoundTag.class)
+                : new ListTag<>("Inventory");
+
+        int targetSlot = hasItemAt(inventory, -106) ? firstEmptyMainSlot(inventory) : -106;
+        if (targetSlot == Integer.MIN_VALUE) {
+            return;
+        }
+
+        removeEmptyItemsAt(inventory, targetSlot);
+        inventory.add(legacyItem.copy().putByte("Slot", targetSlot));
+        playerData.putList(inventory);
+        playerData.remove(POCKETMINE_OFFHAND);
+    }
+
+    private static boolean importPocketMineEnderChest(CompoundTag playerData) {
+        if (!playerData.contains(POCKETMINE_ENDER_CHEST, ListTag.class)) {
+            return false;
+        }
+
+        ListTag<CompoundTag> legacy = playerData.getList(POCKETMINE_ENDER_CHEST, CompoundTag.class);
+        ListTag<CompoundTag> ender = playerData.contains("EnderItems", ListTag.class)
+                ? playerData.getList("EnderItems", CompoundTag.class)
+                : new ListTag<>("EnderItems");
+        ListTag<CompoundTag> inventory = playerData.contains("Inventory", ListTag.class)
+                ? playerData.getList("Inventory", CompoundTag.class)
+                : new ListTag<>("Inventory");
+        ListTag<CompoundTag> remaining = new ListTag<>(POCKETMINE_ENDER_CHEST);
+        boolean imported = false;
+        boolean movedToMainInventory = false;
+
+        for (CompoundTag legacyItem : legacy.getAll()) {
+            if (!containsItem(legacyItem)) {
+                continue;
+            }
+            int preferredSlot = legacyItem.getByte("Slot");
+            int targetSlot = preferredSlot >= 0 && preferredSlot < 27 && !hasItemAt(ender, preferredSlot)
+                    ? preferredSlot
+                    : firstEmptySlot(ender, 0, 27);
+            if (targetSlot != Integer.MIN_VALUE) {
+                removeEmptyItemsAt(ender, targetSlot);
+                ender.add(legacyItem.copy().putByte("Slot", targetSlot));
+                imported = true;
+            } else {
+                int mainSlot = firstEmptyMainSlot(inventory);
+                if (mainSlot == Integer.MIN_VALUE) {
+                    remaining.add(legacyItem.copy());
+                    continue;
+                }
+                removeEmptyItemsAt(inventory, mainSlot);
+                inventory.add(legacyItem.copy().putByte("Slot", mainSlot));
+                imported = true;
+                movedToMainInventory = true;
+            }
+        }
+
+        playerData.putList(ender);
+        if (movedToMainInventory) {
+            playerData.putList(inventory);
+        }
+        if (remaining.isEmpty()) {
+            playerData.remove(POCKETMINE_ENDER_CHEST);
+        } else {
+            playerData.putList(remaining);
+        }
+        return imported;
+    }
+
+    private static int firstEmptyMainSlot(ListTag<CompoundTag> inventory) {
+        return firstEmptySlot(inventory, 9, 45);
+    }
+
+    private static int firstEmptySlot(ListTag<CompoundTag> inventory, int fromInclusive, int toExclusive) {
+        for (int slot = fromInclusive; slot < toExclusive; slot++) {
+            if (!hasItemAt(inventory, slot)) {
+                return slot;
+            }
+        }
+        return Integer.MIN_VALUE;
+    }
+
+    private static boolean hasItemAt(ListTag<CompoundTag> inventory, int slot) {
+        for (CompoundTag item : inventory.getAll()) {
+            if (item.getByte("Slot") == slot && containsItem(item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void removeEmptyItemsAt(ListTag<CompoundTag> inventory, int slot) {
+        for (CompoundTag item : inventory.getAll()) {
+            if (item.getByte("Slot") == slot && !containsItem(item)) {
+                inventory.remove(item);
+            }
+        }
+    }
+
+    private static boolean containsItem(CompoundTag item) {
+        if (item.getByte("Count") <= 0) {
+            return false;
+        }
+        if (item.containsString("Name")) {
+            return !"minecraft:air".equals(item.getString("Name"));
+        }
+        return item.containsShort("id") && item.getShort("id") != Item.AIR;
     }
 
     @Override
