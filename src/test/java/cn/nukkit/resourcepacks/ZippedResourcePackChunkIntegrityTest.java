@@ -91,4 +91,38 @@ class ZippedResourcePackChunkIntegrityTest {
         assertArrayEquals(expectedSha, MessageDigest.getInstance("SHA-256").digest(reassembledBytes),
                 "reassembled SHA-256 mismatch (client would reject this pack)");
     }
+
+    @Test
+    void replacementAfterLoadKeepsOneConsistentArchive() throws Exception {
+        String manifest = "{\"format_version\":2,\"header\":{\"name\":\"T\",\"description\":\"d\","
+                + "\"uuid\":\"12345678-1234-1234-1234-123456789012\",\"version\":[1,0,0],"
+                + "\"min_engine_version\":[1,21,0]},\"modules\":[{\"type\":\"resources\","
+                + "\"uuid\":\"87654321-4321-4321-4321-210987654321\",\"version\":[1,0,0]}]}";
+        File packFile = tempDir.resolve("replaceable.zip").toFile();
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(packFile))) {
+            zos.putNextEntry(new ZipEntry("manifest.json"));
+            zos.write(manifest.getBytes(StandardCharsets.UTF_8));
+            zos.closeEntry();
+            zos.putNextEntry(new ZipEntry("textures/icon.png"));
+            zos.write(new byte[] {1, 2, 3, 4});
+            zos.closeEntry();
+        }
+
+        byte[] expectedArchive = Files.readAllBytes(packFile.toPath());
+        byte[] expectedSha = MessageDigest.getInstance("SHA-256").digest(expectedArchive);
+        ZippedResourcePack pack = new ZippedResourcePack(packFile);
+
+        Files.writeString(packFile.toPath(), "a different archive was deployed while the server stayed online");
+
+        assertEquals(expectedArchive.length, pack.getPackSize());
+        assertEquals("1.0.0", pack.getPackVersion());
+        assertArrayEquals(expectedSha, pack.getSha256());
+        java.io.ByteArrayOutputStream reassembled = new java.io.ByteArrayOutputStream();
+        int chunkSize = 17;
+        for (int off = 0; off < pack.getPackSize(); off += chunkSize) {
+            reassembled.write(pack.getPackChunk(off, chunkSize));
+        }
+        assertArrayEquals(expectedArchive, reassembled.toByteArray(),
+                "a running server must not mix a startup manifest with replacement bytes");
+    }
 }

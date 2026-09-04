@@ -3,20 +3,22 @@ package cn.nukkit.resourcepacks;
 import cn.nukkit.Server;
 import com.google.gson.JsonParser;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
 
 public class ZippedResourcePack extends AbstractResourcePack {
 
     private File file;
+    private byte[] packBytes;
     private byte[] sha256;
 
     public ZippedResourcePack(File file) {
@@ -40,29 +42,12 @@ public class ZippedResourcePack extends AbstractResourcePack {
         this.file = file;
         this.setSupportType(packType);
 
-        try (ZipFile zip = new ZipFile(file)) {
-            ZipEntry entry = zip.getEntry("manifest.json");
-            if (entry == null) {
-                entry = zip.getEntry("pack_manifest.json");
-            }
-            if (entry == null) {
-                entry = zip.stream()
-                        .filter(e-> !e.isDirectory() &&
-                                (e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") || e.getName().toLowerCase(Locale.ROOT).endsWith("pack_manifest.json")))
-                        .filter(e-> {
-                            File fe = new File(e.getName());
-                            if (!fe.getName().equalsIgnoreCase("manifest.json") && !fe.getName().equalsIgnoreCase("pack_manifest.json")) {
-                                return false;
-                            }
-                            return fe.getParent() == null || fe.getParentFile().getParent() == null;
-                        })
-                        .findFirst()
-                        .orElseThrow(()-> new IllegalArgumentException(
-                                Server.getInstance().getLanguage().translateString("nukkit.resources.zip.no-manifest")));
-            }
-
+        try {
+            this.packBytes = Files.readAllBytes(file.toPath());
+            byte[] manifestBytes = findManifest(this.packBytes);
             this.manifest = new JsonParser()
-                    .parse(new InputStreamReader(zip.getInputStream(entry), StandardCharsets.UTF_8))
+                    .parse(new InputStreamReader(
+                            new ByteArrayInputStream(manifestBytes), StandardCharsets.UTF_8))
                     .getAsJsonObject();
 
             File parentFolder = this.file.getParentFile();
@@ -81,16 +66,60 @@ public class ZippedResourcePack extends AbstractResourcePack {
         }
     }
 
+    private static byte[] findManifest(byte[] archive) throws IOException {
+        byte[] rootPackManifest = null;
+        byte[] nestedManifest = null;
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(archive))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                String name = entry.getName();
+                if (name.equals("manifest.json")) {
+                    return zip.readAllBytes();
+                }
+                if (name.equals("pack_manifest.json")) {
+                    rootPackManifest = zip.readAllBytes();
+                    continue;
+                }
+                if (nestedManifest != null) {
+                    continue;
+                }
+                String lowerName = name.toLowerCase(Locale.ROOT);
+                if (!lowerName.endsWith("manifest.json")
+                        && !lowerName.endsWith("pack_manifest.json")) {
+                    continue;
+                }
+                File manifestFile = new File(name);
+                if (!manifestFile.getName().equalsIgnoreCase("manifest.json")
+                        && !manifestFile.getName().equalsIgnoreCase("pack_manifest.json")) {
+                    continue;
+                }
+                if (manifestFile.getParent() == null
+                        || manifestFile.getParentFile().getParent() == null) {
+                    nestedManifest = zip.readAllBytes();
+                }
+            }
+        }
+        byte[] result = rootPackManifest != null ? rootPackManifest : nestedManifest;
+        if (result == null) {
+            throw new IllegalArgumentException(Server.getInstance().getLanguage()
+                    .translateString("nukkit.resources.zip.no-manifest"));
+        }
+        return result;
+    }
+
     @Override
     public int getPackSize() {
-        return (int) this.file.length();
+        return this.packBytes.length;
     }
 
     @Override
     public byte[] getSha256() {
         if (this.sha256 == null) {
             try {
-                this.sha256 = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(this.file.toPath()));
+                this.sha256 = MessageDigest.getInstance("SHA-256").digest(this.packBytes);
             } catch (Exception e) {
                 Server.getInstance().getLogger().logException(e);
             }
@@ -100,25 +129,14 @@ public class ZippedResourcePack extends AbstractResourcePack {
 
     @Override
     public byte[] getPackChunk(int off, int len) {
-        int size = this.getPackSize();
+        int size = this.packBytes.length;
         byte[] chunk;
         if (size - off > len) {
             chunk = new byte[len];
         } else {
             chunk = new byte[size - off];
         }
-
-        if (chunk.length == 0) {
-            return chunk;
-        }
-        try (RandomAccessFile raf = new RandomAccessFile(this.file, "r")) {
-            raf.seek(off);
-            raf.readFully(chunk);
-        } catch (Exception e) {
-            Server.getInstance().getLogger().logException(e);
-        }
-
-        return chunk;
+        return Arrays.copyOfRange(this.packBytes, off, off + chunk.length);
     }
 
     /**
