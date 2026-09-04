@@ -20,6 +20,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.potion.Effect;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -45,6 +46,7 @@ public class ArmorDamageReductionTest {
     @BeforeAll
     static void initServer() {
         MockServer.init();
+        Effect.init();
     }
 
     /** 同包直接访问 protected static / direct call (same package, protected static) */
@@ -695,6 +697,54 @@ public class ArmorDamageReductionTest {
                 "Legacy should keep ctor-pre-computed RESISTANCE for non-HumanType entities");
     }
 
+    @Test
+    public void testWeakerAbsorptionRefillsItsOwnHeartsWithoutReplacingStrongerEffect() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.addEffect(Effect.getEffect(Effect.ABSORPTION).setAmplifier(3).setDuration(6000));
+        target.setAbsorption(0f);
+
+        target.addEffect(
+                Effect.getEffect(Effect.ABSORPTION).setAmplifier(0).setDuration(2400),
+                cn.nukkit.event.entity.EntityPotionEffectEvent.Cause.FOOD);
+
+        assertEquals(4f, target.getAbsorption(), 0.001f,
+                "A normal golden apple must refill its four absorption points");
+        assertEquals(3, target.getEffect(Effect.ABSORPTION).getAmplifier(),
+                "The weaker apple must not replace enchanted-apple Absorption IV");
+        assertEquals(6000, target.getEffect(Effect.ABSORPTION).getDuration(),
+                "The weaker apple must not shorten the stronger effect");
+    }
+
+    @Test
+    public void testRejectedAbsorptionRefreshNeverReducesRemainingHearts() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.addEffect(Effect.getEffect(Effect.ABSORPTION).setAmplifier(3).setDuration(6000));
+        target.setAbsorption(10f);
+
+        target.addEffect(
+                Effect.getEffect(Effect.ABSORPTION).setAmplifier(0).setDuration(2400),
+                cn.nukkit.event.entity.EntityPotionEffectEvent.Cause.FOOD);
+
+        assertEquals(10f, target.getAbsorption(), 0.001f);
+    }
+
+    @Test
+    public void testRejectedNonFoodAbsorptionDoesNotRefillHearts() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.addEffect(Effect.getEffect(Effect.ABSORPTION).setAmplifier(3).setDuration(6000));
+        target.setAbsorption(0f);
+
+        target.addEffect(
+                Effect.getEffect(Effect.ABSORPTION).setAmplifier(0).setDuration(2400),
+                cn.nukkit.event.entity.EntityPotionEffectEvent.Cause.UNKNOWN);
+
+        assertEquals(0f, target.getAbsorption(), 0.001f,
+                "Only consumed food may replenish a rejected absorption effect");
+    }
+
     private static Item prot4(int id) {
         Item item = Item.get(id);
         item.addEnchantment(Enchantment.getEnchantment(Enchantment.ID_PROTECTION_ALL).setLevel(4));
@@ -706,6 +756,7 @@ public class ArmorDamageReductionTest {
         damager.chunk = chunk;
         damager.speed = new Vector3(0, 1, 0);
         lenient().when(damager.getLevel()).thenReturn(level);
+        lenient().when(damager.getAdventureSettings()).thenReturn(new cn.nukkit.AdventureSettings(damager));
         lenient().when(damager.getBoundingBox()).thenReturn(new SimpleAxisAlignedBB(0, 0, 0, 1, 2, 1));
         lenient().when(damager.isOnGround()).thenReturn(false);
         return damager;
