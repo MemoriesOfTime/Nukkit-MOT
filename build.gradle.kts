@@ -189,6 +189,13 @@ tasks {
     shadowJar {
         manifest.attributes["Multi-Release"] = "true"
 
+        // Shadow 9 defaults to EXCLUDE, which feeds only one source of the duplicated
+        // Log4j2Plugins.dat to the transformer below. The project's own (near-empty) cache
+        // then wins and log4j-core's built-in plugins are dropped, breaking log4j2.xml
+        // loading at runtime (console falls back to StatusLogger with literal § codes).
+        // INCLUDE restores the shadow 8 behavior; see GradleUp/shadow#1733.
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
         transform(Log4j2PluginsCacheFileTransformer())
 
         // Backwards compatible jar directory

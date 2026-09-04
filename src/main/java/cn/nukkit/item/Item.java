@@ -34,6 +34,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -107,18 +108,38 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     protected int stackNetId = 0;
 
+    /**
+     * 直构的裸 Item 不携带类型化行为（堆叠上限、名称、食用/工具/盔甲等），
+     * 已注册 id 必须经 {@link #get(int, Integer, int)} 或 {@link #fromString(String)} 获取。
+     * <p>
+     * A directly constructed bare {@code Item} carries no typed behavior (stack limit,
+     * name, food/tool/armor overrides); registered ids must be obtained via
+     * {@link #get(int, Integer, int)} or {@link #fromString(String)}.
+     */
+    @ApiStatus.Internal
     public Item(int id) {
         this(id, 0, 1, UNKNOWN_STR);
     }
 
+    @ApiStatus.Internal
     public Item(int id, Integer meta) {
         this(id, meta, 1, UNKNOWN_STR);
     }
 
+    @ApiStatus.Internal
     public Item(int id, Integer meta, int count) {
         this(id, meta, count, UNKNOWN_STR);
     }
 
+    /**
+     * 直构的裸 Item 不携带类型化行为（堆叠上限、名称、食用/工具/盔甲等），
+     * 已注册 id 必须经 {@link #get(int, Integer, int)} 或 {@link #fromString(String)} 获取。
+     * <p>
+     * A directly constructed bare {@code Item} carries no typed behavior (stack limit,
+     * name, food/tool/armor overrides); registered ids must be obtained via
+     * {@link #get(int, Integer, int)} or {@link #fromString(String)}.
+     */
+    @ApiStatus.Internal
     public Item(int id, Integer meta, int count, String name) {
         //this.id = id & 0xffff;
         this.id = id;
@@ -953,11 +974,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static OK<?> registerCustomItem(@NotNull Class<? extends CustomItem> clazz, boolean addCreativeItem) {
-        if (!Server.getInstance().enableExperimentMode) {
-            Server.getInstance().getLogger().warning("The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-            return new OK<>(false, "The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-        }
-
         CustomItem customItem;
         Supplier<Item> supplier;
 
@@ -995,7 +1011,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         // Register custom item in all RuntimeItemMappings
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+        for (RuntimeItemMapping mapping : RuntimeItems.values()) {
             mapping.registerCustomItem(customItem);
         }
 
@@ -1019,7 +1035,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             PENDING_CREATIVE_ITEMS.remove(namespaceId);
 
             // Remove from all RuntimeItemMappings
-            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+            for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                 mapping.deleteCustomItem((CustomItem) customItem);
             }
 
