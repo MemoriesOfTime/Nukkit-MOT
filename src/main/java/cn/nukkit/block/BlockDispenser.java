@@ -230,7 +230,10 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
         original = original.clone();
 
         DispenseBehavior behavior = DispenseBehaviorRegister.getBehavior(original);
-        Item result = behavior.dispense(this, facing, original);
+        // The behavior gets its own copy. Several behaviors answer "nothing happened, put it
+        // back" by returning the very item they were given; when that was the same object whose
+        // count is decremented below, the slot lost one item without dispensing anything.
+        Item result = behavior.dispense(this, facing, original.clone());
 
         pk.evid = LevelEventPacket.EVENT_SOUND_CLICK;
 
