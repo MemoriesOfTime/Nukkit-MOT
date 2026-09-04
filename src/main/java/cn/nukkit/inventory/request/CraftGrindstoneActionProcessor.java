@@ -82,7 +82,7 @@ public class CraftGrindstoneActionProcessor implements ItemStackRequestActionPro
                 PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
                 resultClone.getCount(), resultClone.getStackNetId(),
                 resultClone.hasCustomName() ? resultClone.getCustomName() : "",
-                resultClone.getDamage(), ""
+                ItemStackRequestActionProcessor.durabilityCorrection(resultClone), ""
         );
         return context.success(List.of(new ItemStackResponseContainer(
                 ContainerSlotType.CREATED_OUTPUT,
