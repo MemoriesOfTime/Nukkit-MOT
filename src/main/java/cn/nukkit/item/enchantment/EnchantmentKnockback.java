@@ -40,6 +40,7 @@ public class EnchantmentKnockback extends Enchantment {
             return;
         }
 
-        victim.knockBack(attacker, 0, entity.x - attacker.x, entity.z - attacker.z, this.level * 0.5);
+        victim.knockBack(attacker, 0, entity.x - attacker.x, entity.z - attacker.z,
+                this.level * 0.5, EntityLiving.DEFAULT_KNOCKBACK_VERTICAL_LIMIT);
     }
 }
