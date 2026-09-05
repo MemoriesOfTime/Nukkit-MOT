@@ -20,10 +20,6 @@ public class BlockCryingObsidian extends BlockSolid {
 
     @Override
     public double getHardness() {
-        // Bedrock parity: crying obsidian has hardness 35 on Bedrock (50 in Java), the same as
-        // obsidian. With 50 the server expected 9.4 s for a plain diamond pickaxe while every
-        // client finished in 6.6 s, so each break was refused as too fast and the block
-        // reappeared. Confirmed against PocketMine-MP VanillaBlocksInputs (35.0 /* 50 in Java */).
         return 35;
     }
 
