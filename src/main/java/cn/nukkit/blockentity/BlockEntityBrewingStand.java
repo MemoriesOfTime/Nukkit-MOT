@@ -199,7 +199,26 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
         }
 
         //20 seconds
-        BrewEvent e = new BrewEvent(this);
+        MixRecipe[] recipes = matchRecipes(false);
+        Item[] results = new Item[]{Item.AIR_ITEM, Item.AIR_ITEM, Item.AIR_ITEM};
+        for (int i = 0; i < 3; i++) {
+            MixRecipe recipe = recipes[i];
+            if (recipe == null) {
+                continue;
+            }
+            Item previous = inventory.getItem(i + 1);
+            if (previous.isNull()) {
+                continue;
+            }
+            Item result = recipe.getResult();
+            result.setCount(previous.getCount());
+            if (recipe instanceof ContainerRecipe) {
+                result.setDamage(previous.getDamage());
+            }
+            results[i] = result;
+        }
+
+        BrewEvent e = new BrewEvent(this, results);
         this.server.getPluginManager().callEvent(e);
 
         if (e.isCancelled()) {
@@ -207,8 +226,8 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
             return true;
         }
 
-        boolean mixed = false;
-        MixRecipe[] recipes = matchRecipes(false);
+        // Validate every event-authored output before changing any slot. A single invalid
+        // result must not leave a partially brewed batch without consuming ingredient/fuel.
         for (int i = 0; i < 3; i++) {
             MixRecipe recipe = recipes[i];
             if (recipe == null) {
@@ -217,12 +236,24 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
 
             Item previous = inventory.getItem(i + 1);
             if (!previous.isNull()) {
-                Item result = recipe.getResult();
-                result.setCount(previous.getCount());
-                if (recipe instanceof ContainerRecipe) {
-                    result.setDamage(previous.getDamage());
+                Item result = e.getResult(i);
+                if (result == null || result.isNull()) {
+                    stopBrewing();
+                    return true;
                 }
-                inventory.setItem(i + 1, result);
+            }
+        }
+
+        boolean mixed = false;
+        for (int i = 0; i < 3; i++) {
+            MixRecipe recipe = recipes[i];
+            if (recipe == null) {
+                continue;
+            }
+            Item previous = inventory.getItem(i + 1);
+            if (!previous.isNull()) {
+                Item result = e.getResult(i);
+                inventory.setItem(i + 1, result.clone());
                 mixed = true;
             }
         }
