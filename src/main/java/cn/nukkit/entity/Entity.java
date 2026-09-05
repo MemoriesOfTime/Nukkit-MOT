@@ -1420,7 +1420,7 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    private static int correctEntityIdentifiersProtocol(int protocolId) {
+    public static int correctEntityIdentifiersProtocol(int protocolId) {
         if (protocolId >= ProtocolInfo.v1_19_80) {
             return ProtocolInfo.v1_19_80;
         } else if (protocolId >= ProtocolInfo.v1_19_20) {
