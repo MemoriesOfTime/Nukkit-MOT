@@ -104,7 +104,19 @@ public class ResourcePackManager {
      * so no chunk read can be in flight while an old instance is closed).
      */
     public void reloadPacks() {
-        for (ResourcePack pack : this.allPacksById.values()) {
+        // Sets 去重依据 equals（按 packId），同 UUID 的后加载包会覆盖 allPacksById，
+        // 把先加载的实例挤到只在 resourcePacks/behaviorPacks 里 — 必须按身份取三个
+        // 容器的并集，否则被遮蔽的实例永远不会被 close（泄漏快照 channel）。
+        // <p>
+        // The sets dedupe by equals (packId): a later pack with the same UUID
+        // overwrites allPacksById, leaving the earlier instance only in
+        // resourcePacks/behaviorPacks — close the identity-union of all three
+        // containers or the shadowed instance is never closed (channel leak).
+        Set<ResourcePack> toClose = Collections.newSetFromMap(new IdentityHashMap<>());
+        toClose.addAll(this.allPacksById.values());
+        toClose.addAll(this.resourcePacks);
+        toClose.addAll(this.behaviorPacks);
+        for (ResourcePack pack : toClose) {
             closePackQuietly(pack);
         }
         this.allPacksById.clear();

@@ -193,6 +193,20 @@ class ZippedResourcePackChunkIntegrityTest {
                 "{\"format_version\":2,\"header\":{\"name\":\"T\",\"description\":\"d\","
                         + "\"uuid\":\"12345678-1234-1234-1234-123456789012\",\"version\":\"1.0.0\"},"
                         + "\"modules\":[]}",
+                // min_engine_version not an array (getPackProtocol would throw IllegalStateException
+                // on the login path — after construction succeeded)
+                "{\"format_version\":2,\"header\":{\"name\":\"T\",\"description\":\"d\","
+                        + "\"uuid\":\"12345678-1234-1234-1234-123456789012\",\"version\":[1,0,0],"
+                        + "\"min_engine_version\":\"1.21.0\"},\"modules\":[]}",
+                // min_engine_version with a non-numeric element (ProtocolConverter.getAsInt
+                // would throw NumberFormatException)
+                "{\"format_version\":2,\"header\":{\"name\":\"T\",\"description\":\"d\","
+                        + "\"uuid\":\"12345678-1234-1234-1234-123456789012\",\"version\":[1,0,0],"
+                        + "\"min_engine_version\":[true,0,0]},\"modules\":[]}",
+                // min_engine_version too short (convertToProtocol requires >= 3 elements)
+                "{\"format_version\":2,\"header\":{\"name\":\"T\",\"description\":\"d\","
+                        + "\"uuid\":\"12345678-1234-1234-1234-123456789012\",\"version\":[1,0,0],"
+                        + "\"min_engine_version\":[1,21]},\"modules\":[]}",
         };
         for (String manifest : malformedManifests) {
             File packFile = tempDir.resolve("malformed.zip").toFile();

@@ -51,7 +51,12 @@ public class ZippedBehaviourPack extends ZippedResourcePack {
                         }
                     }
                 } catch (Exception ignored) {
-                    log.error("Error while loading behaviour pack manifest: {}", this.getPackName(), ignored);
+                    // getPackId（uuid 已通过 verifyManifest 校验）而非 getPackName：
+                    // NetEase 包可无 name，后者会 NPE 并掩盖原始异常。
+                    // getPackId (uuid validated by verifyManifest), not getPackName:
+                    // NetEase packs may lack a name and getPackName would NPE,
+                    // masking the original error.
+                    log.error("Error while loading behaviour pack manifest: {}", this.getPackId(), ignored);
                 }
             }
     }
