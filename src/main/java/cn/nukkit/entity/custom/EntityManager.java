@@ -80,7 +80,7 @@ public class EntityManager {
                     new ByteArrayInputStream(Entity.getEntityIdentifiersCache(protocol)));
             ListTag<CompoundTag> listTag = compoundTag.getList("idlist", CompoundTag.class);
             for (EntityDefinition entityDefinition : this.identifierToDefinition.values()) {
-                listTag.add(protocol <= 407 ? entityDefinition.getNetworkTagOld() : entityDefinition.getNetworkTag());
+                listTag.add(protocol <= ProtocolInfo.v1_16_0 ? entityDefinition.getNetworkTagOld() : entityDefinition.getNetworkTag());
             }
             compoundTag.putList(listTag);
             return NBTIO.writeNetwork(compoundTag);
@@ -91,22 +91,34 @@ public class EntityManager {
 
     /**
      * Vanilla identifier list of that very protocol plus every registered custom entity.
+     * <p>
+     * Any protocol version may be passed in; the legacy ({@code <= 1.16.0}) vs modern
+     * network tag format is picked automatically, and the result is cached per
+     * identifier bucket so protocols sharing a vanilla list share one cache entry.
      */
     public byte[] getNetworkTagCached(int protocol) {
-        byte[] cached = this.networkTagCache.get(protocol);
+        int cacheKey = Entity.correctEntityIdentifiersProtocol(protocol);
+        if (cacheKey == ProtocolInfo.v1_10_0 && protocol > ProtocolInfo.v1_16_0) {
+            // 408~418 (1.16.20 ~ 1.16.100 beta) share the v1_10_0 vanilla list but use
+            // the modern network tag, so they cannot reuse the <= v1_16_0 entry
+            cacheKey = ProtocolInfo.v1_16_20;
+        }
+        byte[] cached = this.networkTagCache.get(cacheKey);
         if (cached == null) {
-            cached = this.createNetworkTag(protocol);
-            this.networkTagCache.put(protocol, cached);
+            cached = this.createNetworkTag(cacheKey);
+            this.networkTagCache.put(cacheKey, cached);
         }
         return cached;
     }
 
+    @Deprecated
     public byte[] getNetworkTagCached() {
         return this.getNetworkTagCached(ProtocolInfo.CURRENT_PROTOCOL);
     }
 
+    @Deprecated
     public byte[] getNetworkTagCachedOld() {
-        return this.getNetworkTagCached(407);
+        return this.getNetworkTagCached(ProtocolInfo.v1_16_0);
     }
 
     public boolean hasCustomEntities() {

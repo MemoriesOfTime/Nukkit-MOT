@@ -51,8 +51,7 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
     public void encode() {
         this.reset();
         if (EntityManager.get().hasCustomEntities()) { // custom entities
-            this.put(EntityManager.get().getNetworkTagCached(
-                    this.protocol <= ProtocolInfo.v1_16_0 ? 407 : this.protocol));
+            this.put(EntityManager.get().getNetworkTagCached(this.protocol));
         } else {
             if (this.identifiers == null) {
                 this.identifiers = Entity.getEntityIdentifiersCache(this.protocol);
