@@ -4,6 +4,8 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.event.block.BlockFormEvent;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
+import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 
 /**
  * @author Pub4Game
@@ -37,6 +39,12 @@ public class BlockSoulSand extends BlockSolid {
     @Override
     public int getToolType() {
         return ItemTool.TYPE_SHOVEL;
+    }
+
+    @Override
+    protected AxisAlignedBB recalculateBoundingBox() {
+        return new SimpleAxisAlignedBB(
+                this.x, this.y, this.z, this.x + 1, this.y + 1 - 1 / 8d, this.z + 1);
     }
 
     @Override
