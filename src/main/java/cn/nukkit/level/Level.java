@@ -2880,7 +2880,8 @@ public class Level implements ChunkManager, Metadatable {
             item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
         }
 
-        if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)) {
+        if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)
+                && !CreativePlacementDropGuard.suppresses(this, player, target)) {
             if (!isSilkTouch && player != null && drops.length != 0) { // For example no xp from redstone if it's mined with stone pickaxe
                 if (player.isSurvival() || player.isAdventure()) {
                     this.dropExpOrb(vector.add(0.5, 0.5, 0.5), dropExp);
@@ -3163,7 +3164,12 @@ public class Level implements ChunkManager, Metadatable {
             this.scheduleUpdate(block, 1);
         }
 
-        if (!hand.place(item, block, target, face, fx, fy, fz, player)) {
+        boolean placed;
+        try (CreativePlacementDropGuard.Scope ignored =
+                     CreativePlacementDropGuard.enter(this, player, hand)) {
+            placed = hand.place(item, block, target, face, fx, fy, fz, player);
+        }
+        if (!placed) {
             if (liquidMoved) {
                 this.setBlock(block, 0, block, false, false);
                 this.setBlock(block, 1, Block.get(BlockID.AIR), false, false);
