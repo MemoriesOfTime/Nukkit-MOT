@@ -28,8 +28,15 @@ class EffectCommandSafetyTest {
     }
 
     @Test
-    void incidentValuesAreRejected() {
-        assertFalse(EffectCommand.isSafeDurationSeconds(999999));
+    void vanillaUpperBoundsAreAccepted() {
+        assertTrue(EffectCommand.isSafeDurationSeconds(999_999));
+        assertTrue(EffectCommand.isSafeAmplifier(254));
+    }
+
+    @Test
+    void valuesBeyondVanillaBoundsAreRejected() {
+        assertFalse(EffectCommand.isSafeDurationSeconds(1_000_001));
+        assertFalse(EffectCommand.isSafeDurationSeconds(9_999_999));
         assertFalse(EffectCommand.isSafeAmplifier(99999));
     }
 }

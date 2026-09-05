@@ -21,8 +21,11 @@ import java.util.Map;
  * @since 2016/1/23
  */
 public class EffectCommand extends VanillaCommand {
-    static final int MAX_DURATION_SECONDS = 3600;
-    static final int MAX_AMPLIFIER = 6;
+    // Bounds taken from vanilla /effect: 1,000,000s duration cap (introduced in BE 1.16.200), amplifier 0-255.
+    // Out-of-range values are rejected like Java Edition does; vanilla Bedrock clamps duration to the cap instead.
+    // Both stay overflow-safe: 1000000s * 20 ticks < Integer.MAX_VALUE, (255+1) << 2 absorption hearts render fine.
+    public static final int MAX_DURATION_SECONDS = 1_000_000;
+    public static final int MAX_AMPLIFIER = 255;
 
     public EffectCommand(String name) {
         super(name, "commands.effect.description", "nukkit.command.effect.usage");
