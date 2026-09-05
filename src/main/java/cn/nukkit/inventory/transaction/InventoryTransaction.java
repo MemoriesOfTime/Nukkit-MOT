@@ -147,6 +147,30 @@ public class InventoryTransaction {
         this.inventories.add(inventory);
     }
 
+    /**
+     * Replaces every executable occurrence of a pre-event workstation output.
+     * Events are fired after the network action list is built, so changing only
+     * the event item would otherwise leave the old clone to be delivered.
+     *
+     * @return a detached authoritative output, or {@code null} for an invalid event output
+     */
+    protected final Item applyEventOutputToActions(Item originalOutput, Item eventOutput) {
+        if (originalOutput == null || eventOutput == null || eventOutput.isNull()) {
+            return null;
+        }
+
+        Item authoritativeOutput = eventOutput.clone();
+        for (InventoryAction action : this.actions) {
+            if (action.getSourceItem().equalsExact(originalOutput)) {
+                action.setSourceItem(authoritativeOutput.clone());
+            }
+            if (action.getTargetItem().equalsExact(originalOutput)) {
+                action.setTargetItem(authoritativeOutput.clone());
+            }
+        }
+        return authoritativeOutput;
+    }
+
     protected final Pattern TRIM_PATTERN = Pattern.compile("^minecraft:[a-z_]+_smithing_template$");
 
     protected boolean matchItems(boolean clientAuthTrim, boolean clientAuthLapis) {
