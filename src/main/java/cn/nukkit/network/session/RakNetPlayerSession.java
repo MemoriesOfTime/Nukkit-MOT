@@ -51,6 +51,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private static final ThreadLocal<Sha256> HASH_LOCAL = ThreadLocal.withInitial(Natives.SHA_256);
     private static final ThreadLocal<byte[]> CHECKSUM_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
+    /** How many batches in a row a playing session may fail to decode before it is cut anyway. */
+    private static final int MAX_MALFORMED_BATCHES_WHILE_PLAYING = 32;
 
     private final RakNetInterface server;
     private final RakChildChannel channel;
@@ -73,6 +75,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private Cipher decryptionCipher;
     private final AtomicLong encryptCounter = new AtomicLong();
     private final AtomicLong decryptCounter = new AtomicLong();
+
+    private int consecutiveMalformedBatches;
 
     public RakNetPlayerSession(RakNetInterface server, RakChildChannel channel) {
         this.server = server;
@@ -161,7 +165,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
             buffer.readBytes(packetBuffer);
 
-            if (!this.processInboundBatch(packetBuffer, ci)) {
+            if (this.processInboundBatch(packetBuffer, ci)) {
+                this.consecutiveMalformedBatches = 0;
+            } else if (!this.keepPlayingSessionAfterMalformedBatch()) {
                 this.disconnect("Sent malformed packet");
                 Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
                     try {
@@ -598,6 +604,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                 if (!this.server.getNetwork().processBatchQuietly(packetBuffer, this.inbound, this.compressionIn, this.channel.config().getProtocolVersion(), this.player)) {
                     log.warn("[{}] Failed to decode batch packet ({} bytes, non-prefixed, compression={})",
                             this.playerLabel(), packetBuffer.length, this.compressionIn);
+                    this.logMalformedBatchCause(packetBuffer, false);
                     return false;
                 }
                 return true;
@@ -612,9 +619,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     this.player
             );
             if (!result.success()) {
-                log.warn("[{}] Failed to decode batch packet ({} bytes, prefixed, raknetProtocol={}, legacyFallback={})",
-                        this.playerLabel(), packetBuffer.length, this.channel.config().getProtocolVersion(),
+                log.warn("[{}] Failed to decode batch packet ({} bytes, prefixed, prefix=0x{}, compressionIn={}, raknetProtocol={}, legacyFallback={})",
+                        this.playerLabel(), packetBuffer.length,
+                        packetBuffer.length > 0 ? Integer.toHexString(packetBuffer[0] & 0xFF) : "-",
+                        this.compressionIn, this.channel.config().getProtocolVersion(),
                         this.state.getSecurity().isLegacyInboundGraceWindow());
+                this.logMalformedBatchCause(packetBuffer, true);
                 return false;
             }
 
@@ -691,10 +701,64 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         return nowNanos - childChannelAcceptedNanos >= TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
     }
 
+    /**
+     * Whether one malformed batch justifies blocking the whole address for a minute.
+     *
+     * <p>The block exists to stop a flood that never becomes a player: something sends a login
+     * packet and then garbage. A session that already reached {@link SessionLoginPhase#LOGGED_IN}
+     * is a real player who passed login, resource packs and spawn, so a single undecodable batch
+     * from it is a bug on one of the two sides, not an attack. Blocking that address kicks the
+     * player and then keeps him out for sixty seconds, which reads as a ban he cannot explain.
+     */
+    /**
+     * A batch the server cannot decode is not a reason to throw a player out of the world once the
+     * session is already playing. Every packet inside a batch carries its own length, so a batch
+     * that fails to decode costs exactly the packets it carried - a movement step, an inventory
+     * request that goes unanswered - and the client keeps sending the next batches. Killing the
+     * session instead costs the player the fight, the loot and the trust, and the reason reaches
+     * them as "Server not found" on the modern disconnect screen.
+     * <p>
+     * Sessions that have not reached {@link SessionLoginPhase#LOGGED_IN} keep the old behaviour:
+     * a malformed login is an attack surface, not a hiccup. A stream that never recovers is still
+     * cut, so a genuinely broken client cannot hold a session open forever.
+     */
+    private boolean keepPlayingSessionAfterMalformedBatch() {
+        if (this.player == null
+                || this.state.getLogin().getPhase().ordinal() < SessionLoginPhase.LOGGED_IN.ordinal()
+                || this.state.getLogin().getPhase() == SessionLoginPhase.DISCONNECTED) {
+            return false;
+        }
+        return ++this.consecutiveMalformedBatches <= MAX_MALFORMED_BATCHES_WHILE_PLAYING;
+    }
+
+    /**
+     * The quiet decode hides the reason at debug level, and the reason is the only thing that names
+     * the real defect: an action type a new client version added, a container slot type the server
+     * does not know, an item identifier it cannot resolve. Re-running the batch through the loud
+     * path costs one decompression on a path that already failed, and it happens once per dropped
+     * batch.
+     */
+    private void logMalformedBatchCause(byte[] packetBuffer, boolean prefixed) {
+        try {
+            int raknetProtocol = this.channel.config().getProtocolVersion();
+            CompressionProvider compression = prefixed
+                    ? tryResolveCompressionByPrefix(packetBuffer[0], raknetProtocol)
+                    : this.compressionIn;
+            if (compression == null || packetBuffer.length < 2) {
+                return;
+            }
+            byte[] payload = prefixed ? Arrays.copyOfRange(packetBuffer, 1, packetBuffer.length) : packetBuffer;
+            this.server.getNetwork().processBatch(payload, new ObjectArrayList<>(), compression, raknetProtocol, this.player);
+        } catch (Exception ignored) {
+            // A diagnostic must never become a second failure.
+        }
+    }
+
     static boolean shouldBlockAddressAfterMalformed(SessionLoginPhase phase, InetAddress address) {
         return address != null
                 && !address.isSiteLocalAddress()
-                && phase.ordinal() >= SessionLoginPhase.LOGIN_RECEIVED.ordinal();
+                && phase.ordinal() >= SessionLoginPhase.LOGIN_RECEIVED.ordinal()
+                && phase.ordinal() < SessionLoginPhase.LOGGED_IN.ordinal();
     }
 
     record InboundBatchDecodeResult(boolean success, CompressionProvider compression, boolean prefixed, List<DataPacket> packets) {
