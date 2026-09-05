@@ -604,11 +604,8 @@ public record CollisionHelper(Entity entity) {
                     if (block instanceof BlockBarrier && entity.canPassThroughBarrier()) {
                         continue;
                     }
-                    if (!block.canPassThrough() && block.collidesWithBB(boundingBox)) {
-                        AxisAlignedBB blockBB = block.getBoundingBox();
-                        if (blockBB != null) {
-                            collides.add(blockBB);
-                        }
+                    if (!block.canPassThrough()) {
+                        block.addCollisionBoxesToList(boundingBox, collides);
                     }
                 }
             }
