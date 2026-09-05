@@ -5999,7 +5999,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         int tmpX = target.getFloorX() + each.getXOffset();
                         int tmpY = target.getFloorY() + each.getYOffset();
                         int tmpZ = target.getFloorZ() + each.getZOffset();
-                        if (Level.xrayableBlocks[this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ)]) {
+                        int neighborBlockId = this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ);
+                        if (neighborBlockId < Block.MAX_BLOCK_ID && Level.xrayableBlocks[neighborBlockId]) {
                             vector3s[index] = new Vector3(tmpX, tmpY, tmpZ);
                             index++;
                         }
