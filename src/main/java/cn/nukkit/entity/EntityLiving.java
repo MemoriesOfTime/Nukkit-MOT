@@ -592,6 +592,17 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public void lookAt(Vector3 target) {
+        this.lookAt(target, true);
+    }
+
+    /**
+     * Turn only the entity's head towards a target while preserving the body's route-facing yaw.
+     */
+    protected void lookHeadAt(Vector3 target) {
+        this.lookAt(target, false);
+    }
+
+    private void lookAt(Vector3 target, boolean turnBody) {
         double dx = this.x - target.x;
         double dy = this.y - target.y;
         double dz = this.z - target.z;
@@ -601,7 +612,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         if (dz > 0.0d) {
             yaw = -yaw + 180.0d;
         }
-        this.setRotation(yaw, pitch);
+        if (turnBody) {
+            this.setRotation(yaw, pitch);
+        } else {
+            this.setRotation(this.yaw, pitch, yaw);
+        }
     }
 
     public EntityHuman getNearbyHuman() {
