@@ -264,6 +264,10 @@ public class CustomBlockManager {
 
         RuntimeItems.registerCustomBlockLegacyId(identifier, itemId);
 
+        for (RuntimeItemMapping mapping : RuntimeItems.values()) {
+            mapping.registerCustomBlockItem(identifier, itemId, 0);
+        }
+
         if (properties != null) {
             BlockProperties finalProperties = properties;
             variantGenerations(properties, properties.getNames().toArray(new String[0]))
@@ -272,10 +276,6 @@ public class CustomBlockManager {
 
                         for (String name : states.keySet()) {
                             meta = finalProperties.setValue(meta, name, states.get(name));
-                        }
-
-                        for (RuntimeItemMapping mapping : RuntimeItems.values()) {
-                            mapping.registerCustomBlockItem(identifier, itemId, meta);
                         }
 
                         CustomBlockState state;
@@ -287,10 +287,6 @@ public class CustomBlockManager {
                         }
                         this.legacy2CustomState.put(state.getLegacyId(), state);
                     });
-        } else {
-            for (RuntimeItemMapping mapping : RuntimeItems.values()) {
-                mapping.registerCustomBlockItem(identifier, itemId, 0);
-            }
         }
 
         if (blockDefinition != null && blockDefinition.shouldRegisterCreativeItem()) {
