@@ -189,9 +189,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int TRADE_WINDOW_ID = 500;
 
     public static final float DEFAULT_SPEED = 0.1f;
-    public static final float MAXIMUM_SPEED = 0.5f;
+    public static final float MAXIMUM_SPEED = 6f;
     public static final float DEFAULT_FLY_SPEED = 0.05f;
     public static final float DEFAULT_VERTICAL_FLY_SPEED = 1.0f;
+    private static final double SWIM_POSE_HITBOX_HEIGHT = 0.6;
+    private static final int SERVER_MOTION_ALLOWANCE_TICKS = 10;
+    private static final double SERVER_MOTION_EPSILON = 1.0E-6;
 
     public static final int PERMISSION_CUSTOM = 3;
     public static final int PERMISSION_OPERATOR = 2;
@@ -339,6 +342,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int inAirTicks = 0;
     protected int startAirTicks = 5;
     protected int lastInAirTick = 0;
+    private double serverMotionAllowanceX;
+    private double serverMotionAllowanceZ;
+    private int serverMotionAllowanceTicks;
 
     protected AdventureSettings adventureSettings;
     protected Color locatorBarColor;
@@ -1401,6 +1407,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.foodData.setLevel(20, 20);
             this.sendData(this);
         } else {
+            this.clearServerMotionAllowance();
             Position respawnPosition = respawnEvent.getRespawnPosition();
             this.setPosition(respawnPosition);
             this.sendPosition(respawnPosition, yaw, pitch, MovePlayerPacket.MODE_RESET);
@@ -2411,8 +2418,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double tickDiffSq = (double) tickDiff * tickDiff;
         boolean revert = false;
 
-        // Extreme distance check
-        double extremeDistanceLimitSquared = movementSanityLimitSquared(225);
+        // 全轴极限距离检查：软拒绝后客户端-服务器分歧（含垂直穿墙）的兜底回弹阈值，量级对齐 PM1E 的 maxDist；
+        // 合法终端下落 3.9 格/tick（平方 15.2）不会触发
+        double extremeDistanceLimitSquared = movementSanityLimitSquared(49);
         if (distanceSquared / tickDiffSq > extremeDistanceLimitSquared) {
             revert = true;
             server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > "
@@ -2437,39 +2445,64 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double dy = clientPos.y - this.y;
         double dz = clientPos.z - this.z;
 
-        // fastMove collision resolution + speed check on server correction amount (EC pattern)
-        if (!revert) {
-            this.fastMove(dx, dy, dz);
+        double expectedHorizontalSqr = 0;
+        if (this.serverMotionAllowanceTicks > 0) {
+            expectedHorizontalSqr = this.consumeServerMotionAllowance(tickDiff);
+        }
 
-            // Calculate server correction amount (how much fastMove deviated from client position)
-            double diffX = this.x - clientPos.x;
-            double diffY = this.y - clientPos.y;
-            double diffZ = this.z - clientPos.z;
-
-            if (diffX != 0 || diffY != 0 || diffZ != 0) {
-                // Check correction amount, not raw client movement delta
-                if (this.checkMovement && this.riptideTicks <= 0 && this.riding == null && !this.isGliding() && !this.getAllowFlight()) {
-                    double diffHorizontalSqr = (diffX * diffX + diffZ * diffZ) / tickDiffSq;
-                    if (diffHorizontalSqr > MAXIMUM_SPEED) {
-                        PlayerInvalidMoveEvent ev;
-                        this.getServer().getPluginManager().callEvent(ev = new PlayerInvalidMoveEvent(this, true));
-                        if (!ev.isCancelled()) {
-                            revert = ev.isRevert();
-                            if (revert) {
-                                server.getLogger().debug(username + ": diffHSpeed=" + diffHorizontalSqr + " > MAXIMUM_SPEED=" + MAXIMUM_SPEED);
-                            }
-                        }
+        // Anti-speed-hack: compare client delta against server-authorized motion,
+        // matching vanilla's movedDist - expected velocity model instead of using knockback time as a blanket bypass.
+        if (!revert && this.checkMovement && this.riptideTicks <= 0 && this.riding == null && !this.isGliding() && !this.getAllowFlight()) {
+            double hSpeedSqr = Math.max(0, dx * dx + dz * dz - expectedHorizontalSqr) / tickDiffSq;
+            if (hSpeedSqr > MAXIMUM_SPEED) {
+                PlayerInvalidMoveEvent ev;
+                this.getServer().getPluginManager().callEvent(ev = new PlayerInvalidMoveEvent(this, true));
+                if (!ev.isCancelled()) {
+                    revert = ev.isRevert();
+                    if (revert) {
+                        server.getLogger().debug(username + ": hSpeedSqr=" + hSpeedSqr + " > MAXIMUM_SPEED=" + MAXIMUM_SPEED);
                     }
                 }
+            }
+        }
 
-                // Accept client position (revert flag handles correction at end)
+        if (!revert) {
+            // Anti-noclip 软拒绝：目的地碰撞时服务器不采纳该坐标、不发矫正包也不惩罚；
+            // 持续穿墙会不断拉大客户端-服务器位移差，最终由上方速度检查兜底回弹。
+            // 对骑乘/创造/旁观者完全跳过碰撞验证（骑乘坐标由载具客户端预测）。
+            // <p>
+            // Anti-noclip soft rejection: on destination collision the server simply keeps its
+            // own position and sends nothing; sustained phasing grows the client-server delta until the speed
+            // check above reverts it. skips collision validation entirely for passengers/creative/spectator.
+            boolean acceptPosition = true;
+            if (!this.isSpectator() && !this.isCreative() && this.riding == null) {
+                AxisAlignedBB offsetBox = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
+                // 站立判定盒：水平缩 0.05、垂直两侧各缩 stepHeight，楼梯/台阶上行过渡帧不误判
+                AxisAlignedBB standingBox = offsetBox.shrink(0.05, this.getStepHeight(), 0.05);
+                // 匍匐判定盒：游泳/爬行客户端 hitbox 仅 0.6 高，低矮空间（1 格缝隙）按实际姿态放行
+                AxisAlignedBB swimPoseBox = offsetBox.shrink(0.05, 0, 0.05);
+                swimPoseBox.setMaxY(swimPoseBox.getMinY() + SWIM_POSE_HITBOX_HEIGHT);
+
+                if (this.level.hasCollision(this, standingBox, false) && this.level.hasCollision(this, swimPoseBox, false)) {
+                    List<Block> colliding = CollisionHelper.getCollisionBlocks(
+                            this.level, standingBox, this, false, false,
+                            block -> !block.canPassThrough());
+                    // 脚手架/细雪允许进入（原版行为：可站入脚手架、可沉入细雪）
+                    acceptPosition = !colliding.isEmpty() && colliding.stream().allMatch(block -> {
+                        int id = block.getId();
+                        return id == BlockID.SCAFFOLDING || id == BlockID.POWDER_SNOW;
+                    });
+                }
+            }
+
+            if (acceptPosition) {
                 this.x = clientPos.x;
                 this.y = clientPos.y;
                 this.z = clientPos.z;
                 this.boundingBox.setBounds(this.x - 0.3, this.y, this.z - 0.3, this.x + 0.3, this.y + this.getHeight(), this.z + 0.3);
-
-                this.checkChunks();
             }
+
+            this.checkChunks();
 
             // Ground check
             if (!this.isSpectator() && (!this.onGround || dy != 0)) {
@@ -2565,8 +2598,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.firstMove = false;
         }
 
-        // Unified revert handling (EC pattern: MODE_NORMAL for softer correction)
         if (revert) {
+            this.clearServerMotionAllowance();
             this.x = from.x;
             this.y = from.y;
             this.z = from.z;
@@ -2581,7 +2614,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.needSendRotation = false;
             Location correction = from.add(0, 0.00001, 0);
-            this.sendPosition(correction, MovePlayerPacket.MODE_NORMAL);
+            this.sendPosition(correction, MovePlayerPacket.MODE_RESET);
             this.forceMovement = correction;
 
             if (this.speed == null) {
@@ -2700,6 +2733,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     @Override
     public boolean setMotion(Vector3 motion) {
         if (super.setMotion(motion)) {
+            boolean sentToClient = false;
             if (this.chunk != null && this.spawned) {
                 this.addMotion(this.motionX, this.motionY, this.motionZ); // Send to others
                 SetEntityMotionPacket pk = new SetEntityMotionPacket();
@@ -2707,7 +2741,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 pk.motionX = (float) motion.x;
                 pk.motionY = (float) motion.y;
                 pk.motionZ = (float) motion.z;
-                this.dataPacket(pk);
+                sentToClient = this.dataPacket(pk);
+            }
+
+            if (sentToClient) {
+                this.setServerMotionAllowance(motion);
+            } else {
+                this.clearServerMotionAllowance();
             }
 
             if (this.motionY > 0) {
@@ -2718,6 +2758,50 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return false;
+    }
+
+    /**
+     * 为服务端施加、但未通过 setMotion 下发给客户端的冲量（如爆炸击退）登记反速测配额，
+     * 避免由此产生的客户端位移被判为超速。注意：这不是 motion setter（设置速度请用
+     * {@link #setMotion} / {@link #setMotionLocally}），参数应传本次施加的冲量增量。
+     * <p>
+     * Credits the anti-speed-hack allowance for server-applied impulses not sent to the client via
+     * setMotion (e.g. explosion knockback), so the resulting client displacement is not flagged.
+     * This is not a motion setter (use {@link #setMotion} / {@link #setMotionLocally}); pass the
+     * impulse applied this time, not the accumulated motion.
+     */
+    public void setServerMotionAllowance(Vector3 motion) {
+        this.serverMotionAllowanceX = motion.x;
+        this.serverMotionAllowanceZ = motion.z;
+        this.serverMotionAllowanceTicks = SERVER_MOTION_ALLOWANCE_TICKS;
+        if (this.serverMotionAllowanceX * this.serverMotionAllowanceX + this.serverMotionAllowanceZ * this.serverMotionAllowanceZ <= SERVER_MOTION_EPSILON) {
+            this.clearServerMotionAllowance();
+        }
+    }
+
+    private double consumeServerMotionAllowance(int tickDiff) {
+        double expectedX = 0;
+        double expectedZ = 0;
+        double drag = 1 - this.getDrag();
+        for (int i = 0; i < tickDiff && this.serverMotionAllowanceTicks > 0; i++) {
+            expectedX += this.serverMotionAllowanceX;
+            expectedZ += this.serverMotionAllowanceZ;
+            this.serverMotionAllowanceX *= drag;
+            this.serverMotionAllowanceZ *= drag;
+            this.serverMotionAllowanceTicks--;
+        }
+
+        if (this.serverMotionAllowanceTicks <= 0
+                || this.serverMotionAllowanceX * this.serverMotionAllowanceX + this.serverMotionAllowanceZ * this.serverMotionAllowanceZ <= SERVER_MOTION_EPSILON) {
+            this.clearServerMotionAllowance();
+        }
+        return expectedX * expectedX + expectedZ * expectedZ;
+    }
+
+    private void clearServerMotionAllowance() {
+        this.serverMotionAllowanceX = 0;
+        this.serverMotionAllowanceZ = 0;
+        this.serverMotionAllowanceTicks = 0;
     }
 
     /**
@@ -6491,6 +6575,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void close(TextContainer message, String reason, boolean notify) {
         if (this.connected && !this.closed) {
+            this.clearServerMotionAllowance();
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
                 if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
@@ -7452,6 +7537,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.clearServerMotionAllowance();
             this.removeAllWindows();
             this.formOpen = false;
 
