@@ -2991,8 +2991,7 @@ public abstract class Entity extends Location implements Metadatable {
             }
 
             if (block.getId() == Block.POWDER_SNOW) {
-                portal = true;
-                continue;
+                powderSnow = true;
             }
 
             block.onEntityCollide(this);
@@ -3004,6 +3003,18 @@ public abstract class Entity extends Location implements Metadatable {
             inPortalTicks++;
         } else {
             this.inPortalTicks = 0;
+        }
+
+        if (powderSnow) {
+            if (this.getFreezingTicks() < 140) {
+                this.addFreezingTicks(1);
+            }
+        } else if (this.getFreezingTicks() > 0) {
+            this.addFreezingTicks(-1);
+        }
+
+        if (this.getFreezingTicks() == 140 && this.getServer().getTick() % 40 == 0) {
+            this.attack(new EntityDamageEvent(this, EntityDamageEvent.DamageCause.FREEZING, getFrostbiteInjury()));
         }
 
         if (vector.lengthSquared() > 0) {
