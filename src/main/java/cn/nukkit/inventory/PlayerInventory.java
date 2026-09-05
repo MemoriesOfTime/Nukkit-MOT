@@ -107,6 +107,9 @@ public class PlayerInventory extends BaseInventory {
 
     public void setHeldItemIndex(int index, boolean send) {
         if (index >= 0 && index < this.getHotbarSize()) {
+            if (this.itemInHandIndex != index && this.getHolder() instanceof Player player) {
+                player.resetCrossbowInputState();
+            }
             this.itemInHandIndex = index;
 
             if (this.getHolder() instanceof Player && send) {
@@ -148,13 +151,11 @@ public class PlayerInventory extends BaseInventory {
             return;
         }
 
-        this.itemInHandIndex = slot;
+        this.setHeldItemIndex(slot, false);
 
         if (this.getHolder() instanceof Player) {
             this.sendHeldItem((Player) this.getHolder());
         }
-
-        this.sendHeldItem(this.getViewers());
     }
 
     public void sendHeldItem(Player... players) {
