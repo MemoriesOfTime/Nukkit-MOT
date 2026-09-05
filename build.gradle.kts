@@ -1,4 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
+import org.gradle.api.tasks.bundling.AbstractArchiveTask
 
 plugins {
     id("java-library")
@@ -120,8 +121,15 @@ application {
     mainClass.set("cn.nukkit.Nukkit")
 }
 
+// Reproducible archives (mirrors the Maven setup in pom.xml)
+tasks.withType<AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
 gitProperties {
-    dateFormat = "dd.MM.yyyy '@' HH:mm:ss z"
+    // Only the fields Nukkit.GIT_INFO reads; the rest vary per build environment
+    keys = listOf("git.branch", "git.commit.id.abbrev")
     failOnNoGitDirectory = false
 }
 
@@ -203,6 +211,19 @@ tasks {
         archiveClassifier.set("")
 
         exclude("javax/annotation/**")
+
+        // Duplicated dependency metadata (LICENSE, netty versions, ...): INCLUDE keeps
+        // same-named entries in unstable order, so drop them for reproducibility
+        exclude(
+            "META-INF/LICENSE*",
+            "META-INF/NOTICE*",
+            "META-INF/DEPENDENCIES*",
+            "META-INF/AL2.0",
+            "META-INF/LGPL2.1",
+            "META-INF/proguard/**",
+            "META-INF/io.netty.versions.properties",
+            "META-INF/maven/**",
+        )
     }
 
     runShadow {
