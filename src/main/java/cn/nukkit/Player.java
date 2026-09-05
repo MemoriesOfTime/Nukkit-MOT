@@ -72,6 +72,7 @@ import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
+import cn.nukkit.network.process.UsingItemReceive;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
 import cn.nukkit.network.protocol.netease.PyRpcPacket;
@@ -3038,6 +3039,43 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
+     * Start hold-to-use from AuthInput START_USING_ITEM / PlayerAction START_USING_ITEM
+     * using the <em>server</em> held stack. Java chew/drink is local, so the client
+     * animates even when MOT never entered using; other players only see
+     * {@code DATA_FLAG_ACTION} after this path succeeds.
+     */
+    boolean tryStartUsingHeldItem(Item item) {
+        if (!UsingItemReceive.shouldStartUsingFromAuthInput(
+                this.spawned && this.isAlive(),
+                this.isSpectator() && this.server.useClientSpectator,
+                this.isUsingItem(),
+                UsingItemReceive.isHoldToUseItem(item),
+                true)) {
+            return false;
+        }
+        Vector3 direction = this.getDirectionVector();
+        PlayerInteractEvent interactEvent = new PlayerInteractEvent(this, item, direction, this.getDirection(), Action.RIGHT_CLICK_AIR);
+        if (this.isSpectator()) {
+            interactEvent.setCancelled();
+        }
+        this.server.getPluginManager().callEvent(interactEvent);
+        if (interactEvent.isCancelled()) {
+            this.needSendHeldItem = true;
+            return false;
+        }
+        if (!item.onClickAir(this, direction) || !item.canRelease()) {
+            return false;
+        }
+        if (this.isSurvival() || this.isAdventure()) {
+            if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
+                this.inventory.setItemInHand(item);
+            }
+        }
+        this.setUsingItem(true);
+        return true;
+    }
+
+    /**
      * Processes server-side auto-completion for consumable items.
      *
      * @return true if auto-completion was triggered
@@ -4174,6 +4212,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
+                boolean authStartUsingItem = UsingItemReceive.authInputStartsUsingItem(authPacket);
+                Item authHeldItem = this.inventory.getItemInHand();
+                boolean authHoldToUse = UsingItemReceive.isHoldToUseItem(authHeldItem);
+                if (UsingItemReceive.shouldStartUsingFromAuthInput(
+                        this.spawned && this.isAlive(),
+                        this.isSpectator() && this.server.useClientSpectator,
+                        this.isUsingItem(),
+                        authHoldToUse,
+                        authStartUsingItem)) {
+                    this.tryStartUsingHeldItem(authHeldItem);
+                }
+
                 if (authPacket.getInputData().contains(AuthInputAction.START_SPRINTING)) {
                     PlayerToggleSprintEvent playerToggleSprintEvent = new PlayerToggleSprintEvent(this, true);
                     if ((this.foodData.getLevel() <= 6 && !this.getAdventureSettings().get(Type.FLYING)) ||
@@ -4186,7 +4236,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
-                        this.setUsingItem(false);
+                        if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem)) {
+                            this.setUsingItem(false);
+                        }
                     }
                 }
 
@@ -4677,9 +4730,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.getAdventureSettings().set(Type.FLYING, playerToggleFlightEvent.isFlying());
                         }
                         break packetswitch;
+                    case PlayerActionPacket.ACTION_START_USING_ITEM:
+                        this.tryStartUsingHeldItem(this.inventory.getItemInHand());
+                        break packetswitch;
+                    case PlayerActionPacket.ACTION_START_ITEM_USE_ON:
+                    case PlayerActionPacket.ACTION_STOP_ITEM_USE_ON:
+                        // ViaProxy Java uses these as block-interaction compatibility markers.
+                        if (this.isJavaClient()) {
+                            break packetswitch;
+                        }
+                        break;
                 }
 
-                this.setUsingItem(false);
+                if (UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(this.isJavaClient(), playerActionPacket.action)) {
+                    this.setUsingItem(false);
+                }
                 break;
             case ProtocolInfo.INTERACT_PACKET:
                 if (!this.spawned || !this.isAlive()) {
@@ -5429,7 +5494,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
-                    if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
+                    boolean heldSlotChanged = inventory.getHeldItemIndex() != useItemData.hotbarSlot;
+                    if (heldSlotChanged) {
                         inventory.equipItem(useItemData.hotbarSlot);
                     }
 
@@ -5448,6 +5514,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 return;
                             }
 
+                            Item clickBlockHeld = this.inventory.getItemInHand();
+                            if (UsingItemReceive.shouldKeepUsingOnClickBlock(
+                                    this.isJavaClient(),
+                                    this.isUsingItem(),
+                                    UsingItemReceive.isHoldToUseItem(clickBlockHeld),
+                                    heldSlotChanged)) {
+                                return;
+                            }
                             this.setUsingItem(false);
 
                             if (!(this.distance(blockVector.asVector3()) > (this.isCreative() ? 13 : 7))) {
@@ -5574,8 +5648,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 return;
                             }
 
-                            if (!item.equalsFast(useItemData.itemInHand)) {
+                            if (useItemData.itemInHand == null || !item.equalsFast(useItemData.itemInHand)) {
+                                server.getLogger().debug(this.username + ": CLICK_AIR held item mismatch, server="
+                                        + item + ", client=" + useItemData.itemInHand);
                                 this.needSendHeldItem = true;
+                                break;
+                            }
+
+                            if (UsingItemReceive.shouldIgnoreDuplicateClickAirStart(
+                                    this.isUsingItem(),
+                                    UsingItemReceive.isHoldToUseItem(item),
+                                    this.startAction >= 0 ? this.server.getTick() - this.startAction : 0)) {
                                 break;
                             }
 
@@ -5774,7 +5857,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     if (!item.onRelease(this, ticksUsed)) {
                                         this.inventory.sendContents(this);
                                     }
-                                    this.setUsingItem(false);
+                                    if (!UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(
+                                            this.isJavaClient(),
+                                            true,
+                                            UsingItemReceive.isHoldToUseItem(item),
+                                            ticksUsed)) {
+                                        this.setUsingItem(false);
+                                    }
                                 } else {
                                     this.inventory.sendContents(this);
                                 }
