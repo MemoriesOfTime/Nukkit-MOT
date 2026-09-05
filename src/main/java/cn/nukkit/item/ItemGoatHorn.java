@@ -2,19 +2,19 @@ package cn.nukkit.item;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.level.Sound;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.plugin.InternalPlugin;
-
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ItemGoatHorn extends StringItemBase {
 
-    protected int coolDownTick = 140;
+    /**
+     * Item category the vanilla client shows the cool down for. The cool down is shared by every
+     * goat horn a player carries, so it is tracked on the player and not on the item stack.
+     */
+    private static final String COOL_DOWN_CATEGORY = "goat_horn";
 
-    private final AtomicBoolean banUse = new AtomicBoolean(false);
+    protected int coolDownTick = 140;
 
     public ItemGoatHorn() {
         this(0);
@@ -37,14 +37,12 @@ public class ItemGoatHorn extends StringItemBase {
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        if (!this.banUse.getAndSet(true)) {
-            playSound(player);
-            Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> this.banUse.set(false), this.coolDownTick);
-            player.setItemCoolDown(this.coolDownTick, "goat_horn");
-            return true;
-        } else {
+        if (!player.isItemCoolDownEnd(COOL_DOWN_CATEGORY)) {
             return false;
         }
+        playSound(player);
+        player.setItemCoolDown(this.coolDownTick, COOL_DOWN_CATEGORY);
+        return true;
     }
 
     /**

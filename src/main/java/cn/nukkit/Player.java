@@ -309,6 +309,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private static final double FOV_DEGREES = 100.0;
 
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
+    /** Server tick at which the cool down of an item category ends. */
+    protected final Map<String, Integer> itemCoolDownEnds = new HashMap<>(2);
 
     /**
      * 已向本观察者下发 PlayerList(ADD) 的玩家型实体 UUID，用于去重防网易客户端隐形；
@@ -6410,14 +6412,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
-     * 设置指定itemCategory物品的冷却显示效果，注意该方法仅为客户端显示效果，冷却逻辑实现仍需自己实现
+     * 设置指定itemCategory物品的冷却：服务端记录冷却结束的tick，同时把冷却显示效果发给客户端
      * <p>
-     * Set the cooling display effect of the specified itemCategory items, note that this method is only for client-side display effect, cooling logic implementation still needs to be implemented by itself
+     * Start a cool down for the given item category. The end tick is tracked server side, so
+     * {@link #isItemCoolDownEnd(String)} stays authoritative even when the client ignores the
+     * display packet, and the packet is still sent to clients that understand it.
      *
-     * @param coolDown     the cool down
+     * @param coolDown     the cool down, in ticks; zero or less clears the cool down
      * @param itemCategory the item category
      */
     public void setItemCoolDown(int coolDown, String itemCategory) {
+        if (coolDown > 0) {
+            this.itemCoolDownEnds.put(itemCategory, this.server.getTick() + coolDown);
+        } else {
+            this.itemCoolDownEnds.remove(itemCategory);
+        }
+
         if (this.protocol < ProtocolInfo.v1_18_10) {
             return;
         }
@@ -6425,6 +6435,41 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.setCoolDownDuration(coolDown);
         pk.setItemCategory(itemCategory);
         this.dataPacket(pk);
+    }
+
+    /**
+     * 获取指定itemCategory冷却结束的tick，没有冷却时返回0
+     * <p>
+     * Gets the server tick at which the cool down of the given item category ends, or {@code 0}
+     * when this player has no running cool down for it.
+     *
+     * @param itemCategory the item category
+     * @return the end tick, or 0
+     */
+    public int getItemCoolDownEnd(String itemCategory) {
+        Integer end = this.itemCoolDownEnds.get(itemCategory);
+        if (end == null) {
+            return 0;
+        }
+        if (this.server.getTick() >= end) {
+            this.itemCoolDownEnds.remove(itemCategory);
+            return 0;
+        }
+        return end;
+    }
+
+    /**
+     * 判断指定itemCategory的冷却是否已经结束
+     * <p>
+     * Whether the cool down of the given item category has ended. Item behaviours must ask this
+     * before acting: the cool down belongs to the player, not to a single item stack, so two
+     * identical items in the inventory share one cool down.
+     *
+     * @param itemCategory the item category
+     * @return true when the item may be used again
+     */
+    public boolean isItemCoolDownEnd(String itemCategory) {
+        return this.getItemCoolDownEnd(itemCategory) == 0;
     }
 
     /**
