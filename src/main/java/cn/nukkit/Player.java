@@ -155,6 +155,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int SPECTATOR = 3;
     public static final int VIEW = SPECTATOR;
 
+    private static final double CREATIVE_BREAK_POSITION_EPSILON = 1.0E-4;
+    private static final int CREATIVE_BREAK_CORRECTION_TICKS = 5;
+
     public static final int CRAFTING_SMALL = 0;
     public static final int CRAFTING_BIG = 1;
     public static final int ANVIL_WINDOW_ID = 2;
@@ -256,6 +259,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected long randomClientId;
 
     protected Location forceMovement = null;
+
+    private Level deniedCreativeBreakLevel;
+    private BlockVector3 deniedCreativeBreakBlock;
+    private int deniedCreativeBreakExpiresAtTick;
 
     protected Location teleportPosition = null;
 
@@ -660,6 +667,61 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         double speedRatio = (double) configuredFlySpeed / DEFAULT_FLY_SPEED;
         return vanillaLimitSquared * speedRatio * speedRatio;
+    }
+
+    void armDeniedCreativeBreakCorrection(BlockVector3 blockPos) {
+        if (!this.isCreative() || this.noClip || this.riding != null
+                || blockPos.distanceSquared(this) > 4
+                || blockPos.getY() + CREATIVE_BREAK_POSITION_EPSILON >= this.y) {
+            return;
+        }
+
+        Block block = this.level.getBlock(blockPos.asVector3(), false);
+        AxisAlignedBB feet = this.boundingBox.clone().shrink(0.05, 0, 0.05);
+        feet.setMinY(this.y - 0.05);
+        feet.setMaxY(this.y + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(feet)) {
+            return;
+        }
+
+        this.deniedCreativeBreakLevel = this.level;
+        this.deniedCreativeBreakBlock = new BlockVector3(
+                blockPos.getX(), blockPos.getY(), blockPos.getZ());
+        this.deniedCreativeBreakExpiresAtTick = this.server.getTick()
+                + CREATIVE_BREAK_CORRECTION_TICKS;
+    }
+
+    private Vector3 correctDeniedCreativeBreakMovement(Vector3 clientPos) {
+        if (this.deniedCreativeBreakBlock == null) {
+            return clientPos;
+        }
+        if (!this.isCreative() || this.noClip || this.riding != null
+                || this.level != this.deniedCreativeBreakLevel
+                || this.server.getTick() > this.deniedCreativeBreakExpiresAtTick) {
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+        if (clientPos.y >= this.y - CREATIVE_BREAK_POSITION_EPSILON) {
+            return clientPos;
+        }
+
+        Block block = this.level.getBlock(this.deniedCreativeBreakBlock.asVector3(), false);
+        AxisAlignedBB targetFeet = this.boundingBox
+                .getOffsetBoundingBox(clientPos.x - this.x, 0, clientPos.z - this.z)
+                .shrink(0.05, 0, 0.05);
+        targetFeet.setMinY(clientPos.y + CREATIVE_BREAK_POSITION_EPSILON);
+        targetFeet.setMaxY(this.y + 0.05);
+        if (!block.collidesWithBB(targetFeet)) {
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+
+        return new Vector3(clientPos.x, this.y, clientPos.z);
+    }
+
+    private void clearDeniedCreativeBreakCorrection() {
+        this.deniedCreativeBreakLevel = null;
+        this.deniedCreativeBreakBlock = null;
     }
 
     public void setAllowModifyWorld(boolean value) {
@@ -2433,6 +2495,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
+        Vector3 correctedClientPos = this.correctDeniedCreativeBreakMovement(clientPos);
+        boolean correctedDeniedCreativeBreak = correctedClientPos != clientPos;
+        clientPos = correctedClientPos;
+
         double dx = clientPos.x - this.x;
         double dy = clientPos.y - this.y;
         double dz = clientPos.z - this.z;
@@ -2590,7 +2656,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.speed.setComponents(0, 0, 0);
             }
         } else {
-            this.forceMovement = null;
+            if (correctedDeniedCreativeBreak) {
+                Location correction = this.getLocation().add(0, 0.00001, 0);
+                this.sendPosition(correction, MovePlayerPacket.MODE_NORMAL);
+                this.forceMovement = correction;
+            } else {
+                this.forceMovement = null;
+            }
 
             if (this.speed == null) {
                 speed = new Vector3(from.x - to.x, from.y - to.y, from.z - to.z);
@@ -5534,6 +5606,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 break;
                             }
 
+                            this.armDeniedCreativeBreakCorrection(blockVector);
                             inventory.sendContents(this);
                             inventory.sendHeldItem(this);
 
@@ -6042,6 +6115,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (canInteract) {
             handItem = this.level.useBreakOn(blockPos.asVector3(), face, handItem, this, true);
             if (handItem == null) {
+                this.armDeniedCreativeBreakCorrection(blockPos);
                 this.level.sendBlocks(new Player[]{this}, new Vector3[]{blockPos.asVector3()}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
 
                 BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
@@ -6066,6 +6140,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         inventory.sendContents(this);
         inventory.sendHeldItem(this);
+
+        this.armDeniedCreativeBreakCorrection(blockPos);
 
         if (blockPos.distanceSquared(this) < 10000) {
             Vector3 pos = blockPos.asVector3();
