@@ -310,7 +310,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
     /** Server tick at which the cool down of an item category ends. */
-    protected final Map<String, Integer> itemCoolDownEnds = new HashMap<>(2);
+    protected final Map<String, Integer> itemCoolDownEnds = new ConcurrentHashMap<>(2);
 
     /**
      * 已向本观察者下发 PlayerList(ADD) 的玩家型实体 UUID，用于去重防网易客户端隐形；
@@ -6452,7 +6452,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return 0;
         }
         if (this.server.getTick() >= end) {
-            this.itemCoolDownEnds.remove(itemCategory);
+            // remove(key, value): an unconditional remove could clobber a cool down recorded concurrently
+            this.itemCoolDownEnds.remove(itemCategory, end);
             return 0;
         }
         return end;

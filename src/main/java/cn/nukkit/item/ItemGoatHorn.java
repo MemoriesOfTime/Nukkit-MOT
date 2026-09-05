@@ -8,11 +8,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemGoatHorn extends StringItemBase {
 
-    /**
-     * Item category the vanilla client shows the cool down for. The cool down is shared by every
-     * goat horn a player carries, so it is tracked on the player and not on the item stack.
-     */
-    private static final String COOL_DOWN_CATEGORY = "goat_horn";
+    public static final String COOL_DOWN_CATEGORY = "goat_horn";
 
     protected int coolDownTick = 140;
 
