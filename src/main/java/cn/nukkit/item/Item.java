@@ -773,7 +773,21 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void removeCreativeItem(Item item) {
-        CREATIVE_ITEMS.getContents().remove(item);
+        // Item 未重写 hashCode，Map.remove 按身份哈希定位，传入新构造的实例永远匹配失败，
+        // 必须按 equals 语义迭代删除
+        // Item does not override hashCode, so Map.remove locates by identity hash and never
+        // matches a freshly constructed instance; iterate with equals semantics instead
+        var contents = CREATIVE_ITEMS.getContents();
+        boolean checkDamage = !item.isTool();
+        contents.keySet().removeIf(existing -> item.equals(existing, checkDamage));
+
+        Set<CreativeItemGroup> referenced = new HashSet<>();
+        for (CreativeItemGroup group : contents.values()) {
+            if (group != null) {
+                referenced.add(group);
+            }
+        }
+        CREATIVE_ITEMS.getGroups().removeIf(group -> !referenced.contains(group));
     }
 
     /**
@@ -1038,6 +1052,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                 mapping.deleteCustomItem((CustomItem) customItem);
             }
+
+            ItemTag.removeItemTag(namespaceId);
+            NAMESPACED_ID_ITEM.remove(normalizeNamespacedItemIdentifier(namespaceId));
+            clearRegisteredStringItemIdentifierCache(namespaceId);
 
             // Remove from creative items
             removeCreativeItem(customItem);
