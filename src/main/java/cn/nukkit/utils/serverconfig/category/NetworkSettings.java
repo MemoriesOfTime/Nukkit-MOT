@@ -35,6 +35,10 @@ public class NetworkSettings extends OkaeriConfig {
     @CustomKey("use-snappy-compression")
     private boolean useSnappyCompression = false;
 
+    @Comment("Use zlibstream compression for NetEase clients")
+    @CustomKey("use-netease-zlibstream-compression")
+    private boolean useNeteaseZlibStreamCompression = false;
+
     @Comment("Max RakNet packets per 10ms per IP")
     @CustomKey("rak-packet-limit")
     private int rakPacketLimit = 2000;

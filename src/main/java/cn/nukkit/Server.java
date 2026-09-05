@@ -578,6 +578,7 @@ public class Server {
      * Using Snappy compression
      */
     public boolean useSnappy;
+    public boolean useNeteaseZlibStream;
     /**
      * 1.19.30+ Using Client Spectator Mode
      * Because some servers may require the use of the inventory in spectator mode
@@ -3887,6 +3888,7 @@ public class Server {
         // Network
         this.networkCompressionThreshold = config.networkSettings().compressionThreshold();
         this.useSnappy = config.networkSettings().useSnappyCompression();
+        this.useNeteaseZlibStream = config.networkSettings().useNeteaseZlibStreamCompression();
         this.rakPacketLimit = config.networkSettings().rakPacketLimit();
         this.networkLoginTimeoutMilliseconds = config.networkSettings().timeoutMilliseconds();
         this.rakCookieMode = parseRakCookieMode(config.networkSettings().rakCookieMode());
