@@ -1088,6 +1088,44 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return get(id, meta, count, new byte[0]);
     }
 
+    /**
+     * Creates the item form of a block ID.
+     * <p>
+     * Block IDs above 255 use the negative legacy alias in the item registry;
+     * keeping this conversion explicit avoids confusing overlapping item and
+     * block ID spaces in {@link #get(int, Integer, int)}.
+     *
+     * @param blockId the block ID
+     * @return the item form of the block
+     */
+    public static Item getBlockItem(int blockId) {
+        return getBlockItem(blockId, 0, 1);
+    }
+
+    /**
+     * Creates the item form of a block ID with metadata.
+     *
+     * @param blockId the block ID
+     * @param meta block metadata
+     * @return the item form of the block
+     */
+    public static Item getBlockItem(int blockId, Integer meta) {
+        return getBlockItem(blockId, meta, 1);
+    }
+
+    /**
+     * Creates the item form of a block ID with metadata and count.
+     *
+     * @param blockId the block ID
+     * @param meta block metadata
+     * @param count item count
+     * @return the item form of the block
+     */
+    public static Item getBlockItem(int blockId, Integer meta, int count) {
+        int itemId = blockId > 255 ? 255 - blockId : blockId;
+        return get(itemId, meta, count);
+    }
+
     public static Item get(int id, Integer meta, int count, byte[] tags) {
         try {
             Class<?> c;
