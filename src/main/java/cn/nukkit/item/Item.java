@@ -34,6 +34,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -107,18 +108,38 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     protected int stackNetId = 0;
 
+    /**
+     * 直构的裸 Item 不携带类型化行为（堆叠上限、名称、食用/工具/盔甲等），
+     * 已注册 id 必须经 {@link #get(int, Integer, int)} 或 {@link #fromString(String)} 获取。
+     * <p>
+     * A directly constructed bare {@code Item} carries no typed behavior (stack limit,
+     * name, food/tool/armor overrides); registered ids must be obtained via
+     * {@link #get(int, Integer, int)} or {@link #fromString(String)}.
+     */
+    @ApiStatus.Internal
     public Item(int id) {
         this(id, 0, 1, UNKNOWN_STR);
     }
 
+    @ApiStatus.Internal
     public Item(int id, Integer meta) {
         this(id, meta, 1, UNKNOWN_STR);
     }
 
+    @ApiStatus.Internal
     public Item(int id, Integer meta, int count) {
         this(id, meta, count, UNKNOWN_STR);
     }
 
+    /**
+     * 直构的裸 Item 不携带类型化行为（堆叠上限、名称、食用/工具/盔甲等），
+     * 已注册 id 必须经 {@link #get(int, Integer, int)} 或 {@link #fromString(String)} 获取。
+     * <p>
+     * A directly constructed bare {@code Item} carries no typed behavior (stack limit,
+     * name, food/tool/armor overrides); registered ids must be obtained via
+     * {@link #get(int, Integer, int)} or {@link #fromString(String)}.
+     */
+    @ApiStatus.Internal
     public Item(int id, Integer meta, int count, String name) {
         //this.id = id & 0xffff;
         this.id = id;
@@ -752,7 +773,21 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void removeCreativeItem(Item item) {
-        CREATIVE_ITEMS.getContents().remove(item);
+        // Item 未重写 hashCode，Map.remove 按身份哈希定位，传入新构造的实例永远匹配失败，
+        // 必须按 equals 语义迭代删除
+        // Item does not override hashCode, so Map.remove locates by identity hash and never
+        // matches a freshly constructed instance; iterate with equals semantics instead
+        var contents = CREATIVE_ITEMS.getContents();
+        boolean checkDamage = !item.isTool();
+        contents.keySet().removeIf(existing -> item.equals(existing, checkDamage));
+
+        Set<CreativeItemGroup> referenced = new HashSet<>();
+        for (CreativeItemGroup group : contents.values()) {
+            if (group != null) {
+                referenced.add(group);
+            }
+        }
+        CREATIVE_ITEMS.getGroups().removeIf(group -> !referenced.contains(group));
     }
 
     /**
@@ -1017,6 +1052,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                 mapping.deleteCustomItem((CustomItem) customItem);
             }
+
+            ItemTag.removeItemTag(namespaceId);
+            NAMESPACED_ID_ITEM.remove(normalizeNamespacedItemIdentifier(namespaceId));
+            clearRegisteredStringItemIdentifierCache(namespaceId);
 
             // Remove from creative items
             removeCreativeItem(customItem);

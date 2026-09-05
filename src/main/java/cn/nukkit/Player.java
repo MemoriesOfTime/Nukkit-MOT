@@ -5999,7 +5999,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         int tmpX = target.getFloorX() + each.getXOffset();
                         int tmpY = target.getFloorY() + each.getYOffset();
                         int tmpZ = target.getFloorZ() + each.getZOffset();
-                        if (Level.xrayableBlocks[this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ)]) {
+                        int neighborBlockId = this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ);
+                        if (neighborBlockId < Block.MAX_BLOCK_ID && Level.xrayableBlocks[neighborBlockId]) {
                             vector3s[index] = new Vector3(tmpX, tmpY, tmpZ);
                             index++;
                         }
@@ -6873,7 +6874,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             } else {
                 // 发包给客户端清除不死图腾，防止影响自杀等操作
-                if (this.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                if (Entity.isTotem(this.getOffhandInventory().getItemFast(0))) {
                     InventorySlotPacket pk = new InventorySlotPacket();
                     pk.slot = 0;
                     pk.item = Item.AIR_ITEM;
@@ -6887,7 +6888,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 int id = this.getWindowId(this.getInventory());
                 if (id != -1) {
                     for (Entry<Integer, Item> entry : this.getInventory().getContents().entrySet()) {
-                        if (entry.getValue() instanceof ItemTotem) {
+                        if (Entity.isTotem(entry.getValue())) {
                             InventorySlotPacket pk = new InventorySlotPacket();
                             pk.slot = entry.getKey();
                             pk.item = Item.AIR_ITEM;
