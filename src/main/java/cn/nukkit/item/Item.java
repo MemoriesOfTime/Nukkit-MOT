@@ -773,7 +773,21 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void removeCreativeItem(Item item) {
-        CREATIVE_ITEMS.getContents().remove(item);
+        // Item 未重写 hashCode，Map.remove 按身份哈希定位，传入新构造的实例永远匹配失败，
+        // 必须按 equals 语义迭代删除
+        // Item does not override hashCode, so Map.remove locates by identity hash and never
+        // matches a freshly constructed instance; iterate with equals semantics instead
+        var contents = CREATIVE_ITEMS.getContents();
+        boolean checkDamage = !item.isTool();
+        contents.keySet().removeIf(existing -> item.equals(existing, checkDamage));
+
+        Set<CreativeItemGroup> referenced = new HashSet<>();
+        for (CreativeItemGroup group : contents.values()) {
+            if (group != null) {
+                referenced.add(group);
+            }
+        }
+        CREATIVE_ITEMS.getGroups().removeIf(group -> !referenced.contains(group));
     }
 
     /**
@@ -1039,6 +1053,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 mapping.deleteCustomItem((CustomItem) customItem);
             }
 
+            ItemTag.removeItemTag(namespaceId);
+            NAMESPACED_ID_ITEM.remove(normalizeNamespacedItemIdentifier(namespaceId));
+            clearRegisteredStringItemIdentifierCache(namespaceId);
+
             // Remove from creative items
             removeCreativeItem(customItem);
         }
@@ -1086,7 +1104,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             Item item;
 
             if (c == null) {
-                item = new Item(id, meta, count);
+                item = createFallbackItem(id, meta, count);
             } else if (id < 256 && id != 166) {
                 if (meta >= 0) {
                     item = new ItemBlock(Block.get(id, meta), meta, count);
@@ -1103,8 +1121,56 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
             return item;
         } catch (Exception e) {
-            return new Item(id, meta, count).setCompoundTag(tags);
+            return createFallbackItem(id, meta, count).setCompoundTag(tags);
         }
+    }
+
+    /**
+     * 已在告警过的未知物品 id，避免网络/NBT 路径重复刷日志。
+     * <p>
+     * Unknown item ids already warned about, so network/NBT paths do not spam.
+     */
+    private static final Set<Integer> warnedUnknownIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    /**
+     * 无注册类的数字 id 回退：先按映射表反查标识符归一到类型化物品（如 519 -> ItemCopperIngot，
+     * 消灭同一物品的双 id 表示）；有名字但无类的（教育版物品等）至少带上正确名称；
+     * 完全未知的 id 才落回裸 Item 并每个 id 告警一次。
+     * <p>
+     * Fallback for numeric ids without a registered class: resolve the identifier
+     * from the legacy mapping first and normalize to the typed item (e.g. 519 ->
+     * ItemCopperIngot, removing the dual-id representation of one item); ids that
+     * have a name but no class (education items etc.) at least carry the proper
+     * name; only truly unknown ids fall back to a bare Item, warned once per id.
+     */
+    private static Item createFallbackItem(int id, Integer meta, int count) {
+        String identifier = RuntimeItems.getLegacyStringFromLegacyId(id);
+        if (identifier != null) {
+            Supplier<Item> supplier = NAMESPACED_ID_ITEM.get(identifier);
+            if (supplier != null) {
+                try {
+                    Item item = supplier.get();
+                    if (item != null) {
+                        // 无类型类的标识符注册的是共享原型 supplier（() -> item），克隆后才能改状态
+                        item = item.clone();
+                    }
+                    if (item != null) {
+                        item.setCount(count);
+                        if (meta != null && meta >= 0) {
+                            item.setDamage(meta);
+                        }
+                        return item;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            String fallbackName = identifier.indexOf(':') >= 0 ? StringItem.createItemName(identifier) : identifier;
+            return new Item(id, meta, count, fallbackName);
+        }
+        if (warnedUnknownIds.add(id)) {
+            log.warn("Unknown item id {}, falling back to a bare Item", id);
+        }
+        return new Item(id, meta, count);
     }
 
     public static Item fromString(String str) {
