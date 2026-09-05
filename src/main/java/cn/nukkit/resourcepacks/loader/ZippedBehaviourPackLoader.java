@@ -32,6 +32,7 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
 
     @Override
     public List<ResourcePack> loadPacks() {
+        cleanSnapshotCache();
         BaseLang baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
         for (File pack : this.path.listFiles()) {
@@ -45,7 +46,7 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null)
-                        resourcePack = new ZippedBehaviourPack(file, packType);
+                        resourcePack = new ZippedBehaviourPack(file, packType, true);
                 } else {
                     switch (fileExt) {
                         case "zip":

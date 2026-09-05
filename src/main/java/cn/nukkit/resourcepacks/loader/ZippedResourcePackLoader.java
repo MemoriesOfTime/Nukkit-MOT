@@ -71,6 +71,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
 
     @Override
     public List<ResourcePack> loadPacks() {
+        cleanSnapshotCache();
         var baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
         for (File pack : path.listFiles()) {
@@ -84,7 +85,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null) {
-                        resourcePack = new ZippedResourcePack(file, packType);
+                        resourcePack = new ZippedResourcePack(file, packType, true);
                     }
                 } else {
                     switch (fileExt) {
@@ -103,6 +104,24 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         return loadedResourcePacks;
     }
 
+    /**
+     * Wipes this loader's snapshot cache dir: crash leftovers ({@code *.tmp}) and
+     * orphans of removed packs. Instances still holding a channel keep serving
+     * until it closes (POSIX: inode stays alive; Windows: deferred delete).
+     */
+    protected void cleanSnapshotCache() {
+        File cacheDir = new File(ZippedResourcePack.snapshotCacheRoot(), this.path.getName());
+        File[] children = cacheDir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (!child.delete()) {
+                log.debug("Failed to delete resource pack snapshot cache entry: {}", child);
+            }
+        }
+    }
+
     protected static File loadDirectoryPack(File directory) {
         File manifestFile = new File(directory, "manifest.json");
         if (!manifestFile.exists() || !manifestFile.isFile()) {
@@ -112,13 +131,20 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
             }
         }
 
-        File tempFile;
+        File snapshotFile;
         try {
-            tempFile = File.createTempFile("pack", ".zip");
-            tempFile.deleteOnExit();
+            // Written straight into the snapshot cache: already a fresh private
+            // snapshot, and safe from /tmp reapers on long-running servers.
+            File parent = directory.getParentFile();
+            File cacheDir = parent != null
+                    ? new File(ZippedResourcePack.snapshotCacheRoot(), parent.getName())
+                    : ZippedResourcePack.snapshotCacheRoot();
+            //noinspection ResultOfMethodCallIgnored
+            cacheDir.mkdirs();
+            snapshotFile = new File(cacheDir, directory.getName() + ".zip");
 
             FileTime time = FileTime.fromMillis(0);
-            try (ZipOutputStream stream = new ZipOutputStream(new FileOutputStream(tempFile))) {
+            try (ZipOutputStream stream = new ZipOutputStream(new FileOutputStream(snapshotFile))) {
                 stream.setLevel(Deflater.BEST_COMPRESSION);
                 Collection<File> files = new TreeSet<>(FileUtils.listFiles(directory)); // todo: add further checks
                 for (File file : files) {
@@ -146,7 +172,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         } catch (IOException e) {
             throw new RuntimeException("Unable to create temporary mcpack file", e);
         }
-        return tempFile;
+        return snapshotFile;
     }
 
     protected static List<File> getDirectoryFiles(File directory) {
