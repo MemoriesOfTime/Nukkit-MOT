@@ -78,8 +78,9 @@ public class EnchantTransaction extends InventoryTransaction {
 
         return this.inputItem.equals(eInv.getInputSlot(), true, true)
                 && (this.inputItem.getId() == this.outputItem.getId() || (this.inputItem.getId() == Item.BOOK && this.outputItem.getId() == Item.ENCHANTED_BOOK))
-                && (this.inputItem.getCount() == this.outputItem.getCount() || (this.outputItem.getId() == Item.ENCHANTED_BOOK && this.outputItem.getCount() == 1)
-                && this.checkEnchantValid());
+                && (this.inputItem.getCount() == this.outputItem.getCount()
+                        || (this.outputItem.getId() == Item.ENCHANTED_BOOK && this.outputItem.getCount() == 1))
+                && this.checkEnchantValid();
     }
 
     @Override
