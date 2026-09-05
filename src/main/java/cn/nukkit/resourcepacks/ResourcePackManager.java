@@ -81,9 +81,37 @@ public class ResourcePackManager {
         this.loaders.add(loader);
     }
 
+    /**
+     * 重新加载所有资源包。正在下载资源包的预登录玩家不做专门处理：其客户端锁定的
+     * 旧实例 size/SHA-256 校验失败后自行报错，重连即按新实例重新下载。
+     * <p>
+     * Players mid-download (pre-login) are not handled specially: the transfer
+     * they pinned fails validation on the client and they re-download from the
+     * new instances on rejoin.
+     * <p>
+     * 必须先关闭旧实例再加载：释放快照文件句柄后，loader 才能物理删除并重建
+     * 快照（Windows 上被句柄占用的名字处于 delete-pending，同名重建会以
+     * ERROR_ACCESS_DENIED 失败），同时避免旧实例的 fd 与快照磁盘空间泄漏。
+     * <p>
+     * Old instances are then closed before loading: only with their snapshot
+     * handles released can the loaders physically delete and re-create snapshot
+     * files (on Windows a pinned name stays delete-pending and re-creation fails
+     * with ERROR_ACCESS_DENIED), and it prevents the old instances' file
+     * descriptors and snapshot disk space from leaking.
+     * <p>
+     * 应在主线程调用（与玩家资源包下载同线程，保证关闭时无在途读取）。
+     * Must be called on the main thread (same thread as player pack downloads,
+     * so no chunk read can be in flight while an old instance is closed).
+     */
     public void reloadPacks() {
+        for (ResourcePack pack : this.allPacksById.values()) {
+            closePackQuietly(pack);
+        }
+        this.allPacksById.clear();
         this.resourcePacksById.clear();
         this.resourcePacks.clear();
+        this.behaviorPacksById.clear();
+        this.behaviorPacks.clear();
         this.loaders.forEach(loader -> {
             var loadedPacks = loader.loadPacks();
             loadedPacks.forEach(pack -> {
@@ -102,6 +130,16 @@ public class ResourcePackManager {
         this.applyPackConfig();
 
         log.info(Server.getInstance().getLanguage().translateString("nukkit.resources.success", String.valueOf(this.resourcePacks.size())));
+    }
+
+    private static void closePackQuietly(ResourcePack pack) {
+        if (pack instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                log.debug("Failed to close resource pack {}", pack.getPackId(), e);
+            }
+        }
     }
 
     /**

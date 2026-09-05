@@ -7,6 +7,7 @@ import org.jetbrains.annotations.ApiStatus;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,10 +31,11 @@ public class ZippedResourcePack extends AbstractResourcePack implements Closeabl
     /** Test injection point for the snapshot cache root; null = DATA_PATH default. */
     static volatile File cacheRootOverride;
 
-    private File file;
     private FileChannel snapshotChannel;
     private int packSize;
     private byte[] sha256;
+    /** Guards against a stack trace per chunk once reloadPacks() has closed the channel. */
+    private boolean channelCloseReported;
 
     public ZippedResourcePack(File file) {
         this(file, SupportType.UNIVERSAL);
@@ -52,8 +54,9 @@ public class ZippedResourcePack extends AbstractResourcePack implements Closeabl
     }
 
     /**
-     * @param alreadySnapshot file is already a fresh private snapshot (produced by
-     *                        {@code ZippedResourcePackLoader#loadDirectoryPack}); held without copying
+     * @param alreadySnapshot file is a fresh private snapshot (produced by
+     *                        {@code ZippedResourcePackLoader#loadDirectoryPack}); the constructor takes
+     *                        ownership of it: held without copying, deleted here on failure
      */
     @ApiStatus.Internal
     public ZippedResourcePack(File file, SupportType packType, boolean alreadySnapshot) {
@@ -62,10 +65,9 @@ public class ZippedResourcePack extends AbstractResourcePack implements Closeabl
                     .translateString("nukkit.resources.zip.not-found", file.getName()));
         }
 
-        this.file = file;
         this.setSupportType(packType);
 
-        File parentFolder = this.file.getParentFile();
+        File parentFolder = file.getParentFile();
         if (parentFolder == null || !parentFolder.isDirectory()) {
             throw new IllegalArgumentException("Invalid resource pack path");
         }
@@ -73,7 +75,11 @@ public class ZippedResourcePack extends AbstractResourcePack implements Closeabl
         File snapshotTmp = null;
         try {
             if (alreadySnapshot) {
-                this.packSize = (int) file.length();
+                long length = file.length();
+                if (length > Integer.MAX_VALUE) {
+                    throw new IOException("Resource pack too large (" + length + " bytes): " + file.getName());
+                }
+                this.packSize = (int) length;
                 this.sha256 = digestFile(file);
             } else {
                 snapshotTmp = copyToSnapshot(file);
@@ -86,26 +92,28 @@ public class ZippedResourcePack extends AbstractResourcePack implements Closeabl
                         .translateString("nukkit.resources.zip.invalid-manifest"));
             }
             if (snapshotTmp != null) {
-                promoteSnapshot(snapshotTmp, file.getName());
+                promoteSnapshot(snapshotTmp, new File(snapshotTmp.getParentFile(), file.getName()));
             }
         } catch (IOException e) {
-            close();
-            if (snapshotTmp != null) {
-                //noinspection ResultOfMethodCallIgnored
-                snapshotTmp.delete();
-            }
+            cleanupOnFailure(snapshotTmp, alreadySnapshot ? file : null);
             throw new IllegalArgumentException(
                     "Failed to load resource pack snapshot: " + file.getName(), e);
         } catch (RuntimeException e) {
-            close();
-            if (snapshotTmp != null) {
-                //noinspection ResultOfMethodCallIgnored
-                snapshotTmp.delete();
-            }
+            cleanupOnFailure(snapshotTmp, alreadySnapshot ? file : null);
             throw e;
         }
         // 加密密钥只能来自 packs.yml（由 ResourcePackManager.applyPackConfig 注入）。
         // Encryption keys now come exclusively from packs.yml (injected by ResourcePackManager.applyPackConfig).
+    }
+
+    /** Releases the channel and deletes the orphaned snapshot so it cannot outlive the failed instance. */
+    private void cleanupOnFailure(File snapshotTmp, File ownedSnapshot) {
+        close();
+        File orphan = snapshotTmp != null ? snapshotTmp : ownedSnapshot;
+        if (orphan != null) {
+            //noinspection ResultOfMethodCallIgnored
+            orphan.delete();
+        }
     }
 
     private void loadManifest(File snapshot) throws IOException {
@@ -171,19 +179,28 @@ public class ZippedResourcePack extends AbstractResourcePack implements Closeabl
 
     /**
      * Renames the temp snapshot to a stable name for inspection and orphan cleanup.
-     * A failed rename is harmless: the pinned channel keeps serving the temp file.
+     * A failed rename is harmless: callers keep serving from the temp file, and the
+     * next {@code cleanSnapshotCache} sweep removes it once no channel pins it
+     * (on Windows the stable name is unusable while an old channel is still open,
+     * because the delete leaves it in the pending state where re-creation fails).
+     *
+     * @return whether the rename succeeded
      */
-    private static void promoteSnapshot(File tmp, String stableName) {
-        File stable = new File(tmp.getParentFile(), stableName);
+    @ApiStatus.Internal
+    public static boolean promoteSnapshot(File tmp, File stable) {
         try {
             Files.move(tmp.toPath(), stable.toPath(),
                     StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            return true;
         } catch (java.nio.file.AtomicMoveNotSupportedException e) {
             try {
                 Files.move(tmp.toPath(), stable.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                return true;
             } catch (IOException ignored) {
+                return false;
             }
         } catch (IOException ignored) {
+            return false;
         }
     }
 
@@ -245,6 +262,15 @@ public class ZippedResourcePack extends AbstractResourcePack implements Closeabl
                     break;
                 }
             }
+        } catch (ClosedChannelException e) {
+            // Expected after reloadPacks() closed this instance: pre-login players
+            // whose in-flight download still pins the old instance (their client
+            // fails validation and re-downloads on rejoin), or a stale reference
+            // held by a plugin. Report once instead of a stack trace per chunk.
+            if (!this.channelCloseReported) {
+                this.channelCloseReported = true;
+                Server.getInstance().getLogger().logException(e);
+            }
         } catch (Exception e) {
             Server.getInstance().getLogger().logException(e);
         }
@@ -252,7 +278,12 @@ public class ZippedResourcePack extends AbstractResourcePack implements Closeabl
         return chunk;
     }
 
-    /** Closes the snapshot channel; packs live for the process lifetime, so explicit close is rarely needed. */
+    /**
+     * Closes the snapshot channel. Called by {@link ResourcePackManager#reloadPacks()}
+     * before replacing this instance: releasing the handle first lets the snapshot
+     * file be physically deleted and re-created (on Windows a pinned name stays in
+     * delete-pending state, blocking re-creation with ERROR_ACCESS_DENIED).
+     */
     @Override
     public void close() {
         if (this.snapshotChannel != null) {
@@ -261,6 +292,12 @@ public class ZippedResourcePack extends AbstractResourcePack implements Closeabl
             } catch (IOException ignored) {
             }
         }
+    }
+
+    /** Monitoring/test hook: whether the snapshot channel is closed. */
+    @ApiStatus.Internal
+    boolean isSnapshotClosed() {
+        return this.snapshotChannel == null || !this.snapshotChannel.isOpen();
     }
 
     /**

@@ -62,7 +62,9 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
                     loadedResourcePacks.add(resourcePack);
                     log.info(baseLang.translateString("nukkit.resources.zip.loaded", pack.getName()));
                 }
-            } catch (IllegalArgumentException e) {
+            } catch (RuntimeException e) {
+                // IllegalArgumentException = bad pack (skip); RuntimeException also covers
+                // loadDirectoryPack I/O failures, so one broken pack cannot abort the whole load
                 log.warn(baseLang.translateString("nukkit.resources.fail", pack.getName(), e.getMessage()), e);
             }
         }

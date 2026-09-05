@@ -111,6 +111,17 @@ class ZippedResourcePackLoaderTest {
                 "crash leftover should be wiped");
         assertFalse(Files.exists(cacheDir.resolve("removed-pack.zip")),
                 "orphaned snapshot should be wiped");
-        assertTrue(Files.isRegularFile(cacheDir.resolve("MyDirPack.zip")));
+        // Windows 降级路径：首个实例的 channel 仍钉住 stable 名（delete-pending）时
+        // promoteSnapshot 失败，快照保留 .tmp 名 — 两种名字都算加载成功。
+        // Windows degradation: while the first instance's channel still pins the
+        // stable name, promotion fails and the snapshot keeps its .tmp name.
+        try (var snapshots = Files.list(cacheDir)) {
+            assertTrue(snapshots.filter(Files::isRegularFile).anyMatch(p -> {
+                        String name = p.getFileName().toString();
+                        return name.equals("MyDirPack.zip")
+                                || (name.startsWith("MyDirPack.zip.") && name.endsWith(".tmp"));
+                    }),
+                    "directory pack snapshot should exist (stable or tmp-fallback name)");
+        }
     }
 }

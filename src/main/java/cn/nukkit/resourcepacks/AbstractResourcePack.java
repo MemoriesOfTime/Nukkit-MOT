@@ -2,6 +2,7 @@ package cn.nukkit.resourcepacks;
 
 import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import java.util.UUID;
@@ -16,16 +17,43 @@ public abstract class AbstractResourcePack implements ResourcePack {
     private String cdnUrl = "";
     protected String encryptionKey = "";
 
+    /**
+     * 除了字段存在性，还校验后续解析无条件读取的字段类型（getPackId、getPackVersion、
+     * ZippedBehaviourPack 的 modules 扫描）：构造成功之后的抛异常路径没有清理入口，
+     * 会泄漏快照 channel，所以凡是能通过本校验的 manifest 后续解析绝不能抛异常。
+     * <p>
+     * Beyond presence, validates the types of fields that later parsing reads
+     * unconditionally: there is no cleanup path once construction has succeeded
+     * (an escaping exception would leak the snapshot channel), so any manifest
+     * accepted here must parse without throwing afterwards.
+     */
     protected boolean verifyManifest() {
-        if (this.manifest.has("format_version") && this.manifest.has("header") && this.manifest.has("modules")) {
-            JsonObject header = this.manifest.getAsJsonObject("header");
-            return (supportType == SupportType.NETEASE || (header.has("description") && header.has("name"))) &&
-                    header.has("uuid") &&
-                    header.has("version") &&
-                    header.getAsJsonArray("version").size() == 3;
-        } else {
+        if (!this.manifest.has("format_version") || !this.manifest.has("header") || !this.manifest.has("modules")) {
             return false;
         }
+        if (!this.manifest.get("header").isJsonObject() || !this.manifest.get("modules").isJsonArray()) {
+            return false;
+        }
+        JsonObject header = this.manifest.getAsJsonObject("header");
+        JsonElement uuid = header.get("uuid");
+        if (uuid == null || !uuid.isJsonPrimitive()) {
+            return false;
+        }
+        try {
+            UUID.fromString(uuid.getAsString());
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        JsonElement version = header.get("version");
+        if (version == null || !version.isJsonArray() || version.getAsJsonArray().size() != 3) {
+            return false;
+        }
+        for (JsonElement part : version.getAsJsonArray()) {
+            if (!part.isJsonPrimitive()) {
+                return false;
+            }
+        }
+        return supportType == SupportType.NETEASE || (header.has("description") && header.has("name"));
     }
 
     @Override

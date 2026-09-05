@@ -169,4 +169,47 @@ class ZippedResourcePackChunkIntegrityTest {
                     "snapshot copy should exist under the cache root");
         }
     }
+
+    @Test
+    void malformedManifestsAreRejectedWithoutLeakingSnapshot() throws Exception {
+        // 每个变体此前都能通过旧的 verifyManifest（只查字段存在性），随后在构造成功
+        // 之后的解析点抛异常（ZippedBehaviourPack 的 modules 扫描、getPackId）——那条
+        // 路径没有清理入口，会泄漏已打开的快照 channel。现在必须在 verify 阶段拒绝，
+        // 且失败清理不得留下快照文件。
+        String[] malformedManifests = {
+                // "modules" present but not an array
+                "{\"format_version\":2,\"header\":{\"name\":\"T\",\"description\":\"d\","
+                        + "\"uuid\":\"12345678-1234-1234-1234-123456789012\",\"version\":[1,0,0]},"
+                        + "\"modules\":\"oops\"}",
+                // header present but not an object
+                "{\"format_version\":2,\"header\":\"oops\",\"modules\":[]}",
+                // uuid present but unparseable (getPackId would throw later in the manager)
+                "{\"format_version\":2,\"header\":{\"name\":\"T\",\"description\":\"d\","
+                        + "\"uuid\":\"not-a-uuid\",\"version\":[1,0,0]},\"modules\":[]}",
+                // uuid not a string at all
+                "{\"format_version\":2,\"header\":{\"name\":\"T\",\"description\":\"d\","
+                        + "\"uuid\":12345,\"version\":[1,0,0]},\"modules\":[]}",
+                // version present but not a 3-element array
+                "{\"format_version\":2,\"header\":{\"name\":\"T\",\"description\":\"d\","
+                        + "\"uuid\":\"12345678-1234-1234-1234-123456789012\",\"version\":\"1.0.0\"},"
+                        + "\"modules\":[]}",
+        };
+        for (String manifest : malformedManifests) {
+            File packFile = tempDir.resolve("malformed.zip").toFile();
+            try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(packFile))) {
+                zos.putNextEntry(new ZipEntry("manifest.json"));
+                zos.write(manifest.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+            }
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ZippedBehaviourPack(packFile, ResourcePack.SupportType.UNIVERSAL),
+                    "manifest must be rejected at verify time: " + manifest);
+
+            try (var leftovers = Files.walk(tempDir.resolve("snapshot-cache"))) {
+                assertFalse(leftovers.filter(Files::isRegularFile).findAny().isPresent(),
+                        "rejected manifest must not leave a snapshot file behind: " + manifest);
+            }
+        }
+    }
 }
