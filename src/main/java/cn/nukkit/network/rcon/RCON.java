@@ -6,6 +6,10 @@ import cn.nukkit.event.server.RemoteServerCommandEvent;
 import cn.nukkit.utils.TextFormat;
 
 import java.io.IOException;
+import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Implementation of Source RCON protocol.
@@ -17,8 +21,19 @@ import java.io.IOException;
  */
 public class RCON {
 
+    /**
+     * How long a command with no immediate output may keep the connection waiting.
+     *
+     * <p>Plugin commands that talk to a database answer a few ticks after dispatch returns.
+     * Responding straight away hands the operator an empty string, which reads as a failure
+     * even when the command did its job.
+     */
+    private static final int DEFERRED_ANSWER_TICKS = 40;
+
     private final Server server;
     private final RCONServer serverThread;
+    private final List<DeferredAnswer> deferred = new ArrayList<>();
+    private long tick;
 
     public RCON(Server server, String password, String address, int port) {
         if (password.isEmpty()) {
@@ -44,6 +59,9 @@ public class RCON {
             return;
         }
 
+        this.tick++;
+        this.flushDeferred();
+
         RCONCommand command;
         while ((command = serverThread.receive()) != null) {
             RemoteConsoleCommandSender sender = new RemoteConsoleCommandSender();
@@ -54,7 +72,39 @@ public class RCON {
                 this.server.dispatchCommand(sender, command.getCommand());
             }
 
-            this.serverThread.respond(command.getSender(), command.getId(), TextFormat.clean(sender.getMessages()));
+            String answer = TextFormat.clean(sender.getMessages());
+            if (!answer.isEmpty()) {
+                this.serverThread.respond(command.getSender(), command.getId(), answer);
+                continue;
+            }
+
+            this.deferred.add(new DeferredAnswer(command.getSender(), command.getId(), sender, this.tick + DEFERRED_ANSWER_TICKS));
+        }
+    }
+
+    /**
+     * Answers the commands that had nothing to say when they returned.
+     *
+     * <p>A late answer is only sent once it stopped growing: multi line replies arrive
+     * over several ticks, and responding to the first line would cut the rest off.
+     */
+    private void flushDeferred() {
+        if (this.deferred.isEmpty()) {
+            return;
+        }
+
+        Iterator<DeferredAnswer> answers = this.deferred.iterator();
+        while (answers.hasNext()) {
+            DeferredAnswer answer = answers.next();
+            String text = TextFormat.clean(answer.sender.getMessages());
+            boolean settled = !text.isEmpty() && text.length() == answer.length;
+            if (!settled && this.tick < answer.deadline) {
+                answer.length = text.length();
+                continue;
+            }
+
+            answers.remove();
+            this.serverThread.respond(answer.channel, answer.id, text);
         }
     }
 
@@ -65,5 +115,22 @@ public class RCON {
                 serverThread.wait(5000);
             }
         } catch (InterruptedException ignored) {}
+    }
+
+    /** A command that returned without output and may still be answered. */
+    private static final class DeferredAnswer {
+
+        private final SocketChannel channel;
+        private final int id;
+        private final RemoteConsoleCommandSender sender;
+        private final long deadline;
+        private int length;
+
+        private DeferredAnswer(SocketChannel channel, int id, RemoteConsoleCommandSender sender, long deadline) {
+            this.channel = channel;
+            this.id = id;
+            this.sender = sender;
+            this.deadline = deadline;
+        }
     }
 }
