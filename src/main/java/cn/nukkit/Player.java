@@ -238,6 +238,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public Vector3 speed = null;
 
+    /** Fall damage is forgiven this long after the wings fold: the client lands a tick or two before the server sees the ground. */
+    private static final int WINGS_FOLDED_GRACE_TICKS = 10;
+    private int wingsFoldedTick = -WINGS_FOLDED_GRACE_TICKS * 2;
+
     public final HashSet<String> achievements = new HashSet<>();
 
     public int craftingType = CRAFTING_SMALL;
@@ -629,6 +633,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void resetInAirTicks() {
         this.inAirTicks = 0;
+    }
+
+    @Override
+    public void setGliding(boolean value) {
+        if (!value && this.isGliding()) {
+            this.wingsFoldedTick = this.server.getTick();
+        }
+        super.setGliding(value);
     }
 
     public void setAllowFlight(boolean value) {
@@ -2945,12 +2957,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.highestPosition = this.y;
                     }
 
-                    // Wiki: 使用鞘翅滑翔时在垂直高度下降率低于每刻 0.5 格的情况下，摔落高度被重置为 1 格。
-                    // Wiki: 玩家在较小的角度和足够低的速度上着陆不会受到坠落伤害。着陆时临界伤害角度为50°，伤害值等同于玩家从滑行的最高点直接摔落到着陆点受到的伤害。
-                    if (this.isSwimming() || this.isGliding() && Math.abs(this.speed.y) < 0.5 && this.getPitch() <= 40) {
+                    // A gliding player never accumulates fall distance, whatever the pitch and
+                    // descent speed: the wings are the brake. Whatever the last tick before the
+                    // client folded them still adds is forgiven by the grace window in attack().
+                    if (this.isSwimming() || this.isGliding()) {
                         this.resetFallDistance();
-                    } else if (this.isGliding()) {
-                        this.resetInAirTicks();
                     } else {
                         ++this.inAirTicks;
                     }
@@ -7268,6 +7279,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         } else if (source.getCause() == DamageCause.FALL && this.getAllowFlight()) {
             source.setCancelled();
+            return false;
+        } else if (source.getCause() == DamageCause.FALL
+                && this.server.getTick() - this.wingsFoldedTick <= WINGS_FOLDED_GRACE_TICKS) {
+            // Landing from a glide: the client folds the wings before the server registers the
+            // ground, and the last tick or two of descent would otherwise be charged in full.
+            source.setCancelled();
+            this.resetFallDistance();
             return false;
         } else if (source.getCause() == DamageCause.FALL) {
             Position pos = this.getPosition().floor().add(0.5, -1, 0.5);
