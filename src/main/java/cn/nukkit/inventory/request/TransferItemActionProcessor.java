@@ -91,9 +91,19 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
             return context.error();
         }
 
+        // A merge the destination cannot hold in full is vanilla behaviour, not an error: the
+        // client moves as much as fits and keeps the remainder on the source side. Refusing the
+        // whole request instead makes stacks with a small limit — ender pearls, eggs, snowballs —
+        // look like they cannot be merged at all, because the client rolls the request back and
+        // both slots stay as they were.
         int destCount = destItem.isNull() ? 0 : destItem.getCount();
-        if (destCount + count > sourceItem.getMaxStackSize()) {
+        int stackLimit = Math.min(sourceItem.getMaxStackSize(), dstInv.getMaxStackSize());
+        if (destCount >= stackLimit) {
             return context.error();
+        }
+        if (destCount + count > stackLimit) {
+            count = stackLimit - destCount;
+            fullTransfer = sourceItem.getCount() == count;
         }
 
         if (!isSlotCompatible(dstInv, dstSlot, sourceItem)) {
