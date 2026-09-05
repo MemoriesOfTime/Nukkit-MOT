@@ -942,10 +942,17 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             }
         }
 
-        if (hasConduitPower) hasteEffectLevel = Integer.max(hasteEffectLevel, 2);
+        int effectiveHasteEffectLevel = hasConduitPower
+                ? Integer.max(hasteEffectLevel, 2)
+                : hasteEffectLevel;
+
+        if (effectiveHasteEffectLevel > 0) {
+            speedMultiplier *= 1 + (0.2 * effectiveHasteEffectLevel);
+        }
 
         if (hasteEffectLevel > 0) {
-            speedMultiplier *= 1 + (0.2 * hasteEffectLevel);
+            // Bedrock applies an additional exponential bonus to the actual haste effect.
+            speedMultiplier *= Math.pow(1.2, hasteEffectLevel);
         }
 
         if (miningFatigueLevel > 0) {
