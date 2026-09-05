@@ -158,8 +158,12 @@ public class PlayerOffhandInventory extends BaseInventory {
             ensureUniqueBundleId(index, bundle);
         }
 
+        Item[] parts = splitOverstack(item);
+        item = parts[0];
+
         this.slots.put(index, item.clone());
         this.onSlotChange(index, oldItem, send);
+        this.routeOverflow(parts[1]);
         return true;
     }
 
