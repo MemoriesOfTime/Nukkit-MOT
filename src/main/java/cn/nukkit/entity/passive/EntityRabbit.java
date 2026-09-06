@@ -85,8 +85,14 @@ public class EntityRabbit extends EntityJumpingAnimal {
     }
 
     @Override
+    public boolean isBreedingItem(Item item) {
+        int id = item.getId();
+        return id == Item.DANDELION || id == Item.CARROT || id == Item.GOLDEN_CARROT;
+    }
+
+    @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.DANDELION || item.getId() == Item.CARROT || item.getId() == Item.GOLDEN_CARROT) {
+        if (this.isBreedingItem(item)) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
             this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0), item));

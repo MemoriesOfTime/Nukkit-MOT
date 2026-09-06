@@ -159,6 +159,16 @@ public class EntityIronGolem extends EntityWalkingMob {
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
+        if (!this.isLeashed()) {
+            if (item.getId() == Item.LEAD) {
+                this.leash(player);
+                return true; // onInteract: true = decrease count
+            }
+        } else {
+            this.unleash();
+            return false;
+        }
+
         if (item.getId() == ItemID.IRON_INGOT && this.health < this.getRealMaxHealth() && this.isAlive()) {
             this.heal(25f);
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_REPAIR_IRON_GOLEM);

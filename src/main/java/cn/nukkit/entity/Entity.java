@@ -24,7 +24,6 @@ import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
 import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemTotem;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
@@ -43,6 +42,7 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.*;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -1420,7 +1420,7 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    private static int correctEntityIdentifiersProtocol(int protocolId) {
+    public static int correctEntityIdentifiersProtocol(int protocolId) {
         if (protocolId >= ProtocolInfo.v1_19_80) {
             return ProtocolInfo.v1_19_80;
         } else if (protocolId >= ProtocolInfo.v1_19_20) {
@@ -1763,6 +1763,17 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
+    /**
+     * 判断是否为不死图腾：按数字 id 而非 instanceof，插件直构的 plain Item 也能识别。
+     * <p>
+     * Whether the item is a totem, matched by numeric id so plugin-created plain
+     * {@code Item} stacks are recognized as well as typed {@code ItemTotem}s.
+     */
+    @ApiStatus.Internal
+    public static boolean isTotem(Item item) {
+        return item != null && item.getId() == Item.TOTEM && item.getCount() > 0;
+    }
+
     public boolean attack(EntityDamageEvent source) {
         if (hasEffect(Effect.FIRE_RESISTANCE)
                 && (source.getCause() == DamageCause.FIRE
@@ -1833,10 +1844,10 @@ public abstract class Entity extends Location implements Metadatable {
             if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.SUICIDE) {
                 boolean totem = false;
                 boolean isOffhand = false;
-                if (p.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                if (isTotem(p.getOffhandInventory().getItemFast(0))) {
                     totem = true;
                     isOffhand = true;
-                } else if (p.getInventory().getItemInHandFast() instanceof ItemTotem) {
+                } else if (isTotem(p.getInventory().getItemInHandFast())) {
                     totem = true;
                 }
                 if (totem) {
@@ -1857,15 +1868,15 @@ public abstract class Entity extends Location implements Metadatable {
                     p.dataPacket(pk);
 
                     if (isOffhand) {
-                        p.getOffhandInventory().clear(0);
+                        p.getOffhandInventory().decreaseCount(0);
                     } else {
-                        p.getInventory().clear(p.getInventory().getHeldItemIndex());
+                        p.getInventory().decreaseCount(p.getInventory().getHeldItemIndex());
                     }
 
                     source.setCancelled(true);
                     return false;
                 }
-            } else if (p.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+            } else if (isTotem(p.getOffhandInventory().getItemFast(0))) {
                 // This damage bypasses the totem (SUICIDE/VOID) and will kill the player. Hide the
                 // offhand totem before the death/damage signal reaches the client to prevent its
                 // local auto-revival creating a "ghost" state; the real item is left untouched.
@@ -2556,6 +2567,13 @@ public abstract class Entity extends Location implements Metadatable {
                 Block down = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() - 1, this.getFloorZ(), 0, true);
                 int floor = down.getId();
 
+                EntityFallEvent event = new EntityFallEvent(this, down, fallDistance);
+                this.server.getPluginManager().callEvent(event);
+                if (event.isCancelled()) {
+                    return;
+                }
+                fallDistance = event.getFallDistance();
+
                 if (!this.noFallDamage) {
                     float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));
 
@@ -2719,7 +2737,7 @@ public abstract class Entity extends Location implements Metadatable {
         this.level.addEntity(this);
         this.chunk = null;
 
-        if (this instanceof Player) {
+        if (this instanceof Player player && player.isOnline()) {
             this.afterSwitchLevel();
         }
         return true;
@@ -3102,7 +3120,7 @@ public abstract class Entity extends Location implements Metadatable {
                 this.z = pos.z;
 
                 // Dimension change
-                if (this instanceof Player player && newLevel.getDimension() != oldLevel.getDimension()) {
+                if (this instanceof Player player && player.isOnline() && newLevel.getDimension() != oldLevel.getDimension()) {
                     player.setDimension(newLevel.getDimension());
                 }
 

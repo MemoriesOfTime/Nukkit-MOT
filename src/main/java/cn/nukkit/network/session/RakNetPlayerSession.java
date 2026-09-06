@@ -30,6 +30,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 import org.apache.logging.log4j.message.FormattedMessage;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
+import org.cloudburstmc.netty.channel.raknet.RakDisconnectReason;
 import org.cloudburstmc.netty.channel.raknet.packet.RakMessage;
 import org.cloudburstmc.netty.handler.codec.raknet.common.RakSessionCodec;
 
@@ -61,6 +62,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private Player player;
     private String disconnectReason = null;
+    private RakDisconnectReason transportDisconnectReason = null;
 
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
@@ -190,7 +192,40 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        this.disconnect("Disconnected from Server"); // TODO: timeout reason
+        this.disconnect(this.transportReason());
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object event) throws Exception {
+        if (event instanceof RakDisconnectReason reason) {
+            this.transportDisconnectReason = reason;
+        }
+        super.userEventTriggered(ctx, event);
+    }
+
+    /**
+     * RakNet already knows why the channel went down. Keeping that reason instead of one generic
+     * string lets a plugin tell an explicit client exit from an interrupted connection.
+     */
+    private String transportReason() {
+        if (this.transportDisconnectReason == null) {
+            return "transport:unknown";
+        }
+        return switch (this.transportDisconnectReason) {
+            case CLOSED_BY_REMOTE_PEER -> "transport:closed_by_remote_peer";
+            case TIMED_OUT -> "transport:timed_out";
+            case SHUTTING_DOWN -> "transport:shutting_down";
+            case DISCONNECTED -> "transport:disconnected";
+            case CONNECTION_REQUEST_FAILED -> "transport:connection_request_failed";
+            case ALREADY_CONNECTED -> "transport:already_connected";
+            case NO_FREE_INCOMING_CONNECTIONS -> "transport:no_free_incoming_connections";
+            case INCOMPATIBLE_PROTOCOL_VERSION -> "transport:incompatible_protocol_version";
+            case IP_RECENTLY_CONNECTED -> "transport:ip_recently_connected";
+            case BAD_PACKET -> "transport:bad_packet";
+            case QUEUE_TOO_LONG -> "transport:queue_too_long";
+            case SPLIT_QUEUE_TOO_LONG -> "transport:split_queue_too_long";
+            case ORDERING_QUEUE_TOO_LONG -> "transport:ordering_queue_too_long";
+        };
     }
 
     @Override

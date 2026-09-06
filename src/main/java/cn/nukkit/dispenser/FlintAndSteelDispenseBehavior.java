@@ -18,14 +18,18 @@ public class FlintAndSteelDispenseBehavior extends DefaultDispenseBehavior {
                 boolean soulFire = down.getId() == Block.SOUL_SAND || down.getId() == Block.SOUL_SOIL;
                 block.level.setBlock(target, Block.get(soulFire ? BlockID.SOUL_FIRE : BlockID.FIRE));
             }
-            item.useOn(target);
         } else if (target.getId() == BlockID.TNT) {
             target.onActivate(item);
-            item.useOn(target);
         } else {
+            // Nothing was dispensed; returning the item keeps it in the slot.
             this.success = false;
+            return item;
         }
 
-        return null;
+        // A damaged copy takes the different-damage path in BlockDispenser and is added back,
+        // so the flint and steel stays in the slot with one durability spent; returning null
+        // would let the count-- there consume the whole item instead.
+        item.useOn(target);
+        return item.getDamage() >= item.getMaxDurability() ? null : item;
     }
 }

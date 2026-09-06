@@ -170,7 +170,7 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
                                     if (!(durability != null && durability.getLevel() > 0 && (100 / (durability.getLevel() + 1)) <= new Random().nextInt(100))) {
                                         bow.setDamage(bow.getDamage() + 1);
                                         if (bow.getDamage() >= 385) {
-                                            player.getInventory().setItemInHand(new Item(0));
+                                            player.getInventory().setItemInHand(Item.AIR_ITEM.clone());
                                         } else {
                                             player.getInventory().setItemInHand(bow);
                                         }

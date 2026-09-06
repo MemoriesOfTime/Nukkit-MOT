@@ -117,6 +117,30 @@ public final class ItemTag {
     }
 
     /**
+     * 移除某物品注册的全部服务端物品 tag
+     * <p>
+     * Removes all server-side item tags registered for the given item namespaceId.
+     *
+     * @param namespaceId The item namespaceId
+     */
+    public static void removeItemTag(String namespaceId) {
+        var tagSet = ITEM_2_TAGS.remove(namespaceId);
+        if (tagSet == null) {
+            return;
+        }
+        for (var tag : tagSet) {
+            var itemSet = TAG_2_ITEMS.get(tag);
+            if (itemSet == null) {
+                continue;
+            }
+            itemSet.remove(namespaceId);
+            if (itemSet.isEmpty()) {
+                TAG_2_ITEMS.remove(tag);
+            }
+        }
+    }
+
+    /**
      * Register item tags for the given item namespaceId.
      * This is a server-side only method, DO NOT affect the client.
      *
