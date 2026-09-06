@@ -242,11 +242,12 @@ public class Materials implements NBTData {
      * <p>
      * The enum Render method.
      *
-     * @see <a href="https://wiki.bedrock.dev/blocks/blocks-16.html#additional-notes">wiki.bedrock.dev</a>
+     * @see <a href="https://wiki.bedrock.dev/blocks/block-visuals-intro#render-methods">wiki.bedrock.dev</a>
      */
     public enum RenderMethod {
         OPAQUE,
         ALPHA_TEST,
+        ALPHA_TEST_SINGLE_SIDED,
         BLEND,
         DOUBLE_SIDED
     }

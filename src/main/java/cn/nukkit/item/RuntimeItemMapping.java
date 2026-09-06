@@ -247,9 +247,6 @@ public class RuntimeItemMapping {
     synchronized boolean registerCustomItem(CustomItem customItem) {
         int runtimeId = CustomItemDefinition.getRuntimeId(customItem.getNamespaceId());
         String namespaceId = customItem.getNamespaceId();
-        if (!Server.getInstance().enableExperimentMode) {
-            return false;
-        }
         if (!this.customItems.contains(namespaceId)) { //多个版本共用一个RuntimeItemMapping时，重复不返回false
             this.customItems.add(namespaceId);
 
@@ -270,12 +267,17 @@ public class RuntimeItemMapping {
 
     synchronized void deleteCustomItem(CustomItem customItem) {
         String namespaceId = customItem.getNamespaceId();
-        if (!Server.getInstance().enableExperimentMode && !this.customItems.contains(namespaceId)) {
+        if (!this.customItems.contains(namespaceId)) {
             return;
         }
         this.customItems.remove(namespaceId);
 
-        this.runtimeId2Name.remove(customItem.getId());
+        // runtimeId2Name 以 CustomItemDefinition 分配的 runtimeId 为 key；
+        // customItem.getId() 是共享的 STRING_IDENTIFIED_ITEM，会误删原版物品的映射
+        // runtimeId2Name is keyed by the CustomItemDefinition-assigned runtimeId;
+        // customItem.getId() is the shared STRING_IDENTIFIED_ITEM and would delete a vanilla entry
+        int runtimeId = CustomItemDefinition.getRuntimeId(namespaceId);
+        this.runtimeId2Name.remove(runtimeId);
         this.name2RuntimeId.removeInt(customItem.getNamespaceId());
         this.itemPaletteEntries.removeIf(next -> next.getIdentifier().equals(customItem.getNamespaceId()));
 
@@ -299,7 +301,7 @@ public class RuntimeItemMapping {
         BinaryStream paletteBuffer = new BinaryStream();
         int size = 0;
         for (RuntimeEntry entry : this.itemPaletteEntries) {
-            if (entry.isCustomItem() && (!Server.getInstance().enableExperimentMode || protocolId < ProtocolInfo.v1_16_100)) {
+            if (entry.isCustomItem() && protocolId < ProtocolInfo.v1_16_100) {
                 break;
             }
             size++;
@@ -307,7 +309,7 @@ public class RuntimeItemMapping {
         paletteBuffer.putUnsignedVarInt(size);
         for (RuntimeEntry entry : this.itemPaletteEntries) {
             if (entry.isCustomItem()) {
-                if (Server.getInstance().enableExperimentMode && protocolId >= ProtocolInfo.v1_16_100) {
+                if (protocolId >= ProtocolInfo.v1_16_100) {
                     paletteBuffer.putString(entry.getIdentifier());
                     paletteBuffer.putLShort(entry.getRuntimeId());
                     var def = Item.getCustomItemDefinition(entry.getIdentifier());

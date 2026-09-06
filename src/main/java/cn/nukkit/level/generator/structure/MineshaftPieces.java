@@ -424,7 +424,7 @@ public final class MineshaftPieces {
                 for (int z = 0; z <= z1; ++z) {
                     final BlockState block = getBlock(level, 1, -1, z, boundingBox);
                     final int id = level.getBlockIdAt(getWorldX(1, z), getWorldY(-1), getWorldZ(1, z));
-                    if (!block.equals(BlockState.AIR) && Block.solid[id] && !Block.transparent[id]) {
+                    if (!block.equals(BlockState.AIR) && Block.isBlockSolidById(id) && !Block.isBlockTransparentById(id)) {
                         maybeGenerateBlock(level, boundingBox, random, isInterior(level, 1, 0, z, boundingBox) ? 70 : 90, 1, 0, z, RAIL__NS);
                     }
                 }

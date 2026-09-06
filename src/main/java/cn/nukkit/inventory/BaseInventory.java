@@ -11,6 +11,8 @@ import cn.nukkit.event.inventory.InventoryOpenEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemBundle;
+import cn.nukkit.level.Level;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -20,6 +22,7 @@ import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.ApiStatus;
 
 import java.util.*;
@@ -28,6 +31,7 @@ import java.util.*;
  * @author MagicDroidX
  * Nukkit Project
  */
+@Log4j2
 public abstract class BaseInventory implements Inventory {
 
     protected final InventoryType type;
@@ -165,16 +169,29 @@ public abstract class BaseInventory implements Inventory {
             items = newItems;
         }
 
+        // 溢出必须等所有槽位定稿后再装：逐槽写入中途 addItem 的话，
+        // 溢出会被后续槽位的 setItem/clear 覆盖丢失
+        // Route overflow only after every slot is final; inserting it mid-loop
+        // would let later iterations overwrite or clear it.
+        List<Item> deferredOverflow = new ArrayList<>();
         for (int i = 0; i < this.size; ++i) {
             if (!items.containsKey(i)) {
                 if (this.slots.containsKey(i)) {
                     this.clear(i);
                 }
             } else {
-                if (!this.setItem(i, items.get(i))) {
+                Item[] parts = splitOverstack(items.get(i));
+                if (this.setItem(i, parts[0])) {
+                    if (parts[1] != null) {
+                        deferredOverflow.add(parts[1]);
+                    }
+                } else {
                     this.clear(i);
                 }
             }
+        }
+        for (Item overflow : deferredOverflow) {
+            this.routeOverflow(overflow);
         }
     }
 
@@ -214,10 +231,74 @@ public abstract class BaseInventory implements Inventory {
             ensureUniqueBundleId(index, bundle);
         }
 
+        Item[] parts = splitOverstack(item);
+        item = parts[0];
+
         Item old = this.getItem(index);
         this.slots.put(index, item.clone());
         this.onSlotChange(index, old, send);
+        this.routeOverflow(parts[1]);
         return true;
+    }
+
+    /**
+     * 把超叠堆拆分为"本槽合法数量 + 溢出"，不动调用方传入的对象。
+     * 返回数组：[0] 应写入本槽的堆（原对象或克隆），[1] 溢出堆或 null。
+     * <p>
+     * Split an overstacked item into the legal per-slot amount plus overflow,
+     * without mutating the caller's object. Returns [the stack to store in
+     * this slot (original object or a clone), the overflow or null].
+     */
+    protected final Item[] splitOverstack(Item item) {
+        // 用 getter 而非字段：ShelfInventory 等覆写 getMaxStackSize() 收紧单槽上限
+        // Use the getter, not the field: ShelfInventory etc. override getMaxStackSize()
+        int limit = Math.min(item.getMaxStackSize(), this.getMaxStackSize());
+        if (item.getCount() <= limit || limit <= 0) {
+            return new Item[]{item, null};
+        }
+        Item capped = item.clone();
+        capped.setCount(limit);
+        Item overflow = item.clone();
+        overflow.setCount(item.getCount() - limit);
+        // 溢出是服务端新产生的堆，清零 netId 让下游 setItem 重新分配；
+        // 否则克隆与封顶堆共享同一 netId，破坏 SAI 的堆唯一标识
+        overflow.setStackNetId(0);
+        return new Item[]{capped, overflow};
+    }
+
+    /**
+     * 溢出部分先尝试装回本库存，装不下再在世界掉落；无位置可掉的
+     * （虚拟库存）记 warn 后丢弃，保证超叠永远不会留在单个槽位里。
+     * <p>
+     * Route overflow back into this inventory first, then drop it in the
+     * world; if there is nowhere to drop (virtual inventory), warn and discard
+     * so an overstack never stays in a single slot.
+     */
+    protected final void routeOverflow(Item overflow) {
+        if (overflow == null || overflow.isNull() || overflow.getCount() <= 0) {
+            return;
+        }
+        for (Item drop : this.addItem(overflow)) {
+            if (drop == null || drop.getCount() <= 0) {
+                continue;
+            }
+            InventoryHolder holder = this.getHolder();
+            Level level = null;
+            Vector3 pos = null;
+            if (holder instanceof Entity entity) {
+                level = entity.getLevel();
+                pos = entity;
+            } else if (holder instanceof BlockEntity blockEntity) {
+                level = blockEntity.getLevel();
+                pos = blockEntity;
+            }
+            if (level != null && pos != null) {
+                level.dropItem(pos, drop);
+            } else {
+                log.warn("Discarded overstack overflow of {}x item id {} from inventory without a droppable location",
+                        drop.getCount(), drop.getId());
+            }
+        }
     }
 
     @Override
@@ -227,9 +308,13 @@ public abstract class BaseInventory implements Inventory {
             return;
         }
         Item old = this.getItem(index);
+        Item overflow = null;
         if (item == null || item.isNull() || item.getCount() <= 0) {
             this.slots.remove(index);
         } else {
+            Item[] parts = splitOverstack(item);
+            item = parts[0];
+            overflow = parts[1];
             if (item.getStackNetId() == 0) {
                 item.autoAssignStackNetworkId();
             }
@@ -243,6 +328,64 @@ public abstract class BaseInventory implements Inventory {
             ((BlockEntity) holder).setDirty();
         }
         this.onSlotChange(index, old, false);
+        this.routeOverflowForce(overflow);
+    }
+
+    /**
+     * setItemForce 专用的溢出处理：契约要求不触发事件、不发网络包、
+     * 不产生世界掉落，因此绕过 addItem/setItem，按堆叠上限分块直接
+     * 写入空槽；装不下的记 warn 丢弃。
+     * <p>
+     * Overflow handling for setItemForce: the contract forbids events, network
+     * packets and world drops, so chunks of up to the stack limit are written
+     * straight into empty slots, bypassing addItem/setItem; whatever does not
+     * fit is discarded with a warning.
+     */
+    protected final void routeOverflowForce(Item overflow) {
+        if (overflow == null || overflow.isNull() || overflow.getCount() <= 0) {
+            return;
+        }
+        int limit = Math.min(overflow.getMaxStackSize(), this.getMaxStackSize());
+        if (limit <= 0) {
+            return;
+        }
+        // 先合并已有同类堆叠，保持与 addItem 相同的库存填充顺序。
+        // Merge into compatible partial stacks first, matching addItem ordering.
+        for (int i = 0; i < this.getSize() && overflow.getCount() > 0; ++i) {
+            Item slot = this.getItem(i);
+            if (slot.getId() == Item.AIR || slot.getCount() <= 0 || !overflow.equals(slot)) {
+                continue;
+            }
+            int amount = Math.min(limit - slot.getCount(), overflow.getCount());
+            if (amount <= 0) continue;
+            Item old = slot.clone();
+            slot.setCount(slot.getCount() + amount);
+            overflow.setCount(overflow.getCount() - amount);
+            this.slots.put(i, slot.clone());
+            this.onSlotChange(i, old, false);
+        }
+        for (int i = 0; i < this.getSize() && overflow.getCount() > 0; ++i) {
+            Item slot = this.getItem(i);
+            if (slot.getId() != Item.AIR && slot.getCount() > 0) continue;
+            Item chunk = overflow.clone();
+            chunk.setCount(Math.min(limit, overflow.getCount()));
+            overflow.setCount(overflow.getCount() - chunk.getCount());
+            // 直接写入，避免再次进入 setItemForce -> routeOverflowForce 的递归路径。
+            // Write directly to avoid recursively re-entering setItemForce -> routeOverflowForce.
+            Item old = this.getItem(i);
+            if (chunk.getStackNetId() == 0) {
+                chunk.autoAssignStackNetworkId();
+            }
+            if (chunk instanceof ItemBundle bundle) {
+                ensureUniqueBundleId(i, bundle);
+            }
+            this.slots.put(i, chunk.clone());
+            this.onSlotChange(i, old, false);
+        }
+        if (overflow.getCount() > 0) {
+            log.warn("Discarded {}x item id {} overflowing setItemForce into a full inventory",
+                    overflow.getCount(), overflow.getId());
+        }
     }
 
     @Override

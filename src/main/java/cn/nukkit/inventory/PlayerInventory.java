@@ -305,9 +305,13 @@ public class PlayerInventory extends BaseInventory {
             ensureUniqueBundleId(index, bundle);
         }
 
+        Item[] parts = splitOverstack(item);
+        item = parts[0];
+
         Item old = this.getItem(index);
         this.slots.put(index, item.clone());
         this.onSlotChange(index, old, send);
+        this.routeOverflow(parts[1]);
         return true;
     }
 

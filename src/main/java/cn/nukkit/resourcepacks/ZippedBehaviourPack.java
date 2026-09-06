@@ -3,6 +3,7 @@ package cn.nukkit.resourcepacks;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.io.File;
 
@@ -24,7 +25,15 @@ public class ZippedBehaviourPack extends ZippedResourcePack {
     }
 
     public ZippedBehaviourPack(File file, SupportType supportType) {
-        super(file, supportType);
+        this(file, supportType, false);
+    }
+
+    /**
+     * @see ZippedResourcePack#ZippedResourcePack(File, SupportType, boolean)
+     */
+    @ApiStatus.Internal
+    public ZippedBehaviourPack(File file, SupportType supportType, boolean alreadySnapshot) {
+        super(file, supportType, alreadySnapshot);
         if (this.manifest.has("modules"))
             for (JsonElement moduleElement : this.manifest.getAsJsonArray("modules")) {
                 try {
@@ -42,7 +51,12 @@ public class ZippedBehaviourPack extends ZippedResourcePack {
                         }
                     }
                 } catch (Exception ignored) {
-                    log.error("Error while loading behaviour pack manifest: {}", this.getPackName(), ignored);
+                    // getPackId（uuid 已通过 verifyManifest 校验）而非 getPackName：
+                    // NetEase 包可无 name，后者会 NPE 并掩盖原始异常。
+                    // getPackId (uuid validated by verifyManifest), not getPackName:
+                    // NetEase packs may lack a name and getPackName would NPE,
+                    // masking the original error.
+                    log.error("Error while loading behaviour pack manifest: {}", this.getPackId(), ignored);
                 }
             }
     }

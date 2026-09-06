@@ -57,12 +57,8 @@ public abstract class EntityFlying extends BaseEntity {
 
         int x, z;
         if (this.stayTime > 0) {
-            if (Utils.rand(1, 100) > 5) {
-                return;
-            }
-            x = Utils.rand(10, 30);
-            z = Utils.rand(10, 30);
-            this.target = this.add(Utils.rand() ? x : -x, 0, Utils.rand() ? z : -z);
+            // Rest means rest; a new wander target is picked only after it ends.
+            return;
         } else if (Utils.rand(1, 100) == 1) {
             x = Utils.rand(10, 30);
             z = Utils.rand(10, 30);
@@ -106,8 +102,8 @@ public abstract class EntityFlying extends BaseEntity {
                         this.motionY = this.getSpeed() * 0.27 * (y / diff);
                         this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                     }
-                    if ((this.stayTime <= 0 || Utils.rand()) && diff != 0) {
-                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                    if (this.stayTime <= 0 && diff != 0) {
+                        this.turnBodyTowards(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                     return this.followTarget;
                 }
@@ -129,8 +125,8 @@ public abstract class EntityFlying extends BaseEntity {
                         this.motionY = this.getSpeed() * 0.27 * (y / diff);
                         this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                     }
-                    if ((this.stayTime <= 0 || Utils.rand()) && diff != 0) {
-                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                    if (this.stayTime <= 0 && diff != 0) {
+                        this.turnBodyTowards(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
             }

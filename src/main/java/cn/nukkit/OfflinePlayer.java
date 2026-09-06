@@ -68,7 +68,12 @@ public class OfflinePlayer implements IPlayer {
         if (uuid != null) {
             this.namedTag.putLong("UUIDMost", uuid.getMostSignificantBits());
             this.namedTag.putLong("UUIDLeast", uuid.getLeastSignificantBits());
-        } else {
+        }
+
+        if (name != null) {
+            // The caller asked for this exact name, so answer with it. The name stored in the
+            // saved data belongs to the last session and goes stale as soon as the player renames
+            // their account, which silently made whitelist, op and ban act on the previous name.
             this.namedTag.putString("NameTag", name);
         }
     }

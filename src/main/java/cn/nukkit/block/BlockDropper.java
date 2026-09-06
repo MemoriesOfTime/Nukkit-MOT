@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDropper;
+import cn.nukkit.event.block.BlockDispenseEvent;
 import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.Inventory;
@@ -177,6 +178,18 @@ public class BlockDropper extends BlockSolidMeta implements Faceable, BlockEntit
 
         if (target != null) {
             target = target.clone();
+
+            // Same question as the dispenser above: the dropper hands an item to whatever stands
+            // in front of it, and no player event is fired for that.
+            BlockFace dropperFace = this.getBlockFace();
+            BlockDispenseEvent dispenseEvent =
+                    new BlockDispenseEvent(
+                            this, dropperFace, this.getSide(dropperFace), target.clone());
+            this.level.getServer().getPluginManager().callEvent(dispenseEvent);
+
+            if (dispenseEvent.isCancelled()) {
+                return;
+            }
 
             // 优先推入相邻容器；失败则弹入世界（原版 dropper 行为）
             if (!this.dispenseToContainer((BlockEntityDropper) blockEntity, target)) {
