@@ -13,6 +13,22 @@ import lombok.ToString;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * FAPIXEL fap2 core patch：修正线格式。
+ * <p>
+ * 旧实现（第 1 轮 bool+uuid+string，之后 4 轮 string）与网易客户端实际布局不符。
+ * 依据对网易 V860 客户端实际线格式的比对分析：
+ * <pre>
+ *   count(varuint)
+ *   轮 1: valid(bool) + uuid + skinBytes(byteArray)     ← 第三字段是字节数组
+ *   轮 2: udid(string)
+ *   轮 3: extraData(string)
+ *   轮 4: itemId(string)                                 ← 商城商品引用
+ *   尾部 SerializedSkin
+ * </pre>
+ * 旧 string1..string4 映射：string1=udid、string2=extraData、string3=itemId、
+ * string4 保留字段不再上线。错误的布局会让客户端解析失败，皮肤回退史蒂夫。
+ */
 @OnlyNetEase
 @ToString
 public class SyncSkinPacket extends DataPacket {
@@ -23,7 +39,7 @@ public class SyncSkinPacket extends DataPacket {
 
     /**
      * 尾部 SerializedSkin，始终存在（即使 entries 为空）。
-     * <p>Trailing SerializedSkin, always present even when entries is empty.
+     * <p>Trailing SerializedSkin, always present even when entries are empty.
      */
     public Skin skin = new Skin();
 
@@ -64,24 +80,24 @@ public class SyncSkinPacket extends DataPacket {
         for (int i = 0; i < count; i++) {
             this.entries.add(new SyncSkinEntry());
         }
-        // GROUP 1: flag + uuid + string1
+        // 轮 1: flag + uuid + skinBytes（字节数组，不是字符串）
         for (int i = 0; i < count; i++) {
             SyncSkinEntry entry = this.entries.get(i);
             entry.flag = this.getBoolean();
             entry.uuid = this.getUUID();
-            entry.string1 = this.getString();
+            entry.skinBytes = this.getByteArray();
         }
-        // GROUP 2: string2
+        // 轮 2: udid
+        for (int i = 0; i < count; i++) {
+            this.entries.get(i).string1 = this.getString();
+        }
+        // 轮 3: extraData
         for (int i = 0; i < count; i++) {
             this.entries.get(i).string2 = this.getString();
         }
-        // GROUP 3: string3 (at least one string is item_id)
+        // 轮 4: itemId（商城商品引用）
         for (int i = 0; i < count; i++) {
             this.entries.get(i).string3 = this.getString();
-        }
-        // GROUP 4: string4
-        for (int i = 0; i < count; i++) {
-            this.entries.get(i).string4 = this.getString();
         }
         // 尾部 SerializedSkin
         this.skin = this.getSkin(this.protocol);
@@ -92,23 +108,23 @@ public class SyncSkinPacket extends DataPacket {
         this.reset();
         int count = this.entries.size();
         this.putUnsignedVarInt(count);
-        // GROUP 1: flag + uuid + string1
+        // 轮 1: flag + uuid + skinBytes（字节数组，不是字符串）
         for (SyncSkinEntry entry : this.entries) {
             this.putBoolean(entry.flag);
             this.putUUID(entry.uuid);
+            this.putByteArray(entry.skinBytes != null ? entry.skinBytes : new byte[0]);
+        }
+        // 轮 2: udid
+        for (SyncSkinEntry entry : this.entries) {
             this.putString(entry.string1 != null ? entry.string1 : "");
         }
-        // GROUP 2: string2
+        // 轮 3: extraData
         for (SyncSkinEntry entry : this.entries) {
             this.putString(entry.string2 != null ? entry.string2 : "");
         }
-        // GROUP 3: string3
+        // 轮 4: itemId（商城商品引用）
         for (SyncSkinEntry entry : this.entries) {
             this.putString(entry.string3 != null ? entry.string3 : "");
-        }
-        // GROUP 4: string4
-        for (SyncSkinEntry entry : this.entries) {
-            this.putString(entry.string4 != null ? entry.string4 : "");
         }
         // 尾部 SerializedSkin
         this.putSkin(this.gameVersion, this.skin);
@@ -120,9 +136,15 @@ public class SyncSkinPacket extends DataPacket {
     public static class SyncSkinEntry {
         public boolean flag;
         public UUID uuid;
+        /** 轮 1 的第三字段：皮肤纹理字节（fap2 前被错误地序列化为字符串）。 */
+        public byte[] skinBytes = new byte[0];
+        /** 轮 2 udid。 */
         public String string1 = "";
+        /** 轮 3 extraData。 */
         public String string2 = "";
+        /** 轮 4 itemId（商城商品引用）。 */
         public String string3 = "";
+        /** 旧格式遗留的第 4 个字符串槽位，fap2 起不再上线。 */
         public String string4 = "";
     }
 }
