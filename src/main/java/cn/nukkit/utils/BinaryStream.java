@@ -407,10 +407,11 @@ public class BinaryStream {
                 this.putBoolean(skin.isCapeOnClassic());
             }
             this.putString(skin.getCapeId());
-            String fullSkinId = gameVersion == GameVersion.V1_21_124_NETEASE
-                    ? skin.getFullSkinId() + UUID.randomUUID().toString().substring(0, 8)
-                    : skin.getFullSkinId();
-            this.putString(fullSkinId);
+            // FAPIXEL patch：不再对 V860 强制随机化 fullSkinId。真玩家的 fullSkinId 是网易
+            // 客户端匹配商城/4D 皮肤档案的键，追加随机后缀会让观察者客户端永远匹配失败，
+            // 实体回退占位史蒂夫（实测：资源中心 3D/4D 皮肤在他端始终显示史蒂夫）。
+            // NPC/假人皮肤的唯一性由 Skin#getFullSkinId() 的随机后缀分支保证，不受影响。
+            this.putString(skin.getFullSkinId());
             if (protocol >= ProtocolInfo.v1_14_60) {
                 boolean v2168 = protocol >= ProtocolInfo.v1_26_40;
                 if (v2168) {
