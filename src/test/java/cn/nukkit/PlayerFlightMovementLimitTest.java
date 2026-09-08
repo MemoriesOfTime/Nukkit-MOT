@@ -123,7 +123,7 @@ class PlayerFlightMovementLimitTest {
         player.driveHandleMovement(new Vector3(0.6, decodedY, 0.5));
 
         assertEquals(0.6, player.x, 0.000001);
-        assertEquals(decodedY, player.y, 0.000000001);
+        assertEquals(126.8125, player.y, 0.000000001);
         assertNull(player.forceMovement);
         assertEquals(-1, player.lastSendMode);
     }

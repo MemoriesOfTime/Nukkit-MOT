@@ -156,6 +156,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int VIEW = SPECTATOR;
 
     private static final double CREATIVE_BREAK_POSITION_EPSILON = 1.0E-4;
+    // Bedrock resting contact can sit 0.005 blocks below the collision top. This
+    // controls packets only; the authoritative position still stays on the floor.
+    private static final double CREATIVE_BREAK_CORRECTION_TOLERANCE = 0.01;
     private static final int CREATIVE_BREAK_CORRECTION_TICKS = 5;
 
     public static final int CRAFTING_SMALL = 0;
@@ -701,7 +704,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.clearDeniedCreativeBreakCorrection();
             return clientPos;
         }
-        if (clientPos.y >= this.y - CREATIVE_BREAK_POSITION_EPSILON) {
+        if (clientPos.y >= this.y) {
             return clientPos;
         }
 
@@ -709,14 +712,43 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         AxisAlignedBB targetFeet = this.boundingBox
                 .getOffsetBoundingBox(clientPos.x - this.x, 0, clientPos.z - this.z)
                 .shrink(0.05, 0, 0.05);
-        targetFeet.setMinY(clientPos.y + CREATIVE_BREAK_POSITION_EPSILON);
-        targetFeet.setMaxY(this.y + 0.05);
+        targetFeet.setMinY(clientPos.y);
+        targetFeet.setMaxY(this.y + CREATIVE_BREAK_POSITION_EPSILON);
         if (!block.collidesWithBB(targetFeet)) {
             this.clearDeniedCreativeBreakCorrection();
             return clientPos;
         }
 
-        return new Vector3(clientPos.x, this.y, clientPos.z);
+        // Locate the highest crossed surface using the block's actual collision
+        // predicate. getBoundingBox() alone omits the upper half of stairs.
+        // Testing the interval above each midpoint makes the search monotonic,
+        // including blocks whose collision consists of disconnected pieces.
+        double lowerY = clientPos.y;
+        double upperY = this.y + CREATIVE_BREAK_POSITION_EPSILON;
+        for (int probe = 0; probe < 40 && upperY - lowerY > 1.0E-7; probe++) {
+            double middleY = (lowerY + upperY) * 0.5;
+            targetFeet.setMinY(middleY);
+            if (block.collidesWithBB(targetFeet)) {
+                lowerY = middleY;
+            } else {
+                upperY = middleY;
+            }
+        }
+        // A replacement block may enclose the current feet. Preserve the existing
+        // denial guard without pushing the player above their accepted height.
+        double floorY = Math.min(this.y, upperY);
+        double crossedAt = (this.y - floorY) / (this.y - clientPos.y);
+        targetFeet.offset(-(clientPos.x - this.x) * (1 - crossedAt), 0,
+                -(clientPos.z - this.z) * (1 - crossedAt));
+        targetFeet.setMinY(floorY - CREATIVE_BREAK_POSITION_EPSILON);
+        targetFeet.setMaxY(floorY + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(targetFeet)) {
+            // Diagonal motion may enter this column after passing below its top.
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+
+        return new Vector3(clientPos.x, floorY, clientPos.z);
     }
 
     private void clearDeniedCreativeBreakCorrection() {
@@ -2496,7 +2528,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         Vector3 correctedClientPos = this.correctDeniedCreativeBreakMovement(clientPos);
-        boolean correctedDeniedCreativeBreak = correctedClientPos != clientPos;
+        boolean correctedDeniedCreativeBreak = correctedClientPos.y - clientPos.y
+                > CREATIVE_BREAK_CORRECTION_TOLERANCE;
         clientPos = correctedClientPos;
 
         double dx = clientPos.x - this.x;
@@ -4081,7 +4114,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                 double dis = newPos.distanceSquared(this);
 
-                if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
+                if (this.forceMovement == null && dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
                     break;
                 }
 
@@ -4489,7 +4522,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 double distSqrt = clientPosition.distanceSquared(this);
-                if (distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
+                if (this.forceMovement == null && distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
                     break;
                 }
 
