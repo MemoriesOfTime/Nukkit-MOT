@@ -315,7 +315,12 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Int2IntMap loaderCounter = new Int2IntOpenHashMap();
 
-    private final Map<Long, Map<Integer, ChunkLoader>> chunkLoaders = new ConcurrentHashMap<>();
+    /**
+     * Primitive keys avoid boxing and mix both coordinates of {@link #chunkHash(int, int)}.
+     * Long.hashCode folds them into x ^ z, causing colliding bins for diagonal chunks.
+     * Keep concurrent outer-map reads available to the chunk-loading pipeline.
+     */
+    private final Long2ObjectNonBlockingMap<Map<Integer, ChunkLoader>> chunkLoaders = new Long2ObjectNonBlockingMap<>();
 
     private final Map<Long, Map<Integer, Player>> playerLoaders = new ConcurrentHashMap<>();
 
