@@ -10,6 +10,7 @@ import cn.nukkit.inventory.PlayerEnderChestInventory;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.PlayerOffhandInventory;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemArmor;
 import cn.nukkit.item.ItemSkull;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.format.FullChunk;
@@ -141,6 +142,19 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             return drops.toArray(Item.EMPTY_ARRAY);
         }
         return Item.EMPTY_ARRAY;
+    }
+
+    @Override
+    public double getKnockBackResistance() {
+        double resistance = super.getKnockBackResistance();
+        if (this.inventory != null) {
+            for (Item armor : this.inventory.getArmorContents()) {
+                if (armor instanceof ItemArmor piece && piece.getTier() == ItemArmor.TIER_NETHERITE) {
+                    resistance += KNOCKBACK_RESISTANCE_PER_NETHERITE_PIECE;
+                }
+            }
+        }
+        return resistance;
     }
 
     @Override

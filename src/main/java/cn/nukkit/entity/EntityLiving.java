@@ -55,6 +55,9 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     protected int attackTime = 0;
     protected int knockBackTime = 0;
 
+    /** Resistance contributed by each worn piece of netherite armour. */
+    public static final double KNOCKBACK_RESISTANCE_PER_NETHERITE_PIECE = 0.1;
+
     protected float movementSpeed = 0.1f;
 
     protected int turtleTicks = 0;
@@ -205,9 +208,19 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         this.knockBack(attacker, damage, x, z, 0.3);
     }
 
+    /** Fraction of an incoming knockback impulse resisted, from zero to one. */
+    public double getKnockBackResistance() {
+        return 0d;
+    }
+
     public void knockBack(Entity attacker, double damage, double x, double z, double base) {
         double f = Math.sqrt(x * x + z * z);
         if (f <= 0) {
+            return;
+        }
+
+        double kept = 1d - Math.max(0d, Math.min(1d, this.getKnockBackResistance()));
+        if (kept <= 0d) {
             return;
         }
 
@@ -218,9 +231,9 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         motion.x /= 2d;
         motion.y /= 2d;
         motion.z /= 2d;
-        motion.x += x * f * base;
-        motion.y += base;
-        motion.z += z * f * base;
+        motion.x += x * f * base * kept;
+        motion.y += base * kept;
+        motion.z += z * f * base * kept;
 
         if (motion.y > base) {
             motion.y = base;
