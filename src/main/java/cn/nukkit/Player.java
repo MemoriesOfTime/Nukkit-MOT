@@ -1950,6 +1950,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
+        // Resolve transient items under the accepted transition's old mode: recover finite
+        // items and discard creative items before a delayed close can use the new mode.
+        // Cancelled transitions must leave the inventory available to its current owner.
+        this.resetCraftingGridType();
+
         this.gamemode = gamemode;
 
         if (this.server.useClientSpectator) {
@@ -7908,7 +7913,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             Item[] drops;
 
             if (this.craftingGrid != null) {
-                drops = this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
+                // Creative UI contents are free items: never return or drop them on reset.
+                // Closing a full inventory must not publish them to survival players.
+                drops = this.isCreative() ? Item.EMPTY_ARRAY
+                        : this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
                 this.craftingGrid.clearAll();
 
                 for (Item drop : drops) {
@@ -7916,7 +7924,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            drops = this.inventory.addItem(this.getCursorInventory().getItem(0));
+            drops = this.isCreative() ? Item.EMPTY_ARRAY
+                    : this.inventory.addItem(this.getCursorInventory().getItem(0));
             this.playerUIInventory.getCursorInventory().clear(0);
 
             for (Item drop : drops) {
@@ -7950,7 +7959,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private void moveBlockUIContents(int window) {
         Inventory inventory = this.getWindowById(window);
         if (inventory instanceof FakeBlockUIComponent) {
-            Item[] drops = this.inventory.addItem(inventory.getContents().values().toArray(Item.EMPTY_ARRAY));
+            Item[] drops = this.isCreative() ? Item.EMPTY_ARRAY
+                    : this.inventory.addItem(inventory.getContents().values().toArray(Item.EMPTY_ARRAY));
             inventory.clearAll();
             for (Item drop : drops) {
                 this.level.dropItem(this, drop);
