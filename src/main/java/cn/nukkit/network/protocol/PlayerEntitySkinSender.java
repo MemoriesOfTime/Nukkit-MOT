@@ -105,14 +105,8 @@ public final class PlayerEntitySkinSender {
         Objects.requireNonNull(entry, "entry");
         Objects.requireNonNull(entry.uuid, "entry.uuid");
 
-        // FAPIXEL fap6：无条件 REMOVE → ADD。fap5 曾按服务端台账跳过 REMOVE 只发裸 ADD，
-        // 但 V860 对客户端已持有的条目会忽略重复 ADD（观察者不重渲染），对本人条目更会
-        // 直接破坏自视渲染（实测：persona 条目重建后主体自视隐形，暂停也无法恢复）。
-        // REMOVE 对客户端不存在的条目是无害空操作，REMOVE → ADD 是唯一安全序列。
-        // <p>fap6: always REMOVE then ADD. fap5 skipped the REMOVE when the server-side
-        // registration was gone, but V860 ignores a bare duplicate ADD (no re-render) and a
-        // bare ADD of the viewer's own entry breaks self-rendering. REMOVE on a missing
-        // client entry is a harmless no-op, so the pair is the only safe sequence.
+        // 无条件 REMOVE → ADD：V860 会忽略对客户端已持有条目的裸 ADD（不重渲染），
+        // 对本人条目更会破坏自视渲染；REMOVE 对客户端不存在的条目是无害空操作。
         if (!requiresRetainedEntry(viewer)) {
             return false;
         }
@@ -131,10 +125,7 @@ public final class PlayerEntitySkinSender {
             return false;
         }
         viewer.sentSkins.add(entry.uuid);
-        // 重建即取代握手：作废仍在排期的原始皮肤补发与延迟 REMOVE，防止它们在重建
-        // 之后落地把新条目打回占位/原始皮肤（09-07 房间竞态）。
-        // <p>The rebuild supersedes the handshake: invalidate any still-scheduled raw
-        // resend or delayed REMOVE so they cannot land after it and clobber the entry.
+        // 作废仍在排期的补发与延迟 REMOVE，防止它们晚于重建落地、把新条目顶回旧皮肤。
         currentGeneration(viewer, entry.uuid).incrementAndGet();
         return true;
     }
@@ -187,8 +178,7 @@ public final class PlayerEntitySkinSender {
         if (fingerprint.equals(previous)) {
             return false;
         }
-        // FAPIXEL fap5：条目缺失（初始握手 5t 后被延迟 REMOVE 注销）时也走重建分支——
-        // 否则晚到的确认包（巡检、后进同步、重驱动）会静默失败，观察者永久史蒂夫。
+        // 条目已被延迟 REMOVE 注销时也走重建，否则晚到的确认会静默失败、观察者永久史蒂夫。
         if (previous != null || !viewer.sentSkins.contains(subject)) {
             Player target = Server.getInstance().getPlayer(subject).orElse(null);
             if (target == null) {
@@ -228,22 +218,18 @@ public final class PlayerEntitySkinSender {
     }
 
     /**
-     * 客户端此刻能否应用确认包：必须已有 PlayerList 条目，且该玩家实体已生成到观察者。
-     * 缺任一项客户端都会静默丢弃该条目，而我们已记下指纹便再不重发，因此必须提前拦下。
-     * 条目不存在时顺带清掉残留指纹，避免条目重建后首次确认被误抑制。
+     * 客户端此刻能否应用确认包：该玩家实体须已生成到观察者，否则客户端会静默丢弃该条目，
+     * 而我们已记下指纹便再不重发。不要求 PlayerList 条目仍在——初始握手
+     * {@link #DELAYED_REMOVE_TICKS} 后条目必被注销，条目缺失由 {@link #prepareConfirmSkin}
+     * 的重建分支补 ADD。
      * <p>
-     * Whether the client can apply a confirmation right now: it needs both the PlayerList entry and
-     * the player entity spawned to this viewer. Missing either makes the client drop the entry
-     * silently while we would have recorded the fingerprint and never resent it. A missing entry
-     * also clears any stale fingerprint so the first confirmation after a rebuild isn't suppressed.
+     * Whether the client can apply a confirmation right now: the player entity must have
+     * spawned to this viewer, or the client drops it silently while we would have recorded
+     * the fingerprint and never resent it. A live PlayerList entry is not required — the
+     * delayed REMOVE unregisters it, and the rebuild branch in {@link #prepareConfirmSkin}
+     * re-adds it.
      */
     private static boolean isConfirmable(Player viewer, UUID subject) {
-        // FAPIXEL fap5：不再要求 PlayerList 条目仍在（sentSkins）——初始握手
-        // DELAYED_REMOVE_TICKS(5t) 后条目必被移除并注销，原要求使 40t 巡检对晚到的
-        // 确认包永远静默失败（观察者永久史蒂夫，实测：广播 targets=0
-        // 之后 30 秒无一轮补发成功）。现仅保留实体已生成要求；条目缺失时由
-        // prepareConfirmSkin 的重建分支补 ADD 后再确认。原"条目不存在顺带清残留指纹"
-        // 由指纹比对与重建分支自然覆盖，不再需要。
         Player target = Server.getInstance().getPlayer(subject).orElse(null);
         return target != null && target.hasSpawned.containsKey(viewer.getLoaderId());
     }
@@ -312,13 +298,8 @@ public final class PlayerEntitySkinSender {
             if (viewer.closed) {
                 return;
             }
-            // 代次已变说明 re-spawn 或条目重建（fap6）已接管该条目：不动任何台账、不发
-            // REMOVE。原实现先 unregister 再恢复 sentSkins，会把接管方刚写入的确认指纹
-            // 一并抹掉，诱发巡检反复重建闪烁。
-            // <p>A changed generation means a re-spawn or a rebuild (fap6) has taken over
-            // the entry: touch nothing and send no REMOVE. The old code unregistered first
-            // and restored sentSkins, wiping the successor's fresh confirmation fingerprint
-            // and provoking repeated sweep rebuilds.
+            // 代次已变说明 re-spawn 或条目重建已接管：不动台账也不发 REMOVE——
+            // unregister 会把接管方刚写入的确认指纹一并抹掉，诱发巡检反复重建。
             if (generation.get() != registeredAt) {
                 return;
             }

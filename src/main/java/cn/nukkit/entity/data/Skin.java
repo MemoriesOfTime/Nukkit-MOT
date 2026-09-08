@@ -377,22 +377,6 @@ public class Skin {
         this.armSize = armSize;
     }
 
-    /**
-     * FAPIXEL fap5：是否为网易客户端自带默认皮肤（skinId 形如 "{uuid}.Steve" / "{uuid}.Alex"，
-     * 或核心回退 Standard_Custom）。此类皮肤在 V860 下走验证必被拒（实测），其
-     * fullSkinId 必须随机化下发（跳过档案匹配、直接渲染包内字节），稳定下发会导致玩家
-     * 自视隐形（09-07 fap4 实测：史蒂夫玩家全程看不到自己，暂停才偶发恢复）。
-     */
-    public static boolean isNetEaseBuiltinDefaultSkinId(String skinId) {
-        if (skinId == null || skinId.isEmpty()) {
-            return false;
-        }
-        String lower = skinId.toLowerCase(java.util.Locale.ROOT);
-        return lower.endsWith(".steve")
-                || lower.endsWith(".alex")
-                || "standard_custom".equals(lower);
-    }
-
     public void setFullSkinId(String fullSkinId) {
         this.fullSkinId = fullSkinId;
         this.noPlayFab = false; // Allow another attempt to generate it using the new id

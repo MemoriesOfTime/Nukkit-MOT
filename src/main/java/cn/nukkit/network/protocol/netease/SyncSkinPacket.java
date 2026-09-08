@@ -14,20 +14,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * FAPIXEL fap2 core patch：修正线格式。
+ * 网易 V860 皮肤同步包。条目按轮交错序列化（非逐条），轮 1 的第三字段是皮肤纹理
+ * 字节数组而非字符串；布局写错会让客户端解析失败、皮肤回退史蒂夫。
  * <p>
- * 旧实现（第 1 轮 bool+uuid+string，之后 4 轮 string）与网易客户端实际布局不符。
- * 依据对网易 V860 客户端实际线格式的比对分析：
- * <pre>
- *   count(varuint)
- *   轮 1: valid(bool) + uuid + skinBytes(byteArray)     ← 第三字段是字节数组
- *   轮 2: udid(string)
- *   轮 3: extraData(string)
- *   轮 4: itemId(string)                                 ← 商城商品引用
- *   尾部 SerializedSkin
- * </pre>
- * 旧 string1..string4 映射：string1=udid、string2=extraData、string3=itemId、
- * string4 保留字段不再上线。错误的布局会让客户端解析失败，皮肤回退史蒂夫。
+ * NetEase V860 skin sync packet. Entries are serialized in interleaved rounds (not
+ * per-entry), and round 1's third field is a skin-texture byte array, not a string;
+ * a wrong layout makes the client fail to parse and fall back to Steve.
  */
 @OnlyNetEase
 @ToString
@@ -136,7 +128,7 @@ public class SyncSkinPacket extends DataPacket {
     public static class SyncSkinEntry {
         public boolean flag;
         public UUID uuid;
-        /** 轮 1 的第三字段：皮肤纹理字节（fap2 前被错误地序列化为字符串）。 */
+        /** 轮 1 的第三字段：皮肤纹理字节。 */
         public byte[] skinBytes = new byte[0];
         /** 轮 2 udid。 */
         public String string1 = "";
@@ -144,7 +136,7 @@ public class SyncSkinPacket extends DataPacket {
         public String string2 = "";
         /** 轮 4 itemId（商城商品引用）。 */
         public String string3 = "";
-        /** 旧格式遗留的第 4 个字符串槽位，fap2 起不再上线。 */
+        /** 旧格式遗留槽位，已不再上线。 */
         public String string4 = "";
     }
 }
