@@ -215,7 +215,39 @@ public class BlockPalette {
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
     }
 
+    /**
+     * Older palettes have one skull block; its block entity carries the head type.
+     * Add outgoing aliases only after all vanilla/custom states have been registered.
+     * Do not register states here: that would change canonical reverse lookups used
+     * for world storage, and mark these compatibility aliases as native states.
+     */
+    private void registerLegacySkullAliases() {
+        int[] heads = {BlockID.WITHER_SKELETON_SKULL, BlockID.ZOMBIE_HEAD,
+                BlockID.PLAYER_HEAD, BlockID.CREEPER_HEAD, BlockID.DRAGON_HEAD,
+                BlockID.PIGLIN_HEAD};
+        for (int meta = 0; meta < 6; meta++) {
+            int skull = BlockID.SKULL_BLOCK << Block.DATA_BITS | meta;
+            int runtimeId = this.legacyToRuntimeId.get(skull);
+            if (runtimeId == -1) {
+                continue;
+            }
+            for (int head : heads) {
+                int fullId = head << Block.DATA_BITS | meta;
+                if (!this.legacyToRuntimeId.containsKey(fullId)) {
+                    this.legacyToRuntimeId.put(fullId, runtimeId);
+                    if (this.legacyToHashId.containsKey(skull)) {
+                        this.legacyToHashId.putIfAbsent(fullId, this.legacyToHashId.get(skull));
+                    }
+                }
+            }
+        }
+        this.legacyToRuntimeIdCache.invalidateAll();
+    }
+
     public void lock() {
+        if (!this.locked) {
+            this.registerLegacySkullAliases();
+        }
         this.locked = true;
         this.trim();
     }
