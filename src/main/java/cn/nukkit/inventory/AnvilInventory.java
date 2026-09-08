@@ -31,8 +31,16 @@ public class AnvilInventory extends FakeBlockUIComponent {
         who.resetCraftingGridType();
 
         for (int i = 0; i < 2; ++i) {
-            this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), this.getItem(i));
+            Item item = this.getItem(i);
             this.clear(i);
+            if (item.isNull() || who.isCreative()) {
+                continue;
+            }
+            for (Item drop : who.getInventory().addItem(item)) {
+                if (!who.dropItem(drop)) {
+                    this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), drop);
+                }
+            }
         }
     }
 

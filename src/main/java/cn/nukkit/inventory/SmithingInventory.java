@@ -115,7 +115,9 @@ public class SmithingInventory extends FakeBlockUIComponent {
         super.onClose(who);
         who.craftingType = Player.CRAFTING_SMALL;
 
-        who.giveItem(getItem(EQUIPMENT), getItem(INGREDIENT), getItem(TEMPLATE));
+        if (!who.isCreative()) {
+            who.giveItem(getItem(EQUIPMENT), getItem(INGREDIENT), getItem(TEMPLATE));
+        }
 
         this.clear(EQUIPMENT);
         this.clear(INGREDIENT);
