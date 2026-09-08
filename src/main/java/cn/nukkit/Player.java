@@ -3170,12 +3170,38 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private boolean canInteractEntity(Vector3 pos, double maxDistance) {
-        if (this.distanceSquared(pos) > Math.pow(maxDistance, 2)) {
+        double pointX = pos.x;
+        double pointZ = pos.z;
+        double distanceSquared;
+        if (pos instanceof Entity entity && !(entity instanceof Player) && entity.boundingBox != null) {
+            // A big body puts its visible head and tail far away from the centre point: the
+            // bounding box can extend well beyond the entity position. Measured from the
+            // centre, a hit on the head was farther than the
+            // reach even though the sword touched the model, and the facing check refused a
+            // player who faced the head while the centre was behind his back. The hit is
+            // measured to the nearest point of the bounding box instead; a player standing
+            // inside the body is at distance zero. Players keep the centre measurement so the
+            // PvP reach does not change by a single block.
+            AxisAlignedBB box = entity.boundingBox;
+            double eyeY = this.y + this.getEyeHeight();
+            double nearestX = NukkitMath.clamp(this.x, box.getMinX(), box.getMaxX());
+            double nearestY = NukkitMath.clamp(eyeY, box.getMinY(), box.getMaxY());
+            double nearestZ = NukkitMath.clamp(this.z, box.getMinZ(), box.getMaxZ());
+            double dx = nearestX - this.x;
+            double dy = nearestY - eyeY;
+            double dz = nearestZ - this.z;
+            distanceSquared = dx * dx + dy * dy + dz * dz;
+            pointX = nearestX;
+            pointZ = nearestZ;
+        } else {
+            distanceSquared = this.distanceSquared(pos);
+        }
+        if (distanceSquared > maxDistance * maxDistance) {
             return false;
         }
 
         Vector2 dV = this.getDirectionPlane();
-        return (dV.dot(new Vector2(pos.x, pos.z)) - dV.dot(new Vector2(this.x, this.z))) >= -0.87;
+        return (dV.dot(new Vector2(pointX, pointZ)) - dV.dot(new Vector2(this.x, this.z))) >= -0.87;
     }
 
     protected void processLogin() {
