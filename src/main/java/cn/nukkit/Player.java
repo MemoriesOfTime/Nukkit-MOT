@@ -1105,6 +1105,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.getDataFlag(DATA_FLAGS, DATA_FLAG_ACTION) && this.startAction > -1;
     }
 
+    /**
+     * Whether a use transaction is only a repeat of a consumable that is still being used.
+     *
+     * <p>The client keeps sending {@code USE_ITEM_ACTION_CLICK_AIR} while the button is held down,
+     * and a player in a fight taps the button rather than holding it. Such a transaction arrives
+     * before the item is ready ({@code ticksUsed < useDuration}), so handing it to
+     * {@code Item#onUse} only gets the item refused - while the use state is already gone and the
+     * food is never eaten. Items without a use duration (bow, crossbow, shield) are released by the
+     * client and are not affected.
+     */
+    static boolean isRepeatedConsumableUse(int useDuration, int ticksUsed) {
+        return useDuration > 0 && ticksUsed < useDuration;
+    }
+
+    /**
+     * Whether a consumable is being used right now: food, a potion, milk or the ominous bottle.
+     *
+     * <p>Only these items carry a use duration and are finished by the server timer in
+     * {@link #processAutoCompletion()}. A bow, a crossbow or a shield keeps {@code useDuration == 0}
+     * and is finished by the client releasing the button, so they keep the old behaviour wherever
+     * this check guards a reset.
+     */
+    public boolean isConsumingItem() {
+        if (!this.isUsingItem() || this.inventory == null) {
+            return false;
+        }
+        Item held = this.inventory.getItemInHandFast();
+        return held != null && held.canRelease() && held.getUseDuration() > 0;
+    }
+
     public void setUsingItem(boolean value) {
         this.startAction = value ? this.server.getTick() : -1;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, value);
@@ -4186,7 +4216,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
-                        this.setUsingItem(false);
+                        // Bedrock lets a player eat while sprinting, and sprint is toggled all the
+                        // time in a fight (knock-back, a released stick). Dropping the use state
+                        // here made the food silently never finish.
+                        if (!this.isConsumingItem()) {
+                            this.setUsingItem(false);
+                        }
                     }
                 }
 
@@ -4679,7 +4714,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break packetswitch;
                 }
 
-                this.setUsingItem(false);
+                if (!this.isConsumingItem()) {
+                    this.setUsingItem(false);
+                }
                 break;
             case ProtocolInfo.INTERACT_PACKET:
                 if (!this.spawned || !this.isAlive()) {
@@ -5605,6 +5642,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 }
 
                                 int ticksUsed = this.server.getTick() - this.startAction;
+                                if (isRepeatedConsumableUse(item.getUseDuration(), ticksUsed)) {
+                                    // The client repeats this transaction while the button is held
+                                    // down. Handing it to onUse() this early only gets the item
+                                    // refused, and the use state would be gone: the food is never
+                                    // eaten. Keep using it and let processAutoCompletion() finish.
+                                    break;
+                                }
                                 this.setUsingItem(false);
                                 if (!item.onUse(this, ticksUsed)) {
                                     this.inventory.sendContents(this);
