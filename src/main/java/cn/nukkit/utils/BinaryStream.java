@@ -407,11 +407,23 @@ public class BinaryStream {
                 this.putBoolean(skin.isCapeOnClassic());
             }
             this.putString(skin.getCapeId());
-            // FAPIXEL patch：不再对 V860 强制随机化 fullSkinId。真玩家的 fullSkinId 是网易
-            // 客户端匹配商城/4D 皮肤档案的键，追加随机后缀会让观察者客户端永远匹配失败，
-            // 实体回退占位史蒂夫（实测：资源中心 3D/4D 皮肤在他端始终显示史蒂夫）。
-            // NPC/假人皮肤的唯一性由 Skin#getFullSkinId() 的随机后缀分支保证，不受影响。
-            this.putString(skin.getFullSkinId());
+            // FAPIXEL fap4/fap5：V860 的 fullSkinId 按"稳定键"与否分流（fap1 全稳定、fap3 全随机，各造成一轮回归）。
+            // - 显式设置的稳定键（客户端登录/换肤包解析，或插件 setFullSkinId）以及 persona 皮肤
+            //   （商城皮肤以 persona 标记重建）→ 原样下发：观察者客户端按 fullSkinId 建档/缓存，
+            //   随机化会让档案匹配永远失败 → 先史蒂夫后整体隐形（09-07 fap3 实测）。
+            // - 其余服务端皮肤（RsNPC 对同名皮肤共享同一 Skin 实例且从不 setFullSkinId）→ 每次发包
+            //   随机化：稳定且多实体共享会让网易档案匹配挂起/负缓存 → NPC 整体隐形或回退史蒂夫
+            //   （09-07 fap1 实测）。随机让档案查找确定性失败，客户端转而直接渲染包内皮肤字节。
+            // - fap5：网易自带默认皮肤（{uuid}.Steve/.Alex、Standard_Custom）即使来源稳定键也随机化——
+            //   V860 对 .Steve 走验证必拒，稳定下发导致玩家自视隐形（09-07 fap4 实测）；随机化恢复
+            //   fap6~fap15 时代自视包直接渲染字节的已验证行为。
+            boolean stableSkinId = gameVersion != GameVersion.V1_21_124_NETEASE
+                    || skin.isPersona()
+                    || (skin.isFullSkinIdStable()
+                            && !Skin.isNetEaseBuiltinDefaultSkinId(skin.getSkinId()));
+            this.putString(stableSkinId
+                    ? skin.getFullSkinId()
+                    : skin.getFullSkinId() + UUID.randomUUID().toString().substring(0, 8));
             if (protocol >= ProtocolInfo.v1_14_60) {
                 boolean v2168 = protocol >= ProtocolInfo.v1_26_40;
                 if (v2168) {
