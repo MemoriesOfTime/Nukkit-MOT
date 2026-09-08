@@ -262,14 +262,15 @@ public class Network {
     }
 
     public boolean processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
-        return this.processBatch(payload, packets, compression, raknetProtocol, player, true);
+        return this.processBatchMeasured(payload, packets, compression, raknetProtocol, player, true).success();
     }
 
     public boolean processBatchQuietly(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
-        return this.processBatch(payload, packets, compression, raknetProtocol, player, false);
+        return this.processBatchMeasured(payload, packets, compression, raknetProtocol, player, false).success();
     }
 
-    private boolean processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player, boolean warnOnFailure) {
+    public BatchProcessResult processBatchMeasured(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression,
+                                                   int raknetProtocol, Player player, boolean warnOnFailure) {
         int maxSize = 3145728; // 3 * 1024 * 1024
         if (player != null && player.getSkin() == null) {
             maxSize = 6291456; // 6 * 1024 * 1024
@@ -283,7 +284,16 @@ public class Network {
             } else if (log.isDebugEnabled()) {
                 log.debug("Exception while decompressing batch packet (compression={}, {} bytes)", compression, payload.length, e);
             }
-            return false;
+            return BatchProcessResult.failed(maxSize, MAX_BATCH_PACKET_COUNT, e);
+        }
+
+        // Providers such as NONE do not enforce the requested decompression limit themselves.
+        if (data.length > maxSize) {
+            ProtocolException failure = new ProtocolException("Decompressed batch exceeds " + maxSize + " bytes");
+            if (warnOnFailure) {
+                log.warn("Rejected oversized decoded batch (compression={}, decompressed={} bytes)", compression, data.length);
+            }
+            return BatchProcessResult.failed(data.length, 0, failure);
         }
 
         BinaryStream stream = new BinaryStream(data);
@@ -365,9 +375,24 @@ public class Network {
                 log.debug("Error whilst decoding batch packet (decoded {} packets, compression={}, decompressed={} bytes)",
                         count, compression, data.length, e);
             }
-            return false;
+            return BatchProcessResult.failed(data.length, Math.min(count, MAX_BATCH_PACKET_COUNT), e);
         }
-        return count > 0;
+        if (count == 0) {
+            return BatchProcessResult.failed(data.length, 0, null);
+        }
+        return BatchProcessResult.success(data.length, count);
+    }
+
+    /** Work performed while decoding one compressed batch, including frames with unknown packet IDs. */
+    public record BatchProcessResult(boolean success, int decompressedBytes, int framedPackets, Throwable failure) {
+
+        static BatchProcessResult success(int decompressedBytes, int framedPackets) {
+            return new BatchProcessResult(true, decompressedBytes, framedPackets, null);
+        }
+
+        static BatchProcessResult failed(int decompressedBytes, int framedPackets, Throwable failure) {
+            return new BatchProcessResult(false, decompressedBytes, framedPackets, failure);
+        }
     }
 
     /**
