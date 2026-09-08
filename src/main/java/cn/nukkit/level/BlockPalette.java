@@ -209,10 +209,32 @@ public class BlockPalette {
 
         int legacyId = blockId << Block.DATA_BITS | data;
         this.legacyToRuntimeId.put(legacyId, runtimeId);
-        this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
+        putCanonicalLegacy(this.runtimeIdToLegacy, runtimeId, legacyId);
         int stateHash = Hash.hashBlock(blockState);
-        this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
+        putCanonicalLegacy(this.stateHashToLegacy, stateHash, legacyId);
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
+    }
+
+    /**
+     * Reverse lookup keeps the LOWEST legacy value that maps to a state.
+     * <p>
+     * The legacy data table pads every block to a power of two by repeating its default variant:
+     * {@code minecraft:planks} lists oak at data 0, 6 and 7, {@code minecraft:stone} lists stone at
+     * 0 and 7, and 45 more blocks do the same. All of those rows map to one state, so the reverse
+     * entry was decided by registration order — and when a padding row won, the state translated
+     * back to a data value that Nukkit has no block for. The block then read as an unknown one:
+     * hardness 10, no proper tool, and a vanilla break-time check that cancelled every hit, so oak
+     * planks could not be broken at all, by any tool or by hand.
+     * <p>
+     * The lowest value is the real one in every padded row, and picking it makes the reverse
+     * lookup independent of the order states are registered in. Blocks merged by vanilla into
+     * another id keep their own preset (see {@code NukkitLegacyMapper#getOverrideLegacyId}).
+     */
+    private static void putCanonicalLegacy(Int2IntOpenHashMap reverse, int key, int legacyId) {
+        int known = reverse.get(key);
+        if (known == -1 || legacyId < known) {
+            reverse.put(key, legacyId);
+        }
     }
 
     public void lock() {
