@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockTNT;
@@ -11,8 +12,11 @@ import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
 import cn.nukkit.event.block.BlockExplodeEvent;
 import cn.nukkit.event.block.BlockUpdateEvent;
-import cn.nukkit.event.entity.*;
+import cn.nukkit.event.entity.EntityDamageByBlockEvent;
+import cn.nukkit.event.entity.EntityDamageByEntityEvent;
+import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
+import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -26,7 +30,10 @@ import cn.nukkit.utils.Hash;
 import it.unimi.dsi.fastutil.longs.LongArraySet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class Explosion {
@@ -248,6 +255,10 @@ public class Explosion {
                 entity.motionX += motion.x * impact;
                 entity.motionY += motion.y * impact;
                 entity.motionZ += motion.z * impact;
+                if (entity instanceof Player player) {
+                    // 爆炸击退不走 setMotion，需登记动量配额，否则反速测会把炸飞的位移判为超速
+                    player.setServerMotionAllowance(new Vector3(motion.x * impact, motion.y * impact, motion.z * impact));
+                }
             }
         }
 
