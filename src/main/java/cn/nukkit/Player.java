@@ -71,6 +71,7 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
+import cn.nukkit.network.encryption.LoginChainVerifier;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
@@ -414,6 +415,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected Cache<String, FormWindowDialog> dialogWindows = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
+    private LoginChainVerifier.Verification pendingLoginVerification;
     protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
     /**
@@ -3824,130 +3826,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                try {
-                    this.loginChainData = ClientChainData.read(loginPacket);
-                } catch (ClientChainData.TooBigSkinException ex) {
-                    this.close("", "disconnectionScreen.invalidSkin");
-                    return;
-                } catch (IllegalArgumentException | IllegalStateException ex) {
-                    this.server.getLogger().debug("Rejected malformed login chain from "
-                            + this.getAddress() + ": " + ex.getMessage(), ex);
-                    this.close("", "disconnectionScreen.invalidName");
-                    return;
-                }
-
-                if (!loginChainData.isXboxAuthed() && server.xboxAuth) {
-                    this.close("", "disconnectionScreen.notAuthenticated");
-                    if (server.banXBAuthFailed) {
-                        this.server.getNetwork().blockAddress(this.socketAddress.getAddress(), 5);
-                        this.server.getLogger().notice("Blocked " + getAddress() + " for 5 seconds due to failed Xbox auth");
-                    }
-                    break;
-                }
-
-                if (this.server.isWaterdogCapable() && loginChainData.getWaterdogIP() != null) {
-                    this.socketAddress = new InetSocketAddress(this.loginChainData.getWaterdogIP(), this.getRawPort());
-                }
-
-                this.version = loginChainData.getGameVersion();
-
-                // Use verified identity data from ClientChainData (signature-validated) as the source of truth
-                String verifiedName = TextFormat.clean(loginChainData.getUsername());
-                if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
-                    verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
-                }
-                if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
-                    verifiedName = server.viaProxyUsernamePrefix + verifiedName;
-                }
-
-                this.username = verifiedName;
-                this.unverifiedUsername = null;
-                this.displayName = this.username;
-                this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
-                this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
-
-                this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
-
-                this.randomClientId = loginChainData.getClientId();
-                this.minecraftId = loginChainData.getMinecraftId();
-
-                boolean valid = true;
-                String rawVerifiedName = loginChainData.getUsername();
-                int len = rawVerifiedName == null ? 0 : rawVerifiedName.length();
-                if (((len > 16 || len < 3) && !gameVersion.isNetEase())
-                        || rawVerifiedName == null || rawVerifiedName.trim().isEmpty()
-                        || verifiedName == null || verifiedName.isBlank()) {
-                    valid = false;
-                }
-
-                if (valid && !gameVersion.isNetEase()) {
-                    for (int i = 0; i < len; i++) {
-                        char c = rawVerifiedName.charAt(i);
-                        if ((c >= 'a' && c <= 'z') ||
-                                (c >= 'A' && c <= 'Z') ||
-                                (c >= '0' && c <= '9') ||
-                                c == '_' || c == ' '
-                        ) {
-                            continue;
-                        }
-
-                        valid = false;
-                        break;
-                    }
-                }
-
-                if (!valid || Objects.equals(this.iusername, "rcon") || Objects.equals(this.iusername, "console")) {
-                    this.close("", "disconnectionScreen.invalidName");
-                    break;
-                }
-
-                // 身份派生须在校验之后：名字清理后为空的登录已在上面被拒绝，派生异常才不会逃逸
-                // Identity derivation must follow validation: names that clean to empty were
-                // rejected above, so the derivation cannot throw past this point
-                this.uuid = loginChainData.getClientUUID(verifiedName);
-                this.rawUUID = Binary.writeUUID(this.uuid);
-
-                if (!loginPacket.skin.isValid()) {
-                    this.close("", "disconnectionScreen.invalidSkin");
-                    break;
-                }
-                Skin skin = loginPacket.skin;
-                this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
-
-                PlayerPreLoginEvent playerPreLoginEvent;
-                this.server.getPluginManager().callEvent(playerPreLoginEvent = new PlayerPreLoginEvent(this, "Plugin reason"));
-                if (playerPreLoginEvent.isCancelled()) {
-                    this.close("", playerPreLoginEvent.getKickMessage());
-                    break;
-                }
-
-                if (this.isEnableNetworkEncryption()) {
-                    this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PrepareEncryptionTask(this) {
-                        @Override
-                        public void onCompletion(Server server) {
-                            if (!Player.this.isConnected()) {
-                                return;
-                            }
-
-                            if (this.getHandshakeJwt() == null || this.getEncryptionKey() == null || this.getEncryptionCipher() == null || this.getDecryptionCipher() == null) {
-                                Player.this.close("", "Network Encryption error");
-                                return;
-                            }
-
-                            ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
-                            pk.setJwt(this.getHandshakeJwt());
-                            Player.this.syncLoginPhase(SessionLoginPhase.ENCRYPTION_REQUEST_SENT);
-                            Player.this.forceDataPacket(pk, () -> {
-                                Player.this.syncAwaitingEncryptionHandshake(true);
-                                Player.this.syncLoginPhase(SessionLoginPhase.AWAITING_ENCRYPTION_RESPONSE);
-                                Player.this.getNetworkSession().beginLegacyInboundEncryptionGraceWindow();
-                                Player.this.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
-                            }, ImmediatePacketMode.DIRECT_WRITE);
-                        }
-                    });
-                } else {
-                    this.processPreLogin();
-                }
+                beginLoginVerification(loginPacket, LoginChainVerifier.shared());
                 break;
             case ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET:
                 ResourcePackClientResponsePacket responsePacket = (ResourcePackClientResponsePacket) packet;
@@ -6537,6 +6416,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(TextContainer message, String reason, boolean notify) {
+        if (pendingLoginVerification != null) {
+            pendingLoginVerification.cancel();
+            pendingLoginVerification = null;
+        }
         if (this.connected && !this.closed) {
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
@@ -8715,6 +8598,154 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         boolean isEmpty() {
             return this.requestedChunks.isEmpty();
+        }
+    }
+
+    void beginLoginVerification(LoginPacket packet, LoginChainVerifier verifier) {
+        if (pendingLoginVerification != null) {
+            return;
+        }
+        Skin loginSkin = packet.skin;
+        pendingLoginVerification = verifier.submit(packet.getBuffer(), (validated, failure) -> {
+            if (pendingLoginVerification == null) {
+                return;
+            }
+            pendingLoginVerification = null;
+            if (this.closed || !this.isConnected() || this.getCurrentLoginPhase() != SessionLoginPhase.LOGIN_RECEIVED) {
+                return;
+            }
+            if (failure instanceof ClientChainData.TooBigSkinException) {
+                this.close("", "disconnectionScreen.invalidSkin");
+                return;
+            }
+            if (failure != null || validated == null || !validated.isAuthenticationCurrent()) {
+                this.server.getLogger().debug("Rejected login verification from " + this.getAddress()
+                        + " (" + (failure == null ? "expired or missing result" : failure.getClass().getSimpleName()) + ")");
+                this.close("", "disconnectionScreen.invalidName");
+                return;
+            }
+            continueVerifiedLogin(loginSkin, validated);
+        });
+        if (pendingLoginVerification == null) {
+            this.sendPlayStatus(PlayStatusPacket.LOGIN_FAILED_SERVER_FULL, true);
+            this.close("", "disconnectionScreen.serverFull");
+        }
+    }
+
+    // Called only by the main-thread AsyncTask completion after successful verification.
+    void continueVerifiedLogin(Skin loginSkin, ClientChainData validated) {
+        this.loginChainData = validated;
+        if (!loginChainData.isXboxAuthed() && server.xboxAuth) {
+            this.close("", "disconnectionScreen.notAuthenticated");
+            if (server.banXBAuthFailed) {
+                this.server.getNetwork().blockAddress(this.socketAddress.getAddress(), 5);
+                this.server.getLogger().notice("Blocked " + getAddress() + " for 5 seconds due to failed Xbox auth");
+            }
+            return;
+        }
+
+        if (this.server.isWaterdogCapable() && loginChainData.getWaterdogIP() != null) {
+            this.socketAddress = new InetSocketAddress(this.loginChainData.getWaterdogIP(), this.getRawPort());
+        }
+
+        this.version = loginChainData.getGameVersion();
+
+        // Use verified identity data from ClientChainData (signature-validated) as the source of truth
+        String verifiedName = TextFormat.clean(loginChainData.getUsername());
+        if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
+            verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
+        }
+        if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
+            verifiedName = server.viaProxyUsernamePrefix + verifiedName;
+        }
+
+        this.username = verifiedName;
+        this.unverifiedUsername = null;
+        this.displayName = this.username;
+        this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
+        this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
+
+        this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
+
+        this.randomClientId = loginChainData.getClientId();
+        this.minecraftId = loginChainData.getMinecraftId();
+
+        boolean valid = true;
+        String rawVerifiedName = loginChainData.getUsername();
+        int len = rawVerifiedName == null ? 0 : rawVerifiedName.length();
+        if (((len > 16 || len < 3) && !gameVersion.isNetEase())
+                || rawVerifiedName == null || rawVerifiedName.trim().isEmpty()
+                || verifiedName == null || verifiedName.isBlank()) {
+            valid = false;
+        }
+
+        if (valid && !gameVersion.isNetEase()) {
+            for (int i = 0; i < len; i++) {
+                char c = rawVerifiedName.charAt(i);
+                if ((c >= 'a' && c <= 'z') ||
+                        (c >= 'A' && c <= 'Z') ||
+                        (c >= '0' && c <= '9') ||
+                        c == '_' || c == ' '
+                ) {
+                    continue;
+                }
+
+                valid = false;
+                break;
+            }
+        }
+
+        if (!valid || Objects.equals(this.iusername, "rcon") || Objects.equals(this.iusername, "console")) {
+            this.close("", "disconnectionScreen.invalidName");
+            return;
+        }
+
+        // 身份派生须在校验之后：名字清理后为空的登录已在上面被拒绝，派生异常才不会逃逸
+        // Identity derivation must follow validation: names that clean to empty were
+        // rejected above, so the derivation cannot throw past this point
+        this.uuid = loginChainData.getClientUUID(verifiedName);
+        this.rawUUID = Binary.writeUUID(this.uuid);
+
+        if (!loginSkin.isValid()) {
+            this.close("", "disconnectionScreen.invalidSkin");
+            return;
+        }
+        Skin skin = loginSkin;
+        this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
+
+        PlayerPreLoginEvent playerPreLoginEvent;
+        this.server.getPluginManager().callEvent(playerPreLoginEvent = new PlayerPreLoginEvent(this, "Plugin reason"));
+        if (playerPreLoginEvent.isCancelled()) {
+            this.close("", playerPreLoginEvent.getKickMessage());
+            return;
+        }
+
+        if (this.isEnableNetworkEncryption()) {
+            this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PrepareEncryptionTask(this) {
+                @Override
+                public void onCompletion(Server server) {
+                    if (!Player.this.isConnected()) {
+                        return;
+                    }
+
+                    if (this.getHandshakeJwt() == null || this.getEncryptionKey() == null || this.getEncryptionCipher() == null || this.getDecryptionCipher() == null) {
+                        Player.this.close("", "Network Encryption error");
+                        return;
+                    }
+
+                    ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
+                    pk.setJwt(this.getHandshakeJwt());
+                    Player.this.syncLoginPhase(SessionLoginPhase.ENCRYPTION_REQUEST_SENT);
+                    Player.this.forceDataPacket(pk, () -> {
+                        Player.this.syncAwaitingEncryptionHandshake(true);
+                        Player.this.syncLoginPhase(SessionLoginPhase.AWAITING_ENCRYPTION_RESPONSE);
+                        Player.this.getNetworkSession().beginLegacyInboundEncryptionGraceWindow();
+                        Player.this.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
+                    }, ImmediatePacketMode.DIRECT_WRITE);
+                }
+            });
+        } else {
+            this.processPreLogin();
         }
     }
 

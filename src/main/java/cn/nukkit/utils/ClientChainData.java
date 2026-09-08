@@ -245,6 +245,12 @@ public final class ClientChainData implements LoginChainData {
     ///////////////////////////////////////////////////////////////////////////
 
     private AuthPayload authPayload;
+    private long authenticationExpiresAt = Long.MAX_VALUE;
+
+    /** Recheck only the validated token lifetime when asynchronous verification reaches main. */
+    public boolean isAuthenticationCurrent() {
+        return System.currentTimeMillis() / 1000 < authenticationExpiresAt;
+    }
 
     private String username;
     private UUID clientUUID;
@@ -393,6 +399,9 @@ public final class ClientChainData implements LoginChainData {
             ChainValidationResult result = EncryptionUtils.validatePayload(this.authPayload);
 
             this.xboxAuthed = result.signed();
+            if (result.signed() && this.authPayload instanceof TokenPayload) {
+                authenticationExpiresAt = ((Number) result.rawIdentityClaims().get("exp")).longValue();
+            }
 
             ChainValidationResult.IdentityData extraData = result.identityClaims().extraData;
             this.username = extraData.displayName;
