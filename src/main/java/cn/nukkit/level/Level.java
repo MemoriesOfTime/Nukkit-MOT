@@ -5487,6 +5487,18 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Position calculatePortalMirror(Vector3 portal) {
+        return this.calculatePortalMirror(portal, null);
+    }
+
+    /**
+     * Mirrors a portal position onto the other side.
+     *
+     * @param overworld world the way back from the nether lands in. {@code null} means the default
+     *                  world, which is only the right answer on a server whose single overworld is
+     *                  also the default one: with a hub as the default world the player comes back
+     *                  eight times out from the hub build instead of the world they left.
+     */
+    public Position calculatePortalMirror(Vector3 portal, Level overworld) {
         Level nether = Server.getInstance().getNetherWorld(this.getName());
         if (nether == null) {
             return null;
@@ -5495,16 +5507,21 @@ public class Level implements ChunkManager, Metadatable {
         double x;
         double y;
         double z;
+        Level target;
         if (this == nether) {
+            target = overworld != null && overworld != this
+                    ? overworld
+                    : Server.getInstance().getDefaultLevel();
             x = portal.getFloorX() << 3;
             y = NukkitMath.clamp(portal.getFloorY(), 70, 246);
             z = portal.getFloorZ() << 3;
         } else {
+            target = nether;
             x = portal.getFloorX() >> 3;
             y = NukkitMath.clamp(portal.getFloorY(), 70, 118);
             z = portal.getFloorZ() >> 3;
         }
-        return new Position(x, y, z, this == nether ? Server.getInstance().getDefaultLevel() : nether);
+        return new Position(x, y, z, target);
     }
 
     public boolean isBlockWaterloggedAt(FullChunk chunk, int x, int y, int z) {

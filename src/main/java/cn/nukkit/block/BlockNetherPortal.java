@@ -4,6 +4,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
@@ -278,18 +279,43 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         return Position.fromObject(down.up(), portal.getLevel());
     }
 
+    /**
+     * How far, in blocks, an existing portal is looked up on the other side.
+     */
+    private static final int PORTAL_SEARCH_RADIUS = 128;
+
+    /**
+     * How far the search may pull inactive chunks from disk.
+     *
+     * <p>Scaling a portal coordinate loses at most seven blocks, so the frame used for the trip
+     * is always in the same or an adjacent chunk on the way back.
+     */
+    private static final int PORTAL_DISK_LOAD_CHUNK_RADIUS = 1;
+
+    /**
+     * Looks up the portal closest to the given position.
+     *
+     * <p>The search walks chunks in rings around the origin and stops at the first portal it
+     * finds, so the result is the nearest one and the cost is paid only until then. Chunks that
+     * are not generated yet are skipped instead of being generated on the spot: a player stepping
+     * into a portal must not pay for generating the whole search box, and the portal is going to
+     * be built next to the mirrored position anyway.
+     */
     public static Position findNearestPortal(Position pos) {
         Level level = pos.getLevel();
-        Position found = null;
+        int originChunkX = pos.getFloorX() >> 4;
+        int originChunkZ = pos.getFloorZ() >> 4;
+        int chunkRadius = (PORTAL_SEARCH_RADIUS >> 4) + 1;
 
-        for (int xx = -128; xx <= 128; xx++) {
-            for (int zz = -128; zz <= 128; zz++) {
-                for (int y = 0; y  < level.getMaxBlockY(); y++) {
-                    int x = pos.getFloorX() + xx, z = pos.getFloorZ() + zz;
-                    if (level.getBlockIdAt(x, y, z) == NETHER_PORTAL) {
-                        found = new Position(x, y, z, level);
-                        break;
+        Position found = null;
+        for (int ring = 0; ring <= chunkRadius && found == null; ring++) {
+            for (int chunkX = originChunkX - ring; chunkX <= originChunkX + ring && found == null; chunkX++) {
+                for (int chunkZ = originChunkZ - ring; chunkZ <= originChunkZ + ring && found == null; chunkZ++) {
+                    if (Math.max(Math.abs(chunkX - originChunkX), Math.abs(chunkZ - originChunkZ)) != ring) {
+                        continue;
                     }
+                    found = findPortalInChunk(
+                            level, chunkX, chunkZ, ring <= PORTAL_DISK_LOAD_CHUNK_RADIUS);
                 }
             }
         }
@@ -312,9 +338,55 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         return found;
     }
 
-    public static void spawnPortal(Position pos) {
+    private static Position findPortalInChunk(
+            Level level, int chunkX, int chunkZ, boolean mayLoadFromDisk) {
+        FullChunk chunk = level.getChunk(chunkX, chunkZ, false);
+        if (chunk == null) {
+            // A cold far chunk is not worth blocking the transfer for. The mirror will get a new
+            // frame if no nearby portal exists; already loaded chunks still use the full radius.
+            if (!mayLoadFromDisk || !level.loadChunk(chunkX, chunkZ, false)) {
+                return null;
+            }
+            chunk = level.getChunk(chunkX, chunkZ, false);
+        }
+        if (chunk == null || !chunk.isGenerated()) {
+            return null;
+        }
+
+        int minY = level.getMinBlockY();
+        int maxY = level.getMaxBlockY();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y < maxY; y++) {
+                    if (chunk.getBlockId(x, y, z) == NETHER_PORTAL) {
+                        return new Position((chunkX << 4) + x, y, (chunkZ << 4) + z, level);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * How far up and down a footing for a freshly built portal is looked up.
+     */
+    private static final int PORTAL_GROUND_SEARCH = 96;
+
+    /**
+     * Builds a portal frame around the given position and returns where it ended up.
+     *
+     * <p>The Y that comes in is the one the player entered the portal at on the other side, see
+     * {@link Level#calculatePortalMirror}, and it says nothing about the terrain here: coming back
+     * from the nether at Y=72 built the frame in mid-air and left the player standing on its
+     * obsidian floor high above the ground. The frame is therefore lowered onto the first footing
+     * below the mirrored position, or raised onto the first one above it, and only stays at the
+     * mirrored Y when the whole column is empty.
+     */
+    public static Position spawnPortal(Position pos) {
         Level lvl = pos.level;
-        int x = pos.getFloorX(), y = pos.getFloorY(), z = pos.getFloorZ();
+        int x = pos.getFloorX(), z = pos.getFloorZ();
+        int y = frameHeightFor(lvl, x, pos.getFloorY(), z);
+        Position spawned = new Position(x, y, z, lvl);
 
         for (int xx = -1; xx < 4; xx++) {
             for (int yy = 1; yy < 4; yy++)  {
@@ -361,6 +433,115 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
         lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
         lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
+
+        sealPortalSite(lvl, spawned.getFloorX(), spawned.getFloorY(), spawned.getFloorZ());
+
+        return spawned;
+    }
+
+    /**
+     * Makes the ground a fresh frame stands on safe to arrive at.
+     *
+     * <p>The frame itself is only two obsidian blocks wide, so a player coming through steps off
+     * it right away. Over a lava sea, a cave mouth or a cliff that step is a fall, and the frame
+     * may have been carved out of lava that flows straight back in. So the floor under the whole
+     * cleared box is laid solid and the lava touching it is replaced with plain rock.
+     */
+    private static void sealPortalSite(Level level, int x, int y, int z) {
+        for (int xx = -1; xx < 4; xx++) {
+            for (int zz = -1; zz < 3; zz++) {
+                if (!isSolidAt(level, x + xx, y, z + zz)) {
+                    level.setBlockAt(x + xx, y, z + zz, OBSIDIAN);
+                }
+            }
+        }
+
+        // Liquid on the outside of the box turns into rock, liquid inside it into air: draining
+        // the inside alone leaves the sea around it to flow straight back into the frame.
+        int filler = level.getDimension() == Level.DIMENSION_NETHER ? NETHERRACK : STONE;
+        for (int xx = -2; xx < 5; xx++) {
+            for (int zz = -2; zz < 4; zz++) {
+                for (int yy = 0; yy <= 5; yy++) {
+                    int id = level.getBlockIdAt(x + xx, y + yy, z + zz);
+                    if (!Block.isLava(id) && !Block.isWater(id)) {
+                        continue;
+                    }
+                    boolean shell = xx == -2 || xx == 4 || zz == -2 || zz == 3 || yy == 0 || yy == 5;
+                    level.setBlockAt(x + xx, y + yy, z + zz, shell ? filler : AIR);
+                }
+            }
+        }
+    }
+
+    /**
+     * Y the portal floor is laid at for a frame asked for at the given position.
+     */
+    private static int frameHeightFor(Level level, int x, int y, int z) {
+        int minY = level.getMinBlockY() + 1;
+        int maxY = level.getMaxBlockY() - 5;
+        if (level.getDimension() == Level.DIMENSION_NETHER) {
+            // Under the bedrock roof: a frame built into it is walled in and unreachable.
+            maxY = Math.min(maxY, 122);
+        }
+        if (maxY <= minY) {
+            return y;
+        }
+
+        int start = Math.max(minY, Math.min(maxY, y));
+        for (int yy = start; yy >= Math.max(minY, start - PORTAL_GROUND_SEARCH); yy--) {
+            if (hasFooting(level, x, yy, z)) {
+                return yy + 1;
+            }
+        }
+        for (int yy = start + 1; yy <= Math.min(maxY, start + PORTAL_GROUND_SEARCH); yy++) {
+            if (hasFooting(level, x, yy, z)) {
+                return yy + 1;
+            }
+        }
+        return start;
+    }
+
+    /**
+     * Whether a frame standing on top of the given layer has ground under it and room above.
+     *
+     * <p>Only the two columns the portal blocks themselves sit in are checked: the frame clears
+     * the space around it anyway, so demanding a flat 4x3 patch would reject every slope and send
+     * the frame back into mid-air.
+     */
+    private static boolean hasFooting(Level level, int x, int y, int z) {
+        if (!isSolidAt(level, x + 1, y, z + 1) && !isSolidAt(level, x + 2, y, z + 1)) {
+            return false;
+        }
+        for (int yy = 1; yy <= 4; yy++) {
+            if (isBlockedAt(level, x + 1, y + yy, z + 1) || isBlockedAt(level, x + 2, y + yy, z + 1)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether the given cell keeps a portal frame from standing here.
+     *
+     * <p>Lava counts, and that is the whole point of this method: it is not a footing and it is
+     * not free room either. Treating it as free room is what built frames inside the lava seas of
+     * the nether, so a player stepping through arrived standing in lava.
+     */
+    private static boolean isBlockedAt(Level level, int x, int y, int z) {
+        int id = level.getBlockIdAt(x, y, z);
+        if (id == AIR || id == NETHER_PORTAL) {
+            return false;
+        }
+        return Block.isBlockSolidById(id) || Block.isLava(id) || Block.isWater(id);
+    }
+
+    private static boolean isSolidAt(Level level, int x, int y, int z) {
+        int id = level.getBlockIdAt(x, y, z);
+        if (id == AIR || id == NETHER_PORTAL) {
+            return false;
+        }
+        // Water and lava are not a footing: standing on them means falling through or burning.
+        return Block.isBlockSolidById(id);
     }
 
     @Override
