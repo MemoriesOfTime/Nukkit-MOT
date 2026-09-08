@@ -1,6 +1,7 @@
 package cn.nukkit.event.entity;
 
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityLiving;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.potion.Effect;
 
@@ -19,11 +20,11 @@ public class EntityDamageByEntityEvent extends EntityDamageEvent {
     private Enchantment[] enchantments;
 
     public EntityDamageByEntityEvent(Entity damager, Entity entity, DamageCause cause, float damage) {
-        this(damager, entity, cause, damage, 0.3f);
+        this(damager, entity, cause, damage, (float) EntityLiving.DEFAULT_KNOCKBACK);
     }
 
     public EntityDamageByEntityEvent(Entity damager, Entity entity, DamageCause cause, Map<DamageModifier, Float> modifiers) {
-        this(damager, entity, cause, modifiers, 0.3f);
+        this(damager, entity, cause, modifiers, (float) EntityLiving.DEFAULT_KNOCKBACK);
     }
 
     public EntityDamageByEntityEvent(Entity damager, Entity entity, DamageCause cause, float damage, float knockBack) {
