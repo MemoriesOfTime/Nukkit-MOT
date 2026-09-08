@@ -4064,8 +4064,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                if (!authPacket.getBlockActionData().isEmpty()) {
-                    for (PlayerBlockActionData action : orderBlockActions(authPacket.getBlockActionData().values())) {
+                // A creative client can finish several blocks in one input tick. Replaying the
+                // legacy map silently loses all but the last action of each type, leaving blocks
+                // hidden on the client without ever asking the level to break or restore them.
+                // Only map-only packets need the ordering repair; decoded actions have wire order.
+                List<PlayerBlockActionData> blockActions = authPacket.getDecodedBlockActions();
+                if (blockActions.isEmpty()) {
+                    blockActions = orderBlockActions(authPacket.getBlockActionData().values());
+                }
+                if (!blockActions.isEmpty()) {
+                    for (PlayerBlockActionData action : blockActions) {
                         BlockVector3 blockPos = action.getPosition();
                         if (blockPos == null) {
                             continue;

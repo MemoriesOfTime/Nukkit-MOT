@@ -13,8 +13,10 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -49,6 +51,10 @@ public class PlayerAuthInputPacket extends DataPacket {
     private InventoryTransactionPacket itemUseTransaction;
     private ItemStackRequest itemStackRequest;
     private Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
+    /** All decoded actions in wire order; the legacy map can retain only the last of each type. */
+    private final List<PlayerBlockActionData> decodedBlockActions = new ArrayList<>();
+    @Getter(lombok.AccessLevel.NONE)
+    private final Map<PlayerActionType, PlayerBlockActionData> decodedBlockActionSnapshot = new EnumMap<>(PlayerActionType.class);
     /**
      * @since v748
      */
@@ -94,6 +100,9 @@ public class PlayerAuthInputPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.blockActionData.clear();
+        this.decodedBlockActions.clear();
+        this.decodedBlockActionSnapshot.clear();
         this.pitch = this.getLFloat();
         this.yaw = this.getLFloat();
         this.position = this.getVector3f();
@@ -227,7 +236,7 @@ public class PlayerAuthInputPacket extends DataPacket {
                 if (type == null) {
                     continue;
                 }
-                this.blockActionData.put(type, new PlayerBlockActionData(type, position, facing));
+                this.addDecodedBlockAction(new PlayerBlockActionData(type, position, facing));
             } else {
                 // pre-v2168: 仅 5 种动作携带 position+face / only 5 action types carry position+face
                 if (type == null) {
@@ -239,13 +248,47 @@ public class PlayerAuthInputPacket extends DataPacket {
                     case CRACK_BLOCK:
                     case PREDICT_DESTROY_BLOCK:
                     case CONTINUE_DESTROY_BLOCK:
-                        this.blockActionData.put(type, new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
+                        this.addDecodedBlockAction(new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
                         break;
                     default:
-                        this.blockActionData.put(type, new PlayerBlockActionData(type, null, -1));
+                        this.addDecodedBlockAction(new PlayerBlockActionData(type, null, -1));
                 }
             }
         }
+        // Packet listeners may mutate the legacy map, its actions or their coordinates.
+        // Preserve those filters instead of replaying an unfiltered decoded sequence.
+        this.blockActionData.forEach((type, action) ->
+                this.decodedBlockActionSnapshot.put(type, copyBlockAction(action)));
+    }
+
+    /**
+     * Returns a read-only snapshot of the decoded sequence for replay, or an empty list when a
+     * legacy map edit requires fallback. Snapshot actions and positions are defensive copies;
+     * packet listeners should use {@link #getBlockActionData()} or {@link #setBlockActionData(Map)}
+     * to filter or replace actions.
+     */
+    public List<PlayerBlockActionData> getDecodedBlockActions() {
+        return this.blockActionData.equals(this.decodedBlockActionSnapshot)
+                ? this.decodedBlockActions.stream().map(PlayerAuthInputPacket::copyBlockAction).toList()
+                : List.of();
+    }
+
+    private static PlayerBlockActionData copyBlockAction(PlayerBlockActionData action) {
+        BlockVector3 pos = action.getPosition();
+        return new PlayerBlockActionData(action.getAction(),
+                pos == null ? null : new BlockVector3(pos.x, pos.y, pos.z), action.getFacing());
+    }
+
+    private void addDecodedBlockAction(PlayerBlockActionData action) {
+        this.decodedBlockActions.add(action);
+        this.blockActionData.put(action.getAction(), action);
+    }
+
+    /** Replacing the legacy map explicitly also replaces the decoded action sequence. */
+    public void setBlockActionData(Map<PlayerActionType, PlayerBlockActionData> actions) {
+        this.decodedBlockActions.clear();
+        this.decodedBlockActionSnapshot.clear();
+        this.blockActionData = actions;
     }
 
     private InventoryTransactionPacket readItemUseTransaction() {
