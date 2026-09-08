@@ -4064,8 +4064,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                if (!authPacket.getBlockActionData().isEmpty()) {
-                    for (PlayerBlockActionData action : authPacket.getBlockActionData().values()) {
+                // A creative client can finish several blocks in one input tick. Replaying the
+                // legacy map silently loses all but the last action of each type, leaving blocks
+                // hidden on the client without ever asking the level to break or restore them.
+                // Only map-only packets need the ordering repair; decoded actions have wire order.
+                List<PlayerBlockActionData> blockActions = authPacket.getDecodedBlockActions();
+                if (blockActions.isEmpty()) {
+                    blockActions = orderBlockActions(authPacket.getBlockActionData().values());
+                }
+                if (!blockActions.isEmpty()) {
+                    for (PlayerBlockActionData action : blockActions) {
                         BlockVector3 blockPos = action.getPosition();
                         if (blockPos == null) {
                             continue;
@@ -4080,7 +4088,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (lastBreakPos != null && (lastBreakPos.getX() != blockPos.getX() ||
                                 lastBreakPos.getY() != blockPos.getY() || lastBreakPos.getZ() != blockPos.getZ())) {
                             this.onBlockBreakAbort(lastBreakPos.asVector3(), BlockFace.DOWN);
-                            this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            if (!endsBlockDestruction(action.getAction())) {
+                                this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            }
                         }
 
                         switch (action.getAction()) {
@@ -5931,6 +5941,40 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.needSendInventory = true;
             return false;
         }
+    }
+
+    /**
+     * Replays the block actions of a single input tick in causal order.
+     *
+     * <p>{@link cn.nukkit.network.protocol.PlayerAuthInputPacket} collects the block actions of a
+     * tick into an {@link java.util.EnumMap}, so the order in which the client sent them is lost and
+     * the values are iterated by {@link PlayerActionType} ordinal instead. The client finishes a
+     * block and reaches for the next one in one tick, sending
+     * {@code PREDICT_DESTROY_BLOCK(finished)} followed by {@code START_DESTROY_BLOCK(next)}; the
+     * ordinals replay that backwards, because {@code START_DESTROY_BLOCK} is the first constant of
+     * the enum and {@code PREDICT_DESTROY_BLOCK} is close to the last. Starting the next block first
+     * moves {@code lastBreak} to the current millisecond, and the completion that follows is then
+     * judged against a timer that started an instant ago: {@link cn.nukkit.level.Level#useBreakOn}
+     * reports {@code fastBreak} and the finished block is refused and sent back to the player.
+     *
+     * <p>Actions that END a destruction therefore run before the ones that begin or continue one.
+     * The sort is stable, so actions of the same group keep the order they already had.
+     */
+    static List<PlayerBlockActionData> orderBlockActions(Collection<PlayerBlockActionData> actions) {
+        List<PlayerBlockActionData> ordered = new ArrayList<>(actions);
+        if (ordered.size() > 1) {
+            ordered.sort(Comparator.comparingInt(action -> endsBlockDestruction(action.getAction()) ? 0 : 1));
+        }
+        return ordered;
+    }
+
+    /**
+     * Does this action end the destruction of a block rather than begin or continue one?
+     */
+    static boolean endsBlockDestruction(PlayerActionType action) {
+        return action == PlayerActionType.PREDICT_DESTROY_BLOCK
+                || action == PlayerActionType.ABORT_DESTROY_BLOCK
+                || action == PlayerActionType.STOP_DESTROY_BLOCK;
     }
 
     private void onBlockBreakContinue(Vector3 pos, BlockFace face) {
