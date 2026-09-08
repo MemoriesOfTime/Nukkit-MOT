@@ -58,10 +58,6 @@ public class Skin {
 
     private boolean noPlayFab; // Don't attempt to generate missing play fab id multiple times
     private String fullSkinId;
-    // FAPIXEL fap4：fullSkinId 是否为"显式设置的稳定键"（客户端登录/换肤包提供，或服务端
-    // 插件主动 setFullSkinId）。稳定键下发时保持原样；未设置的（RsNPC 等共享 Skin 实例的
-    // 服务端皮肤）由 BinaryStream#putSkin 每次发包随机化，跳过网易客户端档案匹配。
-    private boolean fullSkinIdStable;
     private String skinId;
     private String playFabId = "";
     private String skinResourcePatch = GEOMETRY_CUSTOM;
@@ -399,15 +395,7 @@ public class Skin {
 
     public void setFullSkinId(String fullSkinId) {
         this.fullSkinId = fullSkinId;
-        this.fullSkinIdStable = fullSkinId != null;
         this.noPlayFab = false; // Allow another attempt to generate it using the new id
-    }
-
-    /**
-     * FAPIXEL fap4：fullSkinId 是否为显式设置的稳定键（见字段注释）。
-     */
-    public boolean isFullSkinIdStable() {
-        return this.fullSkinIdStable && this.fullSkinId != null;
     }
 
     public String getFullSkinId() {
