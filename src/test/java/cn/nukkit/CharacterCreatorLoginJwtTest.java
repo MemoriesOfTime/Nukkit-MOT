@@ -211,7 +211,7 @@ class CharacterCreatorLoginJwtTest {
         assertEquals(2, skin.getPersonaPieces().size());
         assertEquals(1, skin.getTintColors().size());
         assertEquals(1, skin.getAnimations().size());
-        assertTrue(skin.isValid(), "character creator skin should pass isValid()");
+        assertTrue(skin.isValid(GameVersion.getLastVersion().getProtocol()), "character creator skin should pass isValid()");
 
         assertEquals("TestPlayer", pkt.username, "username should be parsed from chain");
     }

@@ -1,5 +1,6 @@
 package cn.nukkit.entity.data;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
@@ -96,6 +97,10 @@ public class Skin {
 
     /** 内容指纹缓存（getContentFingerprint 惰性计算；影响摘要的 setter 负责清除）。 */
     private volatile String cachedFingerprint;
+
+    public boolean isValid() {
+        return this.isValid(GameVersion.getLastVersion().getProtocol());
+    }
 
     public boolean isValid(int protocol) {
         if(protocol <= ProtocolInfo.v_1_0_0){

@@ -478,7 +478,9 @@ public class Network {
                                     filter.add(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(UseItemPacket.class));
                                 }
                             }else{
-                                player.handleDataPacket(pk);
+                                if(player != null){
+                                    player.handleDataPacket(pk);
+                                }
                             }
 
                             if (pk.getOffset() <= 0) {
