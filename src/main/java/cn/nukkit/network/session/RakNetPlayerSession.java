@@ -191,6 +191,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                 buffer.readBytes(packetBuffer);
 
                 DataPacket pk = this.server.getNetwork().getPacket((byte) (packetBuffer[0] & 0xff), ProtocolInfo.v_0_14_3);
+                DataPacket pk011 = this.server.getNetwork().getPacket((byte) (packetId & 0xff), ProtocolInfo.v_0_11_0); //查找 0.11.1 是否存在 0x83 为开头的 pid
                 if (pk != null) {
                     if (this.player != null && this.player.confirmProtocol) {
                         pk.protocol = this.player.protocol;
@@ -202,14 +203,13 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     this.inbound.offer(pk);
                     // 不能直接调用this.player, 因为player可能尚未创建出来
                     // this.player.handleDataPacket(pk);
-                } else {
+                } else if(pk011 != null){
                     //非 0.14.3 pid 列表包 ，如 0.11
-                    DataPacket pk011 = this.server.getNetwork().getPacket((byte) (packetId & 0xff), ProtocolInfo.v_0_11_0); //查找 0.11.1 是否存在 0x83 为开头的 pid
                     pk011.protocol = ProtocolInfo.v_0_11_0;
                     packetBuffer = Binary.appendBytes((byte) (packetId & 0xff), packetBuffer);
-                    pk.setBuffer(packetBuffer, 1);
-                    pk.decode();
-                    this.inbound.offer(pk);
+                    pk011.setBuffer(packetBuffer, 1);
+                    pk011.decode();
+                    this.inbound.offer(pk011);
                     // 不能直接调用this.player, 因为player可能尚未创建出来
                     // this.player.handleDataPacket(pk);
                 }

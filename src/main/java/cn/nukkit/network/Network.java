@@ -474,7 +474,9 @@ public class Network {
 
                             if(pk.pid() == ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(UseItemPacket.class)){
                                 if (!filter.contains(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(UseItemPacket.class))) {
-                                    player.handleDataPacket(packet);
+                                    if (player != null) {
+                                        player.handleDataPacket(pk);
+                                    }
                                     filter.add(ProtocolInfo.oldProtocolInfo.get(ProtocolInfo.v_0_14_3).get(UseItemPacket.class));
                                 }
                             }else{
