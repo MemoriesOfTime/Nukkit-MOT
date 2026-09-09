@@ -57,13 +57,8 @@ public class MovePlayerPacket extends DataPacket {
         this.y = v.y;
         this.z = v.z;
         this.pitch = this.getLFloat();
-        if(this.protocol >= ProtocolInfo.v1_2_0) {
-            this.yaw = this.getLFloat();
-            this.headYaw = this.getLFloat();
-        }else{
-            this.headYaw = this.getLFloat();
-            this.yaw = this.getLFloat();
-        }
+        this.yaw = this.getLFloat();
+        this.headYaw = this.getLFloat();
         this.mode = (byte) this.getByte();
         this.onGround = this.getBoolean();
         if(this.protocol <= ProtocolInfo.v_1_0_0){
