@@ -111,7 +111,7 @@ class EntityHumanSkinLifecycleTest {
                 .map(PlayerListPacket.class::cast)
                 .findFirst().orElseThrow();
         assertEquals(PlayerListPacket.TYPE_ADD, add.type);
-        assertTrue(add.entries[0].skin.isValid());
+        assertTrue(add.entries[0].skin.isValid(GameVersion.getLastVersion().getProtocol()));
         assertFalse(add.entries[0].skin.isFullyTransparent(),
                 "placeholder skin must be opaque so a dropped skin packet degrades to a visible fallback");
     }
