@@ -1,6 +1,7 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.AdventureSettings.Type;
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -3483,6 +3484,11 @@ public abstract class Entity extends Location implements Metadatable {
         return this.dataPropertiesController.getDataProperties(ProtocolInfo.v_0_14_3).remove(id) != null;
     }
 
+    @Deprecated
+    public boolean setDataPropertyAndSendOnlyToSelf(EntityData data) {
+        return this.setDataPropertyAndSendOnlyToSelf(GameVersion.getLastVersion().getProtocol(), data);
+    }
+
     public boolean setDataPropertyAndSendOnlyToSelf(int protocol, EntityData data) {
         EntityMetadata dataProperties = this.dataPropertiesController.getDataProperties(protocol);
 
@@ -3508,48 +3514,108 @@ public abstract class Entity extends Location implements Metadatable {
         return this.dataPropertiesController.getDataProperties(protocol);
     }
 
+    @Deprecated
+    public EntityData getDataProperty(int id) {
+        return this.getDataProperty(GameVersion.getLastVersion().getProtocol(), id);
+    }
+
     public EntityData getDataProperty(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).get(id);
+    }
+
+    @Deprecated
+    public int getDataPropertyInt(int id) {
+        return this.getDataPropertyInt(GameVersion.getLastVersion().getProtocol(), id);
     }
 
     public int getDataPropertyInt(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getInt(id);
     }
 
+    @Deprecated
+    public int getDataPropertyShort(int id) {
+        return this.getDataPropertyShort(GameVersion.getLastVersion().getProtocol(), id);
+    }
+
     public int getDataPropertyShort(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getShort(id);
+    }
+
+    @Deprecated
+    public int getDataPropertyByte(int id) {
+        return this.getDataPropertyByte(GameVersion.getLastVersion().getProtocol(), id);
     }
 
     public int getDataPropertyByte(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getByte(id);
     }
 
+    @Deprecated
+    public boolean getDataPropertyBoolean(int id) {
+        return this.getDataPropertyBoolean(GameVersion.getLastVersion().getProtocol(), id);
+    }
+
     public boolean getDataPropertyBoolean(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getBoolean(id);
+    }
+
+    @Deprecated
+    public long getDataPropertyLong(int id) {
+        return this.getDataPropertyLong(GameVersion.getLastVersion().getProtocol(), id);
     }
 
     public long getDataPropertyLong(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getLong(id);
     }
 
+    @Deprecated
+    public String getDataPropertyString(int id) {
+        return this.getDataPropertyString(GameVersion.getLastVersion().getProtocol(), id);
+    }
+
     public String getDataPropertyString(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getString(id);
+    }
+
+    @Deprecated
+    public float getDataPropertyFloat(int id) {
+        return this.getDataPropertyFloat(GameVersion.getLastVersion().getProtocol(), id);
     }
 
     public float getDataPropertyFloat(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getFloat(id);
     }
 
+    @Deprecated
+    public CompoundTag getDataPropertyNBT(int id) {
+        return this.getDataPropertyNBT(GameVersion.getLastVersion().getProtocol(), id);
+    }
+
     public CompoundTag getDataPropertyNBT(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getNBT(id);
+    }
+
+    @Deprecated
+    public Vector3 getDataPropertyPos(int id) {
+        return this.getDataPropertyPos(GameVersion.getLastVersion().getProtocol(), id);
     }
 
     public Vector3 getDataPropertyPos(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getPosition(id);
     }
 
+    @Deprecated
+    public Vector3f getDataPropertyVector3f(int id) {
+        return this.getDataPropertyVector3f(GameVersion.getLastVersion().getProtocol(), id);
+    }
+
     public Vector3f getDataPropertyVector3f(int protocol, int id) {
         return this.dataPropertiesController.getDataProperties(protocol).getFloatPosition(id);
+    }
+
+    @Deprecated
+    public int getDataPropertyType(int id) {
+        return this.getDataPropertyType(GameVersion.getLastVersion().getProtocol(), id);
     }
 
     public int getDataPropertyType(int protocol, int id) {
@@ -3634,6 +3700,11 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
+    @Deprecated
+    public void setDataFlagSelfOnly(int propertyId, int id, boolean value) {
+        this.setDataFlagSelfOnly(GameVersion.getLastVersion().getProtocol(), propertyId, id, value);
+    }
+
     public void setDataFlagSelfOnly(int protocol, int propertyId, int id, boolean value) {
         if(protocol <= ProtocolInfo.v_0_15_10){
             return;
@@ -3679,6 +3750,11 @@ public abstract class Entity extends Location implements Metadatable {
                 this.setDataPropertyAndSendOnlyToSelf(protocol,newLongEntityData);
             }
         }
+    }
+
+    @Deprecated
+    public boolean getDataFlag(int propertyId, int id) {
+       return this.getDataFlag(GameVersion.getLastNetEaseVersion().getProtocol(), propertyId, id);
     }
 
     public boolean getDataFlag(int protocol, int propertyId, int id) {
