@@ -10125,8 +10125,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 compress.payload = SnappyCompression.compress(bytes);
             } else if (protocol >= ProtocolInfo.v1_16_0) {
                 compress.payload = Zlib.deflateRaw(bytes, Server.getInstance().networkCompressionLevel);
-            } else {
+            }  else if(protocol > ProtocolInfo.v_0_15_10){
                 compress.payload = Zlib.deflatePre16Packet(bytes, Server.getInstance().networkCompressionLevel);
+            }else{
+                // 0.11 - 0.12 - 0.13 - 0.14 - 0.15
+                compress.payload = Zlib.deflate(bytes, Server.getInstance().networkCompressionLevel);
             }
             return compress;
         } catch (Exception e) {

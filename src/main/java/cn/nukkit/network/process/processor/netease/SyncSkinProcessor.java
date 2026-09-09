@@ -35,7 +35,7 @@ public class SyncSkinProcessor extends DataPacketProcessor<SyncSkinPacket> {
         Player player = playerHandle.player;
         Skin skin = pk.skin;
 
-        if (!skin.isValid()) {
+        if (!skin.isValid(playerHandle.getProtocol())) {
             // 软丢弃而非断开：线格式异常不应踢掉换肤玩家
             player.getServer().getLogger().warning(playerHandle.getUsername() + ": SyncSkinPacket with invalid skin, ignored");
             return;
