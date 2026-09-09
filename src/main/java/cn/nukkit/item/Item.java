@@ -34,6 +34,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -107,18 +108,38 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     protected int stackNetId = 0;
 
+    /**
+     * 直构的裸 Item 不携带类型化行为（堆叠上限、名称、食用/工具/盔甲等），
+     * 已注册 id 必须经 {@link #get(int, Integer, int)} 或 {@link #fromString(String)} 获取。
+     * <p>
+     * A directly constructed bare {@code Item} carries no typed behavior (stack limit,
+     * name, food/tool/armor overrides); registered ids must be obtained via
+     * {@link #get(int, Integer, int)} or {@link #fromString(String)}.
+     */
+    @ApiStatus.Internal
     public Item(int id) {
         this(id, 0, 1, UNKNOWN_STR);
     }
 
+    @ApiStatus.Internal
     public Item(int id, Integer meta) {
         this(id, meta, 1, UNKNOWN_STR);
     }
 
+    @ApiStatus.Internal
     public Item(int id, Integer meta, int count) {
         this(id, meta, count, UNKNOWN_STR);
     }
 
+    /**
+     * 直构的裸 Item 不携带类型化行为（堆叠上限、名称、食用/工具/盔甲等），
+     * 已注册 id 必须经 {@link #get(int, Integer, int)} 或 {@link #fromString(String)} 获取。
+     * <p>
+     * A directly constructed bare {@code Item} carries no typed behavior (stack limit,
+     * name, food/tool/armor overrides); registered ids must be obtained via
+     * {@link #get(int, Integer, int)} or {@link #fromString(String)}.
+     */
+    @ApiStatus.Internal
     public Item(int id, Integer meta, int count, String name) {
         //this.id = id & 0xffff;
         this.id = id;
@@ -785,7 +806,21 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void removeCreativeItem(Item item) {
-        CREATIVE_ITEMS.getContents().remove(item);
+        // Item 未重写 hashCode，Map.remove 按身份哈希定位，传入新构造的实例永远匹配失败，
+        // 必须按 equals 语义迭代删除
+        // Item does not override hashCode, so Map.remove locates by identity hash and never
+        // matches a freshly constructed instance; iterate with equals semantics instead
+        var contents = CREATIVE_ITEMS.getContents();
+        boolean checkDamage = !item.isTool();
+        contents.keySet().removeIf(existing -> item.equals(existing, checkDamage));
+
+        Set<CreativeItemGroup> referenced = new HashSet<>();
+        for (CreativeItemGroup group : contents.values()) {
+            if (group != null) {
+                referenced.add(group);
+            }
+        }
+        CREATIVE_ITEMS.getGroups().removeIf(group -> !referenced.contains(group));
     }
 
     /**
@@ -1051,6 +1086,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 mapping.deleteCustomItem((CustomItem) customItem);
             }
 
+            ItemTag.removeItemTag(namespaceId);
+            NAMESPACED_ID_ITEM.remove(normalizeNamespacedItemIdentifier(namespaceId));
+            clearRegisteredStringItemIdentifierCache(namespaceId);
+
             // Remove from creative items
             removeCreativeItem(customItem);
         }
@@ -1082,6 +1121,44 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return get(id, meta, count, new byte[0]);
     }
 
+    /**
+     * Creates the item form of a block ID.
+     * <p>
+     * Block IDs above 255 use the negative legacy alias in the item registry;
+     * keeping this conversion explicit avoids confusing overlapping item and
+     * block ID spaces in {@link #get(int, Integer, int)}.
+     *
+     * @param blockId the block ID
+     * @return the item form of the block
+     */
+    public static Item getBlockItem(int blockId) {
+        return getBlockItem(blockId, 0, 1);
+    }
+
+    /**
+     * Creates the item form of a block ID with metadata.
+     *
+     * @param blockId the block ID
+     * @param meta block metadata
+     * @return the item form of the block
+     */
+    public static Item getBlockItem(int blockId, Integer meta) {
+        return getBlockItem(blockId, meta, 1);
+    }
+
+    /**
+     * Creates the item form of a block ID with metadata and count.
+     *
+     * @param blockId the block ID
+     * @param meta block metadata
+     * @param count item count
+     * @return the item form of the block
+     */
+    public static Item getBlockItem(int blockId, Integer meta, int count) {
+        int itemId = blockId > 255 ? 255 - blockId : blockId;
+        return get(itemId, meta, count);
+    }
+
     public static Item get(int id, Integer meta, int count, byte[] tags) {
         try {
             Class<?> c;
@@ -1098,7 +1175,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             Item item;
 
             if (c == null) {
-                item = new Item(id, meta, count);
+                item = createFallbackItem(id, meta, count);
             } else if (id < 256 && id != 166) {
                 if (meta >= 0) {
                     item = new ItemBlock(Block.get(id, meta), meta, count);
@@ -1115,8 +1192,56 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
             return item;
         } catch (Exception e) {
-            return new Item(id, meta, count).setCompoundTag(tags);
+            return createFallbackItem(id, meta, count).setCompoundTag(tags);
         }
+    }
+
+    /**
+     * 已在告警过的未知物品 id，避免网络/NBT 路径重复刷日志。
+     * <p>
+     * Unknown item ids already warned about, so network/NBT paths do not spam.
+     */
+    private static final Set<Integer> warnedUnknownIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    /**
+     * 无注册类的数字 id 回退：先按映射表反查标识符归一到类型化物品（如 519 -> ItemCopperIngot，
+     * 消灭同一物品的双 id 表示）；有名字但无类的（教育版物品等）至少带上正确名称；
+     * 完全未知的 id 才落回裸 Item 并每个 id 告警一次。
+     * <p>
+     * Fallback for numeric ids without a registered class: resolve the identifier
+     * from the legacy mapping first and normalize to the typed item (e.g. 519 ->
+     * ItemCopperIngot, removing the dual-id representation of one item); ids that
+     * have a name but no class (education items etc.) at least carry the proper
+     * name; only truly unknown ids fall back to a bare Item, warned once per id.
+     */
+    private static Item createFallbackItem(int id, Integer meta, int count) {
+        String identifier = RuntimeItems.getLegacyStringFromLegacyId(id);
+        if (identifier != null) {
+            Supplier<Item> supplier = NAMESPACED_ID_ITEM.get(identifier);
+            if (supplier != null) {
+                try {
+                    Item item = supplier.get();
+                    if (item != null) {
+                        // 无类型类的标识符注册的是共享原型 supplier（() -> item），克隆后才能改状态
+                        item = item.clone();
+                    }
+                    if (item != null) {
+                        item.setCount(count);
+                        if (meta != null && meta >= 0) {
+                            item.setDamage(meta);
+                        }
+                        return item;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            String fallbackName = identifier.indexOf(':') >= 0 ? StringItem.createItemName(identifier) : identifier;
+            return new Item(id, meta, count, fallbackName);
+        }
+        if (warnedUnknownIds.add(id)) {
+            log.warn("Unknown item id {}, falling back to a bare Item", id);
+        }
+        return new Item(id, meta, count);
     }
 
     public static Item fromString(String str) {

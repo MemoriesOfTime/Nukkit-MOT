@@ -272,7 +272,12 @@ public class RuntimeItemMapping {
         }
         this.customItems.remove(namespaceId);
 
-        this.runtimeId2Name.remove(customItem.getId());
+        // runtimeId2Name 以 CustomItemDefinition 分配的 runtimeId 为 key；
+        // customItem.getId() 是共享的 STRING_IDENTIFIED_ITEM，会误删原版物品的映射
+        // runtimeId2Name is keyed by the CustomItemDefinition-assigned runtimeId;
+        // customItem.getId() is the shared STRING_IDENTIFIED_ITEM and would delete a vanilla entry
+        int runtimeId = CustomItemDefinition.getRuntimeId(namespaceId);
+        this.runtimeId2Name.remove(runtimeId);
         this.name2RuntimeId.removeInt(customItem.getNamespaceId());
         this.itemPaletteEntries.removeIf(next -> next.getIdentifier().equals(customItem.getNamespaceId()));
 

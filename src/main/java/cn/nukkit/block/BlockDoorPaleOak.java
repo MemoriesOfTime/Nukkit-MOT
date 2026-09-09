@@ -25,7 +25,7 @@ public class BlockDoorPaleOak extends BlockDoorWood {
 
     @Override
     public Item toItem() {
-        return Item.get(Item.PALE_OAK_DOOR);
+        return Item.getBlockItem(getId());
     }
 
     @Override

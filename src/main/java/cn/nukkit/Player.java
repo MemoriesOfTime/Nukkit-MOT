@@ -46,6 +46,7 @@ import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.item.enchantment.EnchantmentFrostWalker;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.lang.CommandOutputContainer;
 import cn.nukkit.lang.LangCode;
@@ -313,6 +314,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private static final double FOV_DEGREES = 100.0;
 
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
+    /** Server tick at which the cool down of an item category ends. */
+    protected final Map<String, Integer> itemCoolDownEnds = new ConcurrentHashMap<>(2);
 
     /**
      * 已向本观察者下发 PlayerList(ADD) 的玩家型实体 UUID，用于去重防网易客户端隐形；
@@ -2708,8 +2711,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         Item boots = this.inventory.getBootsFast();
 
         Enchantment frostWalker = boots.getEnchantment(Enchantment.ID_FROST_WALKER);
-        if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
-            int radius = 2 + frostWalker.getLevel();
+        int frostWalkerLevel = frostWalker == null ? 0 : frostWalker.getLevel();
+        if (frostWalkerLevel > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
+            // Take the min before adding 2 so a malformed high level cannot overflow 2 + level negative
+            int radius = 2 + Math.min(frostWalkerLevel, EnchantmentFrostWalker.MAX_FREEZE_RADIUS - 2);
             for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
                 for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
                     Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
@@ -8007,7 +8012,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         int tmpX = target.getFloorX() + each.getXOffset();
                         int tmpY = target.getFloorY() + each.getYOffset();
                         int tmpZ = target.getFloorZ() + each.getZOffset();
-                        if (Level.xrayableBlocks[this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ)]) {
+                        int neighborBlockId = this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ);
+                        if (neighborBlockId < Block.MAX_BLOCK_ID && Level.xrayableBlocks[neighborBlockId]) {
                             vector3s[index] = new Vector3(tmpX, tmpY, tmpZ);
                             index++;
                         }
@@ -8424,14 +8430,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
-     * 设置指定itemCategory物品的冷却显示效果，注意该方法仅为客户端显示效果，冷却逻辑实现仍需自己实现
+     * 设置指定itemCategory物品的冷却：服务端记录冷却结束的tick，同时把冷却显示效果发给客户端
      * <p>
-     * Set the cooling display effect of the specified itemCategory items, note that this method is only for client-side display effect, cooling logic implementation still needs to be implemented by itself
+     * Start a cool down for the given item category. The end tick is tracked server side, so
+     * {@link #isItemCoolDownEnd(String)} stays authoritative even when the client ignores the
+     * display packet, and the packet is still sent to clients that understand it.
      *
-     * @param coolDown     the cool down
+     * @param coolDown     the cool down, in ticks; zero or less clears the cool down
      * @param itemCategory the item category
      */
     public void setItemCoolDown(int coolDown, String itemCategory) {
+        if (coolDown > 0) {
+            this.itemCoolDownEnds.put(itemCategory, this.server.getTick() + coolDown);
+        } else {
+            this.itemCoolDownEnds.remove(itemCategory);
+        }
+
         if (this.protocol < ProtocolInfo.v1_18_10) {
             return;
         }
@@ -8439,6 +8453,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.setCoolDownDuration(coolDown);
         pk.setItemCategory(itemCategory);
         this.dataPacket(pk);
+    }
+
+    /**
+     * 获取指定itemCategory冷却结束的tick，没有冷却时返回0
+     * <p>
+     * Gets the server tick at which the cool down of the given item category ends, or {@code 0}
+     * when this player has no running cool down for it.
+     *
+     * @param itemCategory the item category
+     * @return the end tick, or 0
+     */
+    public int getItemCoolDownEnd(String itemCategory) {
+        Integer end = this.itemCoolDownEnds.get(itemCategory);
+        if (end == null) {
+            return 0;
+        }
+        if (this.server.getTick() >= end) {
+            // remove(key, value): an unconditional remove could clobber a cool down recorded concurrently
+            this.itemCoolDownEnds.remove(itemCategory, end);
+            return 0;
+        }
+        return end;
+    }
+
+    /**
+     * 判断指定itemCategory的冷却是否已经结束
+     * <p>
+     * Whether the cool down of the given item category has ended. Item behaviours must ask this
+     * before acting: the cool down belongs to the player, not to a single item stack, so two
+     * identical items in the inventory share one cool down.
+     *
+     * @param itemCategory the item category
+     * @return true when the item may be used again
+     */
+    public boolean isItemCoolDownEnd(String itemCategory) {
+        return this.getItemCoolDownEnd(itemCategory) == 0;
     }
 
     /**
@@ -8887,7 +8937,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             } else {
                 // 发包给客户端清除不死图腾，防止影响自杀等操作
-                if (this.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                if (Entity.isTotem(this.getOffhandInventory().getItemFast(0))) {
                     InventorySlotPacket pk = new InventorySlotPacket();
                     pk.slot = 0;
                     pk.item = Item.AIR_ITEM;
@@ -8901,7 +8951,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 int id = this.getWindowId(this.getInventory());
                 if (id != -1) {
                     for (Entry<Integer, Item> entry : this.getInventory().getContents().entrySet()) {
-                        if (entry.getValue() instanceof ItemTotem) {
+                        if (Entity.isTotem(entry.getValue())) {
                             InventorySlotPacket pk = new InventorySlotPacket();
                             pk.slot = entry.getKey();
                             pk.item = Item.AIR_ITEM;
