@@ -4,44 +4,39 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.network.CompressionProvider;
-import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
-import cn.nukkit.network.proxy.ProxyProtocolHandler;
+import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
 import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
+import cn.nukkit.network.proxy.ProxyProtocolHandler;
 import cn.nukkit.network.session.login.SessionLoginPhase;
-import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.plugin.InternalPlugin;
+import cn.nukkit.scheduler.ServerScheduler;
+import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoop;
+import io.netty.channel.*;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
 import org.cloudburstmc.netty.channel.raknet.packet.RakMessage;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.security.MessageDigest;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -335,13 +330,13 @@ class RakNetPlayerSessionTest {
         int burst = RakNetPlayerSession.MAX_INBOUND_PACKETS_PER_SERVER_TICK + 44;
         assertTrue(fixture.session.enqueueDecodedBatch(testPackets(burst)));
 
-        fixture.session.serverTick();
+        drainServerTick(fixture.session);
 
         verify(fixture.player, times(RakNetPlayerSession.MAX_INBOUND_PACKETS_PER_SERVER_TICK))
                 .handleDataPacket(any(DataPacket.class));
         assertEquals(44, fixture.session.queuedInboundPacketCount());
 
-        fixture.session.serverTick();
+        drainServerTick(fixture.session);
 
         verify(fixture.player, times(burst)).handleDataPacket(any(DataPacket.class));
         assertEquals(0, fixture.session.queuedInboundPacketCount());
@@ -368,7 +363,7 @@ class RakNetPlayerSessionTest {
                 testPackets(RakNetPlayerSession.MAX_QUEUED_INBOUND_PACKETS)));
 
         while (fixture.session.queuedInboundPacketCount() > RakNetPlayerSession.MAX_QUEUED_INBOUND_PACKETS / 2) {
-            fixture.session.serverTick();
+            drainServerTick(fixture.session);
         }
 
         assertFalse(fixture.session.isInboundThrottled());
@@ -592,6 +587,33 @@ class RakNetPlayerSessionTest {
     }
 
     @Test
+    void oversizedWirePacketClosesWithSizeCapReason() throws Exception {
+        SessionFixture fixture = createSession(false);
+
+        receiveBatch(fixture.session, new byte[RakNetPlayerSession.MAX_INBOUND_WIRE_BYTES + 1]);
+
+        assertEquals("Too big packet", fixture.session.getDisconnectReason());
+        verify(fixture.channel).close();
+    }
+
+    @Test
+    void malformedBatchesAboveWindowDisconnectPlayingSession() throws Exception {
+        RakNetInterface networkInterface = mock(RakNetInterface.class, RETURNS_DEEP_STUBS);
+        when(networkInterface.getNetwork()).thenReturn(network);
+        SessionFixture fixture = createSession(networkInterface, false, true, true);
+        fixture.session.getState().getLogin().setPhase(SessionLoginPhase.LOGGED_IN);
+
+        for (int i = 0; i < RakNetPlayerSession.MAX_MALFORMED_BATCHES_WHILE_PLAYING; i++) {
+            receiveBatch(fixture.session, new byte[]{(byte) 0x80});
+            assertNull(fixture.session.getDisconnectReason());
+        }
+
+        receiveBatch(fixture.session, new byte[]{(byte) 0x80});
+
+        assertEquals("Sent malformed packet", fixture.session.getDisconnectReason());
+    }
+
+    @Test
     void malformedSecondFrameDoesNotEnqueueTheValidFirstFrame() throws Exception {
         RakNetInterface networkInterface = mock(RakNetInterface.class, RETURNS_DEEP_STUBS);
         when(networkInterface.getNetwork()).thenReturn(network);
@@ -653,6 +675,11 @@ class RakNetPlayerSessionTest {
         networkInterface.process();
         assertEquals(0, fixtures.get(1).session.queuedInboundPacketCount(),
                 "the next round must give a large head packet the full global byte budget");
+    }
+
+    private static void drainServerTick(RakNetPlayerSession session) {
+        session.serverTick(RakNetPlayerSession.MAX_INBOUND_PACKETS_PER_SERVER_TICK,
+                RakNetPlayerSession.MAX_INBOUND_BYTES_PER_SERVER_TICK);
     }
 
     private static void receiveBatch(RakNetPlayerSession session, byte[] payload) throws Exception {

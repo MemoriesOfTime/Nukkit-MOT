@@ -38,11 +38,7 @@ import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -62,6 +58,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     static final long MAX_QUEUED_INBOUND_BYTES = 6L * 1024L * 1024L;
     private static final int INBOUND_LOW_WATER_PACKETS = MAX_QUEUED_INBOUND_PACKETS / 2;
     private static final long INBOUND_LOW_WATER_BYTES = MAX_QUEUED_INBOUND_BYTES / 2;
+    /** 单个 0xfe 帧的硬性线上尺寸上限，超出即关闭会话。 Hard wire cap for one encapsulated frame. */
+    static final int MAX_INBOUND_WIRE_BYTES = 12582912; // 12 MiB
     /**
      * Permit short bursts of small movement and interaction batches while bounding sustained
      * wire traffic. Decode bytes and framed-packet tokens independently limit processing work.
@@ -77,7 +75,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private static final double INGRESS_FRAME_TOKENS_PER_SECOND = 1300D;
     private static final double FRAME_TOKENS_RESERVATION = 2600D;
     /** How many malformed batches a playing session may send inside the sliding window. */
-    private static final int MAX_MALFORMED_BATCHES_WHILE_PLAYING = 32;
+    static final int MAX_MALFORMED_BATCHES_WHILE_PLAYING = 32;
     static final long MALFORMED_BATCH_WINDOW_NANOS = TimeUnit.MINUTES.toNanos(5);
     private static final long DIAGNOSTIC_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(30);
 
@@ -145,12 +143,15 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, RakMessage msg) throws Exception {
+        if (this.disconnectReason != null) {
+            return;
+        }
         ByteBuf buffer = msg.content();
         short packetId = buffer.readUnsignedByte();
         if (packetId == 0xfe) {
             int len = buffer.readableBytes();
-            if (len > 12582912) {
-                this.rejectWireIngress(len);
+            if (len > MAX_INBOUND_WIRE_BYTES) {
+                this.rejectOversizedWirePacket(len);
                 return;
             }
 
@@ -222,7 +223,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             }
             if (this.isPlayingSession()) {
                 if (!this.keepPlayingSessionAfterMalformedBatch(ingressNowNanos)) {
-                    this.exhaustIngressDecodeBudget();
+                    this.disconnect("Sent malformed packet");
                 }
                 return;
             }
@@ -412,10 +413,6 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         } catch (Throwable e) {
             log.error("[{}] Failed to tick RakNetPlayerSession", this.channel.remoteAddress(), e);
         }
-    }
-
-    public void serverTick() {
-        this.serverTick(MAX_INBOUND_PACKETS_PER_SERVER_TICK, MAX_INBOUND_BYTES_PER_SERVER_TICK);
     }
 
     public InboundDrain serverTick(int packetBudget, long byteBudget) {
@@ -807,8 +804,10 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     /**
-     * Isolate malformed batches after login and apply decode backpressure to repeated failures.
-     * Successful traffic does not clear the sliding failure window. Login stays fail-closed.
+     * 登录后的畸形批次在滑动窗口预算内隔离，超窗则断连；正常流量不清空窗口，登录前保持快速失败。
+     * <p>
+     * Isolate malformed batches after login up to a sliding-window budget; exceeding it disconnects.
+     * Successful traffic does not clear the window. Login stays fail-closed.
      */
     boolean keepPlayingSessionAfterMalformedBatch(long nowNanos) {
         if (this.player == null
@@ -915,15 +914,17 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                 && this.state.getLogin().getPhase() != SessionLoginPhase.DISCONNECTED;
     }
 
-    private void exhaustIngressDecodeBudget() {
-        this.ingressDecodeBytes = 0D;
-        this.ingressFrameTokens = 0D;
-    }
-
     private void rejectWireIngress(int wireBytes) {
         log.warn("[{}] Wire ingress budget exhausted (wireBytes={}); closing before decrypt",
                 this.playerLabel(), wireBytes);
         this.disconnect("Too much inbound data");
+        this.channel.close();
+    }
+
+    private void rejectOversizedWirePacket(int wireBytes) {
+        log.warn("[{}] Closing session: inbound frame of {} bytes exceeds hard limit {}",
+                this.playerLabel(), wireBytes, MAX_INBOUND_WIRE_BYTES);
+        this.disconnect("Too big packet");
         this.channel.close();
     }
 
