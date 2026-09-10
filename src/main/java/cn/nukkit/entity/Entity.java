@@ -2821,7 +2821,19 @@ public abstract class Entity extends Location implements Metadatable {
 
         AxisAlignedBB newBB = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
 
-        if (server.getAllowFlight() || !this.level.hasCollision(this, newBB, false)) {
+        // The float eye-position round trip can place a player's head a few
+        // millionths of a block inside a ceiling. Rejecting all three axes for
+        // that contact turns batched sprint-jumps into horizontal speed setbacks.
+        // Retry only a colliding player's ceiling with a bounded tolerance. Keep
+        // the feet unchanged: raising minY can skip a fence's lower block cell
+        // even though its collision shape extends half a block above that cell.
+        boolean canMove = server.getAllowFlight() || !this.level.hasCollision(this, newBB, false);
+        if (!canMove && this instanceof Player) {
+            AxisAlignedBB ceilingContact = newBB.clone();
+            ceilingContact.setMaxY(ceilingContact.getMaxY() - 1.0E-4);
+            canMove = !this.level.hasCollision(this, ceilingContact, false);
+        }
+        if (canMove) {
             this.boundingBox = newBB;
         }
 
