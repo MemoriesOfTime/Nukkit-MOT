@@ -29,24 +29,20 @@ public abstract class BlockThin extends BlockTransparent {
             boolean flag1 = this.canConnect(this.south());
             boolean flag2 = this.canConnect(this.west());
             boolean flag3 = this.canConnect(this.east());
-            if ((!flag2 || !flag3) && (flag2 || flag3 || flag || flag1)) {
-                if (flag2) {
-                    f = 0;
-                } else if (flag3) {
-                    f1 = 1;
-                }
-            } else {
+            if (flag2 && flag3) {
                 f = 0;
                 f1 = 1;
+            } else if (flag2) {
+                f = 0;
+            } else if (flag3) {
+                f1 = 1;
             }
-            if ((!flag || !flag1) && (flag2 || flag3 || flag || flag1)) {
-                if (flag) {
-                    f2 = 0;
-                } else if (flag1) {
-                    f3 = 1;
-                }
-            } else {
+            if (flag && flag1) {
                 f2 = 0;
+                f3 = 1;
+            } else if (flag) {
+                f2 = 0;
+            } else if (flag1) {
                 f3 = 1;
             }
         } catch (LevelException ignore) {}
