@@ -13,6 +13,14 @@ import lombok.ToString;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 网易 V860 皮肤同步包。条目按轮交错序列化（非逐条），轮 1 的第三字段是皮肤纹理
+ * 字节数组而非字符串；布局写错会让客户端解析失败、皮肤回退史蒂夫。
+ * <p>
+ * NetEase V860 skin sync packet. Entries are serialized in interleaved rounds (not
+ * per-entry), and round 1's third field is a skin-texture byte array, not a string;
+ * a wrong layout makes the client fail to parse and fall back to Steve.
+ */
 @OnlyNetEase
 @ToString
 public class SyncSkinPacket extends DataPacket {
@@ -23,7 +31,7 @@ public class SyncSkinPacket extends DataPacket {
 
     /**
      * 尾部 SerializedSkin，始终存在（即使 entries 为空）。
-     * <p>Trailing SerializedSkin, always present even when entries is empty.
+     * <p>Trailing SerializedSkin, always present even when entries are empty.
      */
     public Skin skin = new Skin();
 
@@ -64,24 +72,24 @@ public class SyncSkinPacket extends DataPacket {
         for (int i = 0; i < count; i++) {
             this.entries.add(new SyncSkinEntry());
         }
-        // GROUP 1: flag + uuid + string1
+        // 轮 1: flag + uuid + skinBytes（字节数组，不是字符串）
         for (int i = 0; i < count; i++) {
             SyncSkinEntry entry = this.entries.get(i);
             entry.flag = this.getBoolean();
             entry.uuid = this.getUUID();
-            entry.string1 = this.getString();
+            entry.skinBytes = this.getByteArray();
         }
-        // GROUP 2: string2
+        // 轮 2: udid
+        for (int i = 0; i < count; i++) {
+            this.entries.get(i).string1 = this.getString();
+        }
+        // 轮 3: extraData
         for (int i = 0; i < count; i++) {
             this.entries.get(i).string2 = this.getString();
         }
-        // GROUP 3: string3 (at least one string is item_id)
+        // 轮 4: itemId（商城商品引用）
         for (int i = 0; i < count; i++) {
             this.entries.get(i).string3 = this.getString();
-        }
-        // GROUP 4: string4
-        for (int i = 0; i < count; i++) {
-            this.entries.get(i).string4 = this.getString();
         }
         // 尾部 SerializedSkin
         this.skin = this.getSkin(this.protocol);
@@ -92,23 +100,23 @@ public class SyncSkinPacket extends DataPacket {
         this.reset();
         int count = this.entries.size();
         this.putUnsignedVarInt(count);
-        // GROUP 1: flag + uuid + string1
+        // 轮 1: flag + uuid + skinBytes（字节数组，不是字符串）
         for (SyncSkinEntry entry : this.entries) {
             this.putBoolean(entry.flag);
             this.putUUID(entry.uuid);
+            this.putByteArray(entry.skinBytes != null ? entry.skinBytes : new byte[0]);
+        }
+        // 轮 2: udid
+        for (SyncSkinEntry entry : this.entries) {
             this.putString(entry.string1 != null ? entry.string1 : "");
         }
-        // GROUP 2: string2
+        // 轮 3: extraData
         for (SyncSkinEntry entry : this.entries) {
             this.putString(entry.string2 != null ? entry.string2 : "");
         }
-        // GROUP 3: string3
+        // 轮 4: itemId（商城商品引用）
         for (SyncSkinEntry entry : this.entries) {
             this.putString(entry.string3 != null ? entry.string3 : "");
-        }
-        // GROUP 4: string4
-        for (SyncSkinEntry entry : this.entries) {
-            this.putString(entry.string4 != null ? entry.string4 : "");
         }
         // 尾部 SerializedSkin
         this.putSkin(this.gameVersion, this.skin);
@@ -120,9 +128,15 @@ public class SyncSkinPacket extends DataPacket {
     public static class SyncSkinEntry {
         public boolean flag;
         public UUID uuid;
+        /** 轮 1 的第三字段：皮肤纹理字节。 */
+        public byte[] skinBytes = new byte[0];
+        /** 轮 2 udid。 */
         public String string1 = "";
+        /** 轮 3 extraData。 */
         public String string2 = "";
+        /** 轮 4 itemId（商城商品引用）。 */
         public String string3 = "";
+        /** 旧格式遗留槽位，已不再上线。 */
         public String string4 = "";
     }
 }
