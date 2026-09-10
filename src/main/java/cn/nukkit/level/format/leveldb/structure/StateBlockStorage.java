@@ -5,6 +5,7 @@ import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.anvil.util.BlockStorage;
@@ -14,6 +15,7 @@ import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -242,16 +244,33 @@ public class StateBlockStorage {
     public void writeTo(GameVersion protocol, BinaryStream stream, boolean antiXray) {
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
-        for (int i = 0; i < SECTION_SIZE; i++) {
-            int fullId = get(i);
-            int id = fullId >> Block.DATA_BITS;
-            int meta = fullId & Block.DATA_MASK;
-            if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
-                id = Block.STONE;
-                meta = 0;
+        // Resolve the palette and network-ID format once per section, as in anvil BlockStorage.
+        // Older protocols still need GlobalBlockPalette's legacy runtime-ID tables.
+        if (protocol.getProtocol() >= ProtocolInfo.v1_16_100) {
+            BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocol);
+            boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
+            for (int i = 0; i < SECTION_SIZE; i++) {
+                int fullId = get(i);
+                int id = fullId >> Block.DATA_BITS;
+                int meta = fullId & Block.DATA_MASK;
+                if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
+                    id = Block.STONE;
+                    meta = 0;
+                }
+                palettedBlockStorage.setBlock(i, useHash ? blockPalette.getHashId(id, meta)
+                                                        : blockPalette.getRuntimeId(id, meta));
             }
-            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, id, meta);
-            palettedBlockStorage.setBlock(i, runtimeId);
+        } else {
+            for (int i = 0; i < SECTION_SIZE; i++) {
+                int fullId = get(i);
+                int id = fullId >> Block.DATA_BITS;
+                int meta = fullId & Block.DATA_MASK;
+                if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
+                    id = Block.STONE;
+                    meta = 0;
+                }
+                palettedBlockStorage.setBlock(i, GlobalBlockPalette.getOrCreateRuntimeId(protocol, id, meta));
+            }
         }
 
         palettedBlockStorage.writeTo(stream);
