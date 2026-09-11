@@ -2774,7 +2774,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Builds the knockback resistance attribute entry and refreshes the last-sent cache.
      */
     private Attribute knockBackResistanceAttributeEntry() {
-        float value = Math.max(0f, Math.min(1f, (float) this.getKnockBackResistance()));
+        float value = Math.max(0, Math.min(1, (float) this.getKnockBackResistance()));
         this.lastSentKnockBackResistance = value;
         return Attribute.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setValue(value);
     }
