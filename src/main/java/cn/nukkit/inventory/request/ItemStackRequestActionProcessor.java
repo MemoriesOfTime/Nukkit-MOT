@@ -1,6 +1,8 @@
 package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemDurable;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ItemStackRequestActionType;
 import org.jetbrains.annotations.Nullable;
@@ -26,5 +28,16 @@ public interface ItemStackRequestActionProcessor<T extends ItemStackRequestActio
      */
     default boolean validateStackNetworkId(int serverNetId, int clientNetId) {
         return serverNetId > 0 && clientNetId > 0 && serverNetId != clientNetId;
+    }
+
+    /**
+     * Return the damage correction used by the Bedrock item-stack response protocol.
+     *
+     * <p>{@link Item#getDamage()} also stores legacy metadata for non-durable items. Sending
+     * that value as durability makes variants such as planks look damaged to the client and
+     * prevents otherwise identical crafted stacks from merging.</p>
+     */
+    static int durabilityCorrection(Item item) {
+        return item instanceof ItemDurable ? item.getDamage() : 0;
     }
 }

@@ -170,7 +170,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
                 PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
                 output.getCount(), output.getStackNetId(),
                 output.hasCustomName() ? output.getCustomName() : "",
-                output.getDamage(), ""
+                ItemStackRequestActionProcessor.durabilityCorrection(output), ""
         );
         return context.success(List.of(new ItemStackResponseContainer(
                 ContainerSlotType.CREATED_OUTPUT,
@@ -359,7 +359,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
                 PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
                 output.getCount(), output.getStackNetId(),
                 output.hasCustomName() ? output.getCustomName() : "",
-                output.getDamage(), ""
+                ItemStackRequestActionProcessor.durabilityCorrection(output), ""
         );
         return context.success(List.of(new ItemStackResponseContainer(
                 ContainerSlotType.CREATED_OUTPUT,
@@ -791,7 +791,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
                 PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
                 output.getCount(), output.getStackNetId(),
                 output.hasCustomName() ? output.getCustomName() : "",
-                output.getDamage(), ""
+                ItemStackRequestActionProcessor.durabilityCorrection(output), ""
         );
         return context.success(List.of(new ItemStackResponseContainer(
                 ContainerSlotType.CREATED_OUTPUT,
