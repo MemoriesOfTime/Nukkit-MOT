@@ -105,10 +105,11 @@ public final class PlayerEntitySkinSender {
         Objects.requireNonNull(entry, "entry");
         Objects.requireNonNull(entry.uuid, "entry.uuid");
 
-        if (!requiresRetainedEntry(viewer) || !viewer.sentSkins.contains(entry.uuid)) {
+        // 无条件 REMOVE → ADD：V860 会忽略对客户端已持有条目的裸 ADD（不重渲染），
+        // 对本人条目更会破坏自视渲染；REMOVE 对客户端不存在的条目是无害空操作。
+        if (!requiresRetainedEntry(viewer)) {
             return false;
         }
-
         PlayerListPacket remove = new PlayerListPacket();
         remove.type = PlayerListPacket.TYPE_REMOVE;
         remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(entry.uuid)};
@@ -124,6 +125,8 @@ public final class PlayerEntitySkinSender {
             return false;
         }
         viewer.sentSkins.add(entry.uuid);
+        // 作废仍在排期的补发与延迟 REMOVE，防止它们晚于重建落地、把新条目顶回旧皮肤。
+        currentGeneration(viewer, entry.uuid).incrementAndGet();
         return true;
     }
 
@@ -175,7 +178,8 @@ public final class PlayerEntitySkinSender {
         if (fingerprint.equals(previous)) {
             return false;
         }
-        if (previous != null) {
+        // 条目已被延迟 REMOVE 注销时也走重建，否则晚到的确认会静默失败、观察者永久史蒂夫。
+        if (previous != null || !viewer.sentSkins.contains(subject)) {
             Player target = Server.getInstance().getPlayer(subject).orElse(null);
             if (target == null) {
                 return false;
@@ -214,20 +218,18 @@ public final class PlayerEntitySkinSender {
     }
 
     /**
-     * 客户端此刻能否应用确认包：必须已有 PlayerList 条目，且该玩家实体已生成到观察者。
-     * 缺任一项客户端都会静默丢弃该条目，而我们已记下指纹便再不重发，因此必须提前拦下。
-     * 条目不存在时顺带清掉残留指纹，避免条目重建后首次确认被误抑制。
+     * 客户端此刻能否应用确认包：该玩家实体须已生成到观察者，否则客户端会静默丢弃该条目，
+     * 而我们已记下指纹便再不重发。不要求 PlayerList 条目仍在——初始握手
+     * {@link #DELAYED_REMOVE_TICKS} 后条目必被注销，条目缺失由 {@link #prepareConfirmSkin}
+     * 的重建分支补 ADD。
      * <p>
-     * Whether the client can apply a confirmation right now: it needs both the PlayerList entry and
-     * the player entity spawned to this viewer. Missing either makes the client drop the entry
-     * silently while we would have recorded the fingerprint and never resent it. A missing entry
-     * also clears any stale fingerprint so the first confirmation after a rebuild isn't suppressed.
+     * Whether the client can apply a confirmation right now: the player entity must have
+     * spawned to this viewer, or the client drops it silently while we would have recorded
+     * the fingerprint and never resent it. A live PlayerList entry is not required — the
+     * delayed REMOVE unregisters it, and the rebuild branch in {@link #prepareConfirmSkin}
+     * re-adds it.
      */
     private static boolean isConfirmable(Player viewer, UUID subject) {
-        if (!viewer.sentSkins.contains(subject)) {
-            viewer.confirmedSkins.remove(subject);
-            return false;
-        }
         Player target = Server.getInstance().getPlayer(subject).orElse(null);
         return target != null && target.hasSpawned.containsKey(viewer.getLoaderId());
     }
@@ -296,13 +298,13 @@ public final class PlayerEntitySkinSender {
             if (viewer.closed) {
                 return;
             }
-            // 互斥：despawn/close 已先清则跳过。
-            if (!unregister(viewer, uuid)) {
+            // 代次已变说明 re-spawn 或条目重建已接管：不动台账也不发 REMOVE——
+            // unregister 会把接管方刚写入的确认指纹一并抹掉，诱发巡检反复重建。
+            if (generation.get() != registeredAt) {
                 return;
             }
-            // 代次已变说明 re-spawn 注册了新条目，恢复 sentSkins 不发 REMOVE。
-            if (generation.get() != registeredAt) {
-                viewer.sentSkins.add(uuid);
+            // 互斥：despawn/close 已先清则跳过。
+            if (!unregister(viewer, uuid)) {
                 return;
             }
             sendRemove(viewer, uuid);

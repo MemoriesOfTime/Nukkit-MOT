@@ -322,20 +322,12 @@ public class BinaryStream {
         return Binary.readUUID(this.get(16));
     }
 
-    /**
-     * @deprecated use {@link #putSkin(GameVersion, Skin)} so the NetEase {@code fullSkinId}
-     * workaround is applied correctly.
-     */
     @Deprecated
     public void putSkin(Skin skin) {
         Server.mvw("BinaryStream#putSkin(Skin)");
         this.putSkin(GameVersion.getLastVersion(), skin);
     }
 
-    /**
-     * @deprecated use {@link #putSkin(GameVersion, Skin)} so the NetEase {@code fullSkinId}
-     * workaround is applied correctly.
-     */
     @Deprecated
     public void putSkin(int protocol, Skin skin) {
         this.putSkin(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), skin);
@@ -407,10 +399,7 @@ public class BinaryStream {
                 this.putBoolean(skin.isCapeOnClassic());
             }
             this.putString(skin.getCapeId());
-            String fullSkinId = gameVersion == GameVersion.V1_21_124_NETEASE
-                    ? skin.getFullSkinId() + UUID.randomUUID().toString().substring(0, 8)
-                    : skin.getFullSkinId();
-            this.putString(fullSkinId);
+            this.putString(skin.getFullSkinId());
             if (protocol >= ProtocolInfo.v1_14_60) {
                 boolean v2168 = protocol >= ProtocolInfo.v1_26_40;
                 if (v2168) {
