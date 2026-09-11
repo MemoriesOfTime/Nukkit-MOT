@@ -2754,10 +2754,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getMaxHealth()).setValue(health > 0 ? (health < getMaxHealth() ? health : getMaxHealth()) : 0),
                 Attribute.getAttribute(Attribute.MAX_HUNGER).setValue(this.foodData.getLevel()).setDefaultValue(this.foodData.getMaxLevel()),
                 Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(this.speedToSend).setDefaultValue(this.getMovementSpeed()),
+                this.knockBackResistanceAttributeEntry(),
                 Attribute.getAttribute(Attribute.EXPERIENCE_LEVEL).setValue(this.expLevel),
                 Attribute.getAttribute(Attribute.EXPERIENCE).setValue(((float) this.exp) / calculateRequireExperience(this.expLevel))
         };
         this.dataPacket(pk);
+    }
+
+    /**
+     * 上次同步给客户端的击退抗性值，[-1, 0) 表示尚未同步过。
+     * <p>
+     * Last knockback resistance value sent to the client; values in [-1, 0) mean never sent.
+     */
+    private float lastSentKnockBackResistance = -1f;
+
+    /**
+     * 构造击退抗性属性条目并更新已同步值缓存。
+     * <p>
+     * Builds the knockback resistance attribute entry and refreshes the last-sent cache.
+     */
+    private Attribute knockBackResistanceAttributeEntry() {
+        float value = Math.max(0, Math.min(1, (float) this.getKnockBackResistance()));
+        this.lastSentKnockBackResistance = value;
+        return Attribute.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setValue(value);
+    }
+
+    /**
+     * 将当前击退抗性通过属性包同步给客户端，盔甲变化后调用；值未变化时跳过发包。
+     * <p>
+     * Syncs the current knockback resistance to the client via the attribute packet, called after armour changes; skips the packet when the value is unchanged.
+     */
+    public void sendKnockBackResistanceAttribute() {
+        float value = Math.max(0f, Math.min(1f, (float) this.getKnockBackResistance()));
+        if (value == this.lastSentKnockBackResistance) {
+            return;
+        }
+        this.setAttribute(this.knockBackResistanceAttributeEntry());
     }
 
     public void sendFogStack() {
