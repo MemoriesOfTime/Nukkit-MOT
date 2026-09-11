@@ -201,6 +201,9 @@ public class PlayerInventory extends BaseInventory {
         if (index >= this.getSize()) {
             this.sendArmorSlot(index, this.getViewers());
             this.sendArmorSlot(index, this.getHolder().getViewers().values());
+            if (holder instanceof Player player) {
+                player.sendKnockBackResistanceAttribute();
+            }
         } else {
             super.onSlotChange(index, before, send);
         }

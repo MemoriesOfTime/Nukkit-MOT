@@ -7,7 +7,7 @@ import cn.nukkit.math.Vector3;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -78,6 +78,55 @@ class NetheriteKnockBackResistanceTest {
         Player player = wearer(new ItemHelmetNetherite());
         player.knockBack(null, 1, 0, 0, 0.3);
         verify(player, never()).setMotion(any(Vector3.class));
+    }
+
+    @Test
+    void attributePacketReflectsWornNetherite() {
+        Player player = wearer(new ItemHelmetNetherite(), new ItemBootsNetherite());
+        doCallRealMethod().when(player).sendKnockBackResistanceAttribute();
+        player.sendKnockBackResistanceAttribute();
+        ArgumentCaptor<Attribute> attribute = ArgumentCaptor.forClass(Attribute.class);
+        verify(player).setAttribute(attribute.capture());
+        assertEquals(Attribute.KNOCKBACK_RESISTANCE, attribute.getValue().getId());
+        assertEquals("minecraft:knockback_resistance", attribute.getValue().getName());
+        assertEquals(0.2f, attribute.getValue().getValue(), 1e-9f);
+    }
+
+    @Test
+    void attributeValueIsClampedToAttributeRange() {
+        Player player = wearer();
+        when(player.getKnockBackResistance()).thenReturn(2d);
+        doCallRealMethod().when(player).sendKnockBackResistanceAttribute();
+        player.sendKnockBackResistanceAttribute();
+        ArgumentCaptor<Attribute> attribute = ArgumentCaptor.forClass(Attribute.class);
+        verify(player).setAttribute(attribute.capture());
+        assertEquals(1f, attribute.getValue().getValue());
+    }
+
+    @Test
+    void unchangedResistanceSkipsThePacket() {
+        Player player = wearer(new ItemHelmetNetherite());
+        doCallRealMethod().when(player).sendKnockBackResistanceAttribute();
+        player.sendKnockBackResistanceAttribute();
+        player.sendKnockBackResistanceAttribute();
+        verify(player, times(1)).setAttribute(any(Attribute.class));
+    }
+
+    @Test
+    void armourSlotChangeSyncsTheAttribute() {
+        Player player = mock(Player.class);
+        PlayerInventory inventory = mock(PlayerInventory.class);
+        player.inventory = inventory;
+        player.spawned = true;
+        when(inventory.getHolder()).thenReturn(player);
+        when(inventory.getSize()).thenReturn(36);
+        when(inventory.getViewers()).thenReturn(java.util.Collections.emptySet());
+        when(player.getViewers()).thenReturn(new java.util.HashMap<>());
+        doCallRealMethod().when(inventory).onSlotChange(anyInt(), any(), anyBoolean());
+
+        inventory.onSlotChange(36, Item.get(Item.AIR), true);
+
+        verify(player).sendKnockBackResistanceAttribute();
     }
 
     private static Player wearer(Item... armour) {
