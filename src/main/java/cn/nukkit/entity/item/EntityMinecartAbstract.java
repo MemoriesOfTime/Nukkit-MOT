@@ -210,7 +210,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         }
 
         //使矿车通知漏斗更新而不是漏斗来检测矿车
-        //通常情况下，矿车的数量远远少于漏斗，所以说此举能大福提高性能
+        //通常情况下，矿车的数量远远少于漏斗，所以说此举能大幅提高性能
         if (this instanceof InventoryHolder holder) {
             checkPickupHopper(new SimpleAxisAlignedBB(this.x, this.y - 1, this.z, this.x, this.y, this.z), holder);
             //漏斗矿车会自行拉取物品!
