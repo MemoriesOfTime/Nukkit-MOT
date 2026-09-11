@@ -62,6 +62,7 @@ import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.EncryptionUtils;
+import cn.nukkit.network.encryption.LoginChainVerifier;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.auth.AuthType;
 import cn.nukkit.network.query.QueryHandler;
@@ -1440,6 +1441,7 @@ public class Server {
                 this.rcon.close();
             }
 
+            LoginChainVerifier.shared().shutdown();
             this.getLogger().debug("Disconnecting all players...");
             for (Player player : new ArrayList<>(this.players.values())) {
                 player.close(player.getLeaveMessage(), reason);
