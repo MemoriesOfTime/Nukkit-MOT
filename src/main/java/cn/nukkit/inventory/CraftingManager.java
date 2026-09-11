@@ -1534,6 +1534,76 @@ public class CraftingManager {
         this.registerShapelessRecipe(recipe);
     }
 
+    /**
+     * Unregisters a recipe.
+     *
+     * @param recipe the recipe to unregister
+     * @return {@code true} if the recipe was removed
+     */
+    public boolean unregisterRecipe(Recipe recipe) {
+        if (recipe == null) {
+            return false;
+        }
+        boolean removed = false;
+        if (recipe instanceof ShapedRecipe shapedRecipe) {
+            removed |= this.recipes.remove(recipe);
+            int resultHash = getItemHash(shapedRecipe.getResult());
+            Map<UUID, ShapedRecipe> recipes = this.shapedRecipes.get(resultHash);
+            if (recipes != null) {
+                UUID hash = getMultiItemHash(new LinkedList<>(shapedRecipe.getIngredientsAggregate()));
+                removed |= recipes.remove(hash, shapedRecipe);
+                if (recipes.isEmpty()) {
+                    this.shapedRecipes.remove(resultHash);
+                }
+            }
+            this.networkIdRecipes.remove(shapedRecipe.getNetworkId(), recipe);
+        } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
+            removed |= this.recipes.remove(recipe);
+            int resultHash = getItemHash(shapelessRecipe.getResult());
+            Map<UUID, ShapelessRecipe> recipes = this.shapelessRecipes.get(resultHash);
+            if (recipes != null) {
+                UUID hash = getMultiItemHash(shapelessRecipe.getIngredientsAggregate());
+                removed |= recipes.remove(hash, shapelessRecipe);
+                if (recipes.isEmpty()) {
+                    this.shapelessRecipes.remove(resultHash);
+                }
+            }
+
+            this.networkIdRecipes.remove(shapelessRecipe.getNetworkId(), recipe);
+
+        } else if (recipe instanceof BlastFurnaceRecipe blastFurnaceRecipe) {
+            removed |= this.blastFurnaceRecipes.remove(getItemHash(blastFurnaceRecipe.getInput()), blastFurnaceRecipe);
+            this.recipeXpMap.removeDouble(recipe);
+        } else if (recipe instanceof SmokerRecipe smokerRecipe) {
+            removed |= this.smokerRecipes.remove(getItemHash(smokerRecipe.getInput()), smokerRecipe);
+            this.recipeXpMap.removeDouble(recipe);
+
+        } else if (recipe instanceof FurnaceRecipe furnaceRecipe) {
+            removed |= this.furnaceRecipes.remove(getItemHash(furnaceRecipe.getInput()), furnaceRecipe);
+            this.recipeXpMap.removeDouble(recipe);
+        } else if (recipe instanceof SmithingRecipe smithingRecipe) {
+            UUID hash = getMultiItemHash(smithingRecipe.getIngredientsAggregate());
+            removed |= this.smithingRecipes.remove(hash, smithingRecipe);
+            this.networkIdRecipes.remove(smithingRecipe.getNetworkId(), recipe);
+
+        } else if (recipe instanceof StonecutterRecipe stonecutterRecipe) {
+            removed |= this.stonecutterRecipes.remove(stonecutterRecipe);
+            this.networkIdRecipes.remove(stonecutterRecipe.getNetworkId(), recipe);
+
+        } else if (recipe instanceof CampfireRecipe campfireRecipe) {
+            removed |= this.campfireRecipes.remove(
+                getItemHash(campfireRecipe.getInput()),
+                campfireRecipe
+            );
+        }
+
+        if (removed) {
+            this.rebuildPacket();
+        }
+
+        return removed;
+    }
+
     private static int getPotionHash(Item ingredient, Item potion) {
         int ingredientHash = ((ingredient.getId() & 0x3FF) << 6) | (ingredient.getDamage() & 0x3F);
         int potionHash = ((potion.getId() & 0x3FF) << 6) | (potion.getDamage() & 0x3F);
