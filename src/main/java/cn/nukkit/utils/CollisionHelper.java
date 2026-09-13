@@ -3,6 +3,7 @@ package cn.nukkit.utils;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockBarrier;
+import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
@@ -235,6 +236,7 @@ public record CollisionHelper(Entity entity) {
 
         Block[] result = new Block[(int) Math.min(estimatedCount, 64)];
         int count = 0;
+        boolean standardLevel = level.getClass() == Level.class;
 
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
@@ -242,14 +244,25 @@ public record CollisionHelper(Entity entity) {
                 for (int y = clampedMinY; y <= clampedMaxY; y++) {
                     if (isAirAt(chunk, x, y, z)) continue;
 
-                    Block block = level.getBlock(chunk, x, y, z, 0, false);
+                    Block block;
+                    boolean detached = false;
+                    if (standardLevel && level.isYInRange(y) && chunk != null
+                            && chunk.getX() == (x >> 4) && chunk.getZ() == (z >> 4)) {
+                        // Match Level.getBlock's unpacked path; extended metadata must not be truncated.
+                        int[] state = chunk.getBlockState(x & 0xF, y, z & 0xF, 0);
+                        block = Block.get(state[0], state[1], level, x, y, z, 0);
+                        // The earlier air probe or a custom factory's returned id cannot prove ownership.
+                        detached = state[0] >= 0 && state[0] < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID;
+                    } else {
+                        block = level.getBlock(chunk, x, y, z, 0, false);
+                    }
                     if (block == null || block.isAir()) continue;
 
                     if (count == result.length) {
                         result = Arrays.copyOf(result, (int) Math.min((long) result.length * 2, estimatedCount));
                     }
 
-                    result[count++] = block.clone();
+                    result[count++] = detached ? block : block.clone();
                 }
             }
         }
