@@ -7,6 +7,11 @@ import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.format.ChunkSection;
+import cn.nukkit.level.format.generic.EmptyChunkSection;
+import cn.nukkit.level.format.leveldb.LevelDBProvider;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import org.jetbrains.annotations.NotNull;
@@ -237,22 +242,46 @@ public record CollisionHelper(Entity entity) {
         Block[] result = new Block[(int) Math.min(estimatedCount, 64)];
         int count = 0;
         boolean standardLevel = level.getClass() == Level.class;
+        boolean standardProvider = standardLevel && level.getProvider() != null
+                && level.getProvider().getClass() == LevelDBProvider.class;
 
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 FullChunk chunk = chunkAt(level, entity.chunk, x, z);
+                boolean standardChunk = standardProvider && chunk != null && chunk.getClass() == LevelDBChunk.class
+                        && chunk.getProvider() == level.getProvider() && chunk.getX() == (x >> 4) && chunk.getZ() == (z >> 4);
                 for (int y = clampedMinY; y <= clampedMaxY; y++) {
-                    if (isAirAt(chunk, x, y, z)) continue;
+                    boolean haveState = false;
+                    long statePair = 0L;
+                    if (standardChunk) {
+                        ChunkSection section = ((LevelDBChunk) chunk).getSection(y >> 4);
+                        if (section.getClass() == EmptyChunkSection.class) continue;
+                        if (section.getClass() == LevelDBChunkSection.class) {
+                            statePair = ((LevelDBChunkSection) section).getBlockStatePair(x & 0xF, y & 0xF, z & 0xF, 0);
+                            if ((int) (statePair >>> 32) == Block.AIR) continue;
+                            haveState = true;
+                        }
+                    }
+                    if (!haveState && isAirAt(chunk, x, y, z)) continue;
 
                     Block block;
                     boolean detached = false;
                     if (standardLevel && level.isYInRange(y) && chunk != null
                             && chunk.getX() == (x >> 4) && chunk.getZ() == (z >> 4)) {
                         // Match Level.getBlock's unpacked path; extended metadata must not be truncated.
-                        int[] state = chunk.getBlockState(x & 0xF, y, z & 0xF, 0);
-                        block = Block.get(state[0], state[1], level, x, y, z, 0);
+                        int id;
+                        int meta;
+                        if (haveState) {
+                            id = (int) (statePair >>> 32);
+                            meta = (int) statePair;
+                        } else {
+                            int[] state = chunk.getBlockState(x & 0xF, y, z & 0xF, 0);
+                            id = state[0];
+                            meta = state[1];
+                        }
+                        block = Block.get(id, meta, level, x, y, z, 0);
                         // The earlier air probe or a custom factory's returned id cannot prove ownership.
-                        detached = state[0] >= 0 && state[0] < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID;
+                        detached = id >= 0 && id < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID;
                     } else {
                         block = level.getBlock(chunk, x, y, z, 0, false);
                     }
