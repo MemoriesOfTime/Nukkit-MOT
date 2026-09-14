@@ -2442,8 +2442,18 @@ public class BinaryStream {
             }
             case CRAFT_RECIPE_AUTO -> {
                 int recipeId = (int) getUnsignedVarInt();
-                int numberOfRequestedCrafts = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
-                int timesCrafted = protocol >= ProtocolInfo.v1_17_10 ? (getByte() & 0xFF) : 0;
+                int numberOfRequestedCrafts;
+                int timesCrafted;
+                if (protocol >= ProtocolInfo.v1_26_40) {
+                    // v2168: the repetitions byte is sent once and serves as both values.
+                    // Reading the removed duplicate shifts every ingredient by one byte, the
+                    // whole batch fails to decode and the recipe book craft silently does nothing.
+                    numberOfRequestedCrafts = getByte() & 0xFF;
+                    timesCrafted = numberOfRequestedCrafts;
+                } else {
+                    numberOfRequestedCrafts = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
+                    timesCrafted = protocol >= ProtocolInfo.v1_17_10 ? (getByte() & 0xFF) : 0;
+                }
                 List<ItemDescriptorWithCount> ingredients = new ArrayList<>();
                 if (protocol >= ProtocolInfo.v1_19_40) {
                     // v2168: ingredients 数组 count 改用 VarUInt / ingredients array count uses VarUInt
