@@ -3884,7 +3884,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.version = loginChainData.getGameVersion();
 
                 // Use verified identity data from ClientChainData (signature-validated) as the source of truth
-                String verifiedName = TextFormat.clean(loginChainData.getUsername());
+                // The name is trimmed before anything keys on it: whitelist, bans, the duplicate login
+                // check, the name lookup table and the offline identity all see the same string.
+                // Replace mode keeps its historical form ("Name " -> "Name_") and is not trimmed.
+                String verifiedName = this.server.spaceMode == 2
+                        ? TextFormat.clean(loginChainData.getUsername())
+                        : verifiedLoginName(loginChainData.getUsername());
                 if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
                     verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
                 }
@@ -3904,6 +3909,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.minecraftId = loginChainData.getMinecraftId();
 
                 boolean valid = true;
+                // Length and characters are still checked on the raw name, exactly as before trimming
+                // existed: a short name padded with a space ("gg ") keeps logging in.
                 String rawVerifiedName = loginChainData.getUsername();
                 int len = rawVerifiedName == null ? 0 : rawVerifiedName.length();
                 if (((len > 16 || len < 3) && !gameVersion.isNetEase())
@@ -3930,6 +3937,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (!valid || Objects.equals(this.iusername, "rcon") || Objects.equals(this.iusername, "console")) {
                     this.close("", "disconnectionScreen.invalidName");
+                    break;
+                }
+
+                // An Xbox login has its own profile and is not affected by an unfolded offline name.
+                String foldBlock = loginChainData.isXboxAuthed() ? null : this.server.profileFoldBlockReason(this.iusername);
+                if (foldBlock != null) {
+                    this.server.getLogger().warning("Refused the offline login of " + this.username + ": the player data "
+                            + "saved under a padded spelling of this name was not folded at startup (" + foldBlock + ")");
+                    this.close("", "Your player data is unavailable, please contact the server administrators");
                     break;
                 }
 
@@ -9090,6 +9106,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public Map<Integer, FormWindow> getServerSettings() {
         return serverSettings;
+    }
+
+    /**
+     * The name a verified login is known by: format codes removed and whitespace at either end
+     * trimmed.
+     * <p>
+     * Clients can report {@code "Name "} or {@code " Name"} for the account that otherwise logs
+     * in as {@code "Name"}. Left untrimmed, the padded form derived its own offline identity and
+     * its own player data file, so one account owned two inventories and a relog between the two
+     * spellings loaded whatever the other file still held. Trimming also stops the padded form
+     * from slipping past a name ban, the whitelist and the duplicate login check. Spaces inside
+     * the name are part of it and stay.
+     *
+     * @param chainUsername name from the verified login chain
+     * @return the trimmed name, or {@code null} when the chain carries none
+     */
+    static String verifiedLoginName(String chainUsername) {
+        String cleaned = TextFormat.clean(chainUsername);
+        return cleaned == null ? null : cleaned.strip();
     }
 
     public String getUsername() {
