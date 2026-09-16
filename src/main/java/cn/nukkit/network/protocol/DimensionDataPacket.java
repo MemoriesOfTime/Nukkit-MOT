@@ -64,8 +64,13 @@ public class DimensionDataPacket extends DataPacket {
         this.reset();
         this.putArray(this.definitions, dimensionDefinition -> {
             this.putString(dimensionDefinition.getId());
-            this.putVarInt(dimensionDefinition.getMaximumHeight());
-            this.putVarInt(dimensionDefinition.getMinimumHeight());
+            if (this.protocol >= ProtocolInfo.v1_26_50_27) {
+                this.putVarInt(dimensionDefinition.getMinimumHeight());
+                this.putVarInt(dimensionDefinition.getMaximumHeight() - dimensionDefinition.getMinimumHeight());
+            } else {
+                this.putVarInt(dimensionDefinition.getMaximumHeight());
+                this.putVarInt(dimensionDefinition.getMinimumHeight());
+            }
             this.putVarInt(dimensionDefinition.getGeneratorType());
             if (this.protocol >= ProtocolInfo.v1_26_20) {
                 this.putVarInt(dimensionDefinition.getDimensionType());

@@ -336,6 +336,10 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
         var def = cb.getDefinitions().get(0);
         assertEquals("minecraft:test_dim", def.getId());
         assertEquals("minecraft:plains", def.getDefaultBiome());
+        // v2192 前导对 =（下限, 跨度 320-(-64)=384）；CB 将跨度读入其 maximumHeight 字段
+        // Leading pair since v2192 = (min, span 384); CB reads the span into its maximumHeight field
+        assertEquals(-64, def.getMinimumHeight());
+        assertEquals(384, def.getMaximumHeight());
     }
 
     @Test
