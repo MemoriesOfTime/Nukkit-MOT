@@ -5030,6 +5030,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     // open. Without this the window stayed open on the server: the lid hung open for
                     // everyone and the chest did not open again for this player until a teleport.
                     closeEnderChestWindowForUnknownId();
+                    // The same happens to a chest, barrel, shulker box, hopper or furnace of the world:
+                    // the lid hung open and the block did not open again for this player. Only windows
+                    // of real block entities are closed here. A plugin window drawn on a fake block has
+                    // no block entity, and a late -1 must not shut a fresh window of that kind.
+                    closeWorldContainerWindowsForUnknownId();
 
                     this.craftingType = CRAFTING_SMALL;
                     this.resetCraftingGridType();
@@ -6929,6 +6934,43 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.closingWindowId = Integer.MAX_VALUE;
         this.removeWindow(enderChest, true);
         this.closingWindowId = Integer.MIN_VALUE;
+    }
+
+    /**
+     * Closes the windows of real world containers after the client sent ContainerClose with window
+     * id -1 while its own inventory was not open.
+     */
+    void closeWorldContainerWindowsForUnknownId() {
+        for (Inventory open : this.openWindowsSnapshot()) {
+            if (!isWorldBlockContainer(open) || this.getWindowId(open) == -1) {
+                continue;
+            }
+            this.server.getPluginManager().callEvent(new InventoryCloseEvent(open, this));
+            this.closingWindowId = Integer.MAX_VALUE;
+            this.removeWindow(open, true);
+            this.closingWindowId = Integer.MIN_VALUE;
+        }
+    }
+
+    List<Inventory> openWindowsSnapshot() {
+        return new ArrayList<>(this.windows.keySet());
+    }
+
+    /**
+     * A container window of a block entity that still stands in its level. A window whose holder is
+     * a fake block ({@link cn.nukkit.inventory.FakeBlockMenu}), a closed block entity or anything
+     * else is not a world container.
+     */
+    static boolean isWorldBlockContainer(Inventory inventory) {
+        if (!(inventory instanceof ContainerInventory)) {
+            return false;
+        }
+        InventoryHolder holder = inventory.getHolder();
+        if (!(holder instanceof BlockEntity blockEntity) || blockEntity.closed) {
+            return false;
+        }
+        Level level = blockEntity.getLevel();
+        return level != null && level.getBlockEntityIfLoaded(blockEntity) == blockEntity;
     }
 
     @Override
