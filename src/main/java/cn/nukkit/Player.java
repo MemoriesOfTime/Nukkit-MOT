@@ -3193,6 +3193,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             distanceSquared = dx * dx + dy * dy + dz * dz;
             pointX = nearestX;
             pointZ = nearestZ;
+            if (distanceSquared > maxDistance * maxDistance) {
+                return false;
+            }
+            // A big body overlaps terrain and encloses players standing next to it, so the
+            // client reports a hit while the crosshair rests on a wall.
+            // The swing has to reach the body without crossing a block; see MeleeLineOfSight.
+            Vector3 look = this.getDirectionVector();
+            Level level = this.level;
+            if (!MeleeLineOfSight.clear(this.x, eyeY, this.z, look.x, look.y, look.z, box, maxDistance,
+                    (bx, by, bz) -> {
+                        Block block = level.getBlock(bx, by, bz, false);
+                        if (block == null || block.getId() == BlockID.AIR || block.canPassThrough()) {
+                            return null;
+                        }
+                        return block.getBoundingBox();
+                    })) {
+                return false;
+            }
         } else {
             distanceSquared = this.distanceSquared(pos);
         }

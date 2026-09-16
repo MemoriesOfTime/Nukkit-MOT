@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.entity.Entity;
+import cn.nukkit.level.Level;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -71,6 +72,8 @@ class PlayerEntityReachTest {
         Player player = mock(Player.class);
         when(player.getEyeHeight()).thenReturn(1.62f);
         when(player.getDirectionPlane()).thenReturn(new Vector2(1, 0));
+        when(player.getDirectionVector()).thenReturn(new Vector3(1, 0, 0));
+        player.level = mock(Level.class);
         doCallRealMethod().when(player).distanceSquared(any(Vector3.class));
         Method method = Player.class.getDeclaredMethod("canInteractEntity", Vector3.class, double.class);
         method.setAccessible(true);
