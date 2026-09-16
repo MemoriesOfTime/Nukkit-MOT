@@ -5676,10 +5676,8 @@ public class Level implements ChunkManager, Metadatable {
             return GameVersion.V1_20_50_NETEASE;
         }
 
-        // 1.26.50 起方块 runtimeId 全面重编号，2192+ 需独立调色板桶（2193 与 2192 同调色板）
-        // Block runtime ids were fully renumbered in 1.26.50; 2192+ needs its own palette bucket (2193 shares it)
         if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
-            return GameVersion.V1_26_50_27;
+            return GameVersion.V1_26_50;
         } else if (protocol >= GameVersion.V1_26_40.getProtocol()) {
             return GameVersion.V1_26_40;
         } else if (protocol >= GameVersion.V1_26_30.getProtocol()) {
@@ -5846,7 +5844,7 @@ public class Level implements ChunkManager, Metadatable {
             if (player >= GameVersion.V1_26_30.getProtocol()) if (player < GameVersion.V1_26_40.getProtocol()) return true;
         if (chunk == GameVersion.V1_26_40.getProtocol())
             if (player >= GameVersion.V1_26_40.getProtocol()) if (player < GameVersion.V1_26_50_27.getProtocol()) return true;
-        if (chunk == GameVersion.V1_26_50_27.getProtocol())
+        if (chunk == GameVersion.V1_26_50.getProtocol())
             if (player >= GameVersion.V1_26_50_27.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }

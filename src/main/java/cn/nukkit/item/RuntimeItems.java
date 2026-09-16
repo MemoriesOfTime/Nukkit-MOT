@@ -111,7 +111,7 @@ public class RuntimeItems {
                     of(GameVersion.V1_26_20),
                     of(GameVersion.V1_26_30),
                     of(GameVersion.V1_26_40),
-                    of(GameVersion.V1_26_50_27),
+                    of(GameVersion.V1_26_50),
                     // NetEase
                     of(GameVersion.V1_20_50_NETEASE),
                     of(GameVersion.V1_21_2_NETEASE),
@@ -195,7 +195,7 @@ public class RuntimeItems {
             return getMappingNetEase(protocolId);
         }
         if (protocolId >= ProtocolInfo.v1_26_50_27) {
-            return of(GameVersion.V1_26_50_27);
+            return of(GameVersion.V1_26_50);
         } else if (protocolId >= ProtocolInfo.v1_26_40) {
             return of(GameVersion.V1_26_40);
         } else if (protocolId >= ProtocolInfo.v1_26_30) {

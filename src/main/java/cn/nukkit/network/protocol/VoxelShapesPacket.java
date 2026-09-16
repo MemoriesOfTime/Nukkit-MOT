@@ -14,10 +14,10 @@ import java.util.zip.Deflater;
  * This packet contains a copy of all behavior pack voxel shapes data.
  * Sends the serializable voxel shapes data to the client as it's needed on both the client and server.
  * <p>
- * v2192 起客户端要求 vanilla 体素形状数据，登录时发送缓存的 voxel_shapes_2192.bin；旧版本发送空数据。
+ * v2192 起客户端要求 vanilla 体素形状数据，登录时发送缓存的 voxel_shapes_2193.bin（2192 预览与 2193 正式共用）；旧版本发送空数据。
  * <p>
- * Since v2192 clients require the vanilla voxel shape data; a cached voxel_shapes_2192.bin is sent on login,
- * older protocols receive an empty data set.
+ * Since v2192 clients require the vanilla voxel shape data; a cached voxel_shapes_2193.bin (shared by the
+ * 2192 preview and the 2193 stable release) is sent on login, older protocols receive an empty data set.
  * <p>
  * Adapted from NukkitPetteriM1Edition (<a href="https://github.com/PetteriM1/NukkitPetteriM1Edition">Nukkit PM1E</a>)
  *
@@ -28,21 +28,21 @@ public class VoxelShapesPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.VOXEL_SHAPES_PACKET;
 
-    private static final BatchPacket CACHED_PACKET_2192;
+    private static final BatchPacket CACHED_PACKET_VANILLA;
     private static final BatchPacket CACHED_PACKET_EMPTY;
 
     static {
         VoxelShapesPacket pk = new VoxelShapesPacket();
-        pk.protocol = ProtocolInfo.v1_26_50_27;
-        pk.gameVersion = GameVersion.V1_26_50_27;
+        pk.protocol = ProtocolInfo.v1_26_50;
+        pk.gameVersion = GameVersion.V1_26_50;
         try {
             pk.bin = ByteStreams.toByteArray(Objects.requireNonNull(
-                    VoxelShapesPacket.class.getClassLoader().getResourceAsStream("voxel_shapes_2192.bin")));
+                    VoxelShapesPacket.class.getClassLoader().getResourceAsStream("voxel_shapes_2193.bin")));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
         pk.tryEncode();
-        CACHED_PACKET_2192 = pk.compress(Deflater.BEST_COMPRESSION);
+        CACHED_PACKET_VANILLA = pk.compress(Deflater.BEST_COMPRESSION);
 
         pk = new VoxelShapesPacket();
         pk.protocol = ProtocolInfo.v1_26_20_26;
@@ -57,7 +57,7 @@ public class VoxelShapesPacket extends DataPacket {
      */
     public static BatchPacket getCachedPacket(int protocol) {
         if (protocol >= ProtocolInfo.v1_26_50_27) {
-            return CACHED_PACKET_2192;
+            return CACHED_PACKET_VANILLA;
         }
         return CACHED_PACKET_EMPTY;
     }

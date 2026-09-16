@@ -17,11 +17,11 @@ class V2192LoginDataTest {
 
     @Test
     void vanillaBlockPropertiesLoad() throws Exception {
-        Field field = StartGamePacket.class.getDeclaredField("vanillaBlockProperties2192");
+        Field field = StartGamePacket.class.getDeclaredField("vanillaBlockProperties");
         field.setAccessible(true);
         List<?> properties = (List<?>) field.get(null);
 
-        assertFalse(properties.isEmpty(), "block_properties_2192.json 应非空 / should not be empty");
+        assertFalse(properties.isEmpty(), "block_properties_2193.json 应非空 / should not be empty");
         for (Object o : properties) {
             String name = (String) o.getClass().getDeclaredMethod("getName").invoke(o);
             NbtMap nbt = (NbtMap) o.getClass().getDeclaredMethod("getProperties").invoke(o);
@@ -34,7 +34,7 @@ class V2192LoginDataTest {
 
     @Test
     void voxelShapesCachedPacketsSplit() {
-        // 静态初始化会加载 voxel_shapes_2192.bin，缺失即抛错 / static init loads the bin and fails loudly if missing
+        // 静态初始化会加载 voxel_shapes_2193.bin，缺失即抛错 / static init loads the bin and fails loudly if missing
         assertNotNull(VoxelShapesPacket.getCachedPacket(ProtocolInfo.v1_26_50_27));
         assertNotNull(VoxelShapesPacket.getCachedPacket(ProtocolInfo.v1_26_50));
         assertNotNull(VoxelShapesPacket.getCachedPacket(ProtocolInfo.v1_26_20_26));

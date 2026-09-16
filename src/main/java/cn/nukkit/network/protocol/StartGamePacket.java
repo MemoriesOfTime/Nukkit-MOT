@@ -49,13 +49,14 @@ public class StartGamePacket extends DataPacket {
     private static final byte[] EMPTY_UUID;
 
     /**
-     * v2192 起 vanilla 数据驱动方块属性需随 StartGame 下发（block_properties_2192.json）。
+     * v2192 起 vanilla 数据驱动方块属性需随 StartGame 下发（block_properties_2193.json，2192 预览与 2193 正式共用）。
      * <p>
-     * Since v2192 the vanilla data-driven block properties must be sent in StartGame (block_properties_2192.json).
+     * Since v2192 the vanilla data-driven block properties must be sent in StartGame (block_properties_2193.json,
+     * shared by the 2192 preview and the 2193 stable release).
      * <p>
      * Adapted from NukkitPetteriM1Edition (<a href="https://github.com/PetteriM1/NukkitPetteriM1Edition">Nukkit PM1E</a>)
      */
-    private static final List<BlockPropertyData> vanillaBlockProperties2192;
+    private static final List<BlockPropertyData> vanillaBlockProperties;
 
     @Value
     private static class BlockPropertyData {
@@ -66,9 +67,9 @@ public class StartGamePacket extends DataPacket {
     static {
         EMPTY_UUID = Binary.writeUUID(new UUID(0, 0));
         try (Reader reader = new InputStreamReader(Objects.requireNonNull(
-                StartGamePacket.class.getClassLoader().getResourceAsStream("block_properties_2192.json")), StandardCharsets.UTF_8)) {
+                StartGamePacket.class.getClassLoader().getResourceAsStream("block_properties_2193.json")), StandardCharsets.UTF_8)) {
             Type type = new TypeToken<List<BlockPropertyData>>() {}.getType();
-            vanillaBlockProperties2192 = new GsonBuilder()
+            vanillaBlockProperties = new GsonBuilder()
                     .registerTypeAdapter(NbtMap.class, new NbtMapDeserializer())
                     .create()
                     .fromJson(reader, type);
@@ -444,8 +445,8 @@ public class StartGamePacket extends DataPacket {
                 // v2192 起 vanilla 数据驱动方块属性与自定义方块合并在同一列表下发
                 // Since v2192 vanilla data-driven block properties and custom blocks share one list
                 boolean hasCustomBlocks = this.blockDefinitions != null && !this.blockDefinitions.isEmpty();
-                this.putUnsignedVarInt(vanillaBlockProperties2192.size() + (hasCustomBlocks ? this.blockDefinitions.size() : 0));
-                for (BlockPropertyData data : vanillaBlockProperties2192) {
+                this.putUnsignedVarInt(vanillaBlockProperties.size() + (hasCustomBlocks ? this.blockDefinitions.size() : 0));
+                for (BlockPropertyData data : vanillaBlockProperties) {
                     this.putString(data.name);
                     this.putNbtTag(data.properties);
                 }
