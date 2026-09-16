@@ -4,6 +4,8 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.LevelException;
 
+import java.util.List;
+
 /**
  * Created on 2015/12/6 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
@@ -16,6 +18,30 @@ public abstract class BlockThin extends BlockTransparent {
     @Override
     public boolean isSolid() {
         return false;
+    }
+
+    /** Post and arms instead of one stretched box; see {@link CrossCollisionShape}. */
+    private AxisAlignedBB[] collisionParts() {
+        AxisAlignedBB bounds = this.getBoundingBox();
+        if (bounds == null) {
+            return new AxisAlignedBB[0];
+        }
+        return CrossCollisionShape.parts(bounds, this.x + 0.5, this.z + 0.5, CrossCollisionShape.PANE_POST, CrossCollisionShape.PANE_ARM);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb) {
+        return CrossCollisionShape.collides(this.collisionParts(), bb);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb, boolean collisionBB) {
+        return collisionBB ? CrossCollisionShape.collides(this.collisionParts(), bb) : super.collidesWithBB(bb, false);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        CrossCollisionShape.addColliding(this.collisionParts(), bb, collidingBoxes);
     }
 
     @Override
