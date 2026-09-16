@@ -52,11 +52,7 @@ public class PlayerEnderChestInventory extends BaseInventory {
             blockEventPacket.eventType = 1;
             blockEventPacket.eventData = 1;
 
-            Level level = this.getHolder().getLevel();
-            if (level != null) {
-                level.addLevelSoundEvent(this.getHolder().add(0.5, 0.5, 0.5), LevelSoundEventPacket.SOUND_ENDERCHEST_OPEN);
-                level.addChunkPacket((int) this.getHolder().getX() >> 4, (int) this.getHolder().getZ() >> 4, blockEventPacket);
-            }
+            broadcastLid(chest, who, blockEventPacket, LevelSoundEventPacket.SOUND_ENDERCHEST_OPEN);
         }
     }
 
@@ -81,15 +77,27 @@ public class PlayerEnderChestInventory extends BaseInventory {
             blockEventPacket.eventType = 1;
             blockEventPacket.eventData = 0;
 
-            Level level = this.getHolder().getLevel();
-            if (level != null) {
-                level.addLevelSoundEvent(this.getHolder().add(0.5, 0.5, 0.5), LevelSoundEventPacket.SOUND_ENDERCHEST_CLOSED);
-                level.addChunkPacket((int) this.getHolder().getX() >> 4, (int) this.getHolder().getZ() >> 4, blockEventPacket);
-            }
+            broadcastLid(chest, who, blockEventPacket, LevelSoundEventPacket.SOUND_ENDERCHEST_CLOSED);
 
             who.setViewingEnderChest(null);
         }
 
         super.onClose(who);
+    }
+
+    /**
+     * The lid animation belongs to the ender chest block, not to the player who opened it.
+     * Addressing the chunk of the holder sent the close event wherever the player stood at
+     * the moment the window closed: a player teleported with the chest open (respawn,
+     * plugin teleport, level change) closes the window after the move, so the event went to
+     * the destination chunk and the lid stayed open for everyone around the chest.
+     */
+    private void broadcastLid(BlockEnderChest chest, Player who, BlockEventPacket packet, int sound) {
+        Level level = chest.getLevel() != null ? chest.getLevel() : who.getLevel();
+        if (level == null) {
+            return;
+        }
+        level.addLevelSoundEvent(chest.add(0.5, 0.5, 0.5), sound);
+        level.addChunkPacket(chest.getFloorX() >> 4, chest.getFloorZ() >> 4, packet);
     }
 }
