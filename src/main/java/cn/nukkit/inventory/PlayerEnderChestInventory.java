@@ -69,20 +69,24 @@ public class PlayerEnderChestInventory extends BaseInventory {
         super.onClose(who);
 
         BlockEnderChest chest = who.getViewingEnderChest();
-        if (chest != null && chest.getViewers().size() == 1) {
-            BlockEventPacket blockEventPacket = new BlockEventPacket();
-            blockEventPacket.x = (int) chest.getX();
-            blockEventPacket.y = (int) chest.getY();
-            blockEventPacket.z = (int) chest.getZ();
-            blockEventPacket.eventType = 1;
-            blockEventPacket.eventData = 0;
-
-            broadcastLid(chest, who, blockEventPacket, LevelSoundEventPacket.SOUND_ENDERCHEST_CLOSED);
-
+        if (chest != null) {
+            // The viewers of one ender chest are shared by every player looking into it (they live on
+            // the block entity), so the lid closes only when the last of them leaves. The old check
+            // "size == 1" never removed a viewer when two players had the chest open.
+            chest.getViewers().remove(who);
             who.setViewingEnderChest(null);
-        }
 
-        super.onClose(who);
+            if (chest.getViewers().isEmpty()) {
+                BlockEventPacket blockEventPacket = new BlockEventPacket();
+                blockEventPacket.x = (int) chest.getX();
+                blockEventPacket.y = (int) chest.getY();
+                blockEventPacket.z = (int) chest.getZ();
+                blockEventPacket.eventType = 1;
+                blockEventPacket.eventData = 0;
+
+                broadcastLid(chest, who, blockEventPacket, LevelSoundEventPacket.SOUND_ENDERCHEST_CLOSED);
+            }
+        }
     }
 
     /**
