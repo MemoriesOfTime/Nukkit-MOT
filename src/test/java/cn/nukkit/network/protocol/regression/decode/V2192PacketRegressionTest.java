@@ -1,14 +1,7 @@
 package cn.nukkit.network.protocol.regression.decode;
 
 import cn.nukkit.math.BlockVector3;
-import cn.nukkit.network.protocol.BossEventPacket;
-import cn.nukkit.network.protocol.InventoryTransactionPacket;
-import cn.nukkit.network.protocol.ItemStackResponsePacket;
-import cn.nukkit.network.protocol.MoveEntityDeltaPacket;
-import cn.nukkit.network.protocol.PlaySoundPacket;
-import cn.nukkit.network.protocol.PlayerAuthInputPacket;
-import cn.nukkit.network.protocol.RecordStartedPacket;
-import cn.nukkit.network.protocol.SetPlayerFurnaceOptionsPacket;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse;
@@ -20,10 +13,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * v2192 (1.26.50) 线格式变更的 CB 交叉验证：
@@ -43,7 +33,7 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
         cn.nukkit.MockServer.init();
     }
 
-    private static final int V2192 = cn.nukkit.network.protocol.ProtocolInfo.v1_26_50;
+    private static final int V2192 = cn.nukkit.network.protocol.ProtocolInfo.v1_26_50_27;
 
     // ==================== PlayerAuthInputPacket：可选段单 bool 化 ====================
 

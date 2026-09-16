@@ -80,7 +80,7 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         }
 
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
-            boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50;
+            boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50_27;
             this.entityDiagnostics = new ArrayList<>();
             this.getArray(this.entityDiagnostics, bs -> new EntityDiagnosticTimingInfo(bs.getString(), bs.getString(), bs.getLLong(), (byte) bs.getByte(),
                     // v2192 尾部新增 position + dimension / trailing position + dimension added in v2192
@@ -129,7 +129,7 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         }
 
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
-            boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50;
+            boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50_27;
             this.putArray(this.entityDiagnostics, info -> {
                 this.putString(info.displayName);
                 this.putString(info.entity);
@@ -201,11 +201,11 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         public long timeInNs;
         public byte percentOfTotal;
         /**
-         * @since v2192 v1_26_50
+         * @since v2192 v1_26_50_27
          */
         public cn.nukkit.math.Vector3f position;
         /**
-         * @since v2192 v1_26_50
+         * @since v2192 v1_26_50_27
          */
         public String dimension;
     }

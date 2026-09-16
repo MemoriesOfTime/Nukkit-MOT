@@ -74,7 +74,7 @@ public class MoveEntityDeltaPacket extends DataPacket {
             this.forceMoveLocalEntity = this.getBoolean();
             if (this.forceMoveLocalEntity) { this.flags |= FLAG_FORCE_MOVE_LOCAL_ENTITY; }
             this.forceCompletion = this.getBoolean();
-            if (protocol >= ProtocolInfo.v1_26_50) {
+            if (protocol >= ProtocolInfo.v1_26_50_27) {
                 // v2192 尾部新增 ticks / trailing ticks added in v2192
                 this.getUnsignedVarLong();
             }
@@ -127,7 +127,7 @@ public class MoveEntityDeltaPacket extends DataPacket {
             this.putBoolean(this.forceMove);
             this.putBoolean((this.flags & FLAG_FORCE_MOVE_LOCAL_ENTITY) != 0 || this.forceMoveLocalEntity);
             this.putBoolean((this.flags & FLAG_FORCE_COMPLETION) != 0 || this.forceCompletion);
-            if (protocol >= ProtocolInfo.v1_26_50) {
+            if (protocol >= ProtocolInfo.v1_26_50_27) {
                 // v2192 尾部新增 ticks；服务器未启用客户端预测移动，恒为 0
                 // trailing ticks added in v2192; always 0 while client-side prediction is unused
                 this.putUnsignedVarLong(0);

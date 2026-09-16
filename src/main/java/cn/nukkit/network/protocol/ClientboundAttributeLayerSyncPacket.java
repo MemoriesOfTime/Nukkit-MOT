@@ -201,7 +201,7 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_26_30) {
             this.putLInt(e.localTransitionTicks);
             this.putBoolean(e.noiseTransition);
-            if (this.protocol >= ProtocolInfo.v1_26_50) {
+            if (this.protocol >= ProtocolInfo.v1_26_50_27) {
                 // v2192 尾部新增噪声对齐 / trailing noise alignment added in v2192
                 EnvironmentAttributeData.NoiseAlignment na = e.noiseAlignment != null
                         ? e.noiseAlignment

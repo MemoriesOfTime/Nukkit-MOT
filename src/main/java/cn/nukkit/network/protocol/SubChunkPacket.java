@@ -94,7 +94,7 @@ public class SubChunkPacket extends DataPacket {
      * previously it was one raw block.
      */
     private void putHeightMapData(byte[] heightMapData) {
-        if (this.protocol < ProtocolInfo.v1_26_50) {
+        if (this.protocol < ProtocolInfo.v1_26_50_27) {
             this.put(heightMapData);
             return;
         }

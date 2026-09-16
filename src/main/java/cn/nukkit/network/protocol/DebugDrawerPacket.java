@@ -89,7 +89,7 @@ public class DebugDrawerPacket extends DataPacket {
                     if (this.protocol >= ProtocolInfo.v1_26_20_26) {
                         this.putBoolean(text.isUseRotation());
                         this.putOptionalNull(text.getBackgroundColor(), color -> this.putLInt(color.getRGB()));
-                        if (this.protocol >= ProtocolInfo.v1_26_50) {
+                        if (this.protocol >= ProtocolInfo.v1_26_50_27) {
                             // v2192 新增行间距 / line gap height added in v2192
                             this.putLFloat(text.getLineGapHeight());
                         }

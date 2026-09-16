@@ -60,7 +60,7 @@ public class BossEventPacket extends DataPacket {
     public void decode() {
         this.bossEid = this.getEntityUniqueId();
         if (this.protocol >= ProtocolInfo.v1_26_30) {
-            if (this.protocol < ProtocolInfo.v1_26_50) {
+            if (this.protocol < ProtocolInfo.v1_26_50_27) {
                 // v2192 起移除 playerEid / playerEid removed in v2192
                 this.playerEid = this.getEntityUniqueId();
             }
@@ -112,7 +112,7 @@ public class BossEventPacket extends DataPacket {
         this.filteredTitle = TextFormat.clamp(this.filteredTitle, MAX_TITLE_CHARS);
         this.putEntityUniqueId(this.bossEid);
         if (this.protocol >= ProtocolInfo.v1_26_30) {
-            if (this.protocol < ProtocolInfo.v1_26_50) {
+            if (this.protocol < ProtocolInfo.v1_26_50_27) {
                 // v2192 起移除 playerEid / playerEid removed in v2192
                 this.putEntityUniqueId(this.playerEid);
             }

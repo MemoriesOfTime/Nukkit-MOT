@@ -112,7 +112,8 @@ public enum GameVersion {
     V1_26_40(2168, false, "1.26.40"),
     V1_26_44(2168, false, "1.26.44"), // 与 V1_26_40 同 wire 协议号（未提升，仅 SetScore 不同）；不进 BY_PROTOCOL，仅直接引用/byName 可达
     V1_26_45(2169, false, "1.26.45"),
-    V1_26_50(2192, false, "1.26.50"),
+    V1_26_50_27(2192, false, "1.26.50.27"),
+    V1_26_50(2193, false, "1.26.50"),
 
     V1_20_50_NETEASE(630, true, "1.20.50_NetEase"),
     V1_21_2_NETEASE(686, true, "1.21.2_NetEase"),

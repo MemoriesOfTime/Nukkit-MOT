@@ -13,15 +13,25 @@ import cn.nukkit.network.protocol.types.AuthoritativeMovementMode;
 import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Binary;
+import cn.nukkit.utils.NbtMapDeserializer;
 import cn.nukkit.utils.Utils;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
+import lombok.Value;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.nbt.NbtMap;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.lang.reflect.Type;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Log4j2
@@ -38,8 +48,33 @@ public class StartGamePacket extends DataPacket {
 
     private static final byte[] EMPTY_UUID;
 
+    /**
+     * v2192 起 vanilla 数据驱动方块属性需随 StartGame 下发（block_properties_2192.json）。
+     * <p>
+     * Since v2192 the vanilla data-driven block properties must be sent in StartGame (block_properties_2192.json).
+     * <p>
+     * Adapted from NukkitPetteriM1Edition (<a href="https://github.com/PetteriM1/NukkitPetteriM1Edition">Nukkit PM1E</a>)
+     */
+    private static final List<BlockPropertyData> vanillaBlockProperties2192;
+
+    @Value
+    private static class BlockPropertyData {
+        String name;
+        NbtMap properties;
+    }
+
     static {
         EMPTY_UUID = Binary.writeUUID(new UUID(0, 0));
+        try (Reader reader = new InputStreamReader(Objects.requireNonNull(
+                StartGamePacket.class.getClassLoader().getResourceAsStream("block_properties_2192.json")), StandardCharsets.UTF_8)) {
+            Type type = new TypeToken<List<BlockPropertyData>>() {}.getType();
+            vanillaBlockProperties2192 = new GsonBuilder()
+                    .registerTypeAdapter(NbtMap.class, new NbtMapDeserializer())
+                    .create()
+                    .fromJson(reader, type);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -405,7 +440,27 @@ public class StartGamePacket extends DataPacket {
             this.putVarInt(this.enchantmentSeed);
         }
         if (protocol > ProtocolInfo.v1_5_0) {
-            if (protocol >= ProtocolInfo.v1_16_100) {
+            if (protocol >= ProtocolInfo.v1_26_50_27) {
+                // v2192 起 vanilla 数据驱动方块属性与自定义方块合并在同一列表下发
+                // Since v2192 vanilla data-driven block properties and custom blocks share one list
+                boolean hasCustomBlocks = this.blockDefinitions != null && !this.blockDefinitions.isEmpty();
+                this.putUnsignedVarInt(vanillaBlockProperties2192.size() + (hasCustomBlocks ? this.blockDefinitions.size() : 0));
+                for (BlockPropertyData data : vanillaBlockProperties2192) {
+                    this.putString(data.name);
+                    this.putNbtTag(data.properties);
+                }
+                if (hasCustomBlocks) {
+                    for (CustomBlockDefinition definition : this.blockDefinitions) {
+                        this.putString(definition.identifier());
+                        try {
+                            CompoundTag serializedNbt = CustomBlockDefinitionSerializer.serialize(definition.nbt(), protocol);
+                            this.put(NBTIO.write(serializedNbt, ByteOrder.LITTLE_ENDIAN, true));
+                        } catch (Exception e) {
+                            log.error("Error while encoding NBT data of CustomBlockDefinition", e);
+                        }
+                    }
+                }
+            } else if (protocol >= ProtocolInfo.v1_16_100) {
                 if (this.blockDefinitions != null && !this.blockDefinitions.isEmpty()) {
                     this.putUnsignedVarInt(this.blockDefinitions.size());
                     for (CustomBlockDefinition definition : this.blockDefinitions) {

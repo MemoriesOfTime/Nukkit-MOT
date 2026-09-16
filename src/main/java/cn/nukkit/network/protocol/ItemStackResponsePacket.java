@@ -29,7 +29,7 @@ public class ItemStackResponsePacket extends DataPacket {
                     return;
                 }
                 // v2192 起容器段仅一个存在性 bool / single presence bool for containers since v2192
-                if (this.protocol < ProtocolInfo.v1_26_50) {
+                if (this.protocol < ProtocolInfo.v1_26_50_27) {
                     this.putBoolean(true);
                 }
                 this.putBoolean(true);
@@ -51,7 +51,7 @@ public class ItemStackResponsePacket extends DataPacket {
                     if (this.protocol >= ProtocolInfo.v1_26_40) {
                         // v2168~v2169 netId 外包双 bool（has-entry + present）；v2192 起仅 present
                         // v2168~v2169 wrap netId in two booleans; only the presence bool remains since v2192
-                        if (this.protocol < ProtocolInfo.v1_26_50) {
+                        if (this.protocol < ProtocolInfo.v1_26_50_27) {
                             this.putBoolean(true);
                         }
                         boolean present = item.getStackNetworkId() != 0;

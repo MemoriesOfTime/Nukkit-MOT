@@ -71,7 +71,7 @@ public class DimensionDataPacket extends DataPacket {
                 this.putVarInt(dimensionDefinition.getDimensionType());
                 if (this.protocol >= ProtocolInfo.v1_26_40) {
                     this.putUUID(dimensionDefinition.getPackId());
-                    if (this.protocol >= ProtocolInfo.v1_26_50) {
+                    if (this.protocol >= ProtocolInfo.v1_26_50_27) {
                         // v2192 新增默认生物群系 / default biome added in v2192
                         this.putString(dimensionDefinition.getDefaultBiome() != null ? dimensionDefinition.getDefaultBiome() : "");
                     }

@@ -2,11 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.inventory.transaction.data.UseItemData;
-import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.BlockVector3;
-import cn.nukkit.math.Vector2;
-import cn.nukkit.math.Vector2f;
-import cn.nukkit.math.Vector3f;
+import cn.nukkit.math.*;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import lombok.Getter;
@@ -101,7 +97,7 @@ public class PlayerAuthInputPacket extends DataPacket {
         this.headYaw = this.getLFloat();
 
         boolean v2168 = this.protocol >= ProtocolInfo.v1_26_40;
-        boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50;
+        boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50_27;
         if (v2168) {
             if (!v2192) {
                 this.getBoolean(); // v2168~v2169 外层 true，丢弃；v2192 起移除 / outer true, discarded; removed in v2192
@@ -273,7 +269,7 @@ public class PlayerAuthInputPacket extends DataPacket {
         packet.setOffset(this.getOffset());
 
         boolean v2168Shape = packet.protocol >= ProtocolInfo.v1_26_40;
-        boolean v2192Shape = packet.protocol >= ProtocolInfo.v1_26_50;
+        boolean v2192Shape = packet.protocol >= ProtocolInfo.v1_26_50_27;
         packet.legacyRequestId = packet.getVarInt();
         boolean hasLegacySlots = v2168Shape
                 ? packet.getBoolean() && packet.legacyRequestId < -1 && (packet.legacyRequestId & 1) == 0
@@ -311,6 +307,9 @@ public class PlayerAuthInputPacket extends DataPacket {
         itemData.blockPos = packet.getBlockVector3();
         itemData.face = v2168Shape ? BlockFace.fromIndex(packet.getByte() & 0xff) : packet.getBlockFace();
         itemData.hotbarSlot = packet.getVarInt();
+        if (packet.protocol >= ProtocolInfo.v1_26_50_27) {
+           itemData.hand = packet.getByte();
+        }
         itemData.itemInHand = v2168Shape ? packet.getNetworkItemStackDescriptor(packet.gameVersion) : packet.getSlot(packet.gameVersion);
         itemData.playerPos = packet.getVector3f().asVector3();
         itemData.clickPos = packet.getVector3f();

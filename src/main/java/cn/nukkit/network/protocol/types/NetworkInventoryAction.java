@@ -77,7 +77,7 @@ public class NetworkInventoryAction {
 
         if (useV1001InventoryTransactionShape) {
             // v2192 起每对 bool 仅剩存在性内层 bool / since v2192 only the presence bool remains
-            boolean singleBool = packet.protocol >= ProtocolInfo.v1_26_50;
+            boolean singleBool = packet.protocol >= ProtocolInfo.v1_26_50_27;
             if (singleBool ? packet.getBoolean() : packet.getBoolean() && packet.getBoolean()) {
                 this.windowId = packet.getSingedByte();
             }
@@ -123,7 +123,7 @@ public class NetworkInventoryAction {
         packet.putUnsignedVarInt(this.sourceType);
 
         if (packet.protocol >= ProtocolInfo.v1_26_30) {
-            boolean v2192 = packet.protocol >= ProtocolInfo.v1_26_50;
+            boolean v2192 = packet.protocol >= ProtocolInfo.v1_26_50_27;
             if (v2192) {
                 // v2192：单存在性 bool / single presence bool
                 switch (this.sourceType) {

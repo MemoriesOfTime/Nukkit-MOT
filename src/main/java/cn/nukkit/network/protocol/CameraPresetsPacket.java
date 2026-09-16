@@ -143,7 +143,7 @@ public class CameraPresetsPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_80) {
             this.putOptionalNull(preset.getControlScheme(), (controlScheme) -> this.putByte((byte) controlScheme.ordinal()));
         }
-        if (this.protocol >= ProtocolInfo.v1_26_50) {
+        if (this.protocol >= ProtocolInfo.v1_26_50_27) {
             // v2192 尾部新增 / trailing fields added in v2192
             this.putBoolean(preset.isApplyInheritedStartingRotation());
             this.putOptionalNull(preset.getStartingRotation(), startingRotation -> this.putVector2f(startingRotation));
@@ -223,7 +223,7 @@ public class CameraPresetsPacket extends DataPacket {
                 listener, effects, rotationSpeed, snapToTarget, entityOffset, horizontalRotationLimit, verticalRotationLimit,
                 continueTargeting, alignTargetAndCameraForward, blockListeningRadius, aimAssist, controlScheme
         );
-        if (this.protocol >= ProtocolInfo.v1_26_50) {
+        if (this.protocol >= ProtocolInfo.v1_26_50_27) {
             // v2192 尾部新增 / trailing fields added in v2192
             preset.setApplyInheritedStartingRotation(this.getBoolean());
             preset.setStartingRotation(this.getOptional(null, BinaryStream::getVector2f));
