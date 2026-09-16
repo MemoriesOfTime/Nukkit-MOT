@@ -4,7 +4,6 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
-import cn.nukkit.inventory.transaction.action.CraftingTakeResultAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -77,10 +76,16 @@ public class CraftingTransaction extends InventoryTransaction {
     }
 
     public void setPrimaryOutput(Item item) {
+        if (item == null || item.isNull()) {
+            throw new IllegalArgumentException("Primary result item must not be null or air");
+        }
         if (primaryOutput == null) {
             primaryOutput = item.clone();
-        } else if (!primaryOutput.equals(item)) {
+        } else if (!primaryOutput.equals(item, true, false) || primaryOutput.getCount() != item.getCount()) {
             throw new RuntimeException("Primary result item has already been set and does not match the current item (expected " + primaryOutput + ", got " + item + ')');
+        } else {
+            // Same item identity may still carry event-authored NBT.
+            primaryOutput = item.clone();
         }
     }
 
@@ -115,35 +120,32 @@ public class CraftingTransaction extends InventoryTransaction {
 
     /**
      * Replaces the client-authored output with the server-rebuilt one, covering primaryOutput,
-     * CraftingTakeResultAction source and the inventory SlotChangeAction target, so that the
-     * authoritative NBT lands in the player's inventory.
+     * parsed result actions and inventory targets so that authoritative NBT lands
+     * in the player's inventory.
      */
     void applyAuthoritativeOutput(Item authoritativeOutput) {
-        if (authoritativeOutput == null || authoritativeOutput.equalsExact(this.primaryOutput)) {
+        Item rewritten = applyEventOutputToActions(this.primaryOutput, authoritativeOutput);
+        if (rewritten == null) {
             return;
         }
-
-        this.primaryOutput = authoritativeOutput.clone();
-
-        for (InventoryAction action : this.actions) {
-            if (action instanceof CraftingTakeResultAction resultAction) {
-                resultAction.setSourceItem(authoritativeOutput.clone());
-            } else if (action instanceof SlotChangeAction slotChangeAction) {
-                if (slotChangeAction.getSourceItem().isNull()
-                        && slotChangeAction.getTargetItem().getId() == authoritativeOutput.getId()
-                        && slotChangeAction.getTargetItem().getCount() > 0) {
-                    slotChangeAction.setTargetItem(authoritativeOutput.clone());
-                }
-            }
-        }
+        this.primaryOutput = rewritten;
     }
 
     @Override
     protected boolean callExecuteEvent() {
         CraftItemEvent ev;
+        Item originalOutput = this.primaryOutput == null ? null : this.primaryOutput.clone();
 
         this.source.getServer().getPluginManager().callEvent(ev = new CraftItemEvent(this));
-        return !ev.isCancelled();
+        if (ev.isCancelled()) {
+            return false;
+        }
+        Item rewritten = applyEventOutputToActions(originalOutput, this.primaryOutput);
+        if (rewritten == null) {
+            return false;
+        }
+        this.primaryOutput = rewritten;
+        return true;
     }
 
     @Override

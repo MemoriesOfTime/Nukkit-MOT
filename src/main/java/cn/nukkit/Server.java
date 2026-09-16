@@ -24,6 +24,8 @@ import cn.nukkit.event.server.BatchPacketsEvent;
 import cn.nukkit.event.server.PlayerDataSerializeEvent;
 import cn.nukkit.event.server.QueryRegenerateEvent;
 import cn.nukkit.event.server.ServerStopEvent;
+import cn.nukkit.event.server.ServerTickStartEvent;
+import cn.nukkit.event.server.ServerTickEndEvent;
 import cn.nukkit.inventory.CraftingManager;
 import cn.nukkit.inventory.Recipe;
 import cn.nukkit.item.Item;
@@ -129,6 +131,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
+import java.util.function.LongSupplier;
 
 /**
  * The main server class
@@ -1781,7 +1784,11 @@ public class Server {
     }
 
     private void tick() {
-        long tickTime = System.currentTimeMillis();
+        tick(System.currentTimeMillis(), System::nanoTime);
+    }
+
+    // The actual tick body also accepts a monotonic clock for deterministic boundary tests.
+    void tick(long tickTime, LongSupplier nanoTime) {
 
         long time = tickTime - this.nextTick;
         if (time < -25) {
@@ -1792,84 +1799,104 @@ public class Server {
             }
         }
 
-        long tickTimeNano = System.nanoTime();
         if ((tickTime - this.nextTick) < -25) {
             return;
         }
 
-        ++this.tickCounter;
+        long tickTimeNano = nanoTime.getAsLong();
+        long tickId = ++this.tickCounter;
+        Throwable tickFailure = null;
+        try {
+            this.pluginManager.callEvent(new ServerTickStartEvent(tickId));
+            this.network.processInterfaces();
 
-        this.network.processInterfaces();
+            if (this.rcon != null) {
+                this.rcon.check();
+            }
 
-        if (this.rcon != null) {
-            this.rcon.check();
-        }
+            this.scheduler.mainThreadHeartbeat(this.tickCounter);
 
-        this.scheduler.mainThreadHeartbeat(this.tickCounter);
+            this.checkTickUpdates(this.tickCounter);
 
-        this.checkTickUpdates(this.tickCounter);
+            for (Player player : new ArrayList<>(this.players.values())) {
+                player.checkNetwork();
+            }
 
-        for (Player player : new ArrayList<>(this.players.values())) {
-            player.checkNetwork();
-        }
+            if ((this.tickCounter & 0b1111) == 0) {
+                this.titleTick();
 
-        if ((this.tickCounter & 0b1111) == 0) {
-            this.titleTick();
+                this.network.resetStatistics();
+                this.maxTick = 20;
+                this.maxUse = 0;
 
-            this.network.resetStatistics();
-            this.maxTick = 20;
-            this.maxUse = 0;
-
-            if ((this.tickCounter & 0b111111111) == 0) {
-                try {
-                    this.pluginManager.callEvent(this.queryRegenerateEvent = new QueryRegenerateEvent(this, 5));
-                    if (this.queryHandler != null) {
-                        this.queryHandler.regenerateInfo();
+                if ((this.tickCounter & 0b111111111) == 0) {
+                    try {
+                        this.pluginManager.callEvent(this.queryRegenerateEvent = new QueryRegenerateEvent(this, 5));
+                        if (this.queryHandler != null) {
+                            this.queryHandler.regenerateInfo();
+                        }
+                    } catch (Exception e) {
+                        log.error(e);
                     }
-                } catch (Exception e) {
-                    log.error(e);
+                }
+
+                this.network.updateName();
+            }
+
+            if (++this.autoSaveTicker >= this.autoSaveTicks) {
+                this.autoSaveTicker = 0;
+                this.doAutoSave();
+            }
+
+            if (this.tickCounter % 100 == 0) {
+                for (Level level : this.levelArray) {
+                    if (!level.isBeingConverted) {
+                        level.doChunkGarbageCollection();
+                    }
                 }
             }
 
-            this.network.updateName();
-        }
+            long nowNano = nanoTime.getAsLong();
 
-        if (++this.autoSaveTicker >= this.autoSaveTicks) {
-            this.autoSaveTicker = 0;
-            this.doAutoSave();
-        }
+            float tick = (float) Math.min(20, 1000000000 / Math.max(1000000, ((double) nowNano - tickTimeNano)));
+            float use = (float) Math.min(1, ((double) (nowNano - tickTimeNano)) / 50000000);
 
-        if (this.tickCounter % 100 == 0) {
-            for (Level level : this.levelArray) {
-                if (!level.isBeingConverted) {
-                    level.doChunkGarbageCollection();
+            if (this.maxTick > tick) {
+                this.maxTick = tick;
+            }
+
+            if (this.maxUse < use) {
+                this.maxUse = use;
+            }
+
+            System.arraycopy(this.tickAverage, 1, this.tickAverage, 0, this.tickAverage.length - 1);
+            this.tickAverage[this.tickAverage.length - 1] = tick;
+
+            System.arraycopy(this.useAverage, 1, this.useAverage, 0, this.useAverage.length - 1);
+            this.useAverage[this.useAverage.length - 1] = use;
+
+            if ((this.nextTick - tickTime) < -1000) {
+                this.nextTick = tickTime;
+            } else {
+                this.nextTick += 50;
+            }
+        } catch (RuntimeException | Error failure) {
+            tickFailure = failure;
+            throw failure;
+        } finally {
+            // Capture before dispatch: observers must not inflate the value they receive.
+            long durationNanos = nanoTime.getAsLong() - tickTimeNano;
+            try {
+                this.pluginManager.callEvent(new ServerTickEndEvent(tickId, durationNanos));
+            } catch (RuntimeException | Error eventFailure) {
+                if (tickFailure != null) {
+                    if (eventFailure != tickFailure) {
+                        tickFailure.addSuppressed(eventFailure);
+                    }
+                } else {
+                    throw eventFailure;
                 }
             }
-        }
-
-        long nowNano = System.nanoTime();
-
-        float tick = (float) Math.min(20, 1000000000 / Math.max(1000000, ((double) nowNano - tickTimeNano)));
-        float use = (float) Math.min(1, ((double) (nowNano - tickTimeNano)) / 50000000);
-
-        if (this.maxTick > tick) {
-            this.maxTick = tick;
-        }
-
-        if (this.maxUse < use) {
-            this.maxUse = use;
-        }
-
-        System.arraycopy(this.tickAverage, 1, this.tickAverage, 0, this.tickAverage.length - 1);
-        this.tickAverage[this.tickAverage.length - 1] = tick;
-
-        System.arraycopy(this.useAverage, 1, this.useAverage, 0, this.useAverage.length - 1);
-        this.useAverage[this.useAverage.length - 1] = use;
-
-        if ((this.nextTick - tickTime) < -1000) {
-            this.nextTick = tickTime;
-        } else {
-            this.nextTick += 50;
         }
     }
 

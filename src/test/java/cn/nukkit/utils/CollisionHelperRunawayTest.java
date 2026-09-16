@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import org.junit.jupiter.api.BeforeEach;
@@ -183,6 +184,10 @@ public class CollisionHelperRunawayTest {
         AxisAlignedBB bb = new SimpleAxisAlignedBB(0.3, 0, 0.3, 0.7, 1.8, 0.7);
         Level level = Mockito.mock(Level.class);
         Entity entity = Mockito.mock(Entity.class);
+        FullChunk chunk = Mockito.mock(FullChunk.class);
+        entity.chunk = chunk;
+        Mockito.when(chunk.getBlockId(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt(), Mockito.eq(0)))
+                .thenReturn(Block.LAVA);
         Block lava = Block.get(Block.LAVA);
         lava.setLevel(level);
         lava.setComponents(0, 0, 0);

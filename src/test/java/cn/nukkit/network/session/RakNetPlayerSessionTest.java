@@ -6,29 +6,37 @@ import cn.nukkit.Player;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
-import cn.nukkit.network.proxy.ProxyProtocolHandler;
+import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
 import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
+import cn.nukkit.network.proxy.ProxyProtocolHandler;
 import cn.nukkit.network.session.login.SessionLoginPhase;
+import cn.nukkit.plugin.InternalPlugin;
+import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoop;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.*;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
+import org.cloudburstmc.netty.channel.raknet.packet.RakMessage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -76,6 +84,9 @@ class RakNetPlayerSessionTest {
         assertSame(CompressionProvider.NONE, result.compression());
         assertEquals(1, result.packets().size());
         assertInstanceOf(ClientToServerHandshakePacket.class, result.packets().get(0));
+        assertTrue(result.workBytes() > legacyPacketBuffer.length,
+                "the failed prefixed attempt must also consume the decode budget");
+        assertTrue(result.framedPackets() > result.packets().size());
     }
 
     @Test
@@ -308,7 +319,386 @@ class RakNetPlayerSessionTest {
         assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.CONNECTED, address));
         assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED, address));
         assertTrue(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.LOGIN_RECEIVED, address));
-        assertTrue(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.LOGGED_IN, address));
+        assertTrue(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.RESOURCE_PACK, address));
+        assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.LOGGED_IN, address));
+        assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.DISCONNECTED, address));
+    }
+
+    @Test
+    void serverTickDefersInboundTailWithoutDroppingPackets() {
+        SessionFixture fixture = createSession(false);
+        int burst = RakNetPlayerSession.MAX_INBOUND_PACKETS_PER_SERVER_TICK + 44;
+        assertTrue(fixture.session.enqueueDecodedBatch(testPackets(burst)));
+
+        drainServerTick(fixture.session);
+
+        verify(fixture.player, times(RakNetPlayerSession.MAX_INBOUND_PACKETS_PER_SERVER_TICK))
+                .handleDataPacket(any(DataPacket.class));
+        assertEquals(44, fixture.session.queuedInboundPacketCount());
+
+        drainServerTick(fixture.session);
+
+        verify(fixture.player, times(burst)).handleDataPacket(any(DataPacket.class));
+        assertEquals(0, fixture.session.queuedInboundPacketCount());
+    }
+
+    @Test
+    void inboundQueueHasAHardPerSessionBound() {
+        SessionFixture fixture = createSession(false);
+
+        assertTrue(fixture.session.enqueueDecodedBatch(
+                testPackets(RakNetPlayerSession.MAX_QUEUED_INBOUND_PACKETS)));
+        assertFalse(fixture.session.enqueueDecodedBatch(List.of(new TestPacket())));
+
+        assertEquals(RakNetPlayerSession.MAX_QUEUED_INBOUND_PACKETS,
+                fixture.session.queuedInboundPacketCount());
+        assertTrue(fixture.session.isInboundThrottled());
+        assertNull(fixture.session.getDisconnectReason());
+    }
+
+    @Test
+    void inboundBackpressureClearsAtLowWater() {
+        SessionFixture fixture = createSession(false);
+        assertTrue(fixture.session.enqueueDecodedBatch(
+                testPackets(RakNetPlayerSession.MAX_QUEUED_INBOUND_PACKETS)));
+
+        while (fixture.session.queuedInboundPacketCount() > RakNetPlayerSession.MAX_QUEUED_INBOUND_PACKETS / 2) {
+            drainServerTick(fixture.session);
+        }
+
+        assertFalse(fixture.session.isInboundThrottled());
+        assertTrue(fixture.session.enqueueDecodedBatch(List.of(new TestPacket())));
+        assertNull(fixture.session.getDisconnectReason());
+    }
+
+    @Test
+    void inboundQueueAlsoHasAByteBound() {
+        SessionFixture fixture = createSession(false);
+        TestPacket fullBatch = new TestPacket();
+        fullBatch.setBuffer(new byte[(int) RakNetPlayerSession.MAX_QUEUED_INBOUND_BYTES]);
+
+        assertTrue(fixture.session.enqueueDecodedBatch(List.of(fullBatch)));
+        assertFalse(fixture.session.enqueueDecodedBatch(List.of(new TestPacket())));
+
+        assertEquals(RakNetPlayerSession.MAX_QUEUED_INBOUND_BYTES,
+                fixture.session.queuedInboundByteCount());
+        assertTrue(fixture.session.isInboundThrottled());
+        assertNull(fixture.session.getDisconnectReason());
+    }
+
+    @Test
+    void ingressBudgetChargesDecodeWorkEvenWhenNothingCanBeQueued() {
+        SessionFixture fixture = createSession(false);
+        long now = System.nanoTime();
+        int worstDecode = 6 * 1024 * 1024;
+
+        for (int i = 0; i < 3; i++) {
+            assertTrue(fixture.session.reserveWireIngressBudget(64, now));
+            assertTrue(fixture.session.reserveDecodeIngressBudget(now));
+            fixture.session.settleIngressBudget(worstDecode, 1300, now);
+        }
+
+        assertTrue(fixture.session.reserveWireIngressBudget(64, now));
+        assertFalse(fixture.session.reserveDecodeIngressBudget(now));
+        assertNull(fixture.session.getDisconnectReason());
+    }
+
+    @Test
+    void ingressBudgetAllowsNormalSmallBatchesButBoundsSameInstantBurst() {
+        SessionFixture fixture = createSession(false);
+        long now = System.nanoTime();
+
+        for (int i = 0; i < 1200; i++) {
+            assertTrue(fixture.session.reserveWireIngressBudget(1, now));
+            assertTrue(fixture.session.reserveDecodeIngressBudget(now));
+            fixture.session.settleIngressBudget(1, 1, now);
+        }
+
+        assertFalse(fixture.session.reserveWireIngressBudget(1, now));
+    }
+
+    @Test
+    void measuredDecodeCountsUnknownFrames() {
+        BinaryStream batch = new BinaryStream();
+        BinaryStream unknownPacket = new BinaryStream();
+        unknownPacket.putUnsignedVarInt(0x3ff);
+        for (int i = 0; i < 1300; i++) {
+            batch.putByteArray(unknownPacket.getBuffer());
+        }
+        List<DataPacket> decoded = new ArrayList<>();
+
+        Network.BatchProcessResult result = network.processBatchMeasured(
+                batch.getBuffer(), decoded, CompressionProvider.NONE, RAKNET_PROTOCOL, null, false);
+
+        assertTrue(result.success());
+        assertEquals(1300, result.framedPackets());
+        assertTrue(decoded.isEmpty());
+    }
+
+    @Test
+    void interfaceBudgetRotatesPastSessionsThatUsedThePreviousTick() throws Exception {
+        Queue<RakNetPlayerSession> creationQueue = new ArrayDeque<>();
+        Set<RakNetPlayerSession> pending = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        Map<InetSocketAddress, RakNetPlayerSession> sessions = new LinkedHashMap<>();
+        RakNetInterface interfaceUnderTest = createRakNetInterface(
+                MockServer.get(), creationQueue, pending, sessions);
+        List<SessionFixture> fixtures = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            SessionFixture fixture = createSession(interfaceUnderTest, false, true, true);
+            fixture.session.enqueueDecodedBatch(testPackets(1300));
+            fixtures.add(fixture);
+            sessions.put(new InetSocketAddress("127.0.0.1", 20000 + i), fixture.session);
+        }
+
+        interfaceUnderTest.process();
+
+        int queuedAfterFirstTick = fixtures.stream()
+                .mapToInt(fixture -> fixture.session.queuedInboundPacketCount())
+                .sum();
+        assertEquals(20 * 1300 - 2048, queuedAfterFirstTick);
+        assertEquals(1300, fixtures.get(19).session.queuedInboundPacketCount());
+
+        interfaceUnderTest.process();
+
+        assertTrue(fixtures.get(19).session.queuedInboundPacketCount() < 1300,
+                "the round-robin cursor must serve a session skipped by the previous global budget");
+    }
+
+    @Test
+    void loggedInMalformedBudgetIsSlidingAndSuccessfulTrafficDoesNotClearIt() {
+        SessionFixture fixture = createSession(false);
+        fixture.session.getState().getLogin().setPhase(SessionLoginPhase.LOGGED_IN);
+        long now = TimeUnit.SECONDS.toNanos(100);
+
+        for (int i = 0; i < 32; i++) {
+            assertTrue(fixture.session.keepPlayingSessionAfterMalformedBatch(now));
+        }
+        assertTrue(fixture.session.enqueueDecodedBatch(List.of(new TestPacket())));
+
+        assertFalse(fixture.session.keepPlayingSessionAfterMalformedBatch(now));
+    }
+
+    @Test
+    void expiredMalformedBatchesFreeTheBudget() {
+        SessionFixture fixture = createSession(false);
+        fixture.session.getState().getLogin().setPhase(SessionLoginPhase.LOGGED_IN);
+        long now = TimeUnit.SECONDS.toNanos(100);
+        for (int i = 0; i < 32; i++) {
+            assertTrue(fixture.session.keepPlayingSessionAfterMalformedBatch(now));
+        }
+
+        assertTrue(fixture.session.keepPlayingSessionAfterMalformedBatch(
+                now + RakNetPlayerSession.MALFORMED_BATCH_WINDOW_NANOS + 1));
+    }
+
+    @Test
+    void malformedBatchBeforeLoginStillFailsClosed() {
+        SessionFixture fixture = createSession(false);
+        fixture.session.getState().getLogin().setPhase(SessionLoginPhase.RESOURCE_PACK);
+
+        assertFalse(fixture.session.keepPlayingSessionAfterMalformedBatch(1));
+    }
+
+    @Test
+    void delayedMalformedLoginCloseUsesOriginalPhaseAndAddress() throws Exception {
+        assertMalformedLoginPolicy(SessionLoginPhase.RESOURCE_PACK, true);
+    }
+
+    @Test
+    void delayedMalformedNegotiationCloseDoesNotBlockAnAddress() throws Exception {
+        assertMalformedLoginPolicy(SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED, false);
+    }
+
+    private static void assertMalformedLoginPolicy(SessionLoginPhase phase, boolean expectedBlock) throws Exception {
+        RakNetInterface networkInterface = mock(RakNetInterface.class, RETURNS_DEEP_STUBS);
+        when(networkInterface.getNetwork()).thenReturn(network);
+        SessionFixture fixture = createSession(networkInterface, false, true, true);
+        fixture.session.getState().getLogin().setPhase(phase);
+        InetAddress originalAddress = InetAddress.getByName("192.0.2.23");
+        when(fixture.channel.remoteAddress()).thenReturn(new InetSocketAddress(originalAddress, 20000));
+        ServerScheduler scheduler = mock(ServerScheduler.class);
+        when(MockServer.get().getScheduler()).thenReturn(scheduler);
+
+        receiveBatch(fixture.session, new byte[]{(byte) 0x80});
+
+        assertEquals(SessionLoginPhase.DISCONNECTED, fixture.session.getState().getLogin().getPhase());
+        assertEquals("Sent malformed packet", fixture.session.getDisconnectReason());
+        ArgumentCaptor<Runnable> callback = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).scheduleDelayedTask(eq(InternalPlugin.INSTANCE), callback.capture(), eq(10));
+        when(fixture.channel.remoteAddress()).thenThrow(new IllegalStateException("channel already closed"));
+
+        callback.getValue().run();
+
+        verify(fixture.channel).close();
+        verify(networkInterface, times(expectedBlock ? 1 : 0)).blockAddress(originalAddress, 60);
+        verify(fixture.channel, never()).unsafe();
+    }
+
+    @Test
+    void encryptedSoftThrottleKeepsTheNextPacketDecryptable() throws Exception {
+        for (boolean queueThrottle : new boolean[]{true, false}) {
+            RakNetInterface networkInterface = mock(RakNetInterface.class, RETURNS_DEEP_STUBS);
+            when(networkInterface.getNetwork()).thenReturn(network);
+            SessionFixture fixture = createSession(networkInterface, false, true, true);
+            fixture.session.getState().getLogin().setPhase(SessionLoginPhase.LOGGED_IN);
+            fixture.session.setCompression(CompressionProvider.NONE);
+            SecretKey key = new SecretKeySpec(new byte[32], "AES");
+            Cipher clientCipher = EncryptionUtils.createCipher(true, true, key);
+            fixture.session.setEncryption(key, EncryptionUtils.createCipher(true, true, key),
+                    EncryptionUtils.createCipher(true, false, key));
+            if (queueThrottle) {
+                setField(fixture.session, "inboundThrottled", true);
+            } else {
+                setField(fixture.session, "ingressDecodeBytes", 0D);
+                setField(fixture.session, "lastIngressRefillNanos", Long.MAX_VALUE);
+            }
+            byte[] payload = {(byte) 0xff, 0x01, ClientToServerHandshakePacket.NETWORK_ID};
+
+            receiveBatch(fixture.session, encryptBatch(clientCipher, key, 0, payload));
+
+            assertEquals(0, fixture.session.queuedInboundPacketCount());
+            assertNull(fixture.session.getDisconnectReason());
+            setField(fixture.session, "inboundThrottled", false);
+            setField(fixture.session, "ingressDecodeBytes", 24D * 1024 * 1024);
+
+            receiveBatch(fixture.session, encryptBatch(clientCipher, key, 1, payload));
+
+            assertEquals(1, fixture.session.queuedInboundPacketCount(),
+                    "soft backpressure must advance both the cipher stream and checksum counter");
+            assertNull(fixture.session.getDisconnectReason());
+            verify(fixture.channel, never()).close();
+        }
+    }
+
+    @Test
+    void wireThrottleClosesBeforeDecrypting() throws Exception {
+        SessionFixture fixture = createSession(false);
+        Cipher cipher = mock(Cipher.class);
+        SecretKey key = new SecretKeySpec(new byte[32], "AES");
+        fixture.session.setEncryption(key, cipher, cipher);
+        setField(fixture.session, "ingressBatchTokens", 0D);
+        setField(fixture.session, "lastIngressRefillNanos", Long.MAX_VALUE);
+
+        receiveBatch(fixture.session, new byte[]{1, 2, 3});
+
+        assertEquals("Too much inbound data", fixture.session.getDisconnectReason());
+        verify(fixture.channel).close();
+        verifyNoInteractions(cipher);
+    }
+
+    @Test
+    void oversizedWirePacketClosesWithSizeCapReason() throws Exception {
+        SessionFixture fixture = createSession(false);
+
+        receiveBatch(fixture.session, new byte[RakNetPlayerSession.MAX_INBOUND_WIRE_BYTES + 1]);
+
+        assertEquals("Too big packet", fixture.session.getDisconnectReason());
+        verify(fixture.channel).close();
+    }
+
+    @Test
+    void malformedBatchesAboveWindowDisconnectPlayingSession() throws Exception {
+        RakNetInterface networkInterface = mock(RakNetInterface.class, RETURNS_DEEP_STUBS);
+        when(networkInterface.getNetwork()).thenReturn(network);
+        SessionFixture fixture = createSession(networkInterface, false, true, true);
+        fixture.session.getState().getLogin().setPhase(SessionLoginPhase.LOGGED_IN);
+
+        for (int i = 0; i < RakNetPlayerSession.MAX_MALFORMED_BATCHES_WHILE_PLAYING; i++) {
+            receiveBatch(fixture.session, new byte[]{(byte) 0x80});
+            assertNull(fixture.session.getDisconnectReason());
+        }
+
+        receiveBatch(fixture.session, new byte[]{(byte) 0x80});
+
+        assertEquals("Sent malformed packet", fixture.session.getDisconnectReason());
+    }
+
+    @Test
+    void malformedSecondFrameDoesNotEnqueueTheValidFirstFrame() throws Exception {
+        RakNetInterface networkInterface = mock(RakNetInterface.class, RETURNS_DEEP_STUBS);
+        when(networkInterface.getNetwork()).thenReturn(network);
+        SessionFixture fixture = createSession(networkInterface, false, true, true);
+        fixture.session.getState().getLogin().setPhase(SessionLoginPhase.LOGGED_IN);
+        BinaryStream batch = new BinaryStream();
+        batch.putByteArray(new byte[]{ClientToServerHandshakePacket.NETWORK_ID});
+        batch.putByteArray(new byte[]{(byte) 0x80});
+        List<DataPacket> prefix = new ArrayList<>();
+        Network.BatchProcessResult result = network.processBatchMeasured(
+                batch.getBuffer(), prefix, CompressionProvider.NONE, RAKNET_PROTOCOL, fixture.player, false);
+        assertFalse(result.success());
+        assertEquals(2, result.framedPackets());
+        assertEquals(batch.getCount(), result.decompressedBytes());
+        assertEquals(1, prefix.size(), "the first frame really did decode before the failure");
+
+        receiveBatch(fixture.session, batch.getBuffer());
+
+        assertEquals(0, fixture.session.queuedInboundPacketCount());
+        assertEquals(0, fixture.session.queuedInboundByteCount());
+        assertNull(fixture.session.getDisconnectReason());
+    }
+
+    @Test
+    void uncompressedBatchesCannotBypassTheDecodedByteLimit() {
+        byte[] oversized = new byte[3 * 1024 * 1024 + 1];
+        List<DataPacket> decoded = new ArrayList<>();
+
+        Network.BatchProcessResult result = network.processBatchMeasured(
+                oversized, decoded, CompressionProvider.NONE, RAKNET_PROTOCOL, null, false);
+
+        assertFalse(result.success());
+        assertEquals(oversized.length, result.decompressedBytes());
+        assertEquals(0, result.framedPackets());
+        assertTrue(decoded.isEmpty());
+    }
+
+    @Test
+    void globalByteBudgetEventuallyServesALargeHeadPacket() throws Exception {
+        Map<InetSocketAddress, RakNetPlayerSession> sessions = new LinkedHashMap<>();
+        RakNetInterface networkInterface = createRakNetInterface(MockServer.get(), new ArrayDeque<>(),
+                Collections.newSetFromMap(new ConcurrentHashMap<>()), sessions);
+        List<SessionFixture> fixtures = new ArrayList<>();
+        int[] sizes = {3 * 1024 * 1024, 4 * 1024 * 1024, 1024 * 1024};
+        for (int i = 0; i < sizes.length; i++) {
+            SessionFixture fixture = createSession(networkInterface, false, true, true);
+            TestPacket packet = new TestPacket();
+            packet.setBuffer(new byte[sizes[i]]);
+            assertTrue(fixture.session.enqueueDecodedBatch(List.of(packet)));
+            fixtures.add(fixture);
+            sessions.put(new InetSocketAddress("127.0.0.1", 20000 + i), fixture.session);
+        }
+
+        networkInterface.process();
+
+        assertEquals(0, fixtures.get(0).session.queuedInboundPacketCount());
+        assertEquals(1, fixtures.get(1).session.queuedInboundPacketCount());
+        assertEquals(0, fixtures.get(2).session.queuedInboundPacketCount());
+        networkInterface.process();
+        assertEquals(0, fixtures.get(1).session.queuedInboundPacketCount(),
+                "the next round must give a large head packet the full global byte budget");
+    }
+
+    private static void drainServerTick(RakNetPlayerSession session) {
+        session.serverTick(RakNetPlayerSession.MAX_INBOUND_PACKETS_PER_SERVER_TICK,
+                RakNetPlayerSession.MAX_INBOUND_BYTES_PER_SERVER_TICK);
+    }
+
+    private static void receiveBatch(RakNetPlayerSession session, byte[] payload) throws Exception {
+        RakMessage message = new RakMessage(Unpooled.buffer(payload.length + 1).writeByte(0xfe).writeBytes(payload));
+        try {
+            session.channelRead0(mock(ChannelHandlerContext.class), message);
+        } finally {
+            message.release();
+        }
+    }
+
+    private static byte[] encryptBatch(Cipher cipher, SecretKey key, long counter, byte[] payload) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.update(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(counter).array());
+        digest.update(payload);
+        digest.update(key.getEncoded());
+        byte[] plaintext = Arrays.copyOf(payload, payload.length + 8);
+        System.arraycopy(digest.digest(), 0, plaintext, payload.length, 8);
+        return cipher.update(plaintext);
     }
 
     @Test
@@ -386,7 +776,7 @@ class RakNetPlayerSessionTest {
             when(player.shouldLogin()).thenReturn(false);
             session.setPlayer(player);
         }
-        return new SessionFixture(session, channel, eventLoop, scheduledFuture);
+        return new SessionFixture(session, channel, eventLoop, scheduledFuture, session.getPlayer());
     }
 
     private static void invokeNetworkTick(RakNetPlayerSession session) throws Exception {
@@ -418,7 +808,8 @@ class RakNetPlayerSessionTest {
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
-        Field field = RakNetInterface.class.getDeclaredField(fieldName);
+        Class<?> owner = target instanceof RakNetPlayerSession ? RakNetPlayerSession.class : RakNetInterface.class;
+        Field field = owner.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
     }
@@ -460,8 +851,16 @@ class RakNetPlayerSessionTest {
         return prefixed;
     }
 
+    private static List<DataPacket> testPackets(int count) {
+        List<DataPacket> packets = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            packets.add(new TestPacket());
+        }
+        return packets;
+    }
+
     private record SessionFixture(RakNetPlayerSession session, RakChildChannel channel, EventLoop eventLoop,
-                                  ScheduledFuture<?> tickFuture) {
+                                  ScheduledFuture<?> tickFuture, Player player) {
     }
 
     private static final class TestPacket extends DataPacket {

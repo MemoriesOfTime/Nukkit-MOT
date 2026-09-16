@@ -46,6 +46,8 @@
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
         <netty.version>4.2.16.Final</netty.version>
         <maven.shade.skip>false</maven.shade.skip>
+        <!-- Reproducible build: entry timestamps follow the last commit time -->
+        <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
     </properties>
 
     <distributionManagement>
@@ -667,9 +669,9 @@
                 <version>3.6.2</version>
                 <dependencies>
                     <dependency>
-                        <groupId>com.github.edwgiz</groupId>
-                        <artifactId>maven-shade-plugin.log4j2-cachefile-transformer</artifactId>
-                        <version>2.8.1</version>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+                        <version>0.2.0</version>
                     </dependency>
                 </dependencies>
                 <executions>
@@ -704,7 +706,7 @@
                     </filters>
                     <transformers>
                         <transformer
-                                implementation="com.github.edwgiz.mavenShadePlugin.log4j2CacheTransformer.PluginsCacheFileTransformer">
+                                implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer">
                         </transformer>
                     </transformers>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
@@ -726,8 +728,8 @@
                 <configuration>
                     <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
                     <prefix>git</prefix>
-                    <dateFormat>dd.MM.yyyy '@' HH:mm:ss z</dateFormat>
-                    <dateFormatTimeZone>${user.timezone}</dateFormatTimeZone>
+                    <dateFormat>yyyy-MM-dd'T'HH:mm:ssXXX</dateFormat>
+                    <dateFormatTimeZone>UTC</dateFormatTimeZone>
                     <verbose>true</verbose>
                     <generateGitPropertiesFile>true</generateGitPropertiesFile>
                     <generateGitPropertiesFilename>${project.build.outputDirectory}/git.properties
@@ -739,10 +741,14 @@
                     <failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
                     <skip>false</skip>
                     <runOnlyOnce>true</runOnlyOnce>
-                    <excludeProperties>
-                        <excludeProperty>git.user.*</excludeProperty>
-                    </excludeProperties>
+                    <!-- Only commit-determined fields; the rest vary with the build
+                         environment. git.commit.time must stay listed: this filter also
+                         drops injected properties, and outputTimestamp resolves against
+                         it (see dateFormat below). -->
                     <includeOnlyProperties>
+                        <includeOnlyProperty>^git.commit.id.abbrev$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.commit.time$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.branch$</includeOnlyProperty>
                     </includeOnlyProperties>
                     <useBranchNameFromBuildEnvironment>false</useBranchNameFromBuildEnvironment>
                     <useNativeGit>false</useNativeGit>

@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockBarrier;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import org.jetbrains.annotations.NotNull;
@@ -34,6 +35,34 @@ public record CollisionHelper(Entity entity) {
     /** Test-only hook to reset the throttle map between tests. Not part of the public API. */
     static void resetThrottleStateForTests() {
         RUNAWAY_LOG_TIMES.clear();
+    }
+
+    /** Default filter of the {@code getCollisionBlocks} overloads: everything except air. Kept as a
+     * constant so the loop can recognise it and take the allocation-free air fast path below. */
+    private static final Predicate<Block> NOT_AIR = block -> block.getId() != Block.AIR;
+
+    /**
+     * Resolves the chunk owning a block column, reusing {@code hint} when it already covers it.
+     * Returns {@code null} for an unloaded chunk, which every caller here treats as air - exactly what
+     * {@link Level#getBlock} produces for a missing chunk.
+     */
+    private static FullChunk chunkAt(Level level, FullChunk hint, int x, int z) {
+        int cx = x >> 4;
+        int cz = z >> 4;
+        if (hint != null && hint.getX() == cx && hint.getZ() == cz) {
+            return hint;
+        }
+        return level.getChunkIfLoaded(cx, cz);
+    }
+
+    /**
+     * Allocation-free air probe: reads the raw block id out of the section instead of materialising a
+     * Block. Empty cells dominate every entity bounding box, and each one used to allocate a BlockAir
+     * (plus its Position/Vector3 clone) that the very next line threw away. Air has no bounding box and
+     * no collision box, so skipping it is behaviour-preserving for all callers below.
+     */
+    private static boolean isAirAt(FullChunk chunk, int x, int y, int z) {
+        return chunk == null || chunk.getBlockId(x & 0xF, y, z & 0xF, 0) == Block.AIR;
     }
 
     /** Rejects non-finite AABBs: NaN/Infinity make floor/ceil overflow and throw NegativeArraySizeException. */
@@ -209,8 +238,11 @@ public record CollisionHelper(Entity entity) {
 
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
+                FullChunk chunk = chunkAt(level, entity.chunk, x, z);
                 for (int y = clampedMinY; y <= clampedMaxY; y++) {
-                    Block block = level.getBlock(entity.chunk, x, y, z, 0, false);
+                    if (isAirAt(chunk, x, y, z)) continue;
+
+                    Block block = level.getBlock(chunk, x, y, z, 0, false);
                     if (block == null || block.isAir()) continue;
 
                     if (count == result.length) {
@@ -256,10 +288,14 @@ public record CollisionHelper(Entity entity) {
             return false;
         }
 
+        boolean skipAir = targetBlockId != Block.AIR;
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
+                FullChunk chunk = chunkAt(level, entity.chunk, x, z);
                 for (int y = clampedMinY; y <= clampedMaxY; y++) {
-                    Block block = level.getBlock(entity.chunk, x, y, z, 0, false);
+                    if (skipAir && isAirAt(chunk, x, y, z)) continue;
+
+                    Block block = level.getBlock(chunk, x, y, z, 0, false);
                     if (block == null || block.getId() != targetBlockId) continue;
 
                     if (block.collidesWithBB(boundingBox, true)) {
@@ -371,7 +407,7 @@ public record CollisionHelper(Entity entity) {
                 entity,
                 targetFirst,
                 false,
-                block -> block.getId() != Block.AIR
+                NOT_AIR
         );
     }
 
@@ -398,7 +434,7 @@ public record CollisionHelper(Entity entity) {
                 entity,
                 targetFirst,
                 ignoreCollidesCheck,
-                block -> block.getId() != Block.AIR
+                NOT_AIR
         );
     }
 
@@ -444,11 +480,19 @@ public record CollisionHelper(Entity entity) {
             return Collections.emptyList();
         }
 
+        // Only the built-in filter is known to reject air; a caller-supplied predicate may well be
+        // looking for it, so the fast path stays off for anything else.
+        boolean skipAir = condition == NOT_AIR;
+        FullChunk hint = entity != null && entity.getLevel() == level ? entity.chunk : null;
+
         if (targetFirst) {
             for (int z = minZ; z <= maxZ; ++z) {
                 for (int x = minX; x <= maxX; ++x) {
+                    FullChunk chunk = chunkAt(level, hint, x, z);
                     for (int y = clampedMinY; y <= clampedMaxY; ++y) {
-                        Block block = level.getBlock(x, y, z, false);
+                        if (skipAir && isAirAt(chunk, x, y, z)) continue;
+
+                        Block block = level.getBlock(chunk, x, y, z, 0, false);
                         if (block != null && condition.test(block) &&
                                 (ignoreCollidesCheck || block.collidesWithBB(boundingBox))) {
                             return Collections.singletonList(block);
@@ -460,9 +504,11 @@ public record CollisionHelper(Entity entity) {
             List<Block> collides = new ArrayList<>();
             for (int z = minZ; z <= maxZ; ++z) {
                 for (int x = minX; x <= maxX; ++x) {
+                    FullChunk chunk = chunkAt(level, hint, x, z);
                     for (int y = clampedMinY; y <= clampedMaxY; ++y) {
-                        Block block = level.getBlock(entity != null ? entity.chunk : null,
-                                x, y, z, 0, false);
+                        if (skipAir && isAirAt(chunk, x, y, z)) continue;
+
+                        Block block = level.getBlock(chunk, x, y, z, 0, false);
                         if (block != null && condition.test(block) &&
                                 (ignoreCollidesCheck || block.collidesWithBB(boundingBox))) {
                             collides.add(block);
@@ -514,10 +560,15 @@ public record CollisionHelper(Entity entity) {
             return false;
         }
 
+        FullChunk hint = entity != null && entity.getLevel() == level ? entity.chunk : null;
         for (int z = minZ; z <= maxZ; ++z) {
             for (int x = minX; x <= maxX; ++x) {
+                FullChunk chunk = chunkAt(level, hint, x, z);
                 for (int y = clampedMinY; y <= clampedMaxY; ++y) {
-                    Block block = level.getBlock(entity != null ? entity.chunk : null, x, y, z, 0, false);
+                    // Air passes through and owns no bounding box, so it never reached `return true`.
+                    if (isAirAt(chunk, x, y, z)) continue;
+
+                    Block block = level.getBlock(chunk, x, y, z, 0, false);
                     if (block != null &&
                             (!checkCanPassThrough || !block.canPassThrough()) &&
                             block.collidesWithBB(boundingBox)) {
@@ -597,10 +648,15 @@ public record CollisionHelper(Entity entity) {
             return collides;
         }
 
+        FullChunk hint = entity != null && entity.getLevel() == level ? entity.chunk : null;
         for (int z = minZ; z <= maxZ; ++z) {
             for (int x = minX; x <= maxX; ++x) {
+                FullChunk chunk = chunkAt(level, hint, x, z);
                 for (int y = clampedMinY; y <= clampedMaxY; ++y) {
-                    Block block = level.getBlock(x, y, z, false);
+                    // Air is neither a barrier nor solid: it contributed no cube here.
+                    if (isAirAt(chunk, x, y, z)) continue;
+
+                    Block block = level.getBlock(chunk, x, y, z, 0, false);
                     if (block instanceof BlockBarrier && entity.canPassThroughBarrier()) {
                         continue;
                     }

@@ -61,7 +61,7 @@ public class ProfessionWeapon extends Profession {
                         .setTier(2)
                         .setTraderExp(10)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 36), Item.get(Item.BELL))
+                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 36), Item.getBlockItem(Item.BELL))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(2)
