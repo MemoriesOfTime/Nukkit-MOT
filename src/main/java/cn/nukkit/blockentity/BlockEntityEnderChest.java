@@ -1,13 +1,29 @@
 package cn.nukkit.blockentity;
 
+import cn.nukkit.Player;
+import java.util.HashSet;
+import java.util.Set;
+
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 
 public class BlockEntityEnderChest extends BlockEntitySpawnable {
 
+    /**
+     * Players looking into this ender chest right now. Kept on the block entity because a
+     * {@link cn.nukkit.block.BlockEnderChest} object is created anew for every lookup: a set on the
+     * block saw one viewer at a time, and the first player to close the window shut the lid for
+     * everyone else. Not saved: a window never survives a restart.
+     */
+    private final Set<Player> viewers = new HashSet<>();
+
     public BlockEntityEnderChest(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
+
+    public Set<Player> getViewers() {
+        return viewers;
     }
 
     @Override
