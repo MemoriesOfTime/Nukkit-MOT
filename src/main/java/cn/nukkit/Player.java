@@ -1500,7 +1500,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         int centerX = (int) this.x >> 4;
         int centerZ = (int) this.z >> 4;
 
-        int radius = spawned ? this.chunkRadius : server.c_s_spawnThreshold;
+        // Before the first spawn the client already waits for every chunk inside the publisher
+        // radius (chunkRadius, never below 3). Capping the pre-spawn radius to sqrt(spawn-threshold)
+        // left the outer ring unsent, so the client hung in the air until its own timeout and only
+        // then sent SetLocalPlayerAsInitialized. PocketMine-MP and PowerNukkitX send the full view
+        // distance before spawn and use the threshold only to decide when PLAYER_SPAWN goes out.
+        int radius = spawned ? this.chunkRadius : Math.max(this.chunkRadius, server.c_s_spawnThreshold);
         int radiusSqr = radius * radius;
 
         // FOV 朝向优先(借鉴 PNX):视野内先入队,组内近→远;LongLinkedOpenHashSet 保插入序
@@ -4791,12 +4796,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.getServer().getLogger().debug(username + ": Block pick request for a block too far away");
                     return;
                 }
-                Item item = block.toItem();
+                // A placed shulker box keeps the tag of the item it came from (lore, plugin data);
+                // pick block creates a new item and must not copy that tag onto it.
+                Item item = block instanceof BlockShulkerBox shulkerBox ? shulkerBox.toPickItem() : block.toItem();
                 if (pickRequestPacket.addUserData) {
                     BlockEntity blockEntity = this.getLevel().getBlockEntityIfLoaded(this.temporalVector.setComponents(pickRequestPacket.x, pickRequestPacket.y, pickRequestPacket.z));
                     if (blockEntity != null) {
                         CompoundTag nbt = blockEntity.getCleanedNBT();
                         if (nbt != null) {
+                            nbt.remove(BlockShulkerBox.SOURCE_ITEM_TAG);
+                        }
+                        if (nbt != null && !nbt.isEmpty()) {
                             item.setCustomBlockData(nbt);
                             item.setLore("+(DATA)");
                         }
@@ -7475,7 +7485,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkX = (int) this.teleportPosition.x >> 4;
             int chunkZ = (int) this.teleportPosition.z >> 4;
 
-            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : this.server.c_s_spawnThreshold);
+            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : Math.max(this.chunkRadius, this.server.c_s_spawnThreshold));
             int maxChunkOffset = Math.min(TELEPORT_CHUNK_READY_OFFSET, chunkSendRadius);
             long chunkSendRadiusSqr = (long) chunkSendRadius * chunkSendRadius;
             for (int X = -maxChunkOffset; X <= maxChunkOffset; ++X) {

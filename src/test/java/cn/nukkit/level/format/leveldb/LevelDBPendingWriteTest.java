@@ -95,6 +95,195 @@ public class LevelDBPendingWriteTest {
         return chunk;
     }
 
+    @Test
+    public void secondSnapshotDoesNotWaitForNativeWriteAndBothAcksWaitForNewestRevision() throws Exception {
+        LevelDBChunk chunk = this.newDirtyChunk(41, 42, BLOCK_A);
+        Field field = LevelDBProvider.class.getDeclaredField("db");
+        field.setAccessible(true);
+        DB realDb = (DB) field.get(this.provider);
+        DB delayed = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        Thread main = Thread.currentThread();
+        CountDownLatch firstStarted = new CountDownLatch(1), releaseFirst = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1), releaseSecond = new CountDownLatch(1);
+        AtomicInteger writes = new AtomicInteger();
+        Mockito.doAnswer(invocation -> {
+            Assertions.assertNotSame(main, Thread.currentThread(), "native DB read must not run in snapshot staging");
+            return realDb.get(invocation.getArgument(0, byte[].class));
+        }).when(delayed).get(Mockito.any(byte[].class));
+        Mockito.doAnswer(invocation -> {
+            int number = writes.incrementAndGet();
+            CountDownLatch entered = number == 1 ? firstStarted : secondStarted;
+            CountDownLatch release = number == 1 ? releaseFirst : releaseSecond;
+            entered.countDown();
+            Assertions.assertTrue(release.await(5, TimeUnit.SECONDS));
+            realDb.write(invocation.getArgument(0, WriteBatch.class));
+            return null;
+        }).when(delayed).write(Mockito.any(WriteBatch.class));
+        field.set(this.provider, delayed);
+        try {
+            CompletableFuture<Void> first = this.provider.saveChunkFuture(41, 42, chunk);
+            Assertions.assertTrue(firstStarted.await(5, TimeUnit.SECONDS));
+            chunk.setBlock(0, 64, 0, BLOCK_B);
+            CompletableFuture<Void> second = Assertions.assertTimeout(java.time.Duration.ofSeconds(1),
+                    () -> this.provider.saveChunkFuture(41, 42, chunk));
+            Assertions.assertFalse(first.isDone());
+            Assertions.assertFalse(second.isDone());
+            releaseFirst.countDown();
+            Assertions.assertTrue(secondStarted.await(5, TimeUnit.SECONDS));
+            Assertions.assertTrue(chunk.hasChanged(), "older ACK must not clear newer staged revision");
+            Assertions.assertFalse(first.isDone(), "coalesced barrier includes newer snapshot");
+            Assertions.assertFalse(second.isDone());
+            releaseSecond.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
+            Assertions.assertFalse(chunk.hasChanged());
+        } finally {
+            releaseFirst.countDown(); releaseSecond.countDown();
+            this.drainExecutor();
+            field.set(this.provider, realDb);
+        }
+        Assertions.assertEquals(BLOCK_B, this.readBlockFromDisk(41, 42));
+    }
+
+    @Test
+    public void cleanSecondCallerStillWaitsForPendingPhysicalWrite() throws Exception {
+        LevelDBChunk chunk = this.newDirtyChunk(43, 44, BLOCK_A);
+        Field field = LevelDBProvider.class.getDeclaredField("db"); field.setAccessible(true);
+        DB realDb = (DB) field.get(this.provider);
+        DB delayed = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1);
+        Mockito.doAnswer(invocation -> {
+            started.countDown(); Assertions.assertTrue(release.await(5, TimeUnit.SECONDS));
+            realDb.write(invocation.getArgument(0, WriteBatch.class)); return null;
+        }).when(delayed).write(Mockito.any(WriteBatch.class));
+        field.set(this.provider, delayed);
+        try {
+            CompletableFuture<Void> first = this.provider.saveChunkFuture(43, 44, chunk);
+            Assertions.assertTrue(started.await(5, TimeUnit.SECONDS));
+            chunk.clearChangesIfUnmodified(chunk.getChanges());
+            Assertions.assertFalse(chunk.hasChanged());
+            CompletableFuture<Void> second = Assertions.assertTimeout(java.time.Duration.ofSeconds(1),
+                    () -> this.provider.saveChunkFuture(43, 44, chunk));
+            Assertions.assertFalse(second.isDone());
+            release.countDown();
+            first.get(10, TimeUnit.SECONDS); second.get(10, TimeUnit.SECONDS);
+        } finally {
+            release.countDown(); this.drainExecutor(); field.set(this.provider, realDb);
+        }
+        Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(43, 44));
+    }
+
+    @Test
+    public void supersededFailedWriteCannotReplaceNewerSnapshot() throws Exception {
+        LevelDBChunk chunk = this.newDirtyChunk(45, 46, BLOCK_A);
+        Field field = LevelDBProvider.class.getDeclaredField("db"); field.setAccessible(true);
+        DB realDb = (DB) field.get(this.provider);
+        DB delayed = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger writes = new AtomicInteger();
+        Mockito.doAnswer(invocation -> {
+            if (writes.incrementAndGet() == 1) {
+                started.countDown(); Assertions.assertTrue(release.await(5, TimeUnit.SECONDS));
+                throw new DBException("old snapshot write failed");
+            }
+            realDb.write(invocation.getArgument(0, WriteBatch.class)); return null;
+        }).when(delayed).write(Mockito.any(WriteBatch.class));
+        field.set(this.provider, delayed);
+        try {
+            CompletableFuture<Void> first = this.provider.saveChunkFuture(45, 46, chunk);
+            Assertions.assertTrue(started.await(5, TimeUnit.SECONDS));
+            chunk.setBlock(0, 64, 0, BLOCK_B);
+            CompletableFuture<Void> second = Assertions.assertTimeout(java.time.Duration.ofSeconds(1),
+                    () -> this.provider.saveChunkFuture(45, 46, chunk));
+            release.countDown();
+            first.get(10, TimeUnit.SECONDS); second.get(10, TimeUnit.SECONDS);
+            Assertions.assertEquals(0, this.provider.getFailedWriteCount());
+        } finally {
+            release.countDown(); this.drainExecutor(); field.set(this.provider, realDb);
+        }
+        Assertions.assertEquals(BLOCK_B, this.readBlockFromDisk(45, 46));
+    }
+
+    @Test
+    public void rejectedSaveFutureNeverWritesInlineOrAcknowledgesSuccess() throws Exception {
+        LevelDBChunk chunk = this.newDirtyChunk(47, 48, BLOCK_A);
+        Field field = LevelDBProvider.class.getDeclaredField("db"); field.setAccessible(true);
+        DB realDb = (DB) field.get(this.provider);
+        DB counted = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        field.set(this.provider, counted);
+        this.executor().shutdown();
+        CompletableFuture<Void> result = this.provider.saveChunkFuture(47, 48, chunk);
+        Assertions.assertThrows(ExecutionException.class, () -> result.get(5, TimeUnit.SECONDS));
+        Mockito.verify(counted, Mockito.never()).write(Mockito.any(WriteBatch.class));
+        Mockito.verify(counted, Mockito.never()).get(Mockito.any(byte[].class));
+        Assertions.assertTrue(chunk.hasChanged());
+        field.set(this.provider, realDb);
+    }
+
+    @Test
+    public void deferredActorCleanupUsesCapturedIdsAndRemovesOnlyStaleRecords() throws Exception {
+        LevelDBChunk chunk = this.newDirtyChunk(49, 50, BLOCK_A);
+        DB database = this.provider.getDatabase();
+        byte[] oldId = java.nio.ByteBuffer.allocate(8).putLong(101L).array();
+        byte[] retainedId = java.nio.ByteBuffer.allocate(8).putLong(102L).array();
+        byte[] newId = java.nio.ByteBuffer.allocate(8).putLong(103L).array();
+        byte[] oldDigp = java.nio.ByteBuffer.allocate(16).put(oldId).put(retainedId).array();
+        byte[] digp = LevelDBKey.getKey(LevelDBKey.DIGP_PREFIX, 49, 50, Level.DIMENSION_OVERWORLD);
+        byte[] oldActor = LevelDBKey.getKey(LevelDBKey.ACTOR_PREFIX, oldId);
+        byte[] retainedActor = LevelDBKey.getKey(LevelDBKey.ACTOR_PREFIX, retainedId);
+        byte[] newActor = LevelDBKey.getKey(LevelDBKey.ACTOR_PREFIX, newId);
+        byte[] legacy = LevelDBKey.ENTITIES.getKey(49, 50, Level.DIMENSION_OVERWORLD);
+        database.put(digp, oldDigp);
+        database.put(oldActor, new byte[] {1});
+        database.put(retainedActor, new byte[] {2});
+        database.put(legacy, new byte[] {9});
+        chunk.setPreservedEntityActors(java.util.List.of(
+                new LevelDBChunk.PreservedEntityActor(retainedId, new byte[] {3}),
+                new LevelDBChunk.PreservedEntityActor(newId, new byte[] {4})));
+        CountDownLatch release = this.pauseExecutor();
+        try {
+            CompletableFuture<Void> written = this.provider.saveChunkFuture(49, 50, chunk);
+            // Changing live entities after capture must not change the worker's retention set.
+            chunk.setPreservedEntityActors(java.util.List.of());
+            Assertions.assertArrayEquals(new byte[] {1}, database.get(oldActor));
+            release.countDown();
+            written.get(10, TimeUnit.SECONDS);
+        } finally { release.countDown(); this.drainExecutor(); }
+        Assertions.assertNull(database.get(oldActor));
+        Assertions.assertArrayEquals(new byte[] {3}, database.get(retainedActor));
+        Assertions.assertArrayEquals(new byte[] {4}, database.get(newActor));
+        Assertions.assertArrayEquals(java.nio.ByteBuffer.allocate(16).put(retainedId).put(newId).array(), database.get(digp));
+        Assertions.assertNull(database.get(legacy));
+        this.provider.saveChunkFuture(49, 50, chunk).get(10, TimeUnit.SECONDS);
+        Assertions.assertNull(database.get(digp));
+        Assertions.assertNull(database.get(retainedActor));
+        Assertions.assertNull(database.get(newActor));
+    }
+
+    @Test
+    public void failedDroppedSlotCannotAcknowledgeAnotherQueuedCaller() throws Exception {
+        LevelDBChunk chunk = this.newDirtyChunk(51, 52, BLOCK_A);
+        this.provider.maxRetainedFailedWrites = 0;
+        Field field = LevelDBProvider.class.getDeclaredField("db"); field.setAccessible(true);
+        DB realDb = (DB) field.get(this.provider);
+        DB failing = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(realDb));
+        Mockito.doThrow(new DBException("persistent write failure"))
+                .when(failing).write(Mockito.any(WriteBatch.class));
+        field.set(this.provider, failing);
+        CountDownLatch release = this.pauseExecutor();
+        try {
+            CompletableFuture<Void> first = this.provider.saveChunkFuture(51, 52, chunk);
+            CompletableFuture<Void> second = this.provider.saveChunkFuture(51, 52, chunk);
+            release.countDown();
+            Assertions.assertThrows(ExecutionException.class, () -> first.get(10, TimeUnit.SECONDS));
+            Assertions.assertThrows(ExecutionException.class, () -> second.get(10, TimeUnit.SECONDS));
+            Assertions.assertTrue(chunk.hasChanged());
+            Assertions.assertEquals(0, this.provider.getPendingWriteCount());
+        } finally {
+            release.countDown(); this.drainExecutor(); field.set(this.provider, realDb);
+        }
+    }
+
     private ExecutorService executor() throws Exception {
         Field field = LevelDBProvider.class.getDeclaredField("executor");
         field.setAccessible(true);
