@@ -47,6 +47,18 @@ public class EntitySerializer {
         });
     }
 
+    @FunctionalInterface
+    public interface Cleanup {
+        void apply(DB sourceDb, WriteBatch writeBatch);
+    }
+
+    /** Main-thread entity snapshot; stale actor DB reads are deferred to the commit worker. */
+    public static Cleanup snapshotEntities(WriteBatch writeBatch, LevelDBChunk chunk) {
+        Cleanup cleanup = EntityStorageV1_18_30.INSTANCE.snapshotEntities(writeBatch, chunk);
+        EntityStorageLegacy.INSTANCE.deleteEntities(null, writeBatch, chunk);
+        return cleanup;
+    }
+
     public static void saveEntities(DB sourceDb, WriteBatch writeBatch, LevelDBChunk chunk) {
         EntityStorageV1_18_30.INSTANCE.saveEntities(sourceDb, writeBatch, chunk);
         EntityStorageLegacy.INSTANCE.deleteEntities(sourceDb, writeBatch, chunk);
