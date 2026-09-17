@@ -22,12 +22,19 @@ public class DebugText extends DebugShape {
     boolean showBackface;
     boolean showTextBackface;
 
+    @Deprecated(forRemoval = true)
     public DebugText(long id, int dimension, @Nullable Vector3f position, @Nullable Float scale, @Nullable Vector3f rotation, @Nullable Float totalTimeLeft, @Nullable Color color, String text) {
         this(id, dimension, position, scale, rotation, totalTimeLeft, null, color, text, false, null, 0f, false, false, false);
     }
 
+    @Deprecated(forRemoval = true)
     public DebugText(long id, int dimension, @Nullable Vector3f position, @Nullable Float scale, @Nullable Vector3f rotation, @Nullable Float totalTimeLeft, @Nullable Float maximumRenderDistance, @Nullable Color color, String text) {
         this(id, dimension, position, scale, rotation, totalTimeLeft, maximumRenderDistance, color, text, false, null, 0f, false, false, false);
+    }
+
+    @Deprecated(forRemoval = true)
+    public DebugText(long id, int dimension, @Nullable Vector3f position, @Nullable Float scale, @Nullable Vector3f rotation, @Nullable Float totalTimeLeft, @Nullable Float maximumRenderDistance, @Nullable Color color, String text, boolean useRotation, @Nullable Color backgroundColor, boolean depthTest, boolean showBackface, boolean showTextBackface) {
+        this(id, dimension, position, scale, rotation, totalTimeLeft, maximumRenderDistance, color, text, useRotation, backgroundColor, 0f, depthTest, showBackface, showTextBackface);
     }
 
     public DebugText(long id, int dimension, @Nullable Vector3f position, @Nullable Float scale, @Nullable Vector3f rotation, @Nullable Float totalTimeLeft, @Nullable Float maximumRenderDistance, @Nullable Color color, String text, boolean useRotation, @Nullable Color backgroundColor, float lineGapHeight, boolean depthTest, boolean showBackface, boolean showTextBackface) {
