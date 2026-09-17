@@ -1,17 +1,25 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.types.voxel.SerializableVoxelShape;
+import com.google.common.io.ByteStreams;
 import lombok.ToString;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.util.*;
+import java.util.zip.Deflater;
 
 /**
  * Syncs client with server voxel shape data on world join.
  * This packet contains a copy of all behavior pack voxel shapes data.
  * Sends the serializable voxel shapes data to the client as it's needed on both the client and server.
+ * <p>
+ * v2192 起客户端要求 vanilla 体素形状数据，登录时发送缓存的 voxel_shapes_2193.bin（2192 预览与 2193 正式共用）；旧版本发送空数据。
+ * <p>
+ * Since v2192 clients require the vanilla voxel shape data; a cached voxel_shapes_2193.bin (shared by the
+ * 2192 preview and the 2193 stable release) is sent on login, older protocols receive an empty data set.
+ * <p>
+ * Adapted from NukkitPetteriM1Edition (<a href="https://github.com/PetteriM1/NukkitPetteriM1Edition">Nukkit PM1E</a>)
  *
  * @since v924
  */
@@ -19,6 +27,45 @@ import java.util.Map;
 public class VoxelShapesPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.VOXEL_SHAPES_PACKET;
+
+    private static final BatchPacket CACHED_PACKET_VANILLA;
+    private static final BatchPacket CACHED_PACKET_EMPTY;
+
+    static {
+        VoxelShapesPacket pk = new VoxelShapesPacket();
+        pk.protocol = ProtocolInfo.v1_26_50;
+        pk.gameVersion = GameVersion.V1_26_50;
+        try {
+            pk.bin = ByteStreams.toByteArray(Objects.requireNonNull(
+                    VoxelShapesPacket.class.getClassLoader().getResourceAsStream("voxel_shapes_2193.bin")));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        pk.tryEncode();
+        CACHED_PACKET_VANILLA = pk.compress(Deflater.BEST_COMPRESSION);
+
+        pk = new VoxelShapesPacket();
+        pk.protocol = ProtocolInfo.v1_26_20_26;
+        pk.gameVersion = GameVersion.V1_26_20_26;
+        pk.tryEncode();
+        CACHED_PACKET_EMPTY = pk.compress(Deflater.BEST_COMPRESSION);
+    }
+
+    /**
+     * 登录期缓存包：v2192 起带 vanilla 数据，旧版本为空数据 / cached join-time packet:
+     * vanilla data since v2192, empty data for older protocols.
+     */
+    public static BatchPacket getCachedPacket(int protocol) {
+        if (protocol >= ProtocolInfo.v1_26_50_27) {
+            return CACHED_PACKET_VANILLA;
+        }
+        return CACHED_PACKET_EMPTY;
+    }
+
+    /**
+     * 预编码的原始载荷，设置后 encode 直接透传 / pre-encoded raw payload; encode passes it through when set.
+     */
+    private byte[] bin;
 
     /**
      * List of serializable voxel shapes.
@@ -116,6 +163,11 @@ public class VoxelShapesPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+
+        if (this.bin != null) {
+            this.put(this.bin);
+            return;
+        }
 
         // Write shapes array
         this.putUnsignedVarInt(this.shapes.size());
