@@ -53,6 +53,9 @@ import java.util.concurrent.atomic.AtomicReference;
 @Log4j2
 public class NetherNetInterface implements AdvancedSourceInterface {
 
+    /** 登录超时禁用（timeout-milliseconds=0）时的握手兜底值。 Handshake fallback while the login timeout is disabled. */
+    private static final int DEFAULT_HANDSHAKE_TIMEOUT_SECONDS = 30;
+
     private final Server server;
     private Network network;
 
@@ -95,7 +98,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
 
         this.eventLoopGroup = new MultiThreadIoEventLoopGroup(2, NioIoHandler.newFactory());
 
-        int handshakeTimeout = Math.max(settings.handshakeTimeoutSeconds(), 1);
+        int handshakeTimeout = handshakeTimeoutSeconds(server.networkLoginTimeoutMilliseconds);
         InetSocketAddress bindAddress = new InetSocketAddress(
                 server.getIp().isBlank() ? "0.0.0.0" : server.getIp(), server.getPort());
         var bindFuture = new ServerBootstrap()
@@ -127,6 +130,18 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             return List.of();
         }
         return List.of(new IceServerInfo.Builder().setUrls(List.copyOf(urls)).build());
+    }
+
+    /**
+     * 握手预算与登录超时同源（同一时间窗口），避免两个时钟取小导致配置被截断；
+     * 登录超时禁用时用兜底值，废弃握手仍需回收。
+     * The handshake budget shares the login timeout's window so neither clock truncates the
+     * other; a disabled login timeout falls back so abandoned handshakes are still reaped.
+     */
+    static int handshakeTimeoutSeconds(int loginTimeoutMillis) {
+        return loginTimeoutMillis <= 0
+                ? DEFAULT_HANDSHAKE_TIMEOUT_SECONDS
+                : Math.max(loginTimeoutMillis / 1000, 1);
     }
 
     private PongData buildPong() {
@@ -391,7 +406,10 @@ public class NetherNetInterface implements AdvancedSourceInterface {
      */
     @Override
     public void sendRawPacket(InetSocketAddress socketAddress, ByteBuf payload) {
-        payload.release();
+        // Network.sendPacket 把同一个 buffer 依次交给所有接口，RakNet 的 pipeline 写入消耗
+        // 唯一一次引用计数并负责释放；此处不得 release，否则查询应答会双重释放
+        // Network.sendPacket hands one buffer to every interface and RakNet's pipeline write
+        // consumes its only refcount; releasing here would double-free the query reply
     }
 
     /**

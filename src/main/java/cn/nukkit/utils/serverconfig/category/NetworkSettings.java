@@ -47,7 +47,7 @@ public class NetworkSettings extends OkaeriConfig {
     @CustomKey("rak-cookie-mode")
     private String rakCookieMode = "active";
 
-    @Comment("Client timeout in milliseconds (reserved, not yet applied)")
+    @Comment("Login timeout in milliseconds, also bounds the NetherNet WebRTC handshake phase (30s fallback when 0)")
     @CustomKey("timeout-milliseconds")
     private int timeoutMilliseconds = 25000;
 

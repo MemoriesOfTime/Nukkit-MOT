@@ -37,7 +37,7 @@ class ConfigCommentsTest {
         String yaml = saveWithComments("eng");
 
         assertTrue(yaml.contains("NetherNet (WebRTC) transport settings, runs alongside RakNet"), "nested section header should resolve from eng properties");
-        assertTrue(yaml.contains("Seconds to wait for the WebRTC handshake"), "nested handshake field should resolve from eng properties");
+        assertTrue(yaml.contains("Extra ICE STUN/TURN servers"), "nested ice-servers field should resolve from eng properties");
     }
 
     private String saveWithComments(String lang) throws IOException {

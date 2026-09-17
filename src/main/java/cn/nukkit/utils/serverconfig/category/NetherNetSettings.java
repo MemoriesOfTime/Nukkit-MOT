@@ -26,10 +26,6 @@ public class NetherNetSettings extends OkaeriConfig {
     @CustomKey("enabled")
     private boolean enabled = true;
 
-    @Comment("Seconds to wait for the WebRTC handshake before dropping a connection")
-    @CustomKey("handshake-timeout-seconds")
-    private int handshakeTimeoutSeconds = 30;
-
     @Comment("Extra ICE STUN/TURN servers, e.g. stun:stun.l.google.com:19302. TURN credentials go in the URL: turn:user:pass@host:port?transport=udp")
     @CustomKey("ice-servers")
     private List<String> iceServers = new ArrayList<>();
