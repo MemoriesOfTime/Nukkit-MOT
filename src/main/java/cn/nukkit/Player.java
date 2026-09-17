@@ -3523,7 +3523,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + this.gameVersion.toString() + ")"));
+                this.protocol + " (" + this.gameVersion.toString() + ", " + this.getTransportName() + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
@@ -3709,7 +3709,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + this.gameVersion.toString() + ")"));
+                this.protocol + " (" + this.gameVersion.toString() + ", " + this.getTransportName() + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
@@ -8688,6 +8688,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public NetworkPlayerSession getNetworkSession() {
         return this.networkSession;
+    }
+
+    private String getTransportName() {
+        return this.interfaz instanceof NetherNetInterface ? "NetherNet" : "RakNet";
     }
 
     void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {
