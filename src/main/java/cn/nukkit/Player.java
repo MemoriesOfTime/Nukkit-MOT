@@ -4796,12 +4796,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.getServer().getLogger().debug(username + ": Block pick request for a block too far away");
                     return;
                 }
-                Item item = block.toItem();
+                // A placed shulker box keeps the tag of the item it came from (lore, plugin data);
+                // pick block creates a new item and must not copy that tag onto it.
+                Item item = block instanceof BlockShulkerBox shulkerBox ? shulkerBox.toPickItem() : block.toItem();
                 if (pickRequestPacket.addUserData) {
                     BlockEntity blockEntity = this.getLevel().getBlockEntityIfLoaded(this.temporalVector.setComponents(pickRequestPacket.x, pickRequestPacket.y, pickRequestPacket.z));
                     if (blockEntity != null) {
                         CompoundTag nbt = blockEntity.getCleanedNBT();
                         if (nbt != null) {
+                            nbt.remove(BlockShulkerBox.SOURCE_ITEM_TAG);
+                        }
+                        if (nbt != null && !nbt.isEmpty()) {
                             item.setCustomBlockData(nbt);
                             item.setLore("+(DATA)");
                         }
