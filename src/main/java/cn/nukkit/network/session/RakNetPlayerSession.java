@@ -12,6 +12,7 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.DisconnectPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.session.login.NetworkSessionState;
+import cn.nukkit.network.session.login.SessionLoginContext;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.Binary;
@@ -613,7 +614,17 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     public boolean isLoginPhaseTimedOut(long nowNanos, int timeoutMillis) {
-        return isLoginPhaseTimedOut(this.state.getLogin().getPhase(), this.state.getLogin().getLastActivityNanos(), nowNanos, timeoutMillis);
+        SessionLoginContext login = this.state.getLogin();
+        return isLoginPhaseTimedOut(login.getPhase(), login.getLastActivityNanos(), login.getPhaseStartedNanos(),
+                this.isTransportAlive(), nowNanos, timeoutMillis);
+    }
+
+    /**
+     * Whether RakNet still hears from the client (datagrams within the last five seconds).
+     */
+    private boolean isTransportAlive() {
+        RakSessionCodec codec = channel.rakPipeline().get(RakSessionCodec.class);
+        return codec != null && !codec.isClosed() && !codec.isStale();
     }
 
     @Override
@@ -783,6 +794,30 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /**
+     * Upper bound for a resource pack download that keeps the transport alive.
+     */
+    static final long RESOURCE_PACK_PHASE_MAX_NANOS = TimeUnit.MINUTES.toNanos(10);
+
+    /**
+     * Login phase timeout that does not cut a resource pack download in progress.
+     * <p>
+     * The server queues pack chunks into RakNet much faster than a slow client receives them, and the
+     * client asks for the next pack only after the current one is complete. Measured from the last
+     * request or the last queued chunk, a 6.7 MB pack on a mobile link crossed the login timeout while
+     * the client was still acknowledging data, and the player was dropped in the middle of the download.
+     * PocketMine-MP applies its login timeout only until the login packet and never times out the
+     * download itself. Here the download is allowed while the transport is alive, up to a hard cap.
+     */
+    static boolean isLoginPhaseTimedOut(SessionLoginPhase phase, long lastActivityNanos, long phaseStartedNanos,
+                                        boolean transportAlive, long nowNanos, int timeoutMillis) {
+        if (!isLoginPhaseTimedOut(phase, lastActivityNanos, nowNanos, timeoutMillis)) {
+            return false;
+        }
+        return !(phase == SessionLoginPhase.RESOURCE_PACK && transportAlive
+                && nowNanos - phaseStartedNanos < RESOURCE_PACK_PHASE_MAX_NANOS);
     }
 
     static boolean isLoginPhaseTimedOut(SessionLoginPhase phase, long lastActivityNanos, long nowNanos, int timeoutMillis) {
