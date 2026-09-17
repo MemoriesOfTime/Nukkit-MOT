@@ -25,10 +25,12 @@ public class ItemStackResponsePacket extends DataPacket {
             this.putVarInt(r.getRequestId());
             if (this.protocol >= ProtocolInfo.v1_26_40) {
                 if (r.getContainers().isEmpty()) {
+                    if (this.protocol < ProtocolInfo.v1_26_50_27) {
+                        this.putBoolean(true);
+                    }
                     this.putBoolean(false);
                     return;
                 }
-                // v2192 起容器段仅一个存在性 bool / single presence bool for containers since v2192
                 if (this.protocol < ProtocolInfo.v1_26_50_27) {
                     this.putBoolean(true);
                 }

@@ -96,36 +96,40 @@ public class ClientboundUpdateSoundDataPacket extends DataPacket {
         this.reset();
         this.putLLong(this.serverSoundHandle);
         if (this.protocol >= ProtocolInfo.v1_26_40) {
-            this.putUnsignedVarInt(SOUND_STOP);
-            if (this.volume != null) {
-                this.putUnsignedVarInt(SOUND_SET_VOLUME);
-                this.putLFloat(this.volume);
-            } else {
-                this.putUnsignedVarInt(SOUND_STOP);
+            int tag = SOUND_STOP;
+            Float first = null;
+            Float second = null;
+            if (!this.stop) {
+                if (this.volume != null) {
+                    tag = SOUND_SET_VOLUME;
+                    first = this.volume;
+                } else if (this.pitch != null) {
+                    tag = SOUND_SET_PITCH;
+                    first = this.pitch;
+                } else if (this.fadeTargetVolume != null) {
+                    tag = SOUND_FADE;
+                    first = this.fadeDuration;
+                    second = this.fadeTargetVolume;
+                } else if (this.seekToSeconds != null) {
+                    tag = SOUND_SEEK_TO;
+                    first = this.seekToSeconds;
+                } else if (this.pause) {
+                    tag = SOUND_PAUSE;
+                } else if (this.resume) {
+                    tag = SOUND_RESUME;
+                }
             }
-            if (this.pitch != null) {
-                this.putUnsignedVarInt(SOUND_SET_PITCH);
-                this.putLFloat(this.pitch);
-            } else {
-                this.putUnsignedVarInt(SOUND_STOP);
+            for (int i = 0; i < 7; i++) {
+                this.putUnsignedVarInt(tag);
+                if (first != null) {
+                    this.putLFloat(first);
+                }
+                if (second != null) {
+                    this.putLFloat(second);
+                }
             }
-            if (this.fadeTargetVolume != null) {
-                this.putUnsignedVarInt(SOUND_FADE);
-                this.putLFloat(this.fadeDuration);
-                this.putLFloat(this.fadeTargetVolume);
-            } else {
-                this.putUnsignedVarInt(SOUND_STOP);
-            }
-            if (this.seekToSeconds != null) {
-                this.putUnsignedVarInt(SOUND_SEEK_TO);
-                this.putLFloat(this.seekToSeconds);
-            } else {
-                this.putUnsignedVarInt(SOUND_STOP);
-            }
-            this.putUnsignedVarInt(this.pause ? SOUND_PAUSE : SOUND_STOP);
-            this.putUnsignedVarInt(this.resume ? SOUND_RESUME : SOUND_STOP);
         } else {
-            this.putString(this.type != null ? this.type : "");
+            this.putString(this.type != null ? this.type : "stop");
         }
     }
 
