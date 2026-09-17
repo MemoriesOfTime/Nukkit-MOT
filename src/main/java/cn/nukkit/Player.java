@@ -69,6 +69,7 @@ import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
+import cn.nukkit.network.NetherNetInterface;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
@@ -3954,6 +3955,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 Skin skin = loginPacket.skin;
                 this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
+
+                // NetherNet 跳过加密握手，登录链改用信令身份断言绑定，防止捕获的链被重放
+                // NetherNet skips the encryption handshake, so bind the login chain to the signaling identity instead
+                if (this.interfaz instanceof NetherNetInterface) {
+                    String refusal = ((NetherNetInterface) this.interfaz).checkIdentityBinding(
+                            this.networkSession, this.loginChainData.getIdentityPublicKey());
+                    if (refusal != null) {
+                        log.debug("Refusing a login from {}: {}", this.getSocketAddress(), refusal);
+                        this.close("", "disconnectionScreen.notAuthenticated");
+                        break;
+                    }
+                }
 
                 PlayerPreLoginEvent playerPreLoginEvent;
                 this.server.getPluginManager().callEvent(playerPreLoginEvent = new PlayerPreLoginEvent(this, "Plugin reason"));
@@ -8990,6 +9003,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean isEnableNetworkEncryption() {
+        // NetherNet 会话已由 DTLS 加密，客户端会以明文回应加密握手导致断连，故跳过
+        // NetherNet rides DTLS and a real client answers the handshake in plaintext, so skip it
+        if (this.interfaz instanceof NetherNetInterface) {
+            return false;
+        }
         return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled /*&& loginChainData.isXboxAuthed()*/;
     }
 

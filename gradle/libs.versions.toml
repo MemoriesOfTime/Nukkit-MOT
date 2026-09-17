@@ -31,6 +31,8 @@ bytebuddy = "1.18.8"
 objenesis = "3.4"
 nukkitx_natives = "1.0.3"
 raknet = "1.1.0.CR1-20260822.064033-5"
+cloudburst_nethernet = "2.0.0.CR3-20260916.210127-12"
+libdatachannel = "0.24.5.0-20260916.205653-5"
 cloudburst_common = "3.0.0.Beta13-20260915.235937-24"
 cloudburst_bedrock_codec = "3.0.0.Beta13-20260916.122344-26"
 jackson_dataformat_toml = "2.20.1"
@@ -40,8 +42,12 @@ netease_protocol_extension = "1.21.124-R1"
 
 [libraries]
 raknet = { module = "dev.mot.netty:netty-transport-raknet", version.ref = "raknet" }
+nethernet = { module = "org.cloudburstmc.netty:netty-transport-nethernet", version.ref = "cloudburst_nethernet" }
+libdatachannel = { module = "dev.opencollab:libdatachannel-java", version.ref = "libdatachannel" }
+libdatachannel-arch-detect = { module = "dev.opencollab:libdatachannel-java-arch-detect", version.ref = "libdatachannel" }
 netty-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "netty_epoll" }
 netty-codec-haproxy = { module = "io.netty:netty-codec-haproxy", version.ref = "netty_epoll" }
+netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty_epoll" }
 nukkitx-natives = { module = "com.nukkitx:natives", version.ref = "nukkitx_natives" }
 cloudburst-common = { module = "org.cloudburstmc.protocol:common", version.ref = "cloudburst_common" }
 cloudburst-bedrock-codec = { module = "org.cloudburstmc.protocol:bedrock-codec", version.ref = "cloudburst_bedrock_codec" }

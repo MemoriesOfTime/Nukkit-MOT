@@ -15,6 +15,10 @@ import java.util.List;
 @Accessors(fluent = true)
 public class NetworkSettings extends OkaeriConfig {
 
+    @Comment("NetherNet (WebRTC) transport settings, runs alongside RakNet. Restricted-network clients 1.21.90+ join over HTTP signaling + WebRTC")
+    @CustomKey("nethernet")
+    private NetherNetSettings netherNetSettings = new NetherNetSettings();
+
     @Comment("ZLIB compression provider (2 recommended)")
     @CustomKey("zlib-provider")
     private int zlibProvider = 2;

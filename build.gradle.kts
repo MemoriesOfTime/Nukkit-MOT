@@ -45,6 +45,15 @@ val mockitoAgent by configurations.creating {
 }
 
 dependencies {
+    api(libs.nethernet) {
+        exclude("io.netty")
+        // 改用下方 arch-detect：自带全部平台原生库；Use arch-detect below, it bundles every platform's natives
+        exclude("dev.opencollab", "libdatachannel-java")
+    }
+    api(libs.libdatachannel)
+    api(libs.libdatachannel.arch.detect) {
+        exclude("dev.opencollab", "libdatachannel-java")
+    }
     api(libs.raknet) {
         exclude("io.netty", "netty-common")
         exclude("io.netty", "netty-codec-base")
@@ -55,6 +64,7 @@ dependencies {
     }
     api(libs.netty.epoll)
     api(libs.netty.codec.haproxy)
+    api(libs.netty.codec.http)
     api(libs.nukkitx.natives)
 
     api(libs.cloudburst.common) {
