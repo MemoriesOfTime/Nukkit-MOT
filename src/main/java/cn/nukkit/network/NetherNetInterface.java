@@ -22,6 +22,7 @@ import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPSignaling.JoinRefusal;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling.PongData;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetSignaling.IceServerInfo;
 import org.cloudburstmc.netty.util.nethernet.NetherNetLogging;
@@ -82,18 +83,29 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         NetherNetLogging.setNativeLogLevel("WARN");
 
         ServerIdentity identity = NetherNetIdentity.load(server, settings);
+        NetherNetUdpPorts mediaPorts;
+        try {
+            mediaPorts = resolveMediaPorts(server);
+        } catch (IllegalArgumentException e) {
+            log.fatal(e.getMessage());
+            log.fatal(server.getLanguage().translateString("nukkit.nethernet.udpPorts.hint"));
+            throw e;
+        }
 
         this.signaling = new NetherNetHTTPSignaling.Builder()
                 .setIdentity(identity)
                 .setServeHttp(true)
-                // RakNet 已占用 server-port 的 UDP 侧，媒体端口由系统按对端自动分配
-                // RakNet holds the UDP side of server-port, so media uses system-assigned ports
+                // RakNet 已占用 server-port 的 UDP 侧，信令端口不可复用；媒体端口默认由系统按对端自动分配，
+                // 配置了 server-udp-ports 时改经 peer connection 配置钉住（见 NetherNetUdpPorts）
+                // RakNet holds the UDP side of server-port so the signaling port stays off-limits;
+                // media defaults to system-assigned ports per peer, or gets pinned through the
+                // peer connection config when server-udp-ports is set (see NetherNetUdpPorts)
                 .setIceOnLocalPort(false)
                 .setIceServers(iceServers(settings))
-                .setAdvertisedAddresses(settings.advertiseAddresses())
+                .setAdvertisedAddresses(mediaPorts == null ? Set.of() : mediaPorts.advertisedAddresses())
                 .setTokenTrust(TokenTrust.ANY)
                 .setMotdProvider((host, remoteAddress) -> this.buildPong())
-                .setPlayerFilter((host, player) -> this.acceptsPlayer(player))
+                .setPlayerFilter((host, player) -> this.refusePlayer(player))
                 .build();
 
         this.eventLoopGroup = new MultiThreadIoEventLoopGroup(2, NioIoHandler.newFactory());
@@ -101,9 +113,9 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         int handshakeTimeout = handshakeTimeoutSeconds(server.networkLoginTimeoutMilliseconds);
         InetSocketAddress bindAddress = new InetSocketAddress(
                 server.getIp().isBlank() ? "0.0.0.0" : server.getIp(), server.getPort());
-        var bindFuture = new ServerBootstrap()
+        ServerBootstrap bootstrap = new ServerBootstrap()
                 .group(this.eventLoopGroup)
-                .channelFactory(NetherNetChannelFactory.server(this.signaling))
+                .channelFactory(NetherNetChannelFactory.server(mediaPorts == null ? this.signaling : mediaPorts.decorate(this.signaling)))
                 .option(NetherChannelOption.NETHER_SERVER_RTC_HANDSHAKE_TIMEOUT_SECONDS, handshakeTimeout)
                 .childHandler(new ChannelInitializer<>() {
                     @Override
@@ -112,7 +124,11 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                         NetherNetInterface.this.pendingSessions.add(nukkitSession);
                         channel.pipeline().addLast("nukkit-handler", nukkitSession);
                     }
-                })
+                });
+        if (mediaPorts != null) {
+            bootstrap.option(NetherChannelOption.NETHER_PEER_CONNECTION_CONFIG, mediaPorts.peerConfig(bindAddress));
+        }
+        var bindFuture = bootstrap
                 .bind(bindAddress)
                 .awaitUninterruptibly();
         if (!bindFuture.isSuccess()) {
@@ -121,7 +137,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         }
         this.channel = bindFuture.channel();
 
-        log.info("NetherNet (WebRTC) signaling listening on tcp/{}, WebRTC media on system-assigned udp ports", bindAddress.getPort());
+        if (mediaPorts != null) {
+            log.info("NetherNet (WebRTC) signaling listening on tcp/{}, WebRTC media multiplexed on {}",
+                    bindAddress.getPort(), mediaPorts);
+        } else {
+            log.info("NetherNet (WebRTC) signaling listening on tcp/{}, WebRTC media on system-assigned udp ports", bindAddress.getPort());
+        }
     }
 
     private static List<IceServerInfo> iceServers(NetherNetSettings settings) {
@@ -144,6 +165,30 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 : Math.max(loginTimeoutMillis / 1000, 1);
     }
 
+    /**
+     * server-port 的 UDP 侧归 RakNet，IPv6 监听同理；server.properties 是关键配置，
+     * 解析错误或窗口覆盖任一监听端口时抛本地化错误中止启动，而非回退自动分配。
+     * The UDP side of server-port belongs to RakNet, likewise the IPv6 listener;
+     * server.properties is critical config, so parse errors or windows covering either
+     * listener abort startup with a localized error instead of falling back to auto ports.
+     */
+    private static NetherNetUdpPorts resolveMediaPorts(Server server) {
+        String value = server.getPropertyString("server-udp-ports", "0");
+        NetherNetUdpPorts ports = NetherNetUdpPorts.parse(value, server.getLanguage());
+        if (ports == null) {
+            return null;
+        }
+        if (ports.contains(server.getPort())) {
+            throw new IllegalArgumentException(server.getLanguage()
+                    .translateString("nukkit.nethernet.udpPorts.coversServerPort", value, server.getPort()));
+        }
+        if (server.isIpv6Enabled() && ports.contains(server.getIpv6Port())) {
+            throw new IllegalArgumentException(server.getLanguage()
+                    .translateString("nukkit.nethernet.udpPorts.coversIpv6Port", value, server.getIpv6Port()));
+        }
+        return ports;
+    }
+
     private PongData buildPong() {
         QueryRegenerateEvent info = this.server.getQueryInformation();
         return new PongData.Builder()
@@ -160,16 +205,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 .build();
     }
 
-    /**
-     * 是否允许对端建立传输：停机中、超出人数上限或来源地址被封禁时拒绝。
-     * Whether a peer may open a transport: not while shutting down, past the player cap, or from a blocked address.
-     */
-    private boolean acceptsPlayer(org.cloudburstmc.netty.util.nethernet.PlayerInfo player) {
+    private JoinRefusal refusePlayer(org.cloudburstmc.netty.util.nethernet.PlayerInfo player) {
         if (!this.accepting) {
-            return false;
+            return JoinRefusal.REJECTED;
         }
         if (this.server.getOnlinePlayers().size() >= this.server.getMaxPlayers()) {
-            return false;
+            return JoinRefusal.FULL;
         }
         InetSocketAddress remote = player.remoteAddress();
         if (remote != null) {
@@ -178,11 +219,11 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 if (expiry < System.currentTimeMillis()) {
                     this.blockedAddresses.remove(remote.getAddress());
                 } else {
-                    return false;
+                    return JoinRefusal.REJECTED;
                 }
             }
         }
-        return true;
+        return null;
     }
 
     @Override

@@ -71,7 +71,7 @@ class NetherNetSignalingSmokeTest {
                 .setIceOnLocalPort(false)
                 .setTokenTrust(TokenTrust.ANY)
                 .setMotdProvider((host, remoteAddress) -> pong)
-                .setPlayerFilter((host, player) -> true)
+                .setPlayerFilter((host, player) -> null)
                 .build();
 
         // 通道回报的是请求地址，端口需在此自取

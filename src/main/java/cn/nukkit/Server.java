@@ -874,11 +874,7 @@ public class Server {
         NetherNetSettings netherNetSettings = this.serverConfig != null
                 ? this.serverConfig.networkSettings().netherNetSettings() : null;
         if (netherNetSettings != null && netherNetSettings.enabled()) {
-            try {
-                this.network.registerInterface(new NetherNetInterface(this, netherNetSettings));
-            } catch (Throwable t) {
-                log.fatal("Failed to start the NetherNet (WebRTC) transport, continuing without it", t);
-            }
+            this.network.registerInterface(new NetherNetInterface(this, netherNetSettings));
         }
 
         EntityProperty.init();
@@ -4086,6 +4082,7 @@ public class Server {
             put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
+            put("server-udp-ports", 0);
             put("server-ipv6-port", -1);
             put("server-ipv6", "::");
             put("view-distance", 8);

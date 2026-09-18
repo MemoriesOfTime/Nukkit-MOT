@@ -2,6 +2,7 @@ package cn.nukkit.network;
 
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
+import cn.nukkit.lang.BaseLang;
 import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
@@ -14,7 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.lenient;
 
 /**
@@ -73,5 +74,67 @@ class NetherNetInterfaceTest {
         assertEquals(1, NetherNetInterface.handshakeTimeoutSeconds(1), "sub-second values clamp to one second");
         assertEquals(30, NetherNetInterface.handshakeTimeoutSeconds(0), "a disabled login timeout falls back so abandoned handshakes are reaped");
         assertEquals(30, NetherNetInterface.handshakeTimeoutSeconds(-1));
+    }
+
+    @Test
+    @Timeout(30)
+    void configuredMediaPortStillStartsTheInterface() {
+        Server server = MockServer.get();
+        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("39000");
+        NetherNetInterface pinned = new NetherNetInterface(server, new NetherNetSettings());
+        // 媒体端口在对端接入时才随 peer connection 绑定，构造成功即验证解析与 bootstrap 选项接线无误
+        // The media port binds with a peer connection, so constructing the interface already
+        // proves the parsing and the bootstrap option wiring
+        assertNotNull(pinned);
+        pinned.shutdown();
+    }
+
+    @Test
+    @Timeout(30)
+    void configuredExternalMappingStillStartsTheInterface() {
+        Server server = MockServer.get();
+        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("203.0.113.10:19132:39000");
+        NetherNetInterface mapped = new NetherNetInterface(server, new NetherNetSettings());
+        assertNotNull(mapped);
+        mapped.shutdown();
+    }
+
+    @Test
+    @Timeout(30)
+    void invalidMediaPortsAbortConstruction() {
+        Server server = MockServer.get();
+        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("70000");
+        lenient().when(server.getLanguage()).thenReturn(new BaseLang("eng"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> new NetherNetInterface(server, new NetherNetSettings()));
+        assertTrue(e.getMessage().contains("is not a valid port range"),
+                "the abort carries the localized reason, got: " + e.getMessage());
+    }
+
+    @Test
+    @Timeout(30)
+    void mediaPortsCoveringServerPortAbortConstruction() {
+        Server server = MockServer.get();
+        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("19000-19200");
+        lenient().when(server.getLanguage()).thenReturn(new BaseLang("eng"));
+        lenient().when(server.getPort()).thenReturn(19132);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> new NetherNetInterface(server, new NetherNetSettings()));
+        assertTrue(e.getMessage().contains("server-port 19132"),
+                "the abort names the RakNet-owned port, got: " + e.getMessage());
+    }
+
+    @Test
+    @Timeout(30)
+    void mediaPortsCoveringIpv6ListenerAbortConstruction() {
+        Server server = MockServer.get();
+        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("19000-19200");
+        lenient().when(server.getLanguage()).thenReturn(new BaseLang("eng"));
+        lenient().when(server.isIpv6Enabled()).thenReturn(true);
+        lenient().when(server.getIpv6Port()).thenReturn(19133);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> new NetherNetInterface(server, new NetherNetSettings()));
+        assertTrue(e.getMessage().contains("IPv6 listener port 19133"),
+                "the abort names the IPv6 listener port, got: " + e.getMessage());
     }
 }

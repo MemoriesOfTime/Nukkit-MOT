@@ -22,17 +22,13 @@ import java.util.List;
 @Accessors(fluent = true)
 public class NetherNetSettings extends OkaeriConfig {
 
-    @Comment("Enabled by default alongside RakNet, set false to disable. Signaling shares the server-port over TCP; WebRTC media uses system-assigned UDP ports")
+    @Comment("Enabled by default alongside RakNet, set false to disable. Signaling shares the server-port over TCP; WebRTC media uses system-assigned UDP ports unless server.properties pins them via server-udp-ports")
     @CustomKey("enabled")
     private boolean enabled = true;
 
     @Comment("Extra ICE STUN/TURN servers, e.g. stun:stun.l.google.com:19302. TURN credentials go in the URL: turn:user:pass@host:port?transport=udp")
     @CustomKey("ice-servers")
     private List<String> iceServers = new ArrayList<>();
-
-    @Comment("Public addresses advertised to peers behind a NAT, as \"address:port\" entries")
-    @CustomKey("advertise-addresses")
-    private List<String> advertiseAddresses = new ArrayList<>();
 
     @Comment("Operator identity PEM file, generated on first start, keep it. Changing it makes all returning players re-confirm the trust prompt")
     @CustomKey("identity-file")
