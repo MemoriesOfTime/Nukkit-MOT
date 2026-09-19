@@ -58,7 +58,15 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     private final NetworkSessionState state = new NetworkSessionState();
 
     private Player player;
-    private String disconnectReason = null;
+    /** 事件循环线程写、主线程读，跨线程可见性必需。 Written on the event loop, read by the main thread. */
+    private volatile String disconnectReason = null;
+    /**
+     * 传输激活过又失活即远端关闭。NetherNetChannel 感知远端关闭时先置 inactive 再 close()，
+     * Netty 的 close 记账（wasActive=false）不会补发 channelInactive，须自行感知（见 networkTick）。
+     * A once-active channel going inactive is a remote close: the library flips inactive before
+     * close(), so Netty never fires channelInactive and the session must notice on its own.
+     */
+    private volatile boolean transportWasActive;
 
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
@@ -79,6 +87,10 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         this.server = server;
         this.channel = channel;
         this.tickFuture = channel.eventLoop().scheduleAtFixedRate(this::networkTick, 0, 20, TimeUnit.MILLISECONDS);
+        // 关闭完成即置 disconnectReason：channelInactive 因上述时序不可靠，closeFuture 是可靠信号源
+        // The completed close marks the session disconnected: channelInactive is unreliable here,
+        // while the close future always fires
+        channel.closeFuture().addListener(future -> this.disconnect("transport:closed_by_remote_peer"));
 
         // RakNet 协议 11：NetworkSettings 协商前 batch 以原始格式到达
         // RakNet protocol 11: batches arrive raw until NetworkSettings negotiates compression
@@ -240,8 +252,15 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
 
     private void networkTick() {
         if (!this.channel.isActive()) {
+            // 激活过的会话失活即远端关闭；未激活过的（握手期）交给登录超时，勿在此误杀
+            // Inactive after once active is a remote close; never-active sessions belong to the
+            // login timeout instead
+            if (this.transportWasActive) {
+                this.disconnect("transport:closed_by_remote_peer");
+            }
             return;
         }
+        this.transportWasActive = true;
 
         try {
             List<DataPacket> toBatch = new ObjectArrayList<>();

@@ -8,6 +8,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.session.NetherNetPlayerSession;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.RakNetPlayerSession;
+import cn.nukkit.utils.TextFormat;
 import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -57,12 +58,26 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     /** 登录超时禁用（timeout-milliseconds=0）时的握手兜底值。 Handshake fallback while the login timeout is disabled. */
     private static final int DEFAULT_HANDSHAKE_TIMEOUT_SECONDS = 30;
 
+    /**
+     * 媒体可达性告警：评估窗口内 peerConnecting 达到下限且 iceConnected 为零即告警一次，
+     * 恢复（窗口内出现成功连接）再报一次，持续故障不重复。
+     * Media-reachability alarm: fires once when attempts reach the floor with zero ICE
+     * successes in the window, recovers once when a connection succeeds, no repeat while held.
+     */
+    static final int MEDIA_ALERT_WINDOW_MINUTES = 5;
+    static final long MEDIA_ALERT_MIN_ATTEMPTS = 5;
+
     private final Server server;
     private Network network;
 
     private final Channel channel;
     private final EventLoopGroup eventLoopGroup;
     private final NetherNetHTTPSignaling signaling;
+    private final NetherNetTransportStats stats = new NetherNetTransportStats();
+    /** 告警与 /status 中展示的媒体端口描述。 Media port description shown by the alarm and /status. */
+    private final String mediaDescription;
+    private long nextMediaAlertMinute = -1;
+    private boolean mediaAlarmRaised;
     private final Map<InetSocketAddress, NetherNetPlayerSession> sessions = new HashMap<>();
     private final Queue<NetherNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<NetherNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -111,12 +126,16 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         this.eventLoopGroup = new MultiThreadIoEventLoopGroup(2, NioIoHandler.newFactory());
 
         int handshakeTimeout = handshakeTimeoutSeconds(server.networkLoginTimeoutMilliseconds);
+        this.mediaDescription = mediaPorts == null
+                ? server.getLanguage().translateString("nukkit.nethernet.media.systemAssigned")
+                : mediaPorts.toString();
         InetSocketAddress bindAddress = new InetSocketAddress(
                 server.getIp().isBlank() ? "0.0.0.0" : server.getIp(), server.getPort());
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .group(this.eventLoopGroup)
                 .channelFactory(NetherNetChannelFactory.server(mediaPorts == null ? this.signaling : mediaPorts.decorate(this.signaling)))
                 .option(NetherChannelOption.NETHER_SERVER_RTC_HANDSHAKE_TIMEOUT_SECONDS, handshakeTimeout)
+                .option(NetherChannelOption.NETHER_METRICS, this.stats)
                 .childHandler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel channel) {
@@ -138,10 +157,11 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         this.channel = bindFuture.channel();
 
         if (mediaPorts != null) {
-            log.info("NetherNet (WebRTC) signaling listening on tcp/{}, WebRTC media multiplexed on {}",
-                    bindAddress.getPort(), mediaPorts);
+            log.info(server.getLanguage().translateString("nukkit.nethernet.listening.pinned",
+                    bindAddress.getPort(), mediaPorts));
         } else {
-            log.info("NetherNet (WebRTC) signaling listening on tcp/{}, WebRTC media on system-assigned udp ports", bindAddress.getPort());
+            log.info(server.getLanguage().translateString("nukkit.nethernet.listening.auto",
+                    bindAddress.getPort()));
         }
     }
 
@@ -223,6 +243,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 }
             }
         }
+        this.stats.onJoinAccepted();
         return null;
     }
 
@@ -234,6 +255,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     @Override
     public boolean process() {
         this.expireLoginSessions();
+        this.sampleStatsAndEvaluateMediaAlarm();
 
         NetherNetPlayerSession session;
         while ((session = this.sessionCreationQueue.poll()) != null) {
@@ -272,12 +294,20 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             Player player = nukkitSession.getPlayer();
             if (nukkitSession.getDisconnectReason() != null) {
                 try {
-                    player.close(player.getLeaveMessage(), nukkitSession.getDisconnectReason(), false);
+                    if (player != null) {
+                        player.close(player.getLeaveMessage(), nukkitSession.getDisconnectReason(), false);
+                    }
                 } catch (Exception e) {
                     player.getNetworkSession().disconnect("Internal error");
                     log.error("Exception closing player " + player.getName(), e);
                 }
                 iterator.remove();
+            } else if (!nukkitSession.getChannel().isActive()) {
+                // 会话层信号（closeFuture/tick/channelInactive）全部缺失时的最终防线：
+                // 已入表的会话在建表时必然活跃，失活即远端关闭，本 tick 置因、下 tick 回收
+                // Last resort when every session-level signal went missing: a session in the map
+                // was active when it entered, so an inactive channel is a remote close
+                nukkitSession.disconnect("transport:closed_by_remote_peer");
             } else {
                 activeSessions.add(nukkitSession);
             }
@@ -330,6 +360,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             }
 
             log.warn("Disconnecting timed out pending NetherNet session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            this.stats.onLoginTimeout();
             session.disconnect("disconnectionScreen.timeout");
             return true;
         });
@@ -343,8 +374,97 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 continue;
             }
             log.warn("Disconnecting timed out NetherNet session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            this.stats.onLoginTimeout();
             session.disconnect("disconnectionScreen.timeout");
         }
+    }
+
+    /**
+     * 主线程每 tick 驱动：分钟采样推进历史环形数组，并按告警周期评估媒体可达性
+     * （首评估定在启动后一个完整窗口，避免用不完整数据触发）。
+     * Main-thread tick hook: advances the minute ring, then evaluates media reachability
+     * per alarm cadence (the first check waits one full window so it never fires on partial data).
+     */
+    private void sampleStatsAndEvaluateMediaAlarm() {
+        long nowMillis = System.currentTimeMillis();
+        this.stats.sampleMinute(nowMillis);
+
+        long minute = Math.floorDiv(nowMillis, 60_000L);
+        if (this.nextMediaAlertMinute < 0) {
+            this.nextMediaAlertMinute = minute + MEDIA_ALERT_WINDOW_MINUTES;
+            return;
+        }
+        if (minute < this.nextMediaAlertMinute) {
+            return;
+        }
+        this.nextMediaAlertMinute = minute + MEDIA_ALERT_WINDOW_MINUTES;
+
+        NetherNetTransportStats.TransportSnapshot snapshot =
+                this.stats.snapshot(MEDIA_ALERT_WINDOW_MINUTES, nowMillis);
+        if (mediaUnreachable(snapshot)) {
+            if (!this.mediaAlarmRaised) {
+                this.mediaAlarmRaised = true;
+                log.warn(this.server.getLanguage().translateString("nukkit.nethernet.stats.mediaUnreachable",
+                        snapshot.peerConnecting(), snapshot.iceConnected(), MEDIA_ALERT_WINDOW_MINUTES, this.mediaDescription));
+            }
+        } else if (this.mediaAlarmRaised) {
+            this.mediaAlarmRaised = false;
+            // 窗口内确有成功连接才算恢复；流量枯竭（没人再试）只静默解除。
+            // Only a real success reports recovery; traffic drying up just clears silently.
+            if (snapshot.iceConnected() > 0) {
+                log.info(this.server.getLanguage().translateString("nukkit.nethernet.stats.mediaRecovered",
+                        snapshot.iceConnected(), MEDIA_ALERT_WINDOW_MINUTES));
+            }
+        }
+    }
+
+    /**
+     * 媒体不可达判定：窗口内尝试量达到下限且 ICE 零连通（零是精确值，见 stats 类注）。
+     * Unreachable verdict: attempts at the floor with zero ICE successes in the window
+     * (zero stays exact, see the stats class notes).
+     */
+    static boolean mediaUnreachable(NetherNetTransportStats.TransportSnapshot snapshot) {
+        return snapshot.peerConnecting() >= MEDIA_ALERT_MIN_ATTEMPTS && snapshot.iceConnected() == 0;
+    }
+
+    /**
+     * /status 渲染行（走 lang.ini；simple 两行、full 四行；会话计数仅主线程命令路径读取）。
+     * /status lines localized through lang.ini; two in simple mode, four in full,
+     * session counts are read from the main-thread command path only.
+     */
+    public List<String> buildStatusLines(int windowMinutes, boolean full) {
+        NetherNetTransportStats.TransportSnapshot snapshot =
+                this.stats.snapshot(windowMinutes, System.currentTimeMillis());
+        List<String> lines = new ArrayList<>(4);
+        lines.add(TextFormat.GOLD + this.server.getLanguage().translateString("nukkit.nethernet.stats.summary",
+                this.mediaDescription, this.sessions.size(), this.pendingSessions.size()));
+        lines.add(TextFormat.GOLD + this.server.getLanguage().translateString("nukkit.nethernet.stats.funnel",
+                snapshot.joinAccepted(), snapshot.iceConnected(), snapshot.peerConnecting(),
+                snapshot.rtcConnected(), windowMinutes));
+        if (full) {
+            lines.add(TextFormat.GOLD + this.server.getLanguage().translateString("nukkit.nethernet.stats.traffic",
+                    formatBytes(snapshot.bytesIn()), formatBytes(snapshot.bytesOut())));
+            lines.add(TextFormat.GOLD + this.server.getLanguage().translateString("nukkit.nethernet.stats.dropped",
+                    snapshot.postConnectDrops(), snapshot.loginTimeouts(), windowMinutes));
+        }
+        return lines;
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        if (bytes < 1024 * 1024) {
+            return String.format(Locale.ROOT, "%.1f KB", bytes / 1024f);
+        }
+        if (bytes < 1024L * 1024 * 1024) {
+            return String.format(Locale.ROOT, "%.1f MB", bytes / 1024f / 1024f);
+        }
+        return String.format(Locale.ROOT, "%.2f GB", bytes / 1024f / 1024f / 1024f);
+    }
+
+    public NetherNetTransportStats getTransportStats() {
+        return this.stats;
     }
 
     /**

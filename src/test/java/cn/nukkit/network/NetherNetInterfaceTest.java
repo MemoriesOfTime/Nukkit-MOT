@@ -41,6 +41,9 @@ class NetherNetInterfaceTest {
         lenient().when(server.getPort()).thenReturn(0);
         lenient().when(server.getDataPath()).thenReturn(tempDir.toString());
         lenient().when(server.getMotd()).thenReturn("NetherNetInterfaceTest");
+        // 构造器渲染本地化启动日志与媒体端口描述，统一在 setUp 提供语言
+        // The constructor renders localized startup logs and media description, so setUp provides the language
+        lenient().when(server.getLanguage()).thenReturn(new BaseLang("eng"));
 
         this.netherNet = new NetherNetInterface(server, new NetherNetSettings());
     }
@@ -77,6 +80,34 @@ class NetherNetInterfaceTest {
     }
 
     @Test
+    void mediaUnreachableRequiresAttemptsFloorAndZeroIce() {
+        assertTrue(NetherNetInterface.mediaUnreachable(snapshot(10, 0)),
+                "attempts at the floor with zero ICE successes is the unreachable signature");
+        assertFalse(NetherNetInterface.mediaUnreachable(snapshot(4, 0)),
+                "few attempts may just be an idle server, not a fault");
+        assertFalse(NetherNetInterface.mediaUnreachable(snapshot(10, 1)),
+                "a single ICE success rules out the unreachable signature");
+    }
+
+    private static NetherNetTransportStats.TransportSnapshot snapshot(long peerConnecting, long iceConnected) {
+        return new NetherNetTransportStats.TransportSnapshot(0, peerConnecting, iceConnected, 0, 0, 0, 0, 0, 0);
+    }
+
+    @Test
+    @Timeout(30)
+    void transportStatsAreWiredAndRenderLocalized() {
+        Server server = MockServer.get();
+
+        assertNotNull(this.netherNet.getTransportStats(), "the metrics instance is wired through the bootstrap");
+
+        assertEquals(4, this.netherNet.buildStatusLines(10, true).size(), "full mode renders all four lines");
+        var simple = this.netherNet.buildStatusLines(10, false);
+        assertEquals(2, simple.size(), "simple mode renders two lines");
+        assertTrue(simple.get(0).contains("NetherNet"), "the summary line renders through lang.ini, got: " + simple.get(0));
+        assertTrue(simple.get(1).contains("ICE"), "the funnel line names ICE, got: " + simple.get(1));
+    }
+
+    @Test
     @Timeout(30)
     void configuredMediaPortStillStartsTheInterface() {
         Server server = MockServer.get();
@@ -104,7 +135,6 @@ class NetherNetInterfaceTest {
     void invalidMediaPortsAbortConstruction() {
         Server server = MockServer.get();
         lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("70000");
-        lenient().when(server.getLanguage()).thenReturn(new BaseLang("eng"));
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> new NetherNetInterface(server, new NetherNetSettings()));
         assertTrue(e.getMessage().contains("is not a valid port range"),
@@ -116,7 +146,6 @@ class NetherNetInterfaceTest {
     void mediaPortsCoveringServerPortAbortConstruction() {
         Server server = MockServer.get();
         lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("19000-19200");
-        lenient().when(server.getLanguage()).thenReturn(new BaseLang("eng"));
         lenient().when(server.getPort()).thenReturn(19132);
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> new NetherNetInterface(server, new NetherNetSettings()));
@@ -129,7 +158,6 @@ class NetherNetInterfaceTest {
     void mediaPortsCoveringIpv6ListenerAbortConstruction() {
         Server server = MockServer.get();
         lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("19000-19200");
-        lenient().when(server.getLanguage()).thenReturn(new BaseLang("eng"));
         lenient().when(server.isIpv6Enabled()).thenReturn(true);
         lenient().when(server.getIpv6Port()).thenReturn(19133);
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
