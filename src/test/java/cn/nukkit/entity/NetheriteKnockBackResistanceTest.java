@@ -1,9 +1,11 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.*;
 import cn.nukkit.math.Vector3;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -12,6 +14,11 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class NetheriteKnockBackResistanceTest {
+    @BeforeAll
+    static void initServer() {
+        MockServer.init();
+    }
+
     @Test
     void everyWornPieceContributesOneTenth() {
         Item[] pieces = {new ItemHelmetNetherite(), new ItemChestplateNetherite(),
@@ -127,6 +134,58 @@ class NetheriteKnockBackResistanceTest {
         inventory.onSlotChange(36, Item.get(Item.AIR), true);
 
         verify(player).sendKnockBackResistanceAttribute();
+    }
+
+    // ============== 关闭配置(vanilla-knockback-resistance=false)回归测试 / Disabled-config tests ==============
+
+    /** 临时关闭原版击退抗性执行 body,结束后恢复 / Temporarily disable vanilla knockback resistance, restore after */
+    private void withKnockbackResistanceDisabled(Runnable body) {
+        var settings = MockServer.get().getServerConfig().gameFeatureSettings();
+        boolean previous = settings.vanillaKnockbackResistance();
+        settings.vanillaKnockbackResistance(false);
+        try {
+            body.run();
+        } finally {
+            settings.vanillaKnockbackResistance(previous);
+        }
+    }
+
+    @Test
+    void disabledConfigRestoresFullStrengthKnockback() {
+        withKnockbackResistanceDisabled(() -> {
+            Player player = wearer(new ItemHelmetNetherite(), new ItemChestplateNetherite(),
+                    new ItemLeggingsNetherite(), new ItemBootsNetherite());
+            assertEquals(0, player.getKnockBackResistance(), 1e-9);
+            Vector3 motion = push(player, 3, 4);
+            assertEquals(0.18, motion.x, 1e-9);
+            assertEquals(0.3, motion.y, 1e-9);
+            assertEquals(0.24, motion.z, 1e-9);
+        });
+    }
+
+    @Test
+    void disabledConfigSendsZeroAttribute() {
+        withKnockbackResistanceDisabled(() -> {
+            Player player = wearer(new ItemHelmetNetherite(), new ItemBootsNetherite());
+            doCallRealMethod().when(player).sendKnockBackResistanceAttribute();
+            // Mockito 不执行字段初始化器，恢复「从未同步过」的初值 / Mockito skips field initializers; restore the "never sent" initial value
+            neverSentKnockBackResistance(player);
+            player.sendKnockBackResistanceAttribute();
+            ArgumentCaptor<Attribute> attribute = ArgumentCaptor.forClass(Attribute.class);
+            verify(player).setAttribute(attribute.capture());
+            assertEquals(0f, attribute.getValue().getValue(), 1e-9f,
+                    "Disabled config must clear the client-side knockback resistance attribute");
+        });
+    }
+
+    private static void neverSentKnockBackResistance(Player player) {
+        try {
+            java.lang.reflect.Field field = Player.class.getDeclaredField("lastSentKnockBackResistance");
+            field.setAccessible(true);
+            field.setFloat(player, -1f);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private static Player wearer(Item... armour) {

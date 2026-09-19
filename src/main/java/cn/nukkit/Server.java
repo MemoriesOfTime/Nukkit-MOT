@@ -4014,6 +4014,12 @@ public class Server {
         this.strongIPBans = config.gameFeatureSettings().strongIpBans();
         this.checkOpMovement = config.gameFeatureSettings().checkOpMovement();
 
+        // 击退抗性属性随配置变化，重载后重同步在线玩家
+        // Knockback resistance attribute follows the config; resync online players after reload
+        for (Player player : this.getOnlinePlayers().values()) {
+            player.sendKnockBackResistanceAttribute();
+        }
+
         // NetEase
         this.netEaseMode = config.neteaseSettings().clientSupport();
         this.onlyNetEaseMode = config.neteaseSettings().onlyAllowNeteaseClient();
