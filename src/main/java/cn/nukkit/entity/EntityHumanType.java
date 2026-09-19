@@ -281,6 +281,19 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
     }
 
     @Override
+    public double getKnockBackResistance() {
+        double resistance = super.getKnockBackResistance();
+        if (this.inventory == null
+                || !Server.getInstance().getServerConfig().gameFeatureSettings().vanillaKnockbackResistance()) {
+            return resistance;
+        }
+        for (Item armor : this.inventory.getArmorContents()) {
+            resistance += armor.getKnockBackResistance();
+        }
+        return resistance;
+    }
+
+    @Override
     public boolean attack(EntityDamageEvent source) {
         if (!this.isAlive() || closed) {
             return false;

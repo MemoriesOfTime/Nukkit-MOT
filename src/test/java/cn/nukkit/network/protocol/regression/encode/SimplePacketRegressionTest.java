@@ -200,6 +200,81 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals("music", cbPacket.getType());
     }
 
+    static Stream<Arguments> versionsFrom2168() {
+        return filteredVersions(ProtocolInfo.v1_26_40);
+    }
+
+    @ParameterizedTest(name = "ClientboundUpdateSoundDataPacket v{0} update slots")
+    @MethodSource("versionsFrom2168")
+    void testClientboundUpdateSoundDataPacketV2168Updates(int protocolVersion) {
+        // 按 protocol-docs（BDS 导出）的字段布局独立校验 wire：LLong handle + 7 个 tagged 更新槽。
+        // 值更新必须重复 7 槽（客户端只消费最后一槽），槽 0 不得为 STOP，否则解码侧 stop 被误置 true
+        // Verify the wire independently per protocol-docs (BDS-exported) layouts: LLong handle + 7 tagged
+        // update slots. A value update must repeat into all 7 slots (the client consumes the last one) and
+        // slot 0 must not be STOP, or decode would map stop=true
+        var volume = new cn.nukkit.network.protocol.ClientboundUpdateSoundDataPacket();
+        volume.protocol = protocolVersion;
+        volume.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        volume.serverSoundHandle = 42L;
+        volume.volume = 0.5f;
+        volume.encode();
+
+        ByteBuf volumeBuf = PacketBridgeUtil.nukkitPacketToByteBuf(volume);
+        try {
+            assertEquals(42L, volumeBuf.readLongLE());
+            for (int i = 0; i < 7; i++) {
+                assertEquals(1, org.cloudburstmc.protocol.common.util.VarInts.readUnsignedInt(volumeBuf),
+                        "slot " + i + " should be SET_VOLUME");
+                assertEquals(0.5f, volumeBuf.readFloatLE());
+            }
+            assertEquals(0, volumeBuf.readableBytes(), "expected exactly 7 slots");
+        } finally {
+            volumeBuf.release();
+        }
+
+        var stopPk = new cn.nukkit.network.protocol.ClientboundUpdateSoundDataPacket();
+        stopPk.protocol = protocolVersion;
+        stopPk.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        stopPk.serverSoundHandle = 42L;
+        stopPk.stop = true;
+        stopPk.encode();
+
+        ByteBuf stopBuf = PacketBridgeUtil.nukkitPacketToByteBuf(stopPk);
+        try {
+            assertEquals(42L, stopBuf.readLongLE());
+            for (int i = 0; i < 7; i++) {
+                assertEquals(0, org.cloudburstmc.protocol.common.util.VarInts.readUnsignedInt(stopBuf),
+                        "slot " + i + " should be STOP");
+            }
+            assertEquals(0, stopBuf.readableBytes(), "expected exactly 7 slots");
+        } finally {
+            stopBuf.release();
+        }
+
+        // fade 载荷顺序按 docs：Duration 在前、Target Volume 在后 / fade payload order per docs
+        var fade = new cn.nukkit.network.protocol.ClientboundUpdateSoundDataPacket();
+        fade.protocol = protocolVersion;
+        fade.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        fade.serverSoundHandle = 42L;
+        fade.fadeDuration = 0.5f;
+        fade.fadeTargetVolume = 2.0f;
+        fade.encode();
+
+        ByteBuf fadeBuf = PacketBridgeUtil.nukkitPacketToByteBuf(fade);
+        try {
+            assertEquals(42L, fadeBuf.readLongLE());
+            for (int i = 0; i < 7; i++) {
+                assertEquals(3, org.cloudburstmc.protocol.common.util.VarInts.readUnsignedInt(fadeBuf),
+                        "slot " + i + " should be FADE");
+                assertEquals(0.5f, fadeBuf.readFloatLE());
+                assertEquals(2.0f, fadeBuf.readFloatLE());
+            }
+            assertEquals(0, fadeBuf.readableBytes(), "expected exactly 7 slots");
+        } finally {
+            fadeBuf.release();
+        }
+    }
+
     // ==================== SendPartyDestinationCookiePacket ====================
 
     @ParameterizedTest(name = "SendPartyDestinationCookiePacket v{0}")
@@ -1552,6 +1627,56 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         var item = cbPacket.getEntries().get(0).getContainers().get(0).getItems().get(0);
         assertEquals(3, item.getSlot());
         assertEquals(0, item.getStackNetworkId());
+    }
+
+    @ParameterizedTest(name = "ItemStackResponsePacket v{0} empty containers byte-exact")
+    @MethodSource("versionsFrom419")
+    void testItemStackResponsePacketEmptyContainersByteExact(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.ItemStackResponsePacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        // ERROR 响应总是携带空容器（ItemStackRequestHandler 拒绝请求时）
+        nukkitPacket.entries.add(new cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse(
+                cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus.ERROR,
+                7,
+                java.util.List.of()
+        ));
+
+        var cbPacket = new org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket();
+        cbPacket.getEntries().add(new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.response.ItemStackResponse(
+                org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.response.ItemStackResponseStatus.ERROR,
+                7,
+                java.util.Collections.emptyList()
+        ));
+
+        nukkitPacket.encode();
+
+        // 必须 CB serialize 的字节级对比：CB v2168 反序列化 readBoolean() && readBoolean() 短路，
+        // 少写的常量 true bool 恰好解出空容器且 buffer 全消费，decode 交叉验证无法发现
+        // Byte-exact comparison against CB serialize output is required: CB v2168 deserialize
+        // short-circuits (a && b), so a missing constant-true bool still decodes as empty containers
+        var codec = ProtocolCodecMapping.getCodec(protocolVersion);
+        var helper = codec.createHelper();
+        org.cloudburstmc.protocol.bedrock.codec.BedrockPacketDefinition<org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket> definition =
+                codec.getPacketDefinition(org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket.class);
+        assertNotNull(definition);
+
+        ByteBuf actual = PacketBridgeUtil.nukkitPacketToByteBuf(nukkitPacket);
+        ByteBuf expected = Unpooled.buffer();
+        try {
+            definition.getSerializer().serialize(expected, helper, cbPacket);
+
+            byte[] actualBytes = new byte[actual.readableBytes()];
+            actual.readBytes(actualBytes);
+            byte[] expectedBytes = new byte[expected.readableBytes()];
+            expected.readBytes(expectedBytes);
+
+            assertArrayEquals(expectedBytes, actualBytes,
+                    "v" + protocolVersion + " empty-containers ItemStackResponse bytes diverge from CB");
+        } finally {
+            actual.release();
+            expected.release();
+        }
     }
 
     @ParameterizedTest(name = "ItemStackResponsePacket v{0} should preserve full container name")

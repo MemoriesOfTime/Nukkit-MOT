@@ -11,7 +11,9 @@ import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import org.jetbrains.annotations.ApiStatus;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -119,6 +121,9 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
             items = newItems;
         }
 
+        // 与 BaseInventory.setContents 相同：溢出延后到槽位定稿后再装
+        // Same as BaseInventory.setContents: route overflow after slots are final
+        List<Item> deferredOverflow = new ArrayList<>();
         for (int i = 0; i < this.size; i++) {
             if (!items.containsKey(i)) {
                 if (i < this.left.size) {
@@ -128,9 +133,19 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
                 } else if (this.right.slots.containsKey(i - this.left.size)) {
                     this.clear(i);
                 }
-            } else if (!this.setItem(i, items.get(i))) {
-                this.clear(i);
+            } else {
+                Item[] parts = splitOverstack(items.get(i));
+                if (this.setItem(i, parts[0])) {
+                    if (parts[1] != null) {
+                        deferredOverflow.add(parts[1]);
+                    }
+                } else {
+                    this.clear(i);
+                }
             }
+        }
+        for (Item overflow : deferredOverflow) {
+            this.routeOverflow(overflow);
         }
     }
 
