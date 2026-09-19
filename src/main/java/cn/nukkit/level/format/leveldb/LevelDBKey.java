@@ -33,6 +33,13 @@ public enum LevelDBKey {
     VERSION_OLD('v'),
     NUKKIT_BLOCK_LIGHT((char) 1000),
     NUKKIT_SKY_LIGHT((char) 1001),
+    /**
+     * 1.26.50 连接/角落位迁移完成标记（1=已按邻居重算）；缺失/0=需重算。
+     * <p>
+     * Marker that a chunk's 1.26.50 connection/corner bits have been recomputed (1=done);
+     * missing/0 means the recompute is still pending.
+     */
+    NUKKIT_CONN_FIX_DONE((char) 1002),
     ;
 
     private final byte encoded;

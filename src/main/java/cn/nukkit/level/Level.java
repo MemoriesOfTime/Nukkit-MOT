@@ -3652,6 +3652,10 @@ public class Level implements ChunkManager, Metadatable {
                     for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
                         loader.onChunkPopulated(chunk);
                     }
+
+                    // population 完成才放行邻居的四邻门控：唤醒仍带迁移标志的邻居重试
+                    // Population completion unblocks neighbours' four-neighbour gating: wake flagged neighbours to retry
+                    this.retryLegacyConnectionFixForNeighbours(x, z);
                 }
             } else if (this.chunkGenerationQueue.containsKey(index) || this.chunkPopulationLock.containsKey(index)) {
                 this.chunkGenerationQueue.remove(index);
@@ -4137,7 +4141,7 @@ public class Level implements ChunkManager, Metadatable {
      * 标志由区块加载/生成路径设置（LevelDB 反序列化时检测磁盘状态缺 corner/connection 键；
      * 生成的区块经 chunk.setBlock/setBlockAt 直写不触发 update，也需补算；Anvil 连接位虽可经
      * DataExtra 落盘，但无法区分区块是否由旧版本保存，每次进程启动首个触发点保守重算一次）。
-     * 四邻区块未加载时保留标志推迟重试，
+     * 四邻区块未加载或未 populate 时保留标志推迟重试（population 完成时会唤醒邻居重试），
      * 避免把跨界连接误算为断开；扫描成功后才清标志（中途异常保留待重试），重算后的状态
      * 落盘即升级为 1.26.50，标志自然消失。新放置方块的连接由 place/onUpdate 路径维护。
      * <p>
@@ -4147,14 +4151,18 @@ public class Level implements ChunkManager, Metadatable {
      * <p>
      * Primarily triggered from the mount tail (finishChunkLoad, same pattern as light
      * population), with the send path kept as a fallback. The flag is set on the chunk-load and
-     * generation paths (LevelDB deserialization detects states missing corner/connection keys;
-     * generated chunks are written via chunk.setBlock/setBlockAt which bypass block updates and
-     * need the recompute too; Anvil bits persist via DataExtra, but a save predating this fix
-     * cannot be told apart, so it conservatively recomputes once per process start at the first
-     * trigger). While any horizontal neighbour chunk is
-     * unloaded the flag is kept, avoiding miscomputing cross-border connections as disconnected;
-     * the flag is cleared only after a successful scan (an aborted one stays flagged for retry);
-     * once recomputed and saved the state itself upgrades to 1.26.50 and the flag never returns.
+     * generation paths (LevelDB: a persisted per-chunk migration marker is the authoritative
+     * source — missing/0 means recompute pending — because the load path upgrades keyless states
+     * to keyed all-false ones that a save-before-recompute would otherwise bake, permanently
+     * hiding the need; generated chunks are written via chunk.setBlock/setBlockAt which bypass
+     * block updates and need the recompute too; Anvil bits persist via DataExtra, but a save
+     * predating this fix cannot be told apart, so it conservatively recomputes once per process
+     * start at the first trigger). While any horizontal neighbour chunk is
+     * unloaded or unpopulated the flag is kept (population completion wakes flagged neighbours),
+     * avoiding miscomputing cross-border connections as disconnected;
+     * the flag is cleared only after a successful scan (an aborted one stays flagged for retry),
+     * and the chunk is marked changed so the LevelDB marker persists (a missing marker would
+     * retrigger the idempotent scan on every load).
      * Freshly placed blocks maintain connections via place/onUpdate.
      */
     private void fixLegacyBlockConnections(int x, int z, BaseFullChunk chunk) {
@@ -4169,7 +4177,7 @@ public class Level implements ChunkManager, Metadatable {
         if (!chunk.isNeedsLegacyConnectionFix()) {
             return;
         }
-        if (!this.areHorizontalNeighboursLoaded(x, z)) {
+        if (!this.areHorizontalNeighboursPopulated(x, z)) {
             return;
         }
         IntSet targetIds = connectionDrivenBlockIds();
@@ -4181,7 +4189,9 @@ public class Level implements ChunkManager, Metadatable {
             for (int blockY = minY; blockY <= maxY; blockY++) {
                 for (int bx = 0; bx < 16; bx++) {
                     for (int bz = 0; bz < 16; bz++) {
-                        int id = chunk.getBlockIdAt(bx, blockY, bz);
+                        // getBlockIdAt 需要世界坐标；此处 bx/bz 是局部坐标，须走 getBlockId
+                        // getBlockIdAt expects world coords while bx/bz are chunk-local; use getBlockId
+                        int id = chunk.getBlockId(bx, blockY, bz);
                         if (id == 0 || !targetIds.contains(id)) {
                             continue;
                         }
@@ -4209,21 +4219,40 @@ public class Level implements ChunkManager, Metadatable {
             // Clear the flag only after a full pass; an aborted scan stays flagged for retry
             chunk.setNeedsLegacyConnectionFix(false);
             chunk.setLegacyConnectionsFixed(true);
+            // 置脏让 LevelDB 落盘迁移完成标记：否则无方块改动的干净区块永不保存，
+            // 标记缺失导致每次加载重复扫描
+            // Mark changed so LevelDB persists the migration-done marker; otherwise a clean
+            // chunk (no block writes) would never save and rescan on every load
+            chunk.setChanged();
         } catch (Throwable t) {
             this.server.getLogger().error("Failed to fix legacy block connections in chunk " + x + ", " + z + " of level " + this.getFolderName(), t);
         }
     }
 
-    private boolean areHorizontalNeighboursLoaded(int x, int z) {
-        return this.getChunkIfLoaded(x + 1, z) != null && this.getChunkIfLoaded(x - 1, z) != null
-                && this.getChunkIfLoaded(x, z + 1) != null && this.getChunkIfLoaded(x, z - 1) != null;
+    /**
+     * 四邻须已加载且已 populate：population 直写不触发方块更新，邻居只生成未填充时扫描会把
+     * 跨界连接误算为断开。旧世界磁盘区块加载即 populated，门控行为不变。
+     * <p>
+     * All four horizontal neighbours must be loaded AND populated: population writes bypass block
+     * updates, so scanning next to a generated-but-unpopulated neighbour would miscompute
+     * cross-border connections as disconnected. Disk chunks are populated on load, so the gate is
+     * unchanged for legacy worlds.
+     */
+    private boolean areHorizontalNeighboursPopulated(int x, int z) {
+        return isChunkLoadedAndPopulated(x + 1, z) && isChunkLoadedAndPopulated(x - 1, z)
+                && isChunkLoadedAndPopulated(x, z + 1) && isChunkLoadedAndPopulated(x, z - 1);
+    }
+
+    private boolean isChunkLoadedAndPopulated(int x, int z) {
+        BaseFullChunk chunk = this.getChunkIfLoaded(x, z);
+        return chunk != null && chunk.isPopulated();
     }
 
     /**
-     * 新区块挂载后唤醒四邻中仍带迁移标志的区块重试——它们的四邻可能因此凑齐。
+     * 新区块挂载或 populate 完成后唤醒四邻中仍带迁移标志的区块重试——它们的四邻门控可能因此凑齐。
      * <p>
-     * After a chunk mounts, re-attempt flagged neighbours — this mount may complete their
-     * four-neighbour gating.
+     * After a chunk mounts or completes population, re-attempt flagged neighbours — this may
+     * complete their four-neighbour gating.
      */
     private void retryLegacyConnectionFixForNeighbours(int x, int z) {
         this.retryLegacyConnectionFix(x + 1, z);

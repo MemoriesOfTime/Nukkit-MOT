@@ -86,6 +86,21 @@ class BlockPaletteLegacyMetaFallbackTest {
         int isolated = palette.getRuntimeId(102, 0);
         int both = palette.getRuntimeId(102, BlockThin.FLAG_CONNECTION_NORTH | BlockThin.FLAG_CONNECTION_SOUTH);
         Assertions.assertNotEquals(isolated, both);
+
+        // 栅栏：四个方向的连接变体必须存在，且木种+连接组合不得坍缩回橡木
+        // fences: connection variants per direction must exist, and wood+connection
+        // combos must not collapse back to oak
+        int fenceIsolated = palette.getRuntimeId(85, 0);
+        for (int i = 0; i < 4; i++) {
+            int connected = palette.getRuntimeId(85, BlockFence.FLAG_CONNECTION_NORTH << i);
+            Assertions.assertNotEquals(-1, connected, "fence direction " + i);
+            Assertions.assertNotEquals(fenceIsolated, connected, "fence direction " + i + " must be a distinct variant");
+        }
+        int spruceNorth = palette.getRuntimeId(85, 1 | BlockFence.FLAG_CONNECTION_NORTH);
+        Assertions.assertNotEquals(palette.getRuntimeId(85, BlockFence.FLAG_CONNECTION_NORTH), spruceNorth,
+                "spruce+north must not collapse to oak+north");
+        Assertions.assertNotEquals(palette.getRuntimeId(85, 1), spruceNorth,
+                "spruce+north must not lose the connection variant");
     }
 
     @Test

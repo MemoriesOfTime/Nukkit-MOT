@@ -61,4 +61,21 @@ class BlockStateMetaAlignmentTest {
         Assertions.assertEquals((byte) 0, both.get("minecraft:connection_east"));
         Assertions.assertEquals((byte) 0, both.get("minecraft:connection_west"));
     }
+
+    @Test
+    void fenceConnectionBitsKeepWoodType() {
+        // 栅栏：连接位在 meta 高 4 位，低 3 位木种必须保留 / fences carry connections in the
+        // upper meta nibble; the wood type in the low bits must survive
+        for (int i = 0; i < 4; i++) {
+            cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot state = BlockStateMapping.get().getState(85, 0x10 << i);
+            Assertions.assertEquals("minecraft:oak_fence", state.getVanillaState().getString("name"));
+            Assertions.assertEquals((byte) 1, state.getVanillaState().getCompound("states")
+                    .get("minecraft:connection_" + new String[]{"north", "east", "south", "west"}[i]),
+                    "bit 0x" + Integer.toHexString(0x10 << i));
+        }
+
+        cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot spruce = BlockStateMapping.get().getState(85, 0x11);
+        Assertions.assertEquals("minecraft:spruce_fence", spruce.getVanillaState().getString("name"));
+        Assertions.assertEquals((byte) 1, spruce.getVanillaState().getCompound("states").get("minecraft:connection_north"));
+    }
 }

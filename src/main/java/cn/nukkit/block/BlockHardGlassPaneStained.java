@@ -39,7 +39,7 @@ public class BlockHardGlassPaneStained extends BlockHardGlassPane {
     }
 
     public DyeColor getDyeColor() {
-        return DyeColor.getByWoolData(meta);
+        return DyeColor.getByWoolData(meta & 0xF);
     }
 
     @Override
