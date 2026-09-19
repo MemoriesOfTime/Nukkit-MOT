@@ -53,6 +53,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.NetherNetInterface;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
@@ -86,6 +87,7 @@ import cn.nukkit.utils.serverconfig.ConfigComments;
 import cn.nukkit.utils.serverconfig.ConfigMigration;
 import cn.nukkit.utils.serverconfig.ResourcePackMigration;
 import cn.nukkit.utils.serverconfig.ServerConfig;
+import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -870,6 +872,14 @@ public class Server {
         this.network.setName(this.getMotd());
         this.network.setSubName(this.getSubMotd());
         this.network.registerInterface(new RakNetInterface(this));
+
+        // NetherNet (WebRTC) 与 RakNet 并行：旧客户端走 RakNet，受限网络的 1.21.90+ 客户端走 HTTP 信令 + WebRTC
+        // Runs alongside RakNet: legacy clients keep RakNet, restricted-network 1.21.90+ clients join over WebRTC
+        NetherNetSettings netherNetSettings = this.serverConfig != null
+                ? this.serverConfig.networkSettings().netherNetSettings() : null;
+        if (netherNetSettings != null && netherNetSettings.enabled()) {
+            this.network.registerInterface(new NetherNetInterface(this, netherNetSettings));
+        }
 
         EntityProperty.init();
 
@@ -4096,6 +4106,7 @@ public class Server {
             put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
+            put("server-udp-ports", 0);
             put("server-ipv6-port", -1);
             put("server-ipv6", "::");
             put("view-distance", 8);

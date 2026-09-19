@@ -57,28 +57,28 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     /** One maximum-size legal decoded batch may wait per session. */
     static final int MAX_QUEUED_INBOUND_PACKETS = 1300;
     static final long MAX_QUEUED_INBOUND_BYTES = 6L * 1024L * 1024L;
-    private static final int INBOUND_LOW_WATER_PACKETS = MAX_QUEUED_INBOUND_PACKETS / 2;
-    private static final long INBOUND_LOW_WATER_BYTES = MAX_QUEUED_INBOUND_BYTES / 2;
+    static final int INBOUND_LOW_WATER_PACKETS = MAX_QUEUED_INBOUND_PACKETS / 2;
+    static final long INBOUND_LOW_WATER_BYTES = MAX_QUEUED_INBOUND_BYTES / 2;
     /** 单个 0xfe 帧的硬性线上尺寸上限，超出即关闭会话。 Hard wire cap for one encapsulated frame. */
     static final int MAX_INBOUND_WIRE_BYTES = 12582912; // 12 MiB
     /**
      * Permit short bursts of small movement and interaction batches while bounding sustained
      * wire traffic. Decode bytes and framed-packet tokens independently limit processing work.
      */
-    private static final double MAX_INGRESS_BATCH_TOKENS = 1200D;
-    private static final double INGRESS_BATCH_TOKENS_PER_SECOND = 300D;
-    private static final double MAX_INGRESS_COMPRESSED_BYTES = 48D * 1024D * 1024D;
-    private static final double INGRESS_COMPRESSED_BYTES_PER_SECOND = 6D * 1024D * 1024D;
-    private static final double MAX_INGRESS_DECODE_BYTES = 24D * 1024D * 1024D;
-    private static final double INGRESS_DECODE_BYTES_PER_SECOND = 6D * 1024D * 1024D;
-    private static final double DECODE_BYTES_RESERVATION = 12D * 1024D * 1024D;
-    private static final double MAX_INGRESS_FRAME_TOKENS = 5200D;
-    private static final double INGRESS_FRAME_TOKENS_PER_SECOND = 1300D;
-    private static final double FRAME_TOKENS_RESERVATION = 2600D;
+    static final double MAX_INGRESS_BATCH_TOKENS = 1200D;
+    static final double INGRESS_BATCH_TOKENS_PER_SECOND = 300D;
+    static final double MAX_INGRESS_COMPRESSED_BYTES = 48D * 1024D * 1024D;
+    static final double INGRESS_COMPRESSED_BYTES_PER_SECOND = 6D * 1024D * 1024D;
+    static final double MAX_INGRESS_DECODE_BYTES = 24D * 1024D * 1024D;
+    static final double INGRESS_DECODE_BYTES_PER_SECOND = 6D * 1024D * 1024D;
+    static final double DECODE_BYTES_RESERVATION = 12D * 1024D * 1024D;
+    static final double MAX_INGRESS_FRAME_TOKENS = 5200D;
+    static final double INGRESS_FRAME_TOKENS_PER_SECOND = 1300D;
+    static final double FRAME_TOKENS_RESERVATION = 2600D;
     /** How many malformed batches a playing session may send inside the sliding window. */
     static final int MAX_MALFORMED_BATCHES_WHILE_PLAYING = 32;
     static final long MALFORMED_BATCH_WINDOW_NANOS = TimeUnit.MINUTES.toNanos(5);
-    private static final long DIAGNOSTIC_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(30);
+    static final long DIAGNOSTIC_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(30);
 
     private final RakNetInterface server;
     private final RakChildChannel channel;
