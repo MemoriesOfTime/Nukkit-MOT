@@ -1,5 +1,6 @@
 package cn.nukkit.utils.serverconfig;
 
+import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import eu.okaeri.configs.OkaeriConfig;
 import eu.okaeri.configs.schema.FieldDeclaration;
 import lombok.extern.log4j.Log4j2;
@@ -54,6 +55,13 @@ public class ConfigComments {
 
         for (Map.Entry<String, OkaeriConfig> entry : categories.entrySet()) {
             applyFieldComments(entry.getValue(), comments, entry.getKey());
+        }
+
+        // WorldEntry values inside the worlds map; a fresh instance primes the declaration
+        // cache so its (localized) fields survive the save-time ConfigDeclaration.of lookup
+        applyFieldComments(new WorldEntry(), comments, "worldEntry");
+        for (WorldEntry entry : config.worldSettings().worlds().values()) {
+            applyFieldComments(entry, comments, "worldEntry");
         }
     }
 

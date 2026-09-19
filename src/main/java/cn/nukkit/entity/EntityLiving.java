@@ -40,6 +40,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     public EntityLiving(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+        // Players defer initEntity until login; mobs have already loaded their effects in super.
+        this.initializeMovementState();
     }
 
     @Override
@@ -55,7 +57,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     protected int attackTime = 0;
     protected int knockBackTime = 0;
 
-    protected float movementSpeed = 0.1f;
+    protected float movementSpeed;
 
     protected int turtleTicks = 0;
 
@@ -63,10 +65,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     protected final boolean isDrowned = this instanceof EntityDrowned;
 
-    private final Map<String, EntityMovementSpeedModifier> movementSpeedModifiers = new HashMap<>();
+    private Map<String, EntityMovementSpeedModifier> movementSpeedModifiers;
+
+    private void initializeMovementState() {
+        if (this.movementSpeedModifiers == null) {
+            this.movementSpeedModifiers = new HashMap<>();
+            this.movementSpeed = 0.1f;
+        }
+    }
 
     @Override
     protected void initEntity() {
+        // Entity's constructor loads ActiveEffects through this virtual method, before field
+        // initializers would run. Initialize both values here and never overwrite the loaded speed.
+        this.initializeMovementState();
         super.initEntity();
 
         if (this.namedTag.contains("HealF")) {

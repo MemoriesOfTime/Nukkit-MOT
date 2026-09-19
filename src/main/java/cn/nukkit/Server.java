@@ -20,12 +20,7 @@ import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.event.level.LevelInitEvent;
 import cn.nukkit.event.level.LevelLoadEvent;
-import cn.nukkit.event.server.BatchPacketsEvent;
-import cn.nukkit.event.server.PlayerDataSerializeEvent;
-import cn.nukkit.event.server.QueryRegenerateEvent;
-import cn.nukkit.event.server.ServerStopEvent;
-import cn.nukkit.event.server.ServerTickStartEvent;
-import cn.nukkit.event.server.ServerTickEndEvent;
+import cn.nukkit.event.server.*;
 import cn.nukkit.inventory.CraftingManager;
 import cn.nukkit.inventory.Recipe;
 import cn.nukkit.item.Item;
@@ -130,8 +125,8 @@ import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.regex.Pattern;
 import java.util.function.LongSupplier;
+import java.util.regex.Pattern;
 
 /**
  * The main server class
@@ -4008,6 +4003,12 @@ public class Server {
         this.banXBAuthFailed = config.gameFeatureSettings().tempIpBanFailedXboxAuth();
         this.strongIPBans = config.gameFeatureSettings().strongIpBans();
         this.checkOpMovement = config.gameFeatureSettings().checkOpMovement();
+
+        // 击退抗性属性随配置变化，重载后重同步在线玩家
+        // Knockback resistance attribute follows the config; resync online players after reload
+        for (Player player : this.getOnlinePlayers().values()) {
+            player.sendKnockBackResistanceAttribute();
+        }
 
         // NetEase
         this.netEaseMode = config.neteaseSettings().clientSupport();
