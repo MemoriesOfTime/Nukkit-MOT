@@ -6,11 +6,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
-import java.util.HexFormat;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Unit tests for {@link VanillaPaletteDownloader}.
@@ -96,5 +99,58 @@ class VanillaPaletteDownloaderTest {
         Assertions.assertEquals(0, recovery.failed(), "recovery should not report failures");
         Assertions.assertFalse(Files.exists(tmp.resolve("palettes.zip")),
                 "incremental path must never leave a bundle behind");
+    }
+
+    @Test
+    void paletteMessagesExistInEveryBundledLanguage() throws IOException {
+        Map<String, String> eng = loadIniKeys("eng");
+        Map<String, String> paletteKeys = new HashMap<>();
+        eng.forEach((key, value) -> {
+            if (key.startsWith("nukkit.palette.")) {
+                paletteKeys.put(key, value);
+            }
+        });
+        Assertions.assertFalse(paletteKeys.isEmpty(), "eng must define nukkit.palette.* keys");
+
+        // 该目录下语言文件惯例为全量覆盖，缺失键会静默回退英文 / bundled languages are kept
+        // in full key parity; a missing key would silently fall back to English.
+        for (String folder : new String[]{"chs", "deu", "jpn", "rus", "vie"}) {
+            Map<String, String> lang = loadIniKeys(folder);
+            for (Map.Entry<String, String> entry : paletteKeys.entrySet()) {
+                String translated = lang.get(entry.getKey());
+                Assertions.assertNotNull(translated, folder + " lacks " + entry.getKey());
+                Assertions.assertEquals(placeholders(entry.getValue()), placeholders(translated),
+                        folder + "/" + entry.getKey() + " placeholder set differs from eng");
+            }
+        }
+    }
+
+    private static Map<String, String> loadIniKeys(String folder) throws IOException {
+        try (InputStream in = VanillaPaletteDownloaderTest.class.getClassLoader()
+                .getResourceAsStream("lang/" + folder + "/lang.ini")) {
+            Assertions.assertNotNull(in, folder + "/lang.ini missing from classpath");
+            Map<String, String> map = new HashMap<>();
+            for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+                line = line.trim();
+                if (line.isEmpty() || line.charAt(0) == '#') {
+                    continue;
+                }
+                String[] split = line.split("=", 2);
+                if (split.length == 2) {
+                    map.put(split[0], split[1]);
+                }
+            }
+            return map;
+        }
+    }
+
+    private static List<String> placeholders(String text) {
+        List<String> found = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\\{%\\d+}").matcher(text);
+        while (matcher.find()) {
+            found.add(matcher.group());
+        }
+        Collections.sort(found);
+        return found;
     }
 }
