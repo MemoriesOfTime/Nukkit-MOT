@@ -177,6 +177,10 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        // 共用端口时连上后的远端是中继 leg 的回环地址，入队创建玩家前换回真实客户端
+        // On the shared port the connected remote is the relay leg's loopback address, swap the
+        // real client back before the session is queued for player creation
+        this.server.restoreRelayedRemoteAddress(this.channel);
         if (!this.state.getConnection().isQueuedForPlayerCreation()) {
             this.server.queueSessionForPlayerCreation(this);
         }

@@ -46,6 +46,7 @@ docker run -d --name nukkit-mot \
 - 所有 worlds、plugins、players、`server.properties` 都存放在 `/data` 卷下。
 - `19132/udp` 为 RakNet 游戏端口；`19132/tcp` 为 NetherNet（WebRTC）HTTP 信令端口，默认开启且与 server-port 同号，除非在 `nukkit-mot.yml` 关闭 `network-settings.nethernet`，否则需要一并映射。
 - `19134/udp` 为 NetherNet 媒体端口，即 `server.properties` 中 `server-udp-ports` 的默认值（ICE mux 单端口服务所有对端；设为 `0` 则回退系统随机分配，Docker bridge NAT 下不可达）。宿主发布端口与容器不一致、或需要向客户端公布宿主地址时，使用映射语法 `server-udp-ports=[宿主IP:]外部端口:内部端口`。
+- 只想对外开放一个 UDP 端口时，设置 `server-udp-ports=19132:19134`：NetherNet 媒体会在进程内从 RakNet 的 socket 中继到只绑回环的 19134，此时只需映射 `19132/udp` 与 `19132/tcp`，可去掉 `-p 19134:19134/udp`。
 
 ## 相关链接
 - __🌐 下载地址: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__

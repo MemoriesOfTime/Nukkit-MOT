@@ -4,19 +4,29 @@ import cn.nukkit.MockServer;
 import cn.nukkit.Server;
 import cn.nukkit.lang.BaseLang;
 import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
+import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
+import io.netty.channel.socket.nio.NioDatagramChannel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.*;
 
 /**
  * 回归测试：Network.sendPacket 把同一个 ByteBuf 依次交给所有 AdvancedSourceInterface，
@@ -164,5 +174,72 @@ class NetherNetInterfaceTest {
                 () -> new NetherNetInterface(server, new NetherNetSettings()));
         assertTrue(e.getMessage().contains("IPv6 listener port 19133"),
                 "the abort names the IPv6 listener port, got: " + e.getMessage());
+    }
+
+    @Test
+    @Timeout(30)
+    void sharedPortWindowIsRejected() {
+        Server server = MockServer.get();
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("19130-19140:39000-39010");
+        lenient().when(server.getPort()).thenReturn(19132);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> new NetherNetInterface(server, new NetherNetSettings()));
+        assertTrue(e.getMessage().contains("single-port mapping such as 19132:39000"),
+                "a window published over server-port must be narrowed to one port, got: " + e.getMessage());
+    }
+
+    @Test
+    @Timeout(30)
+    void sharedPortWithoutARakNetListenerAbortsConstruction() {
+        Server server = MockServer.get();
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("19132:39000");
+        lenient().when(server.getPort()).thenReturn(19132);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> new NetherNetInterface(server, new NetherNetSettings(), null));
+        assertTrue(e.getMessage().contains("server-port 19132"),
+                "the abort explains there is nothing to relay from, got: " + e.getMessage());
+    }
+
+    @Test
+    @Timeout(30)
+    void sharedPortHooksTheRelayIntoTheRakNetListener() throws Exception {
+        Server server = MockServer.get();
+        // 信令绑定 TCP，媒体中继挂在 RakNet 的 UDP 监听上：两者用同一个探测到的空闲端口号
+        // Signaling binds TCP and the relay hooks RakNet's UDP listener: both use one probed free port number
+        int port;
+        try (ServerSocket probe = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))) {
+            port = probe.getLocalPort();
+        }
+        lenient().when(server.getPort()).thenReturn(port);
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn(port + ":39000");
+
+        MultiThreadIoEventLoopGroup group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        Channel listener = new Bootstrap().group(group).channel(NioDatagramChannel.class)
+                .handler(new ChannelInboundHandlerAdapter())
+                .bind(new InetSocketAddress("127.0.0.1", 0)).syncUninterruptibly().channel();
+        RakNetInterface rakNet = mock(RakNetInterface.class);
+        when(rakNet.getDatagramChannels()).thenReturn(List.of(listener));
+        NetherNetInterface shared = null;
+        try {
+            shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet);
+            assertNotNull(listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME), "the relay demux sits on the RakNet listener");
+
+            var lines = shared.buildStatusLines(10, true);
+            assertEquals(5, lines.size(), "full mode gains the relay line while the port is shared");
+            assertTrue(lines.get(0).contains("shared with RakNet"), "the summary describes the shared port, got: " + lines.get(0));
+            assertTrue(lines.get(4).contains("relay"), "the extra line reports the relay, got: " + lines.get(4));
+            assertEquals(2, shared.buildStatusLines(10, false).size(), "simple mode stays at two lines");
+        } finally {
+            if (shared != null) {
+                shared.shutdown();
+            }
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME) != null && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertNull(listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME), "shutdown detaches the relay from RakNet");
+            listener.close().awaitUninterruptibly();
+            group.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+        }
     }
 }
