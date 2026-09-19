@@ -26,9 +26,6 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
 
     private static final String POCKETMINE_OFFHAND = "OffHandItem";
     private static final String POCKETMINE_ENDER_CHEST = "EnderChestInventory";
-    /** Host-side durable storage must acknowledge the imported ender chest before clearing this. */
-    public static final String POCKETMINE_ENDER_IMPORT_PENDING =
-            "NukkitPocketMineEnderImportPending";
 
     protected PlayerInventory inventory;
     protected PlayerEnderChestInventory enderChestInventory;
@@ -100,9 +97,7 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
      */
     static void importPocketMineInventories(CompoundTag playerData) {
         importPocketMineOffhand(playerData);
-        if (importPocketMineEnderChest(playerData)) {
-            playerData.putBoolean(POCKETMINE_ENDER_IMPORT_PENDING, true);
-        }
+        importPocketMineEnderChest(playerData);
     }
 
     private static void importPocketMineOffhand(CompoundTag playerData) {
@@ -131,9 +126,9 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
         playerData.remove(POCKETMINE_OFFHAND);
     }
 
-    private static boolean importPocketMineEnderChest(CompoundTag playerData) {
+    private static void importPocketMineEnderChest(CompoundTag playerData) {
         if (!playerData.contains(POCKETMINE_ENDER_CHEST, ListTag.class)) {
-            return false;
+            return;
         }
 
         ListTag<CompoundTag> legacy = playerData.getList(POCKETMINE_ENDER_CHEST, CompoundTag.class);
@@ -144,7 +139,6 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
                 ? playerData.getList("Inventory", CompoundTag.class)
                 : new ListTag<>("Inventory");
         ListTag<CompoundTag> remaining = new ListTag<>(POCKETMINE_ENDER_CHEST);
-        boolean imported = false;
         boolean movedToMainInventory = false;
 
         for (CompoundTag legacyItem : legacy.getAll()) {
@@ -158,7 +152,6 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             if (targetSlot != Integer.MIN_VALUE) {
                 removeEmptyItemsAt(ender, targetSlot);
                 ender.add(legacyItem.copy().putByte("Slot", targetSlot));
-                imported = true;
             } else {
                 int mainSlot = firstEmptyMainSlot(inventory);
                 if (mainSlot == Integer.MIN_VALUE) {
@@ -167,7 +160,6 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
                 }
                 removeEmptyItemsAt(inventory, mainSlot);
                 inventory.add(legacyItem.copy().putByte("Slot", mainSlot));
-                imported = true;
                 movedToMainInventory = true;
             }
         }
@@ -181,7 +173,6 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
         } else {
             playerData.putList(remaining);
         }
-        return imported;
     }
 
     private static int firstEmptyMainSlot(ListTag<CompoundTag> inventory) {

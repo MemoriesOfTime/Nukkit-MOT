@@ -4,9 +4,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class PocketMinePlayerInventoryImportTest {
 
@@ -28,7 +26,6 @@ class PocketMinePlayerInventoryImportTest {
                 itemAt(playerData.getList("EnderItems", CompoundTag.class), 4).getString("Name"));
         assertFalse(playerData.contains("OffHandItem"));
         assertFalse(playerData.contains("EnderChestInventory"));
-        assertTrue(playerData.getBoolean(EntityHumanType.POCKETMINE_ENDER_IMPORT_PENDING));
     }
 
     @Test
@@ -53,7 +50,6 @@ class PocketMinePlayerInventoryImportTest {
         assertEquals("minecraft:diamond_sword", itemAt(ender, 0).getString("Name"));
         assertFalse(playerData.contains("OffHandItem"));
         assertFalse(playerData.contains("EnderChestInventory"));
-        assertTrue(playerData.getBoolean(EntityHumanType.POCKETMINE_ENDER_IMPORT_PENDING));
     }
 
     @Test
@@ -80,7 +76,6 @@ class PocketMinePlayerInventoryImportTest {
         assertEquals(1, playerData.getList("EnderChestInventory", CompoundTag.class).size());
         assertEquals(37, inventory.size());
         assertEquals(27, ender.size());
-        assertFalse(playerData.getBoolean(EntityHumanType.POCKETMINE_ENDER_IMPORT_PENDING));
     }
 
     @Test
@@ -99,7 +94,6 @@ class PocketMinePlayerInventoryImportTest {
         assertEquals("minecraft:diamond_sword",
                 itemAt(playerData.getList("Inventory", CompoundTag.class), 9).getString("Name"));
         assertFalse(playerData.contains("EnderChestInventory"));
-        assertTrue(playerData.getBoolean(EntityHumanType.POCKETMINE_ENDER_IMPORT_PENDING));
     }
 
     @Test
