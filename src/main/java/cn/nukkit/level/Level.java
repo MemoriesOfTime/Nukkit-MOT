@@ -73,10 +73,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.*;
 import lombok.AllArgsConstructor;
@@ -450,6 +447,13 @@ public class Level implements ChunkManager, Metadatable {
 
     // 任务提交 tick,用于超时自愈 / Submit tick for timeout self-healing
     private final Long2LongOpenHashMap chunkSendTaskStartTick = new Long2LongOpenHashMap();
+
+    /**
+     * 连接/角落位驱动的方块 id 白名单（楼梯/栅栏/玻璃板/铁栏/绊线），延迟初始化。
+     * <p>
+     * Lazy-initialized id whitelist of connection/corner-driven blocks (stairs/fences/panes/bars/tripwire).
+     */
+    private static volatile IntSet connectionDrivenBlockIds;
     private static final int CHUNK_SEND_TIMEOUT_TICKS = 200;
 
     // 异步区块加载:pending 去重 + 完成队列,主线程 doTick 中挂载 / Async chunk loading: pending dedup + completion queue, mounted on the main thread in doTick
@@ -3625,6 +3629,12 @@ public class Level implements ChunkManager, Metadatable {
                 return;
             }
             long index = Level.chunkHash(x, z);
+            // 生成/population 经 chunk.setBlock 与 level.setBlockAt 直写，不触发方块更新，
+            // 连接/角落位从未计算；挂上迁移标志，交给挂载/发送路径按邻居补算
+            // Generation/population writes via chunk.setBlock and level.setBlockAt, bypassing
+            // block updates, so connection/corner bits were never computed; flag the chunk for
+            // the mount/send paths to recompute them from neighbours
+            chunk.setNeedsLegacyConnectionFix(true);
             if (this.chunkPopulationQueue.containsKey(index)) {
                 FullChunk oldChunk = this.getChunk(x, z, false);
                 for (int xx = -1; xx <= 1; ++xx) {
@@ -4119,6 +4129,142 @@ public class Level implements ChunkManager, Metadatable {
         this.chunkRequestInternal(chunkRequests);
     }
 
+    /**
+     * 旧世界迁移：1.26.50 之前保存的玻璃板/铁栏/栅栏/楼梯/绊线没有连接/角落位，而 v2193+ 客户端
+     * 渲染完全由这些状态驱动。按邻居重算并写回，使已有建筑立即恢复连接外观。
+     * <p>
+     * 挂载尾段（finishChunkLoad）为主触发点（光照 population 同款模式），发送路径保留为兜底。
+     * 标志由区块加载/生成路径设置（LevelDB 反序列化时检测磁盘状态缺 corner/connection 键；
+     * 生成的区块经 chunk.setBlock/setBlockAt 直写不触发 update，也需补算；Anvil 连接位虽可经
+     * DataExtra 落盘，但无法区分区块是否由旧版本保存，每次进程启动首个触发点保守重算一次）。
+     * 四邻区块未加载时保留标志推迟重试，
+     * 避免把跨界连接误算为断开；扫描成功后才清标志（中途异常保留待重试），重算后的状态
+     * 落盘即升级为 1.26.50，标志自然消失。新放置方块的连接由 place/onUpdate 路径维护。
+     * <p>
+     * Legacy-world migration: panes/bars/fences/stairs/tripwire saved before 1.26.50 carry no
+     * connection/corner bits, yet v2193+ clients render them purely from those states. Recompute
+     * the bits from neighbours so existing builds regain their looks.
+     * <p>
+     * Primarily triggered from the mount tail (finishChunkLoad, same pattern as light
+     * population), with the send path kept as a fallback. The flag is set on the chunk-load and
+     * generation paths (LevelDB deserialization detects states missing corner/connection keys;
+     * generated chunks are written via chunk.setBlock/setBlockAt which bypass block updates and
+     * need the recompute too; Anvil bits persist via DataExtra, but a save predating this fix
+     * cannot be told apart, so it conservatively recomputes once per process start at the first
+     * trigger). While any horizontal neighbour chunk is
+     * unloaded the flag is kept, avoiding miscomputing cross-border connections as disconnected;
+     * the flag is cleared only after a successful scan (an aborted one stays flagged for retry);
+     * once recomputed and saved the state itself upgrades to 1.26.50 and the flag never returns.
+     * Freshly placed blocks maintain connections via place/onUpdate.
+     */
+    private void fixLegacyBlockConnections(int x, int z, BaseFullChunk chunk) {
+        if (chunk.getProvider() instanceof Anvil && !chunk.isLegacyConnectionsFixed()) {
+            // Anvil：连接位虽可经 DataExtra(8bit) 落盘，但无法区分本次加载的区块是否由
+            // 旧版本保存（缺连接位）；会话内首个触发点保守重算一次
+            // Anvil: connection bits do persist via DataExtra (8-bit), but a chunk loaded this
+            // process cannot be told apart from one last saved by an older build without them;
+            // conservatively recompute once at the first trigger
+            chunk.setNeedsLegacyConnectionFix(true);
+        }
+        if (!chunk.isNeedsLegacyConnectionFix()) {
+            return;
+        }
+        if (!this.areHorizontalNeighboursLoaded(x, z)) {
+            return;
+        }
+        IntSet targetIds = connectionDrivenBlockIds();
+        try {
+            int minY = this.getMinBlockY();
+            int maxY = this.getMaxBlockY();
+            int baseX = x << 4;
+            int baseZ = z << 4;
+            for (int blockY = minY; blockY <= maxY; blockY++) {
+                for (int bx = 0; bx < 16; bx++) {
+                    for (int bz = 0; bz < 16; bz++) {
+                        int id = chunk.getBlockIdAt(bx, blockY, bz);
+                        if (id == 0 || !targetIds.contains(id)) {
+                            continue;
+                        }
+                        Block block = this.getBlock(baseX + bx, blockY, baseZ + bz, 0);
+                        if (block == null) {
+                            continue;
+                        }
+                        boolean changed = false;
+                        if (block instanceof BlockThin thin) {
+                            changed = thin.updateConnections();
+                        } else if (block instanceof BlockFence fence) {
+                            changed = fence.updateConnections();
+                        } else if (block instanceof BlockStairs stairs) {
+                            changed = stairs.updateCorner();
+                        } else if (block instanceof BlockTripWire wire) {
+                            changed = wire.updateConnections();
+                        }
+                        if (changed) {
+                            this.setBlock(block, 0, block, true, false);
+                        }
+                    }
+                }
+            }
+            // 成功完成后才清标志：中途异常保留标志，待发送/邻居挂载时重试
+            // Clear the flag only after a full pass; an aborted scan stays flagged for retry
+            chunk.setNeedsLegacyConnectionFix(false);
+            chunk.setLegacyConnectionsFixed(true);
+        } catch (Throwable t) {
+            this.server.getLogger().error("Failed to fix legacy block connections in chunk " + x + ", " + z + " of level " + this.getFolderName(), t);
+        }
+    }
+
+    private boolean areHorizontalNeighboursLoaded(int x, int z) {
+        return this.getChunkIfLoaded(x + 1, z) != null && this.getChunkIfLoaded(x - 1, z) != null
+                && this.getChunkIfLoaded(x, z + 1) != null && this.getChunkIfLoaded(x, z - 1) != null;
+    }
+
+    /**
+     * 新区块挂载后唤醒四邻中仍带迁移标志的区块重试——它们的四邻可能因此凑齐。
+     * <p>
+     * After a chunk mounts, re-attempt flagged neighbours — this mount may complete their
+     * four-neighbour gating.
+     */
+    private void retryLegacyConnectionFixForNeighbours(int x, int z) {
+        this.retryLegacyConnectionFix(x + 1, z);
+        this.retryLegacyConnectionFix(x - 1, z);
+        this.retryLegacyConnectionFix(x, z + 1);
+        this.retryLegacyConnectionFix(x, z - 1);
+    }
+
+    private void retryLegacyConnectionFix(int x, int z) {
+        BaseFullChunk chunk = this.getChunkIfLoaded(x, z);
+        if (chunk != null && chunk.isNeedsLegacyConnectionFix()) {
+            this.fixLegacyBlockConnections(x, z, chunk);
+        }
+    }
+
+    private static IntSet connectionDrivenBlockIds() {
+        IntSet ids = connectionDrivenBlockIds;
+        if (ids != null) {
+            return ids;
+        }
+        synchronized (Level.class) {
+            if (connectionDrivenBlockIds == null) {
+                IntOpenHashSet found = new IntOpenHashSet();
+                Class<?>[] list = Block.list;
+                if (list != null) {
+                    for (int id = 0; id < list.length; id++) {
+                        Class<?> type = list[id];
+                        if (type != null && (BlockThin.class.isAssignableFrom(type)
+                                || BlockFence.class.isAssignableFrom(type)
+                                || BlockStairs.class.isAssignableFrom(type)
+                                || BlockTripWire.class.isAssignableFrom(type))) {
+                            found.add(id);
+                        }
+                    }
+                }
+                connectionDrivenBlockIds = found;
+            }
+            return connectionDrivenBlockIds;
+        }
+    }
+
     private void chunkRequestInternal(Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests) {
         for (long index : chunkRequests.keySet()) {
             ObjectSet<GameVersion> protocols = new ObjectOpenHashSet<>(chunkRequests.get(index));
@@ -4128,6 +4274,9 @@ public class Level implements ChunkManager, Metadatable {
             for (GameVersion protocol : chunkRequests.get(index)) {
                 BaseFullChunk chunk = this.getChunk(x, z);
                 if (chunk != null) {
+                    // 兜底：挂载尾段邻居未齐而保留标志的区块，发送前最后重试一次 / Fallback:
+                    // last retry before sending for chunks still flagged after the mount tail
+                    this.fixLegacyBlockConnections(x, z, chunk);
                     BatchPacket packet = chunk.getChunkPacket(protocol);
                     if (packet != null) {
                         //this.sendChunk(x, z, index, packet);
@@ -4309,6 +4458,12 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         chunk.initChunk();
+
+        // 旧世界连接/角落位迁移：挂载即重算（光照 population 同款挂载尾段模式），并唤醒邻居重试
+        // Legacy connection/corner-bit migration: fix on mount (same tail pattern as light
+        // population) and wake neighbours so their four-neighbour gating may now pass
+        this.fixLegacyBlockConnections(x, z, chunk);
+        this.retryLegacyConnectionFixForNeighbours(x, z);
 
         if (!chunk.isLightPopulated() && chunk.isPopulated() && this.server.lightUpdates) {
             this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new LightPopulationTask(this, chunk));

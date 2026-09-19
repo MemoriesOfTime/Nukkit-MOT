@@ -5,6 +5,7 @@ import cn.nukkit.block.properties.enums.OxidizationLevel;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.level.Level;
 import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -56,6 +57,12 @@ public abstract class BlockBarsCopperBase extends BlockThin implements Oxidizabl
 
     @Override
     public int onUpdate(int type) {
+        // 氧化只关心 RANDOM；其余交给父类维护连接位（v2193 起由状态驱动渲染）
+        // Oxidation only cares about RANDOM; everything else goes to the parent, which
+        // maintains the connection bits (state-driven rendering since v2193)
+        if (type != Level.BLOCK_UPDATE_RANDOM) {
+            return super.onUpdate(type);
+        }
         return Oxidizable.super.onUpdate(type);
     }
 

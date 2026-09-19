@@ -122,7 +122,7 @@ public enum GameVersion {
     V1_21_124_NETEASE(860, true, "1.21.124_NetEase"),
     ;
 
-    private static GameVersion FEATURE_VERSION = GameVersion.V1_26_10;
+    private static GameVersion FEATURE_VERSION = GameVersion.V1_26_50;
     private static final GameVersion LAST_VERSION = GameVersion.V1_26_50; //TODO MultiVersion
     private static final GameVersion LAST_NETEASE_VERSION = GameVersion.V1_21_124_NETEASE; //TODO MultiVersion
 
