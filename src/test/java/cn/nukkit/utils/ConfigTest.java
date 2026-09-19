@@ -168,6 +168,27 @@ public class ConfigTest {
     }
 
     @Test
+    public void testJsonNestedSectionsAndObjectsInLists() throws Exception {
+        Path jsonFile = tempDir.resolve("nested.json");
+        Files.write(jsonFile, "{\"groups\":{\"admin\":{\"prefix\":\"[Admin]\"}},\"members\":[{\"name\":\"Alex\"}]}"
+                .getBytes(StandardCharsets.UTF_8));
+
+        Config config = new Config(jsonFile.toFile(), Config.JSON);
+
+        // Gson 嵌套对象反序列化为 LinkedTreeMap，必须递归转换为 ConfigSection
+        // Gson deserializes nested objects as LinkedTreeMap; they must become ConfigSection
+        Assertions.assertInstanceOf(ConfigSection.class, config.get("groups"));
+
+        ConfigSection groups = config.getSection("groups");
+        ConfigSection admin = groups.getSection("admin");
+        Assertions.assertEquals("[Admin]", admin.getString("prefix"));
+
+        Object firstMember = config.getList("members").get(0);
+        Assertions.assertInstanceOf(ConfigSection.class, firstMember);
+        Assertions.assertEquals("Alex", ((ConfigSection) firstMember).getString("name"));
+    }
+
+    @Test
     public void testConfigMigrationSpaceNameModeReplacing() {
         File propertiesFile = tempDir.resolve("server.properties").toFile();
         Config properties = new Config(propertiesFile, Config.PROPERTIES);
@@ -258,6 +279,7 @@ public class ConfigTest {
         Assertions.assertTrue(config.gameFeatureSettings().enableExperimentMode());
         Assertions.assertEquals(0, config.gameFeatureSettings().multiversionMinProtocol());
         Assertions.assertEquals(-1, config.gameFeatureSettings().multiversionMaxProtocol());
+        Assertions.assertTrue(config.gameFeatureSettings().vanillaKnockbackResistance());
 
         // NetEase
         Assertions.assertFalse(config.neteaseSettings().clientSupport());

@@ -46,6 +46,8 @@
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
         <netty.version>4.2.16.Final</netty.version>
         <maven.shade.skip>false</maven.shade.skip>
+        <!-- Reproducible build: entry timestamps follow the last commit time -->
+        <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
     </properties>
 
     <distributionManagement>
@@ -101,10 +103,57 @@
                 <artifactId>error_prone_annotations</artifactId>
                 <version>2.41.0</version>
             </dependency>
+            <!-- libdatachannel 与 raknet/oshi 传递依赖版本分叉，统一固定；Pin diverging transitive versions -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>2.0.18</version>
+            </dependency>
+            <dependency>
+                <groupId>net.jodah</groupId>
+                <artifactId>expiringmap</artifactId>
+                <version>0.5.11</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>org.cloudburstmc.netty</groupId>
+            <artifactId>netty-transport-nethernet</artifactId>
+            <version>2.0.0.CR3-20260918.234329-18</version>
+            <scope>compile</scope>
+            <exclusions>
+                <!-- 统一使用服务器自带的 Netty 4.2.x；Use the Netty version this server ships with (4.2.x) -->
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <!-- 改用下方 arch-detect：自带全部平台原生库；Use arch-detect below, it bundles every platform's natives -->
+                <exclusion>
+                    <groupId>dev.opencollab</groupId>
+                    <artifactId>libdatachannel-java</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>dev.opencollab</groupId>
+            <artifactId>libdatachannel-java</artifactId>
+            <version>0.24.5.0-20260918.234655-9</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.opencollab</groupId>
+            <artifactId>libdatachannel-java-arch-detect</artifactId>
+            <version>0.24.5.0-20260918.234655-9</version>
+            <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>dev.opencollab</groupId>
+                    <artifactId>libdatachannel-java</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>dev.mot.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
@@ -145,6 +194,12 @@
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http</artifactId>
+            <version>${netty.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
             <artifactId>netty-codec-haproxy</artifactId>
             <version>${netty.version}</version>
             <scope>compile</scope>
@@ -158,7 +213,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta13-20260801.140213-6</version>
+            <version>3.0.0.Beta13-20260915.235937-24</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -516,7 +571,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>bedrock-codec</artifactId>
-            <version>3.0.0.Beta13-20260801.140213-6</version>
+            <version>3.0.0.Beta13-20260916.122344-26</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -667,9 +722,9 @@
                 <version>3.6.2</version>
                 <dependencies>
                     <dependency>
-                        <groupId>com.github.edwgiz</groupId>
-                        <artifactId>maven-shade-plugin.log4j2-cachefile-transformer</artifactId>
-                        <version>2.8.1</version>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+                        <version>0.2.0</version>
                     </dependency>
                 </dependencies>
                 <executions>
@@ -704,7 +759,7 @@
                     </filters>
                     <transformers>
                         <transformer
-                                implementation="com.github.edwgiz.mavenShadePlugin.log4j2CacheTransformer.PluginsCacheFileTransformer">
+                                implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer">
                         </transformer>
                     </transformers>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
@@ -726,8 +781,8 @@
                 <configuration>
                     <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
                     <prefix>git</prefix>
-                    <dateFormat>dd.MM.yyyy '@' HH:mm:ss z</dateFormat>
-                    <dateFormatTimeZone>${user.timezone}</dateFormatTimeZone>
+                    <dateFormat>yyyy-MM-dd'T'HH:mm:ssXXX</dateFormat>
+                    <dateFormatTimeZone>UTC</dateFormatTimeZone>
                     <verbose>true</verbose>
                     <generateGitPropertiesFile>true</generateGitPropertiesFile>
                     <generateGitPropertiesFilename>${project.build.outputDirectory}/git.properties
@@ -739,10 +794,14 @@
                     <failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
                     <skip>false</skip>
                     <runOnlyOnce>true</runOnlyOnce>
-                    <excludeProperties>
-                        <excludeProperty>git.user.*</excludeProperty>
-                    </excludeProperties>
+                    <!-- Only commit-determined fields; the rest vary with the build
+                         environment. git.commit.time must stay listed: this filter also
+                         drops injected properties, and outputTimestamp resolves against
+                         it (see dateFormat below). -->
                     <includeOnlyProperties>
+                        <includeOnlyProperty>^git.commit.id.abbrev$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.commit.time$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.branch$</includeOnlyProperty>
                     </includeOnlyProperties>
                     <useBranchNameFromBuildEnvironment>false</useBranchNameFromBuildEnvironment>
                     <useNativeGit>false</useNativeGit>

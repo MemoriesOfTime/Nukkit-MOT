@@ -2,19 +2,17 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.inventory.transaction.data.UseItemData;
-import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.BlockVector3;
-import cn.nukkit.math.Vector2;
-import cn.nukkit.math.Vector2f;
-import cn.nukkit.math.Vector3f;
+import cn.nukkit.math.*;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -49,6 +47,10 @@ public class PlayerAuthInputPacket extends DataPacket {
     private InventoryTransactionPacket itemUseTransaction;
     private ItemStackRequest itemStackRequest;
     private Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
+    /** All decoded actions in wire order; the legacy map can retain only the last of each type. */
+    private final List<PlayerBlockActionData> decodedBlockActions = new ArrayList<>();
+    @Getter(lombok.AccessLevel.NONE)
+    private final Map<PlayerActionType, PlayerBlockActionData> decodedBlockActionSnapshot = new EnumMap<>(PlayerActionType.class);
     /**
      * @since v748
      */
@@ -94,6 +96,9 @@ public class PlayerAuthInputPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.blockActionData.clear();
+        this.decodedBlockActions.clear();
+        this.decodedBlockActionSnapshot.clear();
         this.pitch = this.getLFloat();
         this.yaw = this.getLFloat();
         this.position = this.getVector3f();
@@ -101,8 +106,11 @@ public class PlayerAuthInputPacket extends DataPacket {
         this.headYaw = this.getLFloat();
 
         boolean v2168 = this.protocol >= ProtocolInfo.v1_26_40;
+        boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50_27;
         if (v2168) {
-            this.getBoolean(); // 外层 true，丢弃 / outer true, discarded
+            if (!v2192) {
+                this.getBoolean(); // v2168~v2169 外层 true，丢弃；v2192 起移除 / outer true, discarded; removed in v2192
+            }
             int count = (int) this.getUnsignedVarInt();
             for (int i = 0; i < Math.min(count, 256); i++) {
                 int ordinal = this.getVarInt();
@@ -152,23 +160,25 @@ public class PlayerAuthInputPacket extends DataPacket {
         }
 
         if (v2168) {
-            if (this.getBoolean() && this.getBoolean()) {
+            // v2192 起各可选段仅一个 bool（v2168~v2169 为恒 true 外层 + 内层双 bool）
+            // Since v2192 each optional section has a single bool (v2168~v2169 used a constant outer + inner bool pair)
+            if (this.optSectionPresent(v2192)) {
                 this.itemUseTransaction = this.readItemUseTransaction();
             }
-            if (this.getBoolean() && this.getBoolean()) {
+            if (this.optSectionPresent(v2192)) {
                 this.itemStackRequest = this.readItemStackRequest(this.gameVersion);
             }
-            if (this.getBoolean() && this.getBoolean()) {
+            if (this.optSectionPresent(v2192)) {
                 int arraySize = (int) this.getUnsignedVarInt();
                 if (arraySize > 256) {
                     throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
                 }
                 this.decodeBlockActions(arraySize, true);
             }
-            if (this.getBoolean() && this.getBoolean()) {
+            if (this.optSectionPresent(v2192)) {
                 this.vehicleRotation = this.getVector2f();
             }
-            if (this.getBoolean() && this.getBoolean()) {
+            if (this.optSectionPresent(v2192)) {
                 this.predictedVehicle = this.getVarLong();
             }
         } else {
@@ -211,6 +221,16 @@ public class PlayerAuthInputPacket extends DataPacket {
     }
 
     /**
+     * v2192 起可选段仅一个存在性 bool；v2168~v2169 为「恒 true 外层 + 内层」双 bool。
+     * <p>
+     * Since v2192 an optional section carries a single presence bool; v2168~v2169 used a
+     * constant-true outer bool plus an inner bool.
+     */
+    private boolean optSectionPresent(boolean v2192) {
+        return v2192 ? this.getBoolean() : this.getBoolean() && this.getBoolean();
+    }
+
+    /**
      * v2168 起每条 block action 固定为 action+position+face（与类型无关）；pre-v2168 仅 5 种动作带 position+face。
      * <p>
      * From v2168 every block action is action+position+face unconditionally; pre-v2168 only 5 action types carry them.
@@ -227,7 +247,7 @@ public class PlayerAuthInputPacket extends DataPacket {
                 if (type == null) {
                     continue;
                 }
-                this.blockActionData.put(type, new PlayerBlockActionData(type, position, facing));
+                this.addDecodedBlockAction(new PlayerBlockActionData(type, position, facing));
             } else {
                 // pre-v2168: 仅 5 种动作携带 position+face / only 5 action types carry position+face
                 if (type == null) {
@@ -239,13 +259,47 @@ public class PlayerAuthInputPacket extends DataPacket {
                     case CRACK_BLOCK:
                     case PREDICT_DESTROY_BLOCK:
                     case CONTINUE_DESTROY_BLOCK:
-                        this.blockActionData.put(type, new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
+                        this.addDecodedBlockAction(new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
                         break;
                     default:
-                        this.blockActionData.put(type, new PlayerBlockActionData(type, null, -1));
+                        this.addDecodedBlockAction(new PlayerBlockActionData(type, null, -1));
                 }
             }
         }
+        // Packet listeners may mutate the legacy map, its actions or their coordinates.
+        // Preserve those filters instead of replaying an unfiltered decoded sequence.
+        this.blockActionData.forEach((type, action) ->
+                this.decodedBlockActionSnapshot.put(type, copyBlockAction(action)));
+    }
+
+    /**
+     * Returns a read-only snapshot of the decoded sequence for replay, or an empty list when a
+     * legacy map edit requires fallback. Snapshot actions and positions are defensive copies;
+     * packet listeners should use {@link #getBlockActionData()} or {@link #setBlockActionData(Map)}
+     * to filter or replace actions.
+     */
+    public List<PlayerBlockActionData> getDecodedBlockActions() {
+        return this.blockActionData.equals(this.decodedBlockActionSnapshot)
+                ? this.decodedBlockActions.stream().map(PlayerAuthInputPacket::copyBlockAction).toList()
+                : List.of();
+    }
+
+    private static PlayerBlockActionData copyBlockAction(PlayerBlockActionData action) {
+        BlockVector3 pos = action.getPosition();
+        return new PlayerBlockActionData(action.getAction(),
+                pos == null ? null : new BlockVector3(pos.x, pos.y, pos.z), action.getFacing());
+    }
+
+    private void addDecodedBlockAction(PlayerBlockActionData action) {
+        this.decodedBlockActions.add(action);
+        this.blockActionData.put(action.getAction(), action);
+    }
+
+    /** Replacing the legacy map explicitly also replaces the decoded action sequence. */
+    public void setBlockActionData(Map<PlayerActionType, PlayerBlockActionData> actions) {
+        this.decodedBlockActions.clear();
+        this.decodedBlockActionSnapshot.clear();
+        this.blockActionData = actions;
     }
 
     private InventoryTransactionPacket readItemUseTransaction() {
@@ -258,6 +312,7 @@ public class PlayerAuthInputPacket extends DataPacket {
         packet.setOffset(this.getOffset());
 
         boolean v2168Shape = packet.protocol >= ProtocolInfo.v1_26_40;
+        boolean v2192Shape = packet.protocol >= ProtocolInfo.v1_26_50_27;
         packet.legacyRequestId = packet.getVarInt();
         boolean hasLegacySlots = v2168Shape
                 ? packet.getBoolean() && packet.legacyRequestId < -1 && (packet.legacyRequestId & 1) == 0
@@ -271,7 +326,8 @@ public class PlayerAuthInputPacket extends DataPacket {
             }
         }
 
-        if (v2168Shape) {
+        if (v2168Shape && !v2192Shape) {
+            // v2168~v2169 actions 前有双 bool；v2192 起移除 / double bool before actions, removed in v2192
             if (!(packet.getBoolean() && packet.getBoolean())) {
                 throw new IllegalStateException("Expected InventoryActionData");
             }
@@ -294,6 +350,9 @@ public class PlayerAuthInputPacket extends DataPacket {
         itemData.blockPos = packet.getBlockVector3();
         itemData.face = v2168Shape ? BlockFace.fromIndex(packet.getByte() & 0xff) : packet.getBlockFace();
         itemData.hotbarSlot = packet.getVarInt();
+        if (packet.protocol >= ProtocolInfo.v1_26_50_27) {
+           itemData.hand = packet.getByte();
+        }
         itemData.itemInHand = v2168Shape ? packet.getNetworkItemStackDescriptor(packet.gameVersion) : packet.getSlot(packet.gameVersion);
         itemData.playerPos = packet.getVector3f().asVector3();
         itemData.clickPos = packet.getVector3f();

@@ -78,8 +78,9 @@ public class EnchantTransaction extends InventoryTransaction {
 
         return this.inputItem.equals(eInv.getInputSlot(), true, true)
                 && (this.inputItem.getId() == this.outputItem.getId() || (this.inputItem.getId() == Item.BOOK && this.outputItem.getId() == Item.ENCHANTED_BOOK))
-                && (this.inputItem.getCount() == this.outputItem.getCount() || (this.outputItem.getId() == Item.ENCHANTED_BOOK && this.outputItem.getCount() == 1)
-                && this.checkEnchantValid());
+                && (this.inputItem.getCount() == this.outputItem.getCount()
+                        || (this.outputItem.getId() == Item.ENCHANTED_BOOK && this.outputItem.getCount() == 1))
+                && this.checkEnchantValid();
     }
 
     @Override
@@ -92,6 +93,7 @@ public class EnchantTransaction extends InventoryTransaction {
         }
 
         EnchantInventory inv = (EnchantInventory) getSource().getWindowById(Player.ENCHANT_WINDOW_ID);
+        Item originalOutput = this.outputItem.clone();
         EnchantItemEvent ev = new EnchantItemEvent(inv, inputItem, outputItem, cost, source);
         source.getServer().getPluginManager().callEvent(ev);
         if (ev.isCancelled()) {
@@ -100,6 +102,13 @@ public class EnchantTransaction extends InventoryTransaction {
             // Cancelled by plugin, means handled OK
             return true;
         }
+        Item authoritativeOutput = applyEventOutputToActions(originalOutput, ev.getNewItem());
+        if (authoritativeOutput == null) {
+            this.sendInventories();
+            source.setNeedSendInventory(true);
+            return true;
+        }
+        this.outputItem = authoritativeOutput;
 
         // This will process all the slot changes
         for (InventoryAction a : this.actions) {
@@ -108,12 +117,6 @@ public class EnchantTransaction extends InventoryTransaction {
             } else {
                 a.onExecuteFail(source);
             }
-        }
-
-        if (!ev.getNewItem().equals(this.outputItem, true, true)) {
-            // Plugin changed item, so the previous slot change is going to be invalid
-            // Send the replaced item to the enchant inventory manually
-            inv.setItem(0, ev.getNewItem(), true);
         }
 
         if (!source.isCreative()) {
