@@ -135,7 +135,7 @@ public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable
     @Override
     public Item[] getDrops(Item item) {
         BlockEntity blockEntity = getLevel().getBlockEntity(this);
-        int dropMeta = 0;
+        int dropMeta = this.getSkullType().ordinal();
         if (blockEntity != null) dropMeta = blockEntity.namedTag.getByte("SkullType");
         return new Item[]{
                 new ItemSkull(dropMeta)
