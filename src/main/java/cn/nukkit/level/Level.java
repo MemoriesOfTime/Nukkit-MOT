@@ -5676,7 +5676,9 @@ public class Level implements ChunkManager, Metadatable {
             return GameVersion.V1_20_50_NETEASE;
         }
 
-        if (protocol >= GameVersion.V1_26_40.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
+            return GameVersion.V1_26_50;
+        } else if (protocol >= GameVersion.V1_26_40.getProtocol()) {
             return GameVersion.V1_26_40;
         } else if (protocol >= GameVersion.V1_26_30.getProtocol()) {
             return GameVersion.V1_26_30;
@@ -5840,7 +5842,10 @@ public class Level implements ChunkManager, Metadatable {
             if (player >= GameVersion.V1_26_20_26.getProtocol()) if (player < GameVersion.V1_26_30.getProtocol()) return true;
         if (chunk == GameVersion.V1_26_30.getProtocol())
             if (player >= GameVersion.V1_26_30.getProtocol()) if (player < GameVersion.V1_26_40.getProtocol()) return true;
-        if (chunk == GameVersion.V1_26_40.getProtocol()) if (player >= GameVersion.V1_26_40.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_40.getProtocol())
+            if (player >= GameVersion.V1_26_40.getProtocol()) if (player < GameVersion.V1_26_50_27.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_50.getProtocol())
+            if (player >= GameVersion.V1_26_50_27.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

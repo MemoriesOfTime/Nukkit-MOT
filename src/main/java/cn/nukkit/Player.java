@@ -69,6 +69,7 @@ import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
+import cn.nukkit.network.NetherNetInterface;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
@@ -1500,7 +1501,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         int centerX = (int) this.x >> 4;
         int centerZ = (int) this.z >> 4;
 
-        int radius = spawned ? this.chunkRadius : server.c_s_spawnThreshold;
+        // Before the first spawn the client already waits for every chunk inside the publisher
+        // radius (chunkRadius, never below 3). Capping the pre-spawn radius to sqrt(spawn-threshold)
+        // left the outer ring unsent, so the client hung in the air until its own timeout and only
+        // then sent SetLocalPlayerAsInitialized. PocketMine-MP and PowerNukkitX send the full view
+        // distance before spawn and use the threshold only to decide when PLAYER_SPAWN goes out.
+        int radius = spawned ? this.chunkRadius : Math.max(this.chunkRadius, server.c_s_spawnThreshold);
         int radiusSqr = radius * radius;
 
         // FOV 朝向优先(借鉴 PNX):视野内先入队,组内近→远;LongLinkedOpenHashSet 保插入序
@@ -3469,8 +3475,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
+        if (this.protocol >= ProtocolInfo.v1_21_120) {
+            this.forceDataPacket(JigsawStructureDataPacket.getCachedPacket(), null);
+        }
+
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
-            this.forceDataPacket(new VoxelShapesPacket(), null);
+            this.forceDataPacket(VoxelShapesPacket.getCachedPacket(this.protocol), null);
         }
 
         StartGamePacket startGamePacket = new StartGamePacket();
@@ -3513,7 +3523,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + this.gameVersion.toString() + ")"));
+                this.protocol + " (" + this.gameVersion.toString() + ", " + this.getTransportName() + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
@@ -3699,7 +3709,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + this.gameVersion.toString() + ")"));
+                this.protocol + " (" + this.gameVersion.toString() + ", " + this.getTransportName() + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
@@ -3945,6 +3955,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 Skin skin = loginPacket.skin;
                 this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
+
+                // NetherNet 跳过加密握手，登录链改用信令身份断言绑定，防止捕获的链被重放
+                // NetherNet skips the encryption handshake, so bind the login chain to the signaling identity instead
+                if (this.interfaz instanceof NetherNetInterface netherNet) {
+                    String identityRefusal = netherNet.checkIdentityBinding(
+                            this.networkSession, this.loginChainData.getIdentityPublicKey());
+                    if (identityRefusal != null) {
+                        log.warn("Refusing a NetherNet login from {}: {}", this.getSocketAddress(), identityRefusal);
+                        this.close("", "disconnectionScreen.notAuthenticated");
+                        break;
+                    }
+                }
 
                 PlayerPreLoginEvent playerPreLoginEvent;
                 this.server.getPluginManager().callEvent(playerPreLoginEvent = new PlayerPreLoginEvent(this, "Plugin reason"));
@@ -4791,12 +4813,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.getServer().getLogger().debug(username + ": Block pick request for a block too far away");
                     return;
                 }
-                Item item = block.toItem();
+                // A placed shulker box keeps the tag of the item it came from (lore, plugin data);
+                // pick block creates a new item and must not copy that tag onto it.
+                Item item = block instanceof BlockShulkerBox shulkerBox ? shulkerBox.toPickItem() : block.toItem();
                 if (pickRequestPacket.addUserData) {
                     BlockEntity blockEntity = this.getLevel().getBlockEntityIfLoaded(this.temporalVector.setComponents(pickRequestPacket.x, pickRequestPacket.y, pickRequestPacket.z));
                     if (blockEntity != null) {
                         CompoundTag nbt = blockEntity.getCleanedNBT();
                         if (nbt != null) {
+                            nbt.remove(BlockShulkerBox.SOURCE_ITEM_TAG);
+                        }
+                        if (nbt != null && !nbt.isEmpty()) {
                             item.setCustomBlockData(nbt);
                             item.setLore("+(DATA)");
                         }
@@ -6557,7 +6584,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(String message, String reason, boolean notify) {
-        this.close(new TextContainer(message), reason, notify);
+        this.close(message, reason, notify, null);
+    }
+
+    /**
+     * @param failReason 断连包的 wire 枚举（v1_20_40+ 编码为序数），null 保持 DISCONNECTED；
+     *                   调用方须确认客户端协议认识该序数
+     * @param failReason the wire fail reason (encoded as an ordinal since v1_20_40);
+     *                   null keeps DISCONNECTED, the caller must ensure the client's protocol knows the ordinal
+     */
+    public void close(String message, String reason, boolean notify, DisconnectFailReason failReason) {
+        this.close(new TextContainer(message), reason, notify, failReason);
     }
 
     public void close(TextContainer message) {
@@ -6569,9 +6606,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(TextContainer message, String reason, boolean notify) {
+        this.close(message, reason, notify, null);
+    }
+
+    public void close(TextContainer message, String reason, boolean notify, DisconnectFailReason failReason) {
         if (this.connected && !this.closed) {
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
+                pk.reason = failReason != null ? failReason : DisconnectFailReason.DISCONNECTED;
                 if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
                     pk.message = TextFormat.clean(TextFormat.colorize(reason));
                 } else {
@@ -7475,7 +7517,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkX = (int) this.teleportPosition.x >> 4;
             int chunkZ = (int) this.teleportPosition.z >> 4;
 
-            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : this.server.c_s_spawnThreshold);
+            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : Math.max(this.chunkRadius, this.server.c_s_spawnThreshold));
             int maxChunkOffset = Math.min(TELEPORT_CHUNK_READY_OFFSET, chunkSendRadius);
             long chunkSendRadiusSqr = (long) chunkSendRadius * chunkSendRadius;
             for (int X = -maxChunkOffset; X <= maxChunkOffset; ++X) {
@@ -8663,6 +8705,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.networkSession;
     }
 
+    private String getTransportName() {
+        return this.interfaz instanceof NetherNetInterface ? "NetherNet" : "RakNet";
+    }
+
     void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {
         PendingResourcePack pending = this.pendingResourcePacks.computeIfAbsent(resourcePack.getPackId(),
                 ignored -> new PendingResourcePack(resourcePack));
@@ -8976,6 +9022,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean isEnableNetworkEncryption() {
+        // NetherNet 会话已由 DTLS 加密，客户端会以明文回应加密握手导致断连，故跳过
+        // NetherNet rides DTLS and a real client answers the handshake in plaintext, so skip it
+        if (this.interfaz instanceof NetherNetInterface) {
+            return false;
+        }
         return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled /*&& loginChainData.isXboxAuthed()*/;
     }
 

@@ -879,4 +879,20 @@ class RakNetPlayerSessionTest {
             this.putByte((byte) 0x7f);
         }
     }
+
+    @Test
+    void resourcePackDownloadIsNotTimedOutWhileTransportIsAlive() {
+        long timeout = 90_000;
+        long start = 0;
+        long now = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(120_000);
+        assertFalse(RakNetPlayerSession.isLoginPhaseTimedOut(SessionLoginPhase.RESOURCE_PACK,
+                start, start, true, now, (int) timeout));
+        assertTrue(RakNetPlayerSession.isLoginPhaseTimedOut(SessionLoginPhase.RESOURCE_PACK,
+                start, start, false, now, (int) timeout));
+        assertTrue(RakNetPlayerSession.isLoginPhaseTimedOut(SessionLoginPhase.CONNECTED,
+                start, start, true, now, (int) timeout));
+        long late = RakNetPlayerSession.RESOURCE_PACK_PHASE_MAX_NANOS + 1;
+        assertTrue(RakNetPlayerSession.isLoginPhaseTimedOut(SessionLoginPhase.RESOURCE_PACK,
+                start, start, true, late, (int) timeout));
+    }
 }
