@@ -71,6 +71,65 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(32, loginPacket.skin.getSkinData().height);
     }
 
+    // Real-world MCPE 1.1.x clients ride RakNet protocol 8 (same as MCPE 1.2-1.5) but keep
+    // the 1-byte inner batch header, so the header width cannot be inferred from the RakNet
+    // version alone. Guards the regression from issue #927.
+    @Test
+    void testLegacy113LoginPacketBatchDecodesOnRakNet8WhenPlayerProtocolUnknown() {
+        Player player = org.mockito.Mockito.mock(Player.class);
+        player.protocol = Integer.MAX_VALUE;
+
+        byte[] skinBytes = new byte[64 * 32 * 4];
+        java.util.UUID clientUuid = java.util.UUID.fromString("12345678-1234-5678-9abc-def012345678");
+        byte[] batchPayload = buildLegacy113LoginBatch("TestUser", clientUuid, 12345L, skinBytes);
+
+        var packets = new ArrayList<DataPacket>();
+        assertTrue(network.processBatch(batchPayload, packets, CompressionProvider.NONE, 8, player));
+        assertEquals(1, packets.size());
+        assertInstanceOf(LoginPacket.class, packets.get(0));
+
+        LoginPacket loginPacket = (LoginPacket) packets.get(0);
+        assertEquals(ProtocolInfo.v1_1_0, loginPacket.getProtocol());
+        assertEquals("TestUser", loginPacket.username);
+        assertEquals(clientUuid, loginPacket.clientUUID);
+        assertEquals(12345L, loginPacket.clientId);
+        assertNotNull(loginPacket.skin);
+        assertEquals("legacy-skin", loginPacket.skin.getSkinId());
+        assertEquals(64, loginPacket.skin.getSkinData().width);
+        assertEquals(32, loginPacket.skin.getSkinData().height);
+    }
+
+    // The first login batch is decoded on the RakNet event loop before the main-thread tick
+    // creates the Player (session.setPlayer), so player == null is the common pre-login state;
+    // it must be sniffed the same way as an un-negotiated player.
+    @Test
+    void testLegacy113LoginPacketBatchDecodesOnRakNet8BeforePlayerCreated() {
+        byte[] skinBytes = new byte[64 * 32 * 4];
+        java.util.UUID clientUuid = java.util.UUID.fromString("12345678-1234-5678-9abc-def012345678");
+        byte[] batchPayload = buildLegacy113LoginBatch("TestUser", clientUuid, 12345L, skinBytes);
+
+        var packets = new ArrayList<DataPacket>();
+        assertTrue(network.processBatch(batchPayload, packets, CompressionProvider.NONE, 8, null));
+        assertEquals(1, packets.size());
+        assertInstanceOf(LoginPacket.class, packets.get(0));
+        assertEquals(ProtocolInfo.v1_1_0, ((LoginPacket) packets.get(0)).getProtocol());
+    }
+
+    // 1.2-1.5 clients share RakNet 8 with 1.0/1.1: the null-player sniff must not misread
+    // their 3-byte-header login as 1-byte.
+    @Test
+    void testLegacy137LoginPacketBatchDecodesOnRakNet8BeforePlayerCreated() {
+        byte[] skinBytes = new byte[64 * 32 * 4];
+        java.util.UUID clientUuid = java.util.UUID.fromString("87654321-4321-8765-cba9-876543210fed");
+        byte[] batchPayload = buildLegacy137LoginBatch("TestUser137", clientUuid, 54321L, skinBytes);
+
+        var packets = new ArrayList<DataPacket>();
+        assertTrue(network.processBatch(batchPayload, packets, CompressionProvider.NONE, 8, null));
+        assertEquals(1, packets.size());
+        assertInstanceOf(LoginPacket.class, packets.get(0));
+        assertEquals(ProtocolInfo.v1_2_0, ((LoginPacket) packets.get(0)).getProtocol());
+    }
+
     @Test
     void testLegacy137LoginPacketBatchDecodesWhenPlayerProtocolUnknown() {
         Player player = org.mockito.Mockito.mock(Player.class);

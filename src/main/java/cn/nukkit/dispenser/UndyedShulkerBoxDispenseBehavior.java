@@ -2,6 +2,7 @@ package cn.nukkit.dispenser;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockDispenser;
+import cn.nukkit.block.BlockShulkerBox;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.item.Item;
@@ -29,6 +30,7 @@ public class UndyedShulkerBoxDispenseBehavior extends DefaultDispenseBehavior {
                     nbt.putList(tag.getList("Items"));
                 }
             }
+            BlockShulkerBox.putSourceItemTag(nbt, item);
 
             block.level.setBlock(target, Block.get(BlockID.UNDYED_SHULKER_BOX, 0), true);
             BlockEntity.createBlockEntity(BlockEntity.SHULKER_BOX, block.level.getChunk(target.getChunkX(), target.getChunkZ()), nbt);

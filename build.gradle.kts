@@ -1,4 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
+import org.gradle.api.tasks.bundling.AbstractArchiveTask
 
 plugins {
     id("java-library")
@@ -44,6 +45,21 @@ val mockitoAgent by configurations.creating {
 }
 
 dependencies {
+    // 与 pom.xml dependencyManagement 同步的传递依赖 pin，防 Gradle 依赖解析漂移
+    // Transitive pins mirroring pom.xml dependencyManagement, guarding against Gradle resolution drift
+    constraints {
+        implementation("net.jodah:expiringmap:${libs.versions.expiringmap.get()}")
+        implementation("org.slf4j:slf4j-api:${libs.versions.slf4j.api.get()}")
+    }
+    api(libs.nethernet) {
+        exclude("io.netty")
+        // 改用下方 arch-detect：自带全部平台原生库；Use arch-detect below, it bundles every platform's natives
+        exclude("dev.opencollab", "libdatachannel-java")
+    }
+    api(libs.libdatachannel)
+    api(libs.libdatachannel.arch.detect) {
+        exclude("dev.opencollab", "libdatachannel-java")
+    }
     api(libs.raknet) {
         exclude("io.netty", "netty-common")
         exclude("io.netty", "netty-codec-base")
@@ -54,6 +70,7 @@ dependencies {
     }
     api(libs.netty.epoll)
     api(libs.netty.codec.haproxy)
+    api(libs.netty.codec.http)
     api(libs.nukkitx.natives)
 
     api(libs.cloudburst.common) {
@@ -120,8 +137,15 @@ application {
     mainClass.set("cn.nukkit.Nukkit")
 }
 
+// Reproducible archives (mirrors the Maven setup in pom.xml)
+tasks.withType<AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
 gitProperties {
-    dateFormat = "dd.MM.yyyy '@' HH:mm:ss z"
+    // Only the fields Nukkit.GIT_INFO reads; the rest vary per build environment
+    keys = listOf("git.branch", "git.commit.id.abbrev")
     failOnNoGitDirectory = false
 }
 
@@ -189,6 +213,13 @@ tasks {
     shadowJar {
         manifest.attributes["Multi-Release"] = "true"
 
+        // Shadow 9 defaults to EXCLUDE, which feeds only one source of the duplicated
+        // Log4j2Plugins.dat to the transformer below. The project's own (near-empty) cache
+        // then wins and log4j-core's built-in plugins are dropped, breaking log4j2.xml
+        // loading at runtime (console falls back to StatusLogger with literal § codes).
+        // INCLUDE restores the shadow 8 behavior; see GradleUp/shadow#1733.
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
         transform(Log4j2PluginsCacheFileTransformer())
 
         // Backwards compatible jar directory
@@ -196,6 +227,19 @@ tasks {
         archiveClassifier.set("")
 
         exclude("javax/annotation/**")
+
+        // Duplicated dependency metadata (LICENSE, netty versions, ...): INCLUDE keeps
+        // same-named entries in unstable order, so drop them for reproducibility
+        exclude(
+            "META-INF/LICENSE*",
+            "META-INF/NOTICE*",
+            "META-INF/DEPENDENCIES*",
+            "META-INF/AL2.0",
+            "META-INF/LGPL2.1",
+            "META-INF/proguard/**",
+            "META-INF/io.netty.versions.properties",
+            "META-INF/maven/**",
+        )
     }
 
     runShadow {

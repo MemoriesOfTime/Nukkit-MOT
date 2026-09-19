@@ -322,20 +322,12 @@ public class BinaryStream {
         return Binary.readUUID(this.get(16));
     }
 
-    /**
-     * @deprecated use {@link #putSkin(GameVersion, Skin)} so the NetEase {@code fullSkinId}
-     * workaround is applied correctly.
-     */
     @Deprecated
     public void putSkin(Skin skin) {
         Server.mvw("BinaryStream#putSkin(Skin)");
         this.putSkin(GameVersion.getLastVersion(), skin);
     }
 
-    /**
-     * @deprecated use {@link #putSkin(GameVersion, Skin)} so the NetEase {@code fullSkinId}
-     * workaround is applied correctly.
-     */
     @Deprecated
     public void putSkin(int protocol, Skin skin) {
         this.putSkin(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), skin);
@@ -407,10 +399,7 @@ public class BinaryStream {
                 this.putBoolean(skin.isCapeOnClassic());
             }
             this.putString(skin.getCapeId());
-            String fullSkinId = gameVersion == GameVersion.V1_21_124_NETEASE
-                    ? skin.getFullSkinId() + UUID.randomUUID().toString().substring(0, 8)
-                    : skin.getFullSkinId();
-            this.putString(fullSkinId);
+            this.putString(skin.getFullSkinId());
             if (protocol >= ProtocolInfo.v1_14_60) {
                 boolean v2168 = protocol >= ProtocolInfo.v1_26_40;
                 if (v2168) {
@@ -1369,17 +1358,7 @@ public class BinaryStream {
         }
 
         if (!item.isSupportedOn(gameVersion) || isErrorItem) {
-            Item originItem = item;
-            item = Item.get(Item.INFO_UPDATE, 0, originItem.getCount());
-            CompoundTag compoundTag = originItem.getNamedTag();
-            if (compoundTag != null) {
-                item.setNamedTag(new CompoundTag().putCompound(MV_ORIGIN_NBT, compoundTag));
-            }
-            item.setCustomName(originItem.getName());
-            item.setNamedTag(item.getNamedTag().putInt(MV_ORIGIN_ID, originItem.getId()).putInt(MV_ORIGIN_META, originItem.getDamage()));
-            if (isStringItem) {
-                item.setNamedTag(item.getNamedTag().putString(MV_ORIGIN_NAMESPACE, originItem.getNamespaceId(gameVersion)));
-            }
+            item = degradeToInfoUpdate(gameVersion, item, isStringItem);
         }
 
         int id = item.getId();
@@ -1461,6 +1440,25 @@ public class BinaryStream {
         }
     }
 
+    /**
+     * 把当前协议无法解析的物品降级为 INFO_UPDATE 占位物品，原始 id/meta/NBT 保存在
+     * MV_ORIGIN_* 标签里供解码端还原（见 getSlotNew / getNetworkItemStackDescriptor）。
+     * putSlotNew 与 putNetworkItemStackDescriptor 共用，保证两条序列化路径行为一致。
+     */
+    private static Item degradeToInfoUpdate(GameVersion gameVersion, Item originItem, boolean isStringItem) {
+        Item item = Item.get(Item.INFO_UPDATE, 0, originItem.getCount());
+        CompoundTag compoundTag = originItem.getNamedTag();
+        if (compoundTag != null) {
+            item.setNamedTag(new CompoundTag().putCompound(MV_ORIGIN_NBT, compoundTag));
+        }
+        item.setCustomName(originItem.getName());
+        item.setNamedTag(item.getNamedTag().putInt(MV_ORIGIN_ID, originItem.getId()).putInt(MV_ORIGIN_META, originItem.getDamage()));
+        if (isStringItem) {
+            item.setNamedTag(item.getNamedTag().putString(MV_ORIGIN_NAMESPACE, originItem.getNamespaceId(gameVersion)));
+        }
+        return item;
+    }
+
     public void putNetworkItemStackDescriptor(GameVersion gameVersion, Item item) {
         this.putNetworkItemStackDescriptor(gameVersion, item, false);
     }
@@ -1476,29 +1474,40 @@ public class BinaryStream {
             item = Item.get(Item.AIR);
         }
 
-        if (item.getId() != Item.AIR && !item.isSupportedOn(gameVersion)) {
-            Item original = item;
-            item = Item.get(Item.INFO_UPDATE, 0, original.getCount());
-            CompoundTag originalNBT = original.getNamedTag();
-            if (originalNBT != null) {
-                item.setNamedTag(new CompoundTag().putCompound(MV_ORIGIN_NBT, originalNBT));
+        boolean isStringItem = item instanceof StringItem;
+        boolean isErrorItem = false;
+        if (item.getId() != Item.AIR) {
+            // 与 putSlotNew 保持一致：无法在当前协议映射表中解析的物品必须降级为
+            // INFO_UPDATE 占位物品，而不是让异常炸掉整个 InventoryContentPacket——
+            // 后者会让玩家背包从此无法同步（每次右键方块都会触发 needSendInventory 重发）。
+            try {
+                RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
+                if (isStringItem && mapping.getNetworkIdByNamespaceId(item.getNamespaceId()).isEmpty()) {
+                    throw new IllegalArgumentException("Unknown StringItem : NamespaceId=" + item.getNamespaceId() + " protocol=" + gameVersion);
+                } else {
+                    mapping.toRuntime(item.getId(), item.getDamage());
+                }
+            } catch (Exception e) {
+                Server.getInstance().getLogger().debug("Unknown Item", e);
+                isErrorItem = true;
             }
-            item.setCustomName("§r§f" + original.getName());
-            item.setNamedTag(item.getNamedTag().putInt(MV_ORIGIN_ID, original.getId()).putInt(MV_ORIGIN_META, original.getDamage()));
+        }
+
+        if (item.getId() != Item.AIR && (!item.isSupportedOn(gameVersion) || isErrorItem)) {
+            item = degradeToInfoUpdate(gameVersion, item, isStringItem);
         }
 
         int id = item.getId();
         int meta = item.getDamage();
         boolean isBlock = item instanceof ItemBlock;
         boolean isDurable = item instanceof ItemDurable;
-        boolean isStringItem = item instanceof StringItem;
 
         RuntimeEntry runtimeEntry = null;
         int runtimeId = 0;
         int damage = 0;
         if (id != Item.AIR) {
             RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
-            if (isStringItem) {
+            if (isStringItem && !isErrorItem) {
                 runtimeId = mapping.getNetworkId(item);
                 damage = item.getDamage();
             } else {
@@ -1721,7 +1730,16 @@ public class BinaryStream {
                 }
 
                 if (compoundTag != null && compoundTag.contains(MV_ORIGIN_ID) && compoundTag.contains(MV_ORIGIN_META)) {
-                    Item mvItem = Item.get(compoundTag.getInt(MV_ORIGIN_ID), compoundTag.getInt(MV_ORIGIN_META), count);
+                    Item mvItem;
+                    if (compoundTag.getInt(MV_ORIGIN_ID) == ItemID.STRING_IDENTIFIED_ITEM && compoundTag.contains(MV_ORIGIN_NAMESPACE)) {
+                        // 与 getSlotNew 的还原逻辑配对：降级前是 StringItem（含自定义物品），
+                        // 必须按命名空间还原，否则会变成裸的 STRING_IDENTIFIED_ITEM(255)
+                        mvItem = Item.fromString(compoundTag.getString(MV_ORIGIN_NAMESPACE));
+                        mvItem.setDamage(compoundTag.getInt(MV_ORIGIN_META));
+                        mvItem.setCount(count);
+                    } else {
+                        mvItem = Item.get(compoundTag.getInt(MV_ORIGIN_ID), compoundTag.getInt(MV_ORIGIN_META), count);
+                    }
                     if (compoundTag.contains(MV_ORIGIN_NBT)) {
                         mvItem.setNamedTag(compoundTag.getCompound(MV_ORIGIN_NBT));
                     }
@@ -2425,7 +2443,10 @@ public class BinaryStream {
             case CRAFT_RECIPE_AUTO -> {
                 int recipeId = (int) getUnsignedVarInt();
                 int numberOfRequestedCrafts = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
-                int timesCrafted = protocol >= ProtocolInfo.v1_17_10 ? (getByte() & 0xFF) : 0;
+                // v2168 起不再有独立 timesCrafted 字节（CB 26.50 起对齐其读取端：timesCrafted 回填 numberOfRequestedCrafts）
+                // No separate timesCrafted byte since v2168 (aligned with CB's reader since its 26.50
+                // commit removed the duplicated count byte): timesCrafted mirrors numberOfRequestedCrafts
+                int timesCrafted = protocol >= ProtocolInfo.v1_17_10 && protocol < ProtocolInfo.v1_26_40 ? (getByte() & 0xFF) : numberOfRequestedCrafts;
                 List<ItemDescriptorWithCount> ingredients = new ArrayList<>();
                 if (protocol >= ProtocolInfo.v1_19_40) {
                     // v2168: ingredients 数组 count 改用 VarUInt / ingredients array count uses VarUInt

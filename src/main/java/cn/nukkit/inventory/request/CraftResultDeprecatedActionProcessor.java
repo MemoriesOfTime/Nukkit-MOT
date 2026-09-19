@@ -43,7 +43,15 @@ public class CraftResultDeprecatedActionProcessor implements ItemStackRequestAct
                 if (!CraftRecipeActionProcessor.validateCraftingRecipe(player, recipe, output, 1)) {
                     return context.error();
                 }
-                context.put(MULTI_RESULTS_KEY, List.of(results));
+                Item eventOutput = context.get(CraftRecipeActionProcessor.EVENT_AUTHORED_MULTI_OUTPUT_KEY);
+                if (eventOutput == null || eventOutput.isNull()) {
+                    return context.error();
+                }
+                output = eventOutput.clone();
+                if (times != null && times > 1) {
+                    output.setCount(output.getCount() * times);
+                }
+                context.put(MULTI_RESULTS_KEY, List.of(output.clone()));
                 output.autoAssignStackNetworkId();
                 player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
                 ItemStackResponseSlot slot = new ItemStackResponseSlot(
