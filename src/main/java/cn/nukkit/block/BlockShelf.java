@@ -13,7 +13,9 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
@@ -35,6 +37,16 @@ public abstract class BlockShelf extends BlockTransparentMeta implements Faceabl
     private static final int TYPE_MASK = 0b0000_0011;
     private static final int POWERED_MASK = 0b0000_0100;
     private static final int DIRECTION_MASK = 0b0001_1000;
+
+    /**
+     * Полка занимает пять пикселей у своей стены, а не весь блок: нижняя доска на всю глубину,
+     * трёхпиксельная задняя стенка и верхняя полка над нишей. Клиент рисует и считает именно
+     * эту форму, поэтому полный куб на сервере превращал полку в подставку.
+     */
+    private static final double SHELF_DEPTH = 5d / 16d;
+    private static final double SHELF_BACK_DEPTH = 3d / 16d;
+    private static final double SHELF_BOARD_HEIGHT = 4d / 16d;
+    private static final double SHELF_TOP_HEIGHT = 12d / 16d;
 
     private static final IntBlockProperty POWERED_SHELF_TYPE = new IntBlockProperty("powered_shelf_type", false, 3, 0);
     private static final BooleanBlockProperty POWERED_BIT = new BooleanBlockProperty("powered_bit", false);
@@ -93,6 +105,64 @@ public abstract class BlockShelf extends BlockTransparentMeta implements Faceabl
     @Override
     public BlockColor getColor() {
         return BlockColor.WOOD_BLOCK_COLOR;
+    }
+
+    /**
+     * Коробка полки, отмеренная от её стены внутрь блока: {@code from} и {@code to} — глубина,
+     * {@code minY} и {@code maxY} — высота. Стена лежит на стороне, противоположной лицевой.
+     */
+    private AxisAlignedBB shelfBox(double from, double to, double minY, double maxY) {
+        return switch (this.getBlockFace().getOpposite()) {
+            case NORTH -> new SimpleAxisAlignedBB(this.x, this.y + minY, this.z + from,
+                    this.x + 1d, this.y + maxY, this.z + to);
+            case SOUTH -> new SimpleAxisAlignedBB(this.x, this.y + minY, this.z + 1d - to,
+                    this.x + 1d, this.y + maxY, this.z + 1d - from);
+            case WEST -> new SimpleAxisAlignedBB(this.x + from, this.y + minY, this.z,
+                    this.x + to, this.y + maxY, this.z + 1d);
+            default -> new SimpleAxisAlignedBB(this.x + 1d - to, this.y + minY, this.z,
+                    this.x + 1d - from, this.y + maxY, this.z + 1d);
+        };
+    }
+
+    private AxisAlignedBB[] recalculateCollisionBoxes() {
+        return new AxisAlignedBB[]{
+                shelfBox(0d, SHELF_DEPTH, 0d, SHELF_BOARD_HEIGHT),
+                shelfBox(0d, SHELF_BACK_DEPTH, SHELF_BOARD_HEIGHT, 1d),
+                shelfBox(SHELF_BACK_DEPTH, SHELF_DEPTH, SHELF_TOP_HEIGHT, 1d)
+        };
+    }
+
+    @Override
+    protected AxisAlignedBB recalculateBoundingBox() {
+        return shelfBox(0d, SHELF_DEPTH, 0d, 1d);
+    }
+
+    private boolean collidesWithShelf(AxisAlignedBB bb) {
+        for (AxisAlignedBB collisionBox : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(collisionBox)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb) {
+        return collidesWithShelf(bb);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb, boolean collisionBB) {
+        return collisionBB ? collidesWithShelf(bb) : super.collidesWithBB(bb, false);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        for (AxisAlignedBB collisionBox : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(collisionBox)) {
+                collidingBoxes.add(collisionBox);
+            }
+        }
     }
 
     @Override

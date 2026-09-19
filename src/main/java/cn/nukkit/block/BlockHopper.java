@@ -17,6 +17,7 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -24,10 +25,54 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
+
 /**
  * @author CreeperFace
  */
 public class BlockHopper extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityHopper> {
+
+    /** Чаша воронки и её бортик: клиент даёт встать внутрь, полный куб — нет. */
+    private AxisAlignedBB[] recalculateCollisionBoxes() {
+        double rim = 2d / 16d;
+        double bowl = 10d / 16d;
+        return new AxisAlignedBB[]{
+                new SimpleAxisAlignedBB(x, y, z, x + 1d, y + bowl, z + 1d),
+                new SimpleAxisAlignedBB(x, y, z, x + rim, y + 1d, z + 1d),
+                new SimpleAxisAlignedBB(x + 1d - rim, y, z, x + 1d, y + 1d, z + 1d),
+                new SimpleAxisAlignedBB(x, y, z, x + 1d, y + 1d, z + rim),
+                new SimpleAxisAlignedBB(x, y, z + 1d - rim, x + 1d, y + 1d, z + 1d)
+        };
+    }
+
+    private boolean collidesWithHopper(AxisAlignedBB bb) {
+        for (AxisAlignedBB part : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(part)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb) {
+        return collidesWithHopper(bb);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb, boolean collisionBB) {
+        return collisionBB ? collidesWithHopper(bb) : super.collidesWithBB(bb, false);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        for (AxisAlignedBB part : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(part)) {
+                collidingBoxes.add(part);
+            }
+        }
+    }
+
 
     public BlockHopper() {
         this(0);
