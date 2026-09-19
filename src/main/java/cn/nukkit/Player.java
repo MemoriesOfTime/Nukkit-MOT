@@ -3958,11 +3958,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 // NetherNet 跳过加密握手，登录链改用信令身份断言绑定，防止捕获的链被重放
                 // NetherNet skips the encryption handshake, so bind the login chain to the signaling identity instead
-                if (this.interfaz instanceof NetherNetInterface) {
-                    String refusal = ((NetherNetInterface) this.interfaz).checkIdentityBinding(
+                if (this.interfaz instanceof NetherNetInterface netherNet) {
+                    String identityRefusal = netherNet.checkIdentityBinding(
                             this.networkSession, this.loginChainData.getIdentityPublicKey());
-                    if (refusal != null) {
-                        log.debug("Refusing a login from {}: {}", this.getSocketAddress(), refusal);
+                    if (identityRefusal != null) {
+                        log.warn("Refusing a NetherNet login from {}: {}", this.getSocketAddress(), identityRefusal);
                         this.close("", "disconnectionScreen.notAuthenticated");
                         break;
                     }
@@ -6584,7 +6584,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(String message, String reason, boolean notify) {
-        this.close(new TextContainer(message), reason, notify);
+        this.close(message, reason, notify, null);
+    }
+
+    /**
+     * @param failReason 断连包的 wire 枚举（v1_20_40+ 编码为序数），null 保持 DISCONNECTED；
+     *                   调用方须确认客户端协议认识该序数
+     * @param failReason the wire fail reason (encoded as an ordinal since v1_20_40);
+     *                   null keeps DISCONNECTED, the caller must ensure the client's protocol knows the ordinal
+     */
+    public void close(String message, String reason, boolean notify, DisconnectFailReason failReason) {
+        this.close(new TextContainer(message), reason, notify, failReason);
     }
 
     public void close(TextContainer message) {
@@ -6596,9 +6606,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(TextContainer message, String reason, boolean notify) {
+        this.close(message, reason, notify, null);
+    }
+
+    public void close(TextContainer message, String reason, boolean notify, DisconnectFailReason failReason) {
         if (this.connected && !this.closed) {
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
+                pk.reason = failReason != null ? failReason : DisconnectFailReason.DISCONNECTED;
                 if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
                     pk.message = TextFormat.clean(TextFormat.colorize(reason));
                 } else {

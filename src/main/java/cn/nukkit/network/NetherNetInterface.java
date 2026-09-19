@@ -37,6 +37,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.KeyFactory;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,7 +83,8 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     private final Queue<NetherNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<NetherNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<InetAddress, Long> blockedAddresses = new ConcurrentHashMap<>();
-    private final AtomicReference<String> pongNonce = new AtomicReference<>(String.format("%016x", new java.security.SecureRandom().nextLong()));
+    /** 广告随附的 nonce（P2P 世界机制，专用服务器客户端不回传也不校验），启动时随机一次。 Rides along in the advertisement, random once at startup; a P2P-worlds mechanism, never verified. */
+    private final AtomicReference<String> pongNonce = new AtomicReference<>(String.format("%016x", new SecureRandom().nextLong()));
 
     private volatile boolean accepting = true;
     private int inboundRoundRobinCursor;

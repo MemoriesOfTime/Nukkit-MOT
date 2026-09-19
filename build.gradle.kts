@@ -45,6 +45,12 @@ val mockitoAgent by configurations.creating {
 }
 
 dependencies {
+    // 与 pom.xml dependencyManagement 同步的传递依赖 pin，防 Gradle 依赖解析漂移
+    // Transitive pins mirroring pom.xml dependencyManagement, guarding against Gradle resolution drift
+    constraints {
+        implementation("net.jodah:expiringmap:${libs.versions.expiringmap.get()}")
+        implementation("org.slf4j:slf4j-api:${libs.versions.slf4j.api.get()}")
+    }
     api(libs.nethernet) {
         exclude("io.netty")
         // 改用下方 arch-detect：自带全部平台原生库；Use arch-detect below, it bundles every platform's natives
