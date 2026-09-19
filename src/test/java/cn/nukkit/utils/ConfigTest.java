@@ -258,6 +258,7 @@ public class ConfigTest {
         Assertions.assertTrue(config.gameFeatureSettings().enableExperimentMode());
         Assertions.assertEquals(0, config.gameFeatureSettings().multiversionMinProtocol());
         Assertions.assertEquals(-1, config.gameFeatureSettings().multiversionMaxProtocol());
+        Assertions.assertTrue(config.gameFeatureSettings().vanillaKnockbackResistance());
 
         // NetEase
         Assertions.assertFalse(config.neteaseSettings().clientSupport());
