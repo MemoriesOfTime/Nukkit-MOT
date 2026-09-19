@@ -686,7 +686,6 @@ public class Server {
 
         this.console = new NukkitConsole();
         this.consoleThread = new ConsoleThread();
-        this.consoleThread.start();
         this.console.setExecutingCommands(true);
 
         // Load server.properties (standard MC settings)
@@ -1478,7 +1477,9 @@ public class Server {
             this.consoleThread.interrupt();
 
             this.getLogger().debug("Stopping network interfaces...");
-            for (SourceInterface interfaz : this.network.getInterfaces()) {
+            // 拷贝后再遍历：unregisterInterface 会从 getInterfaces() 返回的活集合里删除，直接迭代会 CME
+            // Iterate over a copy: unregisterInterface removes from the live set behind getInterfaces()
+            for (SourceInterface interfaz : new ArrayList<>(this.network.getInterfaces())) {
                 interfaz.shutdown();
                 this.network.unregisterInterface(interfaz);
             }
@@ -1517,6 +1518,14 @@ public class Server {
         this.tickCounter = 0;
 
         log.info(this.baseLang.translateString("nukkit.server.startFinished", String.valueOf((double) (System.currentTimeMillis() - Nukkit.START_TIME) / 1000)));
+
+        // 控制台读取线程在服务器就绪后才启动：此前读到的命令依赖尚未创建的对象（scheduler/consoleSender），
+        // 会被静默丢弃（如引导下载期间经管道送达的 stop）；留在 stdin 里等就绪后读取
+        // The console reader starts once the server is ready: commands read earlier depend on objects
+        // not yet constructed (scheduler/consoleSender) and were silently dropped (e.g. a piped stop
+        // arriving during bootstrap downloads); unread input stays buffered in stdin instead
+        this.consoleThread.start();
+
         this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, System::gc, 20);
 
         this.tickProcessor();

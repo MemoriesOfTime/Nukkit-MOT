@@ -127,7 +127,9 @@ public class Network {
     }
 
     public void processInterfaces() {
-        for (SourceInterface interfaz : this.interfaces) {
+        // 拷贝后遍历：异常分支的 unregisterInterface 会从 this.interfaces 删除，直接迭代会 CME
+        // Iterate over a copy: the error branch unregisters from this.interfaces mid-iteration
+        for (SourceInterface interfaz : new ArrayList<>(this.interfaces)) {
             try {
                 interfaz.process();
             } catch (Exception e) {

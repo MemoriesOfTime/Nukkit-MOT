@@ -606,11 +606,11 @@
                         <exclude>cn/nukkit/buildtools/**</exclude>
                     </excludes>
                     <archive>
-                        <manifestEntries>
+                        <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <Main-Class>cn.nukkit.Nukkit</Main-Class>
-                        </manifestEntries>
+                            <mainClass>cn.nukkit.Bootstrap</mainClass>
+                        </manifest>
                     </archive>
                 </configuration>
             </plugin>
@@ -663,6 +663,15 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>3.7.0</version>
+                <!-- 快照构件按实际解析产物（时间戳文件名）复制而非 baseVersion 名：
+                     与 DEPENDENCIES.txt / MANIFEST Class-Path 的精确 pin 对齐，
+                     copy-dependencies 预置的 lib/ 可被引导直接判定就绪
+                     Copy snapshots under their resolved timestamped file names instead of
+                     baseVersion names, matching the exact pins in DEPENDENCIES.txt and the
+                     manifest Class-Path, so a preset lib/ passes the bootstrap readiness check -->
+                <configuration>
+                    <useBaseVersion>false</useBaseVersion>
+                </configuration>
                 <executions>
                     <execution>
                         <id>test-dependency-properties</id>
@@ -670,6 +679,19 @@
                         <goals>
                             <goal>properties</goal>
                         </goals>
+                    </execution>
+                    <!-- 运行时依赖清单输入：供 GenerateDependencyManifest 在 prepare-package 生成 DEPENDENCIES.txt
+                         Feeds GenerateDependencyManifest with the resolved runtime dependency list -->
+                    <execution>
+                        <id>runtime-dependency-list</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>list</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <outputFile>${project.build.directory}/dependency-list.txt</outputFile>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -693,6 +715,22 @@
                             <mainClass>cn.nukkit.buildtools.MinifyJsonResources</mainClass>
                             <arguments>
                                 <argument>${project.build.outputDirectory}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <!-- 生成 target/classes/DEPENDENCIES.txt（随 package 进 jar，供 Bootstrap 下载引导）
+                         Emits target/classes/DEPENDENCIES.txt for the runtime bootstrap -->
+                    <execution>
+                        <id>generate-dependency-manifest</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>cn.nukkit.buildtools.GenerateDependencyManifest</mainClass>
+                            <arguments>
+                                <argument>${project.build.directory}/dependency-list.txt</argument>
+                                <argument>${project.build.outputDirectory}/DEPENDENCIES.txt</argument>
                             </arguments>
                         </configuration>
                     </execution>
@@ -760,6 +798,13 @@
                     <transformers>
                         <transformer
                                 implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer">
+                        </transformer>
+                        <!-- 分发用 shaded jar 仍是自包含的：显式固定 Main-Class，避免继承 jar 插件清单里的 Bootstrap 入口
+                             The shaded distribution jar stays self-contained; pin Main-Class explicitly instead of
+                             inheriting the Bootstrap entry from the jar plugin's manifest -->
+                        <transformer
+                                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                            <mainClass>cn.nukkit.Nukkit</mainClass>
                         </transformer>
                     </transformers>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
