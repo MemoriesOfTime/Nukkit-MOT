@@ -112,11 +112,11 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         this.signaling = new NetherNetHTTPSignaling.Builder()
                 .setIdentity(identity)
                 .setServeHttp(true)
-                // RakNet 已占用 server-port 的 UDP 侧，信令端口不可复用；媒体端口默认由系统按对端自动分配，
-                // 配置了 server-udp-ports 时改经 peer connection 配置钉住（见 NetherNetUdpPorts）
+                // RakNet 已占用 server-port 的 UDP 侧，信令端口不可复用；媒体端口经 server-udp-ports
+                // 钉住（默认 19134，ICE mux 单端口服务所有对端；0 仍为系统自动分配）
                 // RakNet holds the UDP side of server-port so the signaling port stays off-limits;
-                // media defaults to system-assigned ports per peer, or gets pinned through the
-                // peer connection config when server-udp-ports is set (see NetherNetUdpPorts)
+                // media is pinned via server-udp-ports (default 19134, one ICE mux port serves all
+                // peers; 0 still means system-assigned)
                 .setIceOnLocalPort(false)
                 .setIceServers(iceServers(settings))
                 .setAdvertisedAddresses(mediaPorts == null ? Set.of() : mediaPorts.advertisedAddresses())
@@ -195,7 +195,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
      * listener abort startup with a localized error instead of falling back to auto ports.
      */
     private static NetherNetUdpPorts resolveMediaPorts(Server server) {
-        String value = server.getPropertyString("server-udp-ports", "0");
+        String value = server.getPropertyString("server-udp-ports", "19134");
         NetherNetUdpPorts ports = NetherNetUdpPorts.parse(value, server.getLanguage());
         if (ports == null) {
             return null;

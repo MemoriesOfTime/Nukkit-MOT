@@ -4106,7 +4106,7 @@ public class Server {
             put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
-            put("server-udp-ports", 0);
+            put("server-udp-ports", 19134);
             put("server-ipv6-port", -1);
             put("server-ipv6", "::");
             put("view-distance", 8);

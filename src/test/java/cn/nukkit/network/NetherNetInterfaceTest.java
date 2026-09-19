@@ -111,7 +111,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void configuredMediaPortStillStartsTheInterface() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("39000");
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("39000");
         NetherNetInterface pinned = new NetherNetInterface(server, new NetherNetSettings());
         // 媒体端口在对端接入时才随 peer connection 绑定，构造成功即验证解析与 bootstrap 选项接线无误
         // The media port binds with a peer connection, so constructing the interface already
@@ -124,7 +124,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void configuredExternalMappingStillStartsTheInterface() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("203.0.113.10:19132:39000");
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("203.0.113.10:19132:39000");
         NetherNetInterface mapped = new NetherNetInterface(server, new NetherNetSettings());
         assertNotNull(mapped);
         mapped.shutdown();
@@ -134,7 +134,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void invalidMediaPortsAbortConstruction() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("70000");
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("70000");
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> new NetherNetInterface(server, new NetherNetSettings()));
         assertTrue(e.getMessage().contains("is not a valid port range"),
@@ -145,7 +145,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void mediaPortsCoveringServerPortAbortConstruction() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("19000-19200");
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("19000-19200");
         lenient().when(server.getPort()).thenReturn(19132);
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> new NetherNetInterface(server, new NetherNetSettings()));
@@ -157,7 +157,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void mediaPortsCoveringIpv6ListenerAbortConstruction() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "0")).thenReturn("19000-19200");
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("19000-19200");
         lenient().when(server.isIpv6Enabled()).thenReturn(true);
         lenient().when(server.getIpv6Port()).thenReturn(19133);
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
