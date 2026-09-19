@@ -65,6 +65,8 @@ public class LevelDBProvider implements LevelProvider {
     private static final DBProvider JAVA_LDB_PROVIDER = (DBProvider) FeatureBuilder.create(LevelDBProvider.class).addJava("net.daporkchop.ldbjni.java.JavaDBProvider").build();
     private static final byte[] FINALIZATION_STATE_ENCODING_KEY = "NukkitMOTFinalizationStateEncoding".getBytes(StandardCharsets.UTF_8);
     private static final byte[] FINALIZATION_STATE_ENCODING_BEDROCK = new byte[]{1};
+    private static final byte[] CONN_FIX_DONE = new byte[]{1};
+    private static final byte[] CONN_FIX_PENDING = new byte[]{0};
 
     protected final Long2ObjectMap<BaseFullChunk> chunks = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
 
@@ -591,6 +593,26 @@ public class LevelDBProvider implements LevelProvider {
         return this.readOrCreateChunk(chunkX, chunkZ, create) != null;
     }
 
+    /**
+     * 逐区块持久化 1.26.50 连接位迁移标记：缺失/0=需按邻居重算。仅凭状态键检测不够——加载路径
+     * 会把无键状态升级为带键(全 false)并随保存落盘，"已保存但未重算"的区块重载后状态带键而
+     * 失去标志（连接永久显示为断开）；此标记是唯一可靠事实源，缺失（旧版本保存/外部工具重写）
+     * 一律重算，幂等扫描代价一次性。
+     * <p>
+     * Per-chunk persisted 1.26.50 connection-migration marker: missing/0 = recompute from
+     * neighbours. State-keys detection alone is insufficient — the load path upgrades keyless
+     * states to keyed (all-false) ones that get baked by any save before the recompute, so on
+     * reload such chunks look migrated and silently lose the flag (connections render detached
+     * forever). This marker is the authoritative source; a missing marker (saved by older builds
+     * or rewritten by external tools) always triggers one idempotent recompute pass.
+     */
+    private void applyConnectionFixMarker(int chunkX, int chunkZ, int dimensionId, ChunkBuilder chunkBuilder) {
+        byte[] marker = this.db.get(LevelDBKey.NUKKIT_CONN_FIX_DONE.getKey(chunkX, chunkZ, dimensionId));
+        if (marker == null || marker.length == 0 || marker[0] == 0) {
+            chunkBuilder.needsLegacyConnectionFix();
+        }
+    }
+
     @Nullable
     public LevelDBChunk readChunk(int chunkX, int chunkZ) {
         byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
@@ -605,6 +627,7 @@ public class LevelDBProvider implements LevelProvider {
 
         byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
         chunkBuilder.state(deserializeFinalizationState(finalized));
+        this.applyConnectionFixMarker(chunkX, chunkZ, this.level.getDimensionData().getDimensionId(), chunkBuilder);
 
         byte chunkVersion = versionData[0];
 
@@ -1085,6 +1108,11 @@ public class LevelDBProvider implements LevelProvider {
 
         writeBatch.put(LevelDBKey.VERSION.getKey(chunkX, chunkZ, this.level.getDimension()), CHUNK_VERSION_SAVE_DATA);
         writeBatch.put(LevelDBKey.VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimension()), LEGACY_CHUNK_VERSION_SAVE_DATA);
+        // 标志仍在=未完成重算，写 0 保持下次加载重试；扫描完成后由 Level 置标志+setChanged 触发落盘 1
+        // A still-set flag writes 0 so the next load retries; once the scan completes Level clears the
+        // flag and marks the chunk changed, persisting 1
+        writeBatch.put(LevelDBKey.NUKKIT_CONN_FIX_DONE.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()),
+                chunk.isNeedsLegacyConnectionFix() ? CONN_FIX_PENDING : CONN_FIX_DONE);
         writeBatch.put(LevelDBKey.GENERATED_PRE_CAVES_AND_CLIFFS_BLENDING.getKey(chunkX, chunkZ, this.level.getDimension()), GENERATED_PRE_CAVES_AND_CLIFFS_BLENDING_SAVE_DATA);
         writeBatch.put(LevelDBKey.BLENDING_DATA.getKey(chunkX, chunkZ, this.level.getDimension()), BLENDING_DATA_SAVE_DATA);
         writeBatch.put(FINALIZATION_STATE_ENCODING_KEY, FINALIZATION_STATE_ENCODING_BEDROCK);
@@ -1250,6 +1278,7 @@ public class LevelDBProvider implements LevelProvider {
 
         byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
         chunkBuilder.state(deserializeFinalizationState(finalized));
+        this.applyConnectionFixMarker(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId(), chunkBuilder);
 
         byte chunkVersion = versionData[0];
 

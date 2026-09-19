@@ -11,6 +11,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
+import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterVanilla;
 import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
@@ -20,14 +21,10 @@ import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
-import org.cloudburstmc.nbt.NBTInputStream;
-import org.cloudburstmc.nbt.NBTOutputStream;
-import org.cloudburstmc.nbt.NbtMap;
-import org.cloudburstmc.nbt.NbtMapBuilder;
-import org.cloudburstmc.nbt.NbtUtils;
+import org.cloudburstmc.nbt.*;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -158,6 +155,11 @@ public class StateBlockStorage {
 
                     BlockStateSnapshot blockState = BlockStateMapping.get().getStateUnsafe(state);
                     if (blockState == null) {
+                        // 磁盘状态缺 1.26.50 corner/connection 键 => 区块发送前需按邻居重算连接位
+                        // Serialized state lacks 1.26.50 corner/connection keys => recompute from neighbours before sending
+                        if (BlockStateUpdaterVanilla.needsConnectionRecompute(state)) {
+                            chunkBuilder.needsLegacyConnectionFix();
+                        }
                         NbtMap updatedState = BlockStateMapping.get().updateVanillaState(state);
                         blockState = BlockStateMapping.get().getUpdatedOrCustom(state, updatedState);
                         if (!blockState.isCustom()) {
