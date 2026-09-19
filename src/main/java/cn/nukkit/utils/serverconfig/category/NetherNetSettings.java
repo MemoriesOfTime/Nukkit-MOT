@@ -22,7 +22,7 @@ import java.util.List;
 @Accessors(fluent = true)
 public class NetherNetSettings extends OkaeriConfig {
 
-    @Comment("Enabled by default alongside RakNet, set false to disable. Signaling shares the server-port over TCP; WebRTC media uses system-assigned UDP ports unless server.properties pins them via server-udp-ports")
+    @Comment("Enabled by default alongside RakNet, set false to disable. Signaling shares the server-port over TCP; WebRTC media pins UDP 19134 (ICE mux, one port serves all peers) via server.properties server-udp-ports, 0 reverts to system-assigned")
     @CustomKey("enabled")
     private boolean enabled = true;
 
