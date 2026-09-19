@@ -52,8 +52,25 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
 
     @Override
     public void onBreak() {
+        // Close the double chest window before unpairing: unpair() forgets the double inventory, and
+        // close() then reached only the single half. A player looking into the broken double chest
+        // kept a window of a chest that no longer existed.
+        closeDoubleChestWindows(this.doubleInventory);
+        BlockEntityChest pair = this.getPair();
+        if (pair != null && pair.doubleInventory != this.doubleInventory) {
+            closeDoubleChestWindows(pair.doubleInventory);
+        }
         this.unpair();
         super.onBreak();
+    }
+
+    private static void closeDoubleChestWindows(DoubleChestInventory inventory) {
+        if (inventory == null) {
+            return;
+        }
+        for (Player player : new HashSet<>(inventory.getViewers())) {
+            player.removeWindow(inventory);
+        }
     }
 
     @Override

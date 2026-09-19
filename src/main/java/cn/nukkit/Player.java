@@ -548,9 +548,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setViewingEnderChest(BlockEnderChest chest) {
-        if (chest == null && this.viewingEnderChest != null) {
+        if (this.viewingEnderChest != null) {
             this.viewingEnderChest.getViewers().remove(this);
-        } else if (chest != null) {
+        }
+        if (chest != null) {
             chest.getViewers().add(this);
         }
         this.viewingEnderChest = chest;
@@ -5003,6 +5004,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                     }
 
+                    // 1.21 clients also close an ender chest with -1 while their own inventory is not
+                    // open. Without this the window stayed open on the server: the lid hung open for
+                    // everyone and the chest did not open again for this player until a teleport.
+                    closeEnderChestWindowForUnknownId();
+                    // The same happens to a chest, barrel, shulker box, hopper or furnace of the world:
+                    // the lid hung open and the block did not open again for this player. Only windows
+                    // of real block entities are closed here. A plugin window drawn on a fake block has
+                    // no block entity, and a late -1 must not shut a fresh window of that kind.
+                    closeWorldContainerWindowsForUnknownId();
+
                     this.craftingType = CRAFTING_SMALL;
                     this.resetCraftingGridType();
                     this.addWindow(this.craftingGrid, ContainerIds.NONE);
@@ -6824,6 +6835,57 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return LangCode.valueOf(this.getLoginChainData().getLanguageCode());
     }
 
+    /**
+     * Closes an open ender chest window after the client sent ContainerClose with window id -1.
+     */
+    void closeEnderChestWindowForUnknownId() {
+        Inventory enderChest = this.getEnderChestInventory();
+        if (enderChest == null || this.getWindowId(enderChest) == -1) {
+            return;
+        }
+        this.server.getPluginManager().callEvent(new InventoryCloseEvent(enderChest, this));
+        this.closingWindowId = Integer.MAX_VALUE;
+        this.removeWindow(enderChest, true);
+        this.closingWindowId = Integer.MIN_VALUE;
+    }
+
+    /**
+     * Closes the windows of real world containers after the client sent ContainerClose with window
+     * id -1 while its own inventory was not open.
+     */
+    void closeWorldContainerWindowsForUnknownId() {
+        for (Inventory open : this.openWindowsSnapshot()) {
+            if (!isWorldBlockContainer(open) || this.getWindowId(open) == -1) {
+                continue;
+            }
+            this.server.getPluginManager().callEvent(new InventoryCloseEvent(open, this));
+            this.closingWindowId = Integer.MAX_VALUE;
+            this.removeWindow(open, true);
+            this.closingWindowId = Integer.MIN_VALUE;
+        }
+    }
+
+    List<Inventory> openWindowsSnapshot() {
+        return new ArrayList<>(this.windows.keySet());
+    }
+
+    /**
+     * A container window of a block entity that still stands in its level. A window whose holder is
+     * a fake block ({@link cn.nukkit.inventory.FakeBlockMenu}), a closed block entity or anything
+     * else is not a world container.
+     */
+    static boolean isWorldBlockContainer(Inventory inventory) {
+        if (!(inventory instanceof ContainerInventory)) {
+            return false;
+        }
+        InventoryHolder holder = inventory.getHolder();
+        if (!(holder instanceof BlockEntity blockEntity) || blockEntity.closed) {
+            return false;
+        }
+        Level level = blockEntity.getLevel();
+        return level != null && level.getBlockEntityIfLoaded(blockEntity) == blockEntity;
+    }
+
     @Override
     public void kill() {
         if (!this.spawned) {
@@ -6952,6 +7014,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
             }
         }
+
+        // A dead player keeps nothing open, like vanilla. Closed before the drops are collected: a
+        // container that hands its input slots back (trade, anvil, grindstone) returns them to the
+        // inventory that is about to drop, instead of into the inventory of the respawned player,
+        // and the lid of a chest or ender chest closes where it was opened.
+        this.removeAllWindows();
 
         PlayerDeathEvent ev = new PlayerDeathEvent(this, this.getDrops(), new TranslationContainer(message, params.toArray(new String[0])), this.expLevel);
         ev.setKeepInventory(this.level.gameRules.getBoolean(GameRule.KEEP_INVENTORY));
