@@ -460,7 +460,7 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
                 current.isNull() ? 0 : current.getCount(),
                 current.getStackNetId(),
                 current.hasCustomName() ? current.getCustomName() : "",
-                current.getDamage(),
+                ItemStackRequestActionProcessor.durabilityCorrection(current),
                 ""
         );
         FullContainerName name = new FullContainerName(slotData.getContainer(), slotData.getDynamicId());
