@@ -117,7 +117,7 @@ public class ConfigComments {
     }
 
     /**
-     * Apply comments to fields of an OkaeriConfig.
+     * Apply comments to fields of an OkaeriConfig, recursing into nested sub-config fields.
      * <p>
      * Updates both the current declaration instances and the static FieldDeclaration cache.
      * The cache update is necessary because during save, the configurer resolves
@@ -144,6 +144,16 @@ public class ConfigComments {
                     lines = withBlank;
                 }
                 field.setComment(lines);
+            }
+
+            // Recurse into nested sub-configs (e.g. NetworkSettings.netherNetSettings);
+            // top-level category fields are handled by the categories map above
+            if (prefix != null && field.getField() != null
+                    && OkaeriConfig.class.isAssignableFrom(field.getField().getType())) {
+                Object value = field.getValue();
+                if (value instanceof OkaeriConfig) {
+                    applyFieldComments((OkaeriConfig) value, comments, key);
+                }
             }
         }
 
