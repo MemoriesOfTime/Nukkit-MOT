@@ -1844,11 +1844,12 @@ public abstract class Entity extends Location implements Metadatable {
             if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.SUICIDE) {
                 boolean totem = false;
                 boolean isOffhand = false;
-                if (isTotem(p.getOffhandInventory().getItemFast(0))) {
+                // A deliberately held totem takes precedence over the offhand.
+                if (isTotem(p.getInventory().getItemInHandFast())) {
+                    totem = true;
+                } else if (isTotem(p.getOffhandInventory().getItemFast(0))) {
                     totem = true;
                     isOffhand = true;
-                } else if (isTotem(p.getInventory().getItemInHandFast())) {
-                    totem = true;
                 }
                 if (totem) {
                     this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_TOTEM);
