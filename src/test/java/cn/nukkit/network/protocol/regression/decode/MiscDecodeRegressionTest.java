@@ -4045,14 +4045,19 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         ServerPresenceInfoPacket nk = crossEncode(cb, ServerPresenceInfoPacket::new, protocol);
 
         assertNotNull(nk.presenceConfiguration);
-        assertEquals("exp-name", nk.presenceConfiguration.getExperienceName());
-        assertEquals("world-name", nk.presenceConfiguration.getWorldName());
-        // richPresenceId 仅存在于 [v1001, v2168)：CB 的 v2168 helper 继承 v975，丢弃了该字段
-        // richPresenceId only exists in [v1001, v2168): CB's v2168 helper extends v975, dropping the field
-        if (protocol >= ProtocolInfo.v1_26_30 && protocol < ProtocolInfo.v1_26_40) {
+        if (protocol >= ProtocolInfo.v1_26_40) {
+            // v2168 起线上仅剩 optional richPresenceId / only an optional richPresenceId remains on the wire since v2168
+            assertNull(nk.presenceConfiguration.getExperienceName());
+            assertNull(nk.presenceConfiguration.getWorldName());
             assertEquals("rich-1", nk.presenceConfiguration.getRichPresenceId());
         } else {
-            assertNull(nk.presenceConfiguration.getRichPresenceId());
+            assertEquals("exp-name", nk.presenceConfiguration.getExperienceName());
+            assertEquals("world-name", nk.presenceConfiguration.getWorldName());
+            if (protocol >= ProtocolInfo.v1_26_30) {
+                assertEquals("rich-1", nk.presenceConfiguration.getRichPresenceId());
+            } else {
+                assertNull(nk.presenceConfiguration.getRichPresenceId());
+            }
         }
         assertEquals(nk.getCount(), nk.getOffset(), "ServerPresenceInfoPacket decode should consume the full payload");
     }

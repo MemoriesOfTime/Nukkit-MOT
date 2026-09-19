@@ -2,6 +2,7 @@ package cn.nukkit.dispenser;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockDispenser;
+import cn.nukkit.block.BlockShulkerBox;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.item.Item;
@@ -35,6 +36,7 @@ public class ShulkerBoxDispenseBehavior extends DefaultDispenseBehavior {
                 nbt.putList(tag.getList("Items"));
             }
         }
+        BlockShulkerBox.putSourceItemTag(nbt, item);
         // The block itself was never written before this fix: the block entity with the
         // contents was created on an air cell, the slot was emptied, and the next garbage
         // collection or block placement discarded the entity together with everything inside.

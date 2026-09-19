@@ -1908,6 +1908,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return 0;
     }
 
+    public double getKnockBackResistance() {
+        return 0;
+    }
+
     public boolean isUnbreakable() {
         if (!(this instanceof ItemDurable)) {
             return false;
