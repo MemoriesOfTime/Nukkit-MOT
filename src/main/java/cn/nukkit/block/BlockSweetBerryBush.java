@@ -64,7 +64,7 @@ public class BlockSweetBerryBush extends BlockFlowable {
 
     @Override
     public double getHardness() {
-        return this.getDamage() == 0? 0 : 0.25;
+        return 0;
     }
 
     @Override

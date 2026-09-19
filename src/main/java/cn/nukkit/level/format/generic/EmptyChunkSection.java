@@ -2,7 +2,9 @@ package cn.nukkit.level.format.generic;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
+import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.format.ChunkSection;
+import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
@@ -10,6 +12,7 @@ import cn.nukkit.utils.ChunkException;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author MagicDroidX
@@ -24,11 +27,23 @@ public class EmptyChunkSection implements ChunkSection {
     public static byte[] EMPTY_LIGHT_ARR = new byte[2048];
     public static byte[] EMPTY_SKY_LIGHT_ARR = new byte[2048];
 
+    private static final ConcurrentHashMap<Integer, EmptyChunkSection> BY_SECTION_Y = new ConcurrentHashMap<>();
+
     static {
         for (int y = 0; y < EMPTY.length; y++) {
             EMPTY[y] = new EmptyChunkSection(y);
         }
         Arrays.fill(EMPTY_SKY_LIGHT_ARR, (byte) 255);
+    }
+
+    /**
+     * 按世界 section Y 获取共享的不可变空 section 单例，支持负数 Y 和超过 16 段的维度高度。
+     * <p>
+     * Returns a shared immutable empty-section singleton for the given world section Y,
+     * supporting negative Y and dimensions taller than 16 sections.
+     */
+    public static EmptyChunkSection bySectionY(int sectionY) {
+        return BY_SECTION_Y.computeIfAbsent(sectionY, EmptyChunkSection::new);
     }
 
     private final int y;
@@ -232,9 +247,23 @@ public class EmptyChunkSection implements ChunkSection {
     @Override
     public void writeTo(GameVersion gameVersion, BinaryStream stream, boolean antiXray) {
         if (gameVersion.getProtocol() >= ProtocolInfo.v1_19_80) {
+            // v9 空段：0 层（与 vanilla BDS 空子区块编码一致）
+            // v9 empty sub-chunk: zero layers, matching vanilla BDS empty-subchunk encoding
             stream.putByte((byte) 9);
             stream.putByte((byte) 0);
             stream.putByte((byte) this.y);
+            return;
+        }
+        if (gameVersion.getProtocol() >= ProtocolInfo.v1_13_0) {
+            // v8 空段：2 层（与 fresh section 的 hasLayer(1) 一致）V2 单条空气调色板、words 全零，
+            // 修复旧实现写 6145 字节原始数组导致的格式不匹配
+            // v8 empty sub-chunk: 2 layers (matching fresh sections' hasLayer(1)) with a V2
+            // single-air palette and zero words, fixing the old 6145-byte raw-array mismatch
+            stream.putByte((byte) 8);
+            stream.putByte((byte) 2);
+            PalettedBlockStorage palette = PalettedBlockStorage.createWithDefaultState(GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, Block.AIR, 0));
+            palette.writeTo(stream);
+            palette.writeTo(stream);
             return;
         }
         stream.put(this.getBytes(gameVersion));

@@ -8,7 +8,6 @@ import org.jose4j.jwt.JwtClaims;
 import org.jose4j.jwt.consumer.JwtContext;
 import org.jose4j.lang.JoseException;
 
-import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
@@ -123,7 +122,7 @@ public final class ChainValidationResult {
         String displayName = claims.getClaimValueAsString("xname");
         String xuid = claims.getClaimValueAsString("xid");
         String minecraftId = claims.getClaimValueAsString("mid");
-        UUID identity = UUID.nameUUIDFromBytes(("pocket-auth-1-xuid:" + xuid).getBytes(StandardCharsets.UTF_8));
+        UUID identity = EncryptionUtils.deriveIdentity(xuid, minecraftId, displayName);
 
         return new IdentityClaims(
                 new IdentityData(displayName, identity, xuid, null, minecraftId,

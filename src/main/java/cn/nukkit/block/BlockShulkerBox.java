@@ -59,7 +59,7 @@ public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntity
 
     @Override
     public double getHardness() {
-        return 2.5;
+        return 2;
     }
 
     @Override
@@ -87,8 +87,70 @@ public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntity
         return false;
     }
 
+    /**
+     * Block entity key that keeps the NBT of the item the box was placed from.
+     *
+     * <p>Only the contents and the custom name used to be carried through place and break, so
+     * every other part of the item tag vanished the moment the box touched the ground: lore
+     * and any custom keys written by plugins. A box handed out with its
+     * own description came back from the first break as a plain shulker box. The tag is kept
+     * server side only: {@link BlockEntityShulkerBox#getSpawnCompound()} does not send it, so
+     * clients see no difference.
+     */
+    public static final String SOURCE_ITEM_TAG = "SourceItemTag";
+
+    /**
+     * The part of an item tag that the block entity does not already own.
+     *
+     * <p>{@code Items} lives in the box inventory and the display name in {@code CustomName},
+     * both written back from the block entity on break, so a copy here would be a second,
+     * stale source of truth.
+     *
+     * @return a detached copy, or {@code null} when nothing is left to keep
+     */
+    @Nullable
+    public static CompoundTag sourceItemTag(@NotNull Item item) {
+        CompoundTag tag = item.getNamedTag();
+        if (tag == null) {
+            return null;
+        }
+        CompoundTag copy = tag.copy();
+        copy.remove("Items");
+        if (copy.containsCompound("display")) {
+            CompoundTag display = copy.getCompound("display");
+            display.remove("Name");
+            if (display.isEmpty()) {
+                copy.remove("display");
+            }
+        }
+        return copy.isEmpty() ? null : copy;
+    }
+
+    /** Stores {@link #sourceItemTag(Item)} into a block entity compound that is about to be created. */
+    public static void putSourceItemTag(@NotNull CompoundTag blockEntityNbt, @NotNull Item item) {
+        CompoundTag source = sourceItemTag(item);
+        if (source != null) {
+            blockEntityNbt.putCompound(SOURCE_ITEM_TAG, source);
+        }
+    }
+
     @Override
     public Item toItem() {
+        return this.toItem(true);
+    }
+
+    /**
+     * The box as an item for pick block.
+     *
+     * <p>Pick block in creative creates a brand new item from the placed box. It does not copy
+     * the kept item tag: plugin data that identifies a single item (for example a serial number)
+     * would otherwise be duplicated while the original box still sits in the world.
+     */
+    public Item toPickItem() {
+        return this.toItem(false);
+    }
+
+    private Item toItem(boolean withSourceItemTag) {
         ItemBlock item = new ItemBlock(this, this.getDamage(), 1);
 
         if (this.level == null) {
@@ -98,6 +160,13 @@ public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntity
         BlockEntityShulkerBox t = (BlockEntityShulkerBox) this.getLevel().getBlockEntity(this);
 
         if (t != null) {
+            if (withSourceItemTag && t.namedTag.containsCompound(SOURCE_ITEM_TAG)) {
+                CompoundTag source = t.namedTag.getCompound(SOURCE_ITEM_TAG);
+                if (!source.isEmpty()) {
+                    item.setNamedTag(source.copy());
+                }
+            }
+
             ShulkerBoxInventory i = t.getRealInventory();
 
             if (!i.isEmpty()) {
@@ -145,6 +214,7 @@ public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntity
                 nbt.putList(t.getList("Items"));
             }
         }
+        putSourceItemTag(nbt, item);
 
         BlockEntity.createBlockEntity(BlockEntity.SHULKER_BOX, this.getChunk(), nbt);
         return true;

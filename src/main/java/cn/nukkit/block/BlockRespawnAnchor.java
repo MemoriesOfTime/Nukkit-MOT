@@ -88,6 +88,7 @@ public class BlockRespawnAnchor extends BlockMeta {
     public void explode(Player player) {
         BlockExplosionPrimeEvent event = new BlockExplosionPrimeEvent(this, player, 5);
         event.setIncendiary(true);
+        level.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             return;
         }

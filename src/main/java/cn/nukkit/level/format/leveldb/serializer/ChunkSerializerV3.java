@@ -2,6 +2,8 @@ package cn.nukkit.level.format.leveldb.serializer;
 
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.format.Chunk;
+import cn.nukkit.level.format.ChunkSection;
+import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.format.leveldb.LevelDBKey;
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
@@ -30,11 +32,14 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                     chunk.getX(), chunk.getZ(), ySection, dimensionData.getDimensionId()
             );
 
-            LevelDBChunkSection section = (LevelDBChunkSection) chunk.getSection(ySection);
-            if (section == null) {
+            ChunkSection section0 = chunk.getSection(ySection);
+            if (section0 == null || section0 instanceof EmptyChunkSection) {
+                // 空 section 与缺失等价：删除旧 key，防止历史数据在下次加载时复活
+                // Empty == absent: drop any stale key so historical data cannot resurrect on next load
                 writeBatch.delete(key);
                 continue;
             }
+            LevelDBChunkSection section = (LevelDBChunkSection) section0;
 
             if (!section.isDirty()) {
                 continue;
