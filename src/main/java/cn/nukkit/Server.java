@@ -703,6 +703,9 @@ public class Server {
             this.saveServerConfig();
         }
 
+        // Apply localized comments to server.properties based on its language setting
+        this.applyPropertiesComments();
+
         if (!this.serverConfig.debugSettings().ansiTitle()) {
             Nukkit.TITLE = false;
         }
@@ -1374,6 +1377,7 @@ public class Server {
         // Reload server.properties
         log.info("Reloading server properties...");
         this.properties.reload();
+        this.applyPropertiesComments();
 
         // Reload nukkit-mot.yml
         log.info("Reloading server configuration (YAML)...");
@@ -3241,6 +3245,19 @@ public class Server {
                 log.error("Failed to save nukkit-mot.yml", e);
             }
         }
+    }
+
+    /**
+     * 按当前语言设置刷新 server.properties 的逐键注释并保存
+     * <p>
+     * Refresh per-key comments in server.properties for the current language setting, then save.
+     * Keys unknown to the defaults are kept at the end of the file behind a localized notice.
+     */
+    private void applyPropertiesComments() {
+        String lang = this.getPropertyString("language", "eng");
+        this.properties.setPropertyComments(ConfigComments.loadPropertyComments(lang));
+        this.properties.setUnrecognizedPropertyComment(ConfigComments.loadUnrecognizedPropertyComment(lang));
+        this.properties.save();
     }
 
 
