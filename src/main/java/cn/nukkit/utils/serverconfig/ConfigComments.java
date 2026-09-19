@@ -22,6 +22,57 @@ public class ConfigComments {
 
     private static final String FALLBACK_LANG = "eng";
 
+    private static final String PROPERTIES_PREFIX = "properties.";
+
+    private static final String UNRECOGNIZED_KEY = "properties.__unrecognized__";
+
+    /**
+     * 加载 server.properties 的逐键注释表（键去掉 "properties." 前缀）
+     * <p>
+     * Load per-key comments for server.properties (with the "properties." prefix stripped).
+     * English entries fill in any keys missing from the requested language.
+     *
+     * @param lang the language code (e.g. "eng", "chs")
+     * @return key -> comment map, empty if no "properties.*" entries exist in any language
+     */
+    public static Map<String, String> loadPropertyComments(String lang) {
+        Map<String, String> comments = new HashMap<>();
+        collectPropertyEntries(loadComments(FALLBACK_LANG), comments);
+        if (!FALLBACK_LANG.equals(lang)) {
+            collectPropertyEntries(loadComments(lang), comments);
+        }
+        return comments;
+    }
+
+    /**
+     * 加载未识别配置项段的分隔注释（可含换行）
+     * <p>
+     * Load the separator comment for the trailing unrecognized-keys block (newlines allowed).
+     *
+     * @param lang the language code (e.g. "eng", "chs")
+     * @return comment text, null if not defined in any language
+     */
+    public static String loadUnrecognizedPropertyComment(String lang) {
+        Properties target = FALLBACK_LANG.equals(lang) ? null : loadComments(lang);
+        String value = target != null ? target.getProperty(UNRECOGNIZED_KEY) : null;
+        if (value == null) {
+            Properties eng = loadComments(FALLBACK_LANG);
+            value = eng != null ? eng.getProperty(UNRECOGNIZED_KEY) : null;
+        }
+        return value;
+    }
+
+    private static void collectPropertyEntries(Properties props, Map<String, String> out) {
+        if (props == null) {
+            return;
+        }
+        for (String name : props.stringPropertyNames()) {
+            if (name.startsWith(PROPERTIES_PREFIX) && !name.equals(UNRECOGNIZED_KEY)) {
+                out.put(name.substring(PROPERTIES_PREFIX.length()), props.getProperty(name));
+            }
+        }
+    }
+
     /**
      * Apply localized comments to the server config.
      *
