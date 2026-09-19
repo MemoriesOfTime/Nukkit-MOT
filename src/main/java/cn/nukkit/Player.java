@@ -4187,7 +4187,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 boolean authStartUsingItem = UsingItemReceive.authInputStartsUsingItem(authPacket);
-                Item authHeldItem = this.inventory.getItemInHand();
+                // The inventory is built by initEntity, which runs at login. An auth input that
+                // reaches the session before that (a client that keeps moving while its profile
+                // is still loading) used to throw here and drop the connection.
+                Item authHeldItem = this.inventory == null ? null : this.inventory.getItemInHand();
                 boolean authHoldToUse = UsingItemReceive.isHoldToUseItem(authHeldItem);
                 if (UsingItemReceive.shouldStartUsingFromAuthInput(
                         this.spawned && this.isAlive(),
