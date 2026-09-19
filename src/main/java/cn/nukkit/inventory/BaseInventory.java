@@ -308,13 +308,13 @@ public abstract class BaseInventory implements Inventory {
             return;
         }
         Item old = this.getItem(index);
-        Item overflow = null;
         if (item == null || item.isNull() || item.getCount() <= 0) {
             this.slots.remove(index);
         } else {
-            Item[] parts = splitOverstack(item);
-            item = parts[0];
-            overflow = parts[1];
+            // This is a server snapshot restore, not a new item grant. Splitting here
+            // changes unrelated slots and can destroy items when a later restored slot
+            // overwrites the overflow. Preserve the original count and slot exactly;
+            // normal setItem/addItem paths still enforce their stack limits.
             if (item.getStackNetId() == 0) {
                 item.autoAssignStackNetworkId();
             }
@@ -328,64 +328,6 @@ public abstract class BaseInventory implements Inventory {
             ((BlockEntity) holder).setDirty();
         }
         this.onSlotChange(index, old, false);
-        this.routeOverflowForce(overflow);
-    }
-
-    /**
-     * setItemForce 专用的溢出处理：契约要求不触发事件、不发网络包、
-     * 不产生世界掉落，因此绕过 addItem/setItem，按堆叠上限分块直接
-     * 写入空槽；装不下的记 warn 丢弃。
-     * <p>
-     * Overflow handling for setItemForce: the contract forbids events, network
-     * packets and world drops, so chunks of up to the stack limit are written
-     * straight into empty slots, bypassing addItem/setItem; whatever does not
-     * fit is discarded with a warning.
-     */
-    protected final void routeOverflowForce(Item overflow) {
-        if (overflow == null || overflow.isNull() || overflow.getCount() <= 0) {
-            return;
-        }
-        int limit = Math.min(overflow.getMaxStackSize(), this.getMaxStackSize());
-        if (limit <= 0) {
-            return;
-        }
-        // 先合并已有同类堆叠，保持与 addItem 相同的库存填充顺序。
-        // Merge into compatible partial stacks first, matching addItem ordering.
-        for (int i = 0; i < this.getSize() && overflow.getCount() > 0; ++i) {
-            Item slot = this.getItem(i);
-            if (slot.getId() == Item.AIR || slot.getCount() <= 0 || !overflow.equals(slot)) {
-                continue;
-            }
-            int amount = Math.min(limit - slot.getCount(), overflow.getCount());
-            if (amount <= 0) continue;
-            Item old = slot.clone();
-            slot.setCount(slot.getCount() + amount);
-            overflow.setCount(overflow.getCount() - amount);
-            this.slots.put(i, slot.clone());
-            this.onSlotChange(i, old, false);
-        }
-        for (int i = 0; i < this.getSize() && overflow.getCount() > 0; ++i) {
-            Item slot = this.getItem(i);
-            if (slot.getId() != Item.AIR && slot.getCount() > 0) continue;
-            Item chunk = overflow.clone();
-            chunk.setCount(Math.min(limit, overflow.getCount()));
-            overflow.setCount(overflow.getCount() - chunk.getCount());
-            // 直接写入，避免再次进入 setItemForce -> routeOverflowForce 的递归路径。
-            // Write directly to avoid recursively re-entering setItemForce -> routeOverflowForce.
-            Item old = this.getItem(i);
-            if (chunk.getStackNetId() == 0) {
-                chunk.autoAssignStackNetworkId();
-            }
-            if (chunk instanceof ItemBundle bundle) {
-                ensureUniqueBundleId(i, bundle);
-            }
-            this.slots.put(i, chunk.clone());
-            this.onSlotChange(i, old, false);
-        }
-        if (overflow.getCount() > 0) {
-            log.warn("Discarded {}x item id {} overflowing setItemForce into a full inventory",
-                    overflow.getCount(), overflow.getId());
-        }
     }
 
     @Override
