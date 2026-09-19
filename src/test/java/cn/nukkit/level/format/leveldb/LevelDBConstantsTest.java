@@ -67,6 +67,14 @@ public class LevelDBConstantsTest {
     }
 
     @Test
+    public void testUpdaterChainTailMatchesPaletteVersion() throws Exception {
+        java.lang.reflect.Field field = BlockStateMapping.class.getDeclaredField("LATEST_UPDATER_VERSION");
+        field.setAccessible(true);
+        assertEquals(LevelDBConstants.STATE_VERSION, field.getInt(null),
+                "Chain-tail rev drift would be silently masked by the exit normalization; assert it here so drift fails loudly");
+    }
+
+    @Test
     public void testPre12650StairsUpgradesToCornerState() {
         int version1_26_10 = (10 << 8) | (26 << 16) | (1 << 24);
 

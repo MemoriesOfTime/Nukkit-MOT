@@ -330,10 +330,6 @@ public class BlockStateMapping {
 
             cached = CONTEXT.update(state, LATEST_UPDATER_VERSION == version ? version - 1 : version);
 
-            if (cached.getInt("version") != LevelDBConstants.STATE_VERSION) {
-                cached = cached.toBuilder().putInt("version", LevelDBConstants.STATE_VERSION).build();
-            }
-
             BLOCK_UPDATE_CACHE.put(state, cached);
         }
         return cached;

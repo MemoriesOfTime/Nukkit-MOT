@@ -27,14 +27,14 @@ public class BlockStateUpdater_1_26_50 implements BlockStateUpdater {
         // 1.26.50 started storing stair corners and horizontal connections as states
         // instead of inferring them from neighbours at runtime; old states get the defaults.
         for (String stairs : STAIRS) {
-            ctx.addUpdater(1, 26, 50)
+            ctx.addUpdater(1, 26, 50, false, false)
                     .match("name", "minecraft:" + stairs)
                     .visit("states")
                     .tryAdd("minecraft:corner", "none");
         }
 
         for (String connectable : CONNECTABLES) {
-            ctx.addUpdater(1, 26, 50)
+            ctx.addUpdater(1, 26, 50, false, false)
                     .match("name", "minecraft:" + connectable)
                     .visit("states")
                     .tryAdd("minecraft:connection_north", (byte) 0)
