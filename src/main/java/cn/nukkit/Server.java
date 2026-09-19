@@ -272,6 +272,11 @@ public class Server {
     private Watchdog watchdog;
     private NukkitMetrics nukkitMetrics;
     private final DB nameLookup;
+    /**
+     * Trimmed lower-case names whose padded profiles were not folded at startup, with the reason.
+     * Their offline logins are refused: the profile a login would open may not be the latest.
+     */
+    private Map<String, String> profileFoldBlockedNames = Map.of();
     private PlayerDataSerializer playerDataSerializer;
     private SpawnerTask spawnerTask;
 
@@ -843,6 +848,24 @@ public class Server {
 
         if (this.savePlayerDataByUuid) {
             convertLegacyPlayerData();
+            // Before the network opens: a login trimmed to "Name" must find the profile that a
+            // padded "Name " used to save under, and never an older twin of it.
+            if (this.spaceMode == 2) {
+                // Replace mode turns "Name " into "Name_" and does not trim, so padded keys are
+                // not twins of the trimmed name there.
+                log.debug("Not folding player data saved under padded names: space-name-mode is replace");
+            } else {
+                try {
+                    PlayerNameEdgeWhitespaceMigration.Report fold = PlayerNameEdgeWhitespaceMigration.run(nameLookup,
+                            new File(dataPath, "players"),
+                            new File(dataPath, PlayerNameEdgeWhitespaceMigration.QUARANTINE_DIRECTORY));
+                    this.profileFoldBlockedNames = fold.blocked();
+                } catch (RuntimeException failure) {
+                    // Each name is handled inside the run; this only keeps an unexpected fault from
+                    // stopping the whole server.
+                    log.error("Could not fold player data saved under padded names", failure);
+                }
+            }
         }
 
         this.serverID = UUID.randomUUID();
@@ -2306,6 +2329,15 @@ public class Server {
         }
 
         return Optional.of(entry);
+    }
+
+    /**
+     * @param lowerCaseName login name after trimming, lower case
+     * @return why startup left this name's padded profiles unfolded, or {@code null} when offline
+     * logins with it may proceed
+     */
+    String profileFoldBlockReason(String lowerCaseName) {
+        return lowerCaseName == null ? null : profileFoldBlockedNames.get(lowerCaseName);
     }
 
     void updateName(UUID uuid, String name, boolean xboxAuthed) {
