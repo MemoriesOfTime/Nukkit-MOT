@@ -283,6 +283,20 @@ public class LevelDBChunkSection implements ChunkSection {
         }
     }
 
+    /** One palette lookup, retaining all 32 bits of both legacy fields without a temporary array. */
+    public long getBlockStatePair(int x, int y, int z, int layer) {
+        try {
+            this.readLock.lock();
+            if (!this.hasLayerUnsafe(layer)) {
+                return 0L;
+            }
+            BlockStateSnapshot state = this.storages[layer].getBlockState(x, y, z);
+            return ((long) state.getLegacyId() << 32) | (state.getLegacyData() & 0xffffffffL);
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
     @Override
     public boolean setBlock(int x, int y, int z, int blockId) {
         return setBlockAtLayer(x, y, z, 0, blockId, 0);

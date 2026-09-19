@@ -1420,7 +1420,7 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    private static int correctEntityIdentifiersProtocol(int protocolId) {
+    public static int correctEntityIdentifiersProtocol(int protocolId) {
         if (protocolId >= ProtocolInfo.v1_19_80) {
             return ProtocolInfo.v1_19_80;
         } else if (protocolId >= ProtocolInfo.v1_19_20) {
@@ -1844,11 +1844,12 @@ public abstract class Entity extends Location implements Metadatable {
             if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.SUICIDE) {
                 boolean totem = false;
                 boolean isOffhand = false;
-                if (isTotem(p.getOffhandInventory().getItemFast(0))) {
+                // A deliberately held totem takes precedence over the offhand.
+                if (isTotem(p.getInventory().getItemInHandFast())) {
+                    totem = true;
+                } else if (isTotem(p.getOffhandInventory().getItemFast(0))) {
                     totem = true;
                     isOffhand = true;
-                } else if (isTotem(p.getInventory().getItemInHandFast())) {
-                    totem = true;
                 }
                 if (totem) {
                     this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_TOTEM);
@@ -2566,6 +2567,13 @@ public abstract class Entity extends Location implements Metadatable {
             if (!this.hasEffect(Effect.SLOW_FALLING)) {
                 Block down = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() - 1, this.getFloorZ(), 0, true);
                 int floor = down.getId();
+
+                EntityFallEvent event = new EntityFallEvent(this, down, fallDistance);
+                this.server.getPluginManager().callEvent(event);
+                if (event.isCancelled()) {
+                    return;
+                }
+                fallDistance = event.getFallDistance();
 
                 if (!this.noFallDamage) {
                     float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));

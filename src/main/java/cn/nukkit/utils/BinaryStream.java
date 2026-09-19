@@ -322,20 +322,12 @@ public class BinaryStream {
         return Binary.readUUID(this.get(16));
     }
 
-    /**
-     * @deprecated use {@link #putSkin(GameVersion, Skin)} so the NetEase {@code fullSkinId}
-     * workaround is applied correctly.
-     */
     @Deprecated
     public void putSkin(Skin skin) {
         Server.mvw("BinaryStream#putSkin(Skin)");
         this.putSkin(GameVersion.getLastVersion(), skin);
     }
 
-    /**
-     * @deprecated use {@link #putSkin(GameVersion, Skin)} so the NetEase {@code fullSkinId}
-     * workaround is applied correctly.
-     */
     @Deprecated
     public void putSkin(int protocol, Skin skin) {
         this.putSkin(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), skin);
@@ -407,10 +399,7 @@ public class BinaryStream {
                 this.putBoolean(skin.isCapeOnClassic());
             }
             this.putString(skin.getCapeId());
-            String fullSkinId = gameVersion == GameVersion.V1_21_124_NETEASE
-                    ? skin.getFullSkinId() + UUID.randomUUID().toString().substring(0, 8)
-                    : skin.getFullSkinId();
-            this.putString(fullSkinId);
+            this.putString(skin.getFullSkinId());
             if (protocol >= ProtocolInfo.v1_14_60) {
                 boolean v2168 = protocol >= ProtocolInfo.v1_26_40;
                 if (v2168) {
@@ -2454,7 +2443,10 @@ public class BinaryStream {
             case CRAFT_RECIPE_AUTO -> {
                 int recipeId = (int) getUnsignedVarInt();
                 int numberOfRequestedCrafts = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
-                int timesCrafted = protocol >= ProtocolInfo.v1_17_10 ? (getByte() & 0xFF) : 0;
+                // v2168 起不再有独立 timesCrafted 字节（CB 26.50 起对齐其读取端：timesCrafted 回填 numberOfRequestedCrafts）
+                // No separate timesCrafted byte since v2168 (aligned with CB's reader since its 26.50
+                // commit removed the duplicated count byte): timesCrafted mirrors numberOfRequestedCrafts
+                int timesCrafted = protocol >= ProtocolInfo.v1_17_10 && protocol < ProtocolInfo.v1_26_40 ? (getByte() & 0xFF) : numberOfRequestedCrafts;
                 List<ItemDescriptorWithCount> ingredients = new ArrayList<>();
                 if (protocol >= ProtocolInfo.v1_19_40) {
                     // v2168: ingredients 数组 count 改用 VarUInt / ingredients array count uses VarUInt
