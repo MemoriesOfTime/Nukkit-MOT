@@ -1,8 +1,6 @@
 package cn.nukkit.network.process;
 
-import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.item.Item;
-import cn.nukkit.network.protocol.InventoryTransactionPacket;
 import cn.nukkit.network.protocol.PlayerActionPacket;
 import cn.nukkit.network.protocol.PlayerAuthInputPacket;
 import cn.nukkit.network.protocol.types.AuthInputAction;
@@ -20,9 +18,10 @@ import cn.nukkit.network.protocol.types.AuthInputAction;
  * MOT previously parsed those start bits and then ignored them, so eating/drawing
  * never set {@code DATA_FLAG_ACTION} and other players never saw the animation.
  * <p>
- * This helper is package-visible from {@code Player} and unit-tested without a live
- * session so the many cancel paths (equalsFast, second CLICK_AIR, sprint, default
- * PlayerAction fallthrough, same-slot MobEquipment) stay explicit.
+ * Public only so {@code Player} (a different package) can call it; not plugin API.
+ * Unit-tested without a live session so the many cancel paths (equalsFast,
+ * second CLICK_AIR, sprint, default PlayerAction fallthrough, same-slot
+ * MobEquipment) stay explicit.
  */
 public final class UsingItemReceive {
 
@@ -31,16 +30,6 @@ public final class UsingItemReceive {
 
     public static boolean isHoldToUseItem(Item item) {
         return item != null && item.getId() != 0 && item.canRelease();
-    }
-
-    public static boolean isClickAirUse(int transactionType, Object transactionData) {
-        if (transactionType != InventoryTransactionPacket.TYPE_USE_ITEM) {
-            return false;
-        }
-        if (!(transactionData instanceof UseItemData useItemData)) {
-            return false;
-        }
-        return useItemData.actionType == InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR;
     }
 
     /**
@@ -54,16 +43,20 @@ public final class UsingItemReceive {
         return alreadyUsing && holdToUse && ticksUsed < 2;
     }
 
-    public static boolean shouldStartUsingFromClickAir(boolean spawnedAlive, boolean spectatorBlocked,
-                                                       boolean alreadyUsing, boolean holdToUse,
-                                                       boolean onClickAir) {
-        return spawnedAlive && !spectatorBlocked && !alreadyUsing && holdToUse && onClickAir;
-    }
-
     public static boolean authInputStartsUsingItem(PlayerAuthInputPacket packet) {
         return packet != null
                 && packet.getInputData() != null
                 && packet.getInputData().contains(AuthInputAction.START_USING_ITEM);
+    }
+
+    /**
+     * Shared start gate for both start signals (AuthInput {@code START_USING_ITEM} and
+     * PlayerAction {@code ACTION_START_USING_ITEM}); the signal itself is already known
+     * to be present at every caller.
+     */
+    public static boolean shouldStartUsing(boolean spawnedAlive, boolean spectatorBlocked,
+                                           boolean alreadyUsing, boolean holdToUse) {
+        return spawnedAlive && !spectatorBlocked && !alreadyUsing && holdToUse;
     }
 
     /**
@@ -74,7 +67,7 @@ public final class UsingItemReceive {
     public static boolean shouldStartUsingFromAuthInput(boolean spawnedAlive, boolean spectatorBlocked,
                                                         boolean alreadyUsing, boolean holdToUse,
                                                         boolean startUsingItemFlag) {
-        return spawnedAlive && !spectatorBlocked && !alreadyUsing && holdToUse && startUsingItemFlag;
+        return shouldStartUsing(spawnedAlive, spectatorBlocked, alreadyUsing, holdToUse) && startUsingItemFlag;
     }
 
     /**
@@ -118,16 +111,6 @@ public final class UsingItemReceive {
     public static boolean shouldClearUsingOnMobEquipment(boolean javaClient, boolean alreadyUsing,
                                                          int currentHeldIndex, int packetHotbarSlot) {
         return alreadyUsing && (!javaClient || currentHeldIndex != packetHotbarSlot);
-    }
-
-    /**
-     * Early Java {@code TYPE_RELEASE_ITEM} is a real interrupt, including on the first
-     * tick. Duplicate Java CLICK_AIR is ignored by {@link #shouldIgnoreDuplicateClickAirStart};
-     * this path must still clear using-state.
-     */
-    public static boolean shouldRetainUsingOnEarlyJavaRelease(boolean javaClient, boolean alreadyUsing,
-                                                              boolean holdToUse, int ticksUsed) {
-        return false;
     }
 
     /**

@@ -1,10 +1,8 @@
 package cn.nukkit.network.process;
 
 import cn.nukkit.MockServer;
-import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
-import cn.nukkit.network.protocol.InventoryTransactionPacket;
 import cn.nukkit.network.protocol.PlayerActionPacket;
 import cn.nukkit.network.protocol.PlayerAuthInputPacket;
 import cn.nukkit.network.protocol.types.AuthInputAction;
@@ -13,9 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * MOT previously parsed AuthInput START_USING_ITEM / PlayerAction 37 and then
@@ -41,16 +37,6 @@ class UsingItemReceiveTest {
     }
 
     @Test
-    void clickAirTypeDetection() {
-        UseItemData data = new UseItemData();
-        data.actionType = InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR;
-        assertTrue(UsingItemReceive.isClickAirUse(InventoryTransactionPacket.TYPE_USE_ITEM, data));
-        data.actionType = InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK;
-        assertFalse(UsingItemReceive.isClickAirUse(InventoryTransactionPacket.TYPE_USE_ITEM, data));
-        assertFalse(UsingItemReceive.isClickAirUse(InventoryTransactionPacket.TYPE_RELEASE_ITEM, data));
-    }
-
-    @Test
     void ignoreOnlyImmediateDuplicateClickAir() {
         assertTrue(UsingItemReceive.shouldIgnoreDuplicateClickAirStart(true, true, 0));
         assertTrue(UsingItemReceive.shouldIgnoreDuplicateClickAirStart(true, true, 1));
@@ -67,6 +53,15 @@ class UsingItemReceiveTest {
         packet.setInputData(EnumSet.of(AuthInputAction.PERFORM_ITEM_INTERACTION));
         assertFalse(UsingItemReceive.authInputStartsUsingItem(packet));
         assertFalse(UsingItemReceive.authInputStartsUsingItem(null));
+    }
+
+    @Test
+    void startUsingSharedGate() {
+        assertTrue(UsingItemReceive.shouldStartUsing(true, false, false, true));
+        assertFalse(UsingItemReceive.shouldStartUsing(false, false, false, true));
+        assertFalse(UsingItemReceive.shouldStartUsing(true, true, false, true));
+        assertFalse(UsingItemReceive.shouldStartUsing(true, false, true, true));
+        assertFalse(UsingItemReceive.shouldStartUsing(true, false, false, false));
     }
 
     @Test
@@ -110,16 +105,6 @@ class UsingItemReceiveTest {
         assertTrue(UsingItemReceive.shouldClearUsingOnMobEquipment(true, true, 0, 1));
         assertTrue(UsingItemReceive.shouldClearUsingOnMobEquipment(false, true, 0, 0));
         assertFalse(UsingItemReceive.shouldClearUsingOnMobEquipment(true, false, 0, 1));
-    }
-
-    @Test
-    void neverRetainUsingOnEarlyJavaRelease() {
-        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, true, true, 0));
-        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, true, true, 1));
-        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, true, true, 32));
-        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(false, true, true, 0));
-        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, false, true, 0));
-        assertFalse(UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(true, true, false, 0));
     }
 
     @Test

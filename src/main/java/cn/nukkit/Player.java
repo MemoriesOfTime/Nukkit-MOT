@@ -71,8 +71,8 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.NetherNetInterface;
 import cn.nukkit.network.SourceInterface;
-import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.encryption.LoginChainVerifier;
+import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.process.UsingItemReceive;
 import cn.nukkit.network.protocol.*;
@@ -3085,12 +3085,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * {@code DATA_FLAG_ACTION} after this path succeeds.
      */
     boolean tryStartUsingHeldItem(Item item) {
-        if (!UsingItemReceive.shouldStartUsingFromAuthInput(
+        if (!UsingItemReceive.shouldStartUsing(
                 this.spawned && this.isAlive(),
                 this.isSpectator() && this.server.useClientSpectator,
                 this.isUsingItem(),
-                UsingItemReceive.isHoldToUseItem(item),
-                true)) {
+                UsingItemReceive.isHoldToUseItem(item))) {
             return false;
         }
         Vector3 direction = this.getDirectionVector();
@@ -5837,13 +5836,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     if (!item.onRelease(this, ticksUsed)) {
                                         this.inventory.sendContents(this);
                                     }
-                                    if (!UsingItemReceive.shouldRetainUsingOnEarlyJavaRelease(
-                                            this.isJavaClient(),
-                                            true,
-                                            UsingItemReceive.isHoldToUseItem(item),
-                                            ticksUsed)) {
-                                        this.setUsingItem(false);
-                                    }
+                                    // 早释放同样必须结束使用：ViaProxy Java 的 RELEASE_USE_ITEM 会翻译到这里，不能因 ticksUsed 小而保留
+                                    // An early release must still end the use: ViaProxy Java RELEASE_USE_ITEM maps here
+                                    this.setUsingItem(false);
                                 } else {
                                     this.inventory.sendContents(this);
                                 }
