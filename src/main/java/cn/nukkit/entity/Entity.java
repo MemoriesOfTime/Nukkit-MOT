@@ -1874,6 +1874,12 @@ public abstract class Entity extends Location implements Metadatable {
                         p.getInventory().decreaseCount(p.getInventory().getHeldItemIndex());
                     }
 
+                    // A totem consumes the lethal hit but returns false below, so EntityLiving
+                    // cannot arm its usual attackTime. Retain that same hurt window, including
+                    // its stronger-hit rule, without granting absolute noDamageTicks immunity.
+                    EntityLiving living = p;
+                    living.attackTime = Math.max(living.attackTime, source.getAttackCooldown());
+                    this.scheduleUpdate();
                     source.setCancelled(true);
                     return false;
                 }
