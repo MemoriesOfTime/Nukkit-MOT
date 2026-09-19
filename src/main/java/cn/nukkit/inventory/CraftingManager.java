@@ -1535,7 +1535,12 @@ public class CraftingManager {
     }
 
     /**
-     * Unregisters a recipe.
+     * 注销一个配方：从内部索引与网络 ID 映射中移除，并使合成数据包缓存失效。
+     * 仅使缓存失效，不会向在线玩家重发配方列表，需要刷新时请自行调用 {@code Server#sendRecipeList(Player)}。
+     * <p>
+     * Unregisters a recipe: removes it from the internal indexes and the network id map, and invalidates
+     * the cached crafting packets. Connected players are not re-sent the recipe list automatically; call
+     * {@code Server#sendRecipeList(Player)} yourself to refresh them.
      *
      * @param recipe the recipe to unregister
      * @return {@code true} if the recipe was removed
@@ -1548,56 +1553,54 @@ public class CraftingManager {
         if (recipe instanceof ShapedRecipe shapedRecipe) {
             removed |= this.recipes.remove(recipe);
             int resultHash = getItemHash(shapedRecipe.getResult());
-            Map<UUID, ShapedRecipe> recipes = this.shapedRecipes.get(resultHash);
-            if (recipes != null) {
+            Map<UUID, ShapedRecipe> resultRecipes = this.shapedRecipes.get(resultHash);
+            if (resultRecipes != null) {
                 UUID hash = getMultiItemHash(new LinkedList<>(shapedRecipe.getIngredientsAggregate()));
-                removed |= recipes.remove(hash, shapedRecipe);
-                if (recipes.isEmpty()) {
+                removed |= resultRecipes.remove(hash, shapedRecipe);
+                if (resultRecipes.isEmpty()) {
                     this.shapedRecipes.remove(resultHash);
                 }
             }
             this.networkIdRecipes.remove(shapedRecipe.getNetworkId(), recipe);
-        } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
-            removed |= this.recipes.remove(recipe);
-            int resultHash = getItemHash(shapelessRecipe.getResult());
-            Map<UUID, ShapelessRecipe> recipes = this.shapelessRecipes.get(resultHash);
-            if (recipes != null) {
-                UUID hash = getMultiItemHash(shapelessRecipe.getIngredientsAggregate());
-                removed |= recipes.remove(hash, shapelessRecipe);
-                if (recipes.isEmpty()) {
-                    this.shapelessRecipes.remove(resultHash);
-                }
-            }
-
-            this.networkIdRecipes.remove(shapelessRecipe.getNetworkId(), recipe);
-
-        } else if (recipe instanceof BlastFurnaceRecipe blastFurnaceRecipe) {
-            removed |= this.blastFurnaceRecipes.remove(getItemHash(blastFurnaceRecipe.getInput()), blastFurnaceRecipe);
-            this.recipeXpMap.removeDouble(recipe);
-        } else if (recipe instanceof SmokerRecipe smokerRecipe) {
-            removed |= this.smokerRecipes.remove(getItemHash(smokerRecipe.getInput()), smokerRecipe);
-            this.recipeXpMap.removeDouble(recipe);
-
-        } else if (recipe instanceof FurnaceRecipe furnaceRecipe) {
-            removed |= this.furnaceRecipes.remove(getItemHash(furnaceRecipe.getInput()), furnaceRecipe);
-            this.recipeXpMap.removeDouble(recipe);
         } else if (recipe instanceof SmithingRecipe smithingRecipe) {
+            // SmithingRecipe extends ShapelessRecipe, so it must be checked before ShapelessRecipe
             UUID hash = getMultiItemHash(smithingRecipe.getIngredientsAggregate());
             removed |= this.smithingRecipes.remove(hash, smithingRecipe);
             this.networkIdRecipes.remove(smithingRecipe.getNetworkId(), recipe);
-
+        } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
+            removed |= this.recipes.remove(recipe);
+            int resultHash = getItemHash(shapelessRecipe.getResult());
+            Map<UUID, ShapelessRecipe> resultRecipes = this.shapelessRecipes.get(resultHash);
+            if (resultRecipes != null) {
+                UUID hash = getMultiItemHash(shapelessRecipe.getIngredientsAggregate());
+                removed |= resultRecipes.remove(hash, shapelessRecipe);
+                if (resultRecipes.isEmpty()) {
+                    this.shapelessRecipes.remove(resultHash);
+                }
+            }
+            this.networkIdRecipes.remove(shapelessRecipe.getNetworkId(), recipe);
+        } else if (recipe instanceof BlastFurnaceRecipe blastFurnaceRecipe) {
+            removed |= this.blastFurnaceRecipes.remove(getItemHash(blastFurnaceRecipe.getInput()), blastFurnaceRecipe);
+        } else if (recipe instanceof SmokerRecipe smokerRecipe) {
+            removed |= this.smokerRecipes.remove(getItemHash(smokerRecipe.getInput()), smokerRecipe);
+        } else if (recipe instanceof FurnaceRecipe furnaceRecipe) {
+            removed |= this.furnaceRecipes.remove(getItemHash(furnaceRecipe.getInput()), furnaceRecipe);
         } else if (recipe instanceof StonecutterRecipe stonecutterRecipe) {
             removed |= this.stonecutterRecipes.remove(stonecutterRecipe);
             this.networkIdRecipes.remove(stonecutterRecipe.getNetworkId(), recipe);
-
         } else if (recipe instanceof CampfireRecipe campfireRecipe) {
-            removed |= this.campfireRecipes.remove(
-                getItemHash(campfireRecipe.getInput()),
-                campfireRecipe
-            );
+            removed |= this.campfireRecipes.remove(getItemHash(campfireRecipe.getInput()), campfireRecipe);
+        } else if (recipe instanceof MultiRecipe multiRecipe) {
+            removed |= this.multiRecipes.remove(multiRecipe.getId(), multiRecipe);
+            this.networkIdRecipes.remove(multiRecipe.getNetworkId(), recipe);
+        } else if (recipe instanceof BrewingRecipe brewingRecipe) {
+            removed |= this.brewingRecipes.remove(getPotionHash(brewingRecipe.getIngredient(), brewingRecipe.getInput()), brewingRecipe);
+        } else if (recipe instanceof ContainerRecipe containerRecipe) {
+            removed |= this.containerRecipes.remove(getContainerHash(containerRecipe.getIngredient().getId(), containerRecipe.getInput().getId()), containerRecipe);
         }
 
         if (removed) {
+            this.recipeXpMap.removeDouble(recipe);
             this.rebuildPacket();
         }
 
