@@ -15,6 +15,13 @@ import org.jetbrains.annotations.Nullable;
  */
 public abstract class BlockBarsCopperBase extends BlockThin implements Oxidizable, Waxable {
 
+    protected BlockBarsCopperBase() {
+    }
+
+    protected BlockBarsCopperBase(int meta) {
+        super(meta);
+    }
+
     @Override
     public double getHardness() {
         return 5;

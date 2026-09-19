@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
  * Created on 2015/12/6 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
-public abstract class BlockThin extends BlockTransparent {
+public abstract class BlockThin extends BlockTransparentMeta {
 
     /**
      * v2193 起玻璃板/铁栏的连接由 connection_* 方块状态驱动（客户端不再自动计算），
@@ -31,6 +31,10 @@ public abstract class BlockThin extends BlockTransparent {
             | FLAG_CONNECTION_SOUTH | FLAG_CONNECTION_WEST;
 
     protected BlockThin() {
+    }
+
+    protected BlockThin(int meta) {
+        super(meta);
     }
 
     @Override
