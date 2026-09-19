@@ -690,7 +690,8 @@ public class Server {
         log.info("Loading server properties...");
         this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
         this.properties.setHeader("Nukkit-MOT Server Properties\n"
-                + "For advanced settings, see nukkit-mot.yml");
+                + "For advanced settings, see nukkit-mot.yml\n"
+                + "Documentation: https://www.nukkit-mot.com/docs/user-guide/server-config/server-properties");
 
         // Load nukkit-mot.yml (advanced MOT settings)
         log.info("Loading server configuration (YAML)...");
