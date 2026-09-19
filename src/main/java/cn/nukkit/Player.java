@@ -1500,7 +1500,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         int centerX = (int) this.x >> 4;
         int centerZ = (int) this.z >> 4;
 
-        int radius = spawned ? this.chunkRadius : server.c_s_spawnThreshold;
+        // Before the first spawn the client already waits for every chunk inside the publisher
+        // radius (chunkRadius, never below 3). Capping the pre-spawn radius to sqrt(spawn-threshold)
+        // left the outer ring unsent, so the client hung in the air until its own timeout and only
+        // then sent SetLocalPlayerAsInitialized. PocketMine-MP and PowerNukkitX send the full view
+        // distance before spawn and use the threshold only to decide when PLAYER_SPAWN goes out.
+        int radius = spawned ? this.chunkRadius : Math.max(this.chunkRadius, server.c_s_spawnThreshold);
         int radiusSqr = radius * radius;
 
         // FOV 朝向优先(借鉴 PNX):视野内先入队,组内近→远;LongLinkedOpenHashSet 保插入序
@@ -2754,10 +2759,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getMaxHealth()).setValue(health > 0 ? (health < getMaxHealth() ? health : getMaxHealth()) : 0),
                 Attribute.getAttribute(Attribute.MAX_HUNGER).setValue(this.foodData.getLevel()).setDefaultValue(this.foodData.getMaxLevel()),
                 Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(this.speedToSend).setDefaultValue(this.getMovementSpeed()),
+                this.knockBackResistanceAttributeEntry(),
                 Attribute.getAttribute(Attribute.EXPERIENCE_LEVEL).setValue(this.expLevel),
                 Attribute.getAttribute(Attribute.EXPERIENCE).setValue(((float) this.exp) / calculateRequireExperience(this.expLevel))
         };
         this.dataPacket(pk);
+    }
+
+    /**
+     * 上次同步给客户端的击退抗性值，[-1, 0) 表示尚未同步过。
+     * <p>
+     * Last knockback resistance value sent to the client; values in [-1, 0) mean never sent.
+     */
+    private float lastSentKnockBackResistance = -1f;
+
+    /**
+     * 构造击退抗性属性条目并更新已同步值缓存。
+     * <p>
+     * Builds the knockback resistance attribute entry and refreshes the last-sent cache.
+     */
+    private Attribute knockBackResistanceAttributeEntry() {
+        float value = Math.max(0, Math.min(1, (float) this.getKnockBackResistance()));
+        this.lastSentKnockBackResistance = value;
+        return Attribute.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setValue(value);
+    }
+
+    /**
+     * 将当前击退抗性通过属性包同步给客户端，盔甲变化后调用；值未变化时跳过发包。
+     * <p>
+     * Syncs the current knockback resistance to the client via the attribute packet, called after armour changes; skips the packet when the value is unchanged.
+     */
+    public void sendKnockBackResistanceAttribute() {
+        float value = Math.max(0f, Math.min(1f, (float) this.getKnockBackResistance()));
+        if (value == this.lastSentKnockBackResistance) {
+            return;
+        }
+        this.setAttribute(this.knockBackResistanceAttributeEntry());
     }
 
     public void sendFogStack() {
@@ -3437,8 +3474,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
+        if (this.protocol >= ProtocolInfo.v1_21_120) {
+            this.forceDataPacket(JigsawStructureDataPacket.getCachedPacket(), null);
+        }
+
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
-            this.forceDataPacket(new VoxelShapesPacket(), null);
+            this.forceDataPacket(VoxelShapesPacket.getCachedPacket(this.protocol), null);
         }
 
         StartGamePacket startGamePacket = new StartGamePacket();
@@ -4759,12 +4800,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.getServer().getLogger().debug(username + ": Block pick request for a block too far away");
                     return;
                 }
-                Item item = block.toItem();
+                // A placed shulker box keeps the tag of the item it came from (lore, plugin data);
+                // pick block creates a new item and must not copy that tag onto it.
+                Item item = block instanceof BlockShulkerBox shulkerBox ? shulkerBox.toPickItem() : block.toItem();
                 if (pickRequestPacket.addUserData) {
                     BlockEntity blockEntity = this.getLevel().getBlockEntityIfLoaded(this.temporalVector.setComponents(pickRequestPacket.x, pickRequestPacket.y, pickRequestPacket.z));
                     if (blockEntity != null) {
                         CompoundTag nbt = blockEntity.getCleanedNBT();
                         if (nbt != null) {
+                            nbt.remove(BlockShulkerBox.SOURCE_ITEM_TAG);
+                        }
+                        if (nbt != null && !nbt.isEmpty()) {
                             item.setCustomBlockData(nbt);
                             item.setLore("+(DATA)");
                         }
@@ -7443,7 +7489,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkX = (int) this.teleportPosition.x >> 4;
             int chunkZ = (int) this.teleportPosition.z >> 4;
 
-            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : this.server.c_s_spawnThreshold);
+            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : Math.max(this.chunkRadius, this.server.c_s_spawnThreshold));
             int maxChunkOffset = Math.min(TELEPORT_CHUNK_READY_OFFSET, chunkSendRadius);
             long chunkSendRadiusSqr = (long) chunkSendRadius * chunkSendRadius;
             for (int X = -maxChunkOffset; X <= maxChunkOffset; ++X) {
