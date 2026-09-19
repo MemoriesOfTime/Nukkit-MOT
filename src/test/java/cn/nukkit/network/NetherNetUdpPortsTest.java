@@ -165,6 +165,15 @@ class NetherNetUdpPortsTest {
     }
 
     @Test
+    void publishesOnRequiresASinglePortMappingOntoThatPort() {
+        assertTrue(NetherNetUdpPorts.parse("19132:19134", LANG).publishesOn(19132), "a single-port mapping onto server-port shares it");
+        assertTrue(NetherNetUdpPorts.parse("203.0.113.10:19132:19134", LANG).publishesOn(19132), "an address prefix does not change that");
+        assertFalse(NetherNetUdpPorts.parse("19132:19134", LANG).publishesOn(25565), "another server-port is a plain external mapping");
+        assertFalse(NetherNetUdpPorts.parse("19134", LANG).publishesOn(19134), "no mapping means nothing is published elsewhere");
+        assertFalse(NetherNetUdpPorts.parse("19132-19140:32000-32008", LANG).publishesOn(19132), "a window is not a single-port mapping");
+    }
+
+    @Test
     void peerConfigPinsTheWindowWithMux() {
         NetherNetUdpPorts ports = NetherNetUdpPorts.parse("19132-19140:32000-32008", LANG);
         assertNotNull(ports, "equal-length ranges are a valid mapping");

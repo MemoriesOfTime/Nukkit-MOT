@@ -24,6 +24,7 @@ import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPSignaling;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPSignaling.JoinRefusal;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling.PongData;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetSignaling.IceServerInfo;
 import org.cloudburstmc.netty.util.nethernet.NetherNetLogging;
@@ -49,6 +50,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>
  * HTTP 信令端点接收 SDP offer，接受的每个对端成为普通 {@link NetherNetChildChannel}，载荷与 RakNet
  * 的 batch 体一致；DTLS 已加密，Bedrock 加密保持关闭，登录链改由信令身份绑定（见 {@link #checkIdentityBinding}）。
+ * 媒体 UDP 端口由 server-udp-ports 决定；映射到 server-port 上时经 {@link NetherNetMediaRelay} 与 RakNet 共用。
  * <p>
  * Adapted from PowerNukkitX NetherNet support (built on CloudburstMC netty-transport-nethernet
  * and WaterdogPE's signaling work).
@@ -75,6 +77,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     private final EventLoopGroup eventLoopGroup;
     private final NetherNetHTTPSignaling signaling;
     private final NetherNetTransportStats stats = new NetherNetTransportStats();
+    /**
+     * 与 RakNet 共用 server-port 时的进程内中继（server-udp-ports 把媒体发布在 server-port 上），否则为 null。
+     * The in-process relay while media shares server-port with RakNet (server-udp-ports publishes
+     * media on server-port), null otherwise.
+     */
+    private final NetherNetMediaRelay relay;
     /** 告警与 /status 中展示的媒体端口描述。 Media port description shown by the alarm and /status. */
     private final String mediaDescription;
     private long nextMediaAlertMinute = -1;
@@ -90,6 +98,15 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     private int inboundRoundRobinCursor;
 
     public NetherNetInterface(Server server, NetherNetSettings settings) {
+        this(server, settings, null);
+    }
+
+    /**
+     * @param rakNet RakNet 接口；server-udp-ports 把媒体发布在 server-port 上时，从它的监听 socket 中继媒体，
+     *               为 null 时该配置直接中止启动。 The RakNet interface; media published on server-port
+     *               is relayed from its listener sockets, null aborts startup for that configuration.
+     */
+    public NetherNetInterface(Server server, NetherNetSettings settings, RakNetInterface rakNet) {
         this.server = server;
 
         try {
@@ -108,15 +125,32 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             log.fatal(server.getLanguage().translateString("nukkit.nethernet.udpPorts.hint"));
             throw e;
         }
+        boolean sharedPort = mediaPorts != null && mediaPorts.publishesOn(server.getPort());
+        if (sharedPort) {
+            List<Channel> listeners = rakNet == null ? List.of() : rakNet.getDatagramChannels();
+            if (listeners.isEmpty()) {
+                String message = server.getLanguage().translateString("nukkit.nethernet.sharedPort.noRakNet",
+                        server.getPropertyString("server-udp-ports", "19134"), server.getPort());
+                log.fatal(message);
+                throw new IllegalStateException(message);
+            }
+            this.relay = new NetherNetMediaRelay(mediaPorts.begin(),
+                    Math.max(256, server.getMaxPlayers() * 4), this::isAddressBlocked);
+            listeners.forEach(this.relay::attach);
+        } else {
+            this.relay = null;
+        }
 
         this.signaling = new NetherNetHTTPSignaling.Builder()
                 .setIdentity(identity)
                 .setServeHttp(true)
                 // RakNet 已占用 server-port 的 UDP 侧，信令端口不可复用；媒体端口经 server-udp-ports
-                // 钉住（默认 19134，ICE mux 单端口服务所有对端；0 仍为系统自动分配）
+                // 钉住（默认 19134，ICE mux 单端口服务所有对端；0 仍为系统自动分配）。发布在 server-port
+                // 上时由 NetherNetMediaRelay 从 RakNet socket 转发到回环上的媒体端口
                 // RakNet holds the UDP side of server-port so the signaling port stays off-limits;
                 // media is pinned via server-udp-ports (default 19134, one ICE mux port serves all
-                // peers; 0 still means system-assigned)
+                // peers; 0 still means system-assigned). Published on server-port it is relayed by
+                // NetherNetMediaRelay from the RakNet socket to the loopback media port
                 .setIceOnLocalPort(false)
                 .setIceServers(iceServers(settings))
                 .setAdvertisedAddresses(mediaPorts == null ? Set.of() : mediaPorts.advertisedAddresses())
@@ -128,14 +162,22 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         this.eventLoopGroup = new MultiThreadIoEventLoopGroup(2, NioIoHandler.newFactory());
 
         int handshakeTimeout = handshakeTimeoutSeconds(server.networkLoginTimeoutMilliseconds);
-        this.mediaDescription = mediaPorts == null
-                ? server.getLanguage().translateString("nukkit.nethernet.media.systemAssigned")
-                : mediaPorts.toString();
+        this.mediaDescription = describeMedia(server, mediaPorts, sharedPort);
         InetSocketAddress bindAddress = new InetSocketAddress(
                 server.getIp().isBlank() ? "0.0.0.0" : server.getIp(), server.getPort());
+        NetherNetServerSignaling channelSignaling = this.signaling;
+        if (sharedPort) {
+            NetherNetSharedPortSdp.ExternalPorts externalPorts = new NetherNetSharedPortSdp.ExternalPorts(
+                    server.getPort(), server.isIpv6Enabled() ? server.getIpv6Port() : -1);
+            int internalPort = mediaPorts.begin();
+            channelSignaling = this.relay.decorate(this.signaling, sdp -> NetherNetSharedPortSdp.rewriteAnswer(
+                    sdp, internalPort, this.publishedAddresses(), externalPorts));
+        } else if (mediaPorts != null) {
+            channelSignaling = mediaPorts.decorate(this.signaling);
+        }
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .group(this.eventLoopGroup)
-                .channelFactory(NetherNetChannelFactory.server(mediaPorts == null ? this.signaling : mediaPorts.decorate(this.signaling)))
+                .channelFactory(NetherNetChannelFactory.server(channelSignaling))
                 .option(NetherChannelOption.NETHER_SERVER_RTC_HANDSHAKE_TIMEOUT_SECONDS, handshakeTimeout)
                 .option(NetherChannelOption.NETHER_METRICS, this.stats)
                 .childHandler(new ChannelInitializer<>() {
@@ -146,13 +188,24 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                         channel.pipeline().addLast("nukkit-handler", nukkitSession);
                     }
                 });
-        if (mediaPorts != null) {
+        if (sharedPort) {
+            // 媒体 socket 绑在回环：只有中继 leg 能到达它，也不会从内部端口向客户端发起探测；
+            // 对端地址由 leg 以 prflx 带入，库内按信令来源猜测候选的逻辑同样无用
+            // The media socket binds to loopback: only relay legs reach it and no probes leave the
+            // internal port toward clients; the peer arrives as prflx through the leg, so the
+            // library's guessing from the signaling address is pointless too
+            bootstrap.option(NetherChannelOption.NETHER_PEER_CONNECTION_CONFIG, mediaPorts.peerConfig(this.relay.mediaEndpoint()));
+            bootstrap.option(NetherChannelOption.NETHER_INFER_PEER_CANDIDATES, false);
+        } else if (mediaPorts != null) {
             bootstrap.option(NetherChannelOption.NETHER_PEER_CONNECTION_CONFIG, mediaPorts.peerConfig(bindAddress));
         }
         var bindFuture = bootstrap
                 .bind(bindAddress)
                 .awaitUninterruptibly();
         if (!bindFuture.isSuccess()) {
+            if (this.relay != null) {
+                this.relay.shutdown();
+            }
             this.eventLoopGroup.shutdownGracefully();
             throw new RuntimeException("Failed to bind NetherNet signaling on " + bindAddress, bindFuture.cause());
         }
@@ -160,10 +213,62 @@ public class NetherNetInterface implements AdvancedSourceInterface {
 
         if (mediaPorts != null) {
             log.info(server.getLanguage().translateString("nukkit.nethernet.listening.pinned",
-                    bindAddress.getPort(), mediaPorts));
+                    bindAddress.getPort(), this.mediaDescription));
         } else {
             log.info(server.getLanguage().translateString("nukkit.nethernet.listening.auto",
                     bindAddress.getPort()));
+        }
+    }
+
+    private static String describeMedia(Server server, NetherNetUdpPorts mediaPorts, boolean sharedPort) {
+        if (mediaPorts == null) {
+            return server.getLanguage().translateString("nukkit.nethernet.media.systemAssigned");
+        }
+        if (!sharedPort) {
+            return mediaPorts.toString();
+        }
+        String description = server.getLanguage().translateString("nukkit.nethernet.media.sharedPort",
+                server.getPort(), mediaPorts.begin());
+        return mediaPorts.advertisedAddresses().isEmpty()
+                ? description : description + " via " + mediaPorts.advertisedAddresses();
+    }
+
+    /**
+     * 共用端口应答里发布的地址：每次应答重新枚举（加入是低频事件，网卡变化即时生效）。
+     * Addresses published in a shared-port answer, enumerated per answer (joins are rare and
+     * interface changes take effect at once).
+     */
+    private List<InetAddress> publishedAddresses() {
+        List<InetAddress> addresses = NetherNetSharedPortSdp.localAddresses(
+                this.server.getIp(), this.server.getIpv6Address(), this.server.isIpv6Enabled());
+        if (addresses.isEmpty()) {
+            log.warn(this.server.getLanguage().translateString("nukkit.nethernet.sharedPort.noAddress"));
+        }
+        return addresses;
+    }
+
+    private boolean isAddressBlocked(InetAddress address) {
+        Long expiry = this.blockedAddresses.get(address);
+        return expiry != null && expiry >= System.currentTimeMillis();
+    }
+
+    /**
+     * 共用端口时子 channel 连上后报告的远端是中继 leg 的回环地址，换回真实客户端地址后再供玩家创建、
+     * 封禁与日志使用；非中继地址原样保留。当前库版本的 channel 经 Netty 缓存返回的是信令来源地址
+     * （会话构造时已读过一次），此处只在库改为报告 ICE 对端时才真正生效，其余情况无副作用。
+     * With the shared port a connected child channel reports the relay leg's loopback address as
+     * its remote; swap the real client back in before player creation, bans and logs see it.
+     * Addresses that are not a leg stay as they are. The current library channel still answers
+     * with the Netty-cached signaling address (read once at session construction), so this only
+     * bites once the library reports the ICE peer; it is a no-op otherwise.
+     */
+    public void restoreRelayedRemoteAddress(NetherNetChildChannel channel) {
+        if (this.relay == null) {
+            return;
+        }
+        InetSocketAddress client = this.relay.clientFor(channel.remoteAddress());
+        if (client != null) {
+            channel.setRemoteAddress(client);
         }
     }
 
@@ -190,9 +295,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     /**
      * server-port 的 UDP 侧归 RakNet，IPv6 监听同理；server.properties 是关键配置，
      * 解析错误或窗口覆盖任一监听端口时抛本地化错误中止启动，而非回退自动分配。
+     * 外部映射落在 server-port 上（如 19132:19134）表示媒体经进程内中继与 RakNet 共用该端口，只接受单端口映射。
      * The UDP side of server-port belongs to RakNet, likewise the IPv6 listener;
      * server.properties is critical config, so parse errors or windows covering either
      * listener abort startup with a localized error instead of falling back to auto ports.
+     * An external mapping onto server-port (19132:19134, say) means media shares that port with
+     * RakNet through the in-process relay, which takes a single-port mapping only.
      */
     private static NetherNetUdpPorts resolveMediaPorts(Server server) {
         String value = server.getPropertyString("server-udp-ports", "19134");
@@ -207,6 +315,14 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         if (server.isIpv6Enabled() && ports.contains(server.getIpv6Port())) {
             throw new IllegalArgumentException(server.getLanguage()
                     .translateString("nukkit.nethernet.udpPorts.coversIpv6Port", value, server.getIpv6Port()));
+        }
+        if (ports.offset() != 0 && !ports.publishesOn(server.getPort())) {
+            int externalBegin = ports.begin() + ports.offset();
+            int externalEnd = ports.end() + ports.offset();
+            if (externalBegin <= server.getPort() && server.getPort() <= externalEnd) {
+                throw new IllegalArgumentException(server.getLanguage().translateString(
+                        "nukkit.nethernet.udpPorts.sharedWindow", value, server.getPort(), ports.begin()));
+            }
         }
         return ports;
     }
@@ -265,6 +381,10 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
                 continue;
             }
+            // channelActive 已换回真实地址；这里再换一次兜底 RTC_CONNECTED 回调晚于激活的时序
+            // channelActive already restored the real address; repeating it covers an RTC_CONNECTED
+            // callback landing after activation
+            this.restoreRelayedRemoteAddress(session.getChannel());
             InetSocketAddress address = (InetSocketAddress) session.getChannel().remoteAddress();
             try {
                 PlayerCreationEvent event = new PlayerCreationEvent(this, Player.class, Player.class, null, address);
@@ -430,14 +550,15 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     }
 
     /**
-     * /status 渲染行（走 lang.ini；simple 两行、full 四行；会话计数仅主线程命令路径读取）。
-     * /status lines localized through lang.ini; two in simple mode, four in full,
-     * session counts are read from the main-thread command path only.
+     * /status 渲染行（走 lang.ini；simple 两行、full 四行，共用端口时 full 多一行中继状态；
+     * 会话计数仅主线程命令路径读取）。
+     * /status lines localized through lang.ini; two in simple mode, four in full plus a relay line
+     * while the port is shared, session counts are read from the main-thread command path only.
      */
     public List<String> buildStatusLines(int windowMinutes, boolean full) {
         NetherNetTransportStats.TransportSnapshot snapshot =
                 this.stats.snapshot(windowMinutes, System.currentTimeMillis());
-        List<String> lines = new ArrayList<>(4);
+        List<String> lines = new ArrayList<>(5);
         lines.add(TextFormat.GOLD + this.server.getLanguage().translateString("nukkit.nethernet.stats.summary",
                 this.mediaDescription, this.sessions.size(), this.pendingSessions.size()));
         lines.add(TextFormat.GOLD + this.server.getLanguage().translateString("nukkit.nethernet.stats.funnel",
@@ -448,6 +569,13 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                     formatBytes(snapshot.bytesIn()), formatBytes(snapshot.bytesOut())));
             lines.add(TextFormat.GOLD + this.server.getLanguage().translateString("nukkit.nethernet.stats.dropped",
                     snapshot.postConnectDrops(), snapshot.loginTimeouts(), windowMinutes));
+            if (this.relay != null) {
+                NetherNetMediaRelay.Snapshot relaySnapshot = this.relay.snapshot();
+                lines.add(TextFormat.GOLD + this.server.getLanguage().translateString("nukkit.nethernet.stats.relay",
+                        relaySnapshot.legs(), relaySnapshot.legsOpened(),
+                        formatBytes(relaySnapshot.bytesIn()), formatBytes(relaySnapshot.bytesOut()),
+                        relaySnapshot.rejectedUfrag(), relaySnapshot.rejectedLimit() + relaySnapshot.rejectedBlocked()));
+            }
         }
         return lines;
     }
@@ -536,6 +664,9 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
+        if (this.relay != null) {
+            this.relay.shutdown();
+        }
         this.eventLoopGroup.shutdownGracefully();
     }
 
@@ -545,6 +676,9 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
+        if (this.relay != null) {
+            this.relay.shutdown();
+        }
         this.eventLoopGroup.shutdownGracefully();
     }
 

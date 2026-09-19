@@ -1,16 +1,15 @@
 package cn.nukkit.network;
 
 import cn.nukkit.lang.BaseLang;
-import io.netty.channel.EventLoop;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
 import org.cloudburstmc.netty.util.nethernet.EndpointAddress;
-import org.cloudburstmc.netty.util.nethernet.ServerIdentity;
 import tel.schich.libdatachannel.PeerConnectionConfiguration;
 
-import java.net.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -269,83 +268,27 @@ public final class NetherNetUdpPorts {
         return this.offset == 0 ? delegate : new PortRewritingSignaling(delegate);
     }
 
-    /** 纯委托装饰器，仅拦截非 trickle 应答的唯一出口 sendFullSdp。 Pure delegation except the single non-trickle answer exit, sendFullSdp. */
-    private final class PortRewritingSignaling implements NetherNetServerSignaling {
+    /**
+     * 单端口映射且外部端口正是 {@code port}（通常为 server-port）：媒体要在 RakNet 的 UDP 端口上对外发布，
+     * 由 {@link NetherNetMediaRelay} 在进程内转发，而不是指望外部 NAT。
+     * A single-port mapping whose external port is {@code port} (normally server-port): media is
+     * published on RakNet's UDP port and {@link NetherNetMediaRelay} forwards it in-process
+     * instead of relying on an external NAT.
+     */
+    public boolean publishesOn(int port) {
+        return this.offset != 0 && this.begin == this.end && this.begin + this.offset == port;
+    }
 
-        private final NetherNetServerSignaling delegate;
+    /** 仅拦截非 trickle 应答的唯一出口 sendFullSdp。 Intercepts only the single non-trickle answer exit, sendFullSdp. */
+    private final class PortRewritingSignaling extends NetherNetDelegatingSignaling {
 
         private PortRewritingSignaling(NetherNetServerSignaling delegate) {
-            this.delegate = delegate;
+            super(delegate);
         }
 
         @Override
         public void sendFullSdp(String targetNetworkId, String sdp) {
             this.delegate.sendFullSdp(targetNetworkId, NetherNetUdpPorts.this.rewriteSdp(sdp));
-        }
-
-        @Override
-        public void bind(SocketAddress localAddress, EventLoop eventLoop) throws ConnectException {
-            this.delegate.bind(localAddress, eventLoop);
-        }
-
-        @Override
-        public void setNewConnectionHandler(NewConnectionHandler handler) {
-            this.delegate.setNewConnectionHandler(handler);
-        }
-
-        @Override
-        public void setAdvertisementData(PongData pongData) {
-            this.delegate.setAdvertisementData(pongData);
-        }
-
-        @Override
-        public List<IceServerInfo> getIceServers() {
-            return this.delegate.getIceServers();
-        }
-
-        @Override
-        public ServerIdentity serverIdentity() {
-            return this.delegate.serverIdentity();
-        }
-
-        @Override
-        public boolean allowsIceOnLocalPort() {
-            return this.delegate.allowsIceOnLocalPort();
-        }
-
-        @Override
-        public boolean usesTrickleIce() {
-            return this.delegate.usesTrickleIce();
-        }
-
-        @Override
-        public void sendSignal(String targetNetworkId, String data) {
-            this.delegate.sendSignal(targetNetworkId, data);
-        }
-
-        @Override
-        public void setSignalHandler(long connectionId, SignalHandler handler) {
-            this.delegate.setSignalHandler(connectionId, handler);
-        }
-
-        @Override
-        public void removeSignalHandler(long connectionId) {
-            this.delegate.removeSignalHandler(connectionId);
-        }
-
-        @Override
-        public String getLocalNetworkId() {
-            return this.delegate.getLocalNetworkId();
-        }
-
-        @Override
-        public boolean isActive() {
-            return this.delegate.isActive();
-        }
-
-        @Override
-        public void close() {
-            this.delegate.close();
         }
     }
 
