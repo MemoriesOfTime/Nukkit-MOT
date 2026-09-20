@@ -33,7 +33,9 @@ import org.cloudburstmc.netty.util.nethernet.TokenTrust;
 import org.cloudburstmc.netty.util.nethernet.TransportIdentityBinding;
 import tel.schich.libdatachannel.LibDataChannelArchDetect;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.KeyFactory;
@@ -50,7 +52,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>
  * HTTP 信令端点接收 SDP offer，接受的每个对端成为普通 {@link NetherNetChildChannel}，载荷与 RakNet
  * 的 batch 体一致；DTLS 已加密，Bedrock 加密保持关闭，登录链改由信令身份绑定（见 {@link #checkIdentityBinding}）。
- * 媒体 UDP 端口由 server-udp-ports 决定；映射到 server-port 上时经 {@link NetherNetMediaRelay} 与 RakNet 共用。
+ * 媒体 UDP 端口由 server-udp-ports 决定；等于 server-port 或映射到它时经 {@link NetherNetMediaRelay} 与 RakNet 共用。
  * <p>
  * Adapted from PowerNukkitX NetherNet support (built on CloudburstMC netty-transport-nethernet
  * and WaterdogPE's signaling work).
@@ -69,6 +71,15 @@ public class NetherNetInterface implements AdvancedSourceInterface {
      */
     static final int MEDIA_ALERT_WINDOW_MINUTES = 5;
     static final long MEDIA_ALERT_MIN_ATTEMPTS = 5;
+
+    /**
+     * server-udp-ports 的默认媒体端口，也是共用端口时自动挑选内部回环端口的起点。
+     * The server-udp-ports default media port, also where the shared-port search for an
+     * internal loopback port starts.
+     */
+    static final int DEFAULT_MEDIA_PORT = 19134;
+    /** 自动挑选内部端口时最多探测的端口数。 How many ports the internal-port search probes at most. */
+    static final int MEDIA_PORT_ATTEMPTS = 16;
 
     private final Server server;
     private Network network;
@@ -125,16 +136,21 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             log.fatal(server.getLanguage().translateString("nukkit.nethernet.udpPorts.hint"));
             throw e;
         }
-        boolean sharedPort = mediaPorts != null && mediaPorts.publishesOn(server.getPort());
+        boolean sharedPort = mediaPorts != null
+                && (mediaPorts.publishesOn(server.getPort()) || mediaPorts.pinsOnly(server.getPort()));
         if (sharedPort) {
             List<Channel> listeners = rakNet == null ? List.of() : rakNet.getDatagramChannels();
             if (listeners.isEmpty()) {
                 String message = server.getLanguage().translateString("nukkit.nethernet.sharedPort.noRakNet",
-                        server.getPropertyString("server-udp-ports", "19134"), server.getPort());
+                        server.getPropertyString("server-udp-ports", String.valueOf(DEFAULT_MEDIA_PORT)), server.getPort());
                 log.fatal(message);
                 throw new IllegalStateException(message);
             }
-            this.relay = new NetherNetMediaRelay(mediaPorts.begin(),
+            DatagramSocket reservedMediaPort = reserveMediaPort(server, mediaPorts);
+            if (mediaPorts.pinsOnly(server.getPort())) {
+                mediaPorts = mediaPorts.relayedThrough(reservedMediaPort.getLocalPort());
+            }
+            this.relay = new NetherNetMediaRelay(reservedMediaPort,
                     Math.max(256, server.getMaxPlayers() * 4), this::isAddressBlocked);
             listeners.forEach(this.relay::attach);
         } else {
@@ -146,10 +162,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 .setServeHttp(true)
                 // RakNet 已占用 server-port 的 UDP 侧，信令端口不可复用；媒体端口经 server-udp-ports
                 // 钉住（默认 19134，ICE mux 单端口服务所有对端；0 仍为系统自动分配）。发布在 server-port
-                // 上时由 NetherNetMediaRelay 从 RakNet socket 转发到回环上的媒体端口
+                // 上（19132:19134，或直接写 19132 让内部端口自动挑选）时由 NetherNetMediaRelay 从 RakNet
+                // socket 转发到回环上的媒体端口
                 // RakNet holds the UDP side of server-port so the signaling port stays off-limits;
                 // media is pinned via server-udp-ports (default 19134, one ICE mux port serves all
-                // peers; 0 still means system-assigned). Published on server-port it is relayed by
+                // peers; 0 still means system-assigned). Published on server-port (19132:19134, or
+                // plain 19132 with the internal port picked automatically) it is relayed by
                 // NetherNetMediaRelay from the RakNet socket to the loopback media port
                 .setIceOnLocalPort(false)
                 .setIceServers(iceServers(settings))
@@ -295,18 +313,20 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     /**
      * server-port 的 UDP 侧归 RakNet，IPv6 监听同理；server.properties 是关键配置，
      * 解析错误或窗口覆盖任一监听端口时抛本地化错误中止启动，而非回退自动分配。
-     * 外部映射落在 server-port 上（如 19132:19134）表示媒体经进程内中继与 RakNet 共用该端口，只接受单端口映射。
+     * 两种写法表示媒体经进程内中继与 RakNet 共用 server-port：直接写 server-port（如 19132，内部回环端口
+     * 由 {@link #reserveMediaPort} 自动挑选），或单端口映射钉住内部端口（如 19132:19134）。
      * The UDP side of server-port belongs to RakNet, likewise the IPv6 listener;
      * server.properties is critical config, so parse errors or windows covering either
      * listener abort startup with a localized error instead of falling back to auto ports.
-     * An external mapping onto server-port (19132:19134, say) means media shares that port with
-     * RakNet through the in-process relay, which takes a single-port mapping only.
+     * Two spellings mean media shares server-port with RakNet through the in-process relay:
+     * server-port itself (19132, say, with the internal loopback port picked by
+     * {@link #reserveMediaPort}) or a single-port mapping pinning the internal port (19132:19134).
      */
     private static NetherNetUdpPorts resolveMediaPorts(Server server) {
-        String value = server.getPropertyString("server-udp-ports", "19134");
+        String value = server.getPropertyString("server-udp-ports", String.valueOf(DEFAULT_MEDIA_PORT));
         NetherNetUdpPorts ports = NetherNetUdpPorts.parse(value, server.getLanguage());
-        if (ports == null) {
-            return null;
+        if (ports == null || ports.pinsOnly(server.getPort())) {
+            return ports;
         }
         if (ports.contains(server.getPort())) {
             throw new IllegalArgumentException(server.getLanguage()
@@ -325,6 +345,46 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             }
         }
         return ports;
+    }
+
+    /**
+     * 共用端口时预留内部回环端口（{@link NetherNetMediaRelay#reserveMediaPort}）：钉住的内部端口被占即中止启动；
+     * 自动挑选从 {@link #DEFAULT_MEDIA_PORT} 起向上探测，跳过 RakNet 的监听端口，取第一个空闲端口——
+     * 固定段不与系统临时端口段重叠，同机的第二个实例也会因预留而自然错开。
+     * Reserves the internal loopback port for the shared port ({@link NetherNetMediaRelay#reserveMediaPort}):
+     * a pinned internal port already in use aborts startup; the automatic pick probes upward from
+     * {@link #DEFAULT_MEDIA_PORT}, skipping RakNet's listener ports, and takes the first free one —
+     * a fixed range stays clear of the ephemeral range, and a second instance on the host lands on
+     * the next port thanks to the reservation.
+     */
+    private static DatagramSocket reserveMediaPort(Server server, NetherNetUdpPorts mediaPorts) {
+        String value = server.getPropertyString("server-udp-ports", String.valueOf(DEFAULT_MEDIA_PORT));
+        if (mediaPorts.publishesOn(server.getPort())) {
+            try {
+                return NetherNetMediaRelay.reserveMediaPort(mediaPorts.begin());
+            } catch (IOException e) {
+                String message = server.getLanguage().translateString(
+                        "nukkit.nethernet.sharedPort.internalInUse", value, mediaPorts.begin());
+                log.fatal(message);
+                throw new IllegalStateException(message, e);
+            }
+        }
+        int last = DEFAULT_MEDIA_PORT + MEDIA_PORT_ATTEMPTS - 1;
+        IOException lastFailure = null;
+        for (int port = DEFAULT_MEDIA_PORT; port <= last; port++) {
+            if (port == server.getPort() || (server.isIpv6Enabled() && port == server.getIpv6Port())) {
+                continue;
+            }
+            try {
+                return NetherNetMediaRelay.reserveMediaPort(port);
+            } catch (IOException e) {
+                lastFailure = e;
+            }
+        }
+        String message = server.getLanguage().translateString("nukkit.nethernet.sharedPort.noFreeInternalPort",
+                value, server.getPort(), DEFAULT_MEDIA_PORT, last);
+        log.fatal(message);
+        throw new IllegalStateException(message, lastFailure);
     }
 
     private PongData buildPong() {

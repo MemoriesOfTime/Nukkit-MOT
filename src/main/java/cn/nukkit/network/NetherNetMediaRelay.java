@@ -13,6 +13,8 @@ import io.netty.util.ReferenceCountUtil;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
 
+import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.PortUnreachableException;
@@ -23,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
@@ -37,7 +40,7 @@ import java.util.function.UnaryOperator;
  * <p>
  * 首个 STUN Binding Request 必须携带某个待建连接的本端 ufrag（来自应答 SDP）才会开 leg，未知来源的其它数据报
  * 一律丢弃；leg 有总数与每 IP 上限，空闲超时回收。子 channel 连上后看到的远端是 leg 的回环地址，
- * 由 {@link #clientFor} 换回真实客户端地址。
+ * 由 {@link #clientFor} 换回真实客户端地址。内部端口可经 {@link #reserveMediaPort} 预留到首个 offer 为止。
  * <p>
  * In-process UDP relay so NetherNet media shares server-port with RakNet. libjuice owns its own
  * socket with no injection API, so the two transports cannot share one UDP socket; instead STUN/DTLS
@@ -48,7 +51,8 @@ import java.util.function.UnaryOperator;
  * the leg passes as the peer. A leg opens only for a STUN Binding Request carrying the local ufrag
  * of a pending answer; anything else from an unknown source is dropped. Legs are capped in total
  * and per address and reaped when idle. The child channel reports the leg's loopback address as
- * its remote once connected, {@link #clientFor} maps it back.
+ * its remote once connected, {@link #clientFor} maps it back. The internal port can be held through
+ * {@link #reserveMediaPort} until the first offer.
  */
 @Log4j2
 public final class NetherNetMediaRelay {
@@ -106,9 +110,21 @@ public final class NetherNetMediaRelay {
 
     private volatile ScheduledFuture<?> sweepTask;
     private volatile boolean closed;
+    /** 首个 offer 前占住内部端口的 socket，见 {@link #reserveMediaPort}；未预留或已放开为 null。 Holds the internal port until the first offer, see {@link #reserveMediaPort}; null once released or never reserved. */
+    private final AtomicReference<DatagramSocket> reservation = new AtomicReference<>();
 
     public NetherNetMediaRelay(int mediaPort, int maxLegs, Predicate<InetAddress> addressBlocked) {
         this(mediaPort, maxLegs, addressBlocked, DEFAULT_IDLE_TTL_NANOS);
+    }
+
+    /**
+     * 以 {@link #reserveMediaPort} 预留好的端口为内部端口，中继接管预留：首个 offer 进入库之前或关闭时放开。
+     * Takes a port reserved through {@link #reserveMediaPort} as the internal port and owns the
+     * reservation, letting go right before the first offer enters the library or on shutdown.
+     */
+    public NetherNetMediaRelay(DatagramSocket reservedMediaPort, int maxLegs, Predicate<InetAddress> addressBlocked) {
+        this(reservedMediaPort.getLocalPort(), maxLegs, addressBlocked, DEFAULT_IDLE_TTL_NANOS);
+        this.reservation.set(reservedMediaPort);
     }
 
     NetherNetMediaRelay(int mediaPort, int maxLegs, Predicate<InetAddress> addressBlocked, long idleTtlNanos) {
@@ -116,6 +132,34 @@ public final class NetherNetMediaRelay {
         this.maxLegs = maxLegs;
         this.addressBlocked = addressBlocked;
         this.idleTtlNanos = idleTtlNanos;
+    }
+
+    /**
+     * 预留回环上的内部媒体端口。libjuice 只在首个 PeerConnection 收集候选时才绑定它，此前端口一直空着，
+     * 别的进程（比如同机的第二个实例）可能抢走；用一个普通 UDP socket 占住，能立刻发现端口已被占用
+     * （抛 {@link IOException}），也挡住启动到首个玩家之间的抢占。libjuice 不设 SO_REUSEADDR，
+     * 放开前它绑不上；放开与它绑定同在一次新连接回调里，间隔可忽略。
+     * Reserves the internal media port on loopback. libjuice binds it only when the first
+     * PeerConnection gathers candidates, leaving it free for anyone else (a second instance on
+     * the host, say) to grab until then; a plain UDP socket both surfaces a port already in use
+     * (throws {@link IOException}) and keeps it from being taken between startup and the first
+     * player. libjuice sets no SO_REUSEADDR so it cannot bind while the reservation stands; the
+     * release and its bind happen in the same new-connection callback, a negligible gap.
+     */
+    public static DatagramSocket reserveMediaPort(int port) throws IOException {
+        return new DatagramSocket(new InetSocketAddress(LOOPBACK, port));
+    }
+
+    /** 放开预留（幂等）：库即将绑定内部端口，或中继关闭。 Lets go of the reservation (idempotent): the library is about to bind, or the relay shuts down. */
+    void releaseMediaPort() {
+        DatagramSocket held = this.reservation.getAndSet(null);
+        if (held != null) {
+            held.close();
+        }
+    }
+
+    boolean holdsMediaPort() {
+        return this.reservation.get() != null;
     }
 
     /** libjuice 应当绑定的地址（回环 + 内部端口）。 Where libjuice should bind (loopback + internal port). */
@@ -191,6 +235,7 @@ public final class NetherNetMediaRelay {
 
     public void shutdown() {
         this.closed = true;
+        this.releaseMediaPort();
         ScheduledFuture<?> sweep = this.sweepTask;
         if (sweep != null) {
             sweep.cancel(false);
@@ -521,9 +566,14 @@ public final class NetherNetMediaRelay {
 
         @Override
         public void setNewConnectionHandler(NewConnectionHandler handler) {
-            this.delegate.setNewConnectionHandler((connectionId, remoteNetworkId, payload, clientAddress, player) ->
-                    handler.onConnect(connectionId, remoteNetworkId, NetherNetSharedPortSdp.stripCandidates(payload),
-                            clientAddress, player));
+            this.delegate.setNewConnectionHandler((connectionId, remoteNetworkId, payload, clientAddress, player) -> {
+                // 库在这次回调里创建 PeerConnection 并绑定内部端口，预留必须先让路
+                // The library creates the PeerConnection and binds the internal port inside this
+                // callback, so the reservation has to step aside first
+                NetherNetMediaRelay.this.releaseMediaPort();
+                handler.onConnect(connectionId, remoteNetworkId, NetherNetSharedPortSdp.stripCandidates(payload),
+                        clientAddress, player);
+            });
         }
 
         @Override

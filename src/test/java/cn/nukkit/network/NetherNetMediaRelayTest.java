@@ -7,10 +7,12 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.mockito.ArgumentCaptor;
 
 import java.io.IOException;
 import java.net.DatagramSocket;
@@ -23,8 +25,12 @@ import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * 共用端口中继：RFC 7983 分流、ufrag 门禁、回环 leg 往返与地址映射，用真实回环 socket 验证。
@@ -231,6 +237,58 @@ class NetherNetMediaRelayTest {
         byte[] request = stunBindingRequest("srv:cli");
         send(this.client, request, this.listener.localAddress());
         assertArrayEquals(request, this.passedThrough.poll(3, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @Timeout(30)
+    void reservationHoldsTheMediaPortUntilTheFirstOffer() throws Exception {
+        DatagramSocket reserved = NetherNetMediaRelay.reserveMediaPort(0);
+        int port = reserved.getLocalPort();
+        NetherNetMediaRelay reserving = new NetherNetMediaRelay(reserved, 4, address -> false);
+        try {
+            assertEquals(port, reserving.mediaEndpoint().getPort(), "the reserved port is the media endpoint");
+            assertTrue(reserving.holdsMediaPort());
+            assertThrows(IOException.class, () -> NetherNetMediaRelay.reserveMediaPort(port).close(),
+                    "nobody else can bind the port while the reservation stands");
+
+            NetherNetServerSignaling delegate = mock(NetherNetServerSignaling.class);
+            NetherNetServerSignaling decorated = reserving.decorate(delegate, UnaryOperator.identity());
+            AtomicReference<String> offerSeen = new AtomicReference<>();
+            decorated.setNewConnectionHandler((connectionId, remoteNetworkId, payload, clientAddress, player) -> {
+                // 库在此刻创建 PeerConnection 并绑定：端口必须已经空出
+                // The library creates the PeerConnection and binds right here: the port must be free by now
+                assertFalse(reserving.holdsMediaPort(), "the reservation is released before the library sees the offer");
+                try (DatagramSocket libjuice = NetherNetMediaRelay.reserveMediaPort(port)) {
+                    assertEquals(port, libjuice.getLocalPort());
+                } catch (IOException e) {
+                    fail("the media port is still taken when the offer reaches the library", e);
+                }
+                offerSeen.set(payload);
+            });
+            ArgumentCaptor<NetherNetServerSignaling.NewConnectionHandler> installed =
+                    ArgumentCaptor.forClass(NetherNetServerSignaling.NewConnectionHandler.class);
+            verify(delegate).setNewConnectionHandler(installed.capture());
+
+            installed.getValue().onConnect(1L, "peer", "v=0\r\na=candidate:1 1 udp 1 192.0.2.1 5 typ host\r\n", null, null);
+            assertEquals("v=0\r\n", offerSeen.get(), "the offer still loses its candidates on the way in");
+
+            installed.getValue().onConnect(2L, "peer", "v=0\r\n", null, null);
+            assertEquals("v=0\r\n", offerSeen.get(), "a second offer finds no reservation and simply passes");
+        } finally {
+            reserving.shutdown();
+        }
+    }
+
+    @Test
+    void shutdownReleasesAnUnusedReservation() throws Exception {
+        DatagramSocket reserved = NetherNetMediaRelay.reserveMediaPort(0);
+        int port = reserved.getLocalPort();
+        NetherNetMediaRelay reserving = new NetherNetMediaRelay(reserved, 4, address -> false);
+        reserving.shutdown();
+        assertFalse(reserving.holdsMediaPort());
+        try (DatagramSocket free = NetherNetMediaRelay.reserveMediaPort(port)) {
+            assertEquals(port, free.getLocalPort(), "a server that never saw an offer gives the port back on shutdown");
+        }
     }
 
     /** RFC 5389 Binding Request，仅带 USERNAME 属性。 An RFC 5389 Binding Request carrying just USERNAME. */

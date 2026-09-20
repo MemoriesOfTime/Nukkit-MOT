@@ -174,6 +174,32 @@ class NetherNetUdpPortsTest {
     }
 
     @Test
+    void pinsOnlyIsTheUnmappedSinglePortAndRelayedThroughTurnsItIntoTheMapping() {
+        NetherNetUdpPorts plain = NetherNetUdpPorts.parse("19132", LANG);
+        assertNotNull(plain);
+        assertTrue(plain.pinsOnly(19132), "server-port itself asks for the shared port with an automatic internal port");
+        assertFalse(plain.pinsOnly(19134), "another port is an ordinary pinned media port");
+        assertFalse(plain.publishesOn(19132), "without a mapping nothing is published yet");
+        assertFalse(NetherNetUdpPorts.parse("19132:19134", LANG).pinsOnly(19132), "a mapping already names its internal port");
+        assertFalse(NetherNetUdpPorts.parse("19130-19140", LANG).pinsOnly(19132), "a window is not a single port");
+        assertTrue(NetherNetUdpPorts.parse("203.0.113.10:19132", LANG).pinsOnly(19132), "an address prefix does not change that");
+
+        NetherNetUdpPorts relayed = NetherNetUdpPorts.parse("203.0.113.10:19132", LANG).relayedThrough(19135);
+        assertTrue(relayed.publishesOn(19132), "the relayed form is the single-port mapping onto server-port");
+        assertEquals(19135, relayed.begin());
+        assertEquals(19135, relayed.end());
+        assertEquals(Set.of("203.0.113.10"), relayed.advertisedAddresses(), "the address prefix survives");
+        assertEquals("udp/19135 published as 19132 via [203.0.113.10]", relayed.toString());
+        assertEquals(NetherNetUdpPorts.parse("19132:19135", LANG).toString(), plain.relayedThrough(19135).toString(),
+                "plain 19132 relayed through 19135 reads exactly like the explicit 19132:19135");
+
+        assertThrows(IllegalStateException.class, () -> NetherNetUdpPorts.parse("19132:19134", LANG).relayedThrough(19135),
+                "a mapping cannot be relayed a second time");
+        assertThrows(IllegalStateException.class, () -> NetherNetUdpPorts.parse("19130-19140", LANG).relayedThrough(19135),
+                "a window cannot be relayed through one port");
+    }
+
+    @Test
     void peerConfigPinsTheWindowWithMux() {
         NetherNetUdpPorts ports = NetherNetUdpPorts.parse("19132-19140:32000-32008", LANG);
         assertNotNull(ports, "equal-length ranges are a valid mapping");

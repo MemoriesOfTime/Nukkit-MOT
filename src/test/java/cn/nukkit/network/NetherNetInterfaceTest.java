@@ -18,12 +18,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -206,40 +210,142 @@ class NetherNetInterfaceTest {
         Server server = MockServer.get();
         // 信令绑定 TCP，媒体中继挂在 RakNet 的 UDP 监听上：两者用同一个探测到的空闲端口号
         // Signaling binds TCP and the relay hooks RakNet's UDP listener: both use one probed free port number
-        int port;
-        try (ServerSocket probe = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))) {
-            port = probe.getLocalPort();
-        }
+        int port = freeTcpPort();
+        int internal = freeUdpPort();
         lenient().when(server.getPort()).thenReturn(port);
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn(port + ":39000");
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn(port + ":" + internal);
 
-        MultiThreadIoEventLoopGroup group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
-        Channel listener = new Bootstrap().group(group).channel(NioDatagramChannel.class)
-                .handler(new ChannelInboundHandlerAdapter())
-                .bind(new InetSocketAddress("127.0.0.1", 0)).syncUninterruptibly().channel();
-        RakNetInterface rakNet = mock(RakNetInterface.class);
-        when(rakNet.getDatagramChannels()).thenReturn(List.of(listener));
-        NetherNetInterface shared = null;
-        try {
-            shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet);
-            assertNotNull(listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME), "the relay demux sits on the RakNet listener");
+        try (RakNetStandIn rakNet = new RakNetStandIn()) {
+            NetherNetInterface shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet);
+            try {
+                assertNotNull(rakNet.listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME), "the relay demux sits on the RakNet listener");
 
-            var lines = shared.buildStatusLines(10, true);
-            assertEquals(5, lines.size(), "full mode gains the relay line while the port is shared");
-            assertTrue(lines.get(0).contains("shared with RakNet"), "the summary describes the shared port, got: " + lines.get(0));
-            assertTrue(lines.get(4).contains("relay"), "the extra line reports the relay, got: " + lines.get(4));
-            assertEquals(2, shared.buildStatusLines(10, false).size(), "simple mode stays at two lines");
-        } finally {
-            if (shared != null) {
+                var lines = shared.buildStatusLines(10, true);
+                assertEquals(5, lines.size(), "full mode gains the relay line while the port is shared");
+                assertTrue(lines.get(0).contains("shared with RakNet"), "the summary describes the shared port, got: " + lines.get(0));
+                assertEquals(internal, relayedPort(lines.get(0)), "the pinned internal port is the relay target");
+                assertTrue(lines.get(4).contains("relay"), "the extra line reports the relay, got: " + lines.get(4));
+                assertEquals(2, shared.buildStatusLines(10, false).size(), "simple mode stays at two lines");
+                assertThrows(IOException.class, () -> bindUdp(internal).close(),
+                        "the internal port is reserved until the first offer reaches the library");
+            } finally {
                 shared.shutdown();
             }
+            rakNet.awaitDetached();
+            assertNull(rakNet.listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME), "shutdown detaches the relay from RakNet");
+            try (DatagramSocket free = bindUdp(internal)) {
+                assertEquals(internal, free.getLocalPort(), "shutdown gives the reserved port back");
+            }
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void plainServerPortSharesItWithAnAutoPickedInternalPort() throws Exception {
+        Server server = MockServer.get();
+        int port = freeTcpPort();
+        lenient().when(server.getPort()).thenReturn(port);
+        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn(String.valueOf(port));
+
+        // 占住默认起点，自动挑选必须跳过它（本机已有别的进程占着时效果相同）
+        // Hold the default starting point so the pick has to skip it (the same happens when
+        // something else on the host holds it already)
+        DatagramSocket defaultTaken = tryBindUdp(NetherNetInterface.DEFAULT_MEDIA_PORT);
+        try (RakNetStandIn rakNet = new RakNetStandIn()) {
+            NetherNetInterface shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet);
+            try {
+                assertNotNull(rakNet.listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME), "server-port alone switches the relay on");
+                var lines = shared.buildStatusLines(10, true);
+                assertEquals(5, lines.size(), "full mode gains the relay line");
+                assertTrue(lines.get(0).contains("shared with RakNet"), "the summary describes the shared port, got: " + lines.get(0));
+                int internal = relayedPort(lines.get(0));
+                assertNotEquals(NetherNetInterface.DEFAULT_MEDIA_PORT, internal, "the taken default is skipped");
+                assertTrue(internal > NetherNetInterface.DEFAULT_MEDIA_PORT
+                                && internal < NetherNetInterface.DEFAULT_MEDIA_PORT + NetherNetInterface.MEDIA_PORT_ATTEMPTS,
+                        "the pick stays inside the probe range, got " + internal);
+                assertThrows(IOException.class, () -> bindUdp(internal).close(),
+                        "the picked port is reserved until the first offer reaches the library");
+            } finally {
+                shared.shutdown();
+            }
+        } finally {
+            if (defaultTaken != null) {
+                defaultTaken.close();
+            }
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void pinnedInternalPortAlreadyInUseAbortsConstruction() throws Exception {
+        Server server = MockServer.get();
+        int port = freeTcpPort();
+        lenient().when(server.getPort()).thenReturn(port);
+        try (DatagramSocket taken = bindUdp(0); RakNetStandIn rakNet = new RakNetStandIn()) {
+            lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn(port + ":" + taken.getLocalPort());
+            IllegalStateException e = assertThrows(IllegalStateException.class,
+                    () -> new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet));
+            assertTrue(e.getMessage().contains("already in use"),
+                    "the abort names the occupied internal port instead of failing at the first join, got: " + e.getMessage());
+            assertNull(rakNet.listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME), "nothing was attached before the abort");
+        }
+    }
+
+    private static int freeTcpPort() throws IOException {
+        try (ServerSocket probe = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))) {
+            return probe.getLocalPort();
+        }
+    }
+
+    private static int freeUdpPort() throws IOException {
+        try (DatagramSocket probe = bindUdp(0)) {
+            return probe.getLocalPort();
+        }
+    }
+
+    private static DatagramSocket bindUdp(int port) throws IOException {
+        return new DatagramSocket(new InetSocketAddress("127.0.0.1", port));
+    }
+
+    private static DatagramSocket tryBindUdp(int port) {
+        try {
+            return bindUdp(port);
+        } catch (IOException alreadyTaken) {
+            return null;
+        }
+    }
+
+    /** 状态摘要里"relayed to loopback udp/N"的 N。 The N in the summary's "relayed to loopback udp/N". */
+    private static int relayedPort(String summary) {
+        Matcher matcher = Pattern.compile("relayed to loopback udp/(\\d+)").matcher(summary);
+        assertTrue(matcher.find(), "the summary names the relay target, got: " + summary);
+        return Integer.parseInt(matcher.group(1));
+    }
+
+    /** 一个真实的回环 UDP 监听充当 RakNet 的 datagram channel。 A real loopback UDP listener standing in for RakNet's datagram channel. */
+    private static final class RakNetStandIn implements AutoCloseable {
+        final MultiThreadIoEventLoopGroup group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        final Channel listener;
+        final RakNetInterface rakNet = mock(RakNetInterface.class);
+
+        RakNetStandIn() {
+            this.listener = new Bootstrap().group(this.group).channel(NioDatagramChannel.class)
+                    .handler(new ChannelInboundHandlerAdapter())
+                    .bind(new InetSocketAddress("127.0.0.1", 0)).syncUninterruptibly().channel();
+            when(this.rakNet.getDatagramChannels()).thenReturn(List.of(this.listener));
+        }
+
+        void awaitDetached() throws InterruptedException {
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-            while (listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME) != null && System.nanoTime() < deadline) {
+            while (this.listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME) != null && System.nanoTime() < deadline) {
                 Thread.sleep(10);
             }
-            assertNull(listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME), "shutdown detaches the relay from RakNet");
-            listener.close().awaitUninterruptibly();
-            group.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+        }
+
+        @Override
+        public void close() {
+            this.listener.close().awaitUninterruptibly();
+            this.group.shutdownGracefully(0, 0, TimeUnit.SECONDS);
         }
     }
 }

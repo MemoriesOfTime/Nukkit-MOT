@@ -17,12 +17,17 @@ import java.util.Set;
  * 0=系统自动分配；{@code [ip:]internal[-internal]}=钉住本地端口/窗口；
  * {@code [ip:]external[-external]:internal[-internal]}=另发布对端可达的外部映射，
  * 冒号两侧范围长度必须一致。逗号分隔多条目：IP 累计，窗口与偏移须一致。
+ * 钉住的单个端口正是 server-port（{@link #pinsOnly}）或映射到它（{@link #publishesOn}）时，
+ * 媒体与 RakNet 共用该端口，前者的内部回环端口由服务器自动挑选。
  * <p>
  * Parses server-udp-ports from server.properties (BDS syntax): 0=system-assigned;
  * {@code [ip:]internal[-internal]} pins the local port/window;
  * {@code [ip:]external[-external]:internal[-internal]} additionally publishes an
  * externally reachable mapping, range lengths on each side of the colon must match.
  * Comma-separated entries accumulate IPs while window and offset must agree.
+ * A single port pinned exactly on server-port ({@link #pinsOnly}) or mapped onto it
+ * ({@link #publishesOn}) shares that port with RakNet, the former leaving the internal
+ * loopback port for the server to pick.
  */
 @Log4j2
 public final class NetherNetUdpPorts {
@@ -277,6 +282,29 @@ public final class NetherNetUdpPorts {
      */
     public boolean publishesOn(int port) {
         return this.offset != 0 && this.begin == this.end && this.begin + this.offset == port;
+    }
+
+    /**
+     * 未映射的单个端口正是 {@code port}（通常为 server-port）：同样表示与 RakNet 共用该端口，只是内部回环端口
+     * 留给服务器自动挑选，再经 {@link #relayedThrough} 变成 {@link #publishesOn} 形式的单端口映射。
+     * A single unmapped port that is exactly {@code port} (normally server-port): sharing with RakNet
+     * as well, only the internal loopback port is left for the server to pick, after which
+     * {@link #relayedThrough} turns this into the {@link #publishesOn} single-port mapping.
+     */
+    public boolean pinsOnly(int port) {
+        return this.offset == 0 && this.begin == this.end && this.begin == port;
+    }
+
+    /**
+     * 把 {@link #pinsOnly} 的单端口改成经 {@code internalPort} 中继到它的映射（即 {@code ext:internalPort}），地址前缀保留。
+     * Turns a {@link #pinsOnly} single port into the mapping relayed through {@code internalPort}
+     * ({@code ext:internalPort}), keeping any address prefix.
+     */
+    NetherNetUdpPorts relayedThrough(int internalPort) {
+        if (this.offset != 0 || this.begin != this.end) {
+            throw new IllegalStateException("only a single unmapped port can be relayed, got " + this);
+        }
+        return new NetherNetUdpPorts(internalPort, internalPort, this.begin - internalPort, this.advertisedAddresses);
     }
 
     /** 仅拦截非 trickle 应答的唯一出口 sendFullSdp。 Intercepts only the single non-trickle answer exit, sendFullSdp. */
