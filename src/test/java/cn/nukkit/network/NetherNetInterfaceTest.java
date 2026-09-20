@@ -43,6 +43,9 @@ import static org.mockito.Mockito.*;
  */
 class NetherNetInterfaceTest {
 
+    /** 与中继内部端口同一族别的回环地址（preferIPv6Addresses 下是 ::1）。 Loopback of the relay's family (::1 under preferIPv6Addresses). */
+    private static final InetAddress LOOPBACK = InetAddress.getLoopbackAddress();
+
     @TempDir
     Path tempDir;
 
@@ -194,6 +197,81 @@ class NetherNetInterfaceTest {
 
     @Test
     @Timeout(30)
+    void sharedPortWindowCoveringOnlyTheIpv6ListenerIsRejected() {
+        Server server = MockServer.get();
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("19131-19135:39000-39004");
+        lenient().when(server.isIpv6Enabled()).thenReturn(true);
+        lenient().when(server.getIpv6Port()).thenReturn(19133);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> new NetherNetInterface(server, new NetherNetSettings()));
+        assertTrue(e.getMessage().contains("IPv6 listener port 19133"),
+                "a window published over the IPv6 listener must be narrowed to one port, got: " + e.getMessage());
+    }
+
+    @Test
+    @Timeout(30)
+    void mappingOntoTheIpv6ListenerSharesIt() throws Exception {
+        Server server = MockServer.get();
+        int v4Port = freeTcpPort();
+        int v6Port = freeTcpPort();
+        int internal = freeUdpPort();
+        lenient().when(server.getPort()).thenReturn(v4Port);
+        lenient().when(server.isIpv6Enabled()).thenReturn(true);
+        lenient().when(server.getIpv6Port()).thenReturn(v6Port);
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn(v6Port + ":" + internal);
+
+        try (RakNetStandIn rakNet = new RakNetStandIn()) {
+            NetherNetInterface shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet);
+            try {
+                assertNotNull(rakNet.listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME),
+                        "a single-port mapping onto the IPv6 listener shares it like server-port");
+                var lines = shared.buildStatusLines(10, true);
+                assertEquals(5, lines.size(), "full mode gains the relay line");
+                assertTrue(lines.get(0).contains("udp/" + v6Port + " shared with RakNet"),
+                        "the summary names the shared IPv6 listener port, got: " + lines.get(0));
+                assertEquals(internal, relayedPort(lines.get(0)), "the pinned internal port is the relay target");
+                assertThrows(IOException.class, () -> bindUdp(internal).close(),
+                        "the internal port is reserved until the first offer reaches the library");
+            } finally {
+                shared.shutdown();
+            }
+            rakNet.awaitDetached();
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void plainIpv6ListenerPortSharesItWithAnAutoPickedInternalPort() throws Exception {
+        Server server = MockServer.get();
+        int v4Port = freeTcpPort();
+        int v6Port = freeTcpPort();
+        lenient().when(server.getPort()).thenReturn(v4Port);
+        lenient().when(server.isIpv6Enabled()).thenReturn(true);
+        lenient().when(server.getIpv6Port()).thenReturn(v6Port);
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn(String.valueOf(v6Port));
+
+        try (RakNetStandIn rakNet = new RakNetStandIn()) {
+            NetherNetInterface shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet);
+            try {
+                assertNotNull(rakNet.listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME),
+                        "the bare IPv6 listener port shares like server-port does");
+                var lines = shared.buildStatusLines(10, true);
+                assertEquals(5, lines.size(), "full mode gains the relay line");
+                assertTrue(lines.get(0).contains("udp/" + v6Port + " shared with RakNet"),
+                        "the summary names the shared IPv6 listener port, got: " + lines.get(0));
+                int internal = relayedPort(lines.get(0));
+                assertNotEquals(v4Port, internal);
+                assertThrows(IOException.class, () -> bindUdp(internal).close(),
+                        "the picked port is reserved until the first offer reaches the library");
+            } finally {
+                shared.shutdown();
+            }
+            rakNet.awaitDetached();
+        }
+    }
+
+    @Test
+    @Timeout(30)
     void sharedPortWithoutARakNetListenerAbortsConstruction() {
         Server server = MockServer.get();
         lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("19132:39000");
@@ -334,7 +412,7 @@ class NetherNetInterfaceTest {
     }
 
     private static DatagramSocket bindUdp(int port) throws IOException {
-        return new DatagramSocket(new InetSocketAddress("127.0.0.1", port));
+        return new DatagramSocket(new InetSocketAddress(LOOPBACK, port));
     }
 
     private static DatagramSocket tryBindUdp(int port) {
@@ -361,7 +439,7 @@ class NetherNetInterfaceTest {
         RakNetStandIn() {
             this.listener = new Bootstrap().group(this.group).channel(NioDatagramChannel.class)
                     .handler(new ChannelInboundHandlerAdapter())
-                    .bind(new InetSocketAddress("127.0.0.1", 0)).syncUninterruptibly().channel();
+                    .bind(new InetSocketAddress(LOOPBACK, 0)).syncUninterruptibly().channel();
             when(this.rakNet.getDatagramChannels()).thenReturn(List.of(this.listener));
         }
 

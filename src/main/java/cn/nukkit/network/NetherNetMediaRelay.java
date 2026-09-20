@@ -14,11 +14,7 @@ import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
 
 import java.io.IOException;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.PortUnreachableException;
-import java.net.SocketAddress;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,8 +35,9 @@ import java.util.function.UnaryOperator;
  * 再发给客户端。libjuice 只按来源地址与 ufrag 分流、不看目的地址，所以把 leg 当作对端即可完成 ICE/DTLS/SCTP。
  * <p>
  * 首个 STUN Binding Request 必须携带某个待建连接的本端 ufrag（来自应答 SDP）才会开 leg，未知来源的其它数据报
- * 一律丢弃；leg 有总数与每 IP 上限，空闲超时回收。子 channel 连上后看到的远端是 leg 的回环地址，
- * 由 {@link #clientFor} 换回真实客户端地址。内部端口可经 {@link #reserveMediaPort} 预留到首个 offer 为止。
+ * 一律丢弃；leg 有总数与每 IP 上限，空闲超时回收。子 channel 的远端由库按信令来源给出（真实客户端地址，
+ * Netty 自首次读取后缓存、不再跟随库内部变化），无需换回；{@link #clientFor} 仅供诊断把 leg 地址映射回客户端。
+ * 内部端口可经 {@link #reserveMediaPort} 预留到首个 offer 为止。
  * <p>
  * In-process UDP relay so NetherNet media shares server-port with RakNet. libjuice owns its own
  * socket with no injection API, so the two transports cannot share one UDP socket; instead STUN/DTLS
@@ -50,9 +47,10 @@ import java.util.function.UnaryOperator;
  * RakNet socket. libjuice demultiplexes by source address and ufrag only, never by destination, so
  * the leg passes as the peer. A leg opens only for a STUN Binding Request carrying the local ufrag
  * of a pending answer; anything else from an unknown source is dropped. Legs are capped in total
- * and per address and reaped when idle. The child channel reports the leg's loopback address as
- * its remote once connected, {@link #clientFor} maps it back. The internal port can be held through
- * {@link #reserveMediaPort} until the first offer.
+ * and per address and reaped when idle. The child channel's remote is whatever the library derives
+ * from the signaling source (the real client; Netty caches it from the first read and never
+ * re-reads), so no swap is needed; {@link #clientFor} maps a leg address back to its client for
+ * diagnostics. The internal port can be held through {@link #reserveMediaPort} until the first offer.
  */
 @Log4j2
 public final class NetherNetMediaRelay {
@@ -224,15 +222,24 @@ public final class NetherNetMediaRelay {
     }
 
     /**
-     * 回环 leg 地址对应的真实客户端地址；不是 leg 地址时返回 null。
+     * 回环 leg 地址对应的真实客户端地址；不是 leg 地址时返回 null。端口相同还不够，查询地址必须与
+     * leg 绑定的地址一致，同端口号的其它回环 socket 不会被误映射。仅供诊断与测试。
      * The real client behind a loopback leg address, or null when the address is not a leg.
+     * A matching port alone is not enough: the queried address must equal the leg's bound
+     * address, so other loopback sockets sharing the port number never map. Diagnostics and
+     * tests only.
      */
     public InetSocketAddress clientFor(SocketAddress address) {
         if (!(address instanceof InetSocketAddress inet) || inet.getAddress() == null || !inet.getAddress().isLoopbackAddress()) {
             return null;
         }
         Leg leg = this.legsByLocalPort.get(inet.getPort());
-        return leg == null ? null : leg.client;
+        if (leg == null) {
+            return null;
+        }
+        return leg.channel.localAddress() instanceof InetSocketAddress bound
+                && bound.getAddress() != null && bound.getAddress().equals(inet.getAddress())
+                ? leg.client : null;
     }
 
     public Snapshot snapshot() {
@@ -358,9 +365,13 @@ public final class NetherNetMediaRelay {
         }
 
         Leg leg = new Leg(listener, client);
+        // 回环地址随 preferIPv6Addresses 可能是 ::1，leg 的地址族必须与之一致才能绑定/连接
+        // The loopback may be ::1 under preferIPv6Addresses; the leg must match its family to bind/connect
+        SocketProtocolFamily family = this.mediaEndpoint.getAddress() instanceof Inet6Address
+                ? SocketProtocolFamily.INET6 : SocketProtocolFamily.INET;
         ChannelFactory<? extends DatagramChannel> factory = listener instanceof EpollDatagramChannel
-                ? () -> new EpollDatagramChannel(SocketProtocolFamily.INET)
-                : () -> new NioDatagramChannel(SocketProtocolFamily.INET);
+                ? () -> new EpollDatagramChannel(family)
+                : () -> new NioDatagramChannel(family);
         ChannelFuture bound = new Bootstrap()
                 .group(listener.eventLoop())
                 .channelFactory(factory)

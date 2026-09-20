@@ -174,6 +174,17 @@ class NetherNetUdpPortsTest {
     }
 
     @Test
+    void sharesPortCoversBothSharedSpellingsOnEitherListener() {
+        assertTrue(NetherNetUdpPorts.parse("19132", LANG).sharesPort(19132), "a bare listener port shares it");
+        assertTrue(NetherNetUdpPorts.parse("19132:19134", LANG).sharesPort(19132), "a single-port mapping onto it shares it");
+        assertTrue(NetherNetUdpPorts.parse("19133", LANG).sharesPort(19133), "the IPv6 listener port shares the same way");
+        assertTrue(NetherNetUdpPorts.parse("19133:19134", LANG).sharesPort(19133));
+        assertFalse(NetherNetUdpPorts.parse("19134", LANG).sharesPort(19132), "an unrelated pin is standalone");
+        assertFalse(NetherNetUdpPorts.parse("19132-19140", LANG).sharesPort(19132), "windows never share");
+        assertFalse(NetherNetUdpPorts.parse("19132:19134", LANG).sharesPort(19133), "a mapping onto one listener does not share another");
+    }
+
+    @Test
     void pinsOnlyIsTheUnmappedSinglePortAndRelayedThroughTurnsItIntoTheMapping() {
         NetherNetUdpPorts plain = NetherNetUdpPorts.parse("19132", LANG);
         assertNotNull(plain);

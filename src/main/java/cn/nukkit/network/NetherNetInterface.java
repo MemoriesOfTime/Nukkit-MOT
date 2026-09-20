@@ -52,7 +52,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>
  * HTTP 信令端点接收 SDP offer，接受的每个对端成为普通 {@link NetherNetChildChannel}，载荷与 RakNet
  * 的 batch 体一致；DTLS 已加密，Bedrock 加密保持关闭，登录链改由信令身份绑定（见 {@link #checkIdentityBinding}）。
- * 媒体 UDP 端口由 server-udp-ports 决定；等于 server-port 或映射到它时经 {@link NetherNetMediaRelay} 与 RakNet 共用。
+ * 媒体 UDP 端口由 server-udp-ports 决定；单端口钉住或映射到任一 RakNet 监听端口（server-port / IPv6）时
+ * 经 {@link NetherNetMediaRelay} 与 RakNet 共用。
  * <p>
  * Adapted from PowerNukkitX NetherNet support (built on CloudburstMC netty-transport-nethernet
  * and WaterdogPE's signaling work).
@@ -88,9 +89,9 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     private final NetherNetHTTPSignaling signaling;
     private final NetherNetTransportStats stats = new NetherNetTransportStats();
     /**
-     * 与 RakNet 共用 server-port 时的进程内中继（server-udp-ports 把媒体发布在 server-port 上），否则为 null。
-     * The in-process relay while media shares server-port with RakNet (server-udp-ports publishes
-     * media on server-port), null otherwise.
+     * 与 RakNet 共用某个监听端口时的进程内中继（server-udp-ports 把媒体发布在 server-port 或 IPv6 监听上），否则为 null。
+     * The in-process relay while media shares a RakNet listener port (server-udp-ports
+     * publishes media on server-port or the IPv6 listener), null otherwise.
      */
     private final NetherNetMediaRelay relay;
     /** 告警与 /status 中展示的媒体端口描述。 Media port description shown by the alarm and /status. */
@@ -136,7 +137,8 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             throw e;
         }
         boolean sharedPort = mediaPorts != null
-                && (mediaPorts.publishesOn(server.getPort()) || mediaPorts.pinsOnly(server.getPort()));
+                && (mediaPorts.sharesPort(server.getPort())
+                || (server.isIpv6Enabled() && mediaPorts.sharesPort(server.getIpv6Port())));
         if (sharedPort) {
             List<Channel> listeners = rakNet == null ? List.of() : rakNet.getDatagramChannels();
             if (listeners.isEmpty()) {
@@ -146,7 +148,8 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 throw new IllegalStateException(message);
             }
             DatagramSocket reservedMediaPort = reserveMediaPort(server, mediaPorts);
-            if (mediaPorts.pinsOnly(server.getPort())) {
+            if (mediaPorts.pinsOnly(server.getPort())
+                    || (server.isIpv6Enabled() && mediaPorts.pinsOnly(server.getIpv6Port()))) {
                 mediaPorts = mediaPorts.relayedThrough(reservedMediaPort.getLocalPort());
             }
             this.relay = new NetherNetMediaRelay(reservedMediaPort,
@@ -242,8 +245,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         if (!sharedPort) {
             return mediaPorts.toString();
         }
+        // 共用形态下单端口映射总是成立（pinsOnly 已先经 relayedThrough 转换），外部端口 = 内部端口 + 偏移
+        // In shared mode a single-port mapping always holds (pinsOnly was relayedThrough first),
+        // the external port being the internal one plus the offset
+        int externalPort = mediaPorts.begin() + mediaPorts.offset();
         String description = server.getLanguage().translateString("nukkit.nethernet.media.sharedPort",
-                server.getPort(), mediaPorts.begin());
+                externalPort, mediaPorts.begin());
         return mediaPorts.advertisedAddresses().isEmpty()
                 ? description : description + " via " + mediaPorts.advertisedAddresses();
     }
@@ -267,26 +274,6 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         return expiry != null && expiry >= System.currentTimeMillis();
     }
 
-    /**
-     * 共用端口时子 channel 连上后报告的远端是中继 leg 的回环地址，换回真实客户端地址后再供玩家创建、
-     * 封禁与日志使用；非中继地址原样保留。当前库版本的 channel 经 Netty 缓存返回的是信令来源地址
-     * （会话构造时已读过一次），此处只在库改为报告 ICE 对端时才真正生效，其余情况无副作用。
-     * With the shared port a connected child channel reports the relay leg's loopback address as
-     * its remote; swap the real client back in before player creation, bans and logs see it.
-     * Addresses that are not a leg stay as they are. The current library channel still answers
-     * with the Netty-cached signaling address (read once at session construction), so this only
-     * bites once the library reports the ICE peer; it is a no-op otherwise.
-     */
-    public void restoreRelayedRemoteAddress(NetherNetChildChannel channel) {
-        if (this.relay == null) {
-            return;
-        }
-        InetSocketAddress client = this.relay.clientFor(channel.remoteAddress());
-        if (client != null) {
-            channel.setRemoteAddress(client);
-        }
-    }
-
     private static List<IceServerInfo> iceServers(NetherNetSettings settings) {
         List<String> urls = settings.iceServers();
         if (urls == null || urls.isEmpty()) {
@@ -308,48 +295,60 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     }
 
     /**
-     * server-port 的 UDP 侧归 RakNet，IPv6 监听同理；server.properties 是关键配置，
-     * 解析错误或窗口覆盖任一监听端口时抛本地化错误中止启动，而非回退自动分配。
-     * 两种写法表示媒体经进程内中继与 RakNet 共用 server-port：直接写 server-port（如 19132，内部回环端口
-     * 由 {@link #reserveMediaPort} 自动挑选），或单端口映射钉住内部端口（如 19132:19134）。
-     * 缺省条目回退为 server-port 本身，即默认共用。
-     * The UDP side of server-port belongs to RakNet, likewise the IPv6 listener;
-     * server.properties is critical config, so parse errors or windows covering either
-     * listener abort startup with a localized error instead of falling back to auto ports.
-     * Two spellings mean media shares server-port with RakNet through the in-process relay:
-     * server-port itself (19132, say, with the internal loopback port picked by
-     * {@link #reserveMediaPort}) or a single-port mapping pinning the internal port (19132:19134).
-     * A missing entry falls back to server-port itself, so the port is shared by default.
-     */
-    /**
-     * server-udp-ports 的条目值，缺省回退为 server-port 本身（即默认与 RakNet 共用）。
-     * The server-udp-ports entry, falling back to server-port itself when absent
-     * (i.e. the port is shared with RakNet by default).
+     * server-udp-ports 的条目值，默认 19132（与 server-port 相等即共用 RakNet 端口）。生产的 Config 加载时即以
+     * 该字面默认补齐缺失键，server-port 回退仅覆盖绕过默认加载的读取。
+     * The server-udp-ports entry, 19132 by default (equal to server-port it shares RakNet's port).
+     * Production Config auto-fills a missing key with that literal default at load time, so the
+     * server-port fallback only covers reads bypassing default loading.
      */
     private static String udpPortsEntry(Server server) {
         return server.getPropertyString("server-udp-ports", String.valueOf(server.getPort()));
     }
 
+    /**
+     * server-port 的 UDP 侧归 RakNet，IPv6 监听同理；server.properties 是关键配置，
+     * 解析错误或窗口覆盖任一监听端口（含外部映射窗口）时抛本地化错误中止启动，而非回退自动分配。
+     * 直接写某个监听端口（如 19132，内部回环端口由 {@link #reserveMediaPort} 自动挑选）或单端口映射到它
+     * （如 19132:19134、19133:19134）都表示媒体经进程内中继与 RakNet 共用该端口，两种监听一视同仁。
+     * The UDP side of server-port belongs to RakNet, likewise the IPv6 listener;
+     * server.properties is critical config, so parse errors or windows covering either listener
+     * (external mapping windows included) abort startup with a localized error instead of falling
+     * back to auto ports. Writing a listener port itself (19132, say, with the internal loopback
+     * port picked by {@link #reserveMediaPort}) or a single-port mapping onto one (19132:19134,
+     * 19133:19134) both share that port with RakNet through the in-process relay; the two
+     * listeners are treated alike.
+     */
     private static NetherNetUdpPorts resolveMediaPorts(Server server) {
         String value = udpPortsEntry(server);
         NetherNetUdpPorts ports = NetherNetUdpPorts.parse(value, server.getLanguage());
-        if (ports == null || ports.pinsOnly(server.getPort())) {
+        boolean ipv6Enabled = server.isIpv6Enabled();
+        if (ports == null || ports.pinsOnly(server.getPort())
+                || (ipv6Enabled && ports.pinsOnly(server.getIpv6Port()))) {
             return ports;
         }
         if (ports.contains(server.getPort())) {
             throw new IllegalArgumentException(server.getLanguage()
                     .translateString("nukkit.nethernet.udpPorts.coversServerPort", value, server.getPort()));
         }
-        if (server.isIpv6Enabled() && ports.contains(server.getIpv6Port())) {
+        if (ipv6Enabled && ports.contains(server.getIpv6Port())) {
             throw new IllegalArgumentException(server.getLanguage()
                     .translateString("nukkit.nethernet.udpPorts.coversIpv6Port", value, server.getIpv6Port()));
         }
-        if (ports.offset() != 0 && !ports.publishesOn(server.getPort())) {
+        if (ports.offset() != 0) {
             int externalBegin = ports.begin() + ports.offset();
             int externalEnd = ports.end() + ports.offset();
-            if (externalBegin <= server.getPort() && server.getPort() <= externalEnd) {
+            // 覆盖监听端口的外部窗口无法中继（中继只挂在真实的监听 socket 上），仅单端口映射例外
+            // An external window over a listener cannot be relayed (the relay sits only on the
+            // real listener sockets); the single-port mapping is the one exception
+            if (!ports.publishesOn(server.getPort())
+                    && externalBegin <= server.getPort() && server.getPort() <= externalEnd) {
                 throw new IllegalArgumentException(server.getLanguage().translateString(
                         "nukkit.nethernet.udpPorts.sharedWindow", value, server.getPort(), ports.begin()));
+            }
+            if (ipv6Enabled && !ports.publishesOn(server.getIpv6Port())
+                    && externalBegin <= server.getIpv6Port() && server.getIpv6Port() <= externalEnd) {
+                throw new IllegalArgumentException(server.getLanguage().translateString(
+                        "nukkit.nethernet.udpPorts.sharedWindowIpv6", value, server.getIpv6Port(), ports.begin()));
             }
         }
         return ports;
@@ -367,7 +366,8 @@ public class NetherNetInterface implements AdvancedSourceInterface {
      */
     private static DatagramSocket reserveMediaPort(Server server, NetherNetUdpPorts mediaPorts) {
         String value = udpPortsEntry(server);
-        if (mediaPorts.publishesOn(server.getPort())) {
+        if (mediaPorts.publishesOn(server.getPort())
+                || (server.isIpv6Enabled() && mediaPorts.publishesOn(server.getIpv6Port()))) {
             try {
                 return NetherNetMediaRelay.reserveMediaPort(mediaPorts.begin());
             } catch (IOException e) {
@@ -449,10 +449,11 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
                 continue;
             }
-            // channelActive 已换回真实地址；这里再换一次兜底 RTC_CONNECTED 回调晚于激活的时序
-            // channelActive already restored the real address; repeating it covers an RTC_CONNECTED
-            // callback landing after activation
-            this.restoreRelayedRemoteAddress(session.getChannel());
+            // 远端地址自会话构造首次读取起被 Netty 缓存为库给出的信令来源（真实客户端地址），
+            // ICE 连上后也不会变成 leg 地址，玩家创建、封禁与日志直接使用即可
+            // Netty caches the remote from the session's first read as the library's signaling
+            // source (the real client); it never turns into the leg address once ICE connects,
+            // so player creation, bans and logs can use it as is
             InetSocketAddress address = (InetSocketAddress) session.getChannel().remoteAddress();
             try {
                 PlayerCreationEvent event = new PlayerCreationEvent(this, Player.class, Player.class, null, address);

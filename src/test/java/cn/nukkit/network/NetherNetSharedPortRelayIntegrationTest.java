@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Timeout;
 import tel.schich.libdatachannel.*;
 
 import java.net.DatagramSocket;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -82,14 +83,19 @@ class NetherNetSharedPortRelayIntegrationTest {
         assertNotNull(ports);
         assertTrue(ports.publishesOn(listenerPort));
 
-        // 与 NetherNetInterface 共用端口时的接线一致：mux + 内部端口 + 回环绑定，应答改写走装饰器
-        // Wired like NetherNetInterface in shared mode: mux + internal port + loopback bind, answers through the decorator
+        // 与 NetherNetInterface 共用端口时的接线一致：mux + 内部端口 + 回环绑定，应答改写走装饰器；
+        // 对外端口跟随监听（即回环）的族别，IPv6 偏好下发布在 v6 一侧
+        // Wired like NetherNetInterface in shared mode: mux + internal port + loopback bind, answers
+        // through the decorator; the external port follows the listener's (the loopback's) family,
+        // so under IPv6 preference it publishes on the v6 side
+        boolean loopbackIsV6 = LOOPBACK instanceof Inet6Address;
         PeerConnectionConfiguration serverConfig = ports.peerConfig(this.relay.mediaEndpoint()).withDisableAutoNegotiation(true);
         assertEquals(LOOPBACK, serverConfig.bindAddress().orElseThrow());
         this.server = PeerConnection.createPeer(serverConfig);
         RecordingSignaling signaling = new RecordingSignaling();
         NetherNetServerSignaling decorated = this.relay.decorate(signaling, sdp -> NetherNetSharedPortSdp.rewriteAnswer(
-                sdp, this.mediaPort, List.of(LOOPBACK), new NetherNetSharedPortSdp.ExternalPorts(listenerPort, -1)));
+                sdp, this.mediaPort, List.of(LOOPBACK),
+                new NetherNetSharedPortSdp.ExternalPorts(loopbackIsV6 ? -1 : listenerPort, loopbackIsV6 ? listenerPort : -1)));
         CompletableFuture<String> offerForServer = new CompletableFuture<>();
         decorated.setNewConnectionHandler((connectionId, remoteNetworkId, payload, clientAddress, player) -> offerForServer.complete(payload));
 

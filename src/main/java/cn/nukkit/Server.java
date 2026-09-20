@@ -876,9 +876,9 @@ public class Server {
         this.network.registerInterface(rakNetInterface);
 
         // NetherNet (WebRTC) 与 RakNet 并行：旧客户端走 RakNet，受限网络的 1.21.90+ 客户端走 HTTP 信令 + WebRTC；
-        // server-udp-ports 把媒体映射到 server-port 时，媒体经 RakNet 的监听 socket 进程内中继
+        // server-udp-ports 把媒体映射到某个 RakNet 监听端口（server-port/IPv6）时，媒体经监听 socket 进程内中继
         // Runs alongside RakNet: legacy clients keep RakNet, restricted-network 1.21.90+ clients join over WebRTC;
-        // with server-udp-ports mapping media onto server-port it is relayed in-process from RakNet's listener
+        // with server-udp-ports mapping media onto a RakNet listener (server-port/IPv6) it is relayed in-process
         NetherNetSettings netherNetSettings = this.serverConfig != null
                 ? this.serverConfig.networkSettings().netherNetSettings() : null;
         if (netherNetSettings != null && netherNetSettings.enabled()) {
