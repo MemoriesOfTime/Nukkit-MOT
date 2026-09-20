@@ -2302,18 +2302,38 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (server.vanillaPortals) {
                     this.inPortalTicks = 81;
+                    // The transfer is decided here and carried out two hops later: an async task
+                    // looks the far side up and a main thread task moves the player. Both read the
+                    // portalPos field, which the main thread clears the moment the player stops
+                    // standing in the portal - a plugin teleport, /spawn, a death. The lambda then
+                    // reached spawnPortal with null and killed the tick with
+                    // "Cannot read field level because pos is null". The target is taken once, here.
+                    final Position portalTarget = this.portalPos;
+                    if (portalTarget == null) {
+                        return;
+                    }
+                    // World the player is taken from. Leaving it before the lookup ends calls the
+                    // trip off: dragging somebody into the nether seconds after they typed /spawn
+                    // is worse than not transferring them at all.
+                    final Level portalOrigin = this.level;
                     this.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
                         @Override
                         public void onRun() {
-                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalPos);
+                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalTarget);
                             getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                                // Cleared first: a transfer that is called off must not leave the
+                                // field occupied, or the next portal step is never armed again.
+                                portalPos = null;
+                                if (!isOnline() || !isAlive() || level != portalOrigin) {
+                                    inPortalTicks = 0;
+                                    return;
+                                }
                                 if (foundPortal == null) {
-                                    BlockNetherPortal.spawnPortal(portalPos);
-                                    teleport(portalPos.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
+                                    BlockNetherPortal.spawnPortal(portalTarget);
+                                    teleport(portalTarget.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
                                 } else {
                                     teleport(BlockNetherPortal.getSafePortal(foundPortal), TeleportCause.NETHER_PORTAL);
                                 }
-                                portalPos = null;
                             });
                         }
                     });
