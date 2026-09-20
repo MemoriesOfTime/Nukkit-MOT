@@ -43,9 +43,8 @@ docker run -d --name nukkit-mot \
 - `:latest` 和 `:<短SHA>` 是基于 master 分支构建的开发快照。
 - `:1.26.30-R1` 这种 tag 是与 Maven Central 对应的稳定发布版。
 - 所有 worlds、plugins、players、`server.properties` 都存放在 `/data` 卷下。
-- `19132/udp` 为 RakNet 游戏端口；`19132/tcp` 为 NetherNet（WebRTC）HTTP 信令端口，默认开启且与 server-port 同号，除非在 `nukkit-mot.yml` 关闭 `network-settings.nethernet`，否则需要一并映射。
-- NetherNet 媒体默认也共用 `19132/udp`：`server-udp-ports` 默认为 `19132`（即 server-port 本身），媒体在进程内从 RakNet 的 socket 中继到一个自动挑选（从 19134 起取第一个空闲）、只绑回环的内部端口，因此默认部署只需映射以上两个端口。`server-udp-ports=19132:19134` 效果相同，只是钉住了内部端口。
-- 若想让媒体走独立 UDP 端口，可设为如 `server-udp-ports=19134` 并补上 `-p 19134:19134/udp`（设为 `0` 则回退系统随机分配，Docker bridge NAT 下不可达）。宿主发布端口与容器不一致、或需要向客户端公布宿主地址时，使用映射语法 `server-udp-ports=[宿主IP:]外部端口:内部端口`。
+- `19132/udp` 为 RakNet 游戏端口，`19132/tcp` 为 NetherNet（WebRTC）信令端口；NetherNet 媒体复用同一个 UDP 端口，默认映射这两个端口即可。如不使用 NetherNet，可在 `nukkit-mot.yml` 关闭 `network-settings.nethernet`。
+- 想让 NetherNet 媒体走独立 UDP 端口？在 `server.properties` 设置 `server-udp-ports`（如 `19134`，并补 `-p 19134:19134/udp`）。
 
 ## 相关链接
 - __🌐 下载地址: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
