@@ -125,7 +125,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void configuredMediaPortStillStartsTheInterface() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("39000");
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("39000");
         NetherNetInterface pinned = new NetherNetInterface(server, new NetherNetSettings());
         // 媒体端口在对端接入时才随 peer connection 绑定，构造成功即验证解析与 bootstrap 选项接线无误
         // The media port binds with a peer connection, so constructing the interface already
@@ -138,7 +138,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void configuredExternalMappingStillStartsTheInterface() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("203.0.113.10:19132:39000");
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("203.0.113.10:19132:39000");
         NetherNetInterface mapped = new NetherNetInterface(server, new NetherNetSettings());
         assertNotNull(mapped);
         mapped.shutdown();
@@ -148,7 +148,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void invalidMediaPortsAbortConstruction() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("70000");
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("70000");
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> new NetherNetInterface(server, new NetherNetSettings()));
         assertTrue(e.getMessage().contains("is not a valid port range"),
@@ -159,7 +159,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void mediaPortsCoveringServerPortAbortConstruction() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("19000-19200");
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("19000-19200");
         lenient().when(server.getPort()).thenReturn(19132);
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> new NetherNetInterface(server, new NetherNetSettings()));
@@ -171,7 +171,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void mediaPortsCoveringIpv6ListenerAbortConstruction() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("19000-19200");
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("19000-19200");
         lenient().when(server.isIpv6Enabled()).thenReturn(true);
         lenient().when(server.getIpv6Port()).thenReturn(19133);
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
@@ -184,7 +184,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void sharedPortWindowIsRejected() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("19130-19140:39000-39010");
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("19130-19140:39000-39010");
         lenient().when(server.getPort()).thenReturn(19132);
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> new NetherNetInterface(server, new NetherNetSettings()));
@@ -196,7 +196,7 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void sharedPortWithoutARakNetListenerAbortsConstruction() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn("19132:39000");
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("19132:39000");
         lenient().when(server.getPort()).thenReturn(19132);
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> new NetherNetInterface(server, new NetherNetSettings(), null));
@@ -213,7 +213,7 @@ class NetherNetInterfaceTest {
         int port = freeTcpPort();
         int internal = freeUdpPort();
         lenient().when(server.getPort()).thenReturn(port);
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn(port + ":" + internal);
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn(port + ":" + internal);
 
         try (RakNetStandIn rakNet = new RakNetStandIn()) {
             NetherNetInterface shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet);
@@ -245,7 +245,7 @@ class NetherNetInterfaceTest {
         Server server = MockServer.get();
         int port = freeTcpPort();
         lenient().when(server.getPort()).thenReturn(port);
-        lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn(String.valueOf(port));
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn(String.valueOf(port));
 
         // 占住默认起点，自动挑选必须跳过它（本机已有别的进程占着时效果相同）
         // Hold the default starting point so the pick has to skip it (the same happens when
@@ -277,12 +277,42 @@ class NetherNetInterfaceTest {
 
     @Test
     @Timeout(30)
+    void absentEntryDefaultsToTheServerPortAndSharesIt() throws Exception {
+        Server server = MockServer.get();
+        int port = freeTcpPort();
+        lenient().when(server.getPort()).thenReturn(port);
+        // 条目缺失时按代码内默认值回退：默认值必须是 server-port 本身，即默认共用
+        // With the entry missing the in-code default applies: it must be server-port itself,
+        // so the port is shared out of the box
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+
+        try (RakNetStandIn rakNet = new RakNetStandIn()) {
+            NetherNetInterface shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet);
+            try {
+                assertNotNull(rakNet.listener.pipeline().get(NetherNetMediaRelay.HANDLER_NAME),
+                        "a missing entry falls back to server-port, switching the shared port on");
+                var lines = shared.buildStatusLines(10, true);
+                assertEquals(5, lines.size(), "full mode gains the relay line");
+                assertTrue(lines.get(0).contains("shared with RakNet"), "the summary describes the shared port, got: " + lines.get(0));
+                int internal = relayedPort(lines.get(0));
+                assertThrows(IOException.class, () -> bindUdp(internal).close(),
+                        "the picked internal port is reserved until the first offer reaches the library");
+            } finally {
+                shared.shutdown();
+            }
+            rakNet.awaitDetached();
+        }
+    }
+
+    @Test
+    @Timeout(30)
     void pinnedInternalPortAlreadyInUseAbortsConstruction() throws Exception {
         Server server = MockServer.get();
         int port = freeTcpPort();
         lenient().when(server.getPort()).thenReturn(port);
         try (DatagramSocket taken = bindUdp(0); RakNetStandIn rakNet = new RakNetStandIn()) {
-            lenient().when(server.getPropertyString("server-udp-ports", "19134")).thenReturn(port + ":" + taken.getLocalPort());
+            lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn(port + ":" + taken.getLocalPort());
             IllegalStateException e = assertThrows(IllegalStateException.class,
                     () -> new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet));
             assertTrue(e.getMessage().contains("already in use"),

@@ -4111,7 +4111,9 @@ public class Server {
             put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
-            put("server-udp-ports", 19134);
+            // 等于 server-port（默认 19132）即与 RakNet 共用 UDP 端口；设为 19134 等则钉住独立媒体端口
+            // Equal to server-port (19132 by default) it shares RakNet's UDP port; 19134 etc. pins a standalone media port
+            put("server-udp-ports", 19132);
             put("server-ipv6-port", -1);
             put("server-ipv6", "::");
             put("view-distance", 8);
