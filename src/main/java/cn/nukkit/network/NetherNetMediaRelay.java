@@ -174,13 +174,25 @@ public final class NetherNetMediaRelay {
      * present so the sender is the real client (and replies get mapped back to the proxy).
      */
     public void attach(Channel listener) {
-        ChannelPipeline pipeline = listener.pipeline();
-        Demux demux = new Demux(listener);
-        ChannelHandlerContext proxy = pipeline.context(ProxyProtocolHandler.class);
-        if (proxy != null) {
-            pipeline.addAfter(proxy.name(), HANDLER_NAME, demux);
+        // 从非事件循环线程 add 的 handler，其 handlerAdded 被推迟为事件循环上的后续任务，在它执行前
+        // 流经的消息会静默跳过该 handler、径直落到 RakNet；必须在事件循环上挂载并等它生效
+        // A handler added from off the event loop gets its handlerAdded deferred to a later
+        // event-loop task, and messages dispatched before it runs skip the handler straight
+        // into RakNet's arms; mount on the event loop and wait for it to take effect
+        Runnable mount = () -> {
+            ChannelPipeline pipeline = listener.pipeline();
+            Demux demux = new Demux(listener);
+            ChannelHandlerContext proxy = pipeline.context(ProxyProtocolHandler.class);
+            if (proxy != null) {
+                pipeline.addAfter(proxy.name(), HANDLER_NAME, demux);
+            } else {
+                pipeline.addFirst(HANDLER_NAME, demux);
+            }
+        };
+        if (listener.eventLoop().inEventLoop()) {
+            mount.run();
         } else {
-            pipeline.addFirst(HANDLER_NAME, demux);
+            listener.eventLoop().submit(mount).syncUninterruptibly();
         }
         this.listeners.add(listener);
         if (this.sweepTask == null) {
