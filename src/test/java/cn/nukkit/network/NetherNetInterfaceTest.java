@@ -319,16 +319,12 @@ class NetherNetInterfaceTest {
 
     @Test
     @Timeout(30)
-    void plainServerPortSharesItWithAnAutoPickedInternalPort() throws Exception {
+    void plainServerPortSharesItWithASystemAssignedInternalPort() throws Exception {
         Server server = MockServer.get();
         int port = freeTcpPort();
         lenient().when(server.getPort()).thenReturn(port);
         lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn(String.valueOf(port));
 
-        // 占住默认起点，自动挑选必须跳过它（本机已有别的进程占着时效果相同）
-        // Hold the default starting point so the pick has to skip it (the same happens when
-        // something else on the host holds it already)
-        DatagramSocket defaultTaken = tryBindUdp(NetherNetInterface.DEFAULT_MEDIA_PORT);
         try (RakNetStandIn rakNet = new RakNetStandIn()) {
             NetherNetInterface shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet);
             try {
@@ -336,19 +332,15 @@ class NetherNetInterfaceTest {
                 var lines = shared.buildStatusLines(10, true);
                 assertEquals(5, lines.size(), "full mode gains the relay line");
                 assertTrue(lines.get(0).contains("shared with RakNet"), "the summary describes the shared port, got: " + lines.get(0));
+                // 内部端口由系统在回环上分配：无固定窗口可耗尽，同机多实例天然错开
+                // The internal port is OS-assigned on loopback: no fixed window to exhaust and
+                // instances on one host spread out naturally
                 int internal = relayedPort(lines.get(0));
-                assertNotEquals(NetherNetInterface.DEFAULT_MEDIA_PORT, internal, "the taken default is skipped");
-                assertTrue(internal > NetherNetInterface.DEFAULT_MEDIA_PORT
-                                && internal < NetherNetInterface.DEFAULT_MEDIA_PORT + NetherNetInterface.MEDIA_PORT_ATTEMPTS,
-                        "the pick stays inside the probe range, got " + internal);
+                assertNotEquals(port, internal, "the internal port stays off the shared RakNet port");
                 assertThrows(IOException.class, () -> bindUdp(internal).close(),
-                        "the picked port is reserved until the first offer reaches the library");
+                        "the assigned port is reserved until the first offer reaches the library");
             } finally {
                 shared.shutdown();
-            }
-        } finally {
-            if (defaultTaken != null) {
-                defaultTaken.close();
             }
         }
     }
@@ -413,14 +405,6 @@ class NetherNetInterfaceTest {
 
     private static DatagramSocket bindUdp(int port) throws IOException {
         return new DatagramSocket(new InetSocketAddress(LOOPBACK, port));
-    }
-
-    private static DatagramSocket tryBindUdp(int port) {
-        try {
-            return bindUdp(port);
-        } catch (IOException alreadyTaken) {
-            return null;
-        }
     }
 
     /** 状态摘要里"relayed to loopback udp/N"的 N。 The N in the summary's "relayed to loopback udp/N". */

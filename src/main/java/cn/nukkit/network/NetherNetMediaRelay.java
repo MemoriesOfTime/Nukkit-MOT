@@ -148,6 +148,17 @@ public final class NetherNetMediaRelay {
         return new DatagramSocket(new InetSocketAddress(LOOPBACK, port));
     }
 
+    /**
+     * 预留一个系统分配的回环端口（临时段）：同机多实例天然错开，无固定窗口容量上限；预留语义同
+     * {@link #reserveMediaPort(int)}。
+     * Reserves a system-assigned loopback port (the ephemeral range): instances on one
+     * host spread out naturally with no fixed window to exhaust; reservation semantics
+     * as in {@link #reserveMediaPort(int)}.
+     */
+    public static DatagramSocket reserveMediaPort() throws IOException {
+        return new DatagramSocket(new InetSocketAddress(LOOPBACK, 0));
+    }
+
     /** 放开预留（幂等）：库即将绑定内部端口，或中继关闭。 Lets go of the reservation (idempotent): the library is about to bind, or the relay shuts down. */
     void releaseMediaPort() {
         DatagramSocket held = this.reservation.getAndSet(null);

@@ -73,14 +73,6 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     static final int MEDIA_ALERT_WINDOW_MINUTES = 5;
     static final long MEDIA_ALERT_MIN_ATTEMPTS = 5;
 
-    /**
-     * 共用端口时自动挑选内部回环端口的起点。
-     * Where the shared-port search for an internal loopback port starts.
-     */
-    static final int DEFAULT_MEDIA_PORT = 19134;
-    /** 自动挑选内部端口时最多探测的端口数。 How many ports the internal-port search probes at most. */
-    static final int MEDIA_PORT_ATTEMPTS = 16;
-
     private final Server server;
     private Network network;
 
@@ -163,11 +155,11 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 .setIdentity(identity)
                 .setServeHttp(true)
                 // RakNet 已占用 server-port 的 UDP 侧，信令端口不可复用；媒体端口经 server-udp-ports
-                // 钉住（默认等于 server-port，即与 RakNet 共用、由中继转发到自动挑选的回环端口；
+                // 钉住（默认等于 server-port，即与 RakNet 共用、由中继转发到系统分配的回环端口；
                 // 0 仍为系统自动分配）。写成映射（19132:19134）可钉住内部端口
                 // RakNet holds the UDP side of server-port so the signaling port stays off-limits;
                 // media is pinned via server-udp-ports (default: server-port itself, shared with
-                // RakNet and relayed to an automatically picked loopback port; 0 still means
+                // RakNet and relayed to a system-assigned loopback port; 0 still means
                 // system-assigned). A mapping (19132:19134) pins the internal port instead
                 .setIceOnLocalPort(false)
                 .setIceServers(iceServers(settings))
@@ -308,15 +300,15 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     /**
      * server-port 的 UDP 侧归 RakNet，IPv6 监听同理；server.properties 是关键配置，
      * 解析错误或窗口覆盖任一监听端口（含外部映射窗口）时抛本地化错误中止启动，而非回退自动分配。
-     * 直接写某个监听端口（如 19132，内部回环端口由 {@link #reserveMediaPort} 自动挑选）或单端口映射到它
+     * 直接写某个监听端口（如 19132，内部回环端口由 {@link #reserveMediaPort} 交系统分配）或单端口映射到它
      * （如 19132:19134、19133:19134）都表示媒体经进程内中继与 RakNet 共用该端口，两种监听一视同仁。
      * The UDP side of server-port belongs to RakNet, likewise the IPv6 listener;
      * server.properties is critical config, so parse errors or windows covering either listener
      * (external mapping windows included) abort startup with a localized error instead of falling
      * back to auto ports. Writing a listener port itself (19132, say, with the internal loopback
-     * port picked by {@link #reserveMediaPort}) or a single-port mapping onto one (19132:19134,
-     * 19133:19134) both share that port with RakNet through the in-process relay; the two
-     * listeners are treated alike.
+     * port system-assigned by {@link #reserveMediaPort}) or a single-port mapping onto one
+     * (19132:19134, 19133:19134) both share that port with RakNet through the in-process relay;
+     * the two listeners are treated alike.
      */
     private static NetherNetUdpPorts resolveMediaPorts(Server server) {
         String value = udpPortsEntry(server);
@@ -355,14 +347,16 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     }
 
     /**
-     * 共用端口时预留内部回环端口（{@link NetherNetMediaRelay#reserveMediaPort}）：钉住的内部端口被占即中止启动；
-     * 自动挑选从 {@link #DEFAULT_MEDIA_PORT} 起向上探测，跳过 RakNet 的监听端口，取第一个空闲端口——
-     * 固定段不与系统临时端口段重叠，同机的第二个实例也会因预留而自然错开。
-     * Reserves the internal loopback port for the shared port ({@link NetherNetMediaRelay#reserveMediaPort}):
-     * a pinned internal port already in use aborts startup; the automatic pick probes upward from
-     * {@link #DEFAULT_MEDIA_PORT}, skipping RakNet's listener ports, and takes the first free one —
-     * a fixed range stays clear of the ephemeral range, and a second instance on the host lands on
-     * the next port thanks to the reservation.
+     * 共用端口时预留内部回环端口（{@link NetherNetMediaRelay#reserveMediaPort()}）：映射钉住的内部端口被占
+     * 即中止启动；其余交给操作系统在回环上分配（临时段），同机多实例天然错开且无窗口容量上限——代价是
+     * 端口落在临时段，放开与 libjuice 重绑之间理论上可被其他临时 bind 抢走，两者本就同在一次新连接回调里，
+     * 间隔可忽略。
+     * Reserves the internal loopback port for the shared port ({@link NetherNetMediaRelay#reserveMediaPort()}):
+     * a mapped entry's pinned internal port already in use aborts startup; otherwise the OS assigns
+     * it on loopback (the ephemeral range), so instances on one host spread out naturally with no
+     * window to exhaust — the trade-off being an ephemeral-range port that another ephemeral bind
+     * could theoretically grab between the release and libjuice's rebind, both already happening
+     * in one new-connection callback, a negligible gap.
      */
     private static DatagramSocket reserveMediaPort(Server server, NetherNetUdpPorts mediaPorts) {
         String value = udpPortsEntry(server);
@@ -377,22 +371,14 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 throw new IllegalStateException(message, e);
             }
         }
-        int last = DEFAULT_MEDIA_PORT + MEDIA_PORT_ATTEMPTS - 1;
-        IOException lastFailure = null;
-        for (int port = DEFAULT_MEDIA_PORT; port <= last; port++) {
-            if (port == server.getPort() || (server.isIpv6Enabled() && port == server.getIpv6Port())) {
-                continue;
-            }
-            try {
-                return NetherNetMediaRelay.reserveMediaPort(port);
-            } catch (IOException e) {
-                lastFailure = e;
-            }
+        try {
+            return NetherNetMediaRelay.reserveMediaPort();
+        } catch (IOException e) {
+            String message = server.getLanguage().translateString(
+                    "nukkit.nethernet.sharedPort.systemPortFailed", value, server.getPort());
+            log.fatal(message);
+            throw new IllegalStateException(message, e);
         }
-        String message = server.getLanguage().translateString("nukkit.nethernet.sharedPort.noFreeInternalPort",
-                value, server.getPort(), DEFAULT_MEDIA_PORT, last);
-        log.fatal(message);
-        throw new IllegalStateException(message, lastFailure);
     }
 
     private PongData buildPong() {

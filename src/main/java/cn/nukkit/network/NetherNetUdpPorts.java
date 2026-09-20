@@ -18,7 +18,7 @@ import java.util.Set;
  * {@code [ip:]external[-external]:internal[-internal]}=另发布对端可达的外部映射，
  * 冒号两侧范围长度必须一致。逗号分隔多条目：IP 累计，窗口与偏移须一致。
  * 钉住的单个端口正是某个 RakNet 监听端口（server-port 或 IPv6，{@link #pinsOnly}）或单端口映射到它
- * （{@link #publishesOn}）时，媒体与 RakNet 共用该端口，前者的内部回环端口由服务器自动挑选。
+ * （{@link #publishesOn}）时，媒体与 RakNet 共用该端口，前者的内部回环端口由操作系统分配。
  * <p>
  * Parses server-udp-ports from server.properties (BDS syntax): 0=system-assigned;
  * {@code [ip:]internal[-internal]} pins the local port/window;
@@ -27,7 +27,7 @@ import java.util.Set;
  * Comma-separated entries accumulate IPs while window and offset must agree.
  * A single port pinned exactly on a RakNet listener port (server-port or the IPv6 listener,
  * {@link #pinsOnly}) or a single-port mapping onto one ({@link #publishesOn}) shares that
- * port with RakNet, the former leaving the internal loopback port for the server to pick.
+ * port with RakNet, the former leaving the internal loopback port for the OS to assign.
  */
 @Log4j2
 public final class NetherNetUdpPorts {
@@ -286,9 +286,9 @@ public final class NetherNetUdpPorts {
 
     /**
      * 未映射的单个端口正是 {@code port}（某个 RakNet 监听端口）：同样表示与 RakNet 共用该端口，只是内部
-     * 回环端口留给服务器自动挑选，再经 {@link #relayedThrough} 变成 {@link #publishesOn} 形式的单端口映射。
+     * 回环端口留待系统分配，再经 {@link #relayedThrough} 变成 {@link #publishesOn} 形式的单端口映射。
      * A single unmapped port that is exactly {@code port} (a RakNet listener port): sharing with
-     * RakNet as well, only the internal loopback port is left for the server to pick, after which
+     * RakNet as well, only the internal loopback port is left for the OS to assign, after which
      * {@link #relayedThrough} turns this into the {@link #publishesOn} single-port mapping.
      */
     public boolean pinsOnly(int port) {
