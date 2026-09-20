@@ -18,6 +18,8 @@ import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.scheduler.TaskHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
@@ -33,7 +35,9 @@ class EntityHumanSkinLifecycleTest {
 
     private Server server;
     private Level level;
-    private final List<Runnable> pendingDelayedTasks = new ArrayList<>();
+    private final List<DelayedTask> pendingDelayedTasks = new ArrayList<>();
+
+    private record DelayedTask(int delay, Runnable task) { }
 
     @BeforeEach
     void setUp() {
@@ -58,7 +62,8 @@ class EntityHumanSkinLifecycleTest {
         lenient().when(this.server.getScheduler()).thenReturn(fakeScheduler);
         lenient().when(fakeScheduler.scheduleDelayedTask(eq(InternalPlugin.INSTANCE), any(Runnable.class), anyInt()))
                 .thenAnswer(invocation -> {
-                    this.pendingDelayedTasks.add(invocation.getArgument(1));
+                    this.pendingDelayedTasks.add(new DelayedTask(
+                            invocation.getArgument(2), invocation.getArgument(1)));
                     return mock(TaskHandler.class);
                 });
     }
@@ -69,10 +74,16 @@ class EntityHumanSkinLifecycleTest {
      * Runs all registered delayed tasks, simulating the delay elapsing.
      */
     private void runPendingDelayedTasks() {
-        for (Runnable task : new ArrayList<>(this.pendingDelayedTasks)) {
-            task.run();
+        runPendingDelayedTasks(Integer.MAX_VALUE);
+    }
+
+    private void runPendingDelayedTasks(int throughTick) {
+        for (DelayedTask scheduled : new ArrayList<>(this.pendingDelayedTasks)) {
+            if (scheduled.delay() <= throughTick) {
+                this.pendingDelayedTasks.remove(scheduled);
+                scheduled.task().run();
+            }
         }
-        this.pendingDelayedTasks.clear();
     }
 
     @Test
@@ -82,20 +93,7 @@ class EntityHumanSkinLifecycleTest {
 
         npc.spawnTo(viewer);
 
-        // 延迟 REMOVE 未触发，仅见握手三件套（ADD → 皮肤包 → AddPlayer）。
-        List<DataPacket> lifecyclePackets = viewer.sentPackets.stream()
-                .filter(packet -> packet instanceof PlayerListPacket
-                        || packet instanceof PlayerSkinPacket
-                        || packet instanceof AddPlayerPacket)
-                .toList();
-        assertEquals(3, lifecyclePackets.size());
-        PlayerListPacket add = assertInstanceOf(PlayerListPacket.class, lifecyclePackets.get(0));
-        assertEquals(PlayerListPacket.TYPE_ADD, add.type);
-        assertNotEquals(npc.getSkin().getSkinId(), add.entries[0].skin.getSkinId());
-        PlayerSkinPacket update = assertInstanceOf(PlayerSkinPacket.class, lifecyclePackets.get(1));
-        assertEquals(npc.getSkin().getSkinId(), update.skin.getSkinId());
-        assertInstanceOf(AddPlayerPacket.class, lifecyclePackets.get(2));
-        assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+        assertSpawnSkinHandshake(npc, viewer);
     }
 
     @Test
@@ -196,51 +194,51 @@ class EntityHumanSkinLifecycleTest {
         PlayerListPacket remove = assertInstanceOf(PlayerListPacket.class, lifecyclePackets.get(2));
         assertEquals(PlayerListPacket.TYPE_REMOVE, remove.type);
         assertFalse(viewer.sentSkins.contains(npc.getUniqueId()));
+        assertTrue(this.pendingDelayedTasks.isEmpty());
 
         viewer.reject(null);
         viewer.sentPackets.clear();
         npc.spawnTo(viewer);
 
-        assertEquals(3, viewer.sentPackets.stream()
-                .filter(packet -> packet instanceof PlayerListPacket
-                        || packet instanceof PlayerSkinPacket
-                        || packet instanceof AddPlayerPacket)
-                .count());
+        assertSpawnSkinHandshake(npc, viewer);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = GameVersion.class, names = {
+            "V1_21_124", "V1_21_93_NETEASE", "V1_21_124_NETEASE", "V1_26_45"
+    })
+    void everyClientReceivesPostSpawnSkinAndDelayedListRemoval(GameVersion version) {
+        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
+        RecordingPlayer viewer = newViewer(version);
+
+        npc.spawnTo(viewer);
+
+        assertSpawnSkinHandshake(npc, viewer);
+        assertEquals(List.of(2, 5), this.pendingDelayedTasks.stream().map(DelayedTask::delay).toList());
+        viewer.sentPackets.clear();
+
+        runPendingDelayedTasks(1);
+        assertTrue(viewer.sentPackets.isEmpty());
         assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
-    }
 
-    @Test
-    void standardV860NpcKeepsLegacyImmediateRemovalBehavior() {
-        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
-        RecordingPlayer viewer = newViewer(GameVersion.V1_21_124);
+        runPendingDelayedTasks(2);
+        assertEquals(1, viewer.sentPackets.size());
+        assertRealSkin(npc, viewer.sentPackets.get(0));
+        assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+        viewer.sentPackets.clear();
 
-        npc.spawnTo(viewer);
+        runPendingDelayedTasks(4);
+        assertTrue(viewer.sentPackets.isEmpty());
+        assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
 
-        assertTrue(viewer.sentPackets.stream().noneMatch(PlayerSkinPacket.class::isInstance));
-        List<PlayerListPacket> playerListPackets = viewer.sentPackets.stream()
-                .filter(PlayerListPacket.class::isInstance)
-                .map(PlayerListPacket.class::cast)
-                .toList();
-        assertEquals(1, playerListPackets.size());
-        assertEquals(PlayerListPacket.TYPE_REMOVE, playerListPackets.get(0).type);
+        runPendingDelayedTasks(5);
+        assertEquals(1, viewer.sentPackets.size());
+        PlayerListPacket remove = assertInstanceOf(PlayerListPacket.class, viewer.sentPackets.get(0));
+        assertEquals(PlayerListPacket.TYPE_REMOVE, remove.type);
+        assertEquals(1, remove.entries.length);
+        assertEquals(npc.getUniqueId(), remove.entries[0].uuid);
         assertFalse(viewer.sentSkins.contains(npc.getUniqueId()));
-    }
-
-    @Test
-    void olderNeteaseNpcKeepsLegacyImmediateRemovalBehavior() {
-        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
-        RecordingPlayer viewer = newViewer(GameVersion.V1_21_93_NETEASE);
-
-        npc.spawnTo(viewer);
-
-        assertTrue(viewer.sentPackets.stream().noneMatch(PlayerSkinPacket.class::isInstance));
-        List<PlayerListPacket> playerListPackets = viewer.sentPackets.stream()
-                .filter(PlayerListPacket.class::isInstance)
-                .map(PlayerListPacket.class::cast)
-                .toList();
-        assertEquals(1, playerListPackets.size());
-        assertEquals(PlayerListPacket.TYPE_REMOVE, playerListPackets.get(0).type);
-        assertFalse(viewer.sentSkins.contains(npc.getUniqueId()));
+        assertTrue(this.pendingDelayedTasks.isEmpty());
     }
 
     @Test
@@ -260,17 +258,7 @@ class EntityHumanSkinLifecycleTest {
         viewer.sentPackets.clear();
         npc.spawnTo(viewer);
 
-        List<DataPacket> lifecyclePackets = viewer.sentPackets.stream()
-                .filter(packet -> packet instanceof PlayerListPacket
-                        || packet instanceof PlayerSkinPacket
-                        || packet instanceof AddPlayerPacket)
-                .toList();
-        assertEquals(3, lifecyclePackets.size());
-        assertEquals(PlayerListPacket.TYPE_ADD,
-                assertInstanceOf(PlayerListPacket.class, lifecyclePackets.get(0)).type);
-        assertInstanceOf(PlayerSkinPacket.class, lifecyclePackets.get(1));
-        assertInstanceOf(AddPlayerPacket.class, lifecyclePackets.get(2));
-        assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+        assertSpawnSkinHandshake(npc, viewer);
     }
 
     @Test
@@ -315,17 +303,7 @@ class EntityHumanSkinLifecycleTest {
 
         npc.spawnTo(viewer);
 
-        List<DataPacket> lifecyclePackets = viewer.sentPackets.stream()
-                .filter(packet -> packet instanceof PlayerListPacket
-                        || packet instanceof PlayerSkinPacket
-                        || packet instanceof AddPlayerPacket)
-                .toList();
-        assertEquals(3, lifecyclePackets.size());
-        PlayerListPacket add = assertInstanceOf(PlayerListPacket.class, lifecyclePackets.get(0));
-        assertEquals(PlayerListPacket.TYPE_ADD, add.type);
-        assertInstanceOf(PlayerSkinPacket.class, lifecyclePackets.get(1));
-        assertInstanceOf(AddPlayerPacket.class, lifecyclePackets.get(2));
-        assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+        assertSpawnSkinHandshake(npc, viewer);
     }
 
     @Test
@@ -351,6 +329,38 @@ class EntityHumanSkinLifecycleTest {
         assertEquals(1, removes.size());
         assertEquals(npc.getUniqueId(), removes.get(0).entries[0].uuid);
         assertFalse(viewer.sentSkins.contains(npc.getUniqueId()));
+    }
+
+    private static void assertSpawnSkinHandshake(TestHuman npc, RecordingPlayer viewer) {
+        List<DataPacket> packets = viewer.sentPackets.stream()
+                .filter(packet -> packet instanceof PlayerListPacket
+                        || packet instanceof PlayerSkinPacket || packet instanceof AddPlayerPacket)
+                .toList();
+        // 0010 retains every NPC's entry; 0020 paints the real skin again after AddPlayer.
+        assertEquals(4, packets.size());
+        PlayerListPacket add = assertInstanceOf(PlayerListPacket.class, packets.get(0));
+        assertEquals(PlayerListPacket.TYPE_ADD, add.type);
+        assertEquals(1, add.entries.length);
+        assertEquals(npc.getUniqueId(), add.entries[0].uuid);
+        assertEquals(npc.getId(), add.entries[0].entityId);
+        assertTrue(add.entries[0].skin.isValid());
+        assertFalse(add.entries[0].skin.isFullyTransparent());
+        assertNotEquals(npc.getSkin().getSkinId(), add.entries[0].skin.getSkinId());
+        assertRealSkin(npc, packets.get(1));
+        AddPlayerPacket spawn = assertInstanceOf(AddPlayerPacket.class, packets.get(2));
+        assertEquals(npc.getUniqueId(), spawn.uuid);
+        assertEquals(npc.getId(), spawn.entityUniqueId);
+        assertEquals(npc.getId(), spawn.entityRuntimeId);
+        assertRealSkin(npc, packets.get(3));
+        assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+    }
+
+    private static void assertRealSkin(TestHuman npc, DataPacket packet) {
+        PlayerSkinPacket skin = assertInstanceOf(PlayerSkinPacket.class, packet);
+        assertEquals(npc.getUniqueId(), skin.uuid);
+        assertEquals(npc.getSkin().getSkinId(), skin.skin.getSkinId());
+        assertEquals(npc.getSkin().getSkinId(), skin.newSkinName);
+        assertArrayEquals(npc.getSkin().getSkinData().data, skin.skin.getSkinData().data);
     }
 
     private RecordingPlayer newViewer(GameVersion gameVersion) {

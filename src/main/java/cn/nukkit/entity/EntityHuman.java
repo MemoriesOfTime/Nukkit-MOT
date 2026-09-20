@@ -322,8 +322,7 @@ public class EntityHuman extends EntityHumanType {
                 throw new IllegalStateException(this.getClass().getSimpleName() + " must have a valid skin set");
             }
 
-            boolean retainNpcListEntry = !(this instanceof Player)
-                    && PlayerEntitySkinSender.requiresRetainedEntry(player);
+            boolean retainNpcListEntry = !(this instanceof Player);
             if (this instanceof Player) {
                 if (!player.sentSkins.contains(this.uuid)) {
                     this.server.updatePlayerListData(
@@ -331,9 +330,14 @@ public class EntityHuman extends EntityHumanType {
                             new Player[]{player});
                 }
             } else if (retainNpcListEntry) {
-                if (!PlayerEntitySkinSender.sendInitialSkinIfAbsent(
+                // The ADD entry always carries the blank placeholder skin. Modern Bedrock rejects a
+                // player-list entry that holds a full persona skin, and a rejected entry leaves the
+                // AddPlayerPacket below with nothing to draw: the doll vanishes completely instead
+                // of falling back to the default look. The real skin follows the spawn packet.
+                boolean registered = PlayerEntitySkinSender.sendInitialSkinIfAbsent(
                         player, this.uuid, this.getId(), this.getName(), this.getSkin(), "",
-                        this::getSkin)) {
+                        this::getSkin);
+                if (!registered) {
                     this.hasSpawned.remove(player.getLoaderId());
                     return;
                 }
@@ -361,6 +365,13 @@ public class EntityHuman extends EntityHumanType {
             pk.metadata = this.dataProperties.clone();
             player.dataPacket(pk);
 
+            if (retainNpcListEntry) {
+                // Repaint the doll now that the entity exists. Sent before AddPlayerPacket, this
+                // skin update is dropped by international clients, which is why dolls used to stand
+                // as the default player until the entry itself carried the skin.
+                PlayerEntitySkinSender.sendSkinAfterSpawn(player, this.uuid, this.getSkin());
+            }
+
             if (playerInventory != null) {
                 if (this instanceof Player) {
                     playerInventory.sendArmorContents(player);
@@ -379,7 +390,7 @@ public class EntityHuman extends EntityHumanType {
                 player.dataPacket(pkk);
             }
 
-            // V860 分支由 PlayerEntitySkinSender 延迟移除，其余非 Player 实体立即移除。
+            // PlayerEntitySkinSender delays removal for every skin-bearing non-player entity.
             if (!(this instanceof Player) && !retainNpcListEntry) {
                 this.server.removePlayerListData(this.uuid, player);
             }
@@ -389,7 +400,6 @@ public class EntityHuman extends EntityHumanType {
     @Override
     public void despawnFrom(Player player) {
         boolean removeRetainedNpcEntry = !(this instanceof Player)
-                && PlayerEntitySkinSender.requiresRetainedEntry(player)
                 && this.hasSpawned.containsKey(player.getLoaderId());
         super.despawnFrom(player);
         if (removeRetainedNpcEntry) {
