@@ -1,5 +1,6 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.AdventureSettings;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
@@ -710,6 +711,7 @@ public class ArmorDamageReductionTest {
         lenient().when(damager.getLevel()).thenReturn(level);
         lenient().when(damager.getBoundingBox()).thenReturn(new SimpleAxisAlignedBB(0, 0, 0, 1, 2, 1));
         lenient().when(damager.isOnGround()).thenReturn(false);
+        lenient().when(damager.getAdventureSettings()).thenReturn(mock(AdventureSettings.class));
         return damager;
     }
 
