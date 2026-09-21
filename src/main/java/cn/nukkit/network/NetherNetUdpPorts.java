@@ -1,16 +1,15 @@
 package cn.nukkit.network;
 
 import cn.nukkit.lang.BaseLang;
-import io.netty.channel.EventLoop;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
 import org.cloudburstmc.netty.util.nethernet.EndpointAddress;
-import org.cloudburstmc.netty.util.nethernet.ServerIdentity;
 import tel.schich.libdatachannel.PeerConnectionConfiguration;
 
-import java.net.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -18,12 +17,17 @@ import java.util.Set;
  * 0=系统自动分配；{@code [ip:]internal[-internal]}=钉住本地端口/窗口；
  * {@code [ip:]external[-external]:internal[-internal]}=另发布对端可达的外部映射，
  * 冒号两侧范围长度必须一致。逗号分隔多条目：IP 累计，窗口与偏移须一致。
+ * 钉住的单个端口正是某个 RakNet 监听端口（server-port 或 IPv6，{@link #pinsOnly}）或单端口映射到它
+ * （{@link #publishesOn}）时，媒体与 RakNet 共用该端口，前者的内部回环端口由操作系统分配。
  * <p>
  * Parses server-udp-ports from server.properties (BDS syntax): 0=system-assigned;
  * {@code [ip:]internal[-internal]} pins the local port/window;
  * {@code [ip:]external[-external]:internal[-internal]} additionally publishes an
  * externally reachable mapping, range lengths on each side of the colon must match.
  * Comma-separated entries accumulate IPs while window and offset must agree.
+ * A single port pinned exactly on a RakNet listener port (server-port or the IPv6 listener,
+ * {@link #pinsOnly}) or a single-port mapping onto one ({@link #publishesOn}) shares that
+ * port with RakNet, the former leaving the internal loopback port for the OS to assign.
  */
 @Log4j2
 public final class NetherNetUdpPorts {
@@ -269,83 +273,59 @@ public final class NetherNetUdpPorts {
         return this.offset == 0 ? delegate : new PortRewritingSignaling(delegate);
     }
 
-    /** 纯委托装饰器，仅拦截非 trickle 应答的唯一出口 sendFullSdp。 Pure delegation except the single non-trickle answer exit, sendFullSdp. */
-    private final class PortRewritingSignaling implements NetherNetServerSignaling {
+    /**
+     * 单端口映射且外部端口正是 {@code port}（某个 RakNet 监听端口）：媒体要在该端口的 UDP 侧对外发布，
+     * 由 {@link NetherNetMediaRelay} 在进程内转发，而不是指望外部 NAT。
+     * A single-port mapping whose external port is {@code port} (a RakNet listener port): media is
+     * published on that port's UDP side and {@link NetherNetMediaRelay} forwards it in-process
+     * instead of relying on an external NAT.
+     */
+    public boolean publishesOn(int port) {
+        return this.offset != 0 && this.begin == this.end && this.begin + this.offset == port;
+    }
 
-        private final NetherNetServerSignaling delegate;
+    /**
+     * 未映射的单个端口正是 {@code port}（某个 RakNet 监听端口）：同样表示与 RakNet 共用该端口，只是内部
+     * 回环端口留待系统分配，再经 {@link #relayedThrough} 变成 {@link #publishesOn} 形式的单端口映射。
+     * A single unmapped port that is exactly {@code port} (a RakNet listener port): sharing with
+     * RakNet as well, only the internal loopback port is left for the OS to assign, after which
+     * {@link #relayedThrough} turns this into the {@link #publishesOn} single-port mapping.
+     */
+    public boolean pinsOnly(int port) {
+        return this.offset == 0 && this.begin == this.end && this.begin == port;
+    }
+
+    /**
+     * 与监听在 {@code port} 上的 RakNet 共用端口的两种单端口形态（钉住或映射），IPv4/IPv6 监听一视同仁。
+     * Either single-port shape sharing the RakNet listener on {@code port} (pinned or mapped),
+     * treating the IPv4 and IPv6 listeners alike.
+     */
+    public boolean sharesPort(int port) {
+        return this.pinsOnly(port) || this.publishesOn(port);
+    }
+
+    /**
+     * 把 {@link #pinsOnly} 的单端口改成经 {@code internalPort} 中继到它的映射（即 {@code ext:internalPort}），地址前缀保留。
+     * Turns a {@link #pinsOnly} single port into the mapping relayed through {@code internalPort}
+     * ({@code ext:internalPort}), keeping any address prefix.
+     */
+    NetherNetUdpPorts relayedThrough(int internalPort) {
+        if (this.offset != 0 || this.begin != this.end) {
+            throw new IllegalStateException("only a single unmapped port can be relayed, got " + this);
+        }
+        return new NetherNetUdpPorts(internalPort, internalPort, this.begin - internalPort, this.advertisedAddresses);
+    }
+
+    /** 仅拦截非 trickle 应答的唯一出口 sendFullSdp。 Intercepts only the single non-trickle answer exit, sendFullSdp. */
+    private final class PortRewritingSignaling extends NetherNetDelegatingSignaling {
 
         private PortRewritingSignaling(NetherNetServerSignaling delegate) {
-            this.delegate = delegate;
+            super(delegate);
         }
 
         @Override
         public void sendFullSdp(String targetNetworkId, String sdp) {
             this.delegate.sendFullSdp(targetNetworkId, NetherNetUdpPorts.this.rewriteSdp(sdp));
-        }
-
-        @Override
-        public void bind(SocketAddress localAddress, EventLoop eventLoop) throws ConnectException {
-            this.delegate.bind(localAddress, eventLoop);
-        }
-
-        @Override
-        public void setNewConnectionHandler(NewConnectionHandler handler) {
-            this.delegate.setNewConnectionHandler(handler);
-        }
-
-        @Override
-        public void setAdvertisementData(PongData pongData) {
-            this.delegate.setAdvertisementData(pongData);
-        }
-
-        @Override
-        public List<IceServerInfo> getIceServers() {
-            return this.delegate.getIceServers();
-        }
-
-        @Override
-        public ServerIdentity serverIdentity() {
-            return this.delegate.serverIdentity();
-        }
-
-        @Override
-        public boolean allowsIceOnLocalPort() {
-            return this.delegate.allowsIceOnLocalPort();
-        }
-
-        @Override
-        public boolean usesTrickleIce() {
-            return this.delegate.usesTrickleIce();
-        }
-
-        @Override
-        public void sendSignal(String targetNetworkId, String data) {
-            this.delegate.sendSignal(targetNetworkId, data);
-        }
-
-        @Override
-        public void setSignalHandler(long connectionId, SignalHandler handler) {
-            this.delegate.setSignalHandler(connectionId, handler);
-        }
-
-        @Override
-        public void removeSignalHandler(long connectionId) {
-            this.delegate.removeSignalHandler(connectionId);
-        }
-
-        @Override
-        public String getLocalNetworkId() {
-            return this.delegate.getLocalNetworkId();
-        }
-
-        @Override
-        public boolean isActive() {
-            return this.delegate.isActive();
-        }
-
-        @Override
-        public void close() {
-            this.delegate.close();
         }
     }
 
