@@ -2301,28 +2301,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (server.vanillaPortals) {
-                    this.inPortalTicks = 81;
-                    // The transfer is decided here and carried out two hops later: an async task
-                    // looks the far side up and a main thread task moves the player. Both read the
-                    // portalPos field, which the main thread clears the moment the player stops
-                    // standing in the portal - a plugin teleport, /spawn, a death. The lambda then
-                    // reached spawnPortal with null and killed the level tick with
-                    // "Cannot read field level because pos is null". The target is taken once, here.
                     final Position portalTarget = this.portalPos;
                     if (portalTarget == null) {
                         return;
                     }
-                    // World the player is taken from. Leaving it before the lookup ends calls the
-                    // trip off: dragging somebody into the nether seconds after they typed /spawn
-                    // is worse than not transferring them at all.
+                    this.inPortalTicks = 81;
                     final Level portalOrigin = this.level;
                     this.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
                         @Override
                         public void onRun() {
                             Position foundPortal = BlockNetherPortal.findNearestPortal(portalTarget);
                             getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
-                                // Cleared first: a transfer that is called off must not leave the
-                                // field occupied, or the next portal step is never armed again.
+                                // 目标对象同时标识本次请求，旧回调不能传送玩家或清理新请求。
+                                // The target identifies this attempt; stale callbacks must not teleport or clear a newer attempt.
+                                if (portalPos != portalTarget) {
+                                    return;
+                                }
                                 portalPos = null;
                                 if (!isOnline() || !isAlive() || level != portalOrigin) {
                                     inPortalTicks = 0;
@@ -7636,6 +7630,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
@@ -7675,6 +7670,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return false;
     }
 
+    private void cancelPendingPortalTransfer() {
+        // 已完成的传送已清空目标，保留其计时以避免在出口立即回传。
+        // Completed transfers have no target; preserve their timer to prevent an immediate return trip.
+        if (this.portalPos != null) {
+            this.portalPos = null;
+            this.inPortalTicks = 0;
+        }
+    }
+
     public void checkSwimmingState() {
         if (this.isSwimming() && !this.isInsideOfWater()) {
             this.setSwimming(false);
@@ -7703,6 +7707,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void teleportImmediate(Location location, TeleportCause cause) {
         Location from = this.getLocation();
         if (super.teleport(location.add(0, 0.00001, 0), cause)) {
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
