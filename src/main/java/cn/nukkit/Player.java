@@ -2301,19 +2301,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (server.vanillaPortals) {
+                    final Position portalTarget = this.portalPos;
+                    if (portalTarget == null) {
+                        return;
+                    }
                     this.inPortalTicks = 81;
+                    final Level portalOrigin = this.level;
                     this.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
                         @Override
                         public void onRun() {
-                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalPos);
+                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalTarget);
                             getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                                // 目标对象同时标识本次请求，旧回调不能传送玩家或清理新请求。
+                                // The target identifies this attempt; stale callbacks must not teleport or clear a newer attempt.
+                                if (portalPos != portalTarget) {
+                                    return;
+                                }
+                                portalPos = null;
+                                if (!isOnline() || !isAlive() || level != portalOrigin) {
+                                    inPortalTicks = 0;
+                                    return;
+                                }
                                 if (foundPortal == null) {
-                                    BlockNetherPortal.spawnPortal(portalPos);
-                                    teleport(portalPos.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
+                                    BlockNetherPortal.spawnPortal(portalTarget);
+                                    teleport(portalTarget.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
                                 } else {
                                     teleport(BlockNetherPortal.getSafePortal(foundPortal), TeleportCause.NETHER_PORTAL);
                                 }
-                                portalPos = null;
                             });
                         }
                     });
@@ -7616,6 +7630,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
@@ -7655,6 +7670,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return false;
     }
 
+    private void cancelPendingPortalTransfer() {
+        // 已完成的传送已清空目标，保留其计时以避免在出口立即回传。
+        // Completed transfers have no target; preserve their timer to prevent an immediate return trip.
+        if (this.portalPos != null) {
+            this.portalPos = null;
+            this.inPortalTicks = 0;
+        }
+    }
+
     public void checkSwimmingState() {
         if (this.isSwimming() && !this.isInsideOfWater()) {
             this.setSwimming(false);
@@ -7683,6 +7707,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void teleportImmediate(Location location, TeleportCause cause) {
         Location from = this.getLocation();
         if (super.teleport(location.add(0, 0.00001, 0), cause)) {
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
