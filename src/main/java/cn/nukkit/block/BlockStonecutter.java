@@ -1,8 +1,5 @@
 package cn.nukkit.block;
 
-import cn.nukkit.math.AxisAlignedBB;
-import cn.nukkit.math.SimpleAxisAlignedBB;
-
 import cn.nukkit.item.ItemTool;
 
 public class BlockStonecutter extends BlockSolid {
@@ -15,12 +12,6 @@ public class BlockStonecutter extends BlockSolid {
     @Override
     public double getHardness() {
         return 3.5;
-    }
-
-    @Override
-    protected AxisAlignedBB recalculateBoundingBox() {
-        return new SimpleAxisAlignedBB(
-                this.x, this.y, this.z, this.x + 1, this.y + 9d / 16d, this.z + 1);
     }
 
     @Override

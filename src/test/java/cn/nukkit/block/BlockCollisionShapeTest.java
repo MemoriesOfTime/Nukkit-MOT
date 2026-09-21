@@ -8,9 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class BlockCollisionShapeTest {
 
@@ -63,24 +61,52 @@ class BlockCollisionShapeTest {
     }
 
     @Test
-    void stonecutterIsNinePixelsHigh() {
-        Block stonecutter = Block.get(BlockID.STONECUTTER_BLOCK);
-        stonecutter.setComponents(10d, 20d, 30d);
+    void stonecuttersKeepTheirOwnHeights() {
+        // BDS：旧切石机（245）满格，新切石机（452）9px 高 / old stonecutter is a full cube, stonecutter_block is 9px
+        Block legacy = Block.get(BlockID.STONECUTTER);
+        legacy.setComponents(10d, 20d, 30d);
+        assertEquals(21d, legacy.getBoundingBox().getMaxY(), 1e-12);
 
-        assertEquals(20d + 9d / 16d, stonecutter.getBoundingBox().getMaxY(), 1e-12);
+        Block modern = Block.get(BlockID.STONECUTTER_BLOCK);
+        modern.setComponents(10d, 20d, 30d);
+        assertEquals(20d + 9d / 16d, modern.getBoundingBox().getMaxY(), 1e-12);
     }
 
     @Test
-    void hopperHasABowlAndARim() {
+    void hopperMatchesTheBedrockShape() {
         Block hopper = Block.get(BlockID.HOPPER_BLOCK);
         hopper.setComponents(0d, 0d, 0d);
-        AxisAlignedBB bowl = new SimpleAxisAlignedBB(0.3d, 10d / 16d + 0.001d, 0.3d,
-                0.7d, 0.95d, 0.7d);
-        AxisAlignedBB rim = new SimpleAxisAlignedBB(0.01d, 10d / 16d + 0.001d, 0.4d,
-                0.1d, 0.95d, 0.6d);
+        // 法兰以下的四角为空 / the corners below the flange are open
+        AxisAlignedBB cornerUnderFlange = new SimpleAxisAlignedBB(0.01d, 0.01d, 0.01d, 0.2d, 0.6d, 0.2d);
+        // 法兰（y10-11px 满幅）/ the flange spans the full footprint
+        AxisAlignedBB flange = new SimpleAxisAlignedBB(0.3d, 0.63d, 0.3d, 0.7d, 0.7d, 0.7d);
+        // 漏斗体（内缩 4-12px）/ the inset funnel body
+        AxisAlignedBB funnel = new SimpleAxisAlignedBB(0.4d, 0.3d, 0.4d, 0.6d, 0.6d, 0.6d);
+        // 法兰之上的 2px 壁 / the 2px wall above the flange
+        AxisAlignedBB wall = new SimpleAxisAlignedBB(0.01d, 0.7d, 0.4d, 0.1d, 0.9d, 0.6d);
+        // 朝下时的底部出料管 / the bottom spout tube when facing down
+        AxisAlignedBB spout = new SimpleAxisAlignedBB(0.4d, 0.01d, 0.4d, 0.6d, 0.2d, 0.6d);
 
-        assertFalse(hopper.collidesWithBB(bowl));
-        assertTrue(hopper.collidesWithBB(rim));
+        assertFalse(hopper.collidesWithBB(cornerUnderFlange));
+        assertTrue(hopper.collidesWithBB(flange));
+        assertTrue(hopper.collidesWithBB(funnel));
+        assertTrue(hopper.collidesWithBB(wall));
+        assertTrue(hopper.collidesWithBB(spout));
+
+        List<AxisAlignedBB> boxes = new ArrayList<>();
+        hopper.addCollisionBoxesToList(new SimpleAxisAlignedBB(0d, 0d, 0d, 1d, 1d, 1d), boxes);
+        assertEquals(7, boxes.size());
+    }
+
+    @Test
+    void sidewaysHopperMovesItsSpout() {
+        Block north = Block.get(BlockID.HOPPER_BLOCK, 2);
+        north.setComponents(0d, 0d, 0d);
+        AxisAlignedBB sideSpout = new SimpleAxisAlignedBB(0.4d, 0.3d, 0.01d, 0.6d, 0.45d, 0.2d);
+        AxisAlignedBB bottomTube = new SimpleAxisAlignedBB(0.4d, 0.01d, 0.4d, 0.6d, 0.2d, 0.6d);
+
+        assertTrue(north.collidesWithBB(sideSpout));
+        assertFalse(north.collidesWithBB(bottomTube));
     }
 
     @Test
