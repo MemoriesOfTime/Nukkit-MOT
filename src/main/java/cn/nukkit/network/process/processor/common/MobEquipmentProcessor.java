@@ -7,6 +7,7 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.process.UsingItemReceive;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -59,10 +60,15 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
         }
 
         if (inv instanceof PlayerInventory) {
-            ((PlayerInventory) inv).equipItem(pk.hotbarSlot);
+            PlayerInventory playerInventory = (PlayerInventory) inv;
+            int previousHeldIndex = playerInventory.getHeldItemIndex();
+            playerInventory.equipItem(pk.hotbarSlot);
+            if (UsingItemReceive.shouldClearUsingOnMobEquipment(player.isJavaClient(), player.isUsingItem(), previousHeldIndex, pk.hotbarSlot)) {
+                player.setUsingItem(false);
+            }
+        } else {
+            player.setUsingItem(false);
         }
-
-        player.setUsingItem(false);
     }
 
     @Override

@@ -11,6 +11,7 @@ public class SessionLoginContext {
     private volatile boolean awaitingEncryptionHandshake;
     private volatile boolean shouldLogin;
     private volatile long lastActivityNanos = System.nanoTime();
+    private volatile long phaseStartedNanos = this.lastActivityNanos;
     private volatile String disconnectCauseHint;
 
     public SessionLoginPhase getPhase() {
@@ -20,6 +21,7 @@ public class SessionLoginContext {
     public void setPhase(SessionLoginPhase phase) {
         this.phase = phase;
         this.lastActivityNanos = System.nanoTime();
+        this.phaseStartedNanos = this.lastActivityNanos;
     }
 
     /**
@@ -64,6 +66,13 @@ public class SessionLoginContext {
 
     public long getLastActivityNanos() {
         return lastActivityNanos;
+    }
+
+    /**
+     * When the current login phase began.
+     */
+    public long getPhaseStartedNanos() {
+        return phaseStartedNanos;
     }
 
     public String getDisconnectCauseHint() {

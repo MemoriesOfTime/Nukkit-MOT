@@ -4,6 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.transaction.action.CraftingTakeResultAction;
+import cn.nukkit.inventory.transaction.action.CraftingTransferMaterialAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -224,5 +226,15 @@ public class CraftingTransaction extends InventoryTransaction {
         }
         Server.getInstance().getLogger().debug("No actions on the list");
         return false;
+    }
+
+    @Override
+    public void addAction(InventoryAction action) {
+        if (!(action instanceof CraftingTakeResultAction || action instanceof CraftingTransferMaterialAction || action instanceof SlotChangeAction)) {
+            this.invalid = true;
+            Server.getInstance().getLogger().debug("Failed to add InventoryAction for " + source.getName() + ": unexpected action in crafting transaction: " + action);
+            return;
+        }
+        super.addAction(action);
     }
 }

@@ -98,4 +98,8 @@ public class GameFeatureSettings extends OkaeriConfig {
     @Comment("Use vanilla armor damage reduction formula (non-linear with toughness/breach, deterministic EPF). Set false for legacy linear formula")
     @CustomKey("vanilla-armor-reduction")
     private boolean vanillaArmorReduction = true;
+
+    @Comment("Apply vanilla armor knockback resistance (each netherite piece resists 10% of incoming knockback). Set false for legacy full-strength knockback")
+    @CustomKey("vanilla-knockback-resistance")
+    private boolean vanillaKnockbackResistance = true;
 }

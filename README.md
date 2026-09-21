@@ -18,7 +18,7 @@ Nukkit-MOT is a fork of [Nukkit](https://github.com/CloudburstMC/Nukkit) that pr
 Only interested in newer versions? You might want to try [Lumi](https://github.com/KoshakMineDEV/Lumi) or [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 ### What's new in Nukkit-MOT?
-1. Support for 1.2 – 1.26.45 version (you can set the minimum protocol in the config)
+1. Support for 1.2 – 1.26.50 version (you can set the minimum protocol in the config)
 2. Supports most entities with AI
 3. Support for the nether world and The Еnd
 4. Generation of dungeons and caves
@@ -34,6 +34,7 @@ Only interested in newer versions? You might want to try [Lumi](https://github.c
 ```bash
 docker run -d --name nukkit-mot \
   -p 19132:19132/udp \
+  -p 19132:19132/tcp \
   -v $(pwd)/data:/data \
   -e JAVA_OPTS="-Xms2G -Xmx2G" \
   --restart unless-stopped \
@@ -42,6 +43,8 @@ docker run -d --name nukkit-mot \
 - `:latest` and `:<short-sha>` are development snapshots built from the master branch.
 - `:1.26.30-R1` style tags are stable releases mirroring Maven Central.
 - All worlds, plugins, players and `server.properties` live under the `/data` volume.
+- `19132/udp` is RakNet; `19132/tcp` is the NetherNet (WebRTC) signaling. NetherNet media reuses the same UDP port, so these two mappings cover a default setup — disable `network-settings.nethernet` in `nukkit-mot.yml` if you don't use it.
+- Want NetherNet media on its own UDP port instead? Set `server-udp-ports` in `server.properties` (e.g. `19134`, then add `-p 19134:19134/udp`).
 
 ## Links
 - __🌐 Download: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__

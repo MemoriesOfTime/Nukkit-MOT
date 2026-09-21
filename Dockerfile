@@ -81,8 +81,15 @@ COPY --from=build /build/target/Nukkit-MOT-SNAPSHOT.jar /opt/nukkit-mot/Nukkit-M
 RUN useradd -r -m nukkit && chown -R nukkit:nukkit /data
 USER nukkit
 
-# Bedrock 默认端口 / Bedrock default port
-EXPOSE 19132/udp
+# Bedrock 默认端口：UDP 为 RakNet 游戏，TCP 为 NetherNet HTTP 信令（与 server-port 同号，默认开启）；
+# NetherNet 媒体默认也共用 19132/udp（server-udp-ports 默认 19132 = server-port，进程内中继到系统分配的
+# 回环内部端口）；钉住独立媒体端口（如 server-udp-ports=19134）时才需另行发布该端口。
+# Bedrock default ports: UDP for RakNet gameplay, TCP for the NetherNet HTTP signaling
+# (same number as server-port, on by default); NetherNet media shares 19132/udp by default too
+# (server-udp-ports defaults to 19132 = server-port, relayed in-process to an OS-assigned
+# loopback internal port); a pinned standalone media port (e.g. server-udp-ports=19134)
+# is the only case needing that port published as well.
+EXPOSE 19132/udp 19132/tcp
 
 VOLUME ["/data"]
 
