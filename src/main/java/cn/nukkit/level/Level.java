@@ -4961,6 +4961,10 @@ public class Level implements ChunkManager, Metadatable {
             if (toRemove != null) {
                 int size = toRemove.size();
                 for (int i = 0; i < size; i++) {
+                    // Recheck between unloads: the previous chunk and its dirty neighbours may fill the writer.
+                    if (!force && this.isChunkSaveBacklogged()) {
+                        break;
+                    }
                     long index = toRemove.getLong(i);
                     int X = getHashX(index);
                     int Z = getHashZ(index);
@@ -5028,6 +5032,10 @@ public class Level implements ChunkManager, Metadatable {
 
             if (toUnload != null) {
                 for (long index : toUnload) {
+                    // Keep the remaining chunks queued, without splitting one unload's neighbour saves.
+                    if (!force && this.isChunkSaveBacklogged()) {
+                        break;
+                    }
                     int X = getHashX(index);
                     int Z = getHashZ(index);
                     if (this.unloadChunk(X, Z, true)) {

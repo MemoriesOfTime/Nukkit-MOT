@@ -16,6 +16,7 @@ import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 区块写积压背压测试:积压时本 tick 暂停卸载并保留队列,force 与非积压路径不受影响
@@ -122,4 +123,51 @@ public class LevelChunkSaveBackpressureTest {
 
         Assertions.assertFalse(unloadQueue(level).containsKey(hash), "force must bypass backpressure");
     }
+
+    private AtomicInteger queueUntilBacklogged(Level level, int pending) throws Exception {
+        for (int x = 0; x < 3; x++) {
+            unloadQueue(level).put(Level.chunkHash(x * 5, 10), (Long) (System.currentTimeMillis() - 30000));
+        }
+        AtomicInteger writes = new AtomicInteger(pending);
+        Mockito.when(this.provider.isChunkSaveBacklogged()).thenAnswer(ignored -> writes.get() >= 128);
+        Mockito.doAnswer(ignored -> {
+            writes.incrementAndGet();
+            return true;
+        }).when(level).unloadChunk(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyBoolean());
+        return writes;
+    }
+
+    @Test
+    public void countLimitedUnloadStopsAsSoonAsWriterReachesCapacityAndResumes() throws Exception {
+        Level level = newLevel();
+        AtomicInteger writes = queueUntilBacklogged(level, 127);
+        level.unloadChunks(50, false);
+        Assertions.assertEquals(128, writes.get(), "only one more unload fits in the pending-write window");
+        Assertions.assertEquals(2, unloadQueue(level).size(), "deferred chunks remain queued");
+
+        writes.set(0);
+        level.unloadChunks(50, false);
+        Assertions.assertEquals(2, writes.get());
+        Assertions.assertTrue(unloadQueue(level).isEmpty(), "deferred unloads resume after the writer drains");
+    }
+
+    @Test
+    public void timeLimitedUnloadStopsAsSoonAsWriterReachesCapacity() throws Exception {
+        Level level = newLevel();
+        AtomicInteger writes = queueUntilBacklogged(level, 127);
+        level.doGarbageCollection(10000);
+        Assertions.assertEquals(128, writes.get());
+        Assertions.assertEquals(2, unloadQueue(level).size());
+        Mockito.verify(this.provider).doGarbageCollection(Mockito.anyLong());
+    }
+
+    @Test
+    public void forcedUnloadDrainsWholeQueueAfterReachingCapacity() throws Exception {
+        Level level = newLevel();
+        AtomicInteger writes = queueUntilBacklogged(level, 127);
+        level.unloadChunks(50, true);
+        Assertions.assertEquals(130, writes.get());
+        Assertions.assertTrue(unloadQueue(level).isEmpty(), "shutdown must not leave chunks waiting for another tick");
+    }
+
 }
