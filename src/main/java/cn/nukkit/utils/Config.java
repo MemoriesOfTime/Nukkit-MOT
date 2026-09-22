@@ -45,6 +45,9 @@ public class Config {
     private int type = Config.DETECT;
     @Getter
     private String header;
+    private Map<String, String> propertyComments;
+    private List<String> propertyKeyOrder;
+    private String unrecognizedPropertyComment;
 
     /**
      * List of supported config file formats
@@ -163,6 +166,10 @@ public class Config {
         this.correct = true;
         this.type = type;
         this.file = new File(file);
+        if (type == Config.PROPERTIES && !defaultMap.isEmpty()) {
+            // Canonical key order for writeProperties(); an empty map (e.g. reload()) keeps the existing order
+            this.propertyKeyOrder = new ArrayList<>(defaultMap.keySet());
+        }
         if (!this.file.exists()) {
             try {
                 this.file.getParentFile().mkdirs();
@@ -295,6 +302,27 @@ public class Config {
      */
     public void setHeader(String header) {
         this.header = header;
+    }
+
+    /**
+     * 设置 properties 格式的逐键注释表（键 -> 注释文本，可含换行）
+     * <p>
+     * Set per-key comments for properties format (key -> comment text, newlines allowed).
+     * Each comment line is written above its key=value pair with a '#' prefix.
+     * Comments are ignored when parsing, so they never affect loaded values.
+     */
+    public void setPropertyComments(Map<String, String> comments) {
+        this.propertyComments = comments;
+    }
+
+    /**
+     * 设置未识别配置项段的分隔注释（可含换行），仅 properties 格式生效
+     * <p>
+     * Set the separator comment (newlines allowed) written above the trailing
+     * block of keys missing from the canonical key order. Properties format only.
+     */
+    public void setUnrecognizedPropertyComment(String comment) {
+        this.unrecognizedPropertyComment = comment;
     }
 
     /**
@@ -619,16 +647,54 @@ public class Config {
 
     private String writeProperties() {
         StringBuilder content = new StringBuilder(writeHeader());
-        for (Object o : this.config.entrySet()) {
-            Map.Entry entry = (Map.Entry) o;
-            Object v = entry.getValue();
-            Object k = entry.getKey();
-            if (v instanceof Boolean) {
-                v = (Boolean) v ? "on" : "off";
+        if (this.propertyKeyOrder == null) {
+            for (Object o : this.config.entrySet()) {
+                Map.Entry entry = (Map.Entry) o;
+                this.writePropertyEntry(content, entry.getKey(), entry.getValue());
             }
-            content.append(k).append('=').append(v).append("\r\n");
+            return content.toString();
+        }
+
+        // Known keys in canonical order first
+        for (String key : this.propertyKeyOrder) {
+            if (this.config.containsKey(key)) {
+                this.writePropertyEntry(content, key, this.config.get(key));
+            }
+        }
+
+        // Unrecognized keys last, separated by an explanatory comment
+        List<String> unrecognized = new ArrayList<>();
+        for (Object k : this.config.keySet()) {
+            if (!this.propertyKeyOrder.contains(k)) {
+                unrecognized.add(String.valueOf(k));
+            }
+        }
+        if (!unrecognized.isEmpty()) {
+            if (this.unrecognizedPropertyComment != null && !this.unrecognizedPropertyComment.isEmpty()) {
+                for (String line : this.unrecognizedPropertyComment.split("\n")) {
+                    content.append("# ").append(line).append("\r\n");
+                }
+            }
+            for (String key : unrecognized) {
+                this.writePropertyEntry(content, key, this.config.get(key));
+            }
         }
         return content.toString();
+    }
+
+    private void writePropertyEntry(StringBuilder content, Object key, Object value) {
+        if (this.propertyComments != null) {
+            String comment = this.propertyComments.get(String.valueOf(key));
+            if (comment != null && !comment.isEmpty()) {
+                for (String line : comment.split("\n")) {
+                    content.append("# ").append(line).append("\r\n");
+                }
+            }
+        }
+        if (value instanceof Boolean) {
+            value = (Boolean) value ? "on" : "off";
+        }
+        content.append(key).append('=').append(value).append("\r\n");
     }
 
     private void parseProperties(String content) {

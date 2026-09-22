@@ -285,7 +285,7 @@ public final class VillagePieces {
                             final int cz = z & 0xf;
                             int y = chunk.getHighestBlockAt(cx, cz);
                             int id = chunk.getBlockId(cx, y, cz);
-                            while (Block.transparent[id] && y > 63 + 1 - 1 + yOffset) {
+                            while (Block.isBlockTransparentById(id) && y > 63 + 1 - 1 + yOffset) {
                                 id = chunk.getBlockId(cx, --y, cz);
                             }
                             sum += Math.max(y, 63 + 1 - 1 + yOffset);
@@ -1726,7 +1726,7 @@ public final class VillagePieces {
 							final int cz = z & 0xf;
 							int y = chunk.getHighestBlockAt(cx, cz);
 							int id = chunk.getBlockId(cx, y, cz);
-							while (Block.transparent[id] && y > 63 - 1 + yOffset) {
+							while (Block.isBlockTransparentById(id) && y > 63 - 1 + yOffset) {
 								id = chunk.getBlockId(cx, --y, cz);
 							}
 							vec.y = y;

@@ -99,6 +99,45 @@ class EntityHumanSkinLifecycleTest {
     }
 
     @Test
+    void v860NpcPlaceholderSkinIsVisible() {
+        // 回归：占位皮肤必须不透明——93 被客户端限流队列丢弃时，降级为可见占位而非永久隐形
+        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
+        RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);
+
+        npc.spawnTo(viewer);
+
+        PlayerListPacket add = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .findFirst().orElseThrow();
+        assertEquals(PlayerListPacket.TYPE_ADD, add.type);
+        assertTrue(add.entries[0].skin.isValid());
+        assertFalse(add.entries[0].skin.isFullyTransparent(),
+                "placeholder skin must be opaque so a dropped skin packet degrades to a visible fallback");
+    }
+
+    @Test
+    void v860NpcResendUsesLiveSkinAfterChange() {
+        // 回归：补发必须取实体当前皮肤——补发 spawn 时的快照会把窗口内的新皮肤永久顶掉
+        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
+        RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);
+        npc.spawnTo(viewer);
+
+        Skin changed = new Skin();
+        changed.setSkinId("test-npc-skin-2");
+        changed.setSkinData(new byte[Skin.SINGLE_SKIN_SIZE]);
+        npc.setSkin(changed);
+
+        runPendingDelayedTasks(); // +2t 补发与 +5t REMOVE
+
+        PlayerSkinPacket last = viewer.sentPackets.stream()
+                .filter(PlayerSkinPacket.class::isInstance)
+                .map(PlayerSkinPacket.class::cast)
+                .reduce((first, second) -> second).orElseThrow();
+        assertEquals("test-npc-skin-2", last.skin.getSkinId());
+    }
+
+    @Test
     void v860NpcRemovesPlayerListEntryAfterDelayedRemove() {
         TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
         RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);

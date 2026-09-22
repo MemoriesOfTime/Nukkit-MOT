@@ -20,10 +20,7 @@ import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.event.level.LevelInitEvent;
 import cn.nukkit.event.level.LevelLoadEvent;
-import cn.nukkit.event.server.BatchPacketsEvent;
-import cn.nukkit.event.server.PlayerDataSerializeEvent;
-import cn.nukkit.event.server.QueryRegenerateEvent;
-import cn.nukkit.event.server.ServerStopEvent;
+import cn.nukkit.event.server.*;
 import cn.nukkit.inventory.CraftingManager;
 import cn.nukkit.inventory.Recipe;
 import cn.nukkit.item.Item;
@@ -56,10 +53,12 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.NetherNetInterface;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.EncryptionUtils;
+import cn.nukkit.network.encryption.LoginChainVerifier;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.auth.AuthType;
 import cn.nukkit.network.query.QueryHandler;
@@ -89,6 +88,7 @@ import cn.nukkit.utils.serverconfig.ConfigComments;
 import cn.nukkit.utils.serverconfig.ConfigMigration;
 import cn.nukkit.utils.serverconfig.ResourcePackMigration;
 import cn.nukkit.utils.serverconfig.ServerConfig;
+import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -128,6 +128,7 @@ import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
 
 /**
@@ -692,7 +693,8 @@ public class Server {
         log.info("Loading server properties...");
         this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
         this.properties.setHeader("Nukkit-MOT Server Properties\n"
-                + "For advanced settings, see nukkit-mot.yml");
+                + "For advanced settings, see nukkit-mot.yml\n"
+                + "Documentation: https://www.nukkit-mot.com/docs/user-guide/server-config/server-properties");
 
         // Load nukkit-mot.yml (advanced MOT settings)
         log.info("Loading server configuration (YAML)...");
@@ -703,6 +705,9 @@ public class Server {
             this.properties.save();
             this.saveServerConfig();
         }
+
+        // Apply localized comments to server.properties based on its language setting
+        this.applyPropertiesComments();
 
         if (!this.serverConfig.debugSettings().ansiTitle()) {
             Nukkit.TITLE = false;
@@ -867,7 +872,18 @@ public class Server {
         this.network = new Network(this);
         this.network.setName(this.getMotd());
         this.network.setSubName(this.getSubMotd());
-        this.network.registerInterface(new RakNetInterface(this));
+        RakNetInterface rakNetInterface = new RakNetInterface(this);
+        this.network.registerInterface(rakNetInterface);
+
+        // NetherNet (WebRTC) 与 RakNet 并行：旧客户端走 RakNet，受限网络的 1.21.90+ 客户端走 HTTP 信令 + WebRTC；
+        // server-udp-ports 把媒体映射到某个 RakNet 监听端口（server-port/IPv6）时，媒体经监听 socket 进程内中继
+        // Runs alongside RakNet: legacy clients keep RakNet, restricted-network 1.21.90+ clients join over WebRTC;
+        // with server-udp-ports mapping media onto a RakNet listener (server-port/IPv6) it is relayed in-process
+        NetherNetSettings netherNetSettings = this.serverConfig != null
+                ? this.serverConfig.networkSettings().netherNetSettings() : null;
+        if (netherNetSettings != null && netherNetSettings.enabled()) {
+            this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
+        }
 
         EntityProperty.init();
 
@@ -1375,6 +1391,7 @@ public class Server {
         // Reload server.properties
         log.info("Reloading server properties...");
         this.properties.reload();
+        this.applyPropertiesComments();
 
         // Reload nukkit-mot.yml
         log.info("Reloading server configuration (YAML)...");
@@ -1437,6 +1454,7 @@ public class Server {
                 this.rcon.close();
             }
 
+            LoginChainVerifier.shared().shutdown();
             this.getLogger().debug("Disconnecting all players...");
             for (Player player : new ArrayList<>(this.players.values())) {
                 player.close(player.getLeaveMessage(), reason);
@@ -1781,7 +1799,11 @@ public class Server {
     }
 
     private void tick() {
-        long tickTime = System.currentTimeMillis();
+        tick(System.currentTimeMillis(), System::nanoTime);
+    }
+
+    // The actual tick body also accepts a monotonic clock for deterministic boundary tests.
+    void tick(long tickTime, LongSupplier nanoTime) {
 
         long time = tickTime - this.nextTick;
         if (time < -25) {
@@ -1792,84 +1814,104 @@ public class Server {
             }
         }
 
-        long tickTimeNano = System.nanoTime();
         if ((tickTime - this.nextTick) < -25) {
             return;
         }
 
-        ++this.tickCounter;
+        long tickTimeNano = nanoTime.getAsLong();
+        long tickId = ++this.tickCounter;
+        Throwable tickFailure = null;
+        try {
+            this.pluginManager.callEvent(new ServerTickStartEvent(tickId));
+            this.network.processInterfaces();
 
-        this.network.processInterfaces();
+            if (this.rcon != null) {
+                this.rcon.check();
+            }
 
-        if (this.rcon != null) {
-            this.rcon.check();
-        }
+            this.scheduler.mainThreadHeartbeat(this.tickCounter);
 
-        this.scheduler.mainThreadHeartbeat(this.tickCounter);
+            this.checkTickUpdates(this.tickCounter);
 
-        this.checkTickUpdates(this.tickCounter);
+            for (Player player : new ArrayList<>(this.players.values())) {
+                player.checkNetwork();
+            }
 
-        for (Player player : new ArrayList<>(this.players.values())) {
-            player.checkNetwork();
-        }
+            if ((this.tickCounter & 0b1111) == 0) {
+                this.titleTick();
 
-        if ((this.tickCounter & 0b1111) == 0) {
-            this.titleTick();
+                this.network.resetStatistics();
+                this.maxTick = 20;
+                this.maxUse = 0;
 
-            this.network.resetStatistics();
-            this.maxTick = 20;
-            this.maxUse = 0;
-
-            if ((this.tickCounter & 0b111111111) == 0) {
-                try {
-                    this.pluginManager.callEvent(this.queryRegenerateEvent = new QueryRegenerateEvent(this, 5));
-                    if (this.queryHandler != null) {
-                        this.queryHandler.regenerateInfo();
+                if ((this.tickCounter & 0b111111111) == 0) {
+                    try {
+                        this.pluginManager.callEvent(this.queryRegenerateEvent = new QueryRegenerateEvent(this, 5));
+                        if (this.queryHandler != null) {
+                            this.queryHandler.regenerateInfo();
+                        }
+                    } catch (Exception e) {
+                        log.error(e);
                     }
-                } catch (Exception e) {
-                    log.error(e);
+                }
+
+                this.network.updateName();
+            }
+
+            if (++this.autoSaveTicker >= this.autoSaveTicks) {
+                this.autoSaveTicker = 0;
+                this.doAutoSave();
+            }
+
+            if (this.tickCounter % 100 == 0) {
+                for (Level level : this.levelArray) {
+                    if (!level.isBeingConverted) {
+                        level.doChunkGarbageCollection();
+                    }
                 }
             }
 
-            this.network.updateName();
-        }
+            long nowNano = nanoTime.getAsLong();
 
-        if (++this.autoSaveTicker >= this.autoSaveTicks) {
-            this.autoSaveTicker = 0;
-            this.doAutoSave();
-        }
+            float tick = (float) Math.min(20, 1000000000 / Math.max(1000000, ((double) nowNano - tickTimeNano)));
+            float use = (float) Math.min(1, ((double) (nowNano - tickTimeNano)) / 50000000);
 
-        if (this.tickCounter % 100 == 0) {
-            for (Level level : this.levelArray) {
-                if (!level.isBeingConverted) {
-                    level.doChunkGarbageCollection();
+            if (this.maxTick > tick) {
+                this.maxTick = tick;
+            }
+
+            if (this.maxUse < use) {
+                this.maxUse = use;
+            }
+
+            System.arraycopy(this.tickAverage, 1, this.tickAverage, 0, this.tickAverage.length - 1);
+            this.tickAverage[this.tickAverage.length - 1] = tick;
+
+            System.arraycopy(this.useAverage, 1, this.useAverage, 0, this.useAverage.length - 1);
+            this.useAverage[this.useAverage.length - 1] = use;
+
+            if ((this.nextTick - tickTime) < -1000) {
+                this.nextTick = tickTime;
+            } else {
+                this.nextTick += 50;
+            }
+        } catch (RuntimeException | Error failure) {
+            tickFailure = failure;
+            throw failure;
+        } finally {
+            // Capture before dispatch: observers must not inflate the value they receive.
+            long durationNanos = nanoTime.getAsLong() - tickTimeNano;
+            try {
+                this.pluginManager.callEvent(new ServerTickEndEvent(tickId, durationNanos));
+            } catch (RuntimeException | Error eventFailure) {
+                if (tickFailure != null) {
+                    if (eventFailure != tickFailure) {
+                        tickFailure.addSuppressed(eventFailure);
+                    }
+                } else {
+                    throw eventFailure;
                 }
             }
-        }
-
-        long nowNano = System.nanoTime();
-
-        float tick = (float) Math.min(20, 1000000000 / Math.max(1000000, ((double) nowNano - tickTimeNano)));
-        float use = (float) Math.min(1, ((double) (nowNano - tickTimeNano)) / 50000000);
-
-        if (this.maxTick > tick) {
-            this.maxTick = tick;
-        }
-
-        if (this.maxUse < use) {
-            this.maxUse = use;
-        }
-
-        System.arraycopy(this.tickAverage, 1, this.tickAverage, 0, this.tickAverage.length - 1);
-        this.tickAverage[this.tickAverage.length - 1] = tick;
-
-        System.arraycopy(this.useAverage, 1, this.useAverage, 0, this.useAverage.length - 1);
-        this.useAverage[this.useAverage.length - 1] = use;
-
-        if ((this.nextTick - tickTime) < -1000) {
-            this.nextTick = tickTime;
-        } else {
-            this.nextTick += 50;
         }
     }
 
@@ -3220,6 +3262,19 @@ public class Server {
         }
     }
 
+    /**
+     * 按当前语言设置刷新 server.properties 的逐键注释并保存
+     * <p>
+     * Refresh per-key comments in server.properties for the current language setting, then save.
+     * Keys unknown to the defaults are kept at the end of the file behind a localized notice.
+     */
+    private void applyPropertiesComments() {
+        String lang = this.getPropertyString("language", "eng");
+        this.properties.setPropertyComments(ConfigComments.loadPropertyComments(lang));
+        this.properties.setUnrecognizedPropertyComment(ConfigComments.loadUnrecognizedPropertyComment(lang));
+        this.properties.save();
+    }
+
 
     /**
      * Get server.properties config
@@ -3982,6 +4037,12 @@ public class Server {
         this.strongIPBans = config.gameFeatureSettings().strongIpBans();
         this.checkOpMovement = config.gameFeatureSettings().checkOpMovement();
 
+        // 击退抗性属性随配置变化，重载后重同步在线玩家
+        // Knockback resistance attribute follows the config; resync online players after reload
+        for (Player player : this.getOnlinePlayers().values()) {
+            player.sendKnockBackResistanceAttribute();
+        }
+
         // NetEase
         this.netEaseMode = config.neteaseSettings().clientSupport();
         this.onlyNetEaseMode = config.neteaseSettings().onlyAllowNeteaseClient();
@@ -4050,6 +4111,9 @@ public class Server {
             put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
+            // 等于 server-port（默认 19132）即与 RakNet 共用 UDP 端口；设为 19134 等则钉住独立媒体端口
+            // Equal to server-port (19132 by default) it shares RakNet's UDP port; 19134 etc. pins a standalone media port
+            put("server-udp-ports", 19132);
             put("server-ipv6-port", -1);
             put("server-ipv6", "::");
             put("view-distance", 8);

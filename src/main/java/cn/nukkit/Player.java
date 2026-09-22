@@ -51,6 +51,7 @@ import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.item.enchantment.EnchantmentFrostWalker;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.lang.CommandOutputContainer;
 import cn.nukkit.lang.LangCode;
@@ -68,9 +69,12 @@ import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
+import cn.nukkit.network.NetherNetInterface;
 import cn.nukkit.network.SourceInterface;
+import cn.nukkit.network.encryption.LoginChainVerifier;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
+import cn.nukkit.network.process.UsingItemReceive;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
 import cn.nukkit.network.protocol.netease.PyRpcPacket;
@@ -308,6 +312,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private static final double FOV_DEGREES = 100.0;
 
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
+    /** Server tick at which the cool down of an item category ends. */
+    protected final Map<String, Integer> itemCoolDownEnds = new ConcurrentHashMap<>(2);
 
     /**
      * 已向本观察者下发 PlayerList(ADD) 的玩家型实体 UUID，用于去重防网易客户端隐形；
@@ -411,6 +417,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected Cache<String, FormWindowDialog> dialogWindows = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
+    private LoginChainVerifier.Verification pendingLoginVerification;
     protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
     /**
@@ -638,6 +645,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public boolean getAllowFlight() {
         return this.adventureSettings.get(Type.ALLOW_FLIGHT);
+    }
+
+    /**
+     * Scale the packet and tick movement sanity limits for an authorized player who is actually
+     * flying faster than vanilla. The limits are squared distances, so the speed ratio must be
+     * squared as well. Everyone else keeps the original limits unchanged.
+     */
+    double movementSanityLimitSquared(double vanillaLimitSquared) {
+        if (this.adventureSettings == null
+                || !this.adventureSettings.get(Type.ALLOW_FLIGHT)
+                || !this.adventureSettings.get(Type.FLYING)) {
+            return vanillaLimitSquared;
+        }
+
+        float configuredFlySpeed = this.getFlySpeed();
+        if (!Float.isFinite(configuredFlySpeed) || configuredFlySpeed <= DEFAULT_FLY_SPEED) {
+            return vanillaLimitSquared;
+        }
+
+        double speedRatio = (double) configuredFlySpeed / DEFAULT_FLY_SPEED;
+        return vanillaLimitSquared * speedRatio * speedRatio;
     }
 
     public void setAllowModifyWorld(boolean value) {
@@ -969,6 +997,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void setSkin(Skin skin) {
+        if (skin.isFullyTransparent()) {
+            skin = Skin.NO_PERSONA_SKIN;
+        }
         Skin previousSkin = this.getSkin();
         super.setSkin(skin);
         if (!this.spawned) {
@@ -1473,7 +1504,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         int centerX = (int) this.x >> 4;
         int centerZ = (int) this.z >> 4;
 
-        int radius = spawned ? this.chunkRadius : server.c_s_spawnThreshold;
+        // Before the first spawn the client already waits for every chunk inside the publisher
+        // radius (chunkRadius, never below 3). Capping the pre-spawn radius to sqrt(spawn-threshold)
+        // left the outer ring unsent, so the client hung in the air until its own timeout and only
+        // then sent SetLocalPlayerAsInitialized. PocketMine-MP and PowerNukkitX send the full view
+        // distance before spawn and use the threshold only to decide when PLAYER_SPAWN goes out.
+        int radius = spawned ? this.chunkRadius : Math.max(this.chunkRadius, server.c_s_spawnThreshold);
         int radiusSqr = radius * radius;
 
         // FOV 朝向优先(借鉴 PNX):视野内先入队,组内近→远;LongLinkedOpenHashSet 保插入序
@@ -2265,19 +2301,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (server.vanillaPortals) {
+                    final Position portalTarget = this.portalPos;
+                    if (portalTarget == null) {
+                        return;
+                    }
                     this.inPortalTicks = 81;
+                    final Level portalOrigin = this.level;
                     this.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
                         @Override
                         public void onRun() {
-                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalPos);
+                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalTarget);
                             getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                                // 目标对象同时标识本次请求，旧回调不能传送玩家或清理新请求。
+                                // The target identifies this attempt; stale callbacks must not teleport or clear a newer attempt.
+                                if (portalPos != portalTarget) {
+                                    return;
+                                }
+                                portalPos = null;
+                                if (!isOnline() || !isAlive() || level != portalOrigin) {
+                                    inPortalTicks = 0;
+                                    return;
+                                }
                                 if (foundPortal == null) {
-                                    BlockNetherPortal.spawnPortal(portalPos);
-                                    teleport(portalPos.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
+                                    BlockNetherPortal.spawnPortal(portalTarget);
+                                    teleport(portalTarget.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
                                 } else {
                                     teleport(BlockNetherPortal.getSafePortal(foundPortal), TeleportCause.NETHER_PORTAL);
                                 }
-                                portalPos = null;
                             });
                         }
                     });
@@ -2387,9 +2437,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         boolean revert = false;
 
         // Extreme distance check
-        if (distanceSquared / tickDiffSq > 225) {
+        double extremeDistanceLimitSquared = movementSanityLimitSquared(225);
+        if (distanceSquared / tickDiffSq > extremeDistanceLimitSquared) {
             revert = true;
-            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > 225 * tickDiffSq=" + (225 * tickDiffSq));
+            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > "
+                    + extremeDistanceLimitSquared + " * tickDiffSq=" + (extremeDistanceLimitSquared * tickDiffSq));
         } else {
             // Chunk generation check
             if (this.chunk == null || !this.chunk.isGenerated()) {
@@ -2611,8 +2663,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         Item boots = this.inventory.getBootsFast();
 
         Enchantment frostWalker = boots.getEnchantment(Enchantment.ID_FROST_WALKER);
-        if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
-            int radius = 2 + frostWalker.getLevel();
+        int frostWalkerLevel = frostWalker == null ? 0 : frostWalker.getLevel();
+        if (frostWalkerLevel > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
+            // Take the min before adding 2 so a malformed high level cannot overflow 2 + level negative
+            int radius = 2 + Math.min(frostWalkerLevel, EnchantmentFrostWalker.MAX_FREEZE_RADIUS - 2);
             for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
                 for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
                     Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
@@ -2723,10 +2777,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getMaxHealth()).setValue(health > 0 ? (health < getMaxHealth() ? health : getMaxHealth()) : 0),
                 Attribute.getAttribute(Attribute.MAX_HUNGER).setValue(this.foodData.getLevel()).setDefaultValue(this.foodData.getMaxLevel()),
                 Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(this.speedToSend).setDefaultValue(this.getMovementSpeed()),
+                this.knockBackResistanceAttributeEntry(),
                 Attribute.getAttribute(Attribute.EXPERIENCE_LEVEL).setValue(this.expLevel),
                 Attribute.getAttribute(Attribute.EXPERIENCE).setValue(((float) this.exp) / calculateRequireExperience(this.expLevel))
         };
         this.dataPacket(pk);
+    }
+
+    /**
+     * 上次同步给客户端的击退抗性值，[-1, 0) 表示尚未同步过。
+     * <p>
+     * Last knockback resistance value sent to the client; values in [-1, 0) mean never sent.
+     */
+    private float lastSentKnockBackResistance = -1f;
+
+    /**
+     * 构造击退抗性属性条目并更新已同步值缓存。
+     * <p>
+     * Builds the knockback resistance attribute entry and refreshes the last-sent cache.
+     */
+    private Attribute knockBackResistanceAttributeEntry() {
+        float value = Math.max(0, Math.min(1, (float) this.getKnockBackResistance()));
+        this.lastSentKnockBackResistance = value;
+        return Attribute.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setValue(value);
+    }
+
+    /**
+     * 将当前击退抗性通过属性包同步给客户端，盔甲变化后调用；值未变化时跳过发包。
+     * <p>
+     * Syncs the current knockback resistance to the client via the attribute packet, called after armour changes; skips the packet when the value is unchanged.
+     */
+    public void sendKnockBackResistanceAttribute() {
+        float value = Math.max(0f, Math.min(1f, (float) this.getKnockBackResistance()));
+        if (value == this.lastSentKnockBackResistance) {
+            return;
+        }
+        this.setAttribute(this.knockBackResistanceAttributeEntry());
     }
 
     public void sendFogStack() {
@@ -3007,6 +3093,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
+     * Start hold-to-use from AuthInput START_USING_ITEM / PlayerAction START_USING_ITEM
+     * using the <em>server</em> held stack. Java chew/drink is local, so the client
+     * animates even when MOT never entered using; other players only see
+     * {@code DATA_FLAG_ACTION} after this path succeeds.
+     */
+    boolean tryStartUsingHeldItem(Item item) {
+        if (!UsingItemReceive.shouldStartUsing(
+                this.spawned && this.isAlive(),
+                this.isSpectator() && this.server.useClientSpectator,
+                this.isUsingItem(),
+                UsingItemReceive.isHoldToUseItem(item))) {
+            return false;
+        }
+        Vector3 direction = this.getDirectionVector();
+        PlayerInteractEvent interactEvent = new PlayerInteractEvent(this, item, direction, this.getDirection(), Action.RIGHT_CLICK_AIR);
+        if (this.isSpectator()) {
+            interactEvent.setCancelled();
+        }
+        this.server.getPluginManager().callEvent(interactEvent);
+        if (interactEvent.isCancelled()) {
+            this.needSendHeldItem = true;
+            return false;
+        }
+        if (!item.onClickAir(this, direction) || !item.canRelease()) {
+            return false;
+        }
+        if (this.isSurvival() || this.isAdventure()) {
+            if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
+                this.inventory.setItemInHand(item);
+            }
+        }
+        this.setUsingItem(true);
+        return true;
+    }
+
+    /**
      * Processes server-side auto-completion for consumable items.
      *
      * @return true if auto-completion was triggered
@@ -3139,12 +3261,56 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private boolean canInteractEntity(Vector3 pos, double maxDistance) {
-        if (this.distanceSquared(pos) > Math.pow(maxDistance, 2)) {
+        double pointX = pos.x;
+        double pointZ = pos.z;
+        double distanceSquared;
+        if (pos instanceof Entity entity && !(entity instanceof Player) && entity.boundingBox != null) {
+            // A big body puts its visible head and tail far away from the centre point: the
+            // bounding box can extend well beyond the entity position. Measured from the
+            // centre, a hit on the head was farther than the
+            // reach even though the sword touched the model, and the facing check refused a
+            // player who faced the head while the centre was behind his back. The hit is
+            // measured to the nearest point of the bounding box instead; a player standing
+            // inside the body is at distance zero. Players keep the centre measurement so the
+            // PvP reach does not change by a single block.
+            AxisAlignedBB box = entity.boundingBox;
+            double eyeY = this.y + this.getEyeHeight();
+            double nearestX = NukkitMath.clamp(this.x, box.getMinX(), box.getMaxX());
+            double nearestY = NukkitMath.clamp(eyeY, box.getMinY(), box.getMaxY());
+            double nearestZ = NukkitMath.clamp(this.z, box.getMinZ(), box.getMaxZ());
+            double dx = nearestX - this.x;
+            double dy = nearestY - eyeY;
+            double dz = nearestZ - this.z;
+            distanceSquared = dx * dx + dy * dy + dz * dz;
+            pointX = nearestX;
+            pointZ = nearestZ;
+            if (distanceSquared > maxDistance * maxDistance) {
+                return false;
+            }
+            // A big body overlaps terrain and encloses players standing next to it, so the
+            // client reports a hit while the crosshair rests on a wall.
+            // The swing has to reach the body without crossing a block; see MeleeLineOfSight.
+            Vector3 look = this.getDirectionVector();
+            Level level = this.level;
+            if (!MeleeLineOfSight.clear(this.x, eyeY, this.z, look.x, look.y, look.z, box, maxDistance,
+                    (bx, by, bz) -> {
+                        Block block = level.getBlock(bx, by, bz, false);
+                        if (block == null || block.getId() == BlockID.AIR || block.canPassThrough()) {
+                            return null;
+                        }
+                        return block.getBoundingBox();
+                    })) {
+                return false;
+            }
+        } else {
+            distanceSquared = this.distanceSquared(pos);
+        }
+        if (distanceSquared > maxDistance * maxDistance) {
             return false;
         }
 
         Vector2 dV = this.getDirectionPlane();
-        return (dV.dot(new Vector2(pos.x, pos.z)) - dV.dot(new Vector2(this.x, this.z))) >= -0.87;
+        return (dV.dot(new Vector2(pointX, pointZ)) - dV.dot(new Vector2(this.x, this.z))) >= -0.87;
     }
 
     protected void processLogin() {
@@ -3406,8 +3572,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
+        if (this.protocol >= ProtocolInfo.v1_21_120) {
+            this.forceDataPacket(JigsawStructureDataPacket.getCachedPacket(), null);
+        }
+
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
-            this.forceDataPacket(new VoxelShapesPacket(), null);
+            this.forceDataPacket(VoxelShapesPacket.getCachedPacket(this.protocol), null);
         }
 
         StartGamePacket startGamePacket = new StartGamePacket();
@@ -3450,7 +3620,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + this.gameVersion.toString() + ")"));
+                this.protocol + " (" + this.gameVersion.toString() + ", " + this.getTransportName() + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
@@ -3636,7 +3806,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + this.gameVersion.toString() + ")"));
+                this.protocol + " (" + this.gameVersion.toString() + ", " + this.getTransportName() + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
@@ -3793,130 +3963,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                try {
-                    this.loginChainData = ClientChainData.read(loginPacket);
-                } catch (ClientChainData.TooBigSkinException ex) {
-                    this.close("", "disconnectionScreen.invalidSkin");
-                    return;
-                } catch (IllegalArgumentException | IllegalStateException ex) {
-                    this.server.getLogger().debug("Rejected malformed login chain from "
-                            + this.getAddress() + ": " + ex.getMessage(), ex);
-                    this.close("", "disconnectionScreen.invalidName");
-                    return;
-                }
-
-                if (!loginChainData.isXboxAuthed() && server.xboxAuth) {
-                    this.close("", "disconnectionScreen.notAuthenticated");
-                    if (server.banXBAuthFailed) {
-                        this.server.getNetwork().blockAddress(this.socketAddress.getAddress(), 5);
-                        this.server.getLogger().notice("Blocked " + getAddress() + " for 5 seconds due to failed Xbox auth");
-                    }
-                    break;
-                }
-
-                if (this.server.isWaterdogCapable() && loginChainData.getWaterdogIP() != null) {
-                    this.socketAddress = new InetSocketAddress(this.loginChainData.getWaterdogIP(), this.getRawPort());
-                }
-
-                this.version = loginChainData.getGameVersion();
-
-                // Use verified identity data from ClientChainData (signature-validated) as the source of truth
-                String verifiedName = TextFormat.clean(loginChainData.getUsername());
-                if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
-                    verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
-                }
-                if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
-                    verifiedName = server.viaProxyUsernamePrefix + verifiedName;
-                }
-
-                this.username = verifiedName;
-                this.unverifiedUsername = null;
-                this.displayName = this.username;
-                this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
-                this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
-
-                this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
-
-                this.randomClientId = loginChainData.getClientId();
-                this.minecraftId = loginChainData.getMinecraftId();
-
-                boolean valid = true;
-                String rawVerifiedName = loginChainData.getUsername();
-                int len = rawVerifiedName == null ? 0 : rawVerifiedName.length();
-                if (((len > 16 || len < 3) && !gameVersion.isNetEase())
-                        || rawVerifiedName == null || rawVerifiedName.trim().isEmpty()
-                        || verifiedName == null || verifiedName.isBlank()) {
-                    valid = false;
-                }
-
-                if (valid && !gameVersion.isNetEase()) {
-                    for (int i = 0; i < len; i++) {
-                        char c = rawVerifiedName.charAt(i);
-                        if ((c >= 'a' && c <= 'z') ||
-                                (c >= 'A' && c <= 'Z') ||
-                                (c >= '0' && c <= '9') ||
-                                c == '_' || c == ' '
-                        ) {
-                            continue;
-                        }
-
-                        valid = false;
-                        break;
-                    }
-                }
-
-                if (!valid || Objects.equals(this.iusername, "rcon") || Objects.equals(this.iusername, "console")) {
-                    this.close("", "disconnectionScreen.invalidName");
-                    break;
-                }
-
-                // 身份派生须在校验之后：名字清理后为空的登录已在上面被拒绝，派生异常才不会逃逸
-                // Identity derivation must follow validation: names that clean to empty were
-                // rejected above, so the derivation cannot throw past this point
-                this.uuid = loginChainData.getClientUUID(verifiedName);
-                this.rawUUID = Binary.writeUUID(this.uuid);
-
-                if (!loginPacket.skin.isValid()) {
-                    this.close("", "disconnectionScreen.invalidSkin");
-                    break;
-                }
-                Skin skin = loginPacket.skin;
-                this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
-
-                PlayerPreLoginEvent playerPreLoginEvent;
-                this.server.getPluginManager().callEvent(playerPreLoginEvent = new PlayerPreLoginEvent(this, "Plugin reason"));
-                if (playerPreLoginEvent.isCancelled()) {
-                    this.close("", playerPreLoginEvent.getKickMessage());
-                    break;
-                }
-
-                if (this.isEnableNetworkEncryption()) {
-                    this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PrepareEncryptionTask(this) {
-                        @Override
-                        public void onCompletion(Server server) {
-                            if (!Player.this.isConnected()) {
-                                return;
-                            }
-
-                            if (this.getHandshakeJwt() == null || this.getEncryptionKey() == null || this.getEncryptionCipher() == null || this.getDecryptionCipher() == null) {
-                                Player.this.close("", "Network Encryption error");
-                                return;
-                            }
-
-                            ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
-                            pk.setJwt(this.getHandshakeJwt());
-                            Player.this.syncLoginPhase(SessionLoginPhase.ENCRYPTION_REQUEST_SENT);
-                            Player.this.forceDataPacket(pk, () -> {
-                                Player.this.syncAwaitingEncryptionHandshake(true);
-                                Player.this.syncLoginPhase(SessionLoginPhase.AWAITING_ENCRYPTION_RESPONSE);
-                                Player.this.getNetworkSession().beginLegacyInboundEncryptionGraceWindow();
-                                Player.this.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
-                            }, ImmediatePacketMode.DIRECT_WRITE);
-                        }
-                    });
-                } else {
-                    this.processPreLogin();
-                }
+                beginLoginVerification(loginPacket, LoginChainVerifier.shared());
                 break;
             case ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET:
                 ResourcePackClientResponsePacket responsePacket = (ResourcePackClientResponsePacket) packet;
@@ -3984,10 +4031,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                if (dis > 100) {
+                double legacyMoveDistanceLimitSquared = movementSanityLimitSquared(100);
+                if (dis > legacyMoveDistanceLimitSquared) {
                     if (this.lastTeleportTick + 30 < this.server.getTick()) {
                         this.sendPosition(this.getLocation(), MovePlayerPacket.MODE_RESET);
-                        log.debug("{}: move {} > 100", username, dis);
+                        log.debug("{}: move {} > {}", username, dis, legacyMoveDistanceLimitSquared);
                     }
                     break;
                 }
@@ -4032,8 +4080,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                if (!authPacket.getBlockActionData().isEmpty()) {
-                    for (PlayerBlockActionData action : authPacket.getBlockActionData().values()) {
+                // A creative client can finish several blocks in one input tick. Replaying the
+                // legacy map silently loses all but the last action of each type, leaving blocks
+                // hidden on the client without ever asking the level to break or restore them.
+                // Only map-only packets need the ordering repair; decoded actions have wire order.
+                List<PlayerBlockActionData> blockActions = authPacket.getDecodedBlockActions();
+                if (blockActions.isEmpty()) {
+                    blockActions = orderBlockActions(authPacket.getBlockActionData().values());
+                }
+                if (!blockActions.isEmpty()) {
+                    for (PlayerBlockActionData action : blockActions) {
                         BlockVector3 blockPos = action.getPosition();
                         if (blockPos == null) {
                             continue;
@@ -4048,7 +4104,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (lastBreakPos != null && (lastBreakPos.getX() != blockPos.getX() ||
                                 lastBreakPos.getY() != blockPos.getY() || lastBreakPos.getZ() != blockPos.getZ())) {
                             this.onBlockBreakAbort(lastBreakPos.asVector3(), BlockFace.DOWN);
-                            this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            if (!endsBlockDestruction(action.getAction())) {
+                                this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            }
                         }
 
                         switch (action.getAction()) {
@@ -4142,6 +4200,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
+                boolean authStartUsingItem = UsingItemReceive.authInputStartsUsingItem(authPacket);
+                // The inventory is built by initEntity, which runs at login. An auth input that
+                // reaches the session before that (a client that keeps moving while its profile
+                // is still loading) used to throw here and drop the connection.
+                Item authHeldItem = this.inventory == null ? null : this.inventory.getItemInHand();
+                boolean authHoldToUse = UsingItemReceive.isHoldToUseItem(authHeldItem);
+                if (UsingItemReceive.shouldStartUsingFromAuthInput(
+                        this.spawned && this.isAlive(),
+                        this.isSpectator() && this.server.useClientSpectator,
+                        this.isUsingItem(),
+                        authHoldToUse,
+                        authStartUsingItem)) {
+                    this.tryStartUsingHeldItem(authHeldItem);
+                }
+
                 if (authPacket.getInputData().contains(AuthInputAction.START_SPRINTING)) {
                     PlayerToggleSprintEvent playerToggleSprintEvent = new PlayerToggleSprintEvent(this, true);
                     if ((this.foodData.getLevel() <= 6 && !this.getAdventureSettings().get(Type.FLYING)) ||
@@ -4154,7 +4227,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
-                        this.setUsingItem(false);
+                        if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem)) {
+                            this.setUsingItem(false);
+                        }
                     }
                 }
 
@@ -4309,7 +4385,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     if (authPacket.getInputData().contains(AuthInputAction.START_FLYING)) {
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Stale request: the client keeps asking after permission is revoked; refuse and
+                            // resync, real flight is still caught by the movement check
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
@@ -4389,9 +4467,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                if (distSqrt > 100) {
+                double authInputDistanceLimitSquared = movementSanityLimitSquared(100);
+                if (distSqrt > authInputDistanceLimitSquared) {
                     this.sendPosition(this.getLocation(), MovePlayerPacket.MODE_RESET);
-                    log.debug("{}: move {} > 100", username, distSqrt);
+                    log.debug("{}: move {} > {}", username, distSqrt, authInputDistanceLimitSquared);
                     return;
                 }
 
@@ -4620,7 +4699,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case PlayerActionPacket.ACTION_START_FLYING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput() || protocol < ProtocolInfo.v1_20_30_24) break;
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Stale request, handled as START_FLYING above
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
@@ -4641,9 +4721,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.getAdventureSettings().set(Type.FLYING, playerToggleFlightEvent.isFlying());
                         }
                         break packetswitch;
+                    case PlayerActionPacket.ACTION_START_USING_ITEM:
+                        this.tryStartUsingHeldItem(this.inventory.getItemInHand());
+                        break packetswitch;
+                    case PlayerActionPacket.ACTION_START_ITEM_USE_ON:
+                    case PlayerActionPacket.ACTION_STOP_ITEM_USE_ON:
+                        // ViaProxy Java uses these as block-interaction compatibility markers.
+                        if (this.isJavaClient()) {
+                            break packetswitch;
+                        }
+                        break;
                 }
 
-                this.setUsingItem(false);
+                if (UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(this.isJavaClient(), playerActionPacket.action)) {
+                    this.setUsingItem(false);
+                }
                 break;
             case ProtocolInfo.INTERACT_PACKET:
                 if (!this.spawned || !this.isAlive()) {
@@ -4723,12 +4815,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.getServer().getLogger().debug(username + ": Block pick request for a block too far away");
                     return;
                 }
-                Item item = block.toItem();
+                // A placed shulker box keeps the tag of the item it came from (lore, plugin data);
+                // pick block creates a new item and must not copy that tag onto it.
+                Item item = block instanceof BlockShulkerBox shulkerBox ? shulkerBox.toPickItem() : block.toItem();
                 if (pickRequestPacket.addUserData) {
                     BlockEntity blockEntity = this.getLevel().getBlockEntityIfLoaded(this.temporalVector.setComponents(pickRequestPacket.x, pickRequestPacket.y, pickRequestPacket.z));
                     if (blockEntity != null) {
                         CompoundTag nbt = blockEntity.getCleanedNBT();
                         if (nbt != null) {
+                            nbt.remove(BlockShulkerBox.SOURCE_ITEM_TAG);
+                        }
+                        if (nbt != null && !nbt.isEmpty()) {
                             item.setCustomBlockData(nbt);
                             item.setLore("+(DATA)");
                         }
@@ -5393,7 +5490,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
-                    if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
+                    boolean heldSlotChanged = inventory.getHeldItemIndex() != useItemData.hotbarSlot;
+                    if (heldSlotChanged) {
                         inventory.equipItem(useItemData.hotbarSlot);
                     }
 
@@ -5412,6 +5510,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 return;
                             }
 
+                            Item clickBlockHeld = this.inventory.getItemInHand();
+                            if (UsingItemReceive.shouldKeepUsingOnClickBlock(
+                                    this.isJavaClient(),
+                                    this.isUsingItem(),
+                                    UsingItemReceive.isHoldToUseItem(clickBlockHeld),
+                                    heldSlotChanged)) {
+                                return;
+                            }
                             this.setUsingItem(false);
 
                             if (!(this.distance(blockVector.asVector3()) > (this.isCreative() ? 13 : 7))) {
@@ -5538,8 +5644,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 return;
                             }
 
-                            if (!item.equalsFast(useItemData.itemInHand)) {
+                            if (useItemData.itemInHand == null || !item.equalsFast(useItemData.itemInHand)) {
+                                server.getLogger().debug(this.username + ": CLICK_AIR held item mismatch, server="
+                                        + item + ", client=" + useItemData.itemInHand);
                                 this.needSendHeldItem = true;
+                                break;
+                            }
+
+                            if (UsingItemReceive.shouldIgnoreDuplicateClickAirStart(
+                                    this.isUsingItem(),
+                                    UsingItemReceive.isHoldToUseItem(item),
+                                    this.startAction >= 0 ? this.server.getTick() - this.startAction : 0)) {
                                 break;
                             }
 
@@ -5738,6 +5853,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     if (!item.onRelease(this, ticksUsed)) {
                                         this.inventory.sendContents(this);
                                     }
+                                    // 早释放同样必须结束使用：ViaProxy Java 的 RELEASE_USE_ITEM 会翻译到这里，不能因 ticksUsed 小而保留
+                                    // An early release must still end the use: ViaProxy Java RELEASE_USE_ITEM maps here
                                     this.setUsingItem(false);
                                 } else {
                                     this.inventory.sendContents(this);
@@ -5897,6 +6014,40 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    /**
+     * Replays the block actions of a single input tick in causal order.
+     *
+     * <p>{@link cn.nukkit.network.protocol.PlayerAuthInputPacket} collects the block actions of a
+     * tick into an {@link java.util.EnumMap}, so the order in which the client sent them is lost and
+     * the values are iterated by {@link PlayerActionType} ordinal instead. The client finishes a
+     * block and reaches for the next one in one tick, sending
+     * {@code PREDICT_DESTROY_BLOCK(finished)} followed by {@code START_DESTROY_BLOCK(next)}; the
+     * ordinals replay that backwards, because {@code START_DESTROY_BLOCK} is the first constant of
+     * the enum and {@code PREDICT_DESTROY_BLOCK} is close to the last. Starting the next block first
+     * moves {@code lastBreak} to the current millisecond, and the completion that follows is then
+     * judged against a timer that started an instant ago: {@link cn.nukkit.level.Level#useBreakOn}
+     * reports {@code fastBreak} and the finished block is refused and sent back to the player.
+     *
+     * <p>Actions that END a destruction therefore run before the ones that begin or continue one.
+     * The sort is stable, so actions of the same group keep the order they already had.
+     */
+    static List<PlayerBlockActionData> orderBlockActions(Collection<PlayerBlockActionData> actions) {
+        List<PlayerBlockActionData> ordered = new ArrayList<>(actions);
+        if (ordered.size() > 1) {
+            ordered.sort(Comparator.comparingInt(action -> endsBlockDestruction(action.getAction()) ? 0 : 1));
+        }
+        return ordered;
+    }
+
+    /**
+     * Does this action end the destruction of a block rather than begin or continue one?
+     */
+    static boolean endsBlockDestruction(PlayerActionType action) {
+        return action == PlayerActionType.PREDICT_DESTROY_BLOCK
+                || action == PlayerActionType.ABORT_DESTROY_BLOCK
+                || action == PlayerActionType.STOP_DESTROY_BLOCK;
+    }
+
     private void onBlockBreakContinue(Vector3 pos, BlockFace face) {
         if (this.isBreakingBlock()) {
             Block block = this.level.getBlock(pos, false);
@@ -5965,7 +6116,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         int tmpX = target.getFloorX() + each.getXOffset();
                         int tmpY = target.getFloorY() + each.getYOffset();
                         int tmpZ = target.getFloorZ() + each.getZOffset();
-                        if (Level.xrayableBlocks[this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ)]) {
+                        int neighborBlockId = this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ);
+                        if (neighborBlockId < Block.MAX_BLOCK_ID && Level.xrayableBlocks[neighborBlockId]) {
                             vector3s[index] = new Vector3(tmpX, tmpY, tmpZ);
                             index++;
                         }
@@ -6376,14 +6528,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
-     * 设置指定itemCategory物品的冷却显示效果，注意该方法仅为客户端显示效果，冷却逻辑实现仍需自己实现
+     * 设置指定itemCategory物品的冷却：服务端记录冷却结束的tick，同时把冷却显示效果发给客户端
      * <p>
-     * Set the cooling display effect of the specified itemCategory items, note that this method is only for client-side display effect, cooling logic implementation still needs to be implemented by itself
+     * Start a cool down for the given item category. The end tick is tracked server side, so
+     * {@link #isItemCoolDownEnd(String)} stays authoritative even when the client ignores the
+     * display packet, and the packet is still sent to clients that understand it.
      *
-     * @param coolDown     the cool down
+     * @param coolDown     the cool down, in ticks; zero or less clears the cool down
      * @param itemCategory the item category
      */
     public void setItemCoolDown(int coolDown, String itemCategory) {
+        if (coolDown > 0) {
+            this.itemCoolDownEnds.put(itemCategory, this.server.getTick() + coolDown);
+        } else {
+            this.itemCoolDownEnds.remove(itemCategory);
+        }
+
         if (this.protocol < ProtocolInfo.v1_18_10) {
             return;
         }
@@ -6391,6 +6551,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.setCoolDownDuration(coolDown);
         pk.setItemCategory(itemCategory);
         this.dataPacket(pk);
+    }
+
+    /**
+     * 获取指定itemCategory冷却结束的tick，没有冷却时返回0
+     * <p>
+     * Gets the server tick at which the cool down of the given item category ends, or {@code 0}
+     * when this player has no running cool down for it.
+     *
+     * @param itemCategory the item category
+     * @return the end tick, or 0
+     */
+    public int getItemCoolDownEnd(String itemCategory) {
+        Integer end = this.itemCoolDownEnds.get(itemCategory);
+        if (end == null) {
+            return 0;
+        }
+        if (this.server.getTick() >= end) {
+            // remove(key, value): an unconditional remove could clobber a cool down recorded concurrently
+            this.itemCoolDownEnds.remove(itemCategory, end);
+            return 0;
+        }
+        return end;
+    }
+
+    /**
+     * 判断指定itemCategory的冷却是否已经结束
+     * <p>
+     * Whether the cool down of the given item category has ended. Item behaviours must ask this
+     * before acting: the cool down belongs to the player, not to a single item stack, so two
+     * identical items in the inventory share one cool down.
+     *
+     * @param itemCategory the item category
+     * @return true when the item may be used again
+     */
+    public boolean isItemCoolDownEnd(String itemCategory) {
+        return this.getItemCoolDownEnd(itemCategory) == 0;
     }
 
     /**
@@ -6444,7 +6640,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(String message, String reason, boolean notify) {
-        this.close(new TextContainer(message), reason, notify);
+        this.close(message, reason, notify, null);
+    }
+
+    /**
+     * @param failReason 断连包的 wire 枚举（v1_20_40+ 编码为序数），null 保持 DISCONNECTED；
+     *                   调用方须确认客户端协议认识该序数
+     * @param failReason the wire fail reason (encoded as an ordinal since v1_20_40);
+     *                   null keeps DISCONNECTED, the caller must ensure the client's protocol knows the ordinal
+     */
+    public void close(String message, String reason, boolean notify, DisconnectFailReason failReason) {
+        this.close(new TextContainer(message), reason, notify, failReason);
     }
 
     public void close(TextContainer message) {
@@ -6456,9 +6662,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(TextContainer message, String reason, boolean notify) {
+        this.close(message, reason, notify, null);
+    }
+
+    public void close(TextContainer message, String reason, boolean notify, DisconnectFailReason failReason) {
+        if (pendingLoginVerification != null) {
+            pendingLoginVerification.cancel();
+            pendingLoginVerification = null;
+        }
         if (this.connected && !this.closed) {
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
+                pk.reason = failReason != null ? failReason : DisconnectFailReason.DISCONNECTED;
                 if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
                     pk.message = TextFormat.clean(TextFormat.colorize(reason));
                 } else {
@@ -6839,7 +7054,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             } else {
                 // 发包给客户端清除不死图腾，防止影响自杀等操作
-                if (this.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                if (Entity.isTotem(this.getOffhandInventory().getItemFast(0))) {
                     InventorySlotPacket pk = new InventorySlotPacket();
                     pk.slot = 0;
                     pk.item = Item.AIR_ITEM;
@@ -6853,7 +7068,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 int id = this.getWindowId(this.getInventory());
                 if (id != -1) {
                     for (Entry<Integer, Item> entry : this.getInventory().getContents().entrySet()) {
-                        if (entry.getValue() instanceof ItemTotem) {
+                        if (Entity.isTotem(entry.getValue())) {
                             InventorySlotPacket pk = new InventorySlotPacket();
                             pk.slot = entry.getKey();
                             pk.item = Item.AIR_ITEM;
@@ -6979,6 +7194,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.offhandInventory.sendContents(this);
 
         this.spawnToAll();
+
+        // 观察者死亡期间 spawnTo 被存活守卫跳过且客户端实体已被移除，重生后补驱视野内实体
+        for (long index : this.usedChunks.keySet()) {
+            int chunkX = Level.getHashX(index);
+            int chunkZ = Level.getHashZ(index);
+            for (Entity entity : this.level.getChunkEntities(chunkX, chunkZ, false).values()) {
+                if (this != entity && !entity.closed && entity.isAlive()) {
+                    entity.spawnTo(this);
+                }
+            }
+        }
+
         this.scheduleUpdate();
     }
 
@@ -7350,7 +7577,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkX = (int) this.teleportPosition.x >> 4;
             int chunkZ = (int) this.teleportPosition.z >> 4;
 
-            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : this.server.c_s_spawnThreshold);
+            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : Math.max(this.chunkRadius, this.server.c_s_spawnThreshold));
             int maxChunkOffset = Math.min(TELEPORT_CHUNK_READY_OFFSET, chunkSendRadius);
             long chunkSendRadiusSqr = (long) chunkSendRadius * chunkSendRadius;
             for (int X = -maxChunkOffset; X <= maxChunkOffset; ++X) {
@@ -7406,6 +7633,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
@@ -7445,6 +7673,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return false;
     }
 
+    private void cancelPendingPortalTransfer() {
+        // 已完成的传送已清空目标，保留其计时以避免在出口立即回传。
+        // Completed transfers have no target; preserve their timer to prevent an immediate return trip.
+        if (this.portalPos != null) {
+            this.portalPos = null;
+            this.inPortalTicks = 0;
+        }
+    }
+
     public void checkSwimmingState() {
         if (this.isSwimming() && !this.isInsideOfWater()) {
             this.setSwimming(false);
@@ -7473,6 +7710,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void teleportImmediate(Location location, TeleportCause cause) {
         Location from = this.getLocation();
         if (super.teleport(location.add(0, 0.00001, 0), cause)) {
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
@@ -8538,6 +8776,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.networkSession;
     }
 
+    private String getTransportName() {
+        return this.interfaz instanceof NetherNetInterface ? "NetherNet" : "RakNet";
+    }
+
     void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {
         PendingResourcePack pending = this.pendingResourcePacks.computeIfAbsent(resourcePack.getPackId(),
                 ignored -> new PendingResourcePack(resourcePack));
@@ -8622,6 +8864,166 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         boolean isEmpty() {
             return this.requestedChunks.isEmpty();
+        }
+    }
+
+    void beginLoginVerification(LoginPacket packet, LoginChainVerifier verifier) {
+        if (pendingLoginVerification != null) {
+            return;
+        }
+        Skin loginSkin = packet.skin;
+        pendingLoginVerification = verifier.submit(packet.getBuffer(), (validated, failure) -> {
+            if (pendingLoginVerification == null) {
+                return;
+            }
+            pendingLoginVerification = null;
+            if (this.closed || !this.isConnected() || this.getCurrentLoginPhase() != SessionLoginPhase.LOGIN_RECEIVED) {
+                return;
+            }
+            if (failure instanceof ClientChainData.TooBigSkinException) {
+                this.close("", "disconnectionScreen.invalidSkin");
+                return;
+            }
+            if (failure != null || validated == null || !validated.isAuthenticationCurrent()) {
+                this.server.getLogger().debug("Rejected login verification from " + this.getAddress()
+                        + " (" + (failure == null ? "expired or missing result" : failure.getClass().getSimpleName()) + ")");
+                this.close("", "disconnectionScreen.invalidName");
+                return;
+            }
+            continueVerifiedLogin(loginSkin, validated);
+        });
+        if (pendingLoginVerification == null) {
+            this.sendPlayStatus(PlayStatusPacket.LOGIN_FAILED_SERVER_FULL, true);
+            this.close("", "disconnectionScreen.serverFull");
+        }
+    }
+
+    // Called only by the main-thread AsyncTask completion after successful verification.
+    void continueVerifiedLogin(Skin loginSkin, ClientChainData validated) {
+        this.loginChainData = validated;
+        if (!loginChainData.isXboxAuthed() && server.xboxAuth) {
+            this.close("", "disconnectionScreen.notAuthenticated");
+            if (server.banXBAuthFailed) {
+                this.server.getNetwork().blockAddress(this.socketAddress.getAddress(), 5);
+                this.server.getLogger().notice("Blocked " + getAddress() + " for 5 seconds due to failed Xbox auth");
+            }
+            return;
+        }
+
+        if (this.server.isWaterdogCapable() && loginChainData.getWaterdogIP() != null) {
+            this.socketAddress = new InetSocketAddress(this.loginChainData.getWaterdogIP(), this.getRawPort());
+        }
+
+        this.version = loginChainData.getGameVersion();
+
+        // Use verified identity data from ClientChainData (signature-validated) as the source of truth
+        String verifiedName = TextFormat.clean(loginChainData.getUsername());
+        if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
+            verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
+        }
+        if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
+            verifiedName = server.viaProxyUsernamePrefix + verifiedName;
+        }
+
+        this.username = verifiedName;
+        this.unverifiedUsername = null;
+        this.displayName = this.username;
+        this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
+        this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
+
+        this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
+
+        this.randomClientId = loginChainData.getClientId();
+        this.minecraftId = loginChainData.getMinecraftId();
+
+        boolean valid = true;
+        String rawVerifiedName = loginChainData.getUsername();
+        int len = rawVerifiedName == null ? 0 : rawVerifiedName.length();
+        if (((len > 16 || len < 3) && !gameVersion.isNetEase())
+                || rawVerifiedName == null || rawVerifiedName.trim().isEmpty()
+                || verifiedName == null || verifiedName.isBlank()) {
+            valid = false;
+        }
+
+        if (valid && !gameVersion.isNetEase()) {
+            for (int i = 0; i < len; i++) {
+                char c = rawVerifiedName.charAt(i);
+                if ((c >= 'a' && c <= 'z') ||
+                        (c >= 'A' && c <= 'Z') ||
+                        (c >= '0' && c <= '9') ||
+                        c == '_' || c == ' '
+                ) {
+                    continue;
+                }
+
+                valid = false;
+                break;
+            }
+        }
+
+        if (!valid || Objects.equals(this.iusername, "rcon") || Objects.equals(this.iusername, "console")) {
+            this.close("", "disconnectionScreen.invalidName");
+            return;
+        }
+
+        // 身份派生须在校验之后：名字清理后为空的登录已在上面被拒绝，派生异常才不会逃逸
+        // Identity derivation must follow validation: names that clean to empty were
+        // rejected above, so the derivation cannot throw past this point
+        this.uuid = loginChainData.getClientUUID(verifiedName);
+        this.rawUUID = Binary.writeUUID(this.uuid);
+
+        if (!loginSkin.isValid()) {
+            this.close("", "disconnectionScreen.invalidSkin");
+            return;
+        }
+        Skin skin = loginSkin;
+        this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
+
+        // NetherNet 跳过加密握手，登录链改用信令身份断言绑定，防止捕获的链被重放
+        // NetherNet skips the encryption handshake, so bind the login chain to the signaling identity instead
+        if (this.interfaz instanceof NetherNetInterface netherNet) {
+            String identityRefusal = netherNet.checkIdentityBinding(
+                    this.networkSession, this.loginChainData.getIdentityPublicKey());
+            if (identityRefusal != null) {
+                log.warn("Refusing a NetherNet login from {}: {}", this.getSocketAddress(), identityRefusal);
+                this.close("", "disconnectionScreen.notAuthenticated");
+                return;
+            }
+        }
+
+        PlayerPreLoginEvent playerPreLoginEvent;
+        this.server.getPluginManager().callEvent(playerPreLoginEvent = new PlayerPreLoginEvent(this, "Plugin reason"));
+        if (playerPreLoginEvent.isCancelled()) {
+            this.close("", playerPreLoginEvent.getKickMessage());
+            return;
+        }
+
+        if (this.isEnableNetworkEncryption()) {
+            this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PrepareEncryptionTask(this) {
+                @Override
+                public void onCompletion(Server server) {
+                    if (!Player.this.isConnected()) {
+                        return;
+                    }
+
+                    if (this.getHandshakeJwt() == null || this.getEncryptionKey() == null || this.getEncryptionCipher() == null || this.getDecryptionCipher() == null) {
+                        Player.this.close("", "Network Encryption error");
+                        return;
+                    }
+
+                    ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
+                    pk.setJwt(this.getHandshakeJwt());
+                    Player.this.syncLoginPhase(SessionLoginPhase.ENCRYPTION_REQUEST_SENT);
+                    Player.this.forceDataPacket(pk, () -> {
+                        Player.this.syncAwaitingEncryptionHandshake(true);
+                        Player.this.syncLoginPhase(SessionLoginPhase.AWAITING_ENCRYPTION_RESPONSE);
+                        Player.this.getNetworkSession().beginLegacyInboundEncryptionGraceWindow();
+                        Player.this.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
+                    }, ImmediatePacketMode.DIRECT_WRITE);
+                }
+            });
+        } else {
+            this.processPreLogin();
         }
     }
 
@@ -8851,6 +9253,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean isEnableNetworkEncryption() {
+        // NetherNet 会话已由 DTLS 加密，客户端会以明文回应加密握手导致断连，故跳过
+        // NetherNet rides DTLS and a real client answers the handshake in plaintext, so skip it
+        if (this.interfaz instanceof NetherNetInterface) {
+            return false;
+        }
         return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled /*&& loginChainData.isXboxAuthed()*/;
     }
 

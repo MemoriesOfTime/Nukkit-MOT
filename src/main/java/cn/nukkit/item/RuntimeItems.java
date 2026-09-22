@@ -5,6 +5,12 @@ import cn.nukkit.Server;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
@@ -15,14 +21,20 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Log4j2
 @UtilityClass
 public class RuntimeItems {
 
-    private static final Map<String, Integer> legacyString2LegacyInt = new HashMap<>();
-    private static final Map<String, int[]> flattenedId2Legacy = new HashMap<>();
+    private static final Object2IntMap<String> legacyString2LegacyInt = new Object2IntOpenHashMap<>();
+    private static final Int2ObjectMap<String> legacyInt2LegacyString = new Int2ObjectOpenHashMap<>();
+    private static final Object2ObjectMap<String, int[]> flattenedId2Legacy = new Object2ObjectOpenHashMap<>();
+
+    static {
+        legacyString2LegacyInt.defaultReturnValue(-1);
+    }
 
     private static Map<String, MappingEntry> mappingEntries = new HashMap<>();
 
@@ -39,6 +51,15 @@ public class RuntimeItems {
     private static boolean initialized;
 
     private static RuntimeItemMapping of(GameVersion anchor) {
+        if (!initialized) {
+            // 懒加载会把当时的 mappingEntries 永久缓存：init() 之前调用则缓存空表，
+            // 此后每个物品都查不到，且再无第二次机会。
+            //
+            // A lazily built mapping caches whatever mappingEntries held at that moment, so a
+            // call made before init() caches an EMPTY table: every item lookup misses from then
+            // on, and nothing ever rebuilds it. Fail loudly instead of poisoning the cache.
+            throw new IllegalStateException("RuntimeItems are not initialized yet");
+        }
         return MAPPINGS.computeIfAbsent(anchor, gv -> new RuntimeItemMapping(mappingEntries, gv));
     }
 
@@ -90,6 +111,7 @@ public class RuntimeItems {
                     of(GameVersion.V1_26_20),
                     of(GameVersion.V1_26_30),
                     of(GameVersion.V1_26_40),
+                    of(GameVersion.V1_26_50),
                     // NetEase
                     of(GameVersion.V1_20_50_NETEASE),
                     of(GameVersion.V1_21_2_NETEASE),
@@ -115,6 +137,12 @@ public class RuntimeItems {
         JsonObject json = JsonParser.parseReader(new InputStreamReader(itemIdsStream)).getAsJsonObject();
         for (String identifier : json.keySet()) {
             legacyString2LegacyInt.put(identifier, json.get(identifier).getAsInt());
+        }
+        // 逆查表：数字 legacy id -> 标识符。键排序保证多名字共用同一 id 时结果确定
+        // Reverse lookup: numeric legacy id -> identifier. Sorted keys keep the
+        // result deterministic when several names share one id.
+        for (String identifier : new TreeMap<>(legacyString2LegacyInt).keySet()) {
+            legacyInt2LegacyString.putIfAbsent(legacyString2LegacyInt.getInt(identifier), identifier);
         }
 
         InputStream mappingStream = Server.class.getClassLoader().getResourceAsStream("item_mappings.json");
@@ -148,7 +176,7 @@ public class RuntimeItems {
                 continue;
             }
             MappingEntry mappingEntry = entry.getValue();
-            int legacyId = legacyString2LegacyInt.getOrDefault(mappingEntry.getLegacyName(), -1);
+            int legacyId = legacyString2LegacyInt.getInt(mappingEntry.getLegacyName());
             if (legacyId != -1 && !flattenedId2Legacy.containsKey(flattenedId)) {
                 flattenedId2Legacy.put(flattenedId, new int[]{legacyId, mappingEntry.getDamage()});
             }
@@ -166,7 +194,9 @@ public class RuntimeItems {
         if (gameVersion.isNetEase()) {
             return getMappingNetEase(protocolId);
         }
-        if (protocolId >= ProtocolInfo.v1_26_40) {
+        if (protocolId >= ProtocolInfo.v1_26_50_27) {
+            return of(GameVersion.V1_26_50);
+        } else if (protocolId >= ProtocolInfo.v1_26_40) {
             return of(GameVersion.V1_26_40);
         } else if (protocolId >= ProtocolInfo.v1_26_30) {
             return of(GameVersion.V1_26_30);
@@ -260,7 +290,7 @@ public class RuntimeItems {
     }
 
     public static int getLegacyIdFromLegacyString(String identifier) {
-        return legacyString2LegacyInt.getOrDefault(identifier, -1);
+        return legacyString2LegacyInt.getInt(identifier);
     }
 
     /**
@@ -282,6 +312,19 @@ public class RuntimeItems {
      */
     public static void registerCustomBlockLegacyId(String identifier, int legacyId) {
         legacyString2LegacyInt.put(identifier, legacyId);
+        legacyInt2LegacyString.putIfAbsent(legacyId, identifier);
+    }
+
+    /**
+     * 数字 legacy id 反查标识符，供 Item.get 回退时归一到类型化物品。
+     * <p>
+     * Reverse lookup from a numeric legacy id to its identifier, used by the
+     * Item.get fallback to normalize to a typed item.
+     *
+     * @return 标识符，未知返回 null / the identifier, or null if unknown
+     */
+    public static String getLegacyStringFromLegacyId(int legacyId) {
+        return legacyInt2LegacyString.get(legacyId);
     }
 
     @Data
