@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityBed;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.event.block.BlockExplosionPrimeEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBed;
 import cn.nukkit.lang.TranslationContainer;
@@ -104,13 +105,21 @@ public class BlockBed extends BlockTransparentMeta implements Faceable, BlockEnt
     public boolean onActivate(Item item, Player player) {
         if (this.level.getDimension() != Level.DIMENSION_OVERWORLD) {
             if (this.level.getGameRules().getBoolean(GameRule.RESPAWN_BLOCKS_EXPLODE)) {
+                BlockExplosionPrimeEvent event = new BlockExplosionPrimeEvent(this, player, 5);
+                event.setFireChance(0.3333);
+                this.level.getServer().getPluginManager().callEvent(event);
+                if (event.isCancelled()) {
+                    return true;
+                }
                 if (this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true)) {
                     this.level.addParticle(new DestroyBlockParticle(this.add(0.5, 0.5, 0.5), this));
                 }
 
-                Explosion explosion = new Explosion(this.add(0.5, 0, 0.5), 5, this);
-                explosion.setFireSpawnChance(0.3333);
-                explosion.explodeA();
+                Explosion explosion = new Explosion(this.add(0.5, 0, 0.5), event.getForce(), this);
+                explosion.setFireSpawnChance(event.getFireChance());
+                if (event.isBlockBreaking()) {
+                    explosion.explodeA();
+                }
                 explosion.explodeB();
             }
             return true;

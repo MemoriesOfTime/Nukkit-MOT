@@ -102,6 +102,23 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected boolean lightPopulated;
 
+    /**
+     * 1.26.50 前保存的连接/角落位缺失，区块发送前需按邻居重算一次；随状态升级落盘自然清除。
+     * <p>
+     * Connection/corner bits predate 1.26.50 and must be recomputed from neighbours before the
+     * chunk is sent; clears naturally once the upgraded state is saved.
+     */
+    protected boolean needsLegacyConnectionFix;
+
+    /**
+     * 会话内已成功重算过连接/角落位（内存态，不落盘）：Anvil 每次进程启动只需重算一次，
+     * 避免每次区块请求都触发全量扫描。
+     * <p>
+     * Connections were successfully recomputed this process (in-memory only, never persisted):
+     * Anvil recomputes once per process start instead of a full scan on every chunk request.
+     */
+    protected boolean legacyConnectionsFixed;
+
     protected Map<GameVersion, BatchPacket> chunkPackets;
 
     @Override
@@ -964,6 +981,22 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     public void setLightPopulated(boolean value) {
         this.lightPopulated = value;
         this.setChanged();
+    }
+
+    public boolean isNeedsLegacyConnectionFix() {
+        return this.needsLegacyConnectionFix;
+    }
+
+    public void setNeedsLegacyConnectionFix(boolean value) {
+        this.needsLegacyConnectionFix = value;
+    }
+
+    public boolean isLegacyConnectionsFixed() {
+        return this.legacyConnectionsFixed;
+    }
+
+    public void setLegacyConnectionsFixed(boolean value) {
+        this.legacyConnectionsFixed = value;
     }
 
     @Override

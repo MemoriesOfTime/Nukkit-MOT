@@ -33,19 +33,9 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
      *
      * @param map map
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings("unchecked")
     public ConfigSection(LinkedHashMap<String, Object> map) {
-        this();
-        if (map == null || map.isEmpty()) return;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (entry.getValue() instanceof LinkedHashMap linkedHashMap) {
-                super.put(entry.getKey(), new ConfigSection(linkedHashMap));
-            } else if (entry.getValue() instanceof List list) {
-                super.put(entry.getKey(), parseList(list));
-            } else {
-                super.put(entry.getKey(), entry.getValue());
-            }
-        }
+        this((Map<String, Object>) map);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -53,12 +43,10 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         this();
         if (map == null || map.isEmpty()) return;
         for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (entry.getValue() instanceof LinkedHashMap linkedHashMap) {
-                super.put(entry.getKey(), new ConfigSection(linkedHashMap));
-            } else if (entry.getValue() instanceof Map map1) {
+            if (entry.getValue() instanceof Map map1) {
                 super.put(entry.getKey(), new ConfigSection(map1));
-            } else if (entry.getValue() instanceof List) {
-                super.put(entry.getKey(), parseList((List) entry.getValue()));
+            } else if (entry.getValue() instanceof List list) {
+                super.put(entry.getKey(), parseList(list));
             } else {
                 super.put(entry.getKey(), entry.getValue());
             }
@@ -70,8 +58,8 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         List<Object> newList = new ArrayList<>();
 
         for (Object o : list) {
-            if (o instanceof LinkedHashMap) {
-                newList.add(new ConfigSection((LinkedHashMap) o));
+            if (o instanceof Map) {
+                newList.add(new ConfigSection((Map) o));
             } else {
                 newList.add(o);
             }
