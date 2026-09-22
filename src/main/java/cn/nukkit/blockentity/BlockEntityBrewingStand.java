@@ -200,13 +200,16 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
 
         //20 seconds
         MixRecipe[] recipes = matchRecipes(false);
+        Item ingredientSnapshot = inventory.getIngredient();
+        Item[] inputSnapshots = new Item[3];
         Item[] results = new Item[]{Item.AIR_ITEM, Item.AIR_ITEM, Item.AIR_ITEM};
         for (int i = 0; i < 3; i++) {
+            Item previous = inventory.getItem(i + 1);
+            inputSnapshots[i] = previous;
             MixRecipe recipe = recipes[i];
             if (recipe == null) {
                 continue;
             }
-            Item previous = inventory.getItem(i + 1);
             if (previous.isNull()) {
                 continue;
             }
@@ -226,6 +229,16 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
             return true;
         }
 
+        // 监听器可能在事件期间通过库存 API 修改槽位，而配方与结果均按事件快照生成：
+        // 原料被改动则整轮作废，被改动的药水槽跳过而非覆盖。
+        // Listeners may mutate slots via the inventory API during the event, but recipes
+        // and results were authored against the event snapshot: a changed ingredient voids
+        // the round and a changed potion slot is skipped instead of being overwritten.
+        if (!inventory.getIngredient().equalsExact(ingredientSnapshot)) {
+            stopBrewing();
+            return true;
+        }
+
         // Validate every event-authored output before changing any slot. A single invalid
         // result must not leave a partially brewed batch without consuming ingredient/fuel.
         for (int i = 0; i < 3; i++) {
@@ -235,7 +248,7 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
             }
 
             Item previous = inventory.getItem(i + 1);
-            if (!previous.isNull()) {
+            if (isUnchangedInput(previous, inputSnapshots[i])) {
                 Item result = e.getResult(i);
                 if (result == null || result.isNull()) {
                     stopBrewing();
@@ -251,7 +264,7 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
                 continue;
             }
             Item previous = inventory.getItem(i + 1);
-            if (!previous.isNull()) {
+            if (isUnchangedInput(previous, inputSnapshots[i])) {
                 Item result = e.getResult(i);
                 inventory.setItem(i + 1, result.clone());
                 mixed = true;
@@ -271,6 +284,17 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
 
         stopBrewing();
         return true;
+    }
+
+    /**
+     * 事件后该药水槽内容是否仍与事件触发时的快照完全一致（含数量）；
+     * equals 不比较 count，堆叠数被改动时旧结果的数量会失真，故用 equalsExact。
+     * Whether the slot still holds exactly the input (including count) the recipe
+     * was matched against; equals ignores count, so a re-stacked slot must not
+     * receive the pre-event result.
+     */
+    private boolean isUnchangedInput(Item current, Item snapshot) {
+        return !current.isNull() && current.equalsExact(snapshot);
     }
 
     private void restockFuel() {
@@ -296,6 +320,9 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
     private MixRecipe[] matchRecipes(boolean quickTest) {
         MixRecipe[] recipes = new MixRecipe[quickTest? 1 : 3];
         Item ingredient = inventory.getIngredient();
+        if (ingredient.isNull()) {
+            return recipes;
+        }
         CraftingManager craftingManager = getLevel().getServer().getCraftingManager();
         for (int i = 0; i < 3; i++) {
             Item potion = inventory.getItem(i + 1);
