@@ -2,7 +2,6 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.passive.EntityVillager;
-import cn.nukkit.item.Item;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -70,19 +69,9 @@ public class TradeInventory extends BaseInventory {
     @Override
     public void onClose(Player who) {
         // Return input slots, dropping the unplaced remainder so it isn't lost.
-        for (int i = 0; i <= 1; i++) {
-            Item item = this.getItem(i);
-            if (item.isNull()) {
-                continue;
-            }
-            Item[] drops = who.getInventory().addItem(item);
-            for (Item drop : drops) {
-                if (!who.dropItem(drop)) {
-                    who.getLevel().dropItem(who, drop);
-                }
-            }
-            this.clear(i);
-        }
+        who.returnUiItems(this.getItem(0), this.getItem(1));
+        this.clear(0);
+        this.clear(1);
 
         super.onClose(who);
 

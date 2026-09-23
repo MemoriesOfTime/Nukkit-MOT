@@ -1959,6 +1959,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
+        // Resolve transient items under the accepted transition's old mode: recover finite
+        // items and discard creative items before a delayed close can use the new mode.
+        // Cancelled transitions must leave the inventory available to its current owner.
+        this.resetCraftingGridType();
+        this.resolveOpenTradeInputs();
+
         this.gamemode = gamemode;
 
         if (this.server.useClientSpectator) {
@@ -2039,6 +2045,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.inventory.sendCreativeContents();
         return true;
+    }
+
+    /**
+     * 模式切换边界上按旧模式结算已打开交易界面的输入槽：创造物品丢弃、
+     * 有限物品收回背包；交易会话保持打开，与工作站窗口的结算方式一致。
+     * Resolve open trade inputs at a mode-switch boundary under the old mode, so a
+     * delayed close under the new mode cannot resurrect or destroy them; the trade
+     * session itself stays open, mirroring how station windows are resolved.
+     */
+    private void resolveOpenTradeInputs() {
+        TradeInventory tradeInventory = this.getTradeInventory();
+        if (tradeInventory == null) {
+            return;
+        }
+        this.returnUiItems(tradeInventory.getItem(0), tradeInventory.getItem(1));
+        tradeInventory.clear(0);
+        tradeInventory.clear(1);
     }
 
     /**
@@ -8053,7 +8076,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             Item[] drops;
 
             if (this.craftingGrid != null) {
-                drops = this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
+                // Creative UI contents are free items: never return or drop them on reset.
+                // Closing a full inventory must not publish them to survival players.
+                drops = this.isCreative() ? Item.EMPTY_ARRAY
+                        : this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
                 this.craftingGrid.clearAll();
 
                 for (Item drop : drops) {
@@ -8061,7 +8087,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            drops = this.inventory.addItem(this.getCursorInventory().getItem(0));
+            drops = this.isCreative() ? Item.EMPTY_ARRAY
+                    : this.inventory.addItem(this.getCursorInventory().getItem(0));
             this.playerUIInventory.getCursorInventory().clear(0);
 
             for (Item drop : drops) {
@@ -8095,7 +8122,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private void moveBlockUIContents(int window) {
         Inventory inventory = this.getWindowById(window);
         if (inventory instanceof FakeBlockUIComponent) {
-            Item[] drops = this.inventory.addItem(inventory.getContents().values().toArray(Item.EMPTY_ARRAY));
+            Item[] drops = this.isCreative() ? Item.EMPTY_ARRAY
+                    : this.inventory.addItem(inventory.getContents().values().toArray(Item.EMPTY_ARRAY));
             inventory.clearAll();
             for (Item drop : drops) {
                 this.level.dropItem(this, drop);
@@ -9207,6 +9235,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void giveItem(Item... items) {
         for (Item failed : getInventory().addItem(items)) {
             getLevel().dropItem(this, failed);
+        }
+    }
+
+    /**
+     * 回收界面（工作站/交易）输入物品：有限模式收回背包、溢出掉落在玩家处；
+     * 创造模式物品是免费内容，直接丢弃，绝不让其进入有限世界。
+     * Resolve transient UI input items under the current mode: finite modes recover
+     * them into the backpack and drop the overflow at the player, creative discards
+     * these free items so they never reach finite modes.
+     *
+     * @param items input items held by a transient UI (workstation or trade slots)
+     */
+    public void returnUiItems(Item... items) {
+        // Creative UI contents are free items: never return or drop them on close.
+        if (this.isCreative()) {
+            return;
+        }
+        for (Item item : items) {
+            if (item.isNull()) {
+                continue;
+            }
+            Item[] drops = this.inventory.addItem(item);
+            for (Item drop : drops) {
+                if (!this.dropItem(drop)) {
+                    this.level.dropItem(this, drop);
+                }
+            }
         }
     }
 
