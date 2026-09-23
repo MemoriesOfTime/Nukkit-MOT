@@ -204,12 +204,7 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
         super.onClose(who);
         who.craftingType = Player.CRAFTING_SMALL;
 
-        Item[] drops = who.getInventory().addItem(this.getItem(EQUIPMENT), this.getItem(INGREDIENT));
-        for (Item drop : drops) {
-            if (!who.dropItem(drop)) {
-                this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), drop);
-            }
-        }
+        who.returnUiItems(this.getItem(EQUIPMENT), this.getItem(INGREDIENT));
 
         this.clear(EQUIPMENT);
         this.clear(INGREDIENT);
