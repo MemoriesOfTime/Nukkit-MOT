@@ -6,6 +6,7 @@ import cn.nukkit.block.BlockLiquid;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
+import cn.nukkit.event.entity.ItemBurnEvent;
 import cn.nukkit.event.entity.ItemDespawnEvent;
 import cn.nukkit.event.entity.ItemSpawnEvent;
 import cn.nukkit.item.Item;
@@ -185,6 +186,7 @@ public class EntityItem extends Entity {
         this.lastUpdate = currentTick;
 
         if (!this.fireProof && this.isInsideOfFire()) {
+            this.server.getPluginManager().callEvent(new ItemBurnEvent(this));
             this.close();
             return true;
         }
