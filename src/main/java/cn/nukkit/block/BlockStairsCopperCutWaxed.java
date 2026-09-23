@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Level;
 import cn.nukkit.network.protocol.LevelEventPacket;
 
 public class BlockStairsCopperCutWaxed extends BlockStairsCopperCut {
@@ -40,7 +41,9 @@ public class BlockStairsCopperCutWaxed extends BlockStairsCopperCut {
 
     @Override
     public int onUpdate(int type) {
-        return 0;
+        // 打蜡不氧化，但非 RANDOM 更新仍需走父类维护 corner 位
+        // Waxed never oxidizes, but non-RANDOM updates must still reach the parent to maintain corner bits
+        return type == Level.BLOCK_UPDATE_RANDOM ? 0 : super.onUpdate(type);
     }
 
     @Override

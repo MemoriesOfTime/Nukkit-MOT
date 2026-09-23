@@ -8,6 +8,14 @@ import org.jetbrains.annotations.NotNull;
  */
 public class BlockBarsCopperOxidized extends BlockBarsCopperBase {
 
+    public BlockBarsCopperOxidized() {
+    }
+
+    public BlockBarsCopperOxidized(int meta) {
+        super(meta);
+    }
+
+
     @Override
     public String getName() {
         return "Oxidized Copper Bars";
