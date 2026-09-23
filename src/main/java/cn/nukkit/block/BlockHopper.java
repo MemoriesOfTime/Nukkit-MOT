@@ -414,7 +414,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                     continue;
                 }
 
-                InventoryMoveItemEvent ev = new InventoryMoveItemEvent(null, inventory, this, item, InventoryMoveItemEvent.Action.PICKUP);
+                InventoryMoveItemEvent ev = new InventoryMoveItemEvent(null, inventory, this, item, InventoryMoveItemEvent.Action.PICKUP, itemEntity);
                 ev.call();
 
                 if (ev.isCancelled()) {
