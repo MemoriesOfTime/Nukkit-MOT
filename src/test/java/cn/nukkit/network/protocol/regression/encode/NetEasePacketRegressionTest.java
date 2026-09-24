@@ -74,7 +74,8 @@ public class NetEasePacketRegressionTest {
                 GameVersion.V1_21_2_NETEASE,
                 GameVersion.V1_21_50_NETEASE,
                 GameVersion.V1_21_93_NETEASE,
-                GameVersion.V1_21_124_NETEASE
+                GameVersion.V1_21_124_NETEASE,
+                GameVersion.V1_21_130_NETEASE
         ).map(Arguments::of);
     }
 

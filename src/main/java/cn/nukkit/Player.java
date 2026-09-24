@@ -1008,7 +1008,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         Player[] playerListViewers = this.server.playerList.values().stream()
                 .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
-                .filter(viewer -> viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE)
+                .filter(viewer -> !PlayerEntitySkinSender.requiresRetainedEntry(viewer))
                 .toArray(Player[]::new);
         if (playerListViewers.length > 0) {
             this.server.updatePlayerListData(
@@ -1017,7 +1017,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         for (Player viewer : this.server.playerList.values()) {
-            if (viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE
+            if (!PlayerEntitySkinSender.requiresRetainedEntry(viewer)
                     || !viewer.sentSkins.contains(this.getUniqueId())) {
                 continue;
             }

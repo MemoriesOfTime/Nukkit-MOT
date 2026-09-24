@@ -66,7 +66,8 @@ public class SyncSkinProcessor extends DataPacketProcessor<SyncSkinPacket> {
 
     @Override
     public boolean isSupported(int protocol) {
-        return protocol == GameVersion.V1_21_124_NETEASE.getProtocol()
+        return protocol == GameVersion.V1_21_130_NETEASE.getProtocol()
+                || protocol == GameVersion.V1_21_124_NETEASE.getProtocol()
                 || protocol == GameVersion.V1_21_93_NETEASE.getProtocol();
     }
 }
