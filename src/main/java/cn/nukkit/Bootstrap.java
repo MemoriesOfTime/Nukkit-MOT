@@ -15,24 +15,37 @@ import java.util.*;
 import java.util.stream.Stream;
 
 /**
- * 依赖自动下载启动引导：lib/ 缺依赖时按 DEPENDENCIES.txt 从 Maven 仓库下载并重启进程，
- * 依赖已就位时零开销直通 {@code cn.nukkit.Nukkit}。lib/（默认位置）由引导独占管理，
- * 重启前清理清单外的旧 jar，避免通配符 classpath 同时加载新旧版本。
+ * 依赖自动下载启动引导：lib/ 缺依赖或文件损坏时按 DEPENDENCIES.txt 从 Maven 仓库下载并重启进程，
+ * 全部就位且 sha256 校验通过时直通 {@code cn.nukkit.Nukkit}（启动多一次 lib/ 全量哈希，防损坏依赖带病启动）。
+ * lib/（默认位置）由引导独占管理，重启前清理清单外的旧 jar，避免通配符 classpath 同时加载新旧版本。
  * <p>
- * Bootstrap that downloads missing lib/ dependencies per DEPENDENCIES.txt and re-execs,
- * or passes straight through to {@code cn.nukkit.Nukkit} when everything is in place.
+ * Bootstrap that downloads missing or corrupted lib/ dependencies per DEPENDENCIES.txt and re-execs,
+ * or passes straight through {@code cn.nukkit.Nukkit} once every entry passes a full sha256 pass over
+ * lib/ (so a corrupted jar is re-downloaded instead of crashing the server mid-startup).
  * The default lib/ directory is exclusively bootstrap-managed: stale jars outside the
  * manifest are removed before re-exec so the wildcard classpath never mixes jar versions.
  * <p>
  * 运维旋钮（系统属性）：{@code -Dnukkit.libs.dir=<目录>} 覆盖依赖目录，相对路径按工作目录解析，
- * 默认为 jar 同级 lib/，自定义目录视为用户管理、不清理旧文件；
- * {@code -Dnukkit.libs.repos=<逗号分隔仓库URL>} 整体替换清单内置镜像列表（非追加）。
+ * 默认为 jar 同级 lib/；自定义目录不清理清单外旧文件，但内容仍按清单 sha256 校验（与默认目录一致）；
+ * {@code -Dnukkit.libs.repos=<逗号分隔仓库URL>} 整体替换清单内置镜像列表（非追加）；
+ * {@code -Dnukkit.libs.verify=false} 跳过本地 sha256 重校验，文件存在即判就绪——供自行替换/修补
+ * 依赖 jar 的运维使用，下载本身的 sha256 校验不受此开关影响；
+ * {@code -Dnukkit.bootstrap.lang=<语言>} 覆盖消息语言（见 {@link BootstrapLang}）。
  * <p>
  * Operational knobs (system properties): {@code -Dnukkit.libs.dir=<dir>} overrides the
  * dependency directory (relative paths resolve against the working directory; the default
- * is lib/ next to the jar; a custom directory is user-managed and never cleaned), and
+ * is lib/ next to the jar; a custom directory is never cleaned but its contents are still
+ * sha256-verified against the manifest, same as the default location);
  * {@code -Dnukkit.libs.repos=<comma-separated repository URLs>} replaces the manifest's
- * built-in mirror list wholesale rather than appending to it.
+ * built-in mirror list wholesale rather than appending to it;
+ * {@code -Dnukkit.libs.verify=false} skips the local sha256 re-verification so presence
+ * alone counts as ready — for operators who swap in their own patched jars; downloaded
+ * files are still sha256-checked regardless; and
+ * {@code -Dnukkit.bootstrap.lang=<language>} overrides the message language (see {@link BootstrapLang}).
+ * <p>
+ * 控制台消息经 {@link BootstrapLang} 多语言化（六语言，英文兜底）。
+ * <p>
+ * Console messages are localized through {@link BootstrapLang} (six languages, English fallback).
  * <p>
  * 只允许使用 JDK：下载完成前 classpath 上没有任何第三方库（含日志），输出走 System.out/err。
  * <p>
@@ -43,7 +56,8 @@ public final class Bootstrap {
 
     private static final String LIBS_DIR_PROPERTY = "nukkit.libs.dir";
     private static final String REPOS_PROPERTY = "nukkit.libs.repos";
-    /** reexec 标记：子进程跳过就绪检查直接启动（父进程已下载并校验完毕）。 */
+    private static final String VERIFY_PROPERTY = "nukkit.libs.verify";
+    /** reexec 标记：子进程跳过就绪检查直接启动（父进程已跑完就绪/修复路径）。 */
     private static final String REEXEC_MARK_PROPERTY = "nukkit.bootstrap.reexec";
     /**
      * 仅作 classpath 可见性探测（无清单的 shaded jar、IDE 运行，以及 libs.dir 指向别处时）；
@@ -59,12 +73,14 @@ public final class Bootstrap {
 
     public static void main(String[] args) throws Exception {
         if (Boolean.getBoolean(REEXEC_MARK_PROPERTY)) {
-            // 只有父进程下载并逐条校验成功后才会带此标记重启 / set only by a parent that verified every entry
+            // 只有父进程跑完就绪/修复路径后才会带此标记重启 / set only by a parent that
+            // finished the readiness/repair path
             launchNukkit(args);
             return;
         }
-        if (dependenciesReady()) {
-            System.out.println("[Bootstrap] 依赖已就绪，直接启动 / dependencies ready");
+        boolean verify = Boolean.parseBoolean(System.getProperty(VERIFY_PROPERTY, "true"));
+        if (dependenciesReady(verify)) {
+            System.out.println(BootstrapLang.getLine(verify ? "lib.verified" : "lib.skippedVerify"));
             launchNukkit(args);
             return;
         }
@@ -75,7 +91,7 @@ public final class Bootstrap {
         try {
             manifest = DependencyManifest.loadFromClasspath();
         } catch (Exception e) {
-            System.err.println("[Bootstrap] 错误: 读取或解析 DEPENDENCIES.txt 失败 / cannot load DEPENDENCIES.txt: " + e.getMessage());
+            System.err.println(BootstrapLang.getLine("manifest.loadFailed", e.getMessage()));
             System.exit(1);
             return;
         }
@@ -84,23 +100,24 @@ public final class Bootstrap {
         try {
             Files.createDirectories(libsDir);
         } catch (IOException e) {
-            System.err.println("[Bootstrap] 错误: 无法创建依赖目录 / cannot create " + libsDir + ": " + e.getMessage());
+            System.err.println(BootstrapLang.getLine("libsDir.createFailed", libsDir, e.getMessage()));
             System.exit(1);
             return;
         }
-        downloadAll(manifest.entries(), repos, libsDir);
+        downloadAll(manifest.entries(), repos, libsDir, verify);
         cleanStaleFiles(manifest, jar, libsDir);
 
-        System.out.println("[Bootstrap] 依赖就绪，重启进程启动服务器 / restarting");
+        System.out.println(BootstrapLang.getLine("reexec.start"));
         reexec(jar, libsDir, args);
     }
 
     /**
-     * 就绪判定：有清单时逐条核对 lib/ 文件齐全，再用探测类确认当前 classpath 真正可见
-     * （-Dnukkit.libs.dir 可指向别处，jar 清单的 Class-Path 未必覆盖）；
+     * 就绪判定：有清单时逐条校验 lib/ 文件存在且 sha256 与清单一致（损坏即转入下载路径修复；
+     * {@code verifyHashes=false} 时退化为仅存在性检查，即 {@code -Dnukkit.libs.verify=false} 语义），
+     * 再用探测类确认当前 classpath 真正可见（-Dnukkit.libs.dir 可指向别处，jar 清单的 Class-Path 未必覆盖）；
      * 无清单或非 jar 运行（shaded jar / IDE）退回探测类单检，维持旧语义。
      */
-    private static boolean dependenciesReady() {
+    private static boolean dependenciesReady(boolean verifyHashes) {
         DependencyManifest manifest;
         try {
             manifest = DependencyManifest.loadFromClasspath();
@@ -111,20 +128,58 @@ public final class Bootstrap {
         if (jar == null) {
             return probeClassLoadable();
         }
-        Path libsDir = resolveLibsDir(jar);
+        return libFilesMatchManifest(manifest, resolveLibsDir(jar), verifyHashes) && probeClassLoadable();
+    }
+
+    /**
+     * 就绪判定的完整性核对：逐条校验 lib/ 文件存在且 sha256 与清单一致，缺失、损坏
+     * （截断、坏镜像缓存、被篡改）或不可读的文件都判未就绪，交给下载路径整体修复后重启。
+     * 代价是每次启动对全部依赖做一遍哈希（数十 MB 级通常亚秒）。
+     * {@code verifyHashes=false} 跳过哈希只看存在，供自行替换依赖的运维使用。
+     * <p>
+     * Integrity half of the readiness check: every manifest entry must exist with a matching sha256;
+     * missing, corrupted (truncation, bad mirror cache, tampering) or unreadable files count as not
+     * ready so the download path repairs them before launch. Cost is one hash pass over lib/ per
+     * start (sub-second for tens of MB). {@code verifyHashes=false} checks presence only, for
+     * operators who swap in their own jars.
+     */
+    static boolean libFilesMatchManifest(DependencyManifest manifest, Path libsDir, boolean verifyHashes) {
         for (DependencyManifest.Entry entry : manifest.entries()) {
-            if (!Files.isRegularFile(entry.libFile(libsDir))) {
+            Path file = entry.libFile(libsDir);
+            if (!Files.isRegularFile(file)) {
+                return false;
+            }
+            if (!verifyHashes) {
+                continue;
+            }
+            try {
+                if (!DependencyManifest.sha256Hex(file).equals(entry.sha256())) {
+                    return false;
+                }
+            } catch (IOException e) {
                 return false;
             }
         }
-        return probeClassLoadable();
+        return true;
     }
 
     private static boolean probeClassLoadable() {
+        return classLoadable(Bootstrap.class.getClassLoader(), PROBE_CLASS);
+    }
+
+    /**
+     * 类可见性探测：类缺失、class 文件损坏或缺引用类都按「不可见」处理（转入下载修复路径），
+     * 不让引导在依赖未就绪前以裸 Error 崩溃；静态初始化失败等真实代码问题仍照常抛出。
+     * <p>
+     * Class-visibility probe: a missing class, corrupt class file or missing referenced class
+     * all count as not visible (routing to the repair path) instead of crashing bootstrap with
+     * a raw Error; genuine failures such as static-initializer errors still propagate.
+     */
+    static boolean classLoadable(ClassLoader loader, String className) {
         try {
-            Class.forName(PROBE_CLASS);
+            Class.forName(className, true, loader);
             return true;
-        } catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException | ClassFormatError | NoClassDefFoundError e) {
             return false;
         }
     }
@@ -142,7 +197,7 @@ public final class Bootstrap {
             if (cause instanceof Error error) {
                 throw error;
             }
-            throw new IllegalStateException("启动 Nukkit 失败 / failed to start Nukkit", cause);
+            throw new IllegalStateException(BootstrapLang.get("launch.failed"), cause);
         }
     }
 
@@ -152,8 +207,7 @@ public final class Bootstrap {
         if (jar != null) {
             return jar;
         }
-        System.err.println("[Bootstrap] 错误: 引导只支持 jar 运行（IDE 或目录运行请用 java -jar）"
-                + " / bootstrap requires java -jar");
+        System.err.println(BootstrapLang.getLine("launch.requiresJar"));
         System.exit(1);
         throw new AssertionError("unreachable");
     }
@@ -190,28 +244,36 @@ public final class Bootstrap {
                 .toList();
     }
 
-    private static void downloadAll(List<DependencyManifest.Entry> entries, List<String> repos, Path libsDir) {
+    private static void downloadAll(List<DependencyManifest.Entry> entries, List<String> repos, Path libsDir,
+                                    boolean verifyExisting) {
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(Duration.ofSeconds(15))
                 .build();
         int total = entries.size();
         for (int i = 0; i < entries.size(); i++) {
-            downloadEntry(client, entries.get(i), i + 1, total, repos, libsDir);
+            downloadEntry(client, entries.get(i), i + 1, total, repos, libsDir, verifyExisting);
         }
     }
 
     private static void downloadEntry(HttpClient client, DependencyManifest.Entry entry,
-                                      int index, int total, List<String> repos, Path libsDir) {
+                                      int index, int total, List<String> repos, Path libsDir,
+                                      boolean verifyExisting) {
         Path target = entry.libFile(libsDir);
         try {
-            if (Files.isRegularFile(target) && DependencyManifest.sha256Hex(target).equals(entry.sha256())) {
-                System.out.println("[Bootstrap] 下载 (" + index + "/" + total + ") " + entry.fileName() + " ... 已存在，跳过");
+            // verifyExisting=false（-Dnukkit.libs.verify=false）时存在即跳过，尊重运维自替换的 jar
+            // With verifyExisting=false (-Dnukkit.libs.verify=false) presence alone skips the
+            // download, respecting operator-swapped jars
+            if (Files.isRegularFile(target)
+                    && (!verifyExisting || DependencyManifest.sha256Hex(target).equals(entry.sha256()))) {
+                System.out.println(BootstrapLang.getLine("download.exists", index, total, entry.fileName()));
                 return;
             }
         } catch (IOException e) {
-            System.err.println("[Bootstrap] 错误: 校验既有文件失败 / cannot verify " + target + ": " + e);
-            System.exit(2);
+            // 不可读（权限/磁盘错误）按损坏处理：走下方下载替换自愈，rename 只需目录写权限
+            // Unreadable (permissions/disk error) counts as corrupted: the rename-based
+            // replacement below only needs write permission on the directory
+            System.err.println(BootstrapLang.getLine("download.verifyExistingFailed", target, e.getMessage()));
         }
 
         Path part = libsDir.resolve(entry.fileName() + ".part");
@@ -234,8 +296,7 @@ public final class Bootstrap {
                 if (!actual.equals(entry.sha256())) {
                     // 200 但内容不对（镜像缓存损坏、同时间戳重新发布）：换下一个仓库，全部失败才退出
                     // 200 with wrong body (corrupted mirror cache etc.): try the next repository
-                    System.err.println("[Bootstrap] 警告: sha256 校验失败，换下一仓库 / sha256 mismatch for " + url
-                            + " (expected " + entry.sha256() + ", got " + actual + ")");
+                    System.err.println(BootstrapLang.getLine("download.shaMismatch", url, entry.sha256(), actual));
                     Files.deleteIfExists(part);
                     continue;
                 }
@@ -244,12 +305,12 @@ public final class Bootstrap {
                 } catch (AtomicMoveNotSupportedException e) {
                     Files.move(part, target, StandardCopyOption.REPLACE_EXISTING);
                 }
-                System.out.printf("[Bootstrap] 下载 (%d/%d) %s ... OK (%.1f MB)%n",
-                        index, total, entry.fileName(), Files.size(target) / 1048576.0);
+                System.out.println(BootstrapLang.getLine("download.ok", index, total, entry.fileName(),
+                        String.format(Locale.ROOT, "%.1f", Files.size(target) / 1048576.0)));
                 return;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                System.err.println("[Bootstrap] 错误: 下载被中断 / download interrupted: " + entry.fileName());
+                System.err.println(BootstrapLang.getLine("download.interrupted", entry.fileName()));
                 deleteQuietly(part);
                 System.exit(1);
                 throw new AssertionError("unreachable");
@@ -258,8 +319,7 @@ public final class Bootstrap {
             }
         }
         deleteQuietly(part);
-        System.err.println("[Bootstrap] 错误: 全部仓库下载失败 / all repositories failed for " + entry.fileName()
-                + ", 尝试过 / attempted:");
+        System.err.println(BootstrapLang.getLine("download.allFailed", entry.fileName()));
         for (String url : attempted) {
             System.err.println("  " + url);
         }
@@ -298,15 +358,15 @@ public final class Bootstrap {
                 }
             });
         } catch (IOException e) {
-            System.err.println("[Bootstrap] 警告: 无法扫描 lib/ 清理旧文件 / cannot scan " + libsDir + ": " + e.getMessage());
+            System.err.println(BootstrapLang.getLine("clean.scanFailed", libsDir, e.getMessage()));
             return;
         }
         for (Path file : stale) {
             try {
                 Files.deleteIfExists(file);
-                System.out.println("[Bootstrap] 清理旧文件 / removed stale " + file.getFileName());
+                System.out.println(BootstrapLang.getLine("clean.removed", file.getFileName()));
             } catch (IOException e) {
-                System.err.println("[Bootstrap] 警告: 清理失败，旧版本可能与新版本同时加载 / cannot delete " + file + ": " + e.getMessage());
+                System.err.println(BootstrapLang.getLine("clean.deleteFailed", file, e.getMessage()));
             }
         }
     }
@@ -339,7 +399,7 @@ public final class Bootstrap {
             Process process = new ProcessBuilder(command).inheritIO().start();
             System.exit(process.waitFor());
         } catch (IOException e) {
-            System.err.println("[Bootstrap] 错误: 重启进程失败 / cannot re-exec: " + e.getMessage());
+            System.err.println(BootstrapLang.getLine("reexec.failed", e.getMessage()));
             System.exit(1);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

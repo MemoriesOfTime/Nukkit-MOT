@@ -60,7 +60,8 @@ public final class DependencyManifest {
             }
             if (repos == null) {
                 if (!line.startsWith(REPOS_PREFIX)) {
-                    throw new IllegalArgumentException("DEPENDENCIES.txt 第 " + (i + 1) + " 行应为 " + REPOS_PREFIX + "...");
+                    throw new IllegalArgumentException(
+                            BootstrapLang.get("manifest.lineExpectedRepos", i + 1, REPOS_PREFIX + "..."));
                 }
                 repos = new ArrayList<>();
                 for (String repo : line.substring(REPOS_PREFIX.length()).split("\\|")) {
@@ -70,27 +71,27 @@ public final class DependencyManifest {
                     }
                 }
                 if (repos.isEmpty()) {
-                    throw new IllegalArgumentException("DEPENDENCIES.txt 第 " + (i + 1) + " 行 repos 列表为空");
+                    throw new IllegalArgumentException(BootstrapLang.get("manifest.lineEmptyRepos", i + 1));
                 }
                 continue;
             }
             String[] f = line.split(":", -1);
             if (f.length != 5 || f[0].isEmpty() || f[1].isEmpty() || f[2].isEmpty() || f[3].isEmpty()
                     || !SHA256.matcher(f[4]).matches()) {
-                throw new IllegalArgumentException("DEPENDENCIES.txt 第 " + (i + 1) + " 行格式损坏: " + line);
+                throw new IllegalArgumentException(BootstrapLang.get("manifest.lineMalformed", i + 1, line));
             }
             if (!fileNames.add(f[3])) {
                 // lib/ 是扁平命名空间，重名会互相覆盖导致另一依赖缺失 / flat lib/ namespace: a duplicate
                 // fileName would overwrite the other artifact and leave it missing at runtime
-                throw new IllegalArgumentException("DEPENDENCIES.txt 第 " + (i + 1) + " 行文件名重复 / duplicate fileName: " + f[3]);
+                throw new IllegalArgumentException(BootstrapLang.get("manifest.lineDuplicateFile", i + 1, f[3]));
             }
             entries.add(new Entry(f[0], f[1], f[2], f[3], f[4]));
         }
         if (repos == null) {
-            throw new IllegalArgumentException("DEPENDENCIES.txt 缺少 repos= 行");
+            throw new IllegalArgumentException(BootstrapLang.get("manifest.missingRepos"));
         }
         if (entries.isEmpty()) {
-            throw new IllegalArgumentException("DEPENDENCIES.txt 没有任何依赖条目");
+            throw new IllegalArgumentException(BootstrapLang.get("manifest.noEntries"));
         }
         return new DependencyManifest(repos, entries);
     }
@@ -104,7 +105,7 @@ public final class DependencyManifest {
         byte[] bytes;
         try (InputStream in = DependencyManifest.class.getResourceAsStream(RESOURCE)) {
             if (in == null) {
-                throw new IOException("classpath 中缺少 " + RESOURCE);
+                throw new IOException(BootstrapLang.get("manifest.missingResource", RESOURCE));
             }
             bytes = in.readAllBytes();
         }
