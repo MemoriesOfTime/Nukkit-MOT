@@ -297,6 +297,40 @@ public class LevelDBChunkSection implements ChunkSection {
         }
     }
 
+    /**
+     * Reads a cuboid of block state pairs under one read lock.
+     *
+     * <p>Each cell is encoded exactly like {@link #getBlockStatePair}. Bounds are section-local and
+     * inclusive; cells are written column by column in x, z, y order, the order a bounding-box scan
+     * visits them: {@code out[base + (x - x0) * strideX + (z - z0) * strideZ + (y - y0)]}.
+     *
+     * <p>A bounding-box scan used to lock and unlock the section once per cell - a horse visits about
+     * eighty cells every tick. One acquisition per section gives the same values (the cuboid is now read
+     * atomically) without the per-cell synchronisation.
+     */
+    public void getBlockStatePairs(int layer, int x0, int y0, int z0, int x1, int y1, int z1,
+                                   long[] out, int base, int strideX, int strideZ) {
+        this.readLock.lock();
+        try {
+            StateBlockStorage storage = this.hasLayerUnsafe(layer) ? this.storages[layer] : null;
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    int index = base + (x - x0) * strideX + (z - z0) * strideZ;
+                    for (int y = y0; y <= y1; y++, index++) {
+                        if (storage == null) {
+                            out[index] = 0L;
+                            continue;
+                        }
+                        BlockStateSnapshot state = storage.getBlockState(x, y, z);
+                        out[index] = ((long) state.getLegacyId() << 32) | (state.getLegacyData() & 0xffffffffL);
+                    }
+                }
+            }
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
     @Override
     public boolean setBlock(int x, int y, int z, int blockId) {
         return setBlockAtLayer(x, y, z, 0, blockId, 0);
