@@ -329,6 +329,11 @@ public interface ProtocolInfo {
 
     @OnlyNetEase
     int PY_RPC_PACKET = 200;
+    /**
+     * NetEase store purchase-success notification (standalone empty packet)
+     */
+    @OnlyNetEase
+    int NETEASE_PACKET_STORE_BUY_SUCC = 202;
     @OnlyNetEase
     int NETEASE_JSON_PACKET = 203;
     @OnlyNetEase

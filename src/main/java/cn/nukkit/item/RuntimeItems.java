@@ -117,8 +117,9 @@ public class RuntimeItems {
                     of(GameVersion.V1_21_2_NETEASE),
                     of(GameVersion.V1_21_50_NETEASE),
                     of(GameVersion.V1_21_93_NETEASE),
-                    of(GameVersion.V1_21_124_NETEASE),
-                    of(GameVersion.V1_21_130_NETEASE)
+                    of(GameVersion.V1_21_124_NETEASE)
+                    // V1_21_130_NETEASE joins once the netease_898 item table lands; getMappingNetEase
+                    // reuses the standard mapping meanwhile
             };
         }
         return allMappings;
@@ -279,7 +280,9 @@ public class RuntimeItems {
 
     private static RuntimeItemMapping getMappingNetEase(int protocolId) {
         if (protocolId >= GameVersion.V1_21_130_NETEASE.getProtocol()) {
-            return of(GameVersion.V1_21_130_NETEASE);
+            // netease_898 item table not published yet: reuse the standard 898 mapping (the item
+            // table is server-declared; real-device checkpoint); switch back once it lands
+            return of(GameVersion.V1_21_130);
         } else if (protocolId >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
             return of(GameVersion.V1_21_124_NETEASE);
         } else if (protocolId >= GameVersion.V1_21_93_NETEASE.getProtocol()) {

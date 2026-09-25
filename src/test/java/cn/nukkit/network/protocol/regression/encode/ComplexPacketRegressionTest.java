@@ -12,7 +12,9 @@ import cn.nukkit.network.protocol.mapping.LevelSoundEventMap;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.camera.CameraFadeInstruction;
+import cn.nukkit.network.protocol.types.camera.CameraFovInstruction;
 import cn.nukkit.network.protocol.types.camera.CameraPreset;
+import cn.nukkit.network.protocol.types.camera.CameraSplineInstruction;
 import org.cloudburstmc.protocol.bedrock.data.SoundEvent;
 import org.cloudburstmc.protocol.common.util.OptionalBoolean;
 import org.junit.jupiter.api.BeforeAll;
@@ -935,7 +937,8 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.mapId = 1;
         nukkitPacket.dimensionId = 0;
         nukkitPacket.isLocked = false;
-        nukkitPacket.origin = new BlockVector3(0, 0, 0);
+        // non-zero + negative origin: zigzag vs unsigned block-position encodings differ here
+        nukkitPacket.origin = new BlockVector3(10, 64, -5);
         nukkitPacket.scale = 4;
         nukkitPacket.eids = new long[]{10L};
         nukkitPacket.encode();
@@ -945,6 +948,11 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
 
         assertEquals(1L, cbPacket.getUniqueMapId());
         assertEquals(Byte.valueOf((byte) 4), cbPacket.getScale());
+        if (protocolVersion >= ProtocolInfo.v1_19_20) {
+            assertEquals(10, cbPacket.getOrigin().getX());
+            assertEquals(64, cbPacket.getOrigin().getY());
+            assertEquals(-5, cbPacket.getOrigin().getZ());
+        }
     }
 
     static Stream<Arguments> versionsFrom544() {
@@ -962,7 +970,7 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.mapId = 2;
         nukkitPacket.dimensionId = 0;
         nukkitPacket.isLocked = true;
-        nukkitPacket.origin = new BlockVector3(100, 64, 200);
+        nukkitPacket.origin = new BlockVector3(100, 64, -200);
         nukkitPacket.scale = 1;
 
         var tracked = new ClientboundMapItemDataPacket.MapTrackedObject();
@@ -987,6 +995,14 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
 
         assertEquals(2, cbPacket.getUniqueMapId());
         assertTrue(cbPacket.isLocked());
+        assertEquals(100, cbPacket.getOrigin().getX());
+        assertEquals(64, cbPacket.getOrigin().getY());
+        assertEquals(-200, cbPacket.getOrigin().getZ());
+        assertEquals(1, cbPacket.getDecorations().size());
+        var cbDecoration = cbPacket.getDecorations().get(0);
+        assertEquals(8, cbDecoration.getRotation());
+        assertEquals(10, cbDecoration.getXOffset());
+        assertEquals(20, cbDecoration.getYOffset());
     }
 
     @Test
@@ -1137,6 +1153,70 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
 
         assertTrue(cbPacket.getClear().isPresent());
         assertTrue(cbPacket.getClear().getAsBoolean());
+    }
+
+    static Stream<Arguments> versionsFrom827() {
+        return filteredVersions(ProtocolInfo.v1_21_100);
+    }
+
+    @ParameterizedTest(name = "CameraInstructionPacket v{0} (fov)")
+    @MethodSource("versionsFrom827")
+    void testCameraInstructionPacketFov(int protocolVersion) {
+        var nukkitPacket = new CameraInstructionPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.setFovInstruction(new CameraFovInstruction(85.0f, 0.5f,
+                cn.nukkit.network.protocol.types.camera.CameraEase.EASE_IN_QUAD, true));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.CameraInstructionPacket.class);
+
+        assertEquals(85.0f, cbPacket.getFovInstruction().getFov(), 0.001f);
+        assertEquals(0.5f, cbPacket.getFovInstruction().getEaseTime(), 0.001f);
+        // v944+ carries the ease as serialize name; ordinal 6 must not leak through as a wrong name
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.EASE_IN_QUAD,
+                cbPacket.getFovInstruction().getEaseType());
+        assertTrue(cbPacket.getFovInstruction().isClear());
+    }
+
+    @ParameterizedTest(name = "CameraInstructionPacket v{0} (spline)")
+    @MethodSource("versionsFrom859")
+    void testCameraInstructionPacketSpline(int protocolVersion) {
+        var nukkitPacket = new CameraInstructionPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.setSplineInstruction(new CameraSplineInstruction(
+                2.0f,
+                cn.nukkit.network.protocol.types.camera.CameraSplineType.CATMULL_ROM,
+                java.util.List.of(),
+                java.util.List.of(new CameraSplineInstruction.SplineProgressOption(0.5f, 1.0f,
+                        cn.nukkit.network.protocol.types.camera.CameraEase.SPRING)),
+                java.util.List.of(new CameraSplineInstruction.SplineRotationOption(new Vector3f(10f, 20f, 30f), 0.25f,
+                        cn.nukkit.network.protocol.types.camera.CameraEase.EASE_IN_QUAD)),
+                "main_menu", true));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.CameraInstructionPacket.class);
+
+        var cbSpline = cbPacket.getSplineInstruction();
+        assertNotNull(cbSpline);
+        assertEquals(2.0f, cbSpline.getTotalTime(), 0.001f);
+        assertEquals(1, cbSpline.getProgressKeyFrames().size());
+        var cbProgress = cbSpline.getProgressKeyFrames().get(0);
+        assertEquals(0.5f, cbProgress.getValue(), 0.001f);
+        assertEquals(1.0f, cbProgress.getTime(), 0.001f);
+        var cbRotation = cbSpline.getRotationOption().get(0);
+        assertEquals(10.0f, cbRotation.getKeyFrameValues().getX(), 0.001f);
+        assertEquals(0.25f, cbRotation.getKeyFrameTimes(), 0.001f);
+        if (protocolVersion >= ProtocolInfo.v1_26_0) {
+            // v924+ carries eases plus identifier/json; string vs byte is verified byte-for-byte by crossDecode
+            assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.SPRING, cbProgress.getEase());
+            assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.EASE_IN_QUAD, cbRotation.getEase());
+            assertEquals("main_menu", cbSpline.getSplineIdentifier());
+            assertTrue(cbSpline.isLoadFromJson());
+        }
     }
 
     @ParameterizedTest(name = "CameraInstructionPacket v{0} (fade)")

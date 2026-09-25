@@ -191,6 +191,8 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.setTick(12345L);
         nukkitPacket.setPredictionType(CorrectPlayerMovePredictionPacket.PredictionType.VEHICLE);
         nukkitPacket.setVehicleRotation(new Vector2f(90.0f, 45.0f));
+        // non-null value: endianness of the optional float is invisible when it is never written
+        nukkitPacket.setVehicleAngularVelocity(1.5f);
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -200,6 +202,9 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(100.5f, cbPacket.getPosition().getX(), 0.001f);
         assertEquals(90.0f, cbPacket.getVehicleRotation().getX(), 0.001f);
         assertEquals(45.0f, cbPacket.getVehicleRotation().getY(), 0.001f);
+        if (protocolVersion >= ProtocolInfo.v1_21_20) {
+            assertEquals(1.5f, cbPacket.getVehicleAngularVelocity(), 0.001f);
+        }
     }
 
     // ==================== PlayerEnchantOptionsPacket ====================
