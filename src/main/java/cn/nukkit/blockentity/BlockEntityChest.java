@@ -41,6 +41,12 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
                 this.doubleInventory = null;
             }
 
+            // A double chest opened through the other half is referenced only from that half's
+            // field, while this half's real inventory still points at it. getInventory() no longer
+            // re-pairs a closing chest (re-pairing used to close these windows as a side effect), so
+            // close them here: no window may keep a half whose chunk is being unloaded.
+            closeDoubleChestWindows(this.getRealInventory().getDoubleInventory());
+
             for (Player player : new HashSet<>(this.inventory.getViewers())) {
                 player.removeWindow(this.getRealInventory());
             }
@@ -90,7 +96,12 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
 
     @Override
     public BaseInventory getInventory() {
-        if (this.doubleInventory == null && this.isPaired()) {
+        // A closing chest must not pair again. close() has just dropped the double inventory and
+        // the container close() behind it asks getInventory() for the viewers: re-pairing there
+        // builds a new DoubleChestInventory, replays every stack through onSlotChange and so wakes
+        // the hoppers and comparators around the chest - reading their chunks, from disk when a
+        // neighbour is already unloaded. On chunk unload that turned into a load of the neighbour.
+        if (this.doubleInventory == null && this.isPaired() && (this.inventory == null || !this.inventory.destroyed)) {
             this.checkPairing();
         }
 
