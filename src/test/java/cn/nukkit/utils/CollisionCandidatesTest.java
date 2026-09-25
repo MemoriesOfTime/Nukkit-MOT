@@ -108,6 +108,97 @@ class CollisionCandidatesTest {
     }
 
     @Test
+    void aRescanForgetsTheChunksOfTheScanBefore() throws ReflectiveOperationException {
+        // The cache lives as long as the entity: a slot the new scan does not overwrite must not keep
+        // the chunk and section of an older scan reachable (an unloaded or reloaded chunk).
+        CollisionHelper.ScanCache cache = new CollisionHelper.ScanCache();
+        Object first = new Object();
+        Object second = new Object();
+        Object third = new Object();
+        cache.begin(null);
+        cache.stamp(0, 0, 4, first, first, 1);
+        cache.stamp(1, 0, 4, second, second, 1);
+        cache.begin(null);
+        cache.stamp(0, 0, 4, third, third, 2);
+
+        java.lang.reflect.Field chunks = CollisionHelper.ScanCache.class.getDeclaredField("stampChunk");
+        java.lang.reflect.Field sections = CollisionHelper.ScanCache.class.getDeclaredField("stampSection");
+        chunks.setAccessible(true);
+        sections.setAccessible(true);
+        Object[] chunkSlots = (Object[]) chunks.get(cache);
+        Object[] sectionSlots = (Object[]) sections.get(cache);
+        assertSame(third, chunkSlots[0]);
+        assertSame(third, sectionSlots[0]);
+        assertNull(chunkSlots[1]);
+        assertNull(sectionSlots[1]);
+    }
+
+    @Test
+    void restingEntityDoesNotReadItsSectionAgain() {
+        World flat = World.flat(BlockID.STONE, 63);
+        LevelDBChunk chunk = flat.chunk(0, 0);
+        LevelDBChunkSection section = spy((LevelDBChunkSection) chunk.getSection(3));
+        World.replaceSection(chunk, 3, section);
+        CollisionHelper helper = flat.helperAt(5.5, 5.5);
+        AxisAlignedBB box = new SimpleAxisAlignedBB(4.8, 64, 4.8, 6.2, 65.6, 6.2);
+        AxisAlignedBB scan = box.grow(0.5, 0.5, 0.5);
+
+        helper.getCollisionCandidates(scan, box);
+        helper.getCollisionCandidates(scan, box);
+        helper.getCollisionCandidates(scan, box);
+        verify(section, times(1)).getBlockStatePairs(anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
+                any(), anyInt(), anyInt(), anyInt());
+
+        // A moved entity scans again.
+        AxisAlignedBB moved = box.getOffsetBoundingBox(0.1, 0, 0);
+        helper.getCollisionCandidates(moved.grow(0.5, 0.5, 0.5), moved);
+        verify(section, times(2)).getBlockStatePairs(anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
+                any(), anyInt(), anyInt(), anyInt());
+    }
+
+    @Test
+    void restingScanFollowsEveryChangeAroundTheEntity() {
+        // One cached helper per resting entity, compared after random edits with a fresh full scan.
+        Random random = new Random(11);
+        World world = new World(new Random(99));
+        int[] edits = {BlockID.AIR, BlockID.STONE, BlockID.FIRE, BlockID.FENCE, BlockID.TALL_GRASS, BlockID.WATER,
+                BlockID.NETHER_PORTAL, BlockID.COBBLESTONE_WALL, CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID + 991};
+        int checked = 0;
+        for (int entity = 0; entity < 300; entity++) {
+            double x = -10 + random.nextDouble() * 20;
+            double z = -10 + random.nextDouble() * 20;
+            double y = 34 + random.nextDouble() * 30;
+            double width = 0.3 + random.nextDouble() * 1.3;
+            AxisAlignedBB box = new SimpleAxisAlignedBB(x - width / 2, y, z - width / 2, x + width / 2, y + 1.6, z + width / 2);
+            AxisAlignedBB scan = box.grow(0.5, 0.5, 0.5);
+            CollisionHelper cached = world.helperAt(x, z);
+            for (int tick = 0; tick < 12; tick++) {
+                int change = random.nextInt(6);
+                int bx = (int) Math.floor(x) + random.nextInt(5) - 2;
+                int by = (int) Math.floor(y) + random.nextInt(5) - 2;
+                int bz = (int) Math.floor(z) + random.nextInt(5) - 2;
+                if (change == 0) {
+                    world.set(bx, by, bz, edits[random.nextInt(edits.length)]);
+                } else if (change == 1) {
+                    world.replaceSectionAt(bx, by, bz, random);
+                } else if (change == 2) {
+                    world.reloadChunkAt(bx, bz);
+                    // A live entity always points at its loaded chunk: unloading closes it.
+                    cached.entity().chunk = world.chunk((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4);
+                }
+                // The full scan of the same entity, which never uses the cache.
+                Block[] expected = CollisionHelper.filterCollisionBlocks(
+                        cached.getBlocksInBoundingBox(scan), box, 0.5, 0.5, 0.5);
+                Block[] actual = CollisionHelper.filterCollisionBlocks(
+                        cached.getCollisionCandidates(scan, box), box, 0.5, 0.5, 0.5);
+                assertSameBlocks(expected, actual, box, scan);
+                checked++;
+            }
+        }
+        assertEquals(3600, checked);
+    }
+
+    @Test
     void everyNonOverhangShapeStaysInsideItsCell() {
         // The candidate scan relies on it: a block that is neither dynamic nor a fence, gate or wall can
         // only touch a box that overlaps its own cell; fences, gates and walls reach 0.5 above it.
@@ -315,6 +406,70 @@ class CollisionCandidatesTest {
             when(level.getBlockDataAt(anyInt(), anyInt(), anyInt())).thenReturn(0);
             when(level.getBlockDataAt(anyInt(), anyInt(), anyInt(), anyInt())).thenReturn(0);
             return level;
+        }
+
+        /** Writes one block through the section storage, as every block write ends up doing. */
+        void set(int x, int y, int z, int id) {
+            LevelDBChunk chunk = chunk(x >> 4, z >> 4);
+            if (chunk == null || y < 0 || y > 255) {
+                return;
+            }
+            ChunkSection section = chunk.getSection(y >> 4);
+            LevelDBChunkSection leveldb;
+            if (section instanceof LevelDBChunkSection existing) {
+                leveldb = existing;
+            } else {
+                leveldb = new LevelDBChunkSection(y >> 4, new StateBlockStorage[]{new StateBlockStorage()}, false);
+                replaceSection(chunk, y >> 4, leveldb);
+            }
+            leveldb.getStorages()[0].set(x & 0xF, y & 0xF, z & 0xF,
+                    BlockStateSnapshot.builder().legacyId(id).legacyData(0).build());
+        }
+
+        /** Replaces a whole section object, as loading or creating a section does. */
+        void replaceSectionAt(int x, int y, int z, Random random) {
+            LevelDBChunk chunk = chunk(x >> 4, z >> 4);
+            if (chunk == null || y < 0 || y > 255) {
+                return;
+            }
+            if (random.nextInt(4) == 0) {
+                replaceSection(chunk, y >> 4, cn.nukkit.level.format.generic.EmptyChunkSection.bySectionY(y >> 4));
+                return;
+            }
+            StateBlockStorage storage = new StateBlockStorage();
+            for (int i = 0; i < 4096; i++) {
+                if (random.nextInt(100) < 60) {
+                    continue;
+                }
+                storage.set(i, BlockStateSnapshot.builder().legacyId(PALETTE[random.nextInt(PALETTE.length)]).legacyData(0).build());
+            }
+            replaceSection(chunk, y >> 4, new LevelDBChunkSection(y >> 4, new StateBlockStorage[]{storage}, false));
+        }
+
+        /** Unload and load again: a new chunk object with the same sections. */
+        void reloadChunkAt(int x, int z) {
+            int cx = x >> 4;
+            int cz = z >> 4;
+            LevelDBChunk old = chunk(cx, cz);
+            if (old == null) {
+                return;
+            }
+            ChunkSection[] sections = new ChunkSection[16];
+            for (int sy = 0; sy < 16; sy++) {
+                ChunkSection section = old.getSection(sy);
+                sections[sy] = section instanceof LevelDBChunkSection ? section : null;
+            }
+            chunks[cx + 3][cz + 3] = new LevelDBChunk(provider, cx, cz, sections, null, null, null, null, null, ChunkState.FINISHED);
+        }
+
+        static void replaceSection(LevelDBChunk chunk, int sectionY, ChunkSection section) {
+            try {
+                java.lang.reflect.Field field = cn.nukkit.level.format.generic.BaseChunk.class.getDeclaredField("sections");
+                field.setAccessible(true);
+                ((ChunkSection[]) field.get(chunk))[sectionY] = section;
+            } catch (ReflectiveOperationException e) {
+                throw new AssertionError(e);
+            }
         }
 
         LevelDBChunk chunk(int cx, int cz) {

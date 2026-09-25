@@ -29,7 +29,12 @@ import java.util.function.Predicate;
  * Collision helper for entities and other targets.
  * @author labarjni
  */
-public record CollisionHelper(Entity entity) {
+public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache) {
+
+    /** A helper that keeps the entity's last collision scan; see {@link ScanCache}. */
+    public CollisionHelper(Entity entity) {
+        this(entity, new ScanCache());
+    }
 
     /** Cap on block positions visited per collision query; guards against runaway loops from malformed AABBs (cf. EaseCation). */
     private static final int MAX_BOUNDING_BOX_ITERATIONS = 1_000_000;
@@ -339,6 +344,15 @@ public record CollisionHelper(Entity entity) {
             return Block.EMPTY_ARRAY;
         }
 
+        // A resting entity whose blocks did not change gets the candidates of its last scan.
+        ScanCache cache = this.scanCache;
+        if (cache != null) {
+            if (cache.holds(level, entity.chunk, scanBox, entityBox)) {
+                return cache.materialise(level);
+            }
+            cache.begin(level);
+        }
+
         // Cells whose own shape can reach the entity's box: x with x < maxX && x + 1 > minX, the same
         // for z and y, plus the layers from which a shape rising COLLISION_OVERHANG above its cell can.
         // Math.ceil on purpose: NukkitMath.ceilDouble answers floor for positive fractions.
@@ -368,6 +382,9 @@ public record CollisionHelper(Entity entity) {
                 int z1 = Math.min(maxZ, (chunkZ << 4) + 15);
                 FullChunk chunk = chunkAt(level, hint, x0, z0);
                 if (chunk == null) {
+                    if (cache != null) {
+                        cache.stamp(chunkX, chunkZ, 0, null, null, ScanCache.NO_VERSION);
+                    }
                     continue;
                 }
                 hint = chunk;
@@ -382,17 +399,26 @@ public record CollisionHelper(Entity entity) {
                     if (standardChunk) {
                         ChunkSection section = ((LevelDBChunk) chunk).getSection(sectionY);
                         if (section.getClass() == EmptyChunkSection.class) {
+                            if (cache != null) {
+                                cache.stamp(chunkX, chunkZ, sectionY, chunk, section, ScanCache.NO_VERSION);
+                            }
                             continue;
                         }
                         if (section.getClass() == LevelDBChunkSection.class) {
-                            ((LevelDBChunkSection) section).getBlockStatePairs(0, x0 & 0xF, y0 & 0xF, z0 & 0xF,
+                            int version = ((LevelDBChunkSection) section).getBlockStatePairs(0, x0 & 0xF, y0 & 0xF, z0 & 0xF,
                                     x1 & 0xF, y1 & 0xF, z1 & 0xF, pairs, base, strideX, sizeY);
+                            if (cache != null) {
+                                cache.stamp(chunkX, chunkZ, sectionY, chunk, section, version);
+                            }
                             kind = CELL_PAIR;
                         } else {
                             kind = CELL_FALLBACK;
                         }
                     } else {
                         kind = CELL_FALLBACK;
+                    }
+                    if (kind == CELL_FALLBACK && cache != null) {
+                        cache.uncachable();
                     }
                     for (int x = x0; x <= x1; x++) {
                         for (int z = z0; z <= z1; z++) {
@@ -434,6 +460,9 @@ public record CollisionHelper(Entity entity) {
                         block = Block.get(id, (int) pair, level, x, y, z, 0);
                         // The earlier air probe or a custom factory's returned id cannot prove ownership.
                         detached = id >= 0 && id < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID;
+                        if (cache != null && block != null && !block.isAir()) {
+                            cache.candidate(x, y, z, pair);
+                        }
                     } else {
                         // Non-standard chunk or section: exactly the per-cell path of getBlocksInBoundingBox.
                         if (chunk == null) {
@@ -462,7 +491,164 @@ public record CollisionHelper(Entity entity) {
             }
         }
 
+        if (cache != null) {
+            cache.commit(scanBox, entityBox);
+        }
         return count == 0 ? Block.EMPTY_ARRAY : Arrays.copyOf(result, count);
+    }
+
+    /**
+     * The last candidate scan of one entity.
+     *
+     * <p>The candidates depend on nothing but the two boxes and the layer-0 states of the scanned cells,
+     * so they stay exact while the boxes are unchanged and every chunk, section and section version the
+     * scan read is still the same - checked with a few identity comparisons and one volatile read per
+     * section instead of reading every cell again. A resting mob (horses in a pen measured at a
+     * fifth of a busy server's main thread) rescans only when a block around it changes. The blocks are
+     * materialised afresh on every hit and the per-block filter still runs every tick, so shapes that
+     * depend on neighbours or block entities are evaluated as before. Scans that touched a non-standard
+     * chunk or section are not kept.
+     */
+    public static final class ScanCache {
+        static final int NO_VERSION = Integer.MIN_VALUE;
+
+        private Level level;
+        private boolean valid;
+        private boolean cachable;
+        private final double[] boxes = new double[12];
+
+        private int stamps;
+        private int[] stampChunkX = new int[4];
+        private int[] stampChunkZ = new int[4];
+        private int[] stampSectionY = new int[4];
+        private int[] stampVersion = new int[4];
+        private Object[] stampChunk = new Object[4];
+        private Object[] stampSection = new Object[4];
+
+        private int candidates;
+        private int[] candidateX = new int[8];
+        private int[] candidateY = new int[8];
+        private int[] candidateZ = new int[8];
+        private long[] candidatePair = new long[8];
+
+        boolean holds(Level level, FullChunk hint, AxisAlignedBB scanBox, AxisAlignedBB entityBox) {
+            if (!this.valid || this.level != level
+                    || this.boxes[0] != scanBox.getMinX() || this.boxes[1] != scanBox.getMinY()
+                    || this.boxes[2] != scanBox.getMinZ() || this.boxes[3] != scanBox.getMaxX()
+                    || this.boxes[4] != scanBox.getMaxY() || this.boxes[5] != scanBox.getMaxZ()
+                    || this.boxes[6] != entityBox.getMinX() || this.boxes[7] != entityBox.getMinY()
+                    || this.boxes[8] != entityBox.getMinZ() || this.boxes[9] != entityBox.getMaxX()
+                    || this.boxes[10] != entityBox.getMaxY() || this.boxes[11] != entityBox.getMaxZ()) {
+                return false;
+            }
+            for (int i = 0; i < this.stamps; i++) {
+                FullChunk chunk = chunkAt(level, hint, this.stampChunkX[i] << 4, this.stampChunkZ[i] << 4);
+                if (chunk != this.stampChunk[i]) {
+                    return false;
+                }
+                if (chunk == null) {
+                    continue;
+                }
+                hint = chunk;
+                ChunkSection section = ((LevelDBChunk) chunk).getSection(this.stampSectionY[i]);
+                if (section != this.stampSection[i]) {
+                    return false;
+                }
+                if (this.stampVersion[i] != NO_VERSION
+                        && ((LevelDBChunkSection) section).getBlockVersion(0) != this.stampVersion[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        Block[] materialise(Level level) {
+            if (this.candidates == 0) {
+                return Block.EMPTY_ARRAY;
+            }
+            Block[] result = new Block[this.candidates];
+            int count = 0;
+            for (int i = 0; i < this.candidates; i++) {
+                long pair = this.candidatePair[i];
+                int id = (int) (pair >>> 32);
+                Block block = Block.get(id, (int) pair, level, this.candidateX[i], this.candidateY[i], this.candidateZ[i], 0);
+                if (block == null || block.isAir()) {
+                    continue;
+                }
+                result[count++] = id >= 0 && id < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID ? block : block.clone();
+            }
+            return count == result.length ? result : Arrays.copyOf(result, count);
+        }
+
+        void begin(Level level) {
+            this.level = level;
+            this.valid = false;
+            this.cachable = true;
+            // Drop the chunk and section references of the previous scan: a slot past the new stamp
+            // count would otherwise keep an unloaded or replaced chunk reachable while the entity lives.
+            Arrays.fill(this.stampChunk, 0, this.stamps, null);
+            Arrays.fill(this.stampSection, 0, this.stamps, null);
+            this.stamps = 0;
+            this.candidates = 0;
+        }
+
+        void uncachable() {
+            this.cachable = false;
+        }
+
+        void stamp(int chunkX, int chunkZ, int sectionY, Object chunk, Object section, int version) {
+            if (this.stamps == this.stampChunkX.length) {
+                int size = this.stamps << 1;
+                this.stampChunkX = Arrays.copyOf(this.stampChunkX, size);
+                this.stampChunkZ = Arrays.copyOf(this.stampChunkZ, size);
+                this.stampSectionY = Arrays.copyOf(this.stampSectionY, size);
+                this.stampVersion = Arrays.copyOf(this.stampVersion, size);
+                this.stampChunk = Arrays.copyOf(this.stampChunk, size);
+                this.stampSection = Arrays.copyOf(this.stampSection, size);
+            }
+            int i = this.stamps++;
+            this.stampChunkX[i] = chunkX;
+            this.stampChunkZ[i] = chunkZ;
+            this.stampSectionY[i] = sectionY;
+            this.stampVersion[i] = version;
+            this.stampChunk[i] = chunk;
+            this.stampSection[i] = section;
+        }
+
+        void candidate(int x, int y, int z, long pair) {
+            if (this.candidates == this.candidateX.length) {
+                int size = this.candidates << 1;
+                this.candidateX = Arrays.copyOf(this.candidateX, size);
+                this.candidateY = Arrays.copyOf(this.candidateY, size);
+                this.candidateZ = Arrays.copyOf(this.candidateZ, size);
+                this.candidatePair = Arrays.copyOf(this.candidatePair, size);
+            }
+            int i = this.candidates++;
+            this.candidateX[i] = x;
+            this.candidateY[i] = y;
+            this.candidateZ[i] = z;
+            this.candidatePair[i] = pair;
+        }
+
+        void commit(AxisAlignedBB scanBox, AxisAlignedBB entityBox) {
+            if (!this.cachable) {
+                this.valid = false;
+                return;
+            }
+            this.boxes[0] = scanBox.getMinX();
+            this.boxes[1] = scanBox.getMinY();
+            this.boxes[2] = scanBox.getMinZ();
+            this.boxes[3] = scanBox.getMaxX();
+            this.boxes[4] = scanBox.getMaxY();
+            this.boxes[5] = scanBox.getMaxZ();
+            this.boxes[6] = entityBox.getMinX();
+            this.boxes[7] = entityBox.getMinY();
+            this.boxes[8] = entityBox.getMinZ();
+            this.boxes[9] = entityBox.getMaxX();
+            this.boxes[10] = entityBox.getMaxY();
+            this.boxes[11] = entityBox.getMaxZ();
+            this.valid = true;
+        }
     }
 
     private static long[] scratchPairs(int size) {

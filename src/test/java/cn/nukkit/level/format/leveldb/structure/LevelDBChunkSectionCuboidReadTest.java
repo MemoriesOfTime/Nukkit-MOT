@@ -66,6 +66,31 @@ class LevelDBChunkSectionCuboidReadTest {
         assertEquals(1, counting.unlocks);
     }
 
+    @Test
+    void versionMovesWithEveryWriteAndOnlyThen() {
+        StateBlockStorage storage = new StateBlockStorage();
+        LevelDBChunkSection section = new LevelDBChunkSection(0, new StateBlockStorage[]{storage}, false);
+        long[] out = new long[1];
+        int read = section.getBlockStatePairs(0, 1, 2, 3, 1, 2, 3, out, 0, 1, 1);
+        assertEquals(read, section.getBlockVersion(0));
+        section.getBlockStatePair(1, 2, 3, 0);
+        section.getBlockStatePairs(0, 0, 0, 0, 15, 15, 15, new long[4096], 0, 256, 16);
+        assertEquals(read, section.getBlockVersion(0), "reads leave the version alone");
+
+        storage.set(1, 2, 3, BlockStateSnapshot.builder().legacyId(BlockID.STONE).legacyData(0).build());
+        int written = section.getBlockVersion(0);
+        assertNotEquals(read, written, "a write moves it");
+        storage.set(1, 2, 3, BlockStateSnapshot.builder().legacyId(BlockID.AIR).legacyData(0).build());
+        assertNotEquals(written, section.getBlockVersion(0), "so does writing the old state back");
+
+        int beforeCompress = section.getBlockVersion(0);
+        storage.compress();
+        assertNotEquals(beforeCompress, section.getBlockVersion(0), "compacting counts as a change");
+
+        assertEquals(-1, section.getBlockVersion(1), "absent layer");
+        assertEquals(-1, section.getBlockStatePairs(1, 0, 0, 0, 0, 0, 0, out, 0, 1, 1));
+    }
+
     private static final class CountingLock implements Lock {
         private final Lock delegate;
         int locks;

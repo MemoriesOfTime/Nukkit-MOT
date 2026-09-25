@@ -48,6 +48,12 @@ public class StateBlockStorage {
     private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
 
+    /**
+     * Bumped by every change of the stored states. Whoever read cells together with a version knows
+     * they still hold while {@link #getVersion()} returns the same value (the collision scan cache).
+     */
+    private volatile int version;
+
     //用于兼容1.13以下版本
     private byte[] blockIds;
     private NibbleArray blockData;
@@ -117,6 +123,7 @@ public class StateBlockStorage {
         }
 
         this.palette.clear();
+        this.version++;
 
         BitArrayVersion version = BitArrayVersion.get(header >> 1, true);
 
@@ -224,7 +231,14 @@ public class StateBlockStorage {
             }
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unable to set value: " + value + ", palette: " + palette, e);
+        } finally {
+            this.version++;
         }
+    }
+
+    /** See {@link #version}. */
+    public int getVersion() {
+        return this.version;
     }
 
     public void set(int x, int y, int z, BlockStateSnapshot value) {
@@ -364,6 +378,7 @@ public class StateBlockStorage {
             break;
         }
         if (noBlock) {
+            this.version++;
             BlockStateSnapshot firstId = this.palette.get(0);
             this.palette.clear();
             this.palette.add(firstId);
@@ -412,6 +427,7 @@ public class StateBlockStorage {
         }
         this.bitArray = newArray;
         this.palette = newPalette;
+        this.version++;
         return true;
     }
 

@@ -307,9 +307,11 @@ public class LevelDBChunkSection implements ChunkSection {
      * <p>A bounding-box scan used to lock and unlock the section once per cell - a horse visits about
      * eighty cells every tick. One acquisition per section gives the same values (the cuboid is now read
      * atomically) without the per-cell synchronisation.
+     *
+     * @return the {@link #getBlockVersion(int) version} of the layer the cells were read from
      */
-    public void getBlockStatePairs(int layer, int x0, int y0, int z0, int x1, int y1, int z1,
-                                   long[] out, int base, int strideX, int strideZ) {
+    public int getBlockStatePairs(int layer, int x0, int y0, int z0, int x1, int y1, int z1,
+                                  long[] out, int base, int strideX, int strideZ) {
         this.readLock.lock();
         try {
             StateBlockStorage storage = this.hasLayerUnsafe(layer) ? this.storages[layer] : null;
@@ -326,9 +328,21 @@ public class LevelDBChunkSection implements ChunkSection {
                     }
                 }
             }
+            return storage == null ? -1 : storage.getVersion();
         } finally {
             this.readLock.unlock();
         }
+    }
+
+    /**
+     * Version of a layer's states, or -1 while the layer does not exist; unchanged means no cell of the
+     * layer changed. Read without the lock: an answer that races a writer is either the old version
+     * (the reader's cells are consistent with it) or a new one (the reader rescans).
+     */
+    public int getBlockVersion(int layer) {
+        StateBlockStorage[] storages = this.storages;
+        StateBlockStorage storage = layer < storages.length ? storages[layer] : null;
+        return storage == null ? -1 : storage.getVersion();
     }
 
     @Override
