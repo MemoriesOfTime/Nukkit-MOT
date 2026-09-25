@@ -1806,6 +1806,11 @@ public class Level implements ChunkManager, Metadatable {
                     block1.onUpdate(BLOCK_UPDATE_REDSTONE);
                 } else if (block1.isNormalBlock()) {
                     pos = pos.getSideVec(face);
+                    // Same rule as the first ring above: a block behind the solid one may sit in the
+                    // next chunk, and a comparator there is not in memory - do not load it from disk.
+                    if (!this.isChunkLoaded((int) pos.x >> 4, (int) pos.z >> 4)) {
+                        continue;
+                    }
                     block1 = this.getBlock(pos);
 
                     if (BlockRedstoneDiode.isDiode(block1)) {

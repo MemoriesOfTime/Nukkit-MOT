@@ -74,6 +74,8 @@ public class BlockEntityHopperTest {
         Level level = mock(Level.class);
         lenient().when(level.getChunkPlayers(anyInt(), anyInt())).thenReturn(Collections.emptyMap());
         lenient().when(level.getServer()).thenReturn(serverMock);
+        // The hopper sits at a chunk corner; its neighbourhood is in memory unless a test says otherwise.
+        lenient().when(level.isChunkLoaded(anyInt(), anyInt())).thenReturn(true);
 
         FullChunk chunk = mock(FullChunk.class);
         LevelProvider provider = mock(LevelProvider.class);
@@ -599,6 +601,28 @@ public class BlockEntityHopperTest {
 
             // Full, no container above, can't push → should sleep
             assertFalse(result);
+        }
+
+        @Test
+        @DisplayName("E7: neighbour chunk not in memory -> polls without reading it")
+        void unloadedNeighbourChunkIsNotReadFromDisk() {
+            HopperTestContext ctx = createHopper();
+            ctx.hopper.transferCooldown = 0;
+            // The hopper at (0, 64, 0) reaches three blocks into chunk (-1, *); that chunk is unloaded.
+            when(ctx.level.isChunkLoaded(eq(-1), anyInt())).thenReturn(false);
+            ctx.hopper.getInventory().setItem(0, Item.get(ItemID.DIAMOND, 0, 5));
+
+            boolean result = ctx.hopper.onUpdate();
+
+            // Stays awake and retries later instead of sleeping or loading the neighbour
+            assertTrue(result);
+            assertEquals(8, ctx.hopper.transferCooldown);
+            assertEquals(5, ctx.hopper.getInventory().getItem(0).getCount());
+            verify(ctx.level, never()).isBlockPowered(any());
+            verify(ctx.level, never()).getBlock(any(Vector3.class));
+            verify(ctx.level, never()).getBlockEntity(any(Vector3.class));
+            verify(ctx.level, never()).getChunk(anyInt(), anyInt());
+            verify(ctx.level, never()).getChunk(anyInt(), anyInt(), anyBoolean());
         }
     }
 

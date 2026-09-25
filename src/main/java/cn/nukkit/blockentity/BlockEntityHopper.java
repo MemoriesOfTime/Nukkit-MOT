@@ -139,6 +139,15 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
         this.transferCooldown = ev.getTransferCooldown() - 1;
 
         if (!this.isOnTransferCooldown()) {
+            // The redstone lock and the push target below may reach a neighbouring chunk. At the
+            // edge of the loaded area that chunk is not in memory, and the loading getBlock would
+            // read it from disk in the tick. Wait for it instead: keep polling without sleeping,
+            // so the hopper carries on as soon as the neighbour loads.
+            if (!this.isNeighbourhoodLoaded()) {
+                this.setTransferCooldown(8);
+                return true;
+            }
+
             // Sleep when redstone-locked (checked after cooldown decrement for plugin compatibility)
             if (this.level.isBlockPowered(this.getBlock())) {
                 return false;
@@ -469,22 +478,63 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
     }
 
     private static void wakeupHopperAt(Level level, int x, int y, int z) {
-        if (level.getBlockIdAt(x, y, z) == Block.HOPPER_BLOCK) {
-            BlockEntity be = level.getBlockEntity(new Vector3(x, y, z));
-            if (be instanceof BlockEntityHopper hopper && !hopper.closed) {
-                hopper.scheduleUpdate();
-            }
+        FullChunk chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
+        BlockEntityHopper hopper = loadedHopperAt(level, chunk, x, y, z);
+        if (hopper != null) {
+            hopper.scheduleUpdate();
         }
     }
 
     private static void wakeupHopperFacingTo(Level level, int x, int y, int z, int requiredFacing) {
-        if (level.getBlockIdAt(x, y, z) == Block.HOPPER_BLOCK) {
-            if ((level.getBlockDataAt(x, y, z) & 0x7) == requiredFacing) {
-                BlockEntity be = level.getBlockEntity(new Vector3(x, y, z));
-                if (be instanceof BlockEntityHopper hopper && !hopper.closed) {
-                    hopper.scheduleUpdate();
+        FullChunk chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
+        BlockEntityHopper hopper = loadedHopperAt(level, chunk, x, y, z);
+        if (hopper != null && (chunk.getBlockData(x & 0x0f, y, z & 0x0f) & 0x7) == requiredFacing) {
+            hopper.scheduleUpdate();
+        }
+    }
+
+    /**
+     * The hopper standing at the position, looked up only in a chunk that is in memory.
+     * <p>
+     * A hopper in an unloaded chunk does not tick, and it schedules itself when its chunk loads
+     * ({@link #initBlockEntity()}), so there is nothing to wake there. Reading that chunk would load
+     * it from disk on the main thread - a container on a chunk border woke its unloaded neighbour
+     * on every slot change, including the ones made while the container's own chunk was unloading.
+     */
+    private static BlockEntityHopper loadedHopperAt(Level level, FullChunk chunk, int x, int y, int z) {
+        if (chunk == null || level.getBlockIdAt(chunk, x, y, z) != Block.HOPPER_BLOCK) {
+            return null;
+        }
+        BlockEntity be = level.getBlockEntityIfLoaded(chunk, new Vector3(x, y, z));
+        return be instanceof BlockEntityHopper hopper && !hopper.closed ? hopper : null;
+    }
+
+    /**
+     * How far {@link #onUpdate()} reads around the hopper: the push target is one block away, and
+     * the redstone lock asks a solid neighbour for its strong power, which a redstone wire two
+     * blocks away answers by looking at its own neighbours - three blocks.
+     */
+    private static final int NEIGHBOURHOOD_REACH = 3;
+
+    /** Whether every chunk {@link #onUpdate()} may read is in memory, so reading never loads one. */
+    private boolean isNeighbourhoodLoaded() {
+        int x = this.getFloorX();
+        int z = this.getFloorZ();
+        int minChunkX = (x - NEIGHBOURHOOD_REACH) >> 4;
+        int maxChunkX = (x + NEIGHBOURHOOD_REACH) >> 4;
+        int minChunkZ = (z - NEIGHBOURHOOD_REACH) >> 4;
+        int maxChunkZ = (z + NEIGHBOURHOOD_REACH) >> 4;
+        if (minChunkX == maxChunkX && minChunkZ == maxChunkZ) {
+            // Only the hopper's own chunk, which is loaded because the hopper ticks.
+            return true;
+        }
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                if (!this.level.isChunkLoaded(chunkX, chunkZ)) {
+                    return false;
                 }
             }
         }
+        return true;
     }
 }
