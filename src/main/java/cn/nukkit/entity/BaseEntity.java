@@ -112,6 +112,70 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     public abstract Vector3 updateMove(int tickDiff);
 
+    /** A sleeping mob catches up once per this many ticks. */
+    static final int ACTIVATION_INTERVAL = 20;
+    /** Recently hurt mobs stay awake so knock-back, hurt windows and panic keep the per-tick cadence. */
+    static final int ACTIVATION_DAMAGE_GRACE_TICKS = 100;
+    /**
+     * Only this core's own mob classes may sleep: a plugin subclass can hang arbitrary per-tick logic on
+     * {@link #onUpdate(int)}. Snow golems, creakings and elder guardians keep tick-phase timers that a
+     * once-per-second catch-up would either always or never hit.
+     */
+    private static final ClassValue<Boolean> ACTIVATION_CLASS = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            return type.getName().startsWith("cn.nukkit.entity.")
+                    && !EntityBoss.class.isAssignableFrom(type)
+                    && !cn.nukkit.entity.mob.EntitySnowGolem.class.isAssignableFrom(type)
+                    && !cn.nukkit.entity.mob.EntityCreaking.class.isAssignableFrom(type)
+                    && !cn.nukkit.entity.mob.EntityElderGuardian.class.isAssignableFrom(type);
+        }
+    };
+
+    private boolean activationAsleep;
+    /** tickDiff of the base tick in progress; lets the despawn cadence survive a caught-up tick. */
+    protected int lastBaseTickDiff = 1;
+
+    /**
+     * Entity activation: a mob that is farther than {@code entity-settings.activation-blocks} from every player
+     * of its level is updated only on its own phase tick, once per {@link #ACTIVATION_INTERVAL} ticks, with the
+     * elapsed ticks as {@code tickDiff}. Mobs already stop walking past that range, so a sleeping mob only defers
+     * its environment checks (block collisions, suffocation, air). Anything that makes the per-tick cadence
+     * matter wakes the mob at once: fire, effects, recent damage, riders, leash, love, a name tag or an owner.
+     * The range is re-evaluated on every phase tick, so an approaching player wakes a mob within one second.
+     */
+    @Override
+    public boolean isActivationThrottled(int currentTick) {
+        double range = this.server.entityActivationRangeSquared;
+        if (range <= 0 || !this.canSleepOutOfRange()) {
+            this.activationAsleep = false;
+            return false;
+        }
+        if (Math.floorMod(currentTick + (int) (this.id % ACTIVATION_INTERVAL), ACTIVATION_INTERVAL) == 0) {
+            this.activationAsleep = !this.isInTickingRange(range);
+            return false;
+        }
+        return this.activationAsleep;
+    }
+
+    /** Whether this mob is currently sleeping out of the activation range. */
+    public boolean isActivationAsleep() {
+        return this.activationAsleep;
+    }
+
+    protected boolean canSleepOutOfRange() {
+        return ACTIVATION_CLASS.get(this.getClass())
+                && !this.closed && this.isAlive()
+                && this.riding == null && this.passengers.isEmpty()
+                && this.fireTicks <= 0 && this.effects.isEmpty()
+                && this.noDamageTicks <= 0 && this.attackTime <= 0
+                && this.inLoveTicks <= 0
+                && !this.isLeashed()
+                && this.server.getTick() - this.lastDamageTick > ACTIVATION_DAMAGE_GRACE_TICKS
+                && !this.hasCustomName()
+                && !(this instanceof EntityOwnable ownable && ownable.getOwnerName() != null && !ownable.getOwnerName().isEmpty());
+    }
+
     public abstract int getKillExperience();
 
     public boolean isFriendly() {
@@ -257,6 +321,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
+        this.lastBaseTickDiff = tickDiff;
         if (this.canDespawn() && this.age > Server.getInstance().mobDespawnTicks && !this.hasCustomName() && !(this instanceof EntityBoss)) {
             this.close();
             return true;
@@ -697,7 +762,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
      */
     public boolean canDespawn() {
         return this.y < -128 || (this.server.despawnMobs &&
-                !this.persistent && this.age % 100 == 0 && this.riding == null && this.inLoveTicks <= 0 && this.inLoveCooldown <= 0 &&
+                !this.persistent && this.isDespawnCheckTick() && this.riding == null && this.inLoveTicks <= 0 && this.inLoveCooldown <= 0 &&
                 !this.isLeashed() && !this.hasCustomName() && server.getTick() - this.lastDamageTick > 600 && // no damage in 30 seconds
                 !this.isInTickingRange(9216) // 96 blocks
         );
@@ -833,8 +898,18 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.setBothYaw(this.yaw + delta);
     }
 
+    /**
+     * Despawn is probed when age hits a multiple of 100. A caught-up tick covers ages
+     * [age, age + tickDiff - 1] (age advances after this check), so it must not step over the multiple.
+     */
+    private boolean isDespawnCheckTick() {
+        return this.lastBaseTickDiff <= 1 ? this.age % 100 == 0 : hitsResidue(this.age, this.lastBaseTickDiff, 100, 0);
+    }
+
     protected boolean isInTickingRange() {
-        return this.isInTickingRange(6400); // 80 blocks
+        // Walking range and activation range must agree: a mob that sleeps but still walks would jump once a second.
+        double activation = this.server.entityActivationRangeSquared;
+        return this.isInTickingRange(activation > 0 ? activation : 6400); // 80 blocks by default
     }
 
     protected boolean isInTickingRange(double rangeSquared) {

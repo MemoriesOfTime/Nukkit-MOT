@@ -1311,11 +1311,13 @@ public class Level implements ChunkManager, Metadatable {
                     this.updateEntities.remove(id);
                     continue;
                 }
-                if (entity.closed || !entity.onUpdate(currentTick)) {
+                if (!this.updateEntity(entity, currentTick)) {
                     this.updateEntities.remove(id);
                 }
             }
         }
+
+        this.reportEntityActivation();
 
         var updateBlockEntities = this.updateBlockEntities.iterator();
         while (updateBlockEntities.hasNext()) {
@@ -1419,6 +1421,58 @@ public class Level implements ChunkManager, Metadatable {
             Server.broadcastPacket(players.values().toArray(Player.EMPTY_ARRAY), packet);
             gameRules.refresh();
         }
+    }
+
+    /** Mob updates skipped by entity activation since the last report. */
+    private long activationSkippedUpdates;
+    /** Mob updates actually run since the last report. */
+    private long activationRunUpdates;
+    private long lastActivationReport = System.currentTimeMillis();
+    private static final long ACTIVATION_REPORT_INTERVAL_MS = 600_000L;
+
+    public long getActivationSkippedUpdates() {
+        return this.activationSkippedUpdates;
+    }
+
+    public long getActivationRunUpdates() {
+        return this.activationRunUpdates;
+    }
+
+    /**
+     * Runs one scheduled entity update. A mob asleep under entity activation is skipped but stays scheduled.
+     *
+     * @return {@code false} when the entity leaves the update list
+     */
+    boolean updateEntity(Entity entity, int currentTick) {
+        if (entity.closed) {
+            return false;
+        }
+        if (entity.isActivationThrottled(currentTick)) {
+            this.activationSkippedUpdates++;
+            return true;
+        }
+        if (entity instanceof cn.nukkit.entity.BaseEntity) {
+            this.activationRunUpdates++;
+        }
+        return entity.onUpdate(currentTick);
+    }
+
+    /** One line per level every ten minutes: how much mob work entity activation saved. Silent when idle. */
+    private void reportEntityActivation() {
+        long now = System.currentTimeMillis();
+        if (now - this.lastActivationReport < ACTIVATION_REPORT_INTERVAL_MS) {
+            return;
+        }
+        this.lastActivationReport = now;
+        long skipped = this.activationSkippedUpdates;
+        long run = this.activationRunUpdates;
+        this.activationSkippedUpdates = 0;
+        this.activationRunUpdates = 0;
+        if (skipped == 0) {
+            return;
+        }
+        this.server.getLogger().info("Entity activation in level " + this.getFolderName() + ": skipped " + skipped
+                + " of " + (skipped + run) + " mob updates (" + (skipped * 100 / (skipped + run)) + "%) in the last 10 min");
     }
 
     private void performThunder(long index, FullChunk chunk) {

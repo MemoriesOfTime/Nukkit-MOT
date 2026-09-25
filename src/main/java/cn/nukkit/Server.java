@@ -478,6 +478,11 @@ public class Server {
      */
     public boolean despawnMobs;
     /**
+     * Squared horizontal distance past which mobs are updated once per second (entity activation).
+     * Zero or less disables the throttle.
+     */
+    public double entityActivationRangeSquared;
+    /**
      * Strong RakNet level IP bans enabled.
      */
     public boolean strongIPBans;
@@ -3973,6 +3978,9 @@ public class Server {
         this.mobAiEnabled = config.entitySettings().mobAi();
         this.despawnMobs = config.entitySettings().despawnTask();
         this.mobDespawnTicks = config.entitySettings().ticksPerDespawns();
+        int activationBlocks = config.entitySettings().activationBlocks();
+        // Below 16 blocks a mob could sleep inside a player's own view of it; clamp instead of guessing.
+        this.entityActivationRangeSquared = activationBlocks <= 0 ? 0 : (double) Math.max(16, activationBlocks) * Math.max(16, activationBlocks);
 
         // World
         this.netherEnabled = config.worldSettings().nether();
