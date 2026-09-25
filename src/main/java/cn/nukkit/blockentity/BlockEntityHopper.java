@@ -143,13 +143,19 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return false;
         }
 
-        HopperUpdateEvent ev = new HopperUpdateEvent(this);
-        ev.call();
-        if (ev.isCancelled()) {
-            return true;
+        // Fired every tick of every awake hopper; built and called only when someone listens, since
+        // an event nobody listens to cannot be cancelled or change the cooldown.
+        int cooldown = this.transferCooldown;
+        if (HopperUpdateEvent.getHandlers().getRegisteredListeners().length != 0) {
+            HopperUpdateEvent ev = new HopperUpdateEvent(this);
+            ev.call();
+            if (ev.isCancelled()) {
+                return true;
+            }
+            cooldown = ev.getTransferCooldown();
         }
 
-        this.transferCooldown = ev.getTransferCooldown() - 1;
+        this.transferCooldown = cooldown - 1;
 
         if (!this.isOnTransferCooldown()) {
             // The redstone lock and the push target below may reach a neighbouring chunk. At the
@@ -177,22 +183,32 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                 hasContainerAbove = blockAbove instanceof BlockComposter;
             }
 
-            HopperSearchItemEvent searchEvent = new HopperSearchItemEvent(this, false, this.pickupArea);
-            searchEvent.call();
+            boolean searchCancelled = false;
+            boolean cancelPull = false;
+            boolean cancelPush = false;
+            AxisAlignedBB pickupArea = this.pickupArea;
+            if (HopperSearchItemEvent.getHandlers().getRegisteredListeners().length != 0) {
+                HopperSearchItemEvent searchEvent = new HopperSearchItemEvent(this, false, this.pickupArea);
+                searchEvent.call();
+                searchCancelled = searchEvent.isCancelled();
+                cancelPull = searchEvent.isCancelPull();
+                cancelPush = searchEvent.isCancelPush();
+                pickupArea = searchEvent.getPickupArea();
+            }
 
             boolean changed = false;
 
-            if (!searchEvent.isCancelled() && !searchEvent.isCancelPull()) {
+            if (!searchCancelled && !cancelPull) {
                 if (!this.inventory.isFull()) {
                     if (hasContainerAbove) {
                         changed = this.pullItems(blockEntityAbove, blockAbove);
                     } else {
-                        changed = this.pullItemsFromMinecart() || this.pickupItems(searchEvent.getPickupArea());
+                        changed = this.pullItemsFromMinecart() || this.pickupItems(pickupArea);
                     }
                 }
             }
 
-            if (!changed && !searchEvent.isCancelled() && !searchEvent.isCancelPush()) {
+            if (!changed && !searchCancelled && !cancelPush) {
                 if (!this.inventory.isEmpty()) {
                     changed = this.pushItemsIntoMinecart() || this.pushItems();
                 }
@@ -201,7 +217,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             if (changed) {
                 this.setTransferCooldown(8);
                 this.setDirty();
-            } else if (searchEvent.isCancelled()) {
+            } else if (searchCancelled) {
                 // Plugin cancelled the search — keep polling to match original behavior
                 this.setTransferCooldown(8);
             } else if (!hasContainerAbove && !this.inventory.isFull()) {

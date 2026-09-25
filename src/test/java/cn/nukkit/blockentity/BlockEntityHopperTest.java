@@ -707,6 +707,53 @@ public class BlockEntityHopperTest {
         }
     }
 
+    // ===== J. Events — built only when someone listens =====
+
+    @Nested
+    @DisplayName("J. Events")
+    class Events {
+
+        @Test
+        @DisplayName("J1: without listeners no hopper event reaches the plugin manager")
+        void noListenersNoEvents() {
+            HopperTestContext ctx = createHopper();
+            ctx.hopper.transferCooldown = 5;
+            assertTrue(ctx.hopper.onUpdate());
+            assertEquals(4, ctx.hopper.transferCooldown);
+            verify(pluginManagerMock, never()).callEvent(any(cn.nukkit.event.blockentity.HopperUpdateEvent.class));
+        }
+
+        @Test
+        @DisplayName("J2: a listener still cancels the update and sets the cooldown")
+        void listenerStillControlsTheUpdate() {
+            cn.nukkit.plugin.Plugin plugin = mock(cn.nukkit.plugin.Plugin.class);
+            cn.nukkit.plugin.RegisteredListener registration = new cn.nukkit.plugin.RegisteredListener(
+                    new cn.nukkit.event.Listener() {}, (listener, event) -> {}, cn.nukkit.event.EventPriority.NORMAL, plugin, false);
+            cn.nukkit.event.blockentity.HopperUpdateEvent.getHandlers().register(registration);
+            try {
+                HopperTestContext ctx = createHopper();
+                ctx.hopper.transferCooldown = 5;
+                doAnswer(invocation -> {
+                    cn.nukkit.event.blockentity.HopperUpdateEvent event = invocation.getArgument(0);
+                    event.setTransferCooldown(20);
+                    return null;
+                }).when(pluginManagerMock).callEvent(any(cn.nukkit.event.blockentity.HopperUpdateEvent.class));
+                assertTrue(ctx.hopper.onUpdate());
+                assertEquals(19, ctx.hopper.transferCooldown);
+
+                doAnswer(invocation -> {
+                    cn.nukkit.event.blockentity.HopperUpdateEvent event = invocation.getArgument(0);
+                    event.setCancelled();
+                    return null;
+                }).when(pluginManagerMock).callEvent(any(cn.nukkit.event.blockentity.HopperUpdateEvent.class));
+                assertTrue(ctx.hopper.onUpdate());
+                assertEquals(19, ctx.hopper.transferCooldown, "a cancelled update leaves the cooldown alone");
+            } finally {
+                cn.nukkit.event.blockentity.HopperUpdateEvent.getHandlers().unregister(registration);
+            }
+        }
+    }
+
     // ===== F. Boundary — Edge cases =====
 
     @Nested
