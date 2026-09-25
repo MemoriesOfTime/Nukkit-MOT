@@ -9,6 +9,7 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
@@ -149,6 +150,24 @@ public class NBTOutputStream implements DataOutput, AutoCloseable {
             this.writeShort(bytes.length);
         }
         this.stream.write(bytes);
+    }
+
+    /**
+     * Writes an int array with its length prefix. Fixed-width encodings go out as one bulk
+     * write instead of one call per element into the underlying stream; the network VarInt
+     * encoding stays element-wise because it has no fixed width.
+     */
+    public void writeIntArray(int[] data) throws IOException {
+        this.writeInt(data.length);
+        if (network) {
+            for (int value : data) {
+                VarInt.writeVarInt(this.stream, value);
+            }
+            return;
+        }
+        ByteBuffer buffer = ByteBuffer.allocate(data.length * Integer.BYTES).order(this.endianness);
+        buffer.asIntBuffer().put(data);
+        this.stream.write(buffer.array());
     }
 
     public void writeTag(Tag tag) throws IOException {
