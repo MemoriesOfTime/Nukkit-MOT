@@ -761,6 +761,66 @@ public class NetEasePacketRegressionTest {
         assertEquals("Server message", cbPacket.getMessage().toString());
     }
 
+    // ==================== AnimatePacket NetEase attackId tail ====================
+
+    @ParameterizedTest(name = "AnimatePacket NetEase attackId tail v{0}")
+    @MethodSource("netEasePacketPoolVersions")
+    void testAnimatePacketNetEaseAttackIdTail(GameVersion gameVersion) {
+        var nukkitPacket = buildNetEaseAnimatePacket(gameVersion, 1L);
+        nukkitPacket.encode();
+        byte[] encoded = nukkitPacket.getBuffer();
+
+        if (gameVersion.getProtocol() >= GameVersion.V1_21_130_NETEASE.getProtocol()) {
+            // NetEase tail is ActorUniqueID = zigzag varint64: zigzag(1) = 2 -> 0x02.
+            // A uvarlong(1) would emit 0x01 instead, so this pins the wire type.
+            assertEquals(0x02, encoded[encoded.length - 1] & 0xFF,
+                    "attackId must be zigzag varint64, not unsigned varlong");
+
+            var decoded = new cn.nukkit.network.protocol.AnimatePacket();
+            decoded.protocol = gameVersion.getProtocol();
+            decoded.gameVersion = gameVersion;
+            decoded.setBuffer(encoded);
+            decoded.getUnsignedVarInt();
+            decoded.decode();
+            assertEquals(1L, decoded.attackId);
+        } else {
+            // Older NetEase versions carry no tail field: encoding is byte-identical whatever attackId holds
+            var zeroAttack = buildNetEaseAnimatePacket(gameVersion, 0L);
+            zeroAttack.encode();
+            assertArrayEquals(zeroAttack.getBuffer(), encoded);
+        }
+    }
+
+    @Test
+    void testAnimatePacketNetEaseAttackIdNegativeIsSingleByte() {
+        var nukkitPacket = buildNetEaseAnimatePacket(GameVersion.V1_21_130_NETEASE, -1L);
+        nukkitPacket.encode();
+        byte[] encoded = nukkitPacket.getBuffer();
+
+        // zigzag(-1) = 1 -> single byte 0x01; uvarlong(-1) would need 9 bytes (FF FF FF FF FF FF FF FF 01)
+        assertEquals(0x01, encoded[encoded.length - 1] & 0xFF);
+
+        var decoded = new cn.nukkit.network.protocol.AnimatePacket();
+        decoded.protocol = GameVersion.V1_21_130_NETEASE.getProtocol();
+        decoded.gameVersion = GameVersion.V1_21_130_NETEASE;
+        decoded.setBuffer(encoded);
+        decoded.getUnsignedVarInt();
+        decoded.decode();
+        assertEquals(-1L, decoded.attackId);
+    }
+
+    private static cn.nukkit.network.protocol.AnimatePacket buildNetEaseAnimatePacket(GameVersion gameVersion, long attackId) {
+        var nukkitPacket = new cn.nukkit.network.protocol.AnimatePacket();
+        nukkitPacket.protocol = gameVersion.getProtocol();
+        nukkitPacket.gameVersion = gameVersion;
+        nukkitPacket.action = cn.nukkit.network.protocol.AnimatePacket.Action.SWING_ARM;
+        nukkitPacket.eid = 42;
+        nukkitPacket.data = 0.0f;
+        nukkitPacket.swingSource = cn.nukkit.network.protocol.AnimatePacket.SwingSource.NONE;
+        nukkitPacket.attackId = attackId;
+        return nukkitPacket;
+    }
+
     // ==================== Standard packets via NetEase codecs ====================
 
     @ParameterizedTest(name = "PlayStatusPacket NetEase v{0}")

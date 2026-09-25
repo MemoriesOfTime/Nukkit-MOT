@@ -51,7 +51,7 @@ public class AnimatePacket extends DataPacket {
         }
 
         if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_130) {
-            this.attackId = this.getUnsignedVarLong();
+            this.attackId = this.getVarLong();
         }
     }
 
@@ -77,7 +77,7 @@ public class AnimatePacket extends DataPacket {
         }
 
         if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_130) {
-            this.putUnsignedVarLong(this.attackId);
+            this.putVarLong(this.attackId);
         }
     }
 
