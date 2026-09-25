@@ -58,7 +58,7 @@ public class AsyncChunkLoadTest {
         setField(level, "asyncChunkLoadExecutor", executor);
         setField(level, "pendingChunkLoads", new ConcurrentHashMap<>());
         setField(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
-        setField(level, "unloadQueue", new Long2ObjectNonBlockingMap<>());
+        setField(level, "unloadQueue", new it.unimi.dsi.fastutil.longs.Long2LongLinkedOpenHashMap());
         setField(level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
         setField(level, "playerLoaders", new ConcurrentHashMap<>());
         setField(level, "loaders", new Int2ObjectOpenHashMap<>());

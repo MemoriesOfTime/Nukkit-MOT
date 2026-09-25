@@ -8,6 +8,7 @@ import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2LongLinkedOpenHashMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,7 +51,7 @@ public class LevelChunkSaveBackpressureTest {
         setField(level, "provider", this.provider);
         setField(level, "pendingChunkLoads", new ConcurrentHashMap<>());
         setField(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
-        setField(level, "unloadQueue", new Long2ObjectNonBlockingMap<>());
+        setField(level, "unloadQueue", new Long2LongLinkedOpenHashMap());
         setField(level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
         setField(level, "playerLoaders", new ConcurrentHashMap<>());
         setField(level, "loaders", new Int2ObjectOpenHashMap<>());
@@ -64,11 +65,15 @@ public class LevelChunkSaveBackpressureTest {
         field.set(target, value);
     }
 
-    @SuppressWarnings("unchecked")
-    private Long2ObjectNonBlockingMap<Long> unloadQueue(Level level) throws Exception {
+    private Long2LongLinkedOpenHashMap unloadQueue(Level level) throws Exception {
         Field field = Level.class.getDeclaredField("unloadQueue");
         field.setAccessible(true);
-        return (Long2ObjectNonBlockingMap<Long>) field.get(level);
+        return (Long2LongLinkedOpenHashMap) field.get(level);
+    }
+
+    /** A grace period that ran out ten seconds ago. */
+    private static long due() {
+        return Level.unloadClock() - Level.CHUNK_UNLOAD_DELAY_MILLIS - 10000;
     }
 
     @Test
@@ -89,7 +94,7 @@ public class LevelChunkSaveBackpressureTest {
     public void unloadChunksPausesAndKeepsQueueWhileBacklogged() throws Exception {
         Level level = newLevel();
         long hash = Level.chunkHash(3, 5);
-        unloadQueue(level).put(hash, (Long) (System.currentTimeMillis() - 30000));
+        unloadQueue(level).put(hash, due());
 
         Mockito.when(this.provider.isChunkSaveBacklogged()).thenReturn(true);
         level.unloadChunks(50, false);
@@ -102,7 +107,7 @@ public class LevelChunkSaveBackpressureTest {
     public void unloadChunksProceedsWhenNotBacklogged() throws Exception {
         Level level = newLevel();
         long hash = Level.chunkHash(3, 5);
-        unloadQueue(level).put(hash, (Long) (System.currentTimeMillis() - 30000));
+        unloadQueue(level).put(hash, due());
 
         Mockito.when(this.provider.isChunkSaveBacklogged()).thenReturn(false);
         Mockito.when(this.provider.isChunkLoaded(Mockito.anyInt(), Mockito.anyInt())).thenReturn(false);
@@ -115,7 +120,7 @@ public class LevelChunkSaveBackpressureTest {
     public void forceUnloadBypassesBackpressure() throws Exception {
         Level level = newLevel();
         long hash = Level.chunkHash(3, 5);
-        unloadQueue(level).put(hash, (Long) (System.currentTimeMillis() - 30000));
+        unloadQueue(level).put(hash, due());
 
         Mockito.when(this.provider.isChunkSaveBacklogged()).thenReturn(true);
         Mockito.when(this.provider.isChunkLoaded(Mockito.anyInt(), Mockito.anyInt())).thenReturn(false);
@@ -126,7 +131,7 @@ public class LevelChunkSaveBackpressureTest {
 
     private AtomicInteger queueUntilBacklogged(Level level, int pending) throws Exception {
         for (int x = 0; x < 3; x++) {
-            unloadQueue(level).put(Level.chunkHash(x * 5, 10), (Long) (System.currentTimeMillis() - 30000));
+            unloadQueue(level).put(Level.chunkHash(x * 5, 10), due());
         }
         AtomicInteger writes = new AtomicInteger(pending);
         Mockito.when(this.provider.isChunkSaveBacklogged()).thenAnswer(ignored -> writes.get() >= 128);
