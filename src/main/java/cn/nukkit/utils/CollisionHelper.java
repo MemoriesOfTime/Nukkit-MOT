@@ -3,6 +3,11 @@ package cn.nukkit.utils;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockBarrier;
+import cn.nukkit.block.BlockBell;
+import cn.nukkit.block.BlockFence;
+import cn.nukkit.block.BlockFenceGate;
+import cn.nukkit.block.BlockUnknown;
+import cn.nukkit.block.BlockWall;
 import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
@@ -159,8 +164,16 @@ public record CollisionHelper(Entity entity) {
         double expandY = Math.min(MAX_MOTION_EXPANSION, Math.max(0.5, motionAbsY + 0.3));
         double expandZ = Math.min(MAX_MOTION_EXPANSION, Math.max(0.5, motionAbsZ + 0.3));
 
-        Block[] blocks = this.getBlocksInBoundingBox(boundingBox.grow(expandX, expandY, expandZ));
+        Block[] blocks = this.getCollisionCandidates(boundingBox.grow(expandX, expandY, expandZ), boundingBox);
+        return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ);
+    }
 
+    /**
+     * The per-block half of {@link #getCollisionBlocks()}: which scanned blocks the entity touches.
+     * Split out unchanged so the scan can be checked against {@link #getBlocksInBoundingBox} by tests.
+     */
+    static Block[] filterCollisionBlocks(Block[] blocks, AxisAlignedBB boundingBox,
+                                         double expandX, double expandY, double expandZ) {
         if (blocks.length == 0) return Block.EMPTY_ARRAY;
 
         Block[] result = new Block[Math.min(blocks.length, 4)];
@@ -198,6 +211,282 @@ public record CollisionHelper(Entity entity) {
         }
 
         return count == 0 ? Block.EMPTY_ARRAY : Arrays.copyOf(result, count);
+    }
+
+    /* ---------------------------------------------------------------------------------------------
+     * Collision candidates.
+     *
+     * getCollisionBlocks scans the bounding box grown by at least half a block on every side, but the
+     * margin only exists for fire and nether portals (hasDynamicCollision), which are tested against
+     * that grown "trajectory" box. Every other block is tested against the entity's own box (solid) or
+     * a box inside it (pass-through), and its shape lies inside its own cell - except fences, fence
+     * gates and walls, which reach half a block above it, and bells, padded by 1e-6 on every side.
+     * So outside the cells the entity's box overlaps only fire, portals, the one layer of fences,
+     * gates and walls below the feet, bells, custom blocks and unregistered ids can ever pass the
+     * filter. Everything else there - above all the floor every mob stands on - used to be
+     * materialised, tested and dropped every tick, one section lock per cell.
+     *
+     * The candidate scan keeps the very same cells, in the very same x, z, y order, and materialises
+     * blocks exactly as getBlocksInBoundingBox does; it only leaves out blocks that cannot pass the
+     * unchanged filter. Standard LevelDB sections are read one cuboid per section under a single lock.
+     * ------------------------------------------------------------------------------------------- */
+
+    /** Shape flags per legacy block id; see {@link #shapeFlags()}. */
+    static final byte SHAPE_UNKNOWN = 1;
+    static final byte SHAPE_DYNAMIC = 2;
+    static final byte SHAPE_OVERHANG = 4;
+
+    /** Collision shapes of fences, gates and walls end this far above their cell. */
+    private static final double COLLISION_OVERHANG = 0.5;
+
+    private static volatile byte[] shapeFlags;
+
+    private static final byte CELL_AIR = 0;
+    private static final byte CELL_PAIR = 1;
+    private static final byte CELL_FALLBACK = 2;
+
+    /** Scratch buffers kept per thread; larger scans allocate instead of pinning memory. */
+    private static final int SCRATCH_RETAIN_LIMIT = 1 << 14;
+    private static final ThreadLocal<long[]> SCRATCH_PAIRS = ThreadLocal.withInitial(() -> new long[256]);
+    private static final ThreadLocal<byte[]> SCRATCH_CELLS = ThreadLocal.withInitial(() -> new byte[256]);
+
+    /**
+     * Per legacy id: SHAPE_DYNAMIC when the block collides through the trajectory box, SHAPE_OVERHANG
+     * when its collision shape rises above its cell, SHAPE_UNKNOWN when nothing is known about the id
+     * (not registered or no prototype). Ids outside the table (custom blocks) are treated as unknown.
+     * Returns null before {@link Block#init()}, which keeps the original scan.
+     */
+    static byte[] shapeFlags() {
+        byte[] flags = shapeFlags;
+        if (flags == null) {
+            @SuppressWarnings("rawtypes")
+            Class[] list = Block.list;
+            if (list == null) {
+                return null;
+            }
+            flags = new byte[list.length];
+            for (int id = 0; id < list.length; id++) {
+                if (list[id] == null) {
+                    flags[id] = SHAPE_UNKNOWN;
+                    continue;
+                }
+                byte flag;
+                try {
+                    // The same prototypes the scan materialises from, so the table cannot disagree with them.
+                    Block prototype = Block.get(id);
+                    if (prototype == null || prototype instanceof BlockUnknown || prototype instanceof BlockBell) {
+                        // A bell pads its collision box by 1e-6 on every side so a dropped item rings it.
+                        flag = SHAPE_UNKNOWN;
+                    } else {
+                        flag = 0;
+                        if (prototype.hasDynamicCollision()) {
+                            flag |= SHAPE_DYNAMIC;
+                        }
+                        if (prototype instanceof BlockFence || prototype instanceof BlockFenceGate
+                                || prototype instanceof BlockWall) {
+                            flag |= SHAPE_OVERHANG;
+                        }
+                    }
+                } catch (Throwable ignored) {
+                    flag = SHAPE_UNKNOWN;
+                }
+                flags[id] = flag;
+            }
+            shapeFlags = flags;
+        }
+        return flags;
+    }
+
+    /** Whether a block with this raw id, outside the cells the entity overlaps, can still pass the filter. */
+    private static boolean mayCollideFromOutside(byte[] flags, int id, boolean overhangLayer) {
+        if (id < 0 || id >= flags.length) {
+            return true;
+        }
+        int flag = flags[id];
+        return (flag & (SHAPE_UNKNOWN | SHAPE_DYNAMIC)) != 0 || (overhangLayer && (flag & SHAPE_OVERHANG) != 0);
+    }
+
+    /**
+     * Blocks of {@code scanBox} that {@link #filterCollisionBlocks} can accept for an entity whose own
+     * box is {@code entityBox}: the result of {@code getBlocksInBoundingBox(scanBox)} without the blocks
+     * the filter always rejects, in the same order and materialised the same way.
+     */
+    Block[] getCollisionCandidates(AxisAlignedBB scanBox, AxisAlignedBB entityBox) {
+        Level level = entity.getLevel();
+        byte[] flags = shapeFlags();
+        if (level == null || entity.isClosed() || flags == null || !isFinite(scanBox) || !isFinite(entityBox)
+                || level.getClass() != Level.class || level.getProvider() == null
+                || level.getProvider().getClass() != LevelDBProvider.class) {
+            return this.getBlocksInBoundingBox(scanBox);
+        }
+
+        int minX = NukkitMath.floorDouble(scanBox.getMinX());
+        int minY = NukkitMath.floorDouble(scanBox.getMinY());
+        int minZ = NukkitMath.floorDouble(scanBox.getMinZ());
+        int maxX = NukkitMath.ceilDouble(scanBox.getMaxX());
+        int maxY = NukkitMath.ceilDouble(scanBox.getMaxY());
+        int maxZ = NukkitMath.ceilDouble(scanBox.getMaxZ());
+
+        if (minX > maxX || minY > maxY || minZ > maxZ) return Block.EMPTY_ARRAY;
+
+        int clampedMinY = Math.max(minY, level.getMinBlockY());
+        int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
+        if (clampedMinY > clampedMaxY) return Block.EMPTY_ARRAY;
+
+        long estimatedCount = (long) (maxX - minX + 1) * (maxZ - minZ + 1) * (clampedMaxY - clampedMinY + 1);
+        if (estimatedCount <= 0 || estimatedCount > MAX_BOUNDING_BOX_ITERATIONS) {
+            logRunawayAABB(entity, scanBox, "getBlocksInBoundingBox");
+            return Block.EMPTY_ARRAY;
+        }
+
+        // Cells whose own shape can reach the entity's box: x with x < maxX && x + 1 > minX, the same
+        // for z and y, plus the layers from which a shape rising COLLISION_OVERHANG above its cell can.
+        // Math.ceil on purpose: NukkitMath.ceilDouble answers floor for positive fractions.
+        int innerMinX = NukkitMath.floorDouble(entityBox.getMinX());
+        int innerMaxX = (int) Math.ceil(entityBox.getMaxX()) - 1;
+        int innerMinZ = NukkitMath.floorDouble(entityBox.getMinZ());
+        int innerMaxZ = (int) Math.ceil(entityBox.getMaxZ()) - 1;
+        int innerMinY = NukkitMath.floorDouble(entityBox.getMinY());
+        int innerMaxY = (int) Math.ceil(entityBox.getMaxY()) - 1;
+        int overhangMinY = NukkitMath.floorDouble(entityBox.getMinY() - COLLISION_OVERHANG);
+
+        int sizeY = clampedMaxY - clampedMinY + 1;
+        int sizeZ = maxZ - minZ + 1;
+        int strideX = sizeZ * sizeY;
+        int cells = (int) estimatedCount;
+        long[] pairs = scratchPairs(cells);
+        byte[] kinds = scratchCells(cells);
+        Arrays.fill(kinds, 0, cells, CELL_AIR);
+
+        // Pass 1: every chunk once, every standard section as one locked cuboid read.
+        FullChunk hint = entity.chunk;
+        for (int chunkX = minX >> 4; chunkX <= maxX >> 4; chunkX++) {
+            int x0 = Math.max(minX, chunkX << 4);
+            int x1 = Math.min(maxX, (chunkX << 4) + 15);
+            for (int chunkZ = minZ >> 4; chunkZ <= maxZ >> 4; chunkZ++) {
+                int z0 = Math.max(minZ, chunkZ << 4);
+                int z1 = Math.min(maxZ, (chunkZ << 4) + 15);
+                FullChunk chunk = chunkAt(level, hint, x0, z0);
+                if (chunk == null) {
+                    continue;
+                }
+                hint = chunk;
+                boolean standardChunk = chunk.getClass() == LevelDBChunk.class
+                        && chunk.getProvider() == level.getProvider()
+                        && chunk.getX() == chunkX && chunk.getZ() == chunkZ;
+                for (int sectionY = clampedMinY >> 4; sectionY <= clampedMaxY >> 4; sectionY++) {
+                    int y0 = Math.max(clampedMinY, sectionY << 4);
+                    int y1 = Math.min(clampedMaxY, (sectionY << 4) + 15);
+                    int base = (x0 - minX) * strideX + (z0 - minZ) * sizeY + (y0 - clampedMinY);
+                    byte kind;
+                    if (standardChunk) {
+                        ChunkSection section = ((LevelDBChunk) chunk).getSection(sectionY);
+                        if (section.getClass() == EmptyChunkSection.class) {
+                            continue;
+                        }
+                        if (section.getClass() == LevelDBChunkSection.class) {
+                            ((LevelDBChunkSection) section).getBlockStatePairs(0, x0 & 0xF, y0 & 0xF, z0 & 0xF,
+                                    x1 & 0xF, y1 & 0xF, z1 & 0xF, pairs, base, strideX, sizeY);
+                            kind = CELL_PAIR;
+                        } else {
+                            kind = CELL_FALLBACK;
+                        }
+                    } else {
+                        kind = CELL_FALLBACK;
+                    }
+                    for (int x = x0; x <= x1; x++) {
+                        for (int z = z0; z <= z1; z++) {
+                            int index = base + (x - x0) * strideX + (z - z0) * sizeY;
+                            Arrays.fill(kinds, index, index + (y1 - y0 + 1), kind);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pass 2: the original x, z, y order; materialise what the filter can use.
+        Block[] result = new Block[(int) Math.min(estimatedCount, 16)];
+        int count = 0;
+        hint = entity.chunk;
+        for (int x = minX; x <= maxX; x++) {
+            boolean insideX = x >= innerMinX && x <= innerMaxX;
+            for (int z = minZ; z <= maxZ; z++) {
+                boolean inside = insideX && z >= innerMinZ && z <= innerMaxZ;
+                int index = (x - minX) * strideX + (z - minZ) * sizeY;
+                FullChunk chunk = null;
+                for (int y = clampedMinY; y <= clampedMaxY; y++, index++) {
+                    byte kind = kinds[index];
+                    if (kind == CELL_AIR) {
+                        continue;
+                    }
+                    Block block;
+                    boolean detached = false;
+                    if (kind == CELL_PAIR) {
+                        long pair = pairs[index];
+                        int id = (int) (pair >>> 32);
+                        if (id == Block.AIR) {
+                            continue;
+                        }
+                        if (!(inside && y >= innerMinY && y <= innerMaxY)
+                                && !mayCollideFromOutside(flags, id, inside && y >= overhangMinY && y < innerMinY)) {
+                            continue;
+                        }
+                        block = Block.get(id, (int) pair, level, x, y, z, 0);
+                        // The earlier air probe or a custom factory's returned id cannot prove ownership.
+                        detached = id >= 0 && id < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID;
+                    } else {
+                        // Non-standard chunk or section: exactly the per-cell path of getBlocksInBoundingBox.
+                        if (chunk == null) {
+                            chunk = chunkAt(level, hint, x, z);
+                            if (chunk != null) {
+                                hint = chunk;
+                            }
+                        }
+                        if (isAirAt(chunk, x, y, z)) continue;
+                        if (level.isYInRange(y) && chunk != null
+                                && chunk.getX() == (x >> 4) && chunk.getZ() == (z >> 4)) {
+                            int[] state = chunk.getBlockState(x & 0xF, y, z & 0xF, 0);
+                            block = Block.get(state[0], state[1], level, x, y, z, 0);
+                            detached = state[0] >= 0 && state[0] < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID;
+                        } else {
+                            block = level.getBlock(chunk, x, y, z, 0, false);
+                        }
+                    }
+                    if (block == null || block.isAir()) continue;
+
+                    if (count == result.length) {
+                        result = Arrays.copyOf(result, (int) Math.min((long) result.length * 2, estimatedCount));
+                    }
+                    result[count++] = detached ? block : block.clone();
+                }
+            }
+        }
+
+        return count == 0 ? Block.EMPTY_ARRAY : Arrays.copyOf(result, count);
+    }
+
+    private static long[] scratchPairs(int size) {
+        if (size > SCRATCH_RETAIN_LIMIT) {
+            return new long[size];
+        }
+        long[] buffer = SCRATCH_PAIRS.get();
+        if (buffer.length < size) {
+            buffer = new long[Math.max(size, buffer.length << 1)];
+            SCRATCH_PAIRS.set(buffer);
+        }
+        return buffer;
+    }
+
+    private static byte[] scratchCells(int size) {
+        if (size > SCRATCH_RETAIN_LIMIT) {
+            return new byte[size];
+        }
+        byte[] buffer = SCRATCH_CELLS.get();
+        if (buffer.length < size) {
+            buffer = new byte[Math.max(size, buffer.length << 1)];
+            SCRATCH_CELLS.set(buffer);
+        }
+        return buffer;
     }
 
     /**
