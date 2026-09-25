@@ -2791,8 +2791,28 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean isSubmerged() {
         double y = this.y + this.getEyeHeight();
-        Block block = this.level.getBlock(this.temporalVector.setComponents(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(y), NukkitMath.floorDouble(this.z)));
+        int blockX = NukkitMath.floorDouble(this.x);
+        int blockY = NukkitMath.floorDouble(y);
+        int blockZ = NukkitMath.floorDouble(this.z);
+        // Every living entity asks this every tick, and the answer is almost always "no": read the two
+        // ids from the entity's own chunk and materialise blocks only when one of them can be water.
+        FullChunk chunk = this.chunk;
+        if (chunk != null && this.level != null && chunk.getX() == blockX >> 4 && chunk.getZ() == blockZ >> 4
+                && this.level.isYInRange(blockY)
+                && !mayMaterialiseAsWater(chunk.getBlockId(blockX & 0x0f, blockY, blockZ & 0x0f, 0))
+                && !mayMaterialiseAsWater(chunk.getBlockId(blockX & 0x0f, blockY, blockZ & 0x0f, 1))) {
+            return false;
+        }
+        Block block = this.level.getBlock(this.temporalVector.setComponents(blockX, blockY, blockZ));
         return block instanceof BlockWater || this.level.getBlock(block, 1) instanceof BlockWater;
+    }
+
+    /**
+     * Whether a raw block id can come out of {@link Block#get} as a {@link BlockWater}: the two water ids,
+     * and custom or out-of-range ids whose factory is unknown.
+     */
+    static boolean mayMaterialiseAsWater(int id) {
+        return id == Block.WATER || id == Block.STILL_WATER || id < 0 || id >= Block.MAX_BLOCK_ID;
     }
 
     public boolean isInsideOfWater() {
