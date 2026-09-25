@@ -50,6 +50,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -85,6 +86,8 @@ public class LevelDBProvider implements LevelProvider {
     // 读锁保护异步读，写锁保护 DB 关闭。/ Read lock guards reads; write lock guards DB close.
     private final ReadWriteLock dbReadCloseLock = new ReentrantReadWriteLock();
     private final ExecutorService executor;
+    /** Latest serialized level.dat not yet on disk; the writer thread (or close) takes it. */
+    private final AtomicReference<byte[]> pendingLevelDat = new AtomicReference<>();
 
     // 每区块单写槽：新 batch 覆盖旧 batch，读取前先落盘。
     // One slot per chunk: newest batch wins and commits before reads.
@@ -482,13 +485,47 @@ public class LevelDBProvider implements LevelProvider {
     public void saveLevelData() {
         updateLevelData(levelData);
 
-        try (OutputStream stream = Files.newOutputStream(Paths.get(path, "level.dat"))) {
+        // Serialize on the caller (it owns levelData); the file IO goes to the provider's writer
+        // thread. Autosave used to truncate and rewrite level.dat on MAIN, and a truncate waits
+        // for the filesystem journal: on a busy HDD that held the tick for 5 s.
+        byte[] image;
+        try {
             byte[] data = NBTIO.write(levelData, ByteOrder.LITTLE_ENDIAN);
-            stream.write(Binary.writeLInt(CURRENT_STORAGE_VERSION));
-            stream.write(Binary.writeLInt(data.length));
-            stream.write(data);
+            image = new byte[8 + data.length];
+            System.arraycopy(Binary.writeLInt(CURRENT_STORAGE_VERSION), 0, image, 0, 4);
+            System.arraycopy(Binary.writeLInt(data.length), 0, image, 4, 4);
+            System.arraycopy(data, 0, image, 8, data.length);
         } catch (IOException e) {
             throw new RuntimeException("Unable to save level.dat: " + path, e);
+        }
+        if (this.pendingLevelDat.getAndSet(image) != null) {
+            return; // A queued write has not started yet; it will take this newer image.
+        }
+        ExecutorService writer = this.executor;
+        if (writer != null) {
+            try {
+                // Single writer thread: saves land in call order; close() writes what is left.
+                writer.execute(() -> this.writePendingLevelDat(false));
+                return;
+            } catch (RejectedExecutionException closing) {
+                // Provider closing: write on the caller as before.
+            }
+        }
+        this.writePendingLevelDat(true);
+    }
+
+    /** Replaces level.dat through a sibling file, so a crash never leaves it truncated. */
+    private void writePendingLevelDat(boolean rethrow) {
+        byte[] image = this.pendingLevelDat.getAndSet(null);
+        if (image == null) return;
+        Path target = Paths.get(path, "level.dat");
+        Path temporary = target.resolveSibling("level.dat.tmp");
+        try {
+            Files.write(temporary, image);
+            Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            if (rethrow) throw new RuntimeException("Unable to save level.dat: " + path, e);
+            log.error("Unable to save level.dat: {}", path, e);
         }
     }
 
@@ -1444,6 +1481,8 @@ public class LevelDBProvider implements LevelProvider {
             } catch (InterruptedException e) {
                 this.executor.shutdownNow();
             }
+            // A level.dat write dropped by a forced shutdown (or never queued) still lands.
+            this.writePendingLevelDat(false);
             // 限时抢救残留 batch；持续故障时每槽写入可能耗时数秒，故两条路径共用同一预算。
             // Flush leftover batches within a budget; a sustained fault costs seconds per slot, so both paths share it.
             long deadline = System.currentTimeMillis() + this.closeSweepBudgetMillis;
