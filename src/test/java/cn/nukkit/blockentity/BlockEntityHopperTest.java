@@ -509,8 +509,7 @@ public class BlockEntityHopperTest {
             HopperTestContext ctx = createHopper();
             ctx.hopper.transferCooldown = 1; // Will become 0 after decrement
 
-            // getBlock() calls level.getBlock(this)
-            when(ctx.level.getBlock(any(Vector3.class))).thenReturn(Block.get(Block.HOPPER_BLOCK));
+            // The lock is read at the hopper's own position; no Block is materialised for it.
             when(ctx.level.isBlockPowered(any(Vector3.class))).thenReturn(true);
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.DIAMOND, 0, 5));
@@ -623,6 +622,88 @@ public class BlockEntityHopperTest {
             verify(ctx.level, never()).getBlockEntity(any(Vector3.class));
             verify(ctx.level, never()).getChunk(anyInt(), anyInt());
             verify(ctx.level, never()).getChunk(anyInt(), anyInt(), anyBoolean());
+        }
+    }
+
+    // ===== H. RedstoneLock — the lock is kept, not re-read on every transfer =====
+
+    @Nested
+    @DisplayName("H. RedstoneLock")
+    class RedstoneLock {
+
+        private void idleWithoutContainerAbove(HopperTestContext ctx) {
+            lenient().when(ctx.level.getBlockEntity(any(Vector3.class))).thenReturn(null);
+            lenient().when(ctx.level.getBlock(any(FullChunk.class), anyInt(), anyInt(), anyInt(), anyBoolean()))
+                    .thenReturn(Block.get(Block.AIR));
+            lenient().when(ctx.level.getCollidingEntities(any())).thenReturn(new cn.nukkit.entity.Entity[0]);
+        }
+
+        @Test
+        @DisplayName("H1: the lock is read once and trusted for the TTL window")
+        void lockIsReadOncePerWindow() {
+            HopperTestContext ctx = createHopper();
+            long[] tick = {1000};
+            when(ctx.level.getCurrentTick()).thenAnswer(invocation -> tick[0]);
+            when(ctx.level.isBlockPowered(any(Vector3.class))).thenReturn(false);
+            idleWithoutContainerAbove(ctx);
+
+            // Five idle attempts eight ticks apart: 32 ticks, inside the window.
+            for (int attempt = 0; attempt < 5; attempt++) {
+                ctx.hopper.transferCooldown = 0;
+                assertTrue(ctx.hopper.onUpdate());
+                tick[0] += 8;
+            }
+            verify(ctx.level, times(1)).isBlockPowered(any(Vector3.class));
+
+            tick[0] += BlockEntityHopper.REDSTONE_LOCK_TTL;
+            ctx.hopper.transferCooldown = 0;
+            assertTrue(ctx.hopper.onUpdate());
+            verify(ctx.level, times(2)).isBlockPowered(any(Vector3.class));
+        }
+
+        @Test
+        @DisplayName("H2: a redstone update wakes a hopper that slept locked, and only that one")
+        void redstoneUpdateWakesOnlyALockedHopper() {
+            HopperTestContext ctx = createHopper();
+            when(ctx.level.isBlockPowered(any(Vector3.class))).thenReturn(true);
+            assertFalse(ctx.hopper.onUpdate(), "locked hopper sleeps");
+            clearInvocations(ctx.level); // the constructor scheduled the first update
+
+            ctx.hopper.invalidateRedstonePower();
+            verify(ctx.level, times(1)).scheduleBlockEntityUpdate(ctx.hopper);
+
+            // The lock is now unknown: a second redstone update has nothing to wake.
+            ctx.hopper.invalidateRedstonePower();
+            verify(ctx.level, times(1)).scheduleBlockEntityUpdate(ctx.hopper);
+
+            // Next attempt reads the world again and finds the power gone.
+            when(ctx.level.isBlockPowered(any(Vector3.class))).thenReturn(false);
+            idleWithoutContainerAbove(ctx);
+            ctx.hopper.transferCooldown = 0;
+            assertTrue(ctx.hopper.onUpdate(), "unlocked hopper polls for items again");
+            verify(ctx.level, times(1)).isBlockPowered(any(Vector3.class));
+        }
+
+        @Test
+        @DisplayName("H3: the hopper block forwards normal and redstone updates to its block entity")
+        void blockForwardsUpdates() {
+            HopperTestContext ctx = createHopper();
+            when(ctx.level.getBlockEntity(any(Vector3.class))).thenReturn(ctx.hopper);
+            // Locked while the toggle bit still says enabled: the redstone path never set it.
+            when(ctx.level.isBlockPowered(any(Vector3.class))).thenReturn(true);
+            assertFalse(ctx.hopper.onUpdate());
+            clearInvocations(ctx.level); // the constructor scheduled the first update
+
+            Block hopperBlock = Block.get(Block.HOPPER_BLOCK, 0, ctx.level, 0, 64, 0);
+            when(ctx.level.isBlockPowered(any(Vector3.class))).thenReturn(false);
+            assertEquals(Level.BLOCK_UPDATE_NORMAL, hopperBlock.onUpdate(Level.BLOCK_UPDATE_NORMAL));
+            // Before: no wake, because the toggle bit did not change. Now the lock itself decides.
+            verify(ctx.level, times(1)).scheduleBlockEntityUpdate(ctx.hopper);
+
+            when(ctx.level.isBlockPowered(any(Vector3.class))).thenReturn(true);
+            hopperBlock.onUpdate(Level.BLOCK_UPDATE_NORMAL);
+            assertEquals(Level.BLOCK_UPDATE_REDSTONE, hopperBlock.onUpdate(Level.BLOCK_UPDATE_REDSTONE));
+            verify(ctx.level, times(2)).scheduleBlockEntityUpdate(ctx.hopper);
         }
     }
 

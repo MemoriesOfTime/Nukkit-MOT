@@ -35,6 +35,19 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
 
     private AxisAlignedBB pickupArea;
 
+    /**
+     * How long a redstone lock read from the world is trusted without an update of the hopper block.
+     * Every change of a neighbour's power reaches the hopper as a normal or redstone block update, which
+     * refreshes or forgets the lock at once; the window only bounds a notification a redstone source
+     * failed to send (a lit torch placed under the block next to the hopper sends none).
+     */
+    static final int REDSTONE_LOCK_TTL = 40;
+    private static final byte LOCK_UNKNOWN = 0;
+    private static final byte LOCK_FREE = 1;
+    private static final byte LOCK_POWERED = 2;
+    private byte redstoneLock = LOCK_UNKNOWN;
+    private long redstoneLockTick;
+
     //由容器矿车检测漏斗并通知更新，这样子能大幅优化性能
     @Getter
     @Setter
@@ -149,7 +162,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             }
 
             // Sleep when redstone-locked (checked after cooldown decrement for plugin compatibility)
-            if (this.level.isBlockPowered(this.getBlock())) {
+            if (this.isRedstoneLocked()) {
                 return false;
             }
 
@@ -201,6 +214,51 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
         }
 
         return true;
+    }
+
+    /**
+     * Whether redstone locks the hopper. Reading the power of the six neighbours - and of the six
+     * neighbours of every solid one - costs up to 42 block lookups, and was done on every transfer
+     * attempt of every awake hopper: half of all hopper time and most of its allocations. Vanilla keeps
+     * the lock in the block (toggle_bit / ENABLED) and changes it only from neighbour updates; this
+     * keeps the last answer until {@link BlockHopper} reports an update or {@link #REDSTONE_LOCK_TTL}
+     * ticks pass.
+     */
+    private boolean isRedstoneLocked() {
+        long now = this.level.getCurrentTick();
+        if (this.redstoneLock == LOCK_UNKNOWN || now - this.redstoneLockTick >= REDSTONE_LOCK_TTL
+                || now < this.redstoneLockTick) {
+            this.redstoneLock = this.level.isBlockPowered(this) ? LOCK_POWERED : LOCK_FREE;
+            this.redstoneLockTick = now;
+        }
+        return this.redstoneLock == LOCK_POWERED;
+    }
+
+    /**
+     * A normal update of the hopper block has just read the power of its neighbours. A hopper that slept
+     * locked is woken once the power is gone - whatever its toggle bit says, which a redstone update
+     * never used to change.
+     */
+    public void setRedstonePowered(boolean powered) {
+        boolean wasPowered = this.redstoneLock == LOCK_POWERED;
+        this.redstoneLock = powered ? LOCK_POWERED : LOCK_FREE;
+        this.redstoneLockTick = this.level.getCurrentTick();
+        if (wasPowered && !powered && !this.closed) {
+            this.scheduleUpdate();
+        }
+    }
+
+    /**
+     * A redstone update reached the hopper block: power arriving through the block a lever, button,
+     * torch or repeater acts on. Forget the lock; the next transfer attempt reads it. A hopper that slept
+     * locked is woken to do that read, as nothing else would wake it.
+     */
+    public void invalidateRedstonePower() {
+        boolean wasPowered = this.redstoneLock == LOCK_POWERED;
+        this.redstoneLock = LOCK_UNKNOWN;
+        if (wasPowered && !this.closed) {
+            this.scheduleUpdate();
+        }
     }
 
     public boolean pullItemsFromMinecart() {
