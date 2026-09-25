@@ -40,7 +40,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
         <argLine></argLine>
-        <jline.version>3.30.6</jline.version>
+        <jline.version>3.30.15</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.11</leveldb-mcpe-jni.version>
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
