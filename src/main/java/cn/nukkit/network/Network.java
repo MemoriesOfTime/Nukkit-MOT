@@ -27,6 +27,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * @author MagicDroidX
@@ -55,7 +56,7 @@ public class Network {
 
     private final Server server;
 
-    private final Set<SourceInterface> interfaces = new HashSet<>();
+    private final Set<SourceInterface> interfaces = new CopyOnWriteArraySet<>();
 
     private final Set<AdvancedSourceInterface> advancedInterfaces = new HashSet<>();
 
