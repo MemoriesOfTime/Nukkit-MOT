@@ -6,6 +6,7 @@ import cn.nukkit.block.BlockLiquid;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
+import cn.nukkit.event.entity.ItemBurnEvent;
 import cn.nukkit.event.entity.ItemDespawnEvent;
 import cn.nukkit.event.entity.ItemSpawnEvent;
 import cn.nukkit.item.Item;
@@ -42,6 +43,17 @@ public class EntityItem extends Entity {
     protected int pickupDelay;
 
     protected boolean floatsInLava;
+
+    /**
+     * Whether this entity may join a neighbouring equal stack on the ground.
+     *
+     * <p>Merging keeps only one of the two entities, so any server data written on the absorbed
+     * entity (its tags, not the item's) silently disappears. An entity that carries such data
+     * opts out through the {@code Mergeable} NBT flag, the same key PowerNukkitX uses. Both
+     * sides are checked: a mergeable neighbour can neither absorb nor be absorbed by an entity
+     * that opted out.
+     */
+    protected boolean mergeItems = true;
 
     public EntityItem(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -110,6 +122,8 @@ public class EntityItem extends Entity {
             this.thrower = this.namedTag.getString("Thrower");
         }
 
+        this.mergeItems = mergeableFromNbt(this.namedTag);
+
         if (!this.namedTag.contains("Item")) {
             this.close();
             return;
@@ -172,6 +186,7 @@ public class EntityItem extends Entity {
         this.lastUpdate = currentTick;
 
         if (!this.fireProof && this.isInsideOfFire()) {
+            this.server.getPluginManager().callEvent(new ItemBurnEvent(this));
             this.close();
             return true;
         }
@@ -209,7 +224,7 @@ public class EntityItem extends Entity {
                 }
             }
 
-            if (this.age % 200 == 0 && this.onGround && this.item != null) {
+            if (this.mergeItems && this.age % 200 == 0 && this.onGround && this.item != null) {
                 if (this.item.getCount() < this.item.getMaxStackSize()) {
                     //if (e == null) {
                     Entity[] e = this.getLevel().getNearbyEntities(getBoundingBox().grow(1, 1, 1), this, false);
@@ -218,6 +233,9 @@ public class EntityItem extends Entity {
                     for (Entity entity : e) {
                         if (entity instanceof EntityItem) {
                             if (entity.closed || !entity.isAlive()) {
+                                continue;
+                            }
+                            if (!this.mergeableWith((EntityItem) entity)) {
                                 continue;
                             }
                             Item closeItem = ((EntityItem) entity).item;
@@ -317,7 +335,41 @@ public class EntityItem extends Entity {
             if (this.thrower != null) {
                 this.namedTag.putString("Thrower", this.thrower);
             }
+            if (this.mergeItems) {
+                this.namedTag.remove("Mergeable");
+            } else {
+                this.namedTag.putBoolean("Mergeable", false);
+            }
         }
+    }
+
+    /** True unless the entity opted out of merging; see {@link #mergeItems}. */
+    public boolean isMergeable() {
+        return this.mergeItems;
+    }
+
+    /**
+     * Lets this entity join or absorb equal neighbouring stacks, or forbids it. The choice is
+     * saved with the entity and survives chunk unloads and restarts.
+     */
+    public void setMergeable(boolean mergeable) {
+        this.mergeItems = mergeable;
+        if (this.namedTag != null) {
+            if (mergeable) {
+                this.namedTag.remove("Mergeable");
+            } else {
+                this.namedTag.putBoolean("Mergeable", false);
+            }
+        }
+    }
+
+    /** Both entities must allow merging; the item equality check stays with the caller. */
+    protected boolean mergeableWith(EntityItem other) {
+        return this.mergeItems && other != null && other.mergeItems;
+    }
+
+    static boolean mergeableFromNbt(CompoundTag tag) {
+        return tag == null || !tag.contains("Mergeable") || tag.getBoolean("Mergeable");
     }
 
     @Override
