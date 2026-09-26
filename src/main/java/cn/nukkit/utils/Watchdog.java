@@ -76,7 +76,9 @@ public class Watchdog extends Thread {
             try {
                 sleep(Math.max(time >> 2, 1000));
             } catch (InterruptedException ignore) {
-                server.getLogger().emergency("The Watchdog thread has been interrupted and is no longer monitoring the server state");
+                if (running) {
+                    server.getLogger().emergency("The Watchdog thread has been interrupted and is no longer monitoring the server state");
+                }
                 running = false;
                 return;
             }
