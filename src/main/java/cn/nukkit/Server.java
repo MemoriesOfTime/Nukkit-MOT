@@ -850,7 +850,9 @@ public class Server {
 
         this.craftingManager = new CraftingManager();
         ResourcePackMigration.migrate(new File(Nukkit.DATA_PATH));
-        HashSet<ResourcePackLoader> packLoaders = new HashSet<>();
+        // Registration order is the stack order among packs of equal priority: resource packs first,
+        // then behaviour packs, then packs shipped inside plugin jars.
+        Set<ResourcePackLoader> packLoaders = new LinkedHashSet<>();
         packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")));
         packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs")));
         packLoaders.add(new JarPluginResourcePackLoader(new File(this.pluginPath)));

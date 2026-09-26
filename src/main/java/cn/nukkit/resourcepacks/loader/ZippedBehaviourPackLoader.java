@@ -35,7 +35,7 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
         cleanSnapshotCache();
         BaseLang baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
-        for (File pack : this.path.listFiles()) {
+        for (File pack : ResourcePackLoader.listFilesInNameOrder(this.path)) {
             if (shouldIgnoreFile(pack.getName())) {
                 continue;
             }
