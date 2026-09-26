@@ -83,6 +83,7 @@ public class CraftingManager {
     private static BatchPacket packet_netease_766;
     private static BatchPacket packet_netease_819;
     private static BatchPacket packet_netease_860;
+    private static BatchPacket packet_netease_898;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes = new Int2ObjectOpenHashMap<>();
 
@@ -1016,6 +1017,7 @@ public class CraftingManager {
         packet_netease_766 = null;
         packet_netease_819 = null;
         packet_netease_860 = null;
+        packet_netease_898 = null;
 
         this.getCachedPacket(GameVersion.getLastVersion()); // 缓存当前协议版本的数据包
         this.getCachedPacket(GameVersion.getLastNetEaseVersion());
@@ -1042,7 +1044,12 @@ public class CraftingManager {
         int protocol = gameVersion.getProtocol();
 
         if (gameVersion.isNetEase()) {
-            if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+            if (protocol >= GameVersion.V1_21_130_NETEASE.getProtocol()) {
+                if (packet_netease_898 == null) {
+                    packet_netease_898 = this.packetFor(GameVersion.V1_21_130_NETEASE);
+                }
+                return packet_netease_898;
+            } else if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
                 if (packet_netease_860 == null) {
                     packet_netease_860 = this.packetFor(GameVersion.V1_21_124_NETEASE);
                 }

@@ -92,7 +92,7 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_19_30_23;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_19_30_23;
     }
 }

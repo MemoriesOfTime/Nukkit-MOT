@@ -236,6 +236,10 @@ public class BinaryStream {
         this.put(Binary.writeLFloat(v));
     }
 
+    public void putLDouble(double v) {
+        this.put(Binary.writeLDouble(v));
+    }
+
     public int getTriad() {
         return Binary.readTriad(this.get(3));
     }
