@@ -1133,7 +1133,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         level = level == null ? this.level : level;
         long index = Level.chunkHash(x, z);
         if (this.usedChunks.containsKey(index)) {
-            for (Entity entity : level.getChunkEntities(x, z).values()) {
+            // Only live entities have viewers; abandoning a chunk must not reload it from storage.
+            for (Entity entity : level.getChunkEntities(x, z, false).values()) {
                 if (entity != this) {
                     entity.despawnFrom(this);
                 }
@@ -1151,7 +1152,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkZ = Level.getHashZ(index);
             this.level.unregisterChunkLoader(this, chunkX, chunkZ);
 
-            for (Entity entity : level.getChunkEntities(chunkX, chunkZ).values()) {
+            for (Entity entity : level.getChunkEntities(chunkX, chunkZ, false).values()) {
                 if (entity != this) {
                     if (online) {
                         entity.despawnFrom(this);
