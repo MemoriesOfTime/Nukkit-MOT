@@ -320,6 +320,9 @@ public final class PlayerHandle {
     }
 
     public void setChunkRadius(int chunkRadius) {
+        if (player.chunkRadius != chunkRadius) {
+            player.nextChunkOrderRun = 0;
+        }
         player.chunkRadius = chunkRadius;
     }
 
