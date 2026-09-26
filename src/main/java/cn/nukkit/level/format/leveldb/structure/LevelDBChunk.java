@@ -715,10 +715,12 @@ public class LevelDBChunk extends BaseChunk {
 
     @Override
     protected void setInternalSection(float fY, ChunkSection section) {
-        super.setInternalSection(fY, section);
         if (section instanceof LevelDBChunkSection) {
             ((LevelDBChunkSection) section).setParent(this);
         }
+        // Readers may write as soon as the section slot is visible. Its dirty
+        // callback must already know the owning chunk before publication.
+        super.setInternalSection(fY, section);
     }
 
     @Override
