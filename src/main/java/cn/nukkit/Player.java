@@ -1380,10 +1380,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (asyncLoad) {
                         BaseFullChunk loadedChunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
                         if (loadedChunk == null) {
-                            if (this.level.requestChunkLoadAsync(chunkX, chunkZ)) {
-                                continue;
-                            }
-                            // 受理失败(executor 关闭等)→ 落到下方原同步路径 / rejected → fall through to the sync path below
+                            this.level.requestChunkLoadAsync(chunkX, chunkZ);
+                            // A full disk-reader queue is backpressure, not permission to read
+                            // synchronously. Keep the request in loadQueue and retry next tick.
+                            continue;
                         } else if (!loadedChunk.isPopulated()) {
                             boolean neighboursCached = true;
                             boolean queueRejected = false;
@@ -1393,8 +1393,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         continue;
                                     }
                                     if (this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz) == null) {
-                                        // 受理失败(队列已满/executor 关)→ 放弃异步预载,落到下方同步 populateChunk 保证推进,避免队列持续满时该区块永久悬挂
-                                        // Rejected (queue full / executor down) → abandon async preload and fall through to sync populateChunk to guarantee progress, so a saturated queue can't leave this chunk hanging forever
+                                        // Population may read all eight neighbours. Defer it
+                                        // when any preload is rejected, just as for the centre.
                                         if (!this.level.requestChunkLoadAsync(chunkX + dx, chunkZ + dz)) {
                                             queueRejected = true;
                                             break;
@@ -1406,7 +1406,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     break;
                                 }
                             }
-                            if (!queueRejected && !neighboursCached) {
+                            if (queueRejected || !neighboursCached) {
                                 continue;
                             }
                         }
