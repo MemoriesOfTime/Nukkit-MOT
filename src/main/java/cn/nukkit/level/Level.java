@@ -1422,8 +1422,13 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void performThunder(long index, FullChunk chunk) {
-        if (areNeighboringChunksLoaded(index)) return;
-        if (Utils.random.nextInt(100000) == 0) {
+        performThunder(index, chunk, Utils.random.nextInt(100000));
+    }
+
+    // Separate the roll from its effects so the rare path can be tested deterministically.
+    void performThunder(long index, FullChunk chunk, int roll) {
+        if (roll == 0) {
+            if (areNeighboringChunksLoaded(index)) return;
             int LCG = this.getUpdateLCG() >> 2;
 
             int chunkX = chunk.getX() << 4;
