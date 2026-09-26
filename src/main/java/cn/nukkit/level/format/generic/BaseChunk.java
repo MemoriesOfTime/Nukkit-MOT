@@ -279,6 +279,75 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         }
     }
 
+    /** Merge raw section light without LevelDB's implicit-sky height scans. */
+    @Override
+    public void applyLightingFrom(BaseFullChunk snapshot) {
+        if (!(snapshot instanceof BaseChunk source)) {
+            super.applyLightingFrom(snapshot);
+            return;
+        }
+        if (sections.length != source.sections.length || getSectionOffset() != source.getSectionOffset()) {
+            throw new IllegalArgumentException("Lighting snapshot has a different section range");
+        }
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                int height = source.getHeightMap(x, z);
+                if (getHeightMap(x, z) != height) {
+                    setHeightMap(x, z, height);
+                }
+            }
+        }
+        for (int i = 0; i < sections.length; i++) {
+            ChunkSection from = source.sections[i];
+            ChunkSection into = sections[i];
+            byte[] sourceSky = from.getSkyLightArray();
+            byte[] targetSky = into.getSkyLightArray();
+            byte[] sourceBlock = from.getLightArray();
+            byte[] targetBlock = into.getLightArray();
+            boolean skyChanged = !Arrays.equals(sourceSky, targetSky);
+            boolean blockChanged = !Arrays.equals(sourceBlock, targetBlock);
+            if (!skyChanged && !blockChanged) {
+                continue;
+            }
+            if (into instanceof EmptyChunkSection) {
+                int sectionY = i - getSectionOffset();
+                // A block writer may have published a section since the initial read.
+                // Use the same guarded first-write path, then merge into its current result.
+                materializeSectionIfEmpty(sectionY);
+                into = getSection(sectionY);
+                if (into instanceof EmptyChunkSection) {
+                    throw new IllegalStateException("Cannot materialize a lighting section");
+                }
+                targetSky = into.getSkyLightArray();
+                targetBlock = into.getLightArray();
+                skyChanged = !Arrays.equals(sourceSky, targetSky);
+                blockChanged = !Arrays.equals(sourceBlock, targetBlock);
+            }
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        int index = (y << 7) | (z << 3) | (x >> 1);
+                        int shift = (x & 1) << 2;
+                        if (skyChanged) {
+                            int light = (sourceSky[index] >> shift) & 0xf;
+                            if (((targetSky[index] >> shift) & 0xf) != light) {
+                                into.setBlockSkyLight(x, y, z, light);
+                            }
+                        }
+                        if (blockChanged) {
+                            int light = (sourceBlock[index] >> shift) & 0xf;
+                            if (((targetBlock[index] >> shift) & 0xf) != light) {
+                                into.setBlockLight(x, y, z, light);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        setLightPopulated();
+        setChanged();
+    }
+
     @Override
     public void populateBlockLight() {
         int minY = this.getProvider().getMinBlockY();
