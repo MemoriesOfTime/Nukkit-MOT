@@ -5,6 +5,7 @@ import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.Server;
 import cn.nukkit.network.CompressionProvider;
+import cn.nukkit.network.NetEaseZlibStreamCompression;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.NetworkSettingsPacket;
@@ -40,9 +41,10 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
             return;
         }
 
-        if (player.raknetProtocol == 8
+        boolean netEaseClient = player.raknetProtocol == 8
                 && Server.getInstance().netEaseMode
-                && pk.protocolVersion >= GameVersion.V1_20_50_NETEASE.getProtocol()) {
+                && pk.protocolVersion >= GameVersion.V1_20_50_NETEASE.getProtocol();
+        if (netEaseClient) {
             playerHandle.setGameVersion(GameVersion.byProtocol(pk.protocolVersion, true));
             playerHandle.getNetworkSession().setCompressionOut(CompressionProvider.NONE);
         } else {
@@ -52,15 +54,23 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
             playerHandle.getNetworkSession().getState().getLogin().setPhase(SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED);
         }
 
+        boolean neteaseZlibStream = netEaseClient && Server.getInstance().useNeteaseZlibStream;
+
         NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();
         PacketCompressionAlgorithm algorithm;
-        if (player.getServer().useSnappy && player.protocol >= ProtocolInfo.v1_19_30_23) {
+        if (neteaseZlibStream) {
+            algorithm = PacketCompressionAlgorithm.ZLIBSTREAM;
+        } else if (player.getServer().useSnappy && player.protocol >= ProtocolInfo.v1_19_30_23) {
             algorithm = PacketCompressionAlgorithm.SNAPPY;
         } else {
             algorithm = PacketCompressionAlgorithm.ZLIB;
         }
-        CompressionProvider negotiatedCompression = CompressionProvider.from(algorithm, player.raknetProtocol);
-        playerHandle.getNetworkSession().beginLegacyInboundCompressionGraceWindow(negotiatedCompression);
+        CompressionProvider negotiatedCompression = neteaseZlibStream
+                ? new NetEaseZlibStreamCompression()
+                : CompressionProvider.from(algorithm, player.raknetProtocol);
+        if (!neteaseZlibStream) {
+            playerHandle.getNetworkSession().beginLegacyInboundCompressionGraceWindow(negotiatedCompression);
+        }
         settingsPacket.compressionAlgorithm = algorithm;
         settingsPacket.compressionThreshold = 1; // compress everything
         player.forceDataPacket(settingsPacket, () -> {
