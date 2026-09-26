@@ -68,6 +68,23 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         }
     }
 
+    /**
+     * First writers can both fail on the same immutable empty section. Recheck
+     * under the stable section-array monitor so a late fallback cannot replace
+     * another writer's already-populated section. Existing-section access keeps
+     * its normal fast path; this does not synchronize whole-chunk replacement.
+     */
+    private void materializeSectionIfEmpty(int sectionY) {
+        synchronized (this.sections) {
+            if (this.getSection(sectionY) instanceof EmptyChunkSection) {
+                ChunkSection materialized = this.materializeSection(sectionY);
+                if (materialized != null) {
+                    this.setInternalSection(sectionY, materialized);
+                }
+            }
+        }
+    }
+
     private void removeInvalidTile(int x, int y, int z) {
         BlockEntity entity = getTile(x, y, z);
         if (entity != null && !entity.isBlockEntityValid()) {
@@ -115,11 +132,10 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             setChanged();
             return this.getSection(Y).getAndSetBlock(x, y & 0x0f, z, layer, block);
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
-            return this.getSection(Y).getAndSetBlock(x, y & 0x0f, z, layer, block);
+            this.materializeSectionIfEmpty(Y);
+            Block previous = this.getSection(Y).getAndSetBlock(x, y & 0x0f, z, layer, block);
+            setChanged();
+            return previous;
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -137,11 +153,10 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             setChanged();
             return this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
-            return this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
+            this.materializeSectionIfEmpty(Y);
+            boolean changed = this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
+            setChanged();
+            return changed;
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -159,11 +174,10 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             setChanged();
             return this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
-            return this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
+            this.materializeSectionIfEmpty(Y);
+            boolean changed = this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
+            setChanged();
+            return changed;
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -181,11 +195,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockId(x, y & 0x0f, z, layer, id);
             setChanged();
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
+            this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockId(x, y & 0x0f, z, layer, id);
+            setChanged();
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -223,11 +235,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockData(x, y & 0x0f, z, layer, data);
             setChanged();
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
+            this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockData(x, y & 0x0f, z, layer, data);
+            setChanged();
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -245,11 +255,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockSkyLight(x, y & 0x0f, z, level);
             setChanged();
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
+            this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockSkyLight(x, y & 0x0f, z, level);
+            setChanged();
         }
     }
 
@@ -265,11 +273,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockLight(x, y & 0x0f, z, level);
             setChanged();
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
+            this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockLight(x, y & 0x0f, z, level);
+            setChanged();
         }
     }
 
