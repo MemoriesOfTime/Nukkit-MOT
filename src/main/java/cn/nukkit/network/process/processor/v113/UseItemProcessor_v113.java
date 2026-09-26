@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.v113;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.block.Block;
@@ -130,7 +131,7 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacket_v11
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol < ProtocolInfo.v1_2_0;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() < ProtocolInfo.v1_2_0;
     }
 }

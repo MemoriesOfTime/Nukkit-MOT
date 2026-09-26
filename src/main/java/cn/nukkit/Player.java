@@ -3895,7 +3895,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (DataPacketManager.canProcess(packet.protocol, packet.getClass())) {
+        if (DataPacketManager.canProcess(packet.gameVersion, packet.getClass())) {
             DataPacketManager.processPacket(this.playerHandle, packet);
             return;
         }

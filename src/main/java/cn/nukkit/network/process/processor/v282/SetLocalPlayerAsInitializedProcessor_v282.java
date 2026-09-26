@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.v282;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.event.player.PlayerLocallyInitializedEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
@@ -37,7 +38,7 @@ public class SetLocalPlayerAsInitializedProcessor_v282 extends DataPacketProcess
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_6_0_5;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_6_0_5;
     }
 }
