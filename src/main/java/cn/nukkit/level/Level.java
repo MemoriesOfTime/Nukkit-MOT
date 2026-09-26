@@ -2889,7 +2889,8 @@ public class Level implements ChunkManager, Metadatable {
             item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
         }
 
-        if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)) {
+        if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)
+                && !CreativePlacementDropGuard.suppresses(this, player, target)) {
             if (!isSilkTouch && player != null && drops.length != 0) { // For example no xp from redstone if it's mined with stone pickaxe
                 if (player.isSurvival() || player.isAdventure()) {
                     this.dropExpOrb(vector.add(0.5, 0.5, 0.5), dropExp);
@@ -3172,7 +3173,12 @@ public class Level implements ChunkManager, Metadatable {
             this.scheduleUpdate(block, 1);
         }
 
-        if (!hand.place(item, block, target, face, fx, fy, fz, player)) {
+        boolean placed;
+        try (CreativePlacementDropGuard.Scope ignored =
+                     CreativePlacementDropGuard.enter(this, player, hand)) {
+            placed = hand.place(item, block, target, face, fx, fy, fz, player);
+        }
+        if (!placed) {
             if (liquidMoved) {
                 this.setBlock(block, 0, block, false, false);
                 this.setBlock(block, 1, Block.get(BlockID.AIR), false, false);
@@ -4675,6 +4681,7 @@ public class Level implements ChunkManager, Metadatable {
                     if (chunk.hasChanged()) {
                         levelProvider.setChunk(x, z, chunk);
                         levelProvider.saveChunk(x, z);
+                        this.saveChangedNeighbours(levelProvider, x, z);
                     }
                 }
                 for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
@@ -4689,6 +4696,37 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         return true;
+    }
+
+    /**
+     * Writes the changed neighbours of a chunk that is being saved on unload.
+     *
+     * <p>A machine on a chunk border (a hopper feeding a chest across it, a double chest, a hopper
+     * chain) moves items between two chunks within one tick. Saving only the unloading chunk leaves
+     * its neighbour on disk in the state of the previous save, so a crash before that neighbour is
+     * written duplicates or loses everything moved since: a hopper that had pushed a stack into a
+     * chest across the border came back with the stack still inside AND the chest full. Saving the
+     * changed neighbours in the same pass lands both sides of the border on disk together; a chunk
+     * that did not change is skipped, so the extra work is bounded by what the unload queue would
+     * have written a moment later anyway.
+     */
+    private void saveChangedNeighbours(LevelProvider levelProvider, int x, int z) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                int nx = x + dx;
+                int nz = z + dz;
+                if (!this.isChunkLoaded(nx, nz)) {
+                    continue;
+                }
+                BaseFullChunk neighbour = this.getChunk(nx, nz, false);
+                if (neighbour != null && neighbour.hasChanged()) {
+                    levelProvider.saveChunk(nx, nz);
+                }
+            }
+        }
     }
 
     public boolean isSpawnChunk(int X, int Z) {
