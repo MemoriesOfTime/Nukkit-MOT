@@ -2116,6 +2116,26 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     /**
+     * Whether the level may skip {@link #onUpdate(int)} for this entity on this tick. A skipped entity stays
+     * scheduled; its next update runs with the whole elapsed time as {@code tickDiff}. Only mobs far from every
+     * player opt in, see {@link BaseEntity#isActivationThrottled(int)}.
+     */
+    public boolean isActivationThrottled(int currentTick) {
+        return false;
+    }
+
+    /**
+     * Whether any value in {@code [start, start + span - 1]} is congruent to {@code residue} modulo
+     * {@code period}. With {@code span == 1} this is exactly {@code start % period == residue} for the
+     * non-negative residues used by the tick cadences, so a caught-up update fires a periodic action at
+     * most once instead of skipping it because the counter jumped over the matching value.
+     */
+    protected static boolean hitsResidue(long start, int span, int period, int residue) {
+        long last = start + Math.max(1, span) - 1;
+        return Math.floorDiv(last - residue, period) != Math.floorDiv(start - 1 - residue, period);
+    }
+
+    /**
      * 实体基础 tick 方法，若实体存活，会在 `onUpdate` 方法中被调用。其返回结果会应用到 `onUpdate` 方法中，之后会自动调用 `updateMovement` 方法。
      * Entity base tick, called from onUpdate if the entity is alive. Result is applied to onUpdate. updateMovement is called afterward automatically.
      *
