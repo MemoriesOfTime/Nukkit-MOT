@@ -1,6 +1,8 @@
 package cn.nukkit.entity.data;
 
+import cn.nukkit.MockServer;
 import cn.nukkit.utils.SerializedImage;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -14,6 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * match width×height renders invisible on the client.
  */
 class SkinDimensionValidationTest {
+
+    @BeforeAll
+    static void initServer() {
+        MockServer.init();
+    }
 
     private Skin validBase() {
         Skin skin = new Skin();
