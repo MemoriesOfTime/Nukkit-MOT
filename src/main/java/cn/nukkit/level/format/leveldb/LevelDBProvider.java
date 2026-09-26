@@ -606,8 +606,8 @@ public class LevelDBProvider implements LevelProvider {
      * forever). This marker is the authoritative source; a missing marker (saved by older builds
      * or rewritten by external tools) always triggers one idempotent recompute pass.
      */
-    private void applyConnectionFixMarker(int chunkX, int chunkZ, int dimensionId, ChunkBuilder chunkBuilder) {
-        byte[] marker = this.db.get(LevelDBKey.NUKKIT_CONN_FIX_DONE.getKey(chunkX, chunkZ, dimensionId));
+    private void applyConnectionFixMarker(DB db, int chunkX, int chunkZ, int dimensionId, ChunkBuilder chunkBuilder) {
+        byte[] marker = db.get(LevelDBKey.NUKKIT_CONN_FIX_DONE.getKey(chunkX, chunkZ, dimensionId));
         if (marker == null || marker.length == 0 || marker[0] == 0) {
             chunkBuilder.needsLegacyConnectionFix();
         }
@@ -615,9 +615,17 @@ public class LevelDBProvider implements LevelProvider {
 
     @Nullable
     public LevelDBChunk readChunk(int chunkX, int chunkZ) {
-        byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
+        // Point lookups here feed LevelDB's seek-triggered compaction; read the column through one iterator.
+        try (ChunkColumnReader db = ChunkColumnReader.column(this.db, chunkX, chunkZ, this.level.getDimensionData().getDimensionId())) {
+            return this.readChunk(db, chunkX, chunkZ);
+        }
+    }
+
+    @Nullable
+    private LevelDBChunk readChunk(DB db, int chunkX, int chunkZ) {
+        byte[] versionData = db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
         if (versionData == null || versionData.length != 1) {
-            versionData = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
+            versionData = db.get(VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
             if (versionData == null || versionData.length != 1) {
                 return null;
             }
@@ -625,9 +633,9 @@ public class LevelDBProvider implements LevelProvider {
 
         ChunkBuilder chunkBuilder = new ChunkBuilder(chunkX, chunkZ, this);
 
-        byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
+        byte[] finalized = db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
         chunkBuilder.state(deserializeFinalizationState(finalized));
-        this.applyConnectionFixMarker(chunkX, chunkZ, this.level.getDimensionData().getDimensionId(), chunkBuilder);
+        this.applyConnectionFixMarker(db, chunkX, chunkZ, this.level.getDimensionData().getDimensionId(), chunkBuilder);
 
         byte chunkVersion = versionData[0];
 
@@ -635,22 +643,22 @@ public class LevelDBProvider implements LevelProvider {
             chunkBuilder.dirty();
         }
 
-        ChunkSerializers.deserializeChunk(this.db, chunkBuilder, chunkVersion);
+        ChunkSerializers.deserializeChunk(db, chunkBuilder, chunkVersion);
 
-        Data3dSerializer.deserialize(this.db, chunkBuilder);
+        Data3dSerializer.deserialize(db, chunkBuilder);
         if (!chunkBuilder.hasBiome3d()) {
-            Data2dSerializer.deserialize(this.db, chunkBuilder);
+            Data2dSerializer.deserialize(db, chunkBuilder);
         }
 
-        BlockEntitySerializer.loadBlockEntities(this.db, chunkBuilder);
-        EntitySerializer.loadEntities(this.db, chunkBuilder);
+        BlockEntitySerializer.loadBlockEntities(db, chunkBuilder);
+        EntitySerializer.loadEntities(db, chunkBuilder);
 
-        byte[] tickingData = this.db.get(PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension()));
+        byte[] tickingData = db.get(PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (tickingData != null && tickingData.length != 0) {
             loadBlockTickingQueue(tickingData, false);
         }
 
-        byte[] randomTickingData = this.db.get(RANDOM_TICKS.getKey(chunkX, chunkZ, this.level.getDimension()));
+        byte[] randomTickingData = db.get(RANDOM_TICKS.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (randomTickingData != null && randomTickingData.length != 0) {
             loadBlockTickingQueue(randomTickingData, true);
         }
@@ -898,7 +906,12 @@ public class LevelDBProvider implements LevelProvider {
         Throwable error = null;
         pw.lock.unlock();
         try {
-            if (cleanup != null) cleanup.apply(this.db, batch);
+            if (cleanup != null) {
+                // The old entity digest is read through an iterator too, see ChunkColumnReader.
+                try (ChunkColumnReader reader = ChunkColumnReader.pointReads(this.db)) {
+                    cleanup.apply(reader, batch);
+                }
+            }
             this.db.write(batch);
         } catch (Exception failure) {
             error = failure;
@@ -1266,9 +1279,17 @@ public class LevelDBProvider implements LevelProvider {
      */
     @Nullable
     private LevelDBChunk readChunkDeferred(int chunkX, int chunkZ, Level levelSnapshot) {
-        byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
+        // Same column read as readChunk: no point lookups for LevelDB to charge seeks to.
+        try (ChunkColumnReader db = ChunkColumnReader.column(this.db, chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId())) {
+            return this.readChunkDeferred(db, chunkX, chunkZ, levelSnapshot);
+        }
+    }
+
+    @Nullable
+    private LevelDBChunk readChunkDeferred(DB db, int chunkX, int chunkZ, Level levelSnapshot) {
+        byte[] versionData = db.get(VERSION.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
         if (versionData == null || versionData.length != 1) {
-            versionData = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
+            versionData = db.get(VERSION_OLD.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
             if (versionData == null || versionData.length != 1) {
                 return null;
             }
@@ -1276,9 +1297,9 @@ public class LevelDBProvider implements LevelProvider {
 
         ChunkBuilder chunkBuilder = new ChunkBuilder(chunkX, chunkZ, this);
 
-        byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
+        byte[] finalized = db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId()));
         chunkBuilder.state(deserializeFinalizationState(finalized));
-        this.applyConnectionFixMarker(chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId(), chunkBuilder);
+        this.applyConnectionFixMarker(db, chunkX, chunkZ, levelSnapshot.getDimensionData().getDimensionId(), chunkBuilder);
 
         byte chunkVersion = versionData[0];
 
@@ -1286,23 +1307,23 @@ public class LevelDBProvider implements LevelProvider {
             chunkBuilder.dirty();
         }
 
-        ChunkSerializers.deserializeChunk(this.db, chunkBuilder, chunkVersion);
+        ChunkSerializers.deserializeChunk(db, chunkBuilder, chunkVersion);
 
-        Data3dSerializer.deserialize(this.db, chunkBuilder);
+        Data3dSerializer.deserialize(db, chunkBuilder);
         if (!chunkBuilder.hasBiome3d()) {
-            Data2dSerializer.deserialize(this.db, chunkBuilder);
+            Data2dSerializer.deserialize(db, chunkBuilder);
         }
 
-        BlockEntitySerializer.loadBlockEntities(this.db, chunkBuilder);
-        EntitySerializer.loadEntities(this.db, chunkBuilder);
+        BlockEntitySerializer.loadBlockEntities(db, chunkBuilder);
+        EntitySerializer.loadEntities(db, chunkBuilder);
 
         // 解析 ticking，由主线程挂载时调度。/ Parse ticking; schedule it during main-thread mount.
         List<BaseFullChunk.PendingBlockUpdate> tickingSink = new ArrayList<>();
-        byte[] tickingData = this.db.get(PENDING_TICKS.getKey(chunkX, chunkZ, levelSnapshot.getDimension()));
+        byte[] tickingData = db.get(PENDING_TICKS.getKey(chunkX, chunkZ, levelSnapshot.getDimension()));
         if (tickingData != null && tickingData.length != 0) {
             this.loadBlockTickingQueueDeferred(tickingData, false, tickingSink);
         }
-        byte[] randomTickingData = this.db.get(RANDOM_TICKS.getKey(chunkX, chunkZ, levelSnapshot.getDimension()));
+        byte[] randomTickingData = db.get(RANDOM_TICKS.getKey(chunkX, chunkZ, levelSnapshot.getDimension()));
         if (randomTickingData != null && randomTickingData.length != 0) {
             this.loadBlockTickingQueueDeferred(randomTickingData, true, tickingSink);
         }
