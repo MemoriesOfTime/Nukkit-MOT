@@ -5385,10 +5385,19 @@ public class Level implements ChunkManager, Metadatable {
         if (bb.getMaxY() < this.getMinBlockY() || bb.getMinY() >= this.getMaxBlockY()) {
             return false;
         }
-        int minX = NukkitMath.floorDouble(bb.getMinX()) >> 4;
-        int minZ = NukkitMath.floorDouble(bb.getMinZ()) >> 4;
-        int maxX = NukkitMath.floorDouble(bb.getMaxX()) >> 4;
-        int maxZ = NukkitMath.floorDouble(bb.getMaxZ()) >> 4;
+        double minBlockX = bb.getMinX();
+        double minBlockZ = bb.getMinZ();
+        double maxBlockX = bb.getMaxX();
+        double maxBlockZ = bb.getMaxZ();
+        int minX = NukkitMath.floorDouble(minBlockX) >> 4;
+        int minZ = NukkitMath.floorDouble(minBlockZ) >> 4;
+        // Scheduled block checks use a point-sized area. Keep this optimization
+        // inside the virtual method so custom levels can still override it.
+        if (minBlockX == maxBlockX && minBlockZ == maxBlockZ) {
+            return this.isChunkLoaded(minX, minZ);
+        }
+        int maxX = NukkitMath.floorDouble(maxBlockX) >> 4;
+        int maxZ = NukkitMath.floorDouble(maxBlockZ) >> 4;
 
         for (int x = minX; x <= maxX; ++x) {
             for (int z = minZ; z <= maxZ; ++z) {
