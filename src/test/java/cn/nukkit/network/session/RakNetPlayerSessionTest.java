@@ -7,10 +7,7 @@ import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.encryption.EncryptionUtils;
-import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
-import cn.nukkit.network.protocol.DataPacket;
-import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
-import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.proxy.ProxyProtocolHandler;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.plugin.InternalPlugin;
@@ -733,6 +730,42 @@ class RakNetPlayerSessionTest {
 
         assertTrue(packet.isEncoded, "direct-write packets should still be encoded before the immediate write");
         verify(fixture.channel).writeAndFlush(any(ByteBuf.class));
+    }
+
+    @Test
+    void levelSyncPacketWhitelistIncludesLecternAndLegacyVehiclePackets() {
+        assertTrue(new LecternUpdatePacket().isLevelSyncPacket());
+        assertTrue(new MoveEntityAbsolutePacket().isLevelSyncPacket());
+        assertFalse(new ClientToServerHandshakePacket().isLevelSyncPacket());
+    }
+
+    @Test
+    void levelSyncPacketWhitelistIncludesStateMutatingPackets() {
+        assertTrue(new CommandRequestPacket().isLevelSyncPacket());
+        assertTrue(new TextPacket().isLevelSyncPacket());
+        assertTrue(new PlayerHotbarPacket().isLevelSyncPacket());
+        assertTrue(new BookEditPacket().isLevelSyncPacket());
+        assertTrue(new ModalFormResponsePacket().isLevelSyncPacket());
+        assertTrue(new ServerboundDataStorePacket().isLevelSyncPacket());
+        assertTrue(new ServerboundDataDrivenScreenClosedPacket().isLevelSyncPacket());
+        assertTrue(new NPCRequestPacket().isLevelSyncPacket());
+        assertTrue(new CommandBlockUpdatePacket().isLevelSyncPacket());
+        assertTrue(new ToggleCrafterSlotRequestPacket().isLevelSyncPacket());
+        assertTrue(new SetPlayerGameTypePacket().isLevelSyncPacket());
+        assertTrue(new AdventureSettingsPacket().isLevelSyncPacket());
+        assertTrue(new RequestAbilityPacket().isLevelSyncPacket());
+        assertTrue(new EntityEventPacket().isLevelSyncPacket());
+        assertTrue(new EmotePacket().isLevelSyncPacket());
+        assertTrue(new PlayerSkinPacket().isLevelSyncPacket());
+        assertTrue(new MapInfoRequestPacket().isLevelSyncPacket());
+        assertTrue(new CraftingEventPacket().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.DropItemPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.RemoveBlockPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.UseItemPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.v113.CommandStepPacket_v113().isLevelSyncPacket());
+        assertTrue(new cn.nukkit.network.protocol.netease.SyncSkinPacket().isLevelSyncPacket());
+        assertFalse(new ClientToServerHandshakePacket().isLevelSyncPacket());
     }
 
     private static SessionFixture createSession(boolean executeImmediately) {

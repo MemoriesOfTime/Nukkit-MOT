@@ -70,4 +70,9 @@ public class PlayerSkinPacket extends DataPacket {
             }
         }
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

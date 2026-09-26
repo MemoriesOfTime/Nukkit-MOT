@@ -57,12 +57,26 @@ public class SaveCommand extends VanillaCommand {
 
         broadcastCommandMessage(sender, new TranslationContainer("commands.save.start"));
 
+        // 并行世界的玩家/世界保存投递到其世界线程执行
         for (Player player : sender.getServer().getOnlinePlayers().values()) {
-            player.save();
+            Level playerLevel = player.getLevel();
+            if (playerLevel != null && playerLevel.isParallelTickEnabled()) {
+                playerLevel.scheduleSyncTask(() -> {
+                    if (player.isOnline() && player.getLevel() == playerLevel) {
+                        player.save();
+                    }
+                });
+            } else {
+                player.save();
+            }
         }
 
         for (Level level : sender.getServer().getLevels().values()) {
-            level.save(true);
+            if (level.isParallelTickEnabled()) {
+                level.scheduleSyncTask(() -> level.save(true));
+            } else {
+                level.save(true);
+            }
         }
 
         broadcastCommandMessage(sender, new TranslationContainer("commands.save.success"));

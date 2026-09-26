@@ -126,4 +126,9 @@ public class MoveEntityAbsolutePacket extends DataPacket {
             this.putBoolean(this.teleport);
         }
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

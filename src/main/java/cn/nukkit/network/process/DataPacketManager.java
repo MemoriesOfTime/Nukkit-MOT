@@ -21,8 +21,10 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedList;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * DataPacketManager is a static class to manage DataPacketProcessors and process DataPackets.
@@ -41,7 +43,12 @@ public final class DataPacketManager {
     private static final IntOpenHashSet REGISTERED_PACKETS = new IntOpenHashSet();
     private static final IntOpenHashSet UNREGISTERED_PACKETS = new IntOpenHashSet();
 
-    public static void registerProcessor(int protocol, @NotNull DataPacketProcessor... processors) {
+    // 无锁解析缓存：packetClass → [protocol, processor|NO_PROCESSOR, ...] 平铺数组（已解析含负结果）；注册时整体失效
+    // Lock-free resolution cache: per-class flat [protocol, result] arrays (nulls cached too); cleared on registration
+    private static final ConcurrentHashMap<Class<? extends DataPacket>, Object[]> RESOLUTION_CACHE = new ConcurrentHashMap<>();
+    private static final Object NO_PROCESSOR = new Object();
+
+    public static synchronized void registerProcessor(int protocol, @NotNull DataPacketProcessor... processors) {
         Int2ObjectOpenHashMap<DataPacketProcessor> map = PROTOCOL_PROCESSORS.computeIfAbsent(protocol, (v) -> new Int2ObjectOpenHashMap<>());
         Object2ObjectOpenHashMap<Class<? extends DataPacket>, DataPacketProcessor> mapByClass = PROTOCOL_PROCESSORS_BY_CLASS.computeIfAbsent(protocol, (v) -> new Object2ObjectOpenHashMap<>());
         for (var processor : processors) {
@@ -64,6 +71,7 @@ public final class DataPacketManager {
 
         UNREGISTERED_PACKETS_BY_CLASS.clear();
         UNREGISTERED_PACKETS.clear();
+        RESOLUTION_CACHE.clear();
     }
 
     public static boolean canProcess(int protocol, int packetId) {
@@ -75,6 +83,26 @@ public final class DataPacketManager {
     }
 
     public static DataPacketProcessor getProcessor(int protocol, Class<? extends DataPacket> packet) {
+        Object cached = lookupResolutionCache(protocol, packet);
+        if (cached != null) {
+            return cached == NO_PROCESSOR ? null : (DataPacketProcessor) cached;
+        }
+        return resolveProcessor(protocol, packet);
+    }
+
+    private static synchronized DataPacketProcessor resolveProcessor(int protocol, Class<? extends DataPacket> packet) {
+        // 双检：等锁期间其他线程可能已完成解析并写回缓存
+        Object cached = lookupResolutionCache(protocol, packet);
+        if (cached != null) {
+            return cached == NO_PROCESSOR ? null : (DataPacketProcessor) cached;
+        }
+        DataPacketProcessor processor = getProcessorUncached(protocol, packet);
+        // 懒注册路径的 registerProcessor 会清缓存，须在其后写回
+        cacheResolution(protocol, packet, processor);
+        return processor;
+    }
+
+    private static DataPacketProcessor getProcessorUncached(int protocol, Class<? extends DataPacket> packet) {
         int index = getIndex(protocol, packet);
         if (!REGISTERED_PACKETS_BY_CLASS.contains(packet) || UNREGISTERED_PACKETS_BY_CLASS.contains(index)) {
             return null;
@@ -101,6 +129,41 @@ public final class DataPacketManager {
         return null;
     }
 
+    private static Object lookupResolutionCache(int protocol, Class<? extends DataPacket> packet) {
+        Object[] table = RESOLUTION_CACHE.get(packet);
+        if (table == null) {
+            return null;
+        }
+        for (int i = 0; i < table.length; i += 2) {
+            if ((Integer) table[i] == protocol) {
+                return table[i + 1];
+            }
+        }
+        return null;
+    }
+
+    // 仅在 resolveProcessor 的类监视器内调用：平铺数组的读-改-写非原子，靠该锁串行
+    private static void cacheResolution(int protocol, Class<? extends DataPacket> packet, DataPacketProcessor processor) {
+        Object value = processor == null ? NO_PROCESSOR : processor;
+        Object[] old = RESOLUTION_CACHE.get(packet);
+        if (old == null) {
+            RESOLUTION_CACHE.put(packet, new Object[]{protocol, value});
+            return;
+        }
+        for (int i = 0; i < old.length; i += 2) {
+            if ((Integer) old[i] == protocol) {
+                Object[] copy = old.clone();
+                copy[i + 1] = value;
+                RESOLUTION_CACHE.put(packet, copy);
+                return;
+            }
+        }
+        Object[] updated = Arrays.copyOf(old, old.length + 2);
+        updated[old.length] = protocol;
+        updated[old.length + 1] = value;
+        RESOLUTION_CACHE.put(packet, updated);
+    }
+
     private static DataPacketProcessor getProcessor0(int protocol, Class<? extends DataPacket> packet) {
         Object2ObjectOpenHashMap<Class<? extends DataPacket>, DataPacketProcessor> map = PROTOCOL_PROCESSORS_BY_CLASS.get(protocol);
         if (map == null) {
@@ -110,7 +173,7 @@ public final class DataPacketManager {
         return map.get(packet);
     }
 
-    public static DataPacketProcessor getProcessor(int protocol, int packetId) {
+    public static synchronized DataPacketProcessor getProcessor(int protocol, int packetId) {
         int index = getIndex(protocol, packetId);
         if (!REGISTERED_PACKETS.contains(packetId) || UNREGISTERED_PACKETS.contains(index)) {
             return null;
@@ -162,6 +225,20 @@ public final class DataPacketManager {
         } else {
             throw new UnsupportedOperationException("No processor found for packet " + packet.getClass().getName() + " with id " + packet.packetId() + ".");
         }
+    }
+
+    /**
+     * 单次取锁的快速路径，找到 processor 则锁外执行 handle；替代 canProcess+processPacket 的两次取锁。
+     * Single-lock fast path replacing the canProcess+processPacket pair.
+     */
+    public static boolean tryProcessPacket(@NotNull PlayerHandle playerHandle, @NotNull DataPacket packet) {
+        DataPacketProcessor processor = getProcessor(playerHandle.getProtocol(), packet.getClass());
+        if (processor != null) {
+            //noinspection unchecked
+            processor.handle(playerHandle, packet);
+            return true;
+        }
+        return false;
     }
 
     public static void registerDefaultProcessors() {

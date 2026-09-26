@@ -23,6 +23,8 @@ class LevelChunkLoaderIndexTest {
 
     @BeforeEach
     void prepareIndex() throws Exception {
+        // 并行分支加了锁字段，mock 不跑构造器须手工补设
+        set("chunkLoaderRegistryLock", new Object());
         set("chunkLoaders", new Long2ObjectNonBlockingMap<>());
         set("playerLoaders", new ConcurrentHashMap<>());
         set("loaders", new Int2ObjectOpenHashMap<>());

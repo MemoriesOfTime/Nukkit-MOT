@@ -55,6 +55,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.function.ObjLongConsumer;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.*;
 import static cn.nukkit.level.format.leveldb.LevelDBKey.*;
@@ -561,9 +562,25 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        return ImmutableMap.copyOf(chunks);
+        synchronized (this) {
+            return ImmutableMap.copyOf(chunks);
+        }
     }
 
+    @Override
+    public void forEachLoadedChunk(ObjLongConsumer<? super FullChunk> action) {
+        synchronized (this) {
+            for (Long2ObjectMap.Entry<BaseFullChunk> entry : this.chunks.long2ObjectEntrySet()) {
+                action.accept(entry.getValue(), entry.getLongKey());
+            }
+        }
+    }
+
+    /**
+     * 返回内部区块表的原始引用（非并发），仅限持有 chunks 监视器的调用方使用。
+     * Prefer {@link #getLoadedChunks()} (snapshot).
+     */
+    @Deprecated
     public Long2ObjectMap<? extends FullChunk> getLoadedChunksUnsafe() {
         return chunks;
     }
@@ -707,7 +724,9 @@ public class LevelDBProvider implements LevelProvider {
         if (!chunk.unload(false, safe)) {
             return false;
         }
-        this.chunks.remove(index, chunk);
+        synchronized (this) {
+            this.chunks.remove(index, chunk);
+        }
         return true;
     }
 
@@ -1183,10 +1202,16 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public void saveChunks() {
-        for (BaseFullChunk chunk : this.chunks.values()) {
-            if (chunk.hasChanged()) {
-                this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
+        List<BaseFullChunk> toSave = new ArrayList<>();
+        synchronized (this) {
+            for (BaseFullChunk chunk : this.chunks.values()) {
+                if (chunk.hasChanged()) {
+                    toSave.add(chunk);
+                }
             }
+        }
+        for (BaseFullChunk chunk : toSave) {
+            this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
         }
     }
 
@@ -1196,9 +1221,14 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private void unloadChunksUnsafe(boolean wait) {
-        Iterator<BaseFullChunk> iterator = this.chunks.values().iterator();
-        while (iterator.hasNext()) {
-            LevelDBChunk chunk = (LevelDBChunk) iterator.next();
+        List<BaseFullChunk> toUnload = new ArrayList<>();
+        synchronized (this) {
+            for (BaseFullChunk chunk : this.chunks.values()) {
+                toUnload.add(chunk);
+            }
+        }
+        for (BaseFullChunk base : toUnload) {
+            LevelDBChunk chunk = (LevelDBChunk) base;
             if (wait) {
                 // 单个区块失败不得中断其余区块的保存。/ One failing chunk must not abort the remaining saves.
                 try {
@@ -1213,7 +1243,9 @@ public class LevelDBProvider implements LevelProvider {
                 }
             }
             chunk.unload(level.isSaveOnUnloadEnabled(), false);
-            iterator.remove();
+            synchronized (this) {
+                this.chunks.remove(Level.chunkHash(chunk.getX(), chunk.getZ()), chunk);
+            }
         }
     }
 
@@ -1356,7 +1388,9 @@ public class LevelDBProvider implements LevelProvider {
         if (oldChunk != null && !oldChunk.equals(chunk)) {
             this.unloadChunk(chunkX, chunkZ, false);
         }
-        this.chunks.put(index, (LevelDBChunk) chunk);
+        synchronized (this) {
+            this.chunks.put(index, (LevelDBChunk) chunk);
+        }
     }
 
     @SuppressWarnings("unused")

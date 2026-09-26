@@ -77,7 +77,7 @@ public class GenerationTask extends AsyncTask {
                 return;
             }
 
-            level.generateChunkCallback(chunk.getX(), chunk.getZ(), chunk);
+            level.handleGenerationCallback(chunk.getX(), chunk.getZ(), chunk, true);
         }
     }
 }

@@ -63,6 +63,7 @@ public class AsyncChunkLoadTest {
         setField(level, "playerLoaders", new ConcurrentHashMap<>());
         setField(level, "loaders", new Int2ObjectOpenHashMap<>());
         setField(level, "loaderCounter", new Int2IntOpenHashMap());
+        setField(level, "chunkLoaderRegistryLock", new Object());
         return level;
     }
 

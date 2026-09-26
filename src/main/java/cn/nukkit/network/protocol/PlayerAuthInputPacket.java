@@ -375,4 +375,9 @@ public class PlayerAuthInputPacket extends DataPacket {
     public void encode() {
         this.encodeUnsupported();
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

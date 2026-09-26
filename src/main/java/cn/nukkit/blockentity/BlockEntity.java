@@ -13,6 +13,8 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -74,7 +76,26 @@ public abstract class BlockEntity extends Position {
     // Not a vanilla block entity
     public static final String PERSISTENT_CONTAINER = "PersistentContainer";
 
-    public static long count = 1;
+    // volatile + CAS：并行 tick 下并发构造，非原子 count++ 会复用 ID；public 兼容插件直写
+    public static volatile long count = 1;
+    private static final VarHandle COUNT = getCountHandle();
+
+    private static VarHandle getCountHandle() {
+        try {
+            return MethodHandles.lookup().findStaticVarHandle(BlockEntity.class, "count", long.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    public static long nextBlockEntityId() {
+        long prev, next;
+        do {
+            prev = count;
+            next = prev + 1;
+        } while (!COUNT.compareAndSet(prev, next));
+        return prev;
+    }
 
     private static final BiMap<String, Class<? extends BlockEntity>> knownBlockEntities = HashBiMap.create(30);
 
@@ -86,7 +107,7 @@ public abstract class BlockEntity extends Position {
 
     public final AtomicBoolean scheduledForBlockEntityUpdate = new AtomicBoolean(false);
 
-    public boolean closed = false;
+    public volatile boolean closed = false;
     public CompoundTag namedTag;
     protected Server server;
 
@@ -102,7 +123,7 @@ public abstract class BlockEntity extends Position {
         this.setLevel(chunk.getProvider().getLevel());
         this.namedTag = nbt;
         this.name = "";
-        this.id = BlockEntity.count++;
+        this.id = nextBlockEntityId();
         this.x = this.namedTag.getInt("x");
         this.y = this.namedTag.getInt("y");
         this.z = this.namedTag.getInt("z");

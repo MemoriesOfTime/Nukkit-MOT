@@ -46,4 +46,9 @@ public class ContainerClosePacket extends DataPacket {
             this.putBoolean(this.wasServerInitiated);
         }
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

@@ -34,6 +34,11 @@ public class ServerboundDataDrivenScreenClosedPacket extends DataPacket {
     }
 
     @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
+
+    @Override
     public void decode() {
         this.formId = this.getLInt();
         String reason = this.getString();

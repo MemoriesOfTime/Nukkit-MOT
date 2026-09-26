@@ -358,4 +358,9 @@ public class InventoryTransactionPacket extends DataPacket {
             return new LegacySetItemSlotData(this.containerId, this.slots == null ? null : this.slots.clone());
         }
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

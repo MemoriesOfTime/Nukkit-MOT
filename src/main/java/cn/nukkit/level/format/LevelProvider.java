@@ -54,9 +54,11 @@ public interface LevelProvider {
     }
 
     /**
-     * 在非主线程读取并解码区块;返回 null 表示磁盘不存在;必须支持并发调用
+     * 在非主线程读取并解码区块;返回 null 表示磁盘不存在;必须支持并发调用，且须自行与 close() 互斥
+     * （Level 关闭的有界排空超时后可能在读取进行中拆除底层存储）。
      * <p>
-     * Read and decode a chunk off the main thread; null means absent on disk; must be safe for concurrent calls
+     * Read and decode a chunk off the main thread; null means absent on disk; must be safe for concurrent
+     * calls and exclude close() itself (Level's bounded drain may time out mid-read).
      */
     @Nullable
     default BaseFullChunk readChunkOffThread(int chunkX, int chunkZ) {
@@ -145,6 +147,18 @@ public interface LevelProvider {
     void setSpawn(Vector3 pos);
 
     Map<Long, ? extends FullChunk> getLoadedChunks();
+
+    /**
+     * 遍历已加载区块；实现可在自有监视器内回调，action 须短小且不得回调 provider 写方法。
+     * <p>
+     * Iterates loaded chunks; implementations may invoke the action under their own monitor,
+     * so it must stay cheap and must not call back into mutating provider methods.
+     */
+    default void forEachLoadedChunk(java.util.function.ObjLongConsumer<? super FullChunk> action) {
+        for (Map.Entry<Long, ? extends FullChunk> entry : this.getLoadedChunks().entrySet()) {
+            action.accept(entry.getValue(), entry.getKey());
+        }
+    }
 
     void doGarbageCollection();
 
