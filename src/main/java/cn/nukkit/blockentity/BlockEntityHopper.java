@@ -35,6 +35,19 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
 
     private AxisAlignedBB pickupArea;
 
+    /**
+     * How long a redstone lock read from the world is trusted without an update of the hopper block.
+     * Every change of a neighbour's power reaches the hopper as a normal or redstone block update, which
+     * refreshes or forgets the lock at once; the window only bounds a notification a redstone source
+     * failed to send (a lit torch placed under the block next to the hopper sends none).
+     */
+    static final int REDSTONE_LOCK_TTL = 40;
+    private static final byte LOCK_UNKNOWN = 0;
+    private static final byte LOCK_FREE = 1;
+    private static final byte LOCK_POWERED = 2;
+    private byte redstoneLock = LOCK_UNKNOWN;
+    private long redstoneLockTick;
+
     //由容器矿车检测漏斗并通知更新，这样子能大幅优化性能
     @Getter
     @Setter
@@ -130,17 +143,32 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return false;
         }
 
-        HopperUpdateEvent ev = new HopperUpdateEvent(this);
-        ev.call();
-        if (ev.isCancelled()) {
-            return true;
+        // Fired every tick of every awake hopper; built and called only when someone listens, since
+        // an event nobody listens to cannot be cancelled or change the cooldown.
+        int cooldown = this.transferCooldown;
+        if (HopperUpdateEvent.getHandlers().getRegisteredListeners().length != 0) {
+            HopperUpdateEvent ev = new HopperUpdateEvent(this);
+            ev.call();
+            if (ev.isCancelled()) {
+                return true;
+            }
+            cooldown = ev.getTransferCooldown();
         }
 
-        this.transferCooldown = ev.getTransferCooldown() - 1;
+        this.transferCooldown = cooldown - 1;
 
         if (!this.isOnTransferCooldown()) {
+            // The redstone lock and the push target below may reach a neighbouring chunk. At the
+            // edge of the loaded area that chunk is not in memory, and the loading getBlock would
+            // read it from disk in the tick. Wait for it instead: keep polling without sleeping,
+            // so the hopper carries on as soon as the neighbour loads.
+            if (!this.isNeighbourhoodLoaded()) {
+                this.setTransferCooldown(8);
+                return true;
+            }
+
             // Sleep when redstone-locked (checked after cooldown decrement for plugin compatibility)
-            if (this.level.isBlockPowered(this.getBlock())) {
+            if (this.isRedstoneLocked()) {
                 return false;
             }
 
@@ -155,22 +183,32 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                 hasContainerAbove = blockAbove instanceof BlockComposter;
             }
 
-            HopperSearchItemEvent searchEvent = new HopperSearchItemEvent(this, false, this.pickupArea);
-            searchEvent.call();
+            boolean searchCancelled = false;
+            boolean cancelPull = false;
+            boolean cancelPush = false;
+            AxisAlignedBB pickupArea = this.pickupArea;
+            if (HopperSearchItemEvent.getHandlers().getRegisteredListeners().length != 0) {
+                HopperSearchItemEvent searchEvent = new HopperSearchItemEvent(this, false, this.pickupArea);
+                searchEvent.call();
+                searchCancelled = searchEvent.isCancelled();
+                cancelPull = searchEvent.isCancelPull();
+                cancelPush = searchEvent.isCancelPush();
+                pickupArea = searchEvent.getPickupArea();
+            }
 
             boolean changed = false;
 
-            if (!searchEvent.isCancelled() && !searchEvent.isCancelPull()) {
+            if (!searchCancelled && !cancelPull) {
                 if (!this.inventory.isFull()) {
                     if (hasContainerAbove) {
                         changed = this.pullItems(blockEntityAbove, blockAbove);
                     } else {
-                        changed = this.pullItemsFromMinecart() || this.pickupItems(searchEvent.getPickupArea());
+                        changed = this.pullItemsFromMinecart() || this.pickupItems(pickupArea);
                     }
                 }
             }
 
-            if (!changed && !searchEvent.isCancelled() && !searchEvent.isCancelPush()) {
+            if (!changed && !searchCancelled && !cancelPush) {
                 if (!this.inventory.isEmpty()) {
                     changed = this.pushItemsIntoMinecart() || this.pushItems();
                 }
@@ -179,7 +217,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             if (changed) {
                 this.setTransferCooldown(8);
                 this.setDirty();
-            } else if (searchEvent.isCancelled()) {
+            } else if (searchCancelled) {
                 // Plugin cancelled the search — keep polling to match original behavior
                 this.setTransferCooldown(8);
             } else if (!hasContainerAbove && !this.inventory.isFull()) {
@@ -192,6 +230,51 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
         }
 
         return true;
+    }
+
+    /**
+     * Whether redstone locks the hopper. Reading the power of the six neighbours - and of the six
+     * neighbours of every solid one - costs up to 42 block lookups, and was done on every transfer
+     * attempt of every awake hopper: half of all hopper time and most of its allocations. Vanilla keeps
+     * the lock in the block (toggle_bit / ENABLED) and changes it only from neighbour updates; this
+     * keeps the last answer until {@link BlockHopper} reports an update or {@link #REDSTONE_LOCK_TTL}
+     * ticks pass.
+     */
+    private boolean isRedstoneLocked() {
+        long now = this.level.getCurrentTick();
+        if (this.redstoneLock == LOCK_UNKNOWN || now - this.redstoneLockTick >= REDSTONE_LOCK_TTL
+                || now < this.redstoneLockTick) {
+            this.redstoneLock = this.level.isBlockPowered(this) ? LOCK_POWERED : LOCK_FREE;
+            this.redstoneLockTick = now;
+        }
+        return this.redstoneLock == LOCK_POWERED;
+    }
+
+    /**
+     * A normal update of the hopper block has just read the power of its neighbours. A hopper that slept
+     * locked is woken once the power is gone - whatever its toggle bit says, which a redstone update
+     * never used to change.
+     */
+    public void setRedstonePowered(boolean powered) {
+        boolean wasPowered = this.redstoneLock == LOCK_POWERED;
+        this.redstoneLock = powered ? LOCK_POWERED : LOCK_FREE;
+        this.redstoneLockTick = this.level.getCurrentTick();
+        if (wasPowered && !powered && !this.closed) {
+            this.scheduleUpdate();
+        }
+    }
+
+    /**
+     * A redstone update reached the hopper block: power arriving through the block a lever, button,
+     * torch or repeater acts on. Forget the lock; the next transfer attempt reads it. A hopper that slept
+     * locked is woken to do that read, as nothing else would wake it.
+     */
+    public void invalidateRedstonePower() {
+        boolean wasPowered = this.redstoneLock == LOCK_POWERED;
+        this.redstoneLock = LOCK_UNKNOWN;
+        if (wasPowered && !this.closed) {
+            this.scheduleUpdate();
+        }
     }
 
     public boolean pullItemsFromMinecart() {
@@ -469,22 +552,63 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
     }
 
     private static void wakeupHopperAt(Level level, int x, int y, int z) {
-        if (level.getBlockIdAt(x, y, z) == Block.HOPPER_BLOCK) {
-            BlockEntity be = level.getBlockEntity(new Vector3(x, y, z));
-            if (be instanceof BlockEntityHopper hopper && !hopper.closed) {
-                hopper.scheduleUpdate();
-            }
+        FullChunk chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
+        BlockEntityHopper hopper = loadedHopperAt(level, chunk, x, y, z);
+        if (hopper != null) {
+            hopper.scheduleUpdate();
         }
     }
 
     private static void wakeupHopperFacingTo(Level level, int x, int y, int z, int requiredFacing) {
-        if (level.getBlockIdAt(x, y, z) == Block.HOPPER_BLOCK) {
-            if ((level.getBlockDataAt(x, y, z) & 0x7) == requiredFacing) {
-                BlockEntity be = level.getBlockEntity(new Vector3(x, y, z));
-                if (be instanceof BlockEntityHopper hopper && !hopper.closed) {
-                    hopper.scheduleUpdate();
+        FullChunk chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
+        BlockEntityHopper hopper = loadedHopperAt(level, chunk, x, y, z);
+        if (hopper != null && (chunk.getBlockData(x & 0x0f, y, z & 0x0f) & 0x7) == requiredFacing) {
+            hopper.scheduleUpdate();
+        }
+    }
+
+    /**
+     * The hopper standing at the position, looked up only in a chunk that is in memory.
+     * <p>
+     * A hopper in an unloaded chunk does not tick, and it schedules itself when its chunk loads
+     * ({@link #initBlockEntity()}), so there is nothing to wake there. Reading that chunk would load
+     * it from disk on the main thread - a container on a chunk border woke its unloaded neighbour
+     * on every slot change, including the ones made while the container's own chunk was unloading.
+     */
+    private static BlockEntityHopper loadedHopperAt(Level level, FullChunk chunk, int x, int y, int z) {
+        if (chunk == null || level.getBlockIdAt(chunk, x, y, z) != Block.HOPPER_BLOCK) {
+            return null;
+        }
+        BlockEntity be = level.getBlockEntityIfLoaded(chunk, new Vector3(x, y, z));
+        return be instanceof BlockEntityHopper hopper && !hopper.closed ? hopper : null;
+    }
+
+    /**
+     * How far {@link #onUpdate()} reads around the hopper: the push target is one block away, and
+     * the redstone lock asks a solid neighbour for its strong power, which a redstone wire two
+     * blocks away answers by looking at its own neighbours - three blocks.
+     */
+    private static final int NEIGHBOURHOOD_REACH = 3;
+
+    /** Whether every chunk {@link #onUpdate()} may read is in memory, so reading never loads one. */
+    private boolean isNeighbourhoodLoaded() {
+        int x = this.getFloorX();
+        int z = this.getFloorZ();
+        int minChunkX = (x - NEIGHBOURHOOD_REACH) >> 4;
+        int maxChunkX = (x + NEIGHBOURHOOD_REACH) >> 4;
+        int minChunkZ = (z - NEIGHBOURHOOD_REACH) >> 4;
+        int maxChunkZ = (z + NEIGHBOURHOOD_REACH) >> 4;
+        if (minChunkX == maxChunkX && minChunkZ == maxChunkZ) {
+            // Only the hopper's own chunk, which is loaded because the hopper ticks.
+            return true;
+        }
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                if (!this.level.isChunkLoaded(chunkX, chunkZ)) {
+                    return false;
                 }
             }
         }
+        return true;
     }
 }
