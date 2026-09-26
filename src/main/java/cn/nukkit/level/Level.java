@@ -4094,14 +4094,34 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
-        for (Player player : queue.get(index).values()) {
-            if (player.isConnected() && player.usedChunks.containsKey(index)) {
-                player.sendChunk(x, z, packet);
+        if (this.retainChunkRecipients(protocol, index)) {
+            for (Player player : queue.get(index).values()) {
+                if (this.isChunkRecipient(player, index)) {
+                    player.sendChunk(x, z, packet);
+                }
             }
         }
         queue.remove(index);
         tasks.remove(index);
         this.chunkSendTaskStartTick.remove(index);
+    }
+
+    private boolean isChunkRecipient(Player player, long index) {
+        return player.isConnected() && player.getLevel() == this && player.usedChunks.containsKey(index);
+    }
+
+    private boolean retainChunkRecipients(GameVersion protocol, long index) {
+        ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
+        Int2ObjectMap<Player> recipients = queue.get(index);
+        if (recipients == null) {
+            return false;
+        }
+        recipients.values().removeIf(player -> !this.isChunkRecipient(player, index));
+        if (recipients.isEmpty()) {
+            queue.remove(index);
+            return false;
+        }
+        return true;
     }
 
     private void processChunkRequest() {
@@ -4114,6 +4134,10 @@ public class Level implements ChunkManager, Metadatable {
             LongSet tasks = this.getChunkSendTasks(protocolId);
             ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocolId);
             for (long index : pending) {
+                // Discard departed recipients before chunk lookup and serialization.
+                if (!this.retainChunkRecipients(protocolId, index)) {
+                    continue;
+                }
                 // 超时未回调则强制清除重试 / Force-clear and retry if no callback within timeout
                 long startTick = this.chunkSendTaskStartTick.get(index);
                 if (startTick != 0 && this.server.getTick() - startTick > CHUNK_SEND_TIMEOUT_TICKS
@@ -4345,6 +4369,12 @@ public class Level implements ChunkManager, Metadatable {
     public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
         long index = Level.chunkHash(x, z);
 
+        if (!this.retainChunkRecipients(protocol, index)) {
+            this.getChunkSendTasks(protocol).remove(index);
+            this.chunkSendTaskStartTick.remove(index);
+            return;
+        }
+
         if (server.cacheChunks) {
             BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunkIfLoaded(x, z);
@@ -4362,7 +4392,7 @@ public class Level implements ChunkManager, Metadatable {
 
             if (queue.containsKey(index)) {
                 for (Player player : queue.get(index).values()) {
-                    if (player.isConnected() && player.usedChunks.containsKey(index)) {
+                    if (this.isChunkRecipient(player, index)) {
                         if (matchMVChunkProtocol(protocol, player.getGameVersion())) {
                             player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                         }
