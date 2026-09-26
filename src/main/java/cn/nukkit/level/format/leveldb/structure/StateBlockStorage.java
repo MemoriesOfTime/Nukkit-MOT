@@ -252,16 +252,31 @@ public class StateBlockStorage {
         if (protocol.getProtocol() >= ProtocolInfo.v1_16_100) {
             BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocol);
             boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
+            // A section holds 4096 cells but only a handful of states. Translate each palette entry once, when
+            // a cell first uses it, instead of looking the state up in the protocol palette for every cell.
+            // Cells are still fed to the network storage one by one in the same order with the same ids, so
+            // the encoded section is byte for byte what the per-cell lookup produced, for every protocol.
+            // The network palette index a cell gets depends only on its state and on which states came first,
+            // so it is resolved once per storage palette entry as well; -1 marks an entry not met yet.
+            int paletteSize = this.palette.size();
+            int[] networkIndex = new int[paletteSize];
+            Arrays.fill(networkIndex, -1);
             for (int i = 0; i < SECTION_SIZE; i++) {
-                int fullId = get(i);
-                int id = fullId >> Block.DATA_BITS;
-                int meta = fullId & Block.DATA_MASK;
-                if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
-                    id = Block.STONE;
-                    meta = 0;
+                int local = this.bitArray.get(i);
+                if (local >= 0 && local < paletteSize) {
+                    int known = networkIndex[local];
+                    if (known >= 0) {
+                        palettedBlockStorage.setPaletteIndex(i, known);
+                    } else {
+                        BlockStateSnapshot snapshot = this.palette.get(local);
+                        int networkId = networkId(blockPalette, useHash, antiXray,
+                                snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData());
+                        networkIndex[local] = palettedBlockStorage.setBlockReturningIndex(i, networkId);
+                    }
+                } else {
+                    // Out of the palette: keep the per-cell read, including the exception it throws.
+                    palettedBlockStorage.setBlock(i, networkId(blockPalette, useHash, antiXray, get(i)));
                 }
-                palettedBlockStorage.setBlock(i, useHash ? blockPalette.getHashId(id, meta)
-                                                        : blockPalette.getRuntimeId(id, meta));
             }
         } else {
             for (int i = 0; i < SECTION_SIZE; i++) {
@@ -277,6 +292,16 @@ public class StateBlockStorage {
         }
 
         palettedBlockStorage.writeTo(stream);
+    }
+
+    private static int networkId(BlockPalette blockPalette, boolean useHash, boolean antiXray, int fullId) {
+        int id = fullId >> Block.DATA_BITS;
+        int meta = fullId & Block.DATA_MASK;
+        if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
+            id = Block.STONE;
+            meta = 0;
+        }
+        return useHash ? blockPalette.getHashId(id, meta) : blockPalette.getRuntimeId(id, meta);
     }
 
     private void grow(BitArrayVersion version) {
