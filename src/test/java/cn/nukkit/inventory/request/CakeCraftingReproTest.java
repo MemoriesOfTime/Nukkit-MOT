@@ -25,6 +25,7 @@ import org.mockito.Mockito;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.atLeastOnce;
@@ -270,6 +271,33 @@ class CakeCraftingReproTest {
         ItemStackRequestHandler.handleRequests(player, List.of(cake));
         assertOk();
         assertEquals("kit:craft", inventory.getItem(1).getNamedTag().getString("km_origin"));
+    }
+
+    @Test
+    void craftEventExposesRecipeRepetitionsRatherThanOutputStackSize() {
+        AtomicInteger repetitions = new AtomicInteger();
+        Mockito.doAnswer(invocation -> {
+            if (invocation.getArgument(0) instanceof CraftItemEvent event) {
+                repetitions.set(event.getRepetitions());
+            }
+            return null;
+        }).when(pluginManager).callEvent(Mockito.any());
+        ui.getBigCraftingGrid().setItem(0, Item.get(Item.WHEAT, 0, 3), false);
+        ui.getBigCraftingGrid().setItem(1, Item.get(Item.WHEAT, 0, 3), false);
+        ui.getBigCraftingGrid().setItem(2, Item.get(Item.WHEAT, 0, 3), false);
+        ItemStackRequest bread = new ItemStackRequest(4, join(
+                new CraftRecipeAction(breadNetworkId, 3),
+                new ConsumeAction(3, gridSlot(0)),
+                new ConsumeAction(3, gridSlot(1)),
+                new ConsumeAction(3, gridSlot(2)),
+                placeCreatedToHotbar(3, 3)
+        ), new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(bread));
+
+        assertOk();
+        assertEquals(3, repetitions.get());
+        assertEquals(3, inventory.getItem(3).getCount());
     }
 
     @Test
