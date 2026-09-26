@@ -1,5 +1,7 @@
 package cn.nukkit.level.format.generic;
 
+import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
+
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
@@ -278,66 +280,34 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         int minY = this.getProvider().getMinBlockY();
         int maxY = this.getProvider().getMaxBlockY();
         int sectionOffset = this.getSectionOffset();
-
-        for (int sectionY = 0; sectionY < this.sections.length; sectionY++) {
-            ChunkSection section = this.sections[sectionY];
-            if (section == null || section instanceof EmptyChunkSection) {
-                continue;
+        IntArrayFIFOQueue pending = new IntArrayFIFOQueue();
+        for (int i = 0; i < this.sections.length; i++) {
+            ChunkSection section = this.sections[i];
+            if (section == null || section instanceof EmptyChunkSection) continue;
+            int baseY = (i - sectionOffset) << 4;
+            if (section.maybeHasLightSource()) {
+                for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) for (int y = 0; y < 16; y++) {
+                    if (baseY + y < minY || baseY + y > maxY) continue;
+                    int light = Block.getBlockLight(section.getBlockId(x, y, z));
+                    if (light > 0) section.setBlockLight(x, y, z, light);
+                }
             }
-
-            if (!section.maybeHasLightSource()) {
-                continue;
+            // A dark section has no wavefront. Keep saved cross-chunk light as seeds:
+            // absence of a local emitter does not mean that the section is dark.
+            byte[] lights = section.getLightArray();
+            boolean lit = false;
+            for (byte value : lights) {
+                if (value != 0) { lit = true; break; }
             }
-
-            int baseY = (sectionY - sectionOffset) << 4;
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    for (int y = 0; y < 16; y++) {
-                        int worldY = baseY + y;
-                        if (worldY < minY || worldY > maxY) {
-                            continue;
-                        }
-                        int blockId = section.getBlockId(x, y, z);
-                        int lightLevel = Block.getBlockLight(blockId);
-                        if (lightLevel > 0) {
-                            section.setBlockLight(x, y, z, lightLevel);
-                        }
-                    }
+            if (!lit) continue;
+            for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) for (int y = 0; y < 16; y++) {
+                int worldY = baseY + y;
+                if (worldY >= minY && worldY <= maxY && section.getBlockLight(x, y, z) > 1) {
+                    pending.enqueue(((worldY - minY) << 8) | (z << 4) | x);
                 }
             }
         }
-
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int y = minY; y <= maxY; y++) {
-                    int currentLight = this.getBlockLight(x, y, z);
-                    if (currentLight > 1) {
-                        // Propagate to neighbors within chunk
-                        propagateBlockLightToNeighbor(x - 1, y, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x + 1, y, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y - 1, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y + 1, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y, z - 1, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y, z + 1, currentLight, minY, maxY);
-                    }
-                }
-            }
-        }
-    }
-
-    private void propagateBlockLightToNeighbor(int x, int y, int z, int sourceLight, int minY, int maxY) {
-        // Check bounds (only within chunk)
-        if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < minY || y > maxY) {
-            return;
-        }
-
-        int blockId = this.getBlockId(x, y, z);
-        int lightFilter = Block.getBlockLightFilter(blockId);
-        int newLight = sourceLight - Math.max(1, lightFilter);
-
-        if (newLight > 0 && newLight > this.getBlockLight(x, y, z)) {
-            this.setBlockLight(x, y, z, newLight);
-        }
+        propagateBlockLight(pending, minY, maxY);
     }
 
     @Override

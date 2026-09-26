@@ -25,6 +25,7 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.io.IOException;
@@ -574,7 +575,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                         nextDecrease += 1; // skylight value decreases by one for each block under a block
                                            // that diffuses skylight. The block itself has a value of 15 (if it's a top-most block)
                     } else {
-                        nextDecrease -= Block.getBlockLightFilter(id); // blocks under a light filtering block will have a skylight value
+                        nextDecrease += Block.getBlockLightFilter(id); // blocks under a light filtering block will have a skylight value
                                                             // decreased by the lightFilter value of that block. The block itself
                                                             // has a value of 15 (if it's a top-most block)
                     }
@@ -588,49 +589,49 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     public void populateBlockLight() {
         int minY = this.getProvider().getMinBlockY();
         int maxY = this.getProvider().getMaxBlockY();
-
+        IntArrayFIFOQueue pending = new IntArrayFIFOQueue();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = minY; y <= maxY; y++) {
-                    int blockId = this.getBlockId(x, y, z);
-                    int lightLevel = Block.getBlockLight(blockId);
-                    if (lightLevel > 0) {
-                        this.setBlockLight(x, y, z, lightLevel);
+                    int emitted = Block.getBlockLight(this.getBlockId(x, y, z));
+                    if (emitted > 0) {
+                        this.setBlockLight(x, y, z, emitted);
+                    }
+                    if (this.getBlockLight(x, y, z) > 1) {
+                        pending.enqueue(((y - minY) << 8) | (z << 4) | x);
                     }
                 }
             }
         }
+        propagateBlockLight(pending, minY, maxY);
+    }
 
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int y = minY; y <= maxY; y++) {
-                    int currentLight = this.getBlockLight(x, y, z);
-                    if (currentLight > 1) {
-                        // Propagate to neighbors within chunk
-                        propagateBlockLightToNeighbor(x - 1, y, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x + 1, y, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y - 1, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y + 1, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y, z - 1, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y, z + 1, currentLight, minY, maxY);
-                    }
-                }
-            }
+    /** Complete the within-chunk wave in every direction, retaining pre-existing boundary light. */
+    protected final void propagateBlockLight(IntArrayFIFOQueue pending, int minY, int maxY) {
+        while (!pending.isEmpty()) {
+            int node = pending.dequeueInt();
+            int x = node & 15;
+            int z = (node >>> 4) & 15;
+            int y = (node >>> 8) + minY;
+            int light = this.getBlockLight(x, y, z);
+            if (light <= 1) continue;
+            propagateBlockLightToNeighbor(x - 1, y, z, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x + 1, y, z, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x, y - 1, z, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x, y + 1, z, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x, y, z - 1, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x, y, z + 1, light, minY, maxY, pending);
         }
     }
 
-    private void propagateBlockLightToNeighbor(int x, int y, int z, int sourceLight, int minY, int maxY) {
-        // Check bounds (only within chunk)
-        if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < minY || y > maxY) {
-            return;
-        }
-
-        int blockId = this.getBlockId(x, y, z);
-        int lightFilter = Block.getBlockLightFilter(blockId);
-        int newLight = sourceLight - Math.max(1, lightFilter);
-
-        if (newLight > 0 && newLight > this.getBlockLight(x, y, z)) {
-            this.setBlockLight(x, y, z, newLight);
+    private void propagateBlockLightToNeighbor(int x, int y, int z, int sourceLight,
+                                               int minY, int maxY, IntArrayFIFOQueue pending) {
+        if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < minY || y > maxY) return;
+        int filter = Block.getBlockLightFilter(this.getBlockId(x, y, z));
+        int light = sourceLight - Math.max(1, filter);
+        if (light > 0 && light > this.getBlockLight(x, y, z)) {
+            this.setBlockLight(x, y, z, light);
+            if (light > 1) pending.enqueue(((y - minY) << 8) | (z << 4) | x);
         }
     }
 
