@@ -551,9 +551,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setViewingEnderChest(BlockEnderChest chest) {
-        if (chest == null && this.viewingEnderChest != null) {
+        if (this.viewingEnderChest != null) {
             this.viewingEnderChest.getViewers().remove(this);
-        } else if (chest != null) {
+        }
+        if (chest != null) {
             chest.getViewers().add(this);
         }
         this.viewingEnderChest = chest;
@@ -1107,6 +1108,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public boolean isUsingItem() {
         return this.getDataFlag(DATA_FLAGS, DATA_FLAG_ACTION) && this.startAction > -1;
+    }
+
+    /**
+     * Whether a consumable is being used right now: food, a potion, milk or the ominous bottle.
+     *
+     * <p>Only these items carry a use duration and are finished by the server timer in
+     * {@link #processAutoCompletion()}. A bow, a crossbow or a shield keeps {@code useDuration == 0}
+     * and is finished by the client releasing the button, so they keep the old behaviour wherever
+     * this check guards a reset.
+     */
+    /**
+     * Whether a use transaction is only a repeat of a consumable that is still being used.
+     *
+     * <p>The client keeps sending {@code USE_ITEM_ACTION_CLICK_AIR} while the button is held down,
+     * and a player in a fight taps the button rather than holding it. Such a transaction arrives
+     * before the item is ready ({@code ticksUsed < useDuration}), so handing it to
+     * {@code Item#onUse} only gets the item refused - while the use state is already gone and the
+     * food is never eaten. Items without a use duration (bow, crossbow, shield) are released by the
+     * client and are not affected.
+     */
+    static boolean isRepeatedConsumableUse(int useDuration, int ticksUsed) {
+        return useDuration > 0 && ticksUsed < useDuration;
+    }
+
+    public boolean isConsumingItem() {
+        if (!this.isUsingItem() || this.inventory == null) {
+            return false;
+        }
+        Item held = this.inventory.getItemInHandFast();
+        return held != null && held.canRelease() && held.getUseDuration() > 0;
     }
 
     public void setUsingItem(boolean value) {
@@ -4250,8 +4281,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
+                        // Bedrock lets a player eat while sprinting, and sprint is toggled all the
+                        // time in a fight (knock-back, a released stick). Dropping the use state
+                        // here made the food silently never finish.
                         if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
-                                this.isJavaClient(), authHoldToUse, authStartUsingItem)) {
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem)
+                                && !this.isConsumingItem()) {
                             this.setUsingItem(false);
                         }
                     }
@@ -4756,7 +4791,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                 }
 
-                if (UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(this.isJavaClient(), playerActionPacket.action)) {
+                // A consumable in progress survives an unhandled action: the client keeps the
+                // animation running and the food would otherwise never finish.
+                if (UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(this.isJavaClient(), playerActionPacket.action)
+                        && !this.isConsumingItem()) {
                     this.setUsingItem(false);
                 }
                 break;
@@ -5027,6 +5065,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             return;
                         }
                     }
+
+                    // 1.21 clients also close an ender chest with -1 while their own inventory is not
+                    // open. Without this the window stayed open on the server: the lid hung open for
+                    // everyone and the chest did not open again for this player until a teleport.
+                    closeEnderChestWindowForUnknownId();
+                    // The same happens to a chest, barrel, shulker box, hopper or furnace of the world:
+                    // the lid hung open and the block did not open again for this player. Only windows
+                    // of real block entities are closed here. A plugin window drawn on a fake block has
+                    // no block entity, and a late -1 must not shut a fresh window of that kind.
+                    closeWorldContainerWindowsForUnknownId();
 
                     this.craftingType = CRAFTING_SMALL;
                     this.resetCraftingGridType();
@@ -5707,6 +5755,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 }
 
                                 int ticksUsed = this.server.getTick() - this.startAction;
+                                if (isRepeatedConsumableUse(item.getUseDuration(), ticksUsed)) {
+                                    // The client repeats this transaction while the button is held
+                                    // down. Handing it to onUse() this early only gets the item
+                                    // refused, and the use state would be gone: the food is never
+                                    // eaten. Keep using it and let processAutoCompletion() finish.
+                                    break;
+                                }
                                 this.setUsingItem(false);
                                 if (!item.onUse(this, ticksUsed)) {
                                     this.inventory.sendContents(this);
@@ -6907,6 +6962,57 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return LangCode.valueOf(this.getLoginChainData().getLanguageCode());
     }
 
+    /**
+     * Closes an open ender chest window after the client sent ContainerClose with window id -1.
+     */
+    void closeEnderChestWindowForUnknownId() {
+        Inventory enderChest = this.getEnderChestInventory();
+        if (enderChest == null || this.getWindowId(enderChest) == -1) {
+            return;
+        }
+        this.server.getPluginManager().callEvent(new InventoryCloseEvent(enderChest, this));
+        this.closingWindowId = Integer.MAX_VALUE;
+        this.removeWindow(enderChest, true);
+        this.closingWindowId = Integer.MIN_VALUE;
+    }
+
+    /**
+     * Closes the windows of real world containers after the client sent ContainerClose with window
+     * id -1 while its own inventory was not open.
+     */
+    void closeWorldContainerWindowsForUnknownId() {
+        for (Inventory open : this.openWindowsSnapshot()) {
+            if (!isWorldBlockContainer(open) || this.getWindowId(open) == -1) {
+                continue;
+            }
+            this.server.getPluginManager().callEvent(new InventoryCloseEvent(open, this));
+            this.closingWindowId = Integer.MAX_VALUE;
+            this.removeWindow(open, true);
+            this.closingWindowId = Integer.MIN_VALUE;
+        }
+    }
+
+    List<Inventory> openWindowsSnapshot() {
+        return new ArrayList<>(this.windows.keySet());
+    }
+
+    /**
+     * A container window of a block entity that still stands in its level. A window whose holder is
+     * a fake block ({@link cn.nukkit.inventory.FakeBlockMenu}), a closed block entity or anything
+     * else is not a world container.
+     */
+    static boolean isWorldBlockContainer(Inventory inventory) {
+        if (!(inventory instanceof ContainerInventory)) {
+            return false;
+        }
+        InventoryHolder holder = inventory.getHolder();
+        if (!(holder instanceof BlockEntity blockEntity) || blockEntity.closed) {
+            return false;
+        }
+        Level level = blockEntity.getLevel();
+        return level != null && level.getBlockEntityIfLoaded(blockEntity) == blockEntity;
+    }
+
     @Override
     public void kill() {
         if (!this.spawned) {
@@ -7035,6 +7141,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
             }
         }
+
+        // A dead player keeps nothing open, like vanilla. Closed before the drops are collected: a
+        // container that hands its input slots back (trade, anvil, grindstone) returns them to the
+        // inventory that is about to drop, instead of into the inventory of the respawned player,
+        // and the lid of a chest or ender chest closes where it was opened.
+        this.removeAllWindows();
 
         PlayerDeathEvent ev = new PlayerDeathEvent(this, this.getDrops(), new TranslationContainer(message, params.toArray(new String[0])), this.expLevel);
         ev.setKeepInventory(this.level.gameRules.getBoolean(GameRule.KEEP_INVENTORY));
