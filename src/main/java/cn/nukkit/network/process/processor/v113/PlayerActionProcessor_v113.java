@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.v113;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.block.Block;
@@ -170,7 +171,7 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
                                     if (!(durability != null && durability.getLevel() > 0 && (100 / (durability.getLevel() + 1)) <= new Random().nextInt(100))) {
                                         bow.setDamage(bow.getDamage() + 1);
                                         if (bow.getDamage() >= 385) {
-                                            player.getInventory().setItemInHand(new Item(0));
+                                            player.getInventory().setItemInHand(Item.AIR_ITEM.clone());
                                         } else {
                                             player.getInventory().setItemInHand(bow);
                                         }
@@ -282,7 +283,7 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol < ProtocolInfo.v1_2_0;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() < ProtocolInfo.v1_2_0;
     }
 }

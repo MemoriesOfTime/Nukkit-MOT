@@ -65,8 +65,8 @@ public class EntityBoat extends EntityVehicle {
     public EntityBoat(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
 
-        this.setMaxHealth(40);
-        this.setHealth(40);
+        this.setMaxHealth(4);
+        this.setHealth(4);
     }
 
     @Override
@@ -117,8 +117,6 @@ public class EntityBoat extends EntityVehicle {
         if (invulnerable) {
             return false;
         } else {
-            source.setDamage(source.getDamage() * 2);
-
             boolean attack = super.attack(source);
 
             if (isAlive()) {
@@ -201,6 +199,10 @@ public class EntityBoat extends EntityVehicle {
                             this.level.dropItem(block, Item.get(Item.LILY_PAD, 0, 1));
                         });
             }
+        }
+
+        if (this.isAlive() && this.health < this.getMaxHealth()) {
+            this.health = Math.min(this.getMaxHealth(), this.health + 0.1f);
         }
 
         // We call super here after movement code so block collision checks use up-to-date position

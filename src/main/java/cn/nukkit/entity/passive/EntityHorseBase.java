@@ -141,7 +141,7 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (this.isFeedItem(item) && !this.isInLoveCooldown()) {
+        if (this.isBreedingItem(item) && !this.isInLoveCooldown()) {
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
             this.level.addParticle(new ItemBreakParticle(this.add(0, this.getMountedYOffset(), 0), Item.get(item.getId(), 0, 1)));
             this.setInLove();
@@ -252,6 +252,12 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
                 item.getId() == Item.SUGAR ||
                 item.getId() == Item.BREAD ||
                 item.getId() == Item.GOLDEN_CARROT;
+    }
+
+    // 马类的喂食与繁殖物品恒同，直接复用 isFeedItem
+    @Override
+    public boolean isBreedingItem(Item item) {
+        return this.isFeedItem(item);
     }
 
     @Override

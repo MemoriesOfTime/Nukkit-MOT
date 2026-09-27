@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.api.OnlyNetEase;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import lombok.Getter;
@@ -23,6 +24,8 @@ public class AnimatePacket extends DataPacket {
      * @since v897
      */
     public SwingSource swingSource = SwingSource.NONE;
+    @OnlyNetEase
+    public long attackId;
 
     @Override
     public void decode() {
@@ -46,6 +49,10 @@ public class AnimatePacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.swingSource = this.getOptional(SwingSource.NONE, stream -> SwingSource.from(stream.getString()));
         }
+
+        if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_130) {
+            this.attackId = this.getVarLong();
+        }
     }
 
     @Override
@@ -67,6 +74,10 @@ public class AnimatePacket extends DataPacket {
         }
         if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.putOptional(o -> o != SwingSource.NONE, this.swingSource, o -> this.putString(o.getName()));
+        }
+
+        if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_130) {
+            this.putVarLong(this.attackId);
         }
     }
 

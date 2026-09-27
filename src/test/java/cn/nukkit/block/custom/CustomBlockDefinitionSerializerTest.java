@@ -88,7 +88,7 @@ class CustomBlockDefinitionSerializerTest {
 
     @Test
     void netEaseProtocolsKeepLegacyBooleanAmbientOcclusion() {
-        for (GameVersion version : new GameVersion[]{GameVersion.V1_20_50_NETEASE, GameVersion.V1_21_124_NETEASE}) {
+        for (GameVersion version : new GameVersion[]{GameVersion.V1_20_50_NETEASE, GameVersion.V1_21_124_NETEASE, GameVersion.V1_21_130_NETEASE}) {
             CompoundTag out = CustomBlockDefinitionSerializer.serialize(buildNbt(), version.getProtocol());
             CompoundTag star = material(out, "components", "*");
             assertInstanceOf(ByteTag.class, star.get("ambient_occlusion"), version.toString());
@@ -103,6 +103,20 @@ class CustomBlockDefinitionSerializerTest {
         CompoundTag star = material(CustomBlockDefinitionSerializer.serialize(nbt, ProtocolInfo.v1_26_20), "components", "*");
 
         assertEquals(0.5f, star.getFloat("ambient_occlusion"));
+    }
+
+    @Test
+    void renderMethodIsNeverRewritten() {
+        // 843+ 网络定义仍接受旧名 alpha_test（Geyser 对 1.21.110+ 的适配只转换 packed_bools、render_method 原样透传）
+        // render_method names must pass through untouched on every protocol; clients accept them as-is
+        for (String name : new String[]{"opaque", "alpha_test", "alpha_test_single_sided", "blend", "double_sided"}) {
+            for (int protocol : new int[]{ProtocolInfo.v1_21_100, ProtocolInfo.v1_21_110_26, ProtocolInfo.v1_21_130, ProtocolInfo.v1_26_20, ProtocolInfo.CURRENT_PROTOCOL}) {
+                CompoundTag out = CustomBlockDefinitionSerializer.serialize(nbtWithRenderMethod(name), protocol);
+
+                assertEquals(name, material(out, "components", "*").getString("render_method"), name + " / protocol " + protocol);
+                assertEquals(name, material(out, "permutationComponents", "*").getString("render_method"), name + " / protocol " + protocol);
+            }
+        }
     }
 
     private static CompoundTag buildNbt() {
@@ -123,6 +137,28 @@ class CustomBlockDefinitionSerializerTest {
 
         return new CompoundTag()
                 .putCompound("components", components)
+                .putList("permutations", new ListTag<CompoundTag>()
+                        .add(new CompoundTag()
+                                .putString("condition", "q.block_state('state') == 'alt'")
+                                .putCompound("components", permutationComponents)));
+    }
+
+    private static CompoundTag nbtWithRenderMethod(String renderMethod) {
+        CompoundTag materials = new CompoundTag()
+                .putCompound("*", new CompoundTag()
+                        .putBoolean("ambient_occlusion", true)
+                        .putBoolean("face_dimming", true)
+                        .putString("render_method", renderMethod)
+                        .putString("texture", "leaf"));
+
+        CompoundTag permutationComponents = new CompoundTag()
+                .putCompound("minecraft:material_instances", new CompoundTag()
+                        .putCompound("materials", materials));
+
+        return new CompoundTag()
+                .putCompound("components", new CompoundTag()
+                        .putCompound("minecraft:material_instances", new CompoundTag()
+                                .putCompound("materials", materials)))
                 .putList("permutations", new ListTag<CompoundTag>()
                         .add(new CompoundTag()
                                 .putString("condition", "q.block_state('state') == 'alt'")

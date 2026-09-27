@@ -10,6 +10,16 @@
                 <TimeBasedTriggeringPolicy/>
                 <OnStartupTriggeringPolicy/>
             </Policies>
+            <!-- Keep every rolled log. The default strategy caps the index at 7 per day and
+                 renumbers on rollover, so the eighth restart of a day silently deletes the
+                 oldest archive. Prune only when the archives together exceed 1 GB. -->
+            <DefaultRolloverStrategy fileIndex="nomax">
+                <Delete basePath="logs" maxDepth="1">
+                    <IfFileName glob="*.log.gz">
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfFileName>
+                </Delete>
+            </DefaultRolloverStrategy>
         </RollingRandomAccessFile>
     </Appenders>
     <Loggers>

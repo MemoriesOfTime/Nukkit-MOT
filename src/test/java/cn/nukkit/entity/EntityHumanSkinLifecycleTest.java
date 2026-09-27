@@ -23,6 +23,7 @@ import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -96,6 +97,133 @@ class EntityHumanSkinLifecycleTest {
         assertEquals(npc.getSkin().getSkinId(), update.skin.getSkinId());
         assertInstanceOf(AddPlayerPacket.class, lifecyclePackets.get(2));
         assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+    }
+
+    @Test
+    void npcProfileHashSurvivesNbtRoundTrip() {
+        CompoundTag nbt = npcNbt();
+        nbt.getCompound("Skin").putString("ProfileHash", "persona-profile-hash");
+
+        TestHuman loaded = new TestHuman(newMockChunk(), nbt);
+        assertEquals("persona-profile-hash", loaded.getSkin().getProfileHash());
+
+        TestHuman reloaded = new TestHuman(newMockChunk(), loaded.saveAndGetNbt());
+        assertEquals("persona-profile-hash", reloaded.getSkin().getProfileHash());
+    }
+
+    @Test
+    void v126PersonaNpcWithoutProfileHashAppliesSkinAfterSpawn() {
+        CompoundTag nbt = npcNbt();
+        nbt.getCompound("Skin").putBoolean("PersonaSkin", true);
+        TestHuman npc = new TestHuman(newMockChunk(), nbt);
+        RecordingPlayer viewer = newViewer(GameVersion.V1_26_45);
+
+        npc.spawnTo(viewer);
+
+        List<DataPacket> packets = viewer.sentPackets.stream()
+                .filter(packet -> packet instanceof PlayerListPacket
+                        || packet instanceof AddPlayerPacket
+                        || packet instanceof PlayerSkinPacket)
+                .toList();
+        assertEquals(3, packets.size());
+        PlayerListPacket add = assertInstanceOf(PlayerListPacket.class, packets.get(0));
+        assertEquals(PlayerListPacket.TYPE_ADD, add.type);
+        assertNotEquals(npc.getSkin().getSkinId(), add.entries[0].skin.getSkinId());
+        assertInstanceOf(AddPlayerPacket.class, packets.get(1));
+        PlayerSkinPacket skin = assertInstanceOf(PlayerSkinPacket.class, packets.get(2));
+        assertEquals(npc.getSkin().getSkinId(), skin.skin.getSkinId());
+        assertTrue(viewer.sentSkins.contains(npc.getUniqueId()));
+    }
+
+    @Test
+    void completedNpcSkinHandshakeReleasesGenerationState() {
+        CompoundTag nbt = npcNbt();
+        nbt.getCompound("Skin").putBoolean("PersonaSkin", true);
+        TestHuman npc = new TestHuman(newMockChunk(), nbt);
+        RecordingPlayer viewer = newViewer(GameVersion.V1_26_45);
+
+        npc.spawnTo(viewer);
+        assertEquals(1, trackedGenerationCount(viewer));
+
+        runPendingDelayedTasks();
+
+        assertEquals(0, trackedGenerationCount(viewer),
+                "completed handshakes must not retain every NPC UUID for the viewer lifetime");
+    }
+
+    @Test
+    void v126PersonaNpcWithProfileHashKeepsDirectListSkinPath() {
+        CompoundTag nbt = npcNbt();
+        nbt.getCompound("Skin")
+                .putBoolean("PersonaSkin", true)
+                .putString("ProfileHash", "persona-profile-hash");
+        TestHuman npc = new TestHuman(newMockChunk(), nbt);
+        RecordingPlayer viewer = newViewer(GameVersion.V1_26_45);
+
+        npc.spawnTo(viewer);
+
+        assertTrue(viewer.sentPackets.stream().noneMatch(PlayerSkinPacket.class::isInstance));
+        List<PlayerListPacket> playerListPackets = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .toList();
+        assertEquals(1, playerListPackets.size());
+        assertEquals(PlayerListPacket.TYPE_REMOVE, playerListPackets.get(0).type);
+        assertFalse(viewer.sentSkins.contains(npc.getUniqueId()));
+        assertTrue(this.pendingDelayedTasks.isEmpty());
+    }
+
+    @Test
+    void pre126PersonaNpcKeepsDirectListSkinPath() {
+        CompoundTag nbt = npcNbt();
+        nbt.getCompound("Skin").putBoolean("PersonaSkin", true);
+        TestHuman npc = new TestHuman(newMockChunk(), nbt);
+        RecordingPlayer viewer = newViewer(GameVersion.V1_21_124);
+
+        npc.spawnTo(viewer);
+
+        assertTrue(viewer.sentPackets.stream().noneMatch(PlayerSkinPacket.class::isInstance));
+        assertFalse(viewer.sentSkins.contains(npc.getUniqueId()));
+        assertTrue(this.pendingDelayedTasks.isEmpty());
+    }
+
+    @Test
+    void v860NpcPlaceholderSkinIsVisible() {
+        // 回归：占位皮肤必须不透明——93 被客户端限流队列丢弃时，降级为可见占位而非永久隐形
+        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
+        RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);
+
+        npc.spawnTo(viewer);
+
+        PlayerListPacket add = viewer.sentPackets.stream()
+                .filter(PlayerListPacket.class::isInstance)
+                .map(PlayerListPacket.class::cast)
+                .findFirst().orElseThrow();
+        assertEquals(PlayerListPacket.TYPE_ADD, add.type);
+        assertTrue(add.entries[0].skin.isValid());
+        assertFalse(add.entries[0].skin.isFullyTransparent(),
+                "placeholder skin must be opaque so a dropped skin packet degrades to a visible fallback");
+    }
+
+    @Test
+    void v860NpcResendUsesLiveSkinAfterChange() {
+        // 回归：补发必须取实体当前皮肤——补发 spawn 时的快照会把窗口内的新皮肤永久顶掉
+        TestHuman npc = new TestHuman(newMockChunk(), npcNbt());
+        RecordingPlayer viewer = newViewer(GameVersion.V1_21_124_NETEASE);
+        npc.spawnTo(viewer);
+
+        Skin changed = new Skin();
+        changed.setSkinId("test-npc-skin-2");
+        changed.setSkinData(new byte[Skin.SINGLE_SKIN_SIZE]);
+        npc.setSkin(changed);
+
+        runPendingDelayedTasks(); // +2t 补发与 +5t REMOVE
+
+        PlayerSkinPacket last = viewer.sentPackets.stream()
+                .filter(PlayerSkinPacket.class::isInstance)
+                .map(PlayerSkinPacket.class::cast)
+                .reduce((first, second) -> second).orElseThrow();
+        assertEquals("test-npc-skin-2", last.skin.getSkinId());
     }
 
     @Test
@@ -332,6 +460,21 @@ class EntityHumanSkinLifecycleTest {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private static int trackedGenerationCount(Player viewer) {
+        try {
+            Field field = PlayerEntitySkinSender.class.getDeclaredField("REMOVE_GENERATIONS");
+            field.setAccessible(true);
+            Map<Player, Map<UUID, ?>> generations = (Map<Player, Map<UUID, ?>>) field.get(null);
+            synchronized (generations) {
+                Map<UUID, ?> viewerGenerations = generations.get(viewer);
+                return viewerGenerations == null ? 0 : viewerGenerations.size();
+            }
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Unable to inspect pending NPC skin registrations", e);
+        }
+    }
+
     private FullChunk newMockChunk() {
         FullChunk chunk = mock(FullChunk.class);
         LevelProvider provider = mock(LevelProvider.class);
@@ -352,6 +495,11 @@ class EntityHumanSkinLifecycleTest {
 
         private TestHuman(FullChunk chunk, CompoundTag nbt) {
             super(chunk, nbt);
+        }
+
+        private CompoundTag saveAndGetNbt() {
+            this.saveNBT();
+            return this.namedTag;
         }
     }
 

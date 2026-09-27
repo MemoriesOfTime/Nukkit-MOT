@@ -40,6 +40,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     public EntityLiving(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+        // Players defer initEntity until login; mobs have already loaded their effects in super.
+        this.initializeMovementState();
     }
 
     @Override
@@ -55,7 +57,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     protected int attackTime = 0;
     protected int knockBackTime = 0;
 
-    protected float movementSpeed = 0.1f;
+    protected float movementSpeed;
 
     protected int turtleTicks = 0;
 
@@ -63,10 +65,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     protected final boolean isDrowned = this instanceof EntityDrowned;
 
-    private final Map<String, EntityMovementSpeedModifier> movementSpeedModifiers = new HashMap<>();
+    private Map<String, EntityMovementSpeedModifier> movementSpeedModifiers;
+
+    private void initializeMovementState() {
+        if (this.movementSpeedModifiers == null) {
+            this.movementSpeedModifiers = new HashMap<>();
+            this.movementSpeed = 0.1f;
+        }
+    }
 
     @Override
     protected void initEntity() {
+        // Entity's constructor loads ActiveEffects through this virtual method, before field
+        // initializers would run. Initialize both values here and never overwrite the loaded speed.
+        this.initializeMovementState();
         super.initEntity();
 
         if (this.namedTag.contains("HealF")) {
@@ -205,9 +217,19 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         this.knockBack(attacker, damage, x, z, 0.3);
     }
 
+    /** Fraction of an incoming knockback impulse resisted, from zero to one. */
+    public double getKnockBackResistance() {
+        return 0;
+    }
+
     public void knockBack(Entity attacker, double damage, double x, double z, double base) {
         double f = Math.sqrt(x * x + z * z);
         if (f <= 0) {
+            return;
+        }
+
+        double kept = 1 - Math.max(0, Math.min(1, this.getKnockBackResistance()));
+        if (kept <= 0) {
             return;
         }
 
@@ -218,9 +240,9 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         motion.x /= 2d;
         motion.y /= 2d;
         motion.z /= 2d;
-        motion.x += x * f * base;
-        motion.y += base;
-        motion.z += z * f * base;
+        motion.x += x * f * base * kept;
+        motion.y += base * kept;
+        motion.z += z * f * base * kept;
 
         if (motion.y > base) {
             motion.y = base;
@@ -521,7 +543,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public float getMovementSpeed() {
         return this.movementSpeed;
     }
-    
+
     public int getAirTicks() {
         return this.airTicks;
     }

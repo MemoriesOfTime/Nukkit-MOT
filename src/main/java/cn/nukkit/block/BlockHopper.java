@@ -18,16 +18,90 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
+
 /**
  * @author CreeperFace
  */
 public class BlockHopper extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityHopper> {
+
+    /**
+     * 漏斗的碰撞按 BDS 逐盒建模：y10-11px 满幅法兰、其上 2px 厚四壁、内缩 4-12px 的漏斗体（y4-10），
+     * 以及随输出朝向变化的出料管（朝下为底部 6-10px 竖管，朝向水平时为该侧 y4-8px 横管）；
+     * 法兰以下的四角为空，玩家头部可从侧面探入。
+     * <p>
+     * Collision per BDS: a full-footprint flange at y10-11px, 2px walls above it, an inset funnel
+     * (y4-10) and an output spout that points down (bottom tube) or sideways with the facing.
+     * The corners below the flange stay open so entities can enter them from the side.
+     */
+    private AxisAlignedBB[] recalculateCollisionBoxes() {
+        return new AxisAlignedBB[]{
+                // 法兰 / flange
+                new SimpleAxisAlignedBB(x, y + 10d / 16d, z, x + 1d, y + 11d / 16d, z + 1d),
+                // 西壁 / west wall
+                new SimpleAxisAlignedBB(x, y + 11d / 16d, z, x + 2d / 16d, y + 1d, z + 1d),
+                // 东壁 / east wall
+                new SimpleAxisAlignedBB(x + 14d / 16d, y + 11d / 16d, z, x + 1d, y + 1d, z + 1d),
+                // 北壁 / north wall
+                new SimpleAxisAlignedBB(x + 2d / 16d, y + 11d / 16d, z, x + 14d / 16d, y + 1d, z + 2d / 16d),
+                // 南壁 / south wall
+                new SimpleAxisAlignedBB(x + 2d / 16d, y + 11d / 16d, z + 14d / 16d, x + 14d / 16d, y + 1d, z + 1d),
+                // 漏斗体 / funnel body
+                new SimpleAxisAlignedBB(x + 4d / 16d, y + 4d / 16d, z + 4d / 16d, x + 12d / 16d, y + 10d / 16d, z + 12d / 16d),
+                spoutBox()
+        };
+    }
+
+    /** 出料管：朝下（或未用到的朝上）为底部竖管，水平朝向为该侧横管 / The spout tube per output facing. */
+    private AxisAlignedBB spoutBox() {
+        return switch (this.getFacing()) {
+            case NORTH -> new SimpleAxisAlignedBB(
+                    x + 6d / 16d, y + 4d / 16d, z, x + 10d / 16d, y + 8d / 16d, z + 4d / 16d);
+            case SOUTH -> new SimpleAxisAlignedBB(
+                    x + 6d / 16d, y + 4d / 16d, z + 12d / 16d, x + 10d / 16d, y + 8d / 16d, z + 1d);
+            case WEST -> new SimpleAxisAlignedBB(
+                    x, y + 4d / 16d, z + 6d / 16d, x + 4d / 16d, y + 8d / 16d, z + 10d / 16d);
+            case EAST -> new SimpleAxisAlignedBB(
+                    x + 12d / 16d, y + 4d / 16d, z + 6d / 16d, x + 1d, y + 8d / 16d, z + 10d / 16d);
+            default -> new SimpleAxisAlignedBB(
+                    x + 6d / 16d, y, z + 6d / 16d, x + 10d / 16d, y + 4d / 16d, z + 10d / 16d);
+        };
+    }
+
+    private boolean collidesWithHopper(AxisAlignedBB bb) {
+        for (AxisAlignedBB part : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(part)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb) {
+        return collidesWithHopper(bb);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb, boolean collisionBB) {
+        return collisionBB ? collidesWithHopper(bb) : super.collidesWithBB(bb, false);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        for (AxisAlignedBB part : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(part)) {
+                collidingBoxes.add(part);
+            }
+        }
+    }
 
     public BlockHopper() {
         this(0);

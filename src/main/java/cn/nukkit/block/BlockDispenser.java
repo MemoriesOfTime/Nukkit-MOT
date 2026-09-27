@@ -5,6 +5,7 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDispenser;
 import cn.nukkit.dispenser.DispenseBehavior;
 import cn.nukkit.dispenser.DispenseBehaviorRegister;
+import cn.nukkit.event.block.BlockDispenseEvent;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.Item;
@@ -205,6 +206,17 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
             return;
         }
 
+        // A dispenser fires with nobody behind it, so land guards never see a break or a place
+        // event for what it does. Ask before the behavior runs: cancelling here consumes nothing
+        // and stays silent, which is exactly how a dispenser with an empty slot behaves.
+        BlockDispenseEvent dispenseEvent =
+                new BlockDispenseEvent(this, facing, this.getSide(facing), original.clone());
+        this.level.getServer().getPluginManager().callEvent(dispenseEvent);
+
+        if (dispenseEvent.isCancelled()) {
+            return;
+        }
+
         pk.evid = LevelEventPacket.EVENT_SOUND_CLICK;
         pk.data = 1000;
 
@@ -218,7 +230,10 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
         original = original.clone();
 
         DispenseBehavior behavior = DispenseBehaviorRegister.getBehavior(original);
-        Item result = behavior.dispense(this, facing, original);
+        // The behavior gets its own copy. Several behaviors answer "nothing happened, put it
+        // back" by returning the very item they were given; when that was the same object whose
+        // count is decremented below, the slot lost one item without dispensing anything.
+        Item result = behavior.dispense(this, facing, original.clone());
 
         pk.evid = LevelEventPacket.EVENT_SOUND_CLICK;
 

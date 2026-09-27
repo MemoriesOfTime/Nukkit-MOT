@@ -185,7 +185,7 @@ public class BlockBeehive extends BlockSolidMeta implements Faceable, BlockEntit
     
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{ Item.get(BEEHIVE) };
+        return new Item[]{ Item.getBlockItem(getId()) };
     }
     
     @Override

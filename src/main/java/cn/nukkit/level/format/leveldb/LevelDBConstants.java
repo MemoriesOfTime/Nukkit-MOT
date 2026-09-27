@@ -76,7 +76,7 @@ public final class LevelDBConstants {
 
     public static final int STATE_MAYOR_VERSION = 1;
     public static final int STATE_MINOR_VERSION = 26;
-    public static final int STATE_PATCH_VERSION = 10;
+    public static final int STATE_PATCH_VERSION = 50;
 
     /**
      * Block state schema version written inside block state NBT and consumed by
@@ -96,7 +96,7 @@ public final class LevelDBConstants {
     public static final List<IntTag> CURRENT_LEVEL_VERSION = Collections.unmodifiableList(ObjectArrayList.of(
             new IntTag("", 1), // major
             new IntTag("", 26), // minor
-            new IntTag("", 10), // patch
+            new IntTag("", 50), // patch
             new IntTag("", 0), // revision
             new IntTag("", 0))); // beta
 

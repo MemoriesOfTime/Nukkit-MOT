@@ -83,7 +83,8 @@ class CraftingTransactionFireworkTest {
         // End-to-end: mock the CraftingManager to take the multi-recipe path and verify canExecute
         // passes while the output is overridden by the server.
         // Note: matchItems' SlotChangeAction.isValid requires a real inventory, so consumed inputs
-        // use a BalanceAction whose isValid is always true.
+        // use a BalanceAction (SlotChangeAction subclass whose isValid is always true) — plain
+        // InventoryAction subclasses are rejected by the crafting action whitelist.
         FireworkRecipe realFireworkRecipe = new FireworkRecipe();
         Server server = Server.getInstance();
         CraftingManager craftingManager = Mockito.mock(CraftingManager.class);
@@ -107,9 +108,10 @@ class CraftingTransactionFireworkTest {
         List<InventoryAction> actions = new ArrayList<>();
         actions.add(new CraftingTakeResultAction(clientOutput.clone(), Item.get(Item.AIR)));
         actions.add(new SlotChangeAction(inventory, 0, Item.get(Item.AIR), clientOutput.clone()));
+        int balanceSlot = 1;
         for (Item input : List.of(Item.get(ItemID.PAPER), Item.get(ItemID.GUNPOWDER), fireworkStar((byte) 1))) {
             actions.add(new CraftingTransferMaterialAction(Item.get(Item.AIR), input.clone(), 0));
-            actions.add(new BalanceAction(input.clone(), Item.get(Item.AIR)));
+            actions.add(new BalanceAction(inventory, balanceSlot++, input.clone()));
         }
 
         CraftingTransaction transaction = new CraftingTransaction(player, actions);
@@ -173,10 +175,13 @@ class CraftingTransactionFireworkTest {
         return output;
     }
 
-    /** Balance action whose isValid is always true, supplying haveItems to cancel needItems. */
-    private static final class BalanceAction extends InventoryAction {
-        private BalanceAction(Item sourceItem, Item targetItem) {
-            super(sourceItem, targetItem);
+    /**
+     * Balance action supplying haveItems to cancel needItems. Extends SlotChangeAction to pass the
+     * crafting action whitelist, but keeps isValid trivially true since no real inventory is involved.
+     */
+    private static final class BalanceAction extends SlotChangeAction {
+        private BalanceAction(BaseInventory inventory, int slot, Item sourceItem) {
+            super(inventory, slot, sourceItem, Item.get(Item.AIR));
         }
 
         @Override

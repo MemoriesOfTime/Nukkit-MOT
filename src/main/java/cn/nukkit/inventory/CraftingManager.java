@@ -11,6 +11,9 @@ import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.CraftingDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import io.netty.util.collection.CharObjectHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
@@ -18,6 +21,13 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.UncheckedIOException;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.Deflater;
 
@@ -27,6 +37,42 @@ import java.util.zip.Deflater;
  */
 @Log4j2
 public class CraftingManager {
+
+    // Keep the number types produced by the previous YAML loader: recipe consumers cast to Integer.
+    private static final Gson RECIPE_JSON = new GsonBuilder().setObjectToNumberStrategy(reader -> {
+        String value = reader.nextString();
+        if (value.indexOf('.') >= 0 || value.indexOf('e') >= 0 || value.indexOf('E') >= 0) {
+            return Double.valueOf(value);
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException ignored) {
+            try {
+                return Long.valueOf(value);
+            } catch (NumberFormatException alsoIgnored) {
+                return new BigInteger(value);
+            }
+        }
+    }).create();
+
+    static Config readRecipeJson(Reader reader) {
+        LinkedHashMap<String, Object> root = RECIPE_JSON.fromJson(reader, new TypeToken<LinkedHashMap<String, Object>>() {});
+        Config config = new Config(Config.JSON);
+        config.setAll(root);
+        return config;
+    }
+
+    private static Config loadRecipeJson(String resource) {
+        InputStream stream = Server.class.getClassLoader().getResourceAsStream(resource);
+        if (stream == null) {
+            throw new IllegalStateException("Missing recipe resource: " + resource);
+        }
+        try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+            return readRecipeJson(reader);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read recipe resource: " + resource, e);
+        }
+    }
 
     public final Collection<Recipe> recipes = new ArrayDeque<>();
 
@@ -76,12 +122,14 @@ public class CraftingManager {
     private static BatchPacket packet975;
     private static BatchPacket packet1001;
     private static BatchPacket packet2168;
+    private static BatchPacket packet2193;
 
     private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
     private static BatchPacket packet_netease_766;
     private static BatchPacket packet_netease_819;
     private static BatchPacket packet_netease_860;
+    private static BatchPacket packet_netease_898;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes = new Int2ObjectOpenHashMap<>();
 
@@ -144,9 +192,9 @@ public class CraftingManager {
         this.registerMultiRecipe(new FireworkRecipe());
         this.registerMultiRecipe(new DecoratedPotRecipe());
 
-        Map<String, Object> root = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes.json")).getRootSection();
+        Map<String, Object> root = loadRecipeJson("recipes.json").getRootSection();
         RuntimeItemMapping itemMapping = selectRecipeItemMapping(root);
-        Config furnaceXpConfig = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/furnace_xp.json"));
+        Config furnaceXpConfig = loadRecipeJson("recipes/furnace_xp.json");
 
         for (Map recipe : (List<Map>) root.get("recipes")) {
             try {
@@ -239,7 +287,7 @@ public class CraftingManager {
         }
 
         // Smithing recipes
-        ConfigSection smithing = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("smithing.json")).getRootSection();
+        ConfigSection smithing = loadRecipeJson("smithing.json").getRootSection();
         top:
         for (Map<String, Object> recipe : (List<Map<String, Object>>) smithing.get((Object) "smithing")) {
             String recipeId = (String) recipe.get("id");
@@ -962,6 +1010,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet2193 = null;
         packet2168 = null;
         packet1001 = null;
         packet975 = null;
@@ -1014,6 +1063,7 @@ public class CraftingManager {
         packet_netease_766 = null;
         packet_netease_819 = null;
         packet_netease_860 = null;
+        packet_netease_898 = null;
 
         this.getCachedPacket(GameVersion.getLastVersion()); // 缓存当前协议版本的数据包
         this.getCachedPacket(GameVersion.getLastNetEaseVersion());
@@ -1040,7 +1090,12 @@ public class CraftingManager {
         int protocol = gameVersion.getProtocol();
 
         if (gameVersion.isNetEase()) {
-            if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+            if (protocol >= GameVersion.V1_21_130_NETEASE.getProtocol()) {
+                if (packet_netease_898 == null) {
+                    packet_netease_898 = this.packetFor(GameVersion.V1_21_130_NETEASE);
+                }
+                return packet_netease_898;
+            } else if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
                 if (packet_netease_860 == null) {
                     packet_netease_860 = this.packetFor(GameVersion.V1_21_124_NETEASE);
                 }
@@ -1068,7 +1123,12 @@ public class CraftingManager {
             }
         }
 
-        if (protocol >= GameVersion.V1_26_40.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
+            if (packet2193 == null) {
+                packet2193 = packetFor(GameVersion.V1_26_50);
+            }
+            return packet2193;
+        } else if (protocol >= GameVersion.V1_26_40.getProtocol()) {
             if (packet2168 == null) {
                 packet2168 = packetFor(GameVersion.V1_26_40);
             }
@@ -1532,6 +1592,79 @@ public class CraftingManager {
     @Deprecated
     public void registerShapelessRecipe(int protocol, ShapelessRecipe recipe) {
         this.registerShapelessRecipe(recipe);
+    }
+
+    /**
+     * 注销一个配方：从内部索引与网络 ID 映射中移除，并使合成数据包缓存失效。
+     * 仅使缓存失效，不会向在线玩家重发配方列表，需要刷新时请自行调用 {@code Server#sendRecipeList(Player)}。
+     * <p>
+     * Unregisters a recipe: removes it from the internal indexes and the network id map, and invalidates
+     * the cached crafting packets. Connected players are not re-sent the recipe list automatically; call
+     * {@code Server#sendRecipeList(Player)} yourself to refresh them.
+     *
+     * @param recipe the recipe to unregister
+     * @return {@code true} if the recipe was removed
+     */
+    public boolean unregisterRecipe(Recipe recipe) {
+        if (recipe == null) {
+            return false;
+        }
+        boolean removed = false;
+        if (recipe instanceof ShapedRecipe shapedRecipe) {
+            removed |= this.recipes.remove(recipe);
+            int resultHash = getItemHash(shapedRecipe.getResult());
+            Map<UUID, ShapedRecipe> resultRecipes = this.shapedRecipes.get(resultHash);
+            if (resultRecipes != null) {
+                UUID hash = getMultiItemHash(new LinkedList<>(shapedRecipe.getIngredientsAggregate()));
+                removed |= resultRecipes.remove(hash, shapedRecipe);
+                if (resultRecipes.isEmpty()) {
+                    this.shapedRecipes.remove(resultHash);
+                }
+            }
+            this.networkIdRecipes.remove(shapedRecipe.getNetworkId(), recipe);
+        } else if (recipe instanceof SmithingRecipe smithingRecipe) {
+            // SmithingRecipe extends ShapelessRecipe, so it must be checked before ShapelessRecipe
+            UUID hash = getMultiItemHash(smithingRecipe.getIngredientsAggregate());
+            removed |= this.smithingRecipes.remove(hash, smithingRecipe);
+            this.networkIdRecipes.remove(smithingRecipe.getNetworkId(), recipe);
+        } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
+            removed |= this.recipes.remove(recipe);
+            int resultHash = getItemHash(shapelessRecipe.getResult());
+            Map<UUID, ShapelessRecipe> resultRecipes = this.shapelessRecipes.get(resultHash);
+            if (resultRecipes != null) {
+                UUID hash = getMultiItemHash(shapelessRecipe.getIngredientsAggregate());
+                removed |= resultRecipes.remove(hash, shapelessRecipe);
+                if (resultRecipes.isEmpty()) {
+                    this.shapelessRecipes.remove(resultHash);
+                }
+            }
+            this.networkIdRecipes.remove(shapelessRecipe.getNetworkId(), recipe);
+        } else if (recipe instanceof BlastFurnaceRecipe blastFurnaceRecipe) {
+            removed |= this.blastFurnaceRecipes.remove(getItemHash(blastFurnaceRecipe.getInput()), blastFurnaceRecipe);
+        } else if (recipe instanceof SmokerRecipe smokerRecipe) {
+            removed |= this.smokerRecipes.remove(getItemHash(smokerRecipe.getInput()), smokerRecipe);
+        } else if (recipe instanceof FurnaceRecipe furnaceRecipe) {
+            removed |= this.furnaceRecipes.remove(getItemHash(furnaceRecipe.getInput()), furnaceRecipe);
+        } else if (recipe instanceof StonecutterRecipe stonecutterRecipe) {
+            removed |= this.stonecutterRecipes.remove(stonecutterRecipe);
+            this.networkIdRecipes.remove(stonecutterRecipe.getNetworkId(), recipe);
+        } else if (recipe instanceof CampfireRecipe campfireRecipe) {
+            removed |= this.campfireRecipes.remove(getItemHash(campfireRecipe.getInput()), campfireRecipe);
+        } else if (recipe instanceof MultiRecipe multiRecipe) {
+            removed |= this.multiRecipes.remove(multiRecipe.getId(), multiRecipe);
+            this.networkIdRecipes.remove(multiRecipe.getNetworkId(), recipe);
+        } else if (recipe instanceof BrewingRecipe brewingRecipe) {
+            removed |= this.brewingRecipes.remove(getPotionHash(brewingRecipe.getIngredient(), brewingRecipe.getInput()), brewingRecipe);
+        } else if (recipe instanceof ContainerRecipe containerRecipe) {
+            removed |= this.containerRecipes.remove(getContainerHash(containerRecipe.getIngredient().getId(), containerRecipe.getInput().getId()), containerRecipe);
+        }
+
+        if (removed) {
+            this.recipeXpMap.removeDouble(recipe);
+            this.rebuildPacket();
+        }
+
+        return removed;
     }
 
     private static int getPotionHash(Item ingredient, Item potion) {

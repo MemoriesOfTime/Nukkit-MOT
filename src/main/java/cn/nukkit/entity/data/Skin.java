@@ -88,12 +88,32 @@ public class Skin {
     @OnlyNetEase
     private byte[] bloomData;
 
+    /** 内容指纹缓存（getContentFingerprint 惰性计算；影响摘要的 setter 负责清除）。 */
+    private volatile String cachedFingerprint;
+
     public boolean isValid() {
         return isValid(Server.getInstance().doNotLimitSkinGeometry);
     }
 
     public boolean isValid(boolean doNotLimitSkinGeometry) {
         return isValidSkin(doNotLimitSkinGeometry) && isValidResourcePatch();
+    }
+
+    /**
+     * Returns whether every pixel in this skin is completely transparent.
+     * Empty and malformed images are left to the regular skin validation path.
+     */
+    public boolean isFullyTransparent() {
+        byte[] data = getSkinData().data;
+        if (data.length < PIXEL_SIZE || data.length % PIXEL_SIZE != 0) {
+            return false;
+        }
+        for (int alpha = PIXEL_SIZE - 1; alpha < data.length; alpha += PIXEL_SIZE) {
+            if (data[alpha] != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean isValidSkin() {
@@ -105,6 +125,8 @@ public class Skin {
         return skinId != null && skinId.length() < 100 && !skinId.trim().isEmpty() && //skinId
                 skinData != null && skinData.width >= 64 && skinData.height >= 32 &&
                 skinData.data.length >= SINGLE_SKIN_SIZE && (doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE) && //skinData
+                // 像素长度必须与宽高一致：尺寸不符的皮肤会被客户端渲染为隐身（Nukkit-EC 2467b155e 的隐身修复）
+                skinData.data.length == skinData.width * skinData.height * PIXEL_SIZE &&
                 ((geometryData != null && !geometryData.isEmpty()) &&
                         (doNotLimitSkinGeometry || geometryData.getBytes(StandardCharsets.UTF_8).length <= MAX_DATA_SIZE)) && //geometryData
                 (capeData == null || doNotLimitSkinGeometry || capeData.data.length <= MAX_DATA_SIZE) && //capeData
@@ -150,11 +172,13 @@ public class Skin {
             return;
         }
         this.skinId = skinId;
+        this.cachedFingerprint = null;
     }
 
     public void generateSkinId(String name) {
         byte[] data = Binary.appendBytes(getSkinData().data, getSkinResourcePatch().getBytes(StandardCharsets.UTF_8));
         this.skinId = UUID.nameUUIDFromBytes(data) + "." + name;
+        this.cachedFingerprint = null;
     }
 
     public void setSkinData(byte[] skinData) {
@@ -168,14 +192,17 @@ public class Skin {
     public void setSkinData(SerializedImage skinData) {
         Objects.requireNonNull(skinData, "skinData");
         this.skinData = skinData;
+        this.cachedFingerprint = null;
     }
 
     public void setSkinResourcePatch(String skinResourcePatch) {
         if (skinResourcePatch == null || skinResourcePatch.trim().isEmpty()) {
             this.skinResourcePatch = GEOMETRY_CUSTOM;
+            this.cachedFingerprint = null;
             return;
         }
         this.skinResourcePatch = skinResourcePatch;
+        this.cachedFingerprint = null;
     }
 
     public void setGeometryName(String geometryName) {
@@ -184,12 +211,10 @@ public class Skin {
             this.isLegacySlim = true;
         }
 
-        if (geometryName.trim().isEmpty()) {
-            this.skinResourcePatch = GEOMETRY_CUSTOM;
-            return;
-        }
-
-        this.skinResourcePatch = "{\"geometry\" : {\"default\" : \"" + geometryName + "\"}}";
+        // 经 setSkinResourcePatch 落盘以继承指纹缓存失效（skinResourcePatch 是被哈希字段）
+        setSkinResourcePatch(geometryName.trim().isEmpty()
+                ? null
+                : "{\"geometry\" : {\"default\" : \"" + geometryName + "\"}}");
     }
 
     public String getSkinResourcePatch() {
@@ -215,6 +240,7 @@ public class Skin {
             capeId = null;
         }
         this.capeId = capeId;
+        this.cachedFingerprint = null;
     }
 
     public void setCapeData(byte[] capeData) {
@@ -231,6 +257,7 @@ public class Skin {
     public void setCapeData(SerializedImage capeData) {
         Objects.requireNonNull(capeData, "capeData");
         this.capeData = capeData;
+        this.cachedFingerprint = null;
     }
 
     public String getGeometryData() {
@@ -245,6 +272,7 @@ public class Skin {
         if (!geometryData.equals(this.geometryData)) {
             if (Server.getInstance().doNotLimitSkinGeometry || geometryData.getBytes().length < MAX_DATA_SIZE) {
                 this.geometryData = geometryData;
+                this.cachedFingerprint = null;
             }
         }
     }
@@ -410,8 +438,19 @@ public class Skin {
      * <p>
      * SHA-256 fingerprint over the skin payload that affects client rendering; tells whether two
      * deliveries carry the same skin.
+     * <p>
+     * 结果缓存：指纹在热路径被反复计算（一次换装事件的准入/等待/信任比对，广播时每个观察者
+     * 一次，4D 皮肤数百 KB 全量哈希会阻塞主线程）。影响摘要的 setter 负责清除缓存；
+     * {@code generateSkinId} 内部改写 skinId 时同样清除。
+     * <p>
+     * 契约：{@link SerializedImage#data} 按引用共享（与协议层一致），指纹假设字节在计入摘要后
+     * 不被原地改写——需要换内容请走 setter 使缓存失效。
      */
     public String getContentFingerprint() {
+        String cached = this.cachedFingerprint;
+        if (cached != null) {
+            return cached;
+        }
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
@@ -424,7 +463,9 @@ public class Skin {
         updateFingerprint(digest, this.getCapeId());
         updateFingerprint(digest, this.getSkinData());
         updateFingerprint(digest, this.getCapeData());
-        return HexFormat.of().formatHex(digest.digest());
+        cached = HexFormat.of().formatHex(digest.digest());
+        this.cachedFingerprint = cached;
+        return cached;
     }
 
     private static void updateFingerprint(MessageDigest digest, String value) {

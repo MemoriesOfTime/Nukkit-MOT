@@ -1,7 +1,6 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.Nukkit;
-import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.custom.EntityManager;
 import com.google.common.io.ByteStreams;
@@ -51,13 +50,9 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (Server.getInstance().enableExperimentMode) { //自定义实体
-            if (this.protocol <= ProtocolInfo.v1_16_0) {
-                this.put(EntityManager.get().getNetworkTagCachedOld());
-            } else {
-                this.put(EntityManager.get().getNetworkTagCached());
-            }
-        }else {
+        if (EntityManager.get().hasCustomEntities()) { // custom entities
+            this.put(EntityManager.get().getNetworkTagCached(this.protocol));
+        } else {
             if (this.identifiers == null) {
                 this.identifiers = Entity.getEntityIdentifiersCache(this.protocol);
             }

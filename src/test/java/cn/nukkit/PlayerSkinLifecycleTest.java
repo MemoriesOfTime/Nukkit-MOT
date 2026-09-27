@@ -2,6 +2,7 @@ package cn.nukkit;
 
 import cn.nukkit.entity.data.Skin;
 import cn.nukkit.inventory.PlayerOffhandInventory;
+import cn.nukkit.network.process.processor.common.PlayerSkinProcessor;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.session.NetworkPlayerSession;
@@ -34,6 +35,38 @@ class PlayerSkinLifecycleTest {
                 any(UUID.class), any(Player.class));
         doCallRealMethod().when(this.server).removePlayerListData(
                 any(UUID.class), any(Player[].class));
+    }
+
+    @Test
+    void preSpawnFullyTransparentSkinFallsBackToSteve() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124, "old-skin");
+        subject.spawned = false;
+
+        subject.setSkin(fullyTransparentSkin("transparent-login"));
+
+        assertSame(Skin.NO_PERSONA_SKIN, subject.getSkin());
+        assertTrue(subject.sentPackets.isEmpty());
+    }
+
+    @Test
+    void playerSkinPacketFullyTransparentSkinFallsBackToSteve() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124, "old-skin");
+        PlayerSkinPacket packet = new PlayerSkinPacket();
+        packet.skin = fullyTransparentSkin("transparent-change");
+
+        PlayerSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), packet);
+
+        assertSame(Skin.NO_PERSONA_SKIN, subject.getSkin());
+    }
+
+    @Test
+    void skinWithOneOpaquePixelIsPreserved() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124, "old-skin");
+        Skin visible = validSkin("visible-skin");
+
+        subject.setSkin(visible);
+
+        assertSame(visible, subject.getSkin());
     }
 
     @Test
@@ -517,8 +550,16 @@ class PlayerSkinLifecycleTest {
     private static Skin validSkin(String skinId) {
         Skin skin = new Skin();
         skin.setSkinId(skinId);
-        skin.setSkinData(new byte[Skin.SINGLE_SKIN_SIZE]);
+        byte[] skinData = new byte[Skin.SINGLE_SKIN_SIZE];
+        skinData[3] = (byte) 0xff;
+        skin.setSkinData(skinData);
         skin.setGeometryName("geometry.humanoid.custom");
+        return skin;
+    }
+
+    private static Skin fullyTransparentSkin(String skinId) {
+        Skin skin = validSkin(skinId);
+        skin.setSkinData(new byte[Skin.SINGLE_SKIN_SIZE]);
         return skin;
     }
 
