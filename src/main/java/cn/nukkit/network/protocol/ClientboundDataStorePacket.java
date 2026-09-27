@@ -13,7 +13,9 @@ public class ClientboundDataStorePacket extends DataPacket {
     private static final int TYPE_NONE = 0;
     private static final int TYPE_BOOL = 1;
     private static final int TYPE_INT64 = 2;
+    private static final int TYPE_DOUBLE = 3;
     private static final int TYPE_STRING = 4;
+    private static final int TYPE_LIST = 5;
     private static final int TYPE_OBJECT = 6;
 
     private List<DataStoreAction> updates = new ArrayList<>();
@@ -131,12 +133,21 @@ public class ClientboundDataStorePacket extends DataPacket {
         } else if (value instanceof Boolean b) {
             this.putLInt(TYPE_BOOL);
             this.putBoolean(b);
+        } else if (value instanceof Double || value instanceof Float) {
+            this.putLInt(TYPE_DOUBLE);
+            this.putLDouble(((Number) value).doubleValue());
         } else if (value instanceof Number n) {
             this.putLInt(TYPE_INT64);
             this.putLLong(n.longValue());
         } else if (value instanceof String s) {
             this.putLInt(TYPE_STRING);
             this.putString(s);
+        } else if (value instanceof List<?> list) {
+            this.putLInt(TYPE_LIST);
+            this.putUnsignedVarInt(list.size());
+            for (Object item : list) {
+                writeChangeValue(item);
+            }
         } else if (value instanceof Map<?, ?> map) {
             this.putLInt(TYPE_OBJECT);
             this.putUnsignedVarInt(map.size());

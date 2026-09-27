@@ -37,7 +37,8 @@ public class RecordStartedPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putBlockVector3(this.blockPos != null ? this.blockPos : new BlockVector3(0, 0, 0));
+        // CB v2193 writeVector3i: 3x zigzag varint (y not unsigned); packet targets v2192+ clients only
+        this.putBlockVector3(this.gameVersion, this.blockPos != null ? this.blockPos : new BlockVector3(0, 0, 0));
         this.putLLong(this.serverSoundHandle);
     }
 }

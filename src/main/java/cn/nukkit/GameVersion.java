@@ -120,11 +120,12 @@ public enum GameVersion {
     V1_21_50_NETEASE(766, true, "1.21.50_NetEase"),
     V1_21_93_NETEASE(819, true, "1.21.93_NetEase"),
     V1_21_124_NETEASE(860, true, "1.21.124_NetEase"),
+    V1_21_130_NETEASE(898, true, "1.21.130_NetEase"),
     ;
 
     private static GameVersion FEATURE_VERSION = GameVersion.V1_26_50;
     private static final GameVersion LAST_VERSION = GameVersion.V1_26_50; //TODO MultiVersion
-    private static final GameVersion LAST_NETEASE_VERSION = GameVersion.V1_21_124_NETEASE; //TODO MultiVersion
+    private static final GameVersion LAST_NETEASE_VERSION = GameVersion.V1_21_130_NETEASE; //TODO MultiVersion
 
     private final int protocol;
     private final boolean isNetEase;

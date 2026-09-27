@@ -31,7 +31,7 @@ public class CraftingEventPacket extends DataPacket {
     @Override
     public void decode() {
         this.windowId = this.getByte();
-        this.type = (int) this.getUnsignedVarInt();
+        this.type = this.getVarInt();
         this.id = this.getUUID();
 
         int inputSize = (int) this.getUnsignedVarInt();

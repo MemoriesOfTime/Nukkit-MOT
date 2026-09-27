@@ -47,6 +47,8 @@ public class StateBlockStorage {
 
     private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
+    // Snapshot acknowledgements must also notice public storage mutations that bypass section setters.
+    private volatile int version;
 
     //用于兼容1.13以下版本
     private byte[] blockIds;
@@ -110,6 +112,7 @@ public class StateBlockStorage {
     }
 
     public void readFromStorage(ByteBuf buffer, ChunkBuilder chunkBuilder) {
+        this.version++;
         short header = buffer.readUnsignedByte();
 
         if (header == -1) {
@@ -224,7 +227,13 @@ public class StateBlockStorage {
             }
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unable to set value: " + value + ", palette: " + palette, e);
+        } finally {
+            this.version++;
         }
+    }
+
+    public int getVersion() {
+        return this.version;
     }
 
     public void set(int x, int y, int z, BlockStateSnapshot value) {
@@ -370,6 +379,7 @@ public class StateBlockStorage {
 
 //            Arrays.fill(this.bitArray.getWords(), 0);
             this.bitArray = BitArrayVersion.V1.createPalette(SECTION_SIZE);
+            this.version++;
             return true;
         }
 
@@ -412,6 +422,7 @@ public class StateBlockStorage {
         }
         this.bitArray = newArray;
         this.palette = newPalette;
+        this.version++;
         return true;
     }
 

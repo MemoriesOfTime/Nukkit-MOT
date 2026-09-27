@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.network.process.DataPacketProcessor;
@@ -40,7 +41,7 @@ public class ServerboundDataDrivenScreenClosedProcessor extends DataPacketProces
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_26_10;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_26_10;
     }
 }

@@ -70,6 +70,13 @@ public final class UsingItemReceiveProbe {
         stream.putVector2f(0.6f, -0.4f);
         stream.putVector3f(0.0f, 1.0f, 0.0f);
         stream.putVector2f(-0.25f, 0.75f);
+        // fixed NetEase tail since 766
+        stream.putBoolean(false);
+        stream.putLFloat(0.5f);
+        stream.putLFloat(-0.5f);
+        stream.putBoolean(false);
+        stream.putBoolean(true);
+        stream.putByte(0);
 
         PlayerAuthInputPacket packet = new PlayerAuthInputPacket();
         packet.protocol = ProtocolInfo.v1_21_124;
