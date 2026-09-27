@@ -21,6 +21,8 @@ import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
@@ -245,6 +247,10 @@ public class StateBlockStorage {
     }
 
     public void writeTo(GameVersion protocol, BinaryStream stream, boolean antiXray) {
+        if (protocol.getProtocol() >= ProtocolInfo.v1_16_100 && this.palette.size() > 4) {
+            writeSizedNetworkPalette(protocol, stream, antiXray);
+            return;
+        }
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
         // Resolve the palette and network-ID format once per section, as in anvil BlockStorage.
@@ -302,6 +308,70 @@ public class StateBlockStorage {
             meta = 0;
         }
         return useHash ? blockPalette.getHashId(id, meta) : blockPalette.getRuntimeId(id, meta);
+    }
+
+    /**
+     * Discover the emitted palette before allocating cell words. Growing V2 through every intermediate
+     * width allocates another 4096-cell array and copies all cells at each boundary. Keep the original
+     * first-use ordering, air at index zero, alias merging and minimum V2 width on the wire.
+     */
+    private void writeSizedNetworkPalette(GameVersion protocol, BinaryStream stream, boolean antiXray) {
+        BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocol);
+        boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
+        int[] networkIndex = new int[this.palette.size()];
+        Arrays.fill(networkIndex, -1);
+        IntArrayList networkPalette = new IntArrayList(16);
+        Int2IntOpenHashMap paletteIndex = new Int2IntOpenHashMap(16);
+        paletteIndex.defaultReturnValue(-1);
+        int air = GlobalBlockPalette.getOrCreateRuntimeId(protocol, 0);
+        networkPalette.add(air);
+        paletteIndex.put(air, 0);
+
+        int remaining = networkIndex.length;
+        for (int i = 0; i < SECTION_SIZE; i++) {
+            int local = this.bitArray.get(i);
+            if (local < 0 || local >= networkIndex.length) {
+                get(i); // Preserve the original palette-read exception for corrupt cell indices.
+            }
+            if (networkIndex[local] >= 0) {
+                continue;
+            }
+            BlockStateSnapshot snapshot = this.palette.get(local);
+            int fullId = snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData();
+            int id = networkId(blockPalette, useHash, antiXray, fullId);
+            int index = paletteIndex.get(id);
+            if (index < 0) {
+                index = networkPalette.size();
+                networkPalette.add(id);
+                paletteIndex.put(id, index);
+            }
+            networkIndex[local] = index;
+            if (--remaining == 0) {
+                break;
+            }
+        }
+
+        BitArrayVersion version = BitArrayVersion.V2;
+        while (networkPalette.size() - 1 > version.getMaxEntryValue()) {
+            version = version.next();
+        }
+        BitArray words = version.createPalette(SECTION_SIZE);
+        for (int i = 0; i < SECTION_SIZE; i++) {
+            int local = this.bitArray.get(i);
+            if (local < 0 || local >= networkIndex.length) {
+                get(i); // Also validate cells beyond an early palette-discovery exit.
+            }
+            words.set(i, networkIndex[local]);
+        }
+
+        stream.putByte((byte) getPaletteHeader(version, true));
+        for (int word : words.getWords()) {
+            stream.putLInt(word);
+        }
+        stream.putVarInt(networkPalette.size());
+        for (int i = 0; i < networkPalette.size(); i++) {
+            stream.putVarInt(networkPalette.getInt(i));
+        }
     }
 
     private void grow(BitArrayVersion version) {
