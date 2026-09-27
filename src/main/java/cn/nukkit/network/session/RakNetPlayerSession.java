@@ -50,6 +50,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private static final ThreadLocal<Sha256> HASH_LOCAL = ThreadLocal.withInitial(Natives.SHA_256);
     private static final ThreadLocal<byte[]> CHECKSUM_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
+    // Separate from the received trailer: verification still needs CHECKSUM_LOCAL after hashing.
+    private static final ThreadLocal<byte[]> CHECKSUM_COUNTER_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
     /** Maximum packet work one player may force onto one server tick. The tail stays queued. */
     static final int MAX_INBOUND_PACKETS_PER_SERVER_TICK = 120;
     /** Maximum decoded payload work one player may force onto one server tick. */
@@ -646,17 +648,19 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private byte[] calculateChecksum(long count, ByteBuf payload) {
         Sha256 hash = HASH_LOCAL.get();
-        ByteBuf counterBuf = ByteBufAllocator.DEFAULT.directBuffer(8);
+        byte[] counter = CHECKSUM_COUNTER_LOCAL.get();
         try {
-            counterBuf.writeLongLE(count);
+            // Bedrock hashes the packet counter as exactly eight little-endian bytes.
+            for (int i = 0; i < Long.BYTES; i++) {
+                counter[i] = (byte) (count >>> (i * Byte.SIZE));
+            }
             ByteBuffer keyBuffer = ByteBuffer.wrap(this.encryptionKey.getEncoded());
-            hash.update(counterBuf.internalNioBuffer(0, 8));
+            hash.update(counter);
             hash.update(payload.internalNioBuffer(payload.readerIndex(), payload.readableBytes()));
             hash.update(keyBuffer);
             byte[] digested = hash.digest();
             return Arrays.copyOf(digested, 8);
         } finally {
-            counterBuf.release();
             hash.reset();
         }
     }
