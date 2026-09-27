@@ -27,6 +27,7 @@ import io.netty.buffer.*;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import lombok.extern.log4j.Log4j2;
@@ -1250,6 +1251,37 @@ public class LevelDBProvider implements LevelProvider {
                 this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
             }
         }
+    }
+
+    /**
+     * Hashes of the loaded chunks that have unsaved changes: the chunks {@link #saveChunks()} would save now.
+     * With {@link #saveChunkIfChanged(long)} it lets a save be spread over several ticks.
+     */
+    public long[] getChangedChunkHashes() {
+        synchronized (this.chunks) {
+            LongArrayList changed = new LongArrayList();
+            for (BaseFullChunk chunk : this.chunks.values()) {
+                if (chunk.hasChanged()) {
+                    changed.add(Level.chunkHash(chunk.getX(), chunk.getZ()));
+                }
+            }
+            return changed.toLongArray();
+        }
+    }
+
+    /**
+     * Saves one loaded chunk the way {@link #saveChunks()} saves each of them: only if it still has unsaved
+     * changes, through the same {@link #saveChunk(int, int, FullChunk)}.
+     *
+     * @return false when the chunk is no longer loaded or has nothing left to save
+     */
+    public boolean saveChunkIfChanged(long hash) {
+        BaseFullChunk chunk = this.chunks.get(hash);
+        if (chunk == null || !chunk.hasChanged()) {
+            return false;
+        }
+        this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
+        return true;
     }
 
     @Override

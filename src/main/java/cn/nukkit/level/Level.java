@@ -1853,6 +1853,14 @@ public class Level implements ChunkManager, Metadatable {
         this.server.getPluginManager().callEvent(new LevelSaveEvent(this));
 
         LevelProvider levelProvider = requireProvider();
+        this.copyMetadataTo(levelProvider);
+        this.saveChunks();
+        levelProvider.saveLevelData();
+
+        return true;
+    }
+
+    private void copyMetadataTo(LevelProvider levelProvider) {
         levelProvider.setTime(this.time);
         levelProvider.setRaining(this.raining);
         levelProvider.setRainTime(this.rainTime);
@@ -1860,10 +1868,16 @@ public class Level implements ChunkManager, Metadatable {
         levelProvider.setThunderTime(this.thunderTime);
         levelProvider.setCurrentTick(this.levelCurrentTick);
         levelProvider.setGameRules(this.gameRules);
-        this.saveChunks();
-        levelProvider.saveLevelData();
+    }
 
-        return true;
+    /**
+     * The part of {@link #save(boolean)} after the chunks: time, weather and game rules into level.dat.
+     * {@link AutoSaveQueue} calls it after the last chunk of a level it saved in portions.
+     */
+    void saveMetadata() {
+        LevelProvider levelProvider = requireProvider();
+        this.copyMetadataTo(levelProvider);
+        levelProvider.saveLevelData();
     }
 
     public void saveChunks() {
