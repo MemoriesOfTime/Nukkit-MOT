@@ -786,8 +786,13 @@ public class LevelDBProvider implements LevelProvider {
     private record PendingWriteTicket(PendingWrite slot, long sequence) {}
 
     private PendingWriteTicket stagePendingWrite(long hash, int chunkX, int chunkZ, LevelDBChunk chunk, boolean keepChunkRef) {
+        return this.stagePendingWrite(hash, chunkX, chunkZ, chunk, keepChunkRef, false);
+    }
+
+    private PendingWriteTicket stagePendingWrite(long hash, int chunkX, int chunkZ, LevelDBChunk chunk,
+                                                 boolean keepChunkRef, boolean groupable) {
         long snapshot = chunk.getChanges();
-        CapturedBatch captured = this.save0(chunkX, chunkZ, chunk);
+        CapturedBatch captured = this.save0(chunkX, chunkZ, chunk, groupable);
         WriteBatch batch = captured.batch();
         PendingWriteTicket[] ticket = new PendingWriteTicket[1];
         this.pendingWrites.compute(hash, (h, pw) -> {
@@ -916,16 +921,33 @@ public class LevelDBProvider implements LevelProvider {
                     cleanup.apply(reader, batch);
                 }
             }
-            this.db.write(batch);
+            if (batch instanceof CapturedWriteBatch captured) {
+                try (WriteBatch nativeBatch = this.db.createWriteBatch()) {
+                    captured.replay(nativeBatch);
+                    this.db.write(nativeBatch);
+                }
+            } else {
+                this.db.write(batch);
+            }
             // Metadata is unlocked, and ACK never waits for a section writer. A successful
             // older in-flight batch may acknowledge unchanged sections even if superseded.
             if (sections != null) sections.forEach(LevelDBChunkSection.SaveToken::acknowledge);
-        } catch (Exception failure) {
+        } catch (Throwable failure) {
             error = failure;
         } finally {
             pw.lock.lock();
             pw.writing = false;
         }
+        PendingWriteCommit result = this.finishPendingWrite(hash, pw, batch, cleanup, sections,
+                sequence, changeSnapshot, chunk, error);
+        if (error instanceof Error fatal) throw fatal;
+        return result;
+    }
+
+    /** Requires the slot metadata lock; the matching commit lock remains held through ACK. */
+    private PendingWriteCommit finishPendingWrite(long hash, PendingWrite pw, WriteBatch batch,
+            EntitySerializer.Cleanup cleanup, List<LevelDBChunkSection.SaveToken> sections,
+            long sequence, long changeSnapshot, LevelDBChunk chunk, Throwable error) {
         if (error == null) pw.durableSequence = Math.max(pw.durableSequence, sequence);
         if (pw.sequence != sequence) {
             // A newer main-thread snapshot owns the metadata/retry budget now. It will be
@@ -1114,9 +1136,9 @@ public class LevelDBProvider implements LevelProvider {
     private record CapturedBatch(WriteBatch batch, EntitySerializer.Cleanup cleanup,
                                  List<LevelDBChunkSection.SaveToken> sections) {}
 
-    private CapturedBatch save0(int chunkX, int chunkZ, LevelDBChunk chunk) {
+    private CapturedBatch save0(int chunkX, int chunkZ, LevelDBChunk chunk, boolean groupable) {
         chunk.prepareStorageSave();
-        WriteBatch writeBatch = this.db.createWriteBatch();
+        WriteBatch writeBatch = groupable ? new CapturedWriteBatch() : this.db.createWriteBatch();
         List<LevelDBChunkSection.SaveToken> sections = new ArrayList<>();
 
         if (chunk.isSubChunksDirty()) {
@@ -1206,12 +1228,144 @@ public class LevelDBProvider implements LevelProvider {
         return new CapturedBatch(writeBatch, entityCleanup, List.copyOf(sections));
     }
 
+    private record GroupWrite(long hash, PendingWrite slot, CapturedWriteBatch batch,
+            EntitySerializer.Cleanup cleanup, List<LevelDBChunkSection.SaveToken> sections,
+            long sequence, long changes, LevelDBChunk chunk) {}
+
+    /** Try-lock other slots: a reader or explicit save must never deadlock a group writer. */
+    private void commitPendingWriteGroup(List<Long> hashes) {
+        List<GroupWrite> group = new ArrayList<>();
+        this.dbReadCloseLock.readLock().lock();
+        try {
+            long bytes = 0;
+            Throwable error = null;
+            long started = System.nanoTime();
+            try {
+                for (long hash : hashes) {
+                    PendingWrite pw = this.pendingWrites.get(hash);
+                    if (pw == null || !pw.commitLock.tryLock()) continue;
+                    boolean retained = false;
+                    pw.lock.lock();
+                    try {
+                        if (this.pendingWrites.get(hash) != pw
+                                || !(pw.batch instanceof CapturedWriteBatch batch) || !batch.canGroup()
+                                || (!group.isEmpty() && bytes + batch.getApproximateSize() > this.saveBatchBytes())) continue;
+                        group.add(new GroupWrite(hash, pw, batch, pw.cleanup, pw.sections,
+                                pw.sequence, pw.changeSnapshot, pw.chunkRef));
+                        bytes += batch.getApproximateSize();
+                        pw.batch = null;
+                        pw.cleanup = null;
+                        pw.sections = null;
+                        pw.writing = true;
+                        retained = true;
+                    } finally {
+                        pw.lock.unlock();
+                        if (!retained) pw.commitLock.unlock();
+                    }
+                }
+                if (group.isEmpty()) return;
+                try (WriteBatch combined = this.db.createWriteBatch();
+                     ChunkColumnReader reader = ChunkColumnReader.pointReads(this.db)) {
+                    for (GroupWrite write : group) {
+                        write.batch.replay(combined);
+                        if (write.cleanup != null) write.cleanup.apply(reader, combined);
+                    }
+                    this.db.write(combined);
+                    for (GroupWrite write : group) {
+                        if (write.sections != null) write.sections.forEach(LevelDBChunkSection.SaveToken::acknowledge);
+                    }
+                }
+            } catch (Throwable failure) {
+                // Every claimed slot must be restored even if collection, batch creation
+                // or native I/O aborts with Error and the executor skips its normal tail.
+                error = failure;
+            }
+            long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            if (elapsedMillis >= 100) {
+                log.warn("Slow chunk write group for {}: chunks={} snapshotBytes={} pending={} elapsedMs={} success={}",
+                        this.getName(), group.size(), bytes, this.getPendingWriteCount(), elapsedMillis, error == null);
+            }
+            for (GroupWrite write : group) {
+                PendingWrite pw = write.slot;
+                pw.lock.lock();
+                try {
+                    pw.writing = false;
+                    this.finishPendingWrite(write.hash, pw, write.batch, write.cleanup, write.sections,
+                            write.sequence, write.changes, write.chunk, error);
+                } finally {
+                    pw.lock.unlock();
+                }
+            }
+            if (error instanceof Error fatal) throw fatal;
+        } finally {
+            for (GroupWrite write : group) write.slot.commitLock.unlock();
+            this.dbReadCloseLock.readLock().unlock();
+            for (GroupWrite write : group) this.removeEmptyPendingWrite(write.hash, write.slot);
+        }
+    }
+
+    private int saveBatchChunks() {
+        var config = Server.getInstance().getServerConfig();
+        var world = config == null ? null : config.worldSettings().worlds().get(this.level.getFolderName());
+        return world == null ? 16 : Math.max(1, Math.min(64, world.saveBatchChunks()));
+    }
+
+    private int saveBatchBytes() {
+        var config = Server.getInstance().getServerConfig();
+        var world = config == null ? null : config.worldSettings().worlds().get(this.level.getFolderName());
+        return world == null ? 4 * 1024 * 1024 : Math.max(64 * 1024, Math.min(16 * 1024 * 1024, world.saveBatchBytes()));
+    }
+
+    private void enqueueGroup(List<Long> hashes) {
+        List<Long> captured = List.copyOf(hashes);
+        try {
+            this.executor.execute(() -> {
+                this.commitPendingWriteGroup(captured);
+                // Busy, replaced, oversized and entity-bearing snapshots use the original
+                // per-slot fence; retries and newer revisions are drained by that fence too.
+                for (long hash : captured) {
+                    try { this.commitPendingWrite(hash); }
+                    catch (DBException ignored) { /* retained for the existing retry sweep */ }
+                }
+            });
+        } catch (RejectedExecutionException ignored) {
+            // The explicit shutdown drain owns already captured snapshots, never the caller.
+        }
+    }
+
     @Override
     public void saveChunks() {
-        for (BaseFullChunk chunk : this.chunks.values()) {
-            if (chunk.hasChanged()) {
-                this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
+        if (getClass() != LevelDBProvider.class) {
+            // Preserve virtual saveChunk/saveChunkFuture interception by custom providers.
+            for (BaseFullChunk chunk : this.chunks.values()) {
+                if (chunk.hasChanged()) this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
             }
+            return;
+        }
+        List<Long> group = new ArrayList<>();
+        long bytes = 0;
+        int limit = this.saveBatchChunks();
+        try {
+            for (BaseFullChunk fullChunk : this.chunks.values()) {
+                if (!(fullChunk instanceof LevelDBChunk chunk) || !chunk.hasChanged() || !chunk.isGenerated()) continue;
+                long hash = Level.chunkHash(chunk.getX(), chunk.getZ());
+                PendingWriteTicket ticket = this.stagePendingWrite(hash, chunk.getX(), chunk.getZ(), chunk, true, true);
+                // Read size under metadata lock: a writer may already own a previous task for this slot.
+                long size;
+                ticket.slot.lock.lock();
+                try { size = ticket.slot.batch == null ? 0 : ticket.slot.batch.getApproximateSize(); }
+                finally { ticket.slot.lock.unlock(); }
+                if (!group.isEmpty() && (group.size() >= limit || bytes + size > this.saveBatchBytes())) {
+                    this.enqueueGroup(group);
+                    group.clear();
+                    bytes = 0;
+                }
+                group.add(hash);
+                bytes += size;
+            }
+        } finally {
+            // A bad later chunk must not strand valid snapshots already captured this pass.
+            if (!group.isEmpty()) this.enqueueGroup(group);
         }
     }
 
