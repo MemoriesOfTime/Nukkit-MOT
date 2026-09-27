@@ -89,6 +89,7 @@ public class RepairItemTransaction extends InventoryTransaction {
             this.source.getServer().getLogger().debug("Got unexpected cost " + inventory.getCost() + " from " + this.source.getName() + " (expected " + this.cost + ')');
         }
 
+        Item originalOutput = this.outputItem.clone();
         RepairItemEvent event = new RepairItemEvent(inventory, this.inputItem, this.outputItem, this.materialItem, this.cost, this.source);
         this.source.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
@@ -96,6 +97,13 @@ public class RepairItemTransaction extends InventoryTransaction {
             source.setNeedSendInventory(true);
             return true;
         }
+        Item authoritativeOutput = applyEventOutputToActions(originalOutput, event.getNewItem());
+        if (authoritativeOutput == null) {
+            this.sendInventories();
+            source.setNeedSendInventory(true);
+            return true;
+        }
+        this.outputItem = authoritativeOutput;
 
         for (InventoryAction action : this.actions) {
             if (action.execute(this.source)) {

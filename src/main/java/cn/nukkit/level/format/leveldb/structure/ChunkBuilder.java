@@ -34,10 +34,21 @@ public class ChunkBuilder {
 
     private boolean dirty;
 
+    private boolean needsLegacyConnectionFix;
+
     public ChunkBuilder(int chunkX, int chunkZ, LevelDBProvider levelDBProvider) {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
         this.provider = Preconditions.checkNotNull(levelDBProvider, "levelProvider");
+    }
+
+    public ChunkBuilder needsLegacyConnectionFix() {
+        this.needsLegacyConnectionFix = true;
+        return this;
+    }
+
+    public boolean isNeedsLegacyConnectionFix() {
+        return this.needsLegacyConnectionFix;
     }
 
     public ChunkBuilder chunkX(int chunkX) {
@@ -144,6 +155,10 @@ public class ChunkBuilder {
         );
 
         this.chunkDataLoaders.forEach(loader -> loader.initChunk(levelDBChunk, this.provider));
+
+        if (this.needsLegacyConnectionFix) {
+            levelDBChunk.setNeedsLegacyConnectionFix(true);
+        }
 
         if (this.dirty) {
             levelDBChunk.setAllSubChunksDirty();

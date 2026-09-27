@@ -260,6 +260,9 @@ public class NBTInputStream implements DataInput, AutoCloseable {
                 case Tag.TAG_List:
                     int typeId = this.readUnsignedByte();
                     int listLength = this.readInt();
+                    if (typeId == Tag.TAG_End) {
+                        return new ListTag<>(typeId, new ArrayList<Tag>());
+                    }
                     List<Tag> list = new ArrayList<>(this.readSafely && listLength > 64 ? 64 : listLength);
 
                     for (int i = 0; i < listLength; ++i) {

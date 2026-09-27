@@ -3,7 +3,6 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.entity.data.Skin;
 import cn.nukkit.plugin.InternalPlugin;
 
@@ -13,13 +12,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 /**
- * 统一网易 V860 玩家型实体的皮肤注册与清理顺序。
+ * Coordinates temporary player-list registration and skin application for player-like entities.
  * <p>
- * Coordinates skin registration and cleanup for player-like entities on NetEase V860.
+ * NetEase V860 uses a pre-spawn skin update, while modern international clients fall back to a
+ * placeholder list entry when an unsigned persona skin would otherwise be rejected.
  * <p>
  * Adapted from Nukkit-EC (<a href="https://github.com/EaseCation/Nukkit">Nukkit-EC</a>)
  */
-@OnlyNetEase
 public final class PlayerEntitySkinSender {
 
     private static final String EMPTY_SKIN_ID = "nukkit.empty-player-entity-skin";
@@ -32,9 +31,10 @@ public final class PlayerEntitySkinSender {
      *  <p>The real-skin packet can be dropped by the client's throttled skin queue; resend once before the entry is removed. */
     private static final int SKIN_RESEND_TICKS = 2;
 
-    /** 每观察者按 UUID 记录的注册代次，使旧延迟 REMOVE 任务在 re-spawn 后失效。
-     *  <p>Per-viewer generation per UUID; stale delayed REMOVE tasks are ignored after a re-spawn. */
-    private static final Map<Player, Map<UUID, AtomicLong>> REMOVE_GENERATIONS = new WeakHashMap<>();
+    /** 按观察者对象身份及 UUID 记录待完成握手的代次；完成、替换或取消时立即清理。
+     *  <p>Pending handshake generation keyed by viewer identity and UUID; cleared on completion,
+     *  replacement, or cancellation so stale delayed tasks cannot affect a re-spawn. */
+    private static final Map<Player, Map<UUID, AtomicLong>> REMOVE_GENERATIONS = new IdentityHashMap<>();
 
     private PlayerEntitySkinSender() {
     }
@@ -45,7 +45,22 @@ public final class PlayerEntitySkinSender {
      * Whether the viewer uses the NetEase V860 skin handshake for player-like entities.
      */
     public static boolean requiresRetainedEntry(Player viewer) {
-        return viewer.getGameVersion() == GameVersion.V1_21_124_NETEASE;
+        return viewer.getGameVersion().isNetEase()
+                && viewer.getGameVersion().getProtocol() >= GameVersion.V1_21_124_NETEASE.getProtocol();
+    }
+
+    /**
+     * Whether this NPC skin needs the modern post-spawn fallback. Protocol 2168 introduced the
+     * profile hash used to validate persona skins; unsigned persona skins cannot safely be placed
+     * directly in the player list.
+     */
+    public static boolean requiresPostSpawnSkin(Player viewer, Skin skin) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(skin, "skin");
+        return !viewer.getGameVersion().isNetEase()
+                && viewer.protocol >= ProtocolInfo.v1_26_40
+                && skin.isPersona()
+                && skin.getProfileHash().isEmpty();
     }
 
     public static boolean sendInitialSkinIfAbsent(Player viewer, UUID uuid, long entityId,
@@ -96,6 +111,46 @@ public final class PlayerEntitySkinSender {
     }
 
     /**
+     * Registers a placeholder list entry for a modern client. The caller must send AddPlayer and
+     * then {@link #sendSkinAfterSpawn(Player, UUID, Skin)} while this entry is still registered.
+     */
+    public static boolean registerPostSpawnSkinIfAbsent(Player viewer, UUID uuid, long entityId,
+                                                        String name, String xboxUserId,
+                                                        Supplier<Skin> currentSkin) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(uuid, "uuid");
+        Objects.requireNonNull(currentSkin, "currentSkin");
+
+        if (!viewer.sentSkins.add(uuid)) {
+            return true;
+        }
+
+        PlayerListPacket add = new PlayerListPacket();
+        add.type = PlayerListPacket.TYPE_ADD;
+        add.entries = new PlayerListPacket.Entry[]{
+                new PlayerListPacket.Entry(uuid, entityId, name, createPlaceholderListSkin(), xboxUserId)
+        };
+        if (!viewer.dataPacket(add)) {
+            unregister(viewer, uuid);
+            return false;
+        }
+
+        currentGeneration(viewer, uuid).incrementAndGet();
+        scheduleSkinResend(viewer, uuid, currentSkin);
+        scheduleDelayedRemove(viewer, uuid);
+        return true;
+    }
+
+    /** Sends the real skin after the corresponding AddPlayer packet. */
+    public static void sendSkinAfterSpawn(Player viewer, UUID uuid, Skin skin) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(uuid, "uuid");
+        if (skin != null && skin.isValid()) {
+            sendSkinPacket(viewer, uuid, skin);
+        }
+    }
+
+    /**
      * 以 REMOVE → ADD 原子顺序替换已注册的 V860 玩家列表项。
      * <p>
      * Replaces a registered V860 player-list entry using the safe REMOVE → ADD order.
@@ -105,10 +160,11 @@ public final class PlayerEntitySkinSender {
         Objects.requireNonNull(entry, "entry");
         Objects.requireNonNull(entry.uuid, "entry.uuid");
 
-        if (!requiresRetainedEntry(viewer) || !viewer.sentSkins.contains(entry.uuid)) {
+        // 无条件 REMOVE → ADD：V860 会忽略对客户端已持有条目的裸 ADD（不重渲染），
+        // 对本人条目更会破坏自视渲染；REMOVE 对客户端不存在的条目是无害空操作。
+        if (!requiresRetainedEntry(viewer)) {
             return false;
         }
-
         PlayerListPacket remove = new PlayerListPacket();
         remove.type = PlayerListPacket.TYPE_REMOVE;
         remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(entry.uuid)};
@@ -124,6 +180,8 @@ public final class PlayerEntitySkinSender {
             return false;
         }
         viewer.sentSkins.add(entry.uuid);
+        // 作废仍在排期的补发与延迟 REMOVE，防止它们晚于重建落地、把新条目顶回旧皮肤。
+        invalidateGeneration(viewer, entry.uuid);
         return true;
     }
 
@@ -136,6 +194,7 @@ public final class PlayerEntitySkinSender {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(uuid, "uuid");
 
+        invalidateGeneration(viewer, uuid);
         if (!unregister(viewer, uuid)) {
             return;
         }
@@ -175,7 +234,8 @@ public final class PlayerEntitySkinSender {
         if (fingerprint.equals(previous)) {
             return false;
         }
-        if (previous != null) {
+        // 条目已被延迟 REMOVE 注销时也走重建，否则晚到的确认会静默失败、观察者永久史蒂夫。
+        if (previous != null || !viewer.sentSkins.contains(subject)) {
             Player target = Server.getInstance().getPlayer(subject).orElse(null);
             if (target == null) {
                 return false;
@@ -214,20 +274,18 @@ public final class PlayerEntitySkinSender {
     }
 
     /**
-     * 客户端此刻能否应用确认包：必须已有 PlayerList 条目，且该玩家实体已生成到观察者。
-     * 缺任一项客户端都会静默丢弃该条目，而我们已记下指纹便再不重发，因此必须提前拦下。
-     * 条目不存在时顺带清掉残留指纹，避免条目重建后首次确认被误抑制。
+     * 客户端此刻能否应用确认包：该玩家实体须已生成到观察者，否则客户端会静默丢弃该条目，
+     * 而我们已记下指纹便再不重发。不要求 PlayerList 条目仍在——初始握手
+     * {@link #DELAYED_REMOVE_TICKS} 后条目必被注销，条目缺失由 {@link #prepareConfirmSkin}
+     * 的重建分支补 ADD。
      * <p>
-     * Whether the client can apply a confirmation right now: it needs both the PlayerList entry and
-     * the player entity spawned to this viewer. Missing either makes the client drop the entry
-     * silently while we would have recorded the fingerprint and never resent it. A missing entry
-     * also clears any stale fingerprint so the first confirmation after a rebuild isn't suppressed.
+     * Whether the client can apply a confirmation right now: the player entity must have
+     * spawned to this viewer, or the client drops it silently while we would have recorded
+     * the fingerprint and never resent it. A live PlayerList entry is not required — the
+     * delayed REMOVE unregisters it, and the rebuild branch in {@link #prepareConfirmSkin}
+     * re-adds it.
      */
     private static boolean isConfirmable(Player viewer, UUID subject) {
-        if (!viewer.sentSkins.contains(subject)) {
-            viewer.confirmedSkins.remove(subject);
-            return false;
-        }
         Player target = Server.getInstance().getPlayer(subject).orElse(null);
         return target != null && target.hasSpawned.containsKey(viewer.getLoaderId());
     }
@@ -273,9 +331,12 @@ public final class PlayerEntitySkinSender {
         long registeredAt = generation.get();
         Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
             if (viewer.closed) {
+                clearGeneration(viewer, uuid, generation);
                 return;
             }
-            if (generation.get() != registeredAt || !viewer.sentSkins.contains(uuid)) {
+            if (!isCurrentGeneration(viewer, uuid, generation)
+                    || generation.get() != registeredAt
+                    || !viewer.sentSkins.contains(uuid)) {
                 return;
             }
             sendSkinPacket(viewer, uuid, currentSkin.get());
@@ -294,15 +355,18 @@ public final class PlayerEntitySkinSender {
         long registeredAt = generation.get();
         Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
             if (viewer.closed) {
+                clearGeneration(viewer, uuid, generation);
                 return;
             }
+            // 代次已变说明 re-spawn 或条目重建已接管：不动台账也不发 REMOVE——
+            // unregister 会把接管方刚写入的确认指纹一并抹掉，诱发巡检反复重建。
+            if (!isCurrentGeneration(viewer, uuid, generation)
+                    || generation.get() != registeredAt) {
+                return;
+            }
+            clearGeneration(viewer, uuid, generation);
             // 互斥：despawn/close 已先清则跳过。
             if (!unregister(viewer, uuid)) {
-                return;
-            }
-            // 代次已变说明 re-spawn 注册了新条目，恢复 sentSkins 不发 REMOVE。
-            if (generation.get() != registeredAt) {
-                viewer.sentSkins.add(uuid);
                 return;
             }
             sendRemove(viewer, uuid);
@@ -314,6 +378,39 @@ public final class PlayerEntitySkinSender {
             return REMOVE_GENERATIONS
                     .computeIfAbsent(viewer, v -> new ConcurrentHashMap<>())
                     .computeIfAbsent(uuid, u -> new AtomicLong());
+        }
+    }
+
+    private static boolean isCurrentGeneration(Player viewer, UUID uuid, AtomicLong expected) {
+        synchronized (REMOVE_GENERATIONS) {
+            Map<UUID, AtomicLong> generations = REMOVE_GENERATIONS.get(viewer);
+            return generations != null && generations.get(uuid) == expected;
+        }
+    }
+
+    private static void invalidateGeneration(Player viewer, UUID uuid) {
+        synchronized (REMOVE_GENERATIONS) {
+            Map<UUID, AtomicLong> generations = REMOVE_GENERATIONS.get(viewer);
+            if (generations == null) {
+                return;
+            }
+            generations.remove(uuid);
+            if (generations.isEmpty()) {
+                REMOVE_GENERATIONS.remove(viewer);
+            }
+        }
+    }
+
+    private static boolean clearGeneration(Player viewer, UUID uuid, AtomicLong expected) {
+        synchronized (REMOVE_GENERATIONS) {
+            Map<UUID, AtomicLong> generations = REMOVE_GENERATIONS.get(viewer);
+            if (generations == null || !generations.remove(uuid, expected)) {
+                return false;
+            }
+            if (generations.isEmpty()) {
+                REMOVE_GENERATIONS.remove(viewer);
+            }
+            return true;
         }
     }
 

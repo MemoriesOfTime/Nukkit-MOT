@@ -32,9 +32,10 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
 
     @Override
     public List<ResourcePack> loadPacks() {
+        cleanSnapshotCache();
         BaseLang baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
-        for (File pack : this.path.listFiles()) {
+        for (File pack : ResourcePackLoader.listFilesInNameOrder(this.path)) {
             if (shouldIgnoreFile(pack.getName())) {
                 continue;
             }
@@ -45,7 +46,7 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null)
-                        resourcePack = new ZippedBehaviourPack(file, packType);
+                        resourcePack = new ZippedBehaviourPack(file, packType, true);
                 } else {
                     switch (fileExt) {
                         case "zip":
@@ -61,7 +62,9 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
                     loadedResourcePacks.add(resourcePack);
                     log.info(baseLang.translateString("nukkit.resources.zip.loaded", pack.getName()));
                 }
-            } catch (IllegalArgumentException e) {
+            } catch (RuntimeException e) {
+                // IllegalArgumentException = bad pack (skip); RuntimeException also covers
+                // loadDirectoryPack I/O failures, so one broken pack cannot abort the whole load
                 log.warn(baseLang.translateString("nukkit.resources.fail", pack.getName(), e.getMessage()), e);
             }
         }

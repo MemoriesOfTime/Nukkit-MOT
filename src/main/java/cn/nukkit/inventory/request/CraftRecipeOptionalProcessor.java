@@ -92,6 +92,11 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
             if (repairEvent.isCancelled()) {
                 return context.error();
             }
+            Item eventOutput = repairEvent.getNewItem();
+            if (eventOutput == null || eventOutput.isNull()) {
+                return context.error();
+            }
+            result = eventOutput.clone();
             int finalCost = repairEvent.getCost();
             if (!player.isCreative() && finalCost > 0) {
                 if (player.getExperienceLevel() < finalCost) {

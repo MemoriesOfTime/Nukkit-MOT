@@ -24,4 +24,8 @@ public class UseItemData implements TransactionData {
     public int blockRuntimeId;
     public int clientInteractPrediction;
     public int clientCooldownState;
+    /**
+     * @since v2192
+     */
+    public int hand;
 }

@@ -3,10 +3,7 @@ package cn.nukkit.network;
 import cn.nukkit.*;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
-import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
-import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
-import cn.nukkit.network.protocol.netease.PyRpcPacket;
-import cn.nukkit.network.protocol.netease.SyncSkinPacket;
+import cn.nukkit.network.protocol.netease.*;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -27,6 +24,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * @author MagicDroidX
@@ -55,7 +53,7 @@ public class Network {
 
     private final Server server;
 
-    private final Set<SourceInterface> interfaces = new HashSet<>();
+    private final Set<SourceInterface> interfaces = new CopyOnWriteArraySet<>();
 
     private final Set<AdvancedSourceInterface> advancedInterfaces = new HashSet<>();
 
@@ -262,14 +260,15 @@ public class Network {
     }
 
     public boolean processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
-        return this.processBatch(payload, packets, compression, raknetProtocol, player, true);
+        return this.processBatchMeasured(payload, packets, compression, raknetProtocol, player, true).success();
     }
 
     public boolean processBatchQuietly(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
-        return this.processBatch(payload, packets, compression, raknetProtocol, player, false);
+        return this.processBatchMeasured(payload, packets, compression, raknetProtocol, player, false).success();
     }
 
-    private boolean processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player, boolean warnOnFailure) {
+    public BatchProcessResult processBatchMeasured(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression,
+                                                   int raknetProtocol, Player player, boolean warnOnFailure) {
         int maxSize = 3145728; // 3 * 1024 * 1024
         if (player != null && player.getSkin() == null) {
             maxSize = 6291456; // 6 * 1024 * 1024
@@ -283,7 +282,16 @@ public class Network {
             } else if (log.isDebugEnabled()) {
                 log.debug("Exception while decompressing batch packet (compression={}, {} bytes)", compression, payload.length, e);
             }
-            return false;
+            return BatchProcessResult.failed(maxSize, MAX_BATCH_PACKET_COUNT, e);
+        }
+
+        // Providers such as NONE do not enforce the requested decompression limit themselves.
+        if (data.length > maxSize) {
+            ProtocolException failure = new ProtocolException("Decompressed batch exceeds " + maxSize + " bytes");
+            if (warnOnFailure) {
+                log.warn("Rejected oversized decoded batch (compression={}, decompressed={} bytes)", compression, data.length);
+            }
+            return BatchProcessResult.failed(data.length, 0, failure);
         }
 
         BinaryStream stream = new BinaryStream(data);
@@ -334,12 +342,13 @@ public class Network {
                             pk.decode();
                         } else { // version < 1.6
                             int headerLength;
-                            if (player != null && originalPlayerProtocol == Integer.MAX_VALUE) {
-                                // Pre-login legacy clients have not negotiated a concrete MCPE protocol yet.
-                                // Infer the packet header width from the RakNet protocol to avoid misaligned LoginPacket decoding.
-                                headerLength = raknetProtocol == 7 ? 1 : 3;
-                            } else {
+                            if (player != null && originalPlayerProtocol != Integer.MAX_VALUE) {
                                 headerLength = pk.protocol < ProtocolInfo.v1_2_0 ? 1 : 3;
+                            } else {
+                                // Pre-login legacy clients (player not yet created, or MCPE protocol not
+                                // negotiated) have nothing to derive the header width from: RakNet 8 spans
+                                // both header styles, so sniff the MCPE protocol instead.
+                                headerLength = inferLegacyHeaderLength(buf, raknetProtocol);
                             }
                             pk.setBuffer(buf, headerLength);
                             pk.decode();
@@ -364,9 +373,47 @@ public class Network {
                 log.debug("Error whilst decoding batch packet (decoded {} packets, compression={}, decompressed={} bytes)",
                         count, compression, data.length, e);
             }
-            return false;
+            return BatchProcessResult.failed(data.length, Math.min(count, MAX_BATCH_PACKET_COUNT), e);
         }
-        return count > 0;
+        if (count == 0) {
+            return BatchProcessResult.failed(data.length, 0, null);
+        }
+        return BatchProcessResult.success(data.length, count);
+    }
+
+    /** Work performed while decoding one compressed batch, including frames with unknown packet IDs. */
+    public record BatchProcessResult(boolean success, int decompressedBytes, int framedPackets, Throwable failure) {
+
+        static BatchProcessResult success(int decompressedBytes, int framedPackets) {
+            return new BatchProcessResult(true, decompressedBytes, framedPackets, null);
+        }
+
+        static BatchProcessResult failed(int decompressedBytes, int framedPackets, Throwable failure) {
+            return new BatchProcessResult(false, decompressedBytes, framedPackets, failure);
+        }
+    }
+
+    /**
+     * 推断未登录阶段老客户端（raknet ≤ 8，player 尚未创建或协议未协商）batch 内层包头宽度。
+     * RakNet 8 同时覆盖 MCPE 1.0/1.1（1 字节头）与 1.2–1.5（3 字节头），无法从 RakNet 版本区分；
+     * 改为嗅探包 ID 后的协议号（大端，与 LoginPacket 的 getInt 读取一致），命中 SUPPORTED_PROTOCOLS 即为 1 字节头。
+     * <p>
+     * Infers the inner batch header width for pre-login legacy clients (raknet &le; 8, player not yet
+     * created or MCPE protocol not negotiated). RakNet 8 spans both MCPE 1.0/1.1 (1-byte header) and
+     * 1.2-1.5 (3-byte header), so sniff the MCPE protocol int after the packet id (big-endian,
+     * matching LoginPacket's getInt read) instead of guessing from the RakNet version.
+     */
+    private static int inferLegacyHeaderLength(byte[] buf, int raknetProtocol) {
+        if (raknetProtocol == 7) {
+            return 1;
+        }
+        if (buf.length >= 5) {
+            int candidate = (buf[1] & 0xFF) << 24 | (buf[2] & 0xFF) << 16 | (buf[3] & 0xFF) << 8 | (buf[4] & 0xFF);
+            if (ProtocolInfo.SUPPORTED_PROTOCOLS.contains(candidate)) {
+                return 1;
+            }
+        }
+        return 3;
     }
 
     private GameVersion resolveBatchGameVersion(Player player, boolean netEase) {
@@ -755,6 +802,7 @@ public class Network {
         this.packetPool137NetEase = this.packetPool137.toBuilder()
             .netEase(true)
             .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
+            .registerPacket(ProtocolInfo.NETEASE_PACKET_STORE_BUY_SUCC, StoreBuySuccessPacket.class)
             .registerPacket(ProtocolInfo.NETEASE_JSON_PACKET, NeteaseJsonPacket.class)
             .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
             .build();
@@ -764,7 +812,12 @@ public class Network {
             .minecraftVersion(ProtocolInfo.MINECRAFT_VERSION)
             .deregisterPacket(ProtocolInfo.PLAYER_INPUT_PACKET)
             .deregisterPacket(ProtocolInfo.RIDER_JUMP_PACKET)
+            .deregisterPacket(ProtocolInfo.SCRIPT_CUSTOM_EVENT_PACKET)
+            .deregisterPacket(ProtocolInfo.ITEM_FRAME_DROP_ITEM_PACKET)
+            .deregisterPacket(ProtocolInfo.FILTER_TEXT_PACKET)
             .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
+            // v844 packets (CB v898 registry carries 330/332)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_STORE_PACKET, ClientboundDataStorePacket.class)
             // v924 packets
             .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET, ClientboundDataDrivenUIShowScreenPacket.class)
             .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_SCREEN_PACKET, ClientboundDataDrivenUICloseScreenPacket.class)
@@ -789,11 +842,15 @@ public class Network {
             .registerPacket(ProtocolInfo.CLIENTBOUND_UPDATE_SOUND_DATA_PACKET, ClientboundUpdateSoundDataPacket.class)
             .registerPacket(ProtocolInfo.SEND_PARTY_DESTINATION_COOKIE_PACKET, SendPartyDestinationCookiePacket.class)
             .registerPacket(ProtocolInfo.PARTY_DESTINATION_COOKIE_RESPONSE_PACKET, PartyDestinationCookieResponsePacket.class)
+            // v2192 packets
+            .registerPacket(ProtocolInfo.SET_PLAYER_FURNACE_OPTIONS_PACKET, SetPlayerFurnaceOptionsPacket.class)
+            .registerPacket(ProtocolInfo.RECORD_STARTED_PACKET, RecordStartedPacket.class)
             .build();
 
         this.packetPoolCurrentNetEase = this.packetPoolCurrent.toBuilder()
             .netEase(true)
             .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
+            .registerPacket(ProtocolInfo.NETEASE_PACKET_STORE_BUY_SUCC, StoreBuySuccessPacket.class)
             .registerPacket(ProtocolInfo.NETEASE_JSON_PACKET, NeteaseJsonPacket.class)
             .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
             .registerPacket(ProtocolInfo.PACKET_SYNC_SKIN, SyncSkinPacket.class)

@@ -88,8 +88,15 @@ public class V975PacketRegressionTest extends AbstractPacketRegressionTest {
                 crossDecode(nukkitPacket, org.cloudburstmc.protocol.bedrock.packet.ServerPresenceInfoPacket.class);
 
         assertNotNull(cbPacket.getPresenceConfiguration(), "PresenceConfiguration should not be null");
-        assertEquals("exp-name", cbPacket.getPresenceConfiguration().getExperienceName());
-        assertEquals("world-name", cbPacket.getPresenceConfiguration().getWorldName());
+        if (protocolVersion >= ProtocolInfo.v1_26_40) {
+            // v2168 起线上仅剩 optional richPresenceId / only an optional richPresenceId remains on the wire since v2168
+            assertNull(cbPacket.getPresenceConfiguration().getExperienceName());
+            assertNull(cbPacket.getPresenceConfiguration().getWorldName());
+            assertNull(cbPacket.getPresenceConfiguration().getRichPresenceId());
+        } else {
+            assertEquals("exp-name", cbPacket.getPresenceConfiguration().getExperienceName());
+            assertEquals("world-name", cbPacket.getPresenceConfiguration().getWorldName());
+        }
     }
 
     @ParameterizedTest(name = "ServerPresenceInfoPacket null config v{0}")

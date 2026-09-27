@@ -8,6 +8,13 @@ import cn.nukkit.utils.BlockColor;
  */
 public class BlockHardGlassPane extends BlockThin {
 
+    public BlockHardGlassPane() {
+    }
+
+    public BlockHardGlassPane(int meta) {
+        super(meta);
+    }
+
     @Override
     public String getName() {
         return "Hardened Glass Pane";
