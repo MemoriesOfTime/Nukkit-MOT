@@ -755,6 +755,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
+    public List<Entity> getEntitySnapshot() {
+        Map<Long, Entity> entities = this.getEntities();
+        if (entities instanceof Long2ObjectNonBlockingMap<Entity> map) return map.valuesSnapshot();
+        return List.copyOf(entities.values());
+    }
+
+    @Override
     public Map<Long, BlockEntity> getBlockEntities() {
         return tiles == null ? Collections.emptyMap() : tiles;
     }
