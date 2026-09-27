@@ -75,12 +75,11 @@ class CollisionHelperAirTest {
     @Test
     void entityQueriesUseInclusiveContainingChunksWithoutAnExtraFractionalChunk() {
         java.util.List<String> visited = new java.util.ArrayList<>();
-        when(level.getChunkEntities(anyInt(), anyInt(), anyBoolean())).thenAnswer(i -> {
+        Level scanned = mock(Level.class, CALLS_REAL_METHODS);
+        doAnswer(i -> {
             visited.add(i.getArgument(0) + ":" + i.getArgument(1));
-            return Map.of();
-        });
-        doCallRealMethod().when(level).getNearbyEntities(any(AxisAlignedBB.class), nullable(Entity.class),
-                anyBoolean(), eq(false));
+            return null;
+        }).when(scanned).getChunkIfLoaded(anyInt(), anyInt());
         for (int shift : new int[]{-16, 0, 16}) {
             for (double end : new double[]{12.1, 14.0}) {
                 AxisAlignedBB box = new SimpleAxisAlignedBB(2.1 + shift, 64, 2.1 + shift,
@@ -92,10 +91,10 @@ class CollisionHelperAirTest {
                     for (int z = min; z <= max; z++) expected.add(x + ":" + z);
                 }
                 visited.clear();
-                assertTrue(CollisionHelper.getCollidingEntities(level, box, null).isEmpty());
+                assertTrue(CollisionHelper.getCollidingEntities(scanned, box, null).isEmpty());
                 assertEquals(expected, visited);
                 visited.clear();
-                assertEquals(0, level.getNearbyEntities(box, null, false, false).length);
+                assertEquals(0, scanned.getNearbyEntities(box, null, false, false).length);
                 assertEquals(expected, visited);
             }
         }
