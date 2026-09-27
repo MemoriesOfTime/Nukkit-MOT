@@ -88,6 +88,41 @@ public class Long2ObjectNonBlockingMap<TypeV>
 
     private static final int REPROBE_LIMIT = 10; // Too many reprobes then force a table-resize
 
+    private transient volatile long valuesVersion;
+    private transient volatile ValuesSnapshot<TypeV> valuesSnapshot;
+    private static final AtomicLongFieldUpdater<Long2ObjectNonBlockingMap> VALUES_VERSION =
+            AtomicLongFieldUpdater.newUpdater(Long2ObjectNonBlockingMap.class, "valuesVersion");
+    private static final AtomicReferenceFieldUpdater<Long2ObjectNonBlockingMap, ValuesSnapshot> VALUES_SNAPSHOT =
+            AtomicReferenceFieldUpdater.newUpdater(Long2ObjectNonBlockingMap.class, ValuesSnapshot.class, "valuesSnapshot");
+
+    private record ValuesSnapshot<V>(long version, List<V> values) {}
+
+    /**
+     * Immutable, array-backed membership snapshot, reused until a mapping changes by identity.
+     * Values themselves are not copied. Like the ordinary iterator, a snapshot built during
+     * concurrent writes is weakly consistent; a completed write invalidates the cached version.
+     * A racing rebuild is returned uncached rather than retried while writers keep running.
+     */
+    public List<TypeV> valuesSnapshot() {
+        ValuesSnapshot<TypeV> cached = this.valuesSnapshot;
+        long version = this.valuesVersion;
+        if (cached != null && cached.version() == version) return cached.values();
+
+        List<TypeV> values = List.copyOf(values());
+        ValuesSnapshot<TypeV> rebuilt = new ValuesSnapshot<>(version, values);
+        if (this.valuesVersion == version && VALUES_SNAPSHOT.compareAndSet(this, cached, rebuilt)) {
+            // Close the check/publish race. Also release obsolete entity/level references
+            // if the last write completed before publication and nobody reads this map again.
+            if (this.valuesVersion != version) VALUES_SNAPSHOT.compareAndSet(this, rebuilt, null);
+        }
+        return values;
+    }
+
+    private void invalidateValuesSnapshot() {
+        VALUES_VERSION.incrementAndGet(this);
+        this.valuesSnapshot = null;
+    }
+
     // --- Bits to allow Unsafe access to arrays
     private static final VarHandle _OHandler = MethodHandles.arrayElementVarHandle(Object[].class);
     private static final VarHandle _LHandler = MethodHandles.arrayElementVarHandle(long[].class);
@@ -125,10 +160,10 @@ public class Long2ObjectNonBlockingMap<TypeV>
     }
 
     // --- The Hash Table --------------------
-    private transient CHM _chm;
+    private transient volatile CHM _chm;
     // This next field holds the value for Key 0 - the special key value which
     // is the initial array value, and also means: no-key-inserted-yet.
-    private transient Object _val_1; // Value for Key: NO_KEY
+    private transient volatile Object _val_1; // Value for Key: NO_KEY
 
     // Time since last resize
     private transient long _last_resize_milli;
@@ -352,12 +387,17 @@ public class Long2ObjectNonBlockingMap<TypeV>
         if (oldVal == null || newVal == null) throw new NullPointerException();
         if (key == NO_KEY) {
             Object curVal = _val_1;
-            if (oldVal == NO_MATCH_OLD || // Do we care about expected-Value at all?
+            while (oldVal == NO_MATCH_OLD || // Do we care about expected-Value at all?
                     curVal == oldVal ||       // No instant match already?
                     (oldVal == MATCH_ANY && curVal != TOMBSTONE) ||
                     oldVal.equals(curVal)) { // Expensive equals check
-                if (!CAS(_val_1_handler, curVal, newVal)) // One shot CAS update attempt
-                    curVal = _val_1;                      // Failed; get failing witness
+                Object witness = _val_1_handler.compareAndExchange(this, curVal, newVal);
+                if (witness == curVal) {
+                    if (curVal != newVal) invalidateValuesSnapshot();
+                    break;
+                }
+                // Retry against the actual failed-CAS witness; a failed update is not success.
+                curVal = witness;
             }
             return curVal == TOMBSTONE ? null : (TypeV) curVal; // Return the last value present
         }
@@ -375,12 +415,14 @@ public class Long2ObjectNonBlockingMap<TypeV>
         CHM newchm = new CHM(this, new ConcurrentAutoLongTable(), MIN_SIZE_LOG);
         while (!CAS(_chm_handler, _chm, newchm)) { /*Spin until the clear works*/}
         CAS(_val_1_handler, _val_1, TOMBSTONE);
+        invalidateValuesSnapshot();
     }
 
     // Non-atomic clear, preserving existing large arrays
     public void clear(boolean large) {         // Smack a new empty table down
         _chm.clear();
         CAS(_val_1_handler, _val_1, TOMBSTONE);
+        invalidateValuesSnapshot();
     }
 
     /**
@@ -787,6 +829,10 @@ public class Long2ObjectNonBlockingMap<TypeV>
                 // Adjust sizes - a striped counter
                 if ((V == null || V == TOMBSTONE) && putval != TOMBSTONE) _size.add(1);
                 if (!(V == null || V == TOMBSTONE) && putval == TOMBSTONE) _size.add(-1);
+                // Claiming a previously unused slot with a tombstone changes no membership.
+                if ((V != null && V != TOMBSTONE) || putval != TOMBSTONE) {
+                    _nbhml.invalidateValuesSnapshot();
+                }
             }
 
             // We won; we know the update happened as expected.

@@ -9,6 +9,7 @@ import cn.nukkit.level.util.PalettedBlockStorage;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.List;
 
 /**
  * @author MagicDroidX
@@ -202,6 +203,11 @@ public interface FullChunk extends Cloneable {
     void removeBlockEntity(BlockEntity blockEntity);
 
     Map<Long, Entity> getEntities();
+
+    /** Read-only membership snapshot; entity state remains live. */
+    default List<Entity> getEntitySnapshot() {
+        return List.copyOf(getEntities().values());
+    }
 
     Map<Long, BlockEntity> getBlockEntities();
 
