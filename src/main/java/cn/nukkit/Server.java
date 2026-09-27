@@ -351,6 +351,12 @@ public class Server {
      * Xbox authentication enabled.
      */
     public boolean xboxAuth;
+
+    /**
+     * When true a duplicate login refuses the newcomer instead of closing the session that is
+     * already in the world. Defaults to false, the historical behaviour.
+     */
+    private boolean keepExistingSessionOnDuplicateLogin;
     /**
      * Spawn eggs enabled.
      */
@@ -873,7 +879,9 @@ public class Server {
 
         this.craftingManager = new CraftingManager();
         ResourcePackMigration.migrate(new File(Nukkit.DATA_PATH));
-        HashSet<ResourcePackLoader> packLoaders = new HashSet<>();
+        // Registration order is the stack order among packs of equal priority: resource packs first,
+        // then behaviour packs, then packs shipped inside plugin jars.
+        Set<ResourcePackLoader> packLoaders = new LinkedHashSet<>();
         packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")));
         packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs")));
         packLoaders.add(new JarPluginResourcePackLoader(new File(this.pluginPath)));
@@ -3464,6 +3472,13 @@ public class Server {
     }
 
     /**
+     * @return true when a duplicate login refuses the newcomer and keeps the session already in the world
+     */
+    public boolean isDuplicateLoginKeepingExistingSession() {
+        return this.keepExistingSessionOnDuplicateLogin;
+    }
+
+    /**
      * Check whether a player is whitelisted
      *
      * @param name player name
@@ -3939,6 +3954,7 @@ public class Server {
         this.flyChecks = this.getPropertyBoolean("allow-flight", false);
         this.spawnRadius = this.getPropertyInt("spawn-protection", 10);
         this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
+        this.keepExistingSessionOnDuplicateLogin = this.getPropertyBoolean("keep-existing-session-on-duplicate-login", false);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
         if (!this.encryptionEnabled) {
             log.warn("Encryption is not enabled. For better security, it's recommended to enable it if you don't use a proxy software.");
@@ -4169,6 +4185,7 @@ public class Server {
             put("white-list", false);
             put("whitelist-reason", "§cServer is white-listed");
             put("xbox-auth", true);
+            put("keep-existing-session-on-duplicate-login", false);
             put("encryption", true);
 
             put("force-resources", false);
