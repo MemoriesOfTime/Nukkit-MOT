@@ -1,6 +1,7 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.AdventureSettings.Type;
+import cn.nukkit.AdventureSettings;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -1092,6 +1093,18 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (oldEffect != null && (oldEffect.getAmplifier() > effect.getAmplifier()
             || (oldEffect.getAmplifier() == effect.getAmplifier() && oldEffect.getDuration() >= effect.getDuration()))) {
+            // A weaker/shorter absorption effect must not replace the stronger icon or its
+            // duration, but consuming the item still replenishes the amount granted by that
+            // item. Without this, a normal golden apple eaten while enchanted-apple
+            // Absorption IV is still visible gives zero yellow hearts after the old pool was
+            // depleted: addEffect returns before Effect.add can refill anything.
+            if (effect.getId() == Effect.ABSORPTION
+                    && cause == EntityPotionEffectEvent.Cause.FOOD) {
+                float grantedAbsorption = (effect.getAmplifier() + 1) << 2;
+                if (grantedAbsorption > this.getAbsorption()) {
+                    this.setAbsorption(grantedAbsorption);
+                }
+            }
             return;
         }
 
@@ -1717,13 +1730,33 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     /**
-     * 检查玩家的攻击是否应为暴击 / Check if player's hit should be critical
+     * Whether this melee hit can be a critical one.
      *
-     * @param player player
-     * @return can make a critical hit
+     * <p>Conditions follow vanilla Bedrock as implemented by PocketMine-MP
+     * ({@code Player::attackEntity}): the attacker has to be falling, must not be sprinting,
+     * flying or riding, must not be blinded and must not be in water.
+     *
+     * <p>Sprinting and flying were missing here. Both make the 1.5x bonus nearly permanent
+     * instead of a timed hit: Bedrock players sprint by default, so every sprint-jump landed a
+     * critical, and a player with creative or plugin-granted flight critically hit for free while
+     * hovering, with no fall to commit to.
+     *
+     * @param player the attacker
+     * @return whether the hit can be critical
+     *
+     * <p>{@code speed} is the previous position minus the current one, so falling is a POSITIVE
+     * y — the check reads backwards but is correct.
      */
     private static boolean canCriticalHit(Player player) {
-        if (player.isOnGround() || player.riding != null || player.speed == null || player.speed.y <= 0 || player.hasEffect(Effect.BLINDNESS)) return false;
+        if (player.isOnGround()
+                || player.riding != null
+                || player.speed == null
+                || player.speed.y <= 0
+                || player.isSprinting()
+                || player.getAdventureSettings().get(AdventureSettings.Type.FLYING)
+                || player.hasEffect(Effect.BLINDNESS)) {
+            return false;
+        }
         int b = player.getLevel().getBlockIdAt(player.chunk, player.getFloorX(), player.getFloorY(), player.getFloorZ());
         return b != Block.LADDER && b != Block.VINES && !Block.isWater(b);
     }
