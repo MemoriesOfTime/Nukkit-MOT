@@ -22,6 +22,7 @@ public class SetHealthPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(this.health);
+        // signed zigzag varint on the wire (CB writeInt) even though health is non-negative
+        this.putVarInt(this.health);
     }
 }

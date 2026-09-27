@@ -26,7 +26,7 @@ public class BeaconInventory extends FakeBlockUIComponent {
         super.onClose(who);
 
         // Drop item in slot if client doesn't automatically move it to player's inventory
-        if (!who.isConnected()) {
+        if (!who.isConnected() && !who.isCreative()) {
             this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), this.getItem(0));
         }
         this.clear(0);

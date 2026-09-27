@@ -103,6 +103,7 @@ public class GrindstoneTransaction extends InventoryTransaction {
 
         GrindstoneInventory inventory = (GrindstoneInventory) getSource().getWindowById(Player.GRINDSTONE_WINDOW_ID);
         int experience = inventory.calculateExperience();
+        Item originalOutput = this.outputItem.clone();
         GrindItemEvent event = new GrindItemEvent(inventory, this.equipmentItem, this.outputItem, this.ingredientItem, experience, this.source);
         this.source.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
@@ -110,6 +111,13 @@ public class GrindstoneTransaction extends InventoryTransaction {
             source.setNeedSendInventory(true);
             return true;
         }
+        Item authoritativeOutput = applyEventOutputToActions(originalOutput, event.getNewItem());
+        if (authoritativeOutput == null) {
+            this.sendInventories();
+            source.setNeedSendInventory(true);
+            return true;
+        }
+        this.outputItem = authoritativeOutput;
 
         for (InventoryAction action : this.actions) {
             if (action.execute(this.source)) {

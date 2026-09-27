@@ -6,7 +6,9 @@ import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.NukkitMath;
+import cn.nukkit.network.NetherNetInterface;
 import cn.nukkit.network.Network;
+import cn.nukkit.network.SourceInterface;
 import cn.nukkit.utils.TextFormat;
 import com.sun.jna.platform.win32.COM.WbemcliUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -238,6 +240,9 @@ public class StatusCommand extends VanillaCommand {
             sender.sendMessage(TextFormat.GOLD + "Players: " + playerColor + server.getOnlinePlayers().size() + TextFormat.GREEN + " online, " +
                     TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
 
+            // NetherNet 传输状态（未启用时不显示） Transport state, hidden when NetherNet is disabled
+            sendNetherNetStatus(sender, server, false);
+
             for (Level level : server.getLevels().values()) {
                 sender.sendMessage(buildWorldInfo(level));
             }
@@ -312,6 +317,7 @@ public class StatusCommand extends VanillaCommand {
                         sender.sendMessage(TextFormat.AQUA + "  " + each.getDisplayName());
                         sender.sendMessage(TextFormat.RESET + "    " + formatKB(each.getSpeed()) + "/s " + TextFormat.GRAY + String.join(", ", list));
                     }
+                    sendNetherNetStatus(sender, server, true);
                     sender.sendMessage("");
                 }
             } catch (Exception ignored) {
@@ -379,6 +385,16 @@ public class StatusCommand extends VanillaCommand {
 
 
         return true;
+    }
+
+    private static void sendNetherNetStatus(CommandSender sender, Server server, boolean full) {
+        for (SourceInterface interfaz : server.getNetwork().getInterfaces()) {
+            if (interfaz instanceof NetherNetInterface netherNet) {
+                for (String line : netherNet.buildStatusLines(10, full)) {
+                    sender.sendMessage(line);
+                }
+            }
+        }
     }
 
     private static String buildWorldInfo(Level level) {

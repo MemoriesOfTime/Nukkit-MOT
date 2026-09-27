@@ -217,6 +217,19 @@ class CharacterCreatorLoginJwtTest {
     }
 
     @Test
+    void personaProfileHashSurvivesLoginAndWireRoundTrip() {
+        JsonObject skinPayload = buildPersonaSkinPayload();
+        skinPayload.addProperty("ProfileHash", "persona-profile-hash");
+
+        Skin decoded = decode(buildLoginPacketBuffer(2168, skinPayload)).skin;
+
+        assertEquals("persona-profile-hash", decoded.getProfileHash(),
+                "LoginPacket must preserve the profile hash required by v2168 persona skins");
+        assertEquals("persona-profile-hash", roundTripSkin(decoded).getProfileHash(),
+                "v2168 skin serialization must retain the parsed profile hash");
+    }
+
+    @Test
     void personaSkinWithEmptyCapeDataDecodesWithoutException() {
         // 边缘场景：persona 皮肤无 CapeData 字段（character creator 可能不带披风）
         JsonObject skinPayload = buildPersonaSkinPayload();

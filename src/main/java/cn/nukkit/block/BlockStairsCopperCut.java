@@ -142,7 +142,10 @@ public class BlockStairsCopperCut extends BlockStairs implements CopperBehavior 
             return Level.BLOCK_UPDATE_RANDOM;
         }
 
-        return 0;
+        // 非 RANDOM 更新交给父类，维持楼梯 corner 位（v2193 起由状态驱动渲染）
+        // Non-RANDOM updates go to the parent, which maintains the stair corner bits
+        // (state-driven rendering since v2193)
+        return super.onUpdate(type);
     }
 
     @Override

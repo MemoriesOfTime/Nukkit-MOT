@@ -59,7 +59,7 @@ public class AsyncChunkLoadTest {
         setField(level, "pendingChunkLoads", new ConcurrentHashMap<>());
         setField(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
         setField(level, "unloadQueue", new Long2ObjectNonBlockingMap<>());
-        setField(level, "chunkLoaders", new ConcurrentHashMap<>());
+        setField(level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
         setField(level, "playerLoaders", new ConcurrentHashMap<>());
         setField(level, "loaders", new Int2ObjectOpenHashMap<>());
         setField(level, "loaderCounter", new Int2IntOpenHashMap());

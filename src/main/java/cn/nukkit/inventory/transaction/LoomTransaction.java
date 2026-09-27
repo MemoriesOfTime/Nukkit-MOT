@@ -54,9 +54,6 @@ public class LoomTransaction extends InventoryTransaction {
         }
 
         int patternCount = outputItem.getNamedTag().getList("Patterns").size();
-        if (banner.getNamedTag() == null) {
-            return patternCount == 1;
-        }
 
         if (patternCount > 6) {
             return false;
@@ -67,7 +64,8 @@ public class LoomTransaction extends InventoryTransaction {
             return false;
         }
 
-        return banner.getNamedTag().getList("Patterns").size() + 1 == patternCount;
+        int bannerPatterns = banner.getNamedTag() != null ? banner.getNamedTag().getList("Patterns").size() : 0;
+        return bannerPatterns + 1 == patternCount;
     }
 
     @Override

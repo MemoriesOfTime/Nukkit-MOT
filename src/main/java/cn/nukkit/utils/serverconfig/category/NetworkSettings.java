@@ -15,6 +15,10 @@ import java.util.List;
 @Accessors(fluent = true)
 public class NetworkSettings extends OkaeriConfig {
 
+    @Comment("NetherNet (WebRTC) transport settings, runs alongside RakNet. Restricted-network clients 1.21.90+ join over HTTP signaling + WebRTC")
+    @CustomKey("nethernet")
+    private NetherNetSettings netherNetSettings = new NetherNetSettings();
+
     @Comment("ZLIB compression provider (2 recommended)")
     @CustomKey("zlib-provider")
     private int zlibProvider = 2;
@@ -43,7 +47,7 @@ public class NetworkSettings extends OkaeriConfig {
     @CustomKey("rak-cookie-mode")
     private String rakCookieMode = "active";
 
-    @Comment("Client timeout in milliseconds (reserved, not yet applied)")
+    @Comment("Login timeout in milliseconds, also bounds the NetherNet WebRTC handshake phase (30s fallback when 0)")
     @CustomKey("timeout-milliseconds")
     private int timeoutMilliseconds = 25000;
 

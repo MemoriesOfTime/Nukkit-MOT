@@ -1,6 +1,7 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.AdventureSettings.Type;
+import cn.nukkit.AdventureSettings;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -1432,7 +1433,7 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    private static int correctEntityIdentifiersProtocol(int protocolId) {
+    public static int correctEntityIdentifiersProtocol(int protocolId) {
         if (protocolId >= ProtocolInfo.v1_19_80) {
             return ProtocolInfo.v1_19_80;
         } else if (protocolId >= ProtocolInfo.v1_19_20) {
@@ -1729,13 +1730,33 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     /**
-     * 检查玩家的攻击是否应为暴击 / Check if player's hit should be critical
+     * Whether this melee hit can be a critical one.
      *
-     * @param player player
-     * @return can make a critical hit
+     * <p>Conditions follow vanilla Bedrock as implemented by PocketMine-MP
+     * ({@code Player::attackEntity}): the attacker has to be falling, must not be sprinting,
+     * flying or riding, must not be blinded and must not be in water.
+     *
+     * <p>Sprinting and flying were missing here. Both make the 1.5x bonus nearly permanent
+     * instead of a timed hit: Bedrock players sprint by default, so every sprint-jump landed a
+     * critical, and a player with creative or plugin-granted flight critically hit for free while
+     * hovering, with no fall to commit to.
+     *
+     * @param player the attacker
+     * @return whether the hit can be critical
+     *
+     * <p>{@code speed} is the previous position minus the current one, so falling is a POSITIVE
+     * y — the check reads backwards but is correct.
      */
     private static boolean canCriticalHit(Player player) {
-        if (player.isOnGround() || player.riding != null || player.speed == null || player.speed.y <= 0 || player.hasEffect(Effect.BLINDNESS)) return false;
+        if (player.isOnGround()
+                || player.riding != null
+                || player.speed == null
+                || player.speed.y <= 0
+                || player.isSprinting()
+                || player.getAdventureSettings().get(AdventureSettings.Type.FLYING)
+                || player.hasEffect(Effect.BLINDNESS)) {
+            return false;
+        }
         int b = player.getLevel().getBlockIdAt(player.chunk, player.getFloorX(), player.getFloorY(), player.getFloorZ());
         return b != Block.LADDER && b != Block.VINES && !Block.isWater(b);
     }
@@ -1856,11 +1877,12 @@ public abstract class Entity extends Location implements Metadatable {
             if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.SUICIDE) {
                 boolean totem = false;
                 boolean isOffhand = false;
-                if (isTotem(p.getOffhandInventory().getItemFast(0))) {
+                // A deliberately held totem takes precedence over the offhand.
+                if (isTotem(p.getInventory().getItemInHandFast())) {
+                    totem = true;
+                } else if (isTotem(p.getOffhandInventory().getItemFast(0))) {
                     totem = true;
                     isOffhand = true;
-                } else if (isTotem(p.getInventory().getItemInHandFast())) {
-                    totem = true;
                 }
                 if (totem) {
                     this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_TOTEM);
@@ -2578,6 +2600,13 @@ public abstract class Entity extends Location implements Metadatable {
             if (!this.hasEffect(Effect.SLOW_FALLING)) {
                 Block down = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() - 1, this.getFloorZ(), 0, true);
                 int floor = down.getId();
+
+                EntityFallEvent event = new EntityFallEvent(this, down, fallDistance);
+                this.server.getPluginManager().callEvent(event);
+                if (event.isCancelled()) {
+                    return;
+                }
+                fallDistance = event.getFallDistance();
 
                 if (!this.noFallDamage) {
                     float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));

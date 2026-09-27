@@ -80,9 +80,9 @@ public class PacketCoverageReportTest {
 
         // 3. Auto-detect tested packets from @ParameterizedTest annotations (split by direction)
         Set<String> encodeTestedPackets = scanTestedPacketsFromAnnotations(
-                standardPacketNames, "cn.nukkit.network.protocol.regression.encode");
+                standardPacketNames, "cn.nukkit.network.protocol.regression.encode", "cn.nukkit.network.protocol.regression.decode");
         Set<String> decodeTestedPackets = scanTestedPacketsFromAnnotations(
-                standardPacketNames, "cn.nukkit.network.protocol.regression.decode");
+                standardPacketNames, "cn.nukkit.network.protocol.regression.decode", "cn.nukkit.network.protocol.regression.encode");
 
         // 4. Detect not-applicable packets per direction
         Map<String, Class<?>> classLookup = new HashMap<>();
@@ -155,7 +155,14 @@ public class PacketCoverageReportTest {
         Set<String> effectiveTestable = new TreeSet<>(testablePackets);
         effectiveTestable.removeAll(notApplicable);
 
-        int testedCount = testedPackets.size();
+        // 双向扫描会把 N/A 方向的测试也计入 tested 集合（如 C→S 包的 decode 测试算进 encode tested），
+        // 统计与 TESTED 列表只保留真正可测方向内的包。
+        // Cross-package scanning counts N/A-direction tests into the tested set (e.g. a C->S
+        // packet's decode test lands in encode tested); keep only packets testable in this direction.
+        Set<String> effectiveTested = new TreeSet<>(testedPackets);
+        effectiveTested.retainAll(effectiveTestable);
+
+        int testedCount = effectiveTested.size();
         int effectiveTestableCount = effectiveTestable.size();
         double overallPct = allPackets.isEmpty() ? 0 : (testedCount * 100.0 / allPackets.size());
         double testablePct = effectiveTestableCount == 0 ? 0 : (testedCount * 100.0 / effectiveTestableCount);
@@ -173,7 +180,7 @@ public class PacketCoverageReportTest {
         Collections.sort(naList);
 
         for (String name : allPackets) {
-            if (testedPackets.contains(name)) {
+            if (effectiveTested.contains(name)) {
                 tested.add(name);
             } else if (effectiveTestable.contains(name)) {
                 testableUntested.add(name);
@@ -361,12 +368,17 @@ public class PacketCoverageReportTest {
     }
 
     /**
-     * Scans test classes in the specified package for {@code @ParameterizedTest} annotations
+     * Scans test classes in the specified packages for {@code @ParameterizedTest} annotations
      * and extracts tested packet names from their {@code name} attribute.
+     * Both direction packages are scanned because mixed test classes (e.g. V2192PacketRegressionTest)
+     * may cover encode and decode directions together; not-applicable sets filter direction noise.
      */
-    private static Set<String> scanTestedPacketsFromAnnotations(Set<String> knownPacketNames, String testPackage) {
+    private static Set<String> scanTestedPacketsFromAnnotations(Set<String> knownPacketNames, String... testPackages) {
         Set<String> tested = new HashSet<>();
-        List<Class<?>> testClasses = scanClassesInPackage(testPackage);
+        List<Class<?>> testClasses = new ArrayList<>();
+        for (String testPackage : testPackages) {
+            testClasses.addAll(scanClassesInPackage(testPackage));
+        }
 
         for (Class<?> testClass : testClasses) {
             if (testClass == PacketCoverageReportTest.class) {

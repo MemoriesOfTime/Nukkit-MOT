@@ -1,5 +1,6 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.AdventureSettings;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
@@ -102,7 +103,9 @@ public class ArmorDamageReductionTest {
     public void testEntityBaseTickAppliesLavaDamageWhileStandingInLava() {
         Level level = newMockLevel();
         stubLevelAsLava(level);
-        TestLiving target = new TestLiving(newMockChunk(level), baseNbt());
+        FullChunk chunk = newMockChunk(level);
+        stubChunkAsLava(chunk);
+        TestLiving target = new TestLiving(chunk, baseNbt());
 
         assertTrue(target.isInsideOfLava());
         for (int i = 0; i < 10; i++) {
@@ -759,6 +762,7 @@ public class ArmorDamageReductionTest {
         lenient().when(damager.getAdventureSettings()).thenReturn(new cn.nukkit.AdventureSettings(damager));
         lenient().when(damager.getBoundingBox()).thenReturn(new SimpleAxisAlignedBB(0, 0, 0, 1, 2, 1));
         lenient().when(damager.isOnGround()).thenReturn(false);
+        lenient().when(damager.getAdventureSettings()).thenReturn(mock(AdventureSettings.class));
         return damager;
     }
 
@@ -809,6 +813,13 @@ public class ArmorDamageReductionTest {
                         invocation.getArgument(1, Integer.class),
                         invocation.getArgument(2, Integer.class),
                         invocation.getArgument(3, Integer.class)));
+    }
+
+    /** Keep the raw block IDs consistent with the Level#getBlock lava fixture. */
+    private static void stubChunkAsLava(FullChunk chunk) {
+        lenient().when(chunk.getBlockId(anyInt(), anyInt(), anyInt())).thenReturn(Block.LAVA);
+        lenient().when(chunk.getBlockId(anyInt(), anyInt(), anyInt(), anyInt())).thenAnswer(
+                invocation -> invocation.getArgument(3, Integer.class) == 0 ? Block.LAVA : Block.AIR);
     }
 
     private static Block blockAt(Level level, int id, int x, int y, int z) {
