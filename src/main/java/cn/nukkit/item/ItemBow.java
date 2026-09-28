@@ -24,6 +24,12 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class ItemBow extends ItemTool {
 
+    /**
+     * Launch speed of a fully drawn arrow in blocks per tick: vanilla {@code minecraft:player_arrow}
+     * ({@code power 3.0}) and PocketMine-MP {@code Bow} ({@code $baseForce * 3}).
+     */
+    static final double ARROW_SPEED = 3.0;
+
     public ItemBow() {
         this(0, 1);
     }
@@ -89,7 +95,7 @@ public class ItemBow extends ItemTool {
         ThreadLocalRandom random = ThreadLocalRandom.current();
         Vector3 dir = Vector3.directionFromRotation(player.pitch, player.yaw)
                 .add(0.0075 * random.nextGaussian(), 0.0075 * random.nextGaussian(), 0.0075 * random.nextGaussian());
-        CompoundTag nbt = Entity.getDefaultNBT(player.getEyePosition(), dir.multiply(1.2), (float) dir.yRotFromDirection(), (float) dir.xRotFromDirection())
+        CompoundTag nbt = Entity.getDefaultNBT(player.getEyePosition(), dir, (float) dir.yRotFromDirection(), (float) dir.xRotFromDirection())
                 .putShort("Fire", flame ? 45 * 60 : 0)
                 .putDouble("damage", damage)
                 .putByte("auxValue", itemArrow.getDamage())
@@ -111,10 +117,10 @@ public class ItemBow extends ItemTool {
             }
         }
 
-        double p = (double) ticksUsed / 20;
-
-        double f = Math.min((p * p + p * 2) / 3, 1) * 2.8;
-        EntityShootBowEvent entityShootBowEvent = new EntityShootBowEvent(player, this, new EntityArrow(player.chunk, nbt, player, f == 2), f);
+        // The force is the launch speed of the unit direction above. Only a full draw is critical.
+        double draw = drawStrength(ticksUsed);
+        double f = draw * ARROW_SPEED;
+        EntityShootBowEvent entityShootBowEvent = new EntityShootBowEvent(player, this, new EntityArrow(player.chunk, nbt, player, draw >= 1), f);
 
         if (f < 0.1 || ticksUsed < 3) {
             entityShootBowEvent.setCancelled();
@@ -164,6 +170,14 @@ public class ItemBow extends ItemTool {
         }
 
         return true;
+    }
+
+    /**
+     * How far the bow is drawn after {@code ticksUsed} ticks, from 0 to 1 (full after 20 ticks).
+     */
+    static double drawStrength(int ticksUsed) {
+        double p = (double) ticksUsed / 20;
+        return Math.min((p * p + p * 2) / 3, 1);
     }
 
     protected Item getArrow(Inventory inventory) {
