@@ -20,7 +20,7 @@ public class MapInfoRequestPacket extends DataPacket {
      *
      * @since 1.19.20
      */
-    private final List<MapPixel> pixels = new ObjectArrayList<>();
+    public final List<MapPixel> pixels = new ObjectArrayList<>();
 
     @Override
     public byte pid() {
@@ -32,10 +32,11 @@ public class MapInfoRequestPacket extends DataPacket {
         mapId = this.getVarLong();
 
         if (this.protocol >= ProtocolInfo.v1_19_20) {
-            int count = (int) this.getUnsignedVarInt();
+            // since v544: uint32 length + N x (uint32 pixel + uint16 index), all little-endian, no compression
+            int count = this.getLInt();
             for (int i = 0; i < count; i++) {
                 MapPixel pixel = new MapPixel();
-                pixel.pixel = this.getInt();
+                pixel.pixel = this.getLInt();
                 pixel.index = this.getLShort();
                 this.pixels.add(pixel);
             }
@@ -51,10 +52,10 @@ public class MapInfoRequestPacket extends DataPacket {
         /**
          * Colour value of pixel
          */
-        int pixel;
+        public int pixel;
         /**
          * Pixel index in map.
          */
-        int index;
+        public int index;
     }
 }
