@@ -319,7 +319,8 @@ public class Level implements ChunkManager, Metadatable {
      */
     private final Long2ObjectNonBlockingMap<Map<Integer, ChunkLoader>> chunkLoaders = new Long2ObjectNonBlockingMap<>();
 
-    private final Map<Long, Map<Integer, Player>> playerLoaders = new ConcurrentHashMap<>();
+    // Same coordinate mixing and concurrent publication as chunkLoaders, without boxed tree bins.
+    private final Long2ObjectNonBlockingMap<Map<Integer, Player>> playerLoaders = new Long2ObjectNonBlockingMap<>();
 
     private final Map<Long, Deque<DataPacket>> chunkPackets = new ConcurrentHashMap<>();
 
