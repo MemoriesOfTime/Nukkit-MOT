@@ -342,8 +342,35 @@ public class Level implements ChunkManager, Metadatable {
     // Sentinel marking "too many changes, resend the whole chunk"; never populated, so never test it via size()
     private final Int2ObjectOpenHashMap<Object> changeBlocksFullMap = new Int2ObjectOpenHashMap<>();
 
+    /**
+     * Hard ceiling on how many normal block updates one tick is allowed to perform.
+     *
+     * <p>The normal update queue is re-entrant: an update performed while draining it can push
+     * more updates into the very same drain, so a runaway cascade (liquids, falling blocks,
+     * redstone loops, a huge fill) keeps the main thread busy for as long as it produces work -
+     * until the watchdog kills the server and the worlds are saved from whatever state they were
+     * in. The ceiling turns that freeze into a stutter: the remainder simply stays in the queue
+     * and is performed by the next tick, so nothing is lost. Ordinary play never reaches it.
+     */
+    private static final int MAX_NORMAL_UPDATES_PER_TICK =
+            Math.max(1024, Integer.getInteger("nukkit.maxBlockUpdatesPerTick", 200_000));
+
+    /** Block update work slower than this gets a line in the server log. */
+    private static final long SLOW_BLOCK_UPDATE_NANOS =
+            Math.max(1L, Long.getLong("nukkit.slowBlockUpdateMillis", 50L)) * 1_000_000L;
+
+    /** At most one block update report per level per this many milliseconds. */
+    private static final long BLOCK_UPDATE_REPORT_INTERVAL_MS = 10_000L;
+
     private final BlockUpdateScheduler updateQueue;
     private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
+    /** Size of {@link #normalUpdateQueue}: the queue itself only counts in linear time. */
+    private final AtomicInteger normalUpdateQueueSize = new AtomicInteger();
+    private int normalBlockUpdatesLastTick;
+    private int scheduledBlockUpdatesLastTick;
+    private long blockUpdateNanosLastTick;
+    private long blockUpdateFuseTrips;
+    private long lastBlockUpdateReport;
     private final Map<Long, Set<Integer>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
 
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
@@ -1288,10 +1315,14 @@ public class Level implements ChunkManager, Metadatable {
             this.unloadChunks();
         }
 
-        this.updateQueue.tick(this.levelCurrentTick);
+        long blockUpdateStart = System.nanoTime();
+        this.scheduledBlockUpdatesLastTick = this.updateQueue.tick(this.levelCurrentTick);
 
+        int performed = 0;
         QueuedUpdate queuedUpdate;
-        while ((queuedUpdate = this.normalUpdateQueue.poll()) != null) {
+        while (performed < MAX_NORMAL_UPDATES_PER_TICK && (queuedUpdate = this.normalUpdateQueue.poll()) != null) {
+            this.normalUpdateQueueSize.decrementAndGet();
+            performed++;
             Block block = getBlock(queuedUpdate.block, queuedUpdate.block.layer);
             BlockUpdateEvent event = new BlockUpdateEvent(block);
             this.server.getPluginManager().callEvent(event);
@@ -1302,6 +1333,17 @@ public class Level implements ChunkManager, Metadatable {
                     block.onNeighborChange(queuedUpdate.neighbor.getOpposite());
                 }
             }
+        }
+
+        this.normalBlockUpdatesLastTick = performed;
+        this.blockUpdateNanosLastTick = System.nanoTime() - blockUpdateStart;
+
+        boolean fuseTripped = performed >= MAX_NORMAL_UPDATES_PER_TICK && !this.normalUpdateQueue.isEmpty();
+        if (fuseTripped) {
+            this.blockUpdateFuseTrips++;
+        }
+        if (fuseTripped || this.blockUpdateNanosLastTick > SLOW_BLOCK_UPDATE_NANOS) {
+            this.reportBlockUpdateLoad(fuseTripped);
         }
 
         if (!this.updateEntities.isEmpty()) {
@@ -1806,6 +1848,11 @@ public class Level implements ChunkManager, Metadatable {
                     block1.onUpdate(BLOCK_UPDATE_REDSTONE);
                 } else if (block1.isNormalBlock()) {
                     pos = pos.getSideVec(face);
+                    // Same rule as the first ring above: a block behind the solid one may sit in the
+                    // next chunk, and a comparator there is not in memory - do not load it from disk.
+                    if (!this.isChunkLoaded((int) pos.x >> 4, (int) pos.z >> 4)) {
+                        continue;
+                    }
                     block1 = this.getBlock(pos);
 
                     if (BlockRedstoneDiode.isDiode(block1)) {
@@ -1845,8 +1892,13 @@ public class Level implements ChunkManager, Metadatable {
     public void updateAround(Vector3 pos, int layer) {
         Block block = getBlock(pos);
         for (BlockFace face : BlockFace.values()) {
-            normalUpdateQueue.add(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
+            this.queueNormalUpdate(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
         }
+    }
+
+    private void queueNormalUpdate(QueuedUpdate update) {
+        this.normalUpdateQueue.add(update);
+        this.normalUpdateQueueSize.incrementAndGet();
     }
 
     @Deprecated
@@ -1937,6 +1989,67 @@ public class Level implements ChunkManager, Metadatable {
 
     public Set<BlockUpdateEntry> getPendingBlockUpdates(AxisAlignedBB boundingBox) {
         return updateQueue.getPendingBlockUpdates(boundingBox);
+    }
+
+    /**
+     * Normal block updates waiting for the next tick. A backlog that keeps growing means this
+     * level produces block update work faster than the tick can perform it.
+     */
+    public int getNormalBlockUpdateBacklog() {
+        return this.normalUpdateQueueSize.get();
+    }
+
+    /** Scheduled block updates waiting for their tick. */
+    public int getScheduledBlockUpdateBacklog() {
+        return this.updateQueue.getPendingCount();
+    }
+
+    /** Normal block updates performed by the last tick of this level. */
+    public int getNormalBlockUpdatesLastTick() {
+        return this.normalBlockUpdatesLastTick;
+    }
+
+    /** Scheduled block updates performed by the last tick of this level. */
+    public int getScheduledBlockUpdatesLastTick() {
+        return this.scheduledBlockUpdatesLastTick;
+    }
+
+    /** How long the last tick spent on both block update queues, in nanoseconds. */
+    public long getBlockUpdateNanosLastTick() {
+        return this.blockUpdateNanosLastTick;
+    }
+
+    /**
+     * How many times the per-tick ceiling deferred normal block updates to the next tick. Anything
+     * above zero is a cascade worth looking at: ordinary play never reaches the ceiling.
+     */
+    public long getBlockUpdateFuseTrips() {
+        return this.blockUpdateFuseTrips;
+    }
+
+    /** The per-tick ceiling on normal block updates currently in force. */
+    public static int getMaxNormalBlockUpdatesPerTick() {
+        return MAX_NORMAL_UPDATES_PER_TICK;
+    }
+
+    private void reportBlockUpdateLoad(boolean fuseTripped) {
+        long now = System.currentTimeMillis();
+        if (now - this.lastBlockUpdateReport < BLOCK_UPDATE_REPORT_INTERVAL_MS) {
+            return;
+        }
+        this.lastBlockUpdateReport = now;
+
+        String load = "Block updates in level " + this.getFolderName()
+                + ": normal " + this.normalBlockUpdatesLastTick + " done, " + this.normalUpdateQueueSize.get() + " queued"
+                + "; scheduled " + this.scheduledBlockUpdatesLastTick + " done, " + this.updateQueue.getPendingCount() + " queued"
+                + "; took " + (this.blockUpdateNanosLastTick / 1_000_000L) + "ms";
+
+        if (fuseTripped) {
+            this.server.getLogger().warning(load + "; hit the per-tick ceiling of " + MAX_NORMAL_UPDATES_PER_TICK
+                    + ", the rest waits for the next tick (ceiling hit " + this.blockUpdateFuseTrips + " time(s) so far)");
+        } else {
+            this.server.getLogger().info(load);
+        }
     }
 
     /**
@@ -2889,7 +3002,8 @@ public class Level implements ChunkManager, Metadatable {
             item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
         }
 
-        if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)) {
+        if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)
+                && !CreativePlacementDropGuard.suppresses(this, player, target)) {
             if (!isSilkTouch && player != null && drops.length != 0) { // For example no xp from redstone if it's mined with stone pickaxe
                 if (player.isSurvival() || player.isAdventure()) {
                     this.dropExpOrb(vector.add(0.5, 0.5, 0.5), dropExp);
@@ -3172,7 +3286,12 @@ public class Level implements ChunkManager, Metadatable {
             this.scheduleUpdate(block, 1);
         }
 
-        if (!hand.place(item, block, target, face, fx, fy, fz, player)) {
+        boolean placed;
+        try (CreativePlacementDropGuard.Scope ignored =
+                     CreativePlacementDropGuard.enter(this, player, hand)) {
+            placed = hand.place(item, block, target, face, fx, fy, fz, player);
+        }
+        if (!placed) {
             if (liquidMoved) {
                 this.setBlock(block, 0, block, false, false);
                 this.setBlock(block, 1, Block.get(BlockID.AIR), false, false);
@@ -4675,6 +4794,7 @@ public class Level implements ChunkManager, Metadatable {
                     if (chunk.hasChanged()) {
                         levelProvider.setChunk(x, z, chunk);
                         levelProvider.saveChunk(x, z);
+                        this.saveChangedNeighbours(levelProvider, x, z);
                     }
                 }
                 for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
@@ -4689,6 +4809,37 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         return true;
+    }
+
+    /**
+     * Writes the changed neighbours of a chunk that is being saved on unload.
+     *
+     * <p>A machine on a chunk border (a hopper feeding a chest across it, a double chest, a hopper
+     * chain) moves items between two chunks within one tick. Saving only the unloading chunk leaves
+     * its neighbour on disk in the state of the previous save, so a crash before that neighbour is
+     * written duplicates or loses everything moved since: a hopper that had pushed a stack into a
+     * chest across the border came back with the stack still inside AND the chest full. Saving the
+     * changed neighbours in the same pass lands both sides of the border on disk together; a chunk
+     * that did not change is skipped, so the extra work is bounded by what the unload queue would
+     * have written a moment later anyway.
+     */
+    private void saveChangedNeighbours(LevelProvider levelProvider, int x, int z) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                int nx = x + dx;
+                int nz = z + dz;
+                if (!this.isChunkLoaded(nx, nz)) {
+                    continue;
+                }
+                BaseFullChunk neighbour = this.getChunk(nx, nz, false);
+                if (neighbour != null && neighbour.hasChanged()) {
+                    levelProvider.saveChunk(nx, nz);
+                }
+            }
+        }
     }
 
     public boolean isSpawnChunk(int X, int Z) {
@@ -5848,7 +5999,9 @@ public class Level implements ChunkManager, Metadatable {
     private GameVersion getChunkProtocol(GameVersion version) {
         int protocol = version.getProtocol();
         if (version.isNetEase()) {
-            if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+            if (protocol >= GameVersion.V1_21_130_NETEASE.getProtocol()) {
+                return GameVersion.V1_21_130_NETEASE;
+            } else if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
                 return GameVersion.V1_21_124_NETEASE;
             } else if (protocol >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
                 return GameVersion.V1_21_93_NETEASE;
