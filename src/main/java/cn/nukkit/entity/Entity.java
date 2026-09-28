@@ -1093,6 +1093,18 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (oldEffect != null && (oldEffect.getAmplifier() > effect.getAmplifier()
             || (oldEffect.getAmplifier() == effect.getAmplifier() && oldEffect.getDuration() >= effect.getDuration()))) {
+            // A weaker/shorter absorption effect must not replace the stronger icon or its
+            // duration, but consuming the item still replenishes the amount granted by that
+            // item. Without this, a normal golden apple eaten while enchanted-apple
+            // Absorption IV is still visible gives zero yellow hearts after the old pool was
+            // depleted: addEffect returns before Effect.add can refill anything.
+            if (effect.getId() == Effect.ABSORPTION
+                    && cause == EntityPotionEffectEvent.Cause.FOOD) {
+                float grantedAbsorption = (effect.getAmplifier() + 1) << 2;
+                if (grantedAbsorption > this.getAbsorption()) {
+                    this.setAbsorption(grantedAbsorption);
+                }
+            }
             return;
         }
 
@@ -2862,7 +2874,19 @@ public abstract class Entity extends Location implements Metadatable {
 
         AxisAlignedBB newBB = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
 
-        if (server.getAllowFlight() || !this.level.hasCollision(this, newBB, false)) {
+        // The float eye-position round trip can place a player's head a few
+        // millionths of a block inside a ceiling. Rejecting all three axes for
+        // that contact turns batched sprint-jumps into horizontal speed setbacks.
+        // Retry only a colliding player's ceiling with a bounded tolerance. Keep
+        // the feet unchanged: raising minY can skip a fence's lower block cell
+        // even though its collision shape extends half a block above that cell.
+        boolean canMove = server.getAllowFlight() || !this.level.hasCollision(this, newBB, false);
+        if (!canMove && this instanceof Player) {
+            AxisAlignedBB ceilingContact = newBB.clone();
+            ceilingContact.setMaxY(ceilingContact.getMaxY() - 1.0E-4);
+            canMove = !this.level.hasCollision(this, ceilingContact, false);
+        }
+        if (canMove) {
             this.boundingBox = newBB;
         }
 
