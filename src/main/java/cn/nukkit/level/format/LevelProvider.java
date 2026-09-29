@@ -54,6 +54,15 @@ public interface LevelProvider {
     }
 
     /**
+     * Register a read whose freshness can be checked without IO at publication time.
+     * Providers without this contract return null; callers must not fall back to sync IO.
+     */
+    @Nullable
+    default ChunkReadTicket openChunkRead(int chunkX, int chunkZ) {
+        return null;
+    }
+
+    /**
      * 在非主线程读取并解码区块;返回 null 表示磁盘不存在;必须支持并发调用
      * <p>
      * Read and decode a chunk off the main thread; null means absent on disk; must be safe for concurrent calls
