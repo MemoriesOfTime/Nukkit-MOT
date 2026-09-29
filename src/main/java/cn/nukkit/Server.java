@@ -551,6 +551,8 @@ public class Server {
      * 异步区块发送、加载与保存(实验性)
      */
     public boolean asyncChunkSending;
+    /** Bounded cold-load diagnostics; only cache misses collect a stack. */
+    public boolean coldChunkLoadCounters = true;
     /**
      * 每世界挂起区块写上限,超限暂停卸载(背压)
      * <p>
@@ -4019,6 +4021,7 @@ public class Server {
         this.lightUpdates = config.chunkSettings().lightUpdates();
         this.cacheChunks = config.chunkSettings().cacheChunks();
         this.asyncChunkSending = config.chunkSettings().asyncChunks();
+        this.coldChunkLoadCounters = config.chunkSettings().coldChunkLoadCounters();
         this.maxPendingChunkWrites = Math.max(1, config.chunkSettings().maxPendingChunkWrites());
 
         // Entity
