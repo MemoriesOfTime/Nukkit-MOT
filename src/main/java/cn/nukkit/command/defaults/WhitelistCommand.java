@@ -94,12 +94,21 @@ public class WhitelistCommand extends VanillaCommand {
                 }
                 switch (action.toLowerCase(Locale.ROOT)) {
                     case "add" -> {
-                        sender.getServer().getOfflinePlayer(name).setWhitelisted(true);
+                        if (sender.getServer().asyncProfileIo) {
+                            // Whitelist membership is name-based; no profile or UUID is needed.
+                            sender.getServer().addWhitelist(name);
+                        } else {
+                            sender.getServer().getOfflinePlayer(name).setWhitelisted(true);
+                        }
                         log.addSuccess("commands.allowlist.add.success", name).output(true);
                         return 1;
                     }
                     case "remove" -> {
-                        sender.getServer().getOfflinePlayer(name).setWhitelisted(false);
+                        if (sender.getServer().asyncProfileIo) {
+                            sender.getServer().removeWhitelist(name);
+                        } else {
+                            sender.getServer().getOfflinePlayer(name).setWhitelisted(false);
+                        }
                         log.addSuccess("commands.allowlist.remove.success", name).output(true);
                         return 1;
                     }
