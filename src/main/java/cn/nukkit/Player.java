@@ -30,6 +30,7 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageModifier;
 import cn.nukkit.event.inventory.InventoryCloseEvent;
 import cn.nukkit.event.inventory.InventoryPickupArrowEvent;
+import cn.nukkit.event.inventory.InventoryPickupExperienceEvent;
 import cn.nukkit.event.inventory.InventoryPickupItemEvent;
 import cn.nukkit.event.inventory.InventoryPickupTridentEvent;
 import cn.nukkit.event.player.*;
@@ -417,6 +418,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int noShieldTicks;
 
     public int pickedXPOrb = 0;
+    private boolean experiencePickupInProgress;
     private boolean canPickupXP = true;
 
     protected int formWindowCount = 0;
@@ -8737,6 +8739,26 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (pickedXPOrb < server.getTick() && entity instanceof EntityXPOrb xpOrb && this.boundingBox.isVectorInside(entity)) {
             if (xpOrb.getPickupDelay() <= 0) {
+                if (this.server.experiencePickupEvent) {
+                    if (experiencePickupInProgress) return false;
+                    InventoryPickupExperienceEvent pickup = new InventoryPickupExperienceEvent(this.inventory, xpOrb);
+                    experiencePickupInProgress = true;
+                    try {
+                        this.server.getPluginManager().callEvent(pickup);
+                    } finally {
+                        experiencePickupInProgress = false;
+                    }
+                    // Plugins can close/move the orb or player, or attempt another pickup.
+                    // Recheck at the consumption boundary; never grant XP/Mending twice.
+                    if (pickup.isCancelled() || entity.isClosed() || !this.spawned
+                            || !this.isAlive() || !this.isOnline() || this.isSpectator()
+                            || pickedXPOrb >= server.getTick() || xpOrb.getPickupDelay() > 0
+                            || xpOrb.getLevel() != this.getLevel()
+                            || !this.boundingBox.isVectorInside(entity)
+                            || (entity.namedTag != null && entity.namedTag.getByte("km_combat_drop_locked") != 0)) {
+                        return false;
+                    }
+                }
                 int exp = xpOrb.getExp();
                 entity.close();
                 this.getLevel().addSound(new ExperienceOrbSound(this));
