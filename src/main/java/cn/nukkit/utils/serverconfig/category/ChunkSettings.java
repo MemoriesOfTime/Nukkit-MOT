@@ -56,6 +56,11 @@ public class ChunkSettings extends OkaeriConfig {
     @CustomKey("cold-chunk-load-counters")
     private boolean coldChunkLoadCounters = true;
 
+    @Comment("Defer the whole scheduled liquid update when its flow-search footprint crosses an unloaded chunk")
+    @Comment("Disable to restore synchronous boundary loading. Fully loaded liquid updates are unchanged.")
+    @CustomKey("liquid-loaded-boundary")
+    private boolean liquidLoadedBoundary = true;
+
     @Comment("Max pending chunk writes per world before unloading pauses (backpressure)")
     @CustomKey("max-pending-chunk-writes")
     private int maxPendingChunkWrites = 128;
