@@ -30,33 +30,45 @@ public class BlockUpdateScheduler {
         this.level = level;
     }
 
-    public void tick(long currentTick) {
+    /**
+     * @return how many scheduled updates were performed, so the level can report its load
+     */
+    public int tick(long currentTick) {
+        int performed = 0;
         // Should only perform once, unless ticks were skipped
         if (currentTick - lastTick < Short.MAX_VALUE) {// Arbitrary
             for (long tick = lastTick + 1; tick <= currentTick; tick++) {
-                perform(tick);
+                performed += perform(tick);
             }
         } else {
             LongArrayList times = new LongArrayList(queuedUpdates.keySet());
             Collections.sort(times);
             for (long tick : times) {
                 if (tick <= currentTick) {
-                    perform(tick);
+                    performed += perform(tick);
                 } else {
                     break;
                 }
             }
         }
         lastTick = currentTick;
+        return performed;
     }
 
-    private void perform(long tick) {
+    /** Scheduled updates still waiting for their tick. */
+    public int getPendingCount() {
+        return globalIndex.size();
+    }
+
+    private int perform(long tick) {
+        int performed = 0;
         try {
             lastTick = tick;
             Set<BlockUpdateEntry> updates = pendingUpdates = queuedUpdates.remove(tick);
             if (updates != null) {
                 globalIndex.removeAll(updates);
                 for (BlockUpdateEntry entry : updates) {
+                    performed++;
                     if (level.isAreaLoaded(new SimpleAxisAlignedBB(entry.pos, entry.pos))) {
                         Block block = level.getBlock(entry.pos, entry.block.layer);
 
@@ -71,6 +83,7 @@ public class BlockUpdateScheduler {
         } finally {
             pendingUpdates = null;
         }
+        return performed;
     }
 
     public Set<BlockUpdateEntry> getPendingBlockUpdates(AxisAlignedBB boundingBox) {

@@ -21,11 +21,21 @@
                 </Delete>
             </DefaultRolloverStrategy>
         </RollingRandomAccessFile>
+        <!-- The thread that logs never writes to the disk or the terminal itself. A plain
+             write() into logs/server.log can block for seconds while a spinning disk is busy
+             (1.5 s on the main thread, 2026-09-24), and every such second is a lost second of
+             ticks. One queue serves both targets, so console and file keep the same order.
+             blocking="true" keeps every line: only a completely full queue makes the caller
+             wait, which is exactly what the direct appenders did on every line. The timeout
+             bounds the final flush, so a dead disk cannot hang the stop forever. -->
+        <Async name="Async" bufferSize="8192" blocking="true" shutdownTimeout="10000">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="File"/>
+        </Async>
     </Appenders>
     <Loggers>
         <Root level="INFO">
-            <AppenderRef ref="Console"/>
-            <AppenderRef ref="File"/>
+            <AppenderRef ref="Async"/>
         </Root>
     </Loggers>
 </Configuration>
