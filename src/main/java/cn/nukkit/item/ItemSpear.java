@@ -78,6 +78,38 @@ public abstract class ItemSpear extends StringItemToolBase {
         return true;
     }
 
+    /**
+     * Jab through the attack button ({@code USE_ITEM_ACTION_USE_AS_ATTACK}, 1.21.110+ clients).
+     * A jab that hits wears the spear down like any melee weapon hit; a miss costs nothing.
+     *
+     * @return whether the jab hit a target
+     */
+    public boolean onJab(Player player) {
+        if (this.getDamage() >= this.getMaxDurability()) {
+            return false;
+        }
+        if (!this.stab(player)) {
+            return false;
+        }
+        this.damageSpear(player);
+        return true;
+    }
+
+    /**
+     * Swing cool down of the jab in ticks, from the vanilla {@code minecraft:cooldown} of each
+     * spear (0.65 s wooden … 1.15 s netherite, Mojang/bedrock-samples).
+     */
+    public int getJabCooldownTicks() {
+        return switch (this.getTier()) {
+            case TIER_WOODEN -> 13;
+            case TIER_STONE -> 15;
+            case TIER_COPPER -> 17;
+            case TIER_DIAMOND -> 21;
+            case TIER_NETHERITE -> 23;
+            default -> 19;
+        };
+    }
+
     @Override
     public boolean useOn(Entity entity) {
         if (this.isUnbreakable() || this.noDamageOnAttack() || this.isDurabilitySavedByUnbreaking()) {
@@ -88,7 +120,7 @@ public abstract class ItemSpear extends StringItemToolBase {
         return true;
     }
 
-    private boolean stab(Player player) {
+    boolean stab(Player player) {
         EntityLiving target = this.findStabTarget(player);
         if (target == null) {
             return false;
@@ -228,7 +260,7 @@ public abstract class ItemSpear extends StringItemToolBase {
         }
     }
 
-    private void damageSpear(Player player) {
+    void damageSpear(Player player) {
         if (player.isCreative()) {
             return;
         }
