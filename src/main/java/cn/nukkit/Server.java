@@ -551,6 +551,8 @@ public class Server {
      * 异步区块发送、加载与保存(实验性)
      */
     public boolean asyncChunkSending;
+    /** Pause block entity updates outside the existing chunk ticking range. */
+    public boolean blockEntityTickingRange = true;
     /**
      * 每世界挂起区块写上限,超限暂停卸载(背压)
      * <p>
@@ -4019,6 +4021,7 @@ public class Server {
         this.lightUpdates = config.chunkSettings().lightUpdates();
         this.cacheChunks = config.chunkSettings().cacheChunks();
         this.asyncChunkSending = config.chunkSettings().asyncChunks();
+        this.blockEntityTickingRange = config.chunkSettings().blockEntityTickingRange();
         this.maxPendingChunkWrites = Math.max(1, config.chunkSettings().maxPendingChunkWrites());
 
         // Entity

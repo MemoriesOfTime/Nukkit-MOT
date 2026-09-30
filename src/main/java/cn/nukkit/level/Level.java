@@ -413,6 +413,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private final int chunkTickRadius;
     private final Long2IntMap chunkTickList = new Long2IntOpenHashMap();
+    private final LongSet blockEntityTickingChunks = new LongOpenHashSet();
     private final int chunksPerTicks;
     private final boolean clearChunksOnTick;
 
@@ -1362,17 +1363,7 @@ public class Level implements ChunkManager, Metadatable {
 
         this.reportEntityActivation();
 
-        var updateBlockEntities = this.updateBlockEntities.iterator();
-        while (updateBlockEntities.hasNext()) {
-            BlockEntity be = updateBlockEntities.next();
-            if (!be.isValid()) {
-                be.scheduledForBlockEntityUpdate.set(false);
-                updateBlockEntities.remove();
-            } else if (!be.onUpdate()) {
-                be.scheduledForBlockEntityUpdate.set(false);
-                updateBlockEntities.remove();
-            }
-        }
+        this.tickBlockEntities();
 
         this.tickChunks();
 
@@ -1733,15 +1724,61 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    void tickBlockEntities() {
+        this.blockEntityTickingChunks.clear();
+        if (this.updateBlockEntities.isEmpty()) {
+            return;
+        }
+
+        boolean limitToTickingChunks = this.server.blockEntityTickingRange;
+        if (limitToTickingChunks && this.chunksPerTicks > 0 && !this.loaders.isEmpty()) {
+            int range = this.getChunkTickRange(this.getChunksPerLoader());
+            for (ChunkLoader loader : this.loaders.values()) {
+                // Match tickChunks exactly, including its existing coordinate conversion and
+                // half-open random offset range. Do not use its sparse, transient chunkTickList.
+                int chunkX = (int) loader.getX() >> 4;
+                int chunkZ = (int) loader.getZ() >> 4;
+                for (int dx = -range; dx < range; ++dx) {
+                    for (int dz = -range; dz < range; ++dz) {
+                        this.blockEntityTickingChunks.add(chunkHash(chunkX + dx, chunkZ + dz));
+                    }
+                }
+            }
+        }
+
+        var updateBlockEntities = this.updateBlockEntities.iterator();
+        while (updateBlockEntities.hasNext()) {
+            BlockEntity be = updateBlockEntities.next();
+            if (be.closed || !be.isValid()) {
+                be.scheduledForBlockEntityUpdate.set(false);
+                updateBlockEntities.remove();
+            } else if (limitToTickingChunks && !be.alwaysTick()
+                    && !this.blockEntityTickingChunks.contains(chunkHash(be.getChunkX(), be.getChunkZ()))) {
+                // Keep both the queue entry and the scheduled flag for resumption.
+                continue;
+            } else if (!be.onUpdate()) {
+                be.scheduledForBlockEntityUpdate.set(false);
+                updateBlockEntities.remove();
+            }
+        }
+    }
+
+    private int getChunksPerLoader() {
+        return Math.min(200, Math.max(1, (int) ((double) (this.chunksPerTicks - this.loaders.size()) / this.loaders.size() + 0.5)));
+    }
+
+    private int getChunkTickRange(int chunksPerLoader) {
+        return Math.min(3 + chunksPerLoader / 30, this.chunkTickRadius);
+    }
+
     private void tickChunks() {
         if (this.chunksPerTicks <= 0 || this.loaders.isEmpty()) {
             this.chunkTickList.clear();
             return;
         }
 
-        int chunksPerLoader = Math.min(200, Math.max(1, (int) ((double) (this.chunksPerTicks - this.loaders.size()) / this.loaders.size() + 0.5)));
-        int randRange = 3 + chunksPerLoader / 30;
-        randRange = Math.min(randRange, this.chunkTickRadius);
+        int chunksPerLoader = this.getChunksPerLoader();
+        int randRange = this.getChunkTickRange(chunksPerLoader);
 
         for (ChunkLoader loader : this.loaders.values()) {
             int chunkX = (int) loader.getX() >> 4;
