@@ -23,12 +23,17 @@ import cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public class PlayerInventory extends BaseInventory {
+
+    private boolean exchangingHeldItem;
 
     protected int itemInHandIndex = 0;
 
@@ -137,6 +142,107 @@ public class PlayerInventory extends BaseInventory {
 
     public boolean setItemInHand(Item item) {
         return this.setItem(this.itemInHandIndex, item);
+    }
+
+    /**
+     * Exchanges one held input for a single output, or only consumes the input when result is null.
+     * Preflights every cancellable slot change before committing any of them. No room, a stale
+     * snapshot or a listener veto leaves the exchange unapplied; callers must not consume again.
+     */
+    public boolean exchangeItemInHand(Item expected, Item result, boolean consume, BooleanSupplier stillValid) {
+        if (this.exchangingHeldItem || !(this.getHolder() instanceof Player player)
+                || player.closed || !player.isConnected() || player.getInventory() != this
+                || stillValid == null || expected == null || expected.isNull() || expected.getCount() < 1
+                || (result != null && (result.isNull() || result.getCount() != 1
+                || !result.isSupportedOn(player.getGameVersion())))) {
+            return false;
+        }
+        int heldSlot = this.getHeldItemIndex();
+        Item held = this.getItem(heldSlot).clone();
+        if (!held.equalsExact(expected)) {
+            return false;
+        }
+        int gameMode = player.getGamemode();
+        var level = player.getLevel();
+        var version = player.getGameVersion();
+        Map<Integer, Item> before = new LinkedHashMap<>();
+        Map<Integer, Item> after = new LinkedHashMap<>();
+        int outputSlot = -1;
+        if (consume) {
+            before.put(heldSlot, held);
+            after.put(heldSlot, held.decrement(1));
+        }
+        if (result != null) {
+            if (consume && held.getCount() == 1) {
+                outputSlot = heldSlot;
+            } else {
+                // BaseInventory.firstEmpty includes PlayerInventory's armor slots.
+                for (int slot = 0; slot < this.getSize(); ++slot) {
+                    if (this.getItem(slot).isNull()) {
+                        outputSlot = slot;
+                        break;
+                    }
+                }
+            }
+            if (outputSlot < 0) {
+                return false;
+            }
+            before.putIfAbsent(outputSlot, this.getItem(outputSlot).clone());
+            after.put(outputSlot, result.clone());
+        }
+        this.exchangingHeldItem = true;
+        try {
+            if (!stillValid.getAsBoolean()) {
+                return false;
+            }
+            for (Map.Entry<Integer, Item> entry : after.entrySet()) {
+                int slot = entry.getKey();
+                Item proposed = entry.getValue();
+                EntityInventoryChangeEvent event = new EntityInventoryChangeEvent(
+                        this.getHolder(), before.get(slot).clone(), proposed.clone(), slot);
+                Server.getInstance().getPluginManager().callEvent(event);
+                Item approved = event.getNewItem();
+                // A listener may decorate the output, but may not change the input debit or
+                // turn this single-item exchange into an unrelated item/count conversion.
+                boolean output = slot == outputSlot;
+                if (event.isCancelled() || approved == null
+                        || (output ? !approved.equals(proposed, true, false)
+                        || approved.getCount() != proposed.getCount() : !approved.equalsExact(proposed))) {
+                    return false;
+                }
+                entry.setValue(approved.clone());
+            }
+            if (!stillValid.getAsBoolean() || player.closed || !player.isConnected()
+                    || player.getInventory() != this || this.getHeldItemIndex() != heldSlot
+                    || player.getGamemode() != gameMode || player.getLevel() != level
+                    || !player.getGameVersion().equals(version)
+                    || !this.getItem(heldSlot).equalsExact(held)) {
+                return false;
+            }
+            for (Map.Entry<Integer, Item> entry : before.entrySet()) {
+                if (!this.getItem(entry.getKey()).equalsExact(entry.getValue())) {
+                    return false;
+                }
+            }
+            // Commit every slot before sending updates: callbacks cannot observe half an exchange.
+            for (Map.Entry<Integer, Item> entry : after.entrySet()) {
+                Item value = entry.getValue();
+                if (value.isNull()) {
+                    this.slots.remove(entry.getKey());
+                } else {
+                    if (value.getStackNetId() == 0) {
+                        value.autoAssignStackNetworkId();
+                    }
+                    this.slots.put(entry.getKey(), value);
+                }
+            }
+            for (Map.Entry<Integer, Item> entry : before.entrySet()) {
+                this.onSlotChange(entry.getKey(), entry.getValue(), true);
+            }
+            return true;
+        } finally {
+            this.exchangingHeldItem = false;
+        }
     }
 
     public int getHeldItemSlot() {
