@@ -31,6 +31,13 @@ public abstract class ItemSpear extends StringItemToolBase {
     private static final double MINIMUM_TARGET_DOT = 0.82;
     private static final int MINIMUM_LUNGE_FOOD = 6;
     private static final int BASE_LUNGE_EXHAUSTION = 4;
+    /**
+     * Vanilla {@code kinetic_weapon.damage_conditions.min_relative_speed}, the same for every
+     * spear: how fast, in blocks per second, the spear has to close in on its target to hurt it.
+     */
+    private static final double CHARGE_MIN_RELATIVE_SPEED = 4.6;
+    /** Ticks of network jitter allowed on both edges of the charge window. */
+    private static final int CHARGE_JITTER_TICKS = 3;
 
     protected ItemSpear(String namespaceId, String name) {
         super(namespaceId, name);
@@ -66,7 +73,11 @@ public abstract class ItemSpear extends StringItemToolBase {
             return true;
         }
 
-        boolean hit = this.stab(player);
+        // Vanilla minecraft:kinetic_weapon: the charge strikes only after the spear's warm-up
+        // (delay), until its damage window runs out, and only a target the spear closes in on
+        // fast enough. A charge that hits nothing costs no durability, like a jab or a sword swing.
+        boolean hit = isChargeInWindow(ticksUsed, this.getChargeDelayTicks(), this.getChargeDamageTicks())
+                && this.chargeStab(player);
         this.applyLunge(player);
 
         int sound = hit ? this.getHitSound() : this.getMissSound();
@@ -74,7 +85,9 @@ public abstract class ItemSpear extends StringItemToolBase {
             player.getLevel().addLevelSoundEvent(player, sound);
         }
 
-        this.damageSpear(player);
+        if (hit) {
+            this.damageSpear(player);
+        }
         return true;
     }
 
@@ -110,6 +123,54 @@ public abstract class ItemSpear extends StringItemToolBase {
         };
     }
 
+    /**
+     * Warm-up of the charge in ticks: vanilla {@code kinetic_weapon.delay} of each spear
+     * (15 wooden … 8 netherite, Mojang/bedrock-samples).
+     */
+    public int getChargeDelayTicks() {
+        return switch (this.getTier()) {
+            case TIER_WOODEN -> 15;
+            case TIER_STONE, TIER_GOLD -> 14;
+            case TIER_COPPER -> 13;
+            case TIER_DIAMOND -> 10;
+            case TIER_NETHERITE -> 8;
+            default -> 12;
+        };
+    }
+
+    /**
+     * How long after the warm-up the charge still hurts, in ticks: vanilla
+     * {@code kinetic_weapon.damage_conditions.max_duration} (300 wooden … 175 netherite).
+     */
+    public int getChargeDamageTicks() {
+        return switch (this.getTier()) {
+            case TIER_WOODEN -> 300;
+            case TIER_STONE, TIER_GOLD -> 275;
+            case TIER_COPPER -> 250;
+            case TIER_DIAMOND -> 200;
+            case TIER_NETHERITE -> 175;
+            default -> 225;
+        };
+    }
+
+    static boolean isChargeInWindow(int ticksUsed, int delayTicks, int damageTicks) {
+        return ticksUsed >= delayTicks - CHARGE_JITTER_TICKS
+                && ticksUsed <= delayTicks + damageTicks + CHARGE_JITTER_TICKS;
+    }
+
+    /**
+     * Closing speed in blocks per second along the attacker's look: the attacker's own speed
+     * towards where he looks minus the target's speed in the same direction (vanilla
+     * {@code min_relative_speed} compares this value).
+     */
+    static double relativeChargeSpeed(Vector3 attackerVelocity, Vector3 targetVelocity, Vector3 look) {
+        return (attackerVelocity.dot(look) - targetVelocity.dot(look)) * 20.0;
+    }
+
+    static boolean isChargeFastEnough(double relativeSpeed) {
+        return relativeSpeed >= CHARGE_MIN_RELATIVE_SPEED;
+    }
+
     @Override
     public boolean useOn(Entity entity) {
         if (this.isUnbreakable() || this.noDamageOnAttack() || this.isDurabilitySavedByUnbreaking()) {
@@ -122,10 +183,27 @@ public abstract class ItemSpear extends StringItemToolBase {
 
     boolean stab(Player player) {
         EntityLiving target = this.findStabTarget(player);
+        return target != null && this.strike(player, target);
+    }
+
+    /**
+     * The charge strike: the same target search and damage event as the jab, but only against a
+     * target the spear closes in on at least {@value #CHARGE_MIN_RELATIVE_SPEED} blocks per second.
+     */
+    boolean chargeStab(Player player) {
+        EntityLiving target = this.findStabTarget(player);
         if (target == null) {
             return false;
         }
+        Vector3 targetVelocity = target instanceof Player targetPlayer
+                ? targetPlayer.getRecentVelocity()
+                : new Vector3(target.motionX, target.motionY, target.motionZ);
+        double closing = relativeChargeSpeed(player.getRecentVelocity(), targetVelocity,
+                player.getDirectionVector().normalize());
+        return isChargeFastEnough(closing) && this.strike(player, target);
+    }
 
+    private boolean strike(Player player, EntityLiving target) {
         float damage = this.getJabDamage(player, target);
         Map<EntityDamageEvent.DamageModifier, Float> modifiers = new EnumMap<>(EntityDamageEvent.DamageModifier.class);
         modifiers.put(EntityDamageEvent.DamageModifier.BASE, damage);

@@ -246,6 +246,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int closingWindowId = Integer.MIN_VALUE;
 
     public Vector3 speed = null;
+    /**
+     * Server tick at which {@link #speed} last took a real movement, and how many ticks that
+     * movement spanned. {@code speed} is only refreshed when a new position arrives, so without the
+     * tick a player who stopped would keep the speed of his last step.
+     */
+    private int speedSampleTick = -1;
+    private int speedSampleTicks = 1;
 
     public final HashSet<String> achievements = new HashSet<>();
 
@@ -2754,6 +2761,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             } else {
                 this.speed.setComponents(from.x - to.x, from.y - to.y, from.z - to.z);
             }
+            this.speedSampleTick = this.server.getTick();
+            this.speedSampleTicks = Math.max(1, tickDiff);
 
             if (this.riding == null && this.inventory != null) {
                 if (this.isFoodEnabled() && distanceSquared >= 0.05 && this.getServer().getDifficulty() > 0) {
@@ -4373,8 +4382,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
+                        // A spear charge (minecraft:kinetic_weapon) is meant to be run with: it only
+                        // strikes above a closing speed, and the spear does not slow the player down.
                         if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
-                                this.isJavaClient(), authHoldToUse, authStartUsingItem)) {
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem)
+                                && !(this.inventory != null && this.inventory.getItemInHandFast().isSpear())) {
                             this.setUsingItem(false);
                         }
                     }
@@ -6760,6 +6772,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private static final int SPEAR_JAB_JITTER_TICKS = 3;
+
+    /**
+     * Velocity of this player in blocks per tick from the last accepted movement, or zero when no
+     * movement came in the last {@value #RECENT_VELOCITY_TICKS} ticks (the player stands still).
+     */
+    public Vector3 getRecentVelocity() {
+        return recentVelocity(this.speed, this.speedSampleTick, this.speedSampleTicks, this.server.getTick());
+    }
+
+    static Vector3 recentVelocity(Vector3 speed, int sampleTick, int sampleTicks, int nowTick) {
+        if (speed == null || sampleTick < 0 || nowTick - sampleTick > RECENT_VELOCITY_TICKS) {
+            return new Vector3(0, 0, 0);
+        }
+        double ticks = Math.max(1, sampleTicks);
+        // speed holds from - to: the step backwards.
+        return new Vector3(-speed.x / ticks, -speed.y / ticks, -speed.z / ticks);
+    }
+
+    private static final int RECENT_VELOCITY_TICKS = 2;
 
     /**
      * 判断指定itemCategory的冷却是否已经结束
