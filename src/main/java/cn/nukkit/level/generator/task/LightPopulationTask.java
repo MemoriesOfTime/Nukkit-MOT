@@ -139,6 +139,7 @@ public class LightPopulationTask extends AsyncTask {
             return;
         }
         original.applyLightingFrom(chunk);
+        level.resumeBlockLightAtChunkBoundary(original);
         for (ChunkLoader loader : level.getChunkLoaders(original.getX(), original.getZ())) {
             loader.onChunkChanged(original);
         }

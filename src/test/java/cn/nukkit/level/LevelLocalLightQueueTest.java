@@ -15,25 +15,31 @@ class LevelLocalLightQueueTest {
     void removingOneSourcePreservesTheOtherAndRemovingBothClearsTheLight() {
         Block.init();
         Level level = mock(Level.class);
-        BaseFullChunk chunk = mock(BaseFullChunk.class);
         Map<Long, Integer> light = new HashMap<>();
         Set<Long> sources = new HashSet<>();
         int y = 64;
+        when(level.isYInRange(anyInt())).thenCallRealMethod();
+        when(level.getMinBlockY()).thenReturn(-64);
+        when(level.getMaxBlockY()).thenReturn(319);
         when(level.getDimensionData()).thenReturn(DimensionEnum.OVERWORLD.getDimensionData());
-        when(level.getChunk(anyInt(), anyInt(), eq(false))).thenReturn(chunk);
-        when(level.getBlockIdAt(anyInt(), anyInt(), anyInt())).thenAnswer(inv ->
-            sources.contains(Hash.hashBlock(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2))) ? BlockID.GLOWSTONE : BlockID.AIR);
-        when(level.getBlockLightAt(anyInt(), anyInt(), anyInt())).thenAnswer(inv ->
-            light.getOrDefault(Hash.hashBlock(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2)), 0));
-        doAnswer(inv -> { long key = Hash.hashBlock(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2));
-            int value = inv.getArgument(3); if (value == 0) light.remove(key); else light.put(key, value); return null;
-        }).when(level).setBlockLightAt(anyInt(), anyInt(), anyInt(), anyInt());
-        when(chunk.getBlockLight(anyInt(), anyInt(), anyInt())).thenAnswer(inv ->
-            light.getOrDefault(Hash.hashBlock(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2)), 0));
-        when(chunk.getBlockId(anyInt(), anyInt(), anyInt())).thenAnswer(inv ->
-            sources.contains(Hash.hashBlock(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2))) ? BlockID.GLOWSTONE : BlockID.AIR);
-        doAnswer(inv -> { level.setBlockLightAt(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2), inv.getArgument(3)); return null;
-        }).when(chunk).setBlockLight(anyInt(), anyInt(), anyInt(), anyInt());
+        Map<Long, BaseFullChunk> chunks = new HashMap<>();
+        for (int cx = -1; cx <= 1; cx++) for (int cz = -1; cz <= 1; cz++) {
+            int baseX = cx << 4, baseZ = cz << 4;
+            BaseFullChunk chunk = mock(BaseFullChunk.class);
+            chunks.put(Level.chunkHash(cx, cz), chunk);
+            when(chunk.getBlockLight(anyInt(), anyInt(), anyInt())).thenAnswer(inv ->
+                light.getOrDefault(Hash.hashBlock(baseX + (int) inv.getArgument(0), inv.getArgument(1), baseZ + (int) inv.getArgument(2)), 0));
+            when(chunk.getBlockId(anyInt(), anyInt(), anyInt())).thenAnswer(inv ->
+                sources.contains(Hash.hashBlock(baseX + (int) inv.getArgument(0), inv.getArgument(1), baseZ + (int) inv.getArgument(2))) ? BlockID.GLOWSTONE : BlockID.AIR);
+            doAnswer(inv -> {
+                long key = Hash.hashBlock(baseX + (int) inv.getArgument(0), inv.getArgument(1), baseZ + (int) inv.getArgument(2));
+                int value = inv.getArgument(3);
+                if (value == 0) light.remove(key); else light.put(key, value);
+                return null;
+            }).when(chunk).setBlockLight(anyInt(), anyInt(), anyInt(), anyInt());
+        }
+        when(level.getChunkIfLoaded(anyInt(), anyInt())).thenAnswer(inv ->
+            chunks.get(Level.chunkHash(inv.getArgument(0), inv.getArgument(1))));
         doCallRealMethod().when(level).updateBlockLight(anyMap());
         sources.add(Hash.hashBlock(7, y, 7)); sources.add(Hash.hashBlock(9, y, 7));
         update(level, 7, y, 7); update(level, 9, y, 7);

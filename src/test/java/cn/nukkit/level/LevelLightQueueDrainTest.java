@@ -12,17 +12,17 @@ import static org.mockito.Mockito.*;
 
 class LevelLightQueueDrainTest {
     @Test
-    void failedChunkReadLeavesLaterBucketsQueued() {
+    void failedLoadedChunkAccessLeavesAllBucketsQueued() {
         Level level = mock(Level.class);
         Map<Long, Set<Integer>> queue = new LinkedHashMap<>();
         DimensionData dimension = DimensionEnum.OVERWORLD.getDimensionData();
         queue.put(Level.chunkHash(0, 0), new HashSet<>(Set.of(Level.localBlockHash(1, 64, 1, dimension))));
         queue.put(Level.chunkHash(1, 0), new HashSet<>(Set.of(Level.localBlockHash(17, 64, 1, dimension))));
         when(level.getDimensionData()).thenReturn(dimension);
-        when(level.getChunk(0, 0, false)).thenThrow(new IllegalStateException("chunk read failed"));
+        when(level.getChunkIfLoaded(0, 0)).thenThrow(new IllegalStateException("chunk read failed"));
         doCallRealMethod().when(level).updateBlockLight(anyMap());
         assertThrows(IllegalStateException.class, () -> level.updateBlockLight(queue));
-        assertFalse(queue.containsKey(Level.chunkHash(0, 0)));
+        assertTrue(queue.containsKey(Level.chunkHash(0, 0)));
         assertTrue(queue.containsKey(Level.chunkHash(1, 0)), "later chunks must survive a failed bucket");
     }
 

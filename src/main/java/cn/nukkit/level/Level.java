@@ -374,6 +374,7 @@ public class Level implements ChunkManager, Metadatable {
     private long blockUpdateFuseTrips;
     private long lastBlockUpdateReport;
     private final Map<Long, Set<Integer>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
+    private BlockLightBoundary blockLightBoundary;
 
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
@@ -1422,6 +1423,7 @@ public class Level implements ChunkManager, Metadatable {
     @SuppressWarnings("unchecked")
     public void doTick(int currentTick) {
         updateBlockLight(lightQueue);
+        if (this.blockLightBoundary != null) this.blockLightBoundary.tick();
         this.checkTime();
 
         if (/*stopTime || !this.gameRules.getBoolean(GameRule.DO_DAYLIGHT_CYCLE) ||*/ currentTick % 6000 == 0) { // Keep the time in sync
@@ -2633,6 +2635,12 @@ public class Level implements ChunkManager, Metadatable {
         LongOpenHashSet removalVisited = new LongOpenHashSet();
 
         for (long index : pendingChunks) {
+            // generate=false still reads disk. Cold roots retain their bucket until mount.
+            BaseFullChunk chunk = getChunkIfLoaded(getHashX(index), getHashZ(index));
+            if (!BlockLightBoundary.healthy(chunk)) {
+                this.lightBoundary().request(index);
+                continue;
+            }
             Set<Integer> blocks;
             synchronized (map) {
                 blocks = map.remove(index);
@@ -2640,7 +2648,6 @@ public class Level implements ChunkManager, Metadatable {
             if (blocks == null) {
                 continue;
             }
-            BaseFullChunk chunk = getChunk(getHashX(index), getHashZ(index), false);
 
             for (int blockHash : blocks) {
                 Vector3 pos = getBlockXYZ(index, blockHash, this.getDimensionData());
@@ -2674,12 +2681,12 @@ public class Level implements ChunkManager, Metadatable {
 
             int lightLevel = lightRemovalLevels.dequeueInt();
 
-            this.computeRemoveBlockLight(x - 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x + 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y - 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y + 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y, z - 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y, z + 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
+            this.computeRemoveBlockLight(x - 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x + 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x, y - 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x, y + 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x, y, z - 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x, y, z + 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
         }
 
         while (!lightPropagationQueue.isEmpty()) {
@@ -2689,26 +2696,34 @@ public class Level implements ChunkManager, Metadatable {
             int y = Hash.hashBlockY(node);
             int z = Hash.hashBlockZ(node);
 
-            int id = this.getBlockIdAt(x, y, z);
+            BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
+            if (!BlockLightBoundary.healthy(chunk) || !isYInRange(y)) continue;
+            int id = chunk.getBlockId(x & 15, y, z & 15);
             int lightFilter = id >= Block.MAX_BLOCK_ID ? 15 : Block.lightFilter[id];
-            int lightLevel = this.getBlockLightAt(x, y, z) - lightFilter;
+            int lightLevel = chunk.getBlockLight(x & 15, y, z & 15) - lightFilter;
 
             if (lightLevel >= 1) {
-                this.computeSpreadBlockLight(x - 1, y, z, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x + 1, y, z, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x, y - 1, z, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x, y + 1, z, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x, y, z - 1, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x, y, z + 1, lightLevel, lightPropagationQueue, visited);
+                this.computeSpreadBlockLight(x - 1, y, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x + 1, y, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x, y - 1, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x, y + 1, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x, y, z - 1, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x, y, z + 1, lightLevel, lightPropagationQueue, visited, pendingChunks);
             }
         }
     }
 
     private void computeRemoveBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue,
-                                         IntArrayFIFOQueue removalLevels, LongArrayFIFOQueue spreadQueue, Set<Long> visited, Set<Long> spreadVisited) {
-        int current = this.getBlockLightAt(x, y, z);
+                                         IntArrayFIFOQueue removalLevels, LongArrayFIFOQueue spreadQueue, Set<Long> visited, Set<Long> spreadVisited, List<Long> roots) {
+        if (!isYInRange(y)) return;
+        BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
+        if (!BlockLightBoundary.healthy(chunk)) {
+            this.lightBoundary().defer(x, y, z, roots);
+            return;
+        }
+        int current = chunk.getBlockLight(x & 15, y, z & 15);
         if (current != 0 && current < currentLight) {
-            this.setBlockLightAt(x, y, z, 0);
+            chunk.setBlockLight(x & 15, y, z & 15, 0);
             if (current > 1) {
                 long index = Hash.hashBlock(x, y, z);
                 if (!visited.contains(index)) {
@@ -2726,10 +2741,16 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
-    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue, Set<Long> visited) {
-        int current = this.getBlockLightAt(x, y, z);
+    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue, Set<Long> visited, List<Long> roots) {
+        if (!isYInRange(y)) return;
+        BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
+        if (!BlockLightBoundary.healthy(chunk)) {
+            this.lightBoundary().defer(x, y, z, roots);
+            return;
+        }
+        int current = chunk.getBlockLight(x & 15, y, z & 15);
         if (current < currentLight - 1) {
-            this.setBlockLightAt(x, y, z, currentLight);
+            chunk.setBlockLight(x & 15, y, z & 15, currentLight);
 
             long index = Hash.hashBlock(x, y, z);
             if (!visited.contains(index)) {
@@ -2739,6 +2760,16 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
         }
+    }
+
+    private BlockLightBoundary lightBoundary() {
+        if (this.blockLightBoundary == null) this.blockLightBoundary = new BlockLightBoundary(this);
+        return this.blockLightBoundary;
+    }
+
+    /** Main-thread mount/population hook; every mount reconstructs restart-lost boundaries. */
+    public void resumeBlockLightAtChunkBoundary(BaseFullChunk chunk) {
+        if (this.server.lightUpdates) this.lightBoundary().mounted(chunk, false);
     }
 
     public void addLightUpdate(int x, int y, int z) {
@@ -4096,6 +4127,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         chunk.setChanged();
+        this.resumeBlockLightAtChunkBoundary(chunk);
 
         if (!this.isChunkInUse(index)) {
             this.unloadChunkRequest(chunkX, chunkZ);
@@ -4914,6 +4946,7 @@ public class Level implements ChunkManager, Metadatable {
         // population) and wake neighbours so their four-neighbour gating may now pass
         this.fixLegacyBlockConnections(x, z, chunk);
         this.retryLegacyConnectionFixForNeighbours(x, z);
+        if (this.server.lightUpdates) this.lightBoundary().mounted(chunk, true);
 
         if (!chunk.isLightPopulated() && chunk.isPopulated() && this.server.lightUpdates) {
             LightPopulationTask.schedule(this, chunk);
@@ -5287,6 +5320,7 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
             levelProvider.unloadChunk(x, z, safe);
+            if (this.blockLightBoundary != null) this.blockLightBoundary.unloaded(x, z);
         } catch (Exception e) {
             MainLogger logger = this.server.getLogger();
             logger.error(this.server.getLanguage().translateString("nukkit.level.chunkUnloadError", e.toString()));

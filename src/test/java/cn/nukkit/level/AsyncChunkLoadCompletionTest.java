@@ -85,6 +85,32 @@ class AsyncChunkLoadCompletionTest {
     }
 
     @Test
+    void coldLightingRootUsesTheCompletionAPIWithoutInlineReadOrMountCascade() throws Exception {
+        this.server.lightUpdates = true;
+        when(this.provider.getMinBlockY()).thenReturn(-64);
+        when(this.provider.getMaxBlockY()).thenReturn(319);
+        when(this.level.getDimensionData()).thenReturn(DimensionEnum.OVERWORLD.getDimensionData());
+        BaseFullChunk chunk = chunk();
+        ChunkReadTicket ticket = ticket(chunk);
+        Map<Long, java.util.Set<Integer>> changes = new java.util.HashMap<>();
+        changes.put(HASH, java.util.Set.of(Level.localBlockHash(X << 4, 64, Z << 4, this.level.getDimensionData())));
+        this.level.updateBlockLight(changes);
+        assertTrue(changes.containsKey(HASH));
+        assertEquals(1, this.level.pendingChunkLoads.size());
+        verify(ticket, never()).read();
+        verify(this.provider, never()).getChunk(anyInt(), anyInt(), anyBoolean());
+        this.executor.runNext();
+        assertFalse(this.loaded.containsKey(HASH));
+        this.level.mountChunk(this.level.completedChunkLoads.remove());
+        assertSame(chunk, this.loaded.get(HASH));
+        assertTrue(this.level.pendingChunkLoads.isEmpty(), "light-only mount recursively requested neighbours");
+        this.level.updateBlockLight(changes);
+        assertTrue(changes.isEmpty());
+        verify(ticket, times(1)).read();
+        verify(this.provider, never()).getChunk(anyInt(), anyInt(), anyBoolean());
+    }
+
+    @Test
     void concurrentAndReentrantRequestsShareCompletionAfterMainThreadLifecycle() throws Exception {
         BaseFullChunk chunk = chunk();
         ChunkReadTicket ticket = ticket(chunk);
