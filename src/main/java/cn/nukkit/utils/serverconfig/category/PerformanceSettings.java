@@ -16,6 +16,15 @@ public class PerformanceSettings extends OkaeriConfig {
     @CustomKey("async-workers")
     private String asyncWorkers = "auto";
 
+    @Comment("Guard pathological scheduled block update bursts; false restores unlimited bucket execution")
+    @CustomKey("scheduled-block-update-budget")
+    private boolean scheduledBlockUpdateBudget = true;
+
+    @Comment("Maximum scheduled updates per level tick when the anomaly guard is enabled (high default: 10000)")
+    @Comment("Unexecuted entries retain their order and stay in chunk save snapshots; minimum 1.")
+    @CustomKey("scheduled-block-updates-per-tick")
+    private int scheduledBlockUpdatesPerTick = 10000;
+
     @Comment("Automatically adjust tick rate based on server load")
     @CustomKey("auto-tick-rate")
     private boolean autoTickRate = true;
