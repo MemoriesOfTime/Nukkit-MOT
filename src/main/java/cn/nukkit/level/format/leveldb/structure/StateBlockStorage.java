@@ -23,6 +23,7 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
@@ -425,6 +426,23 @@ public class StateBlockStorage {
             }
         }
         return true;
+    }
+
+    /** Unknown/custom states are not evidence that a connection-driven block is absent. */
+    public boolean mayContainBlockIds(IntSet blockIds) {
+        if (this.palette == null || this.palette.isEmpty()) {
+            return true;
+        }
+        for (BlockStateSnapshot state : this.palette) {
+            if (state == null || state.isCustom()) {
+                return true;
+            }
+            int id = state.getLegacyId();
+            if (id < 0 || id >= Block.MAX_BLOCK_ID || id == Block.INFO_UPDATE || blockIds.contains(id)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public byte[] getBlockIds() {
