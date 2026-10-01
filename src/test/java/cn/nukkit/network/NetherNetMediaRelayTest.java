@@ -269,10 +269,10 @@ class NetherNetMediaRelayTest {
                     ArgumentCaptor.forClass(NetherNetServerSignaling.NewConnectionHandler.class);
             verify(delegate).setNewConnectionHandler(installed.capture());
 
-            installed.getValue().onConnect(1L, "peer", "v=0\r\na=candidate:1 1 udp 1 192.0.2.1 5 typ host\r\n", null, null);
+            installed.getValue().onConnect("1", "peer", "v=0\r\na=candidate:1 1 udp 1 192.0.2.1 5 typ host\r\n", null, null);
             assertEquals("v=0\r\n", offerSeen.get(), "the offer still loses its candidates on the way in");
 
-            installed.getValue().onConnect(2L, "peer", "v=0\r\n", null, null);
+            installed.getValue().onConnect("2", "peer", "v=0\r\n", null, null);
             assertEquals("v=0\r\n", offerSeen.get(), "a second offer finds no reservation and simply passes");
         } finally {
             reserving.shutdown();

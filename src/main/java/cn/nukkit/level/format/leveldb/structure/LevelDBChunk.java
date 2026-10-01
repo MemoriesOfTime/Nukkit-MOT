@@ -38,6 +38,8 @@ public class LevelDBChunk extends BaseChunk {
 
     protected boolean subChunksDirty;
     protected boolean heightmapOrBiomesDirty;
+    private LevelProvider storageSaveProvider;
+    private int storageSaveX, storageSaveZ;
 
     private final Lock writeLock = new ReentrantLock();
 
@@ -54,6 +56,9 @@ public class LevelDBChunk extends BaseChunk {
                         @Nullable List<CompoundTag> entities, @Nullable List<CompoundTag> blockEntities, @NotNull ChunkState state) {
         this.provider = provider;
         this.setPosition(chunkX, chunkZ);
+        this.storageSaveProvider = provider;
+        this.storageSaveX = chunkX;
+        this.storageSaveZ = chunkZ;
 
         this.dimensionData = provider == null ? DimensionData.LEGACY_DIMENSION : provider.getLevel().getDimensionData();
         int minSectionY = this.dimensionData.getMinSectionY();
@@ -489,6 +494,17 @@ public class LevelDBChunk extends BaseChunk {
         }*/
     }
 
+    /** Main-thread save admission also detects relocation through final setX/setZ methods. */
+    public void prepareStorageSave() {
+        if (this.storageSaveProvider != this.provider || this.storageSaveX != this.getX() || this.storageSaveZ != this.getZ()) {
+            this.setAllSubChunksDirty();
+            this.setHeightmapOrBiomesDirty();
+            this.storageSaveProvider = this.provider;
+            this.storageSaveX = this.getX();
+            this.storageSaveZ = this.getZ();
+        }
+    }
+
     public boolean isSubChunksDirty() {
         return this.subChunksDirty;
     }
@@ -714,8 +730,29 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
+    public boolean setSection(float fY, ChunkSection section) {
+        // BaseChunk checks deprecated legacy arrays, which paletted sections always expose
+        // as empty. Inspect the actual storages before binding a replacement instead.
+        boolean changed;
+        if (section instanceof LevelDBChunkSection) {
+            this.setInternalSection(fY, section.isEmpty() ? EmptyChunkSection.bySectionY((int) fY) : section);
+            changed = true;
+        } else {
+            changed = super.setSection(fY, section);
+        }
+        this.subChunksDirty = true;
+        ChunkSection installed = this.getSection(fY);
+        if (installed instanceof LevelDBChunkSection levelDBSection) {
+            levelDBSection.setParent(this);
+            levelDBSection.setDirty();
+        }
+        return changed;
+    }
+
+    @Override
     protected void setInternalSection(float fY, ChunkSection section) {
         super.setInternalSection(fY, section);
+        this.subChunksDirty = true;
         if (section instanceof LevelDBChunkSection) {
             ((LevelDBChunkSection) section).setParent(this);
         }
