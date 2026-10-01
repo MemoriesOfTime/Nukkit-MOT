@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import cn.nukkit.Player;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -7,7 +8,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,12 +24,13 @@ class LevelChunkLoaderIndexTest {
     @BeforeEach
     void prepareIndex() throws Exception {
         set("chunkLoaders", new Long2ObjectNonBlockingMap<>());
-        set("playerLoaders", new ConcurrentHashMap<>());
+        set("playerLoaders", new Long2ObjectNonBlockingMap<>());
         set("loaders", new Int2ObjectOpenHashMap<>());
         set("loaderCounter", new Int2IntOpenHashMap());
         doCallRealMethod().when(level).registerChunkLoader(any(), anyInt(), anyInt(), anyBoolean());
         doCallRealMethod().when(level).unregisterChunkLoader(any(), anyInt(), anyInt());
         doCallRealMethod().when(level).getChunkLoaders(anyInt(), anyInt());
+        doCallRealMethod().when(level).getChunkPlayers(anyInt(), anyInt());
         doCallRealMethod().when(level).isChunkInUse(anyLong());
     }
 
@@ -83,6 +84,34 @@ class LevelChunkLoaderIndexTest {
         } finally {
             reader.shutdownNow();
         }
+    }
+
+    @Test
+    void chunkPlayersKeepSeparateDiagonalAndZeroKeysAndReturnIndependentSnapshots() {
+        Player first = mock(Player.class);
+        Player second = mock(Player.class);
+        when(first.getLoaderId()).thenReturn(11);
+        when(second.getLoaderId()).thenReturn(12);
+        ChunkLoader nonPlayer = loader(13);
+        for (int coordinate : new int[]{-128, -1, 0, 1, 128}) {
+            level.registerChunkLoader(first, coordinate, coordinate, false);
+            level.registerChunkLoader(nonPlayer, coordinate, coordinate, false);
+            assertEquals(java.util.Map.of(11, first), level.getChunkPlayers(coordinate, coordinate));
+        }
+        var snapshot = level.getChunkPlayers(0, 0);
+        level.registerChunkLoader(second, 0, 0, false);
+        assertEquals(java.util.Map.of(11, first), snapshot);
+        snapshot.clear();
+        assertEquals(2, level.getChunkPlayers(0, 0).size());
+        level.unregisterChunkLoader(first, 0, 0);
+        assertEquals(java.util.Map.of(12, second), level.getChunkPlayers(0, 0));
+        level.unregisterChunkLoader(second, 0, 0);
+        assertTrue(level.getChunkPlayers(0, 0).isEmpty());
+        assertTrue(level.isChunkInUse(Level.chunkHash(0, 0)));
+        level.unregisterChunkLoader(nonPlayer, 0, 0);
+        assertFalse(level.isChunkInUse(Level.chunkHash(0, 0)));
+        assertEquals(java.util.Map.of(11, first), level.getChunkPlayers(-1, -1));
+        assertTrue(level.getChunkPlayers(9, 10).isEmpty());
     }
 
     private ChunkLoader loader(int id) {
