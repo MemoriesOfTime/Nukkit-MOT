@@ -1,5 +1,4 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
-import org.gradle.api.tasks.bundling.AbstractArchiveTask
 
 plugins {
     id("java-library")
@@ -99,6 +98,9 @@ dependencies {
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
     annotationProcessor(libs.log4j.core)
+    testCompileOnly(libs.lombok)
+    testAnnotationProcessor(libs.lombok)
+    testAnnotationProcessor(libs.log4j.core)
 
     compileOnly(libs.jsr305)
 
