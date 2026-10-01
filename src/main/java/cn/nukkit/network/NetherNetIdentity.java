@@ -4,7 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.utils.TextFormat;
 import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import lombok.extern.log4j.Log4j2;
-import org.cloudburstmc.netty.util.nethernet.ServerIdentity;
+import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -24,7 +24,7 @@ final class NetherNetIdentity {
     private NetherNetIdentity() {
     }
 
-    static ServerIdentity load(Server server, NetherNetSettings settings) {
+    static OperatorIdentity load(Server server, NetherNetSettings settings) {
         File pem = Path.of(server.getDataPath()).resolve(settings.identityFile()).toFile();
         File parent = pem.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
@@ -33,7 +33,7 @@ final class NetherNetIdentity {
 
         try {
             boolean existed = pem.isFile();
-            ServerIdentity identity = ServerIdentity.fromPemOrCreate(pem, domain(server, settings));
+            OperatorIdentity identity = OperatorIdentity.fromPemOrCreate(pem, domain(server, settings));
             if (!existed) {
                 log.info("Generated a NetherNet identity at {}. Keep it: replacing it re-prompts every returning player", pem);
             }

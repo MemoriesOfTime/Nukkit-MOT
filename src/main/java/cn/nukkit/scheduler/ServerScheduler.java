@@ -3,7 +3,6 @@ package cn.nukkit.scheduler;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.PluginException;
-import cn.nukkit.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayDeque;
@@ -309,7 +308,14 @@ public class ServerScheduler {
         TaskHandler task;
         while ((task = pending.poll()) != null) {
             int tick = Math.max(currentTick, task.getNextRunTick()); // Do not schedule in the past
-            ArrayDeque<TaskHandler> queue = Utils.getOrCreate(queueMap, ArrayDeque.class, tick);
+            ArrayDeque<TaskHandler> queue = queueMap.get(tick);
+            if (queue == null) {
+                ArrayDeque<TaskHandler> created = new ArrayDeque<>();
+                queue = queueMap.putIfAbsent(tick, created);
+                if (queue == null) {
+                    queue = created;
+                }
+            }
             queue.add(task);
         }
         if (currentTick - this.currentTick > queueMap.size()) { // A large number of ticks have passed since the last execution
