@@ -35,7 +35,6 @@ Only interested in newer versions? You might want to try [Lumi](https://github.c
 docker run -d --name nukkit-mot \
   -p 19132:19132/udp \
   -p 19132:19132/tcp \
-  -p 19134:19134/udp \
   -v $(pwd)/data:/data \
   -e JAVA_OPTS="-Xms2G -Xmx2G" \
   --restart unless-stopped \
@@ -44,8 +43,8 @@ docker run -d --name nukkit-mot \
 - `:latest` and `:<short-sha>` are development snapshots built from the master branch.
 - `:1.26.30-R1` style tags are stable releases mirroring Maven Central.
 - All worlds, plugins, players and `server.properties` live under the `/data` volume.
-- `19132/udp` is RakNet. `19132/tcp` is the NetherNet (WebRTC) HTTP signaling — on by default and sharing the server-port number, so map it as well unless you disable `network-settings.nethernet` in `nukkit-mot.yml`.
-- `19134/udp` is the NetherNet media port — the default of `server-udp-ports` in `server.properties` (one ICE mux port serves all peers; `0` reverts to system-assigned ports, which the Docker bridge NAT cannot reach). If the published host port differs from the container's, or clients need the host address announced, use the mapping form `server-udp-ports=[host-ip:]external:internal`.
+- `19132/udp` is RakNet; `19132/tcp` is the NetherNet (WebRTC) signaling. NetherNet media reuses the same UDP port, so these two mappings cover a default setup — disable `network-settings.nethernet` in `nukkit-mot.yml` if you don't use it.
+- Want NetherNet media on its own UDP port instead? Set `server-udp-ports` in `server.properties` (e.g. `19134`, then add `-p 19134:19134/udp`).
 
 ## Links
 - __🌐 Download: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__

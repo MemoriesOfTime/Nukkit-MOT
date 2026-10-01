@@ -1,6 +1,7 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.AdventureSettings.Type;
+import cn.nukkit.AdventureSettings;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -1092,6 +1093,18 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (oldEffect != null && (oldEffect.getAmplifier() > effect.getAmplifier()
             || (oldEffect.getAmplifier() == effect.getAmplifier() && oldEffect.getDuration() >= effect.getDuration()))) {
+            // A weaker/shorter absorption effect must not replace the stronger icon or its
+            // duration, but consuming the item still replenishes the amount granted by that
+            // item. Without this, a normal golden apple eaten while enchanted-apple
+            // Absorption IV is still visible gives zero yellow hearts after the old pool was
+            // depleted: addEffect returns before Effect.add can refill anything.
+            if (effect.getId() == Effect.ABSORPTION
+                    && cause == EntityPotionEffectEvent.Cause.FOOD) {
+                float grantedAbsorption = (effect.getAmplifier() + 1) << 2;
+                if (grantedAbsorption > this.getAbsorption()) {
+                    this.setAbsorption(grantedAbsorption);
+                }
+            }
             return;
         }
 
@@ -1717,13 +1730,33 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     /**
-     * 检查玩家的攻击是否应为暴击 / Check if player's hit should be critical
+     * Whether this melee hit can be a critical one.
      *
-     * @param player player
-     * @return can make a critical hit
+     * <p>Conditions follow vanilla Bedrock as implemented by PocketMine-MP
+     * ({@code Player::attackEntity}): the attacker has to be falling, must not be sprinting,
+     * flying or riding, must not be blinded and must not be in water.
+     *
+     * <p>Sprinting and flying were missing here. Both make the 1.5x bonus nearly permanent
+     * instead of a timed hit: Bedrock players sprint by default, so every sprint-jump landed a
+     * critical, and a player with creative or plugin-granted flight critically hit for free while
+     * hovering, with no fall to commit to.
+     *
+     * @param player the attacker
+     * @return whether the hit can be critical
+     *
+     * <p>{@code speed} is the previous position minus the current one, so falling is a POSITIVE
+     * y — the check reads backwards but is correct.
      */
     private static boolean canCriticalHit(Player player) {
-        if (player.isOnGround() || player.riding != null || player.speed == null || player.speed.y <= 0 || player.hasEffect(Effect.BLINDNESS)) return false;
+        if (player.isOnGround()
+                || player.riding != null
+                || player.speed == null
+                || player.speed.y <= 0
+                || player.isSprinting()
+                || player.getAdventureSettings().get(AdventureSettings.Type.FLYING)
+                || player.hasEffect(Effect.BLINDNESS)) {
+            return false;
+        }
         int b = player.getLevel().getBlockIdAt(player.chunk, player.getFloorX(), player.getFloorY(), player.getFloorZ());
         return b != Block.LADDER && b != Block.VINES && !Block.isWater(b);
     }
@@ -2092,6 +2125,26 @@ public abstract class Entity extends Location implements Metadatable {
     @Deprecated
     public boolean entityBaseTick() {
         return this.entityBaseTick(1);
+    }
+
+    /**
+     * Whether the level may skip {@link #onUpdate(int)} for this entity on this tick. A skipped entity stays
+     * scheduled; its next update runs with the whole elapsed time as {@code tickDiff}. Only mobs far from every
+     * player opt in, see {@link BaseEntity#isActivationThrottled(int)}.
+     */
+    public boolean isActivationThrottled(int currentTick) {
+        return false;
+    }
+
+    /**
+     * Whether any value in {@code [start, start + span - 1]} is congruent to {@code residue} modulo
+     * {@code period}. With {@code span == 1} this is exactly {@code start % period == residue} for the
+     * non-negative residues used by the tick cadences, so a caught-up update fires a periodic action at
+     * most once instead of skipping it because the counter jumped over the matching value.
+     */
+    protected static boolean hitsResidue(long start, int span, int period, int residue) {
+        long last = start + Math.max(1, span) - 1;
+        return Math.floorDiv(last - residue, period) != Math.floorDiv(start - 1 - residue, period);
     }
 
     /**
@@ -2770,8 +2823,28 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean isSubmerged() {
         double y = this.y + this.getEyeHeight();
-        Block block = this.level.getBlock(this.temporalVector.setComponents(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(y), NukkitMath.floorDouble(this.z)));
+        int blockX = NukkitMath.floorDouble(this.x);
+        int blockY = NukkitMath.floorDouble(y);
+        int blockZ = NukkitMath.floorDouble(this.z);
+        // Every living entity asks this every tick, and the answer is almost always "no": read the two
+        // ids from the entity's own chunk and materialise blocks only when one of them can be water.
+        FullChunk chunk = this.chunk;
+        if (chunk != null && this.level != null && chunk.getX() == blockX >> 4 && chunk.getZ() == blockZ >> 4
+                && this.level.isYInRange(blockY)
+                && !mayMaterialiseAsWater(chunk.getBlockId(blockX & 0x0f, blockY, blockZ & 0x0f, 0))
+                && !mayMaterialiseAsWater(chunk.getBlockId(blockX & 0x0f, blockY, blockZ & 0x0f, 1))) {
+            return false;
+        }
+        Block block = this.level.getBlock(this.temporalVector.setComponents(blockX, blockY, blockZ));
         return block instanceof BlockWater || this.level.getBlock(block, 1) instanceof BlockWater;
+    }
+
+    /**
+     * Whether a raw block id can come out of {@link Block#get} as a {@link BlockWater}: the two water ids,
+     * and custom or out-of-range ids whose factory is unknown.
+     */
+    static boolean mayMaterialiseAsWater(int id) {
+        return id == Block.WATER || id == Block.STILL_WATER || id < 0 || id >= Block.MAX_BLOCK_ID;
     }
 
     public boolean isInsideOfWater() {
@@ -2821,7 +2894,19 @@ public abstract class Entity extends Location implements Metadatable {
 
         AxisAlignedBB newBB = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
 
-        if (server.getAllowFlight() || !this.level.hasCollision(this, newBB, false)) {
+        // The float eye-position round trip can place a player's head a few
+        // millionths of a block inside a ceiling. Rejecting all three axes for
+        // that contact turns batched sprint-jumps into horizontal speed setbacks.
+        // Retry only a colliding player's ceiling with a bounded tolerance. Keep
+        // the feet unchanged: raising minY can skip a fence's lower block cell
+        // even though its collision shape extends half a block above that cell.
+        boolean canMove = server.getAllowFlight() || !this.level.hasCollision(this, newBB, false);
+        if (!canMove && this instanceof Player) {
+            AxisAlignedBB ceilingContact = newBB.clone();
+            ceilingContact.setMaxY(ceilingContact.getMaxY() - 1.0E-4);
+            canMove = !this.level.hasCollision(this, ceilingContact, false);
+        }
+        if (canMove) {
             this.boundingBox = newBB;
         }
 

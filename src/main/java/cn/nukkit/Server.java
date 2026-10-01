@@ -273,6 +273,11 @@ public class Server {
     private Watchdog watchdog;
     private NukkitMetrics nukkitMetrics;
     private final DB nameLookup;
+    /**
+     * Trimmed lower-case names whose padded profiles were not folded at startup, with the reason.
+     * Their offline logins are refused: the profile a login would open may not be the latest.
+     */
+    private Map<String, String> profileFoldBlockedNames = Map.of();
     private PlayerDataSerializer playerDataSerializer;
     private SpawnerTask spawnerTask;
 
@@ -346,6 +351,12 @@ public class Server {
      * Xbox authentication enabled.
      */
     public boolean xboxAuth;
+
+    /**
+     * When true a duplicate login refuses the newcomer instead of closing the session that is
+     * already in the world. Defaults to false, the historical behaviour.
+     */
+    private boolean keepExistingSessionOnDuplicateLogin;
     /**
      * Spawn eggs enabled.
      */
@@ -477,6 +488,11 @@ public class Server {
      * Mob despawning enabled.
      */
     public boolean despawnMobs;
+    /**
+     * Squared horizontal distance past which mobs are updated once per second (entity activation).
+     * Zero or less disables the throttle.
+     */
+    public double entityActivationRangeSquared;
     /**
      * Strong RakNet level IP bans enabled.
      */
@@ -843,13 +859,33 @@ public class Server {
 
         if (this.savePlayerDataByUuid) {
             convertLegacyPlayerData();
+            // Before the network opens: a login trimmed to "Name" must find the profile that a
+            // padded "Name " used to save under, and never an older twin of it.
+            if (this.spaceMode == 2) {
+                // Replace mode turns "Name " into "Name_" and does not trim, so padded keys are
+                // not twins of the trimmed name there.
+                log.warn("Not folding player data saved under padded names: space-name-mode is replace");
+            } else {
+                try {
+                    PlayerNameEdgeWhitespaceMigration.Report fold = PlayerNameEdgeWhitespaceMigration.run(nameLookup,
+                            new File(dataPath, "players"),
+                            new File(dataPath, PlayerNameEdgeWhitespaceMigration.QUARANTINE_DIRECTORY));
+                    this.profileFoldBlockedNames = fold.blocked();
+                } catch (RuntimeException failure) {
+                    // Each name is handled inside the run; this only keeps an unexpected fault from
+                    // stopping the whole server.
+                    log.error("Could not fold player data saved under padded names", failure);
+                }
+            }
         }
 
         this.serverID = UUID.randomUUID();
 
         this.craftingManager = new CraftingManager();
         ResourcePackMigration.migrate(new File(Nukkit.DATA_PATH));
-        HashSet<ResourcePackLoader> packLoaders = new HashSet<>();
+        // Registration order is the stack order among packs of equal priority: resource packs first,
+        // then behaviour packs, then packs shipped inside plugin jars.
+        Set<ResourcePackLoader> packLoaders = new LinkedHashSet<>();
         packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")));
         packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs")));
         packLoaders.add(new JarPluginResourcePackLoader(new File(this.pluginPath)));
@@ -871,14 +907,17 @@ public class Server {
         this.network = new Network(this);
         this.network.setName(this.getMotd());
         this.network.setSubName(this.getSubMotd());
-        this.network.registerInterface(new RakNetInterface(this));
+        RakNetInterface rakNetInterface = new RakNetInterface(this);
+        this.network.registerInterface(rakNetInterface);
 
-        // NetherNet (WebRTC) 与 RakNet 并行：旧客户端走 RakNet，受限网络的 1.21.90+ 客户端走 HTTP 信令 + WebRTC
-        // Runs alongside RakNet: legacy clients keep RakNet, restricted-network 1.21.90+ clients join over WebRTC
+        // NetherNet (WebRTC) 与 RakNet 并行：旧客户端走 RakNet，受限网络的 1.21.90+ 客户端走 HTTP 信令 + WebRTC；
+        // server-udp-ports 把媒体映射到某个 RakNet 监听端口（server-port/IPv6）时，媒体经监听 socket 进程内中继
+        // Runs alongside RakNet: legacy clients keep RakNet, restricted-network 1.21.90+ clients join over WebRTC;
+        // with server-udp-ports mapping media onto a RakNet listener (server-port/IPv6) it is relayed in-process
         NetherNetSettings netherNetSettings = this.serverConfig != null
                 ? this.serverConfig.networkSettings().netherNetSettings() : null;
         if (netherNetSettings != null && netherNetSettings.enabled()) {
-            this.network.registerInterface(new NetherNetInterface(this, netherNetSettings));
+            this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
         }
 
         EntityProperty.init();
@@ -2319,6 +2358,15 @@ public class Server {
         return Optional.of(entry);
     }
 
+    /**
+     * @param lowerCaseName login name after trimming, lower case
+     * @return why startup left this name's padded profiles unfolded, or {@code null} when offline
+     * logins with it may proceed
+     */
+    String profileFoldBlockReason(String lowerCaseName) {
+        return lowerCaseName == null ? null : profileFoldBlockedNames.get(lowerCaseName);
+    }
+
     void updateName(UUID uuid, String name, boolean xboxAuthed) {
         byte[] nameBytes = name.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
         nameLookup.put(nameBytes, encodeNameEntry(uuid,
@@ -3438,6 +3486,13 @@ public class Server {
     }
 
     /**
+     * @return true when a duplicate login refuses the newcomer and keeps the session already in the world
+     */
+    public boolean isDuplicateLoginKeepingExistingSession() {
+        return this.keepExistingSessionOnDuplicateLogin;
+    }
+
+    /**
      * Check whether a player is whitelisted
      *
      * @param name player name
@@ -3913,6 +3968,7 @@ public class Server {
         this.flyChecks = this.getPropertyBoolean("allow-flight", false);
         this.spawnRadius = this.getPropertyInt("spawn-protection", 10);
         this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
+        this.keepExistingSessionOnDuplicateLogin = this.getPropertyBoolean("keep-existing-session-on-duplicate-login", false);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
         if (!this.encryptionEnabled) {
             log.warn("Encryption is not enabled. For better security, it's recommended to enable it if you don't use a proxy software.");
@@ -3979,6 +4035,9 @@ public class Server {
         this.mobAiEnabled = config.entitySettings().mobAi();
         this.despawnMobs = config.entitySettings().despawnTask();
         this.mobDespawnTicks = config.entitySettings().ticksPerDespawns();
+        int activationBlocks = config.entitySettings().activationBlocks();
+        // Below 16 blocks a mob could sleep inside a player's own view of it; clamp instead of guessing.
+        this.entityActivationRangeSquared = activationBlocks <= 0 ? 0 : (double) Math.max(16, activationBlocks) * Math.max(16, activationBlocks);
 
         // World
         this.netherEnabled = config.worldSettings().nether();
@@ -4117,7 +4176,9 @@ public class Server {
             put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
-            put("server-udp-ports", 19134);
+            // 等于 server-port（默认 19132）即与 RakNet 共用 UDP 端口；设为 19134 等则钉住独立媒体端口
+            // Equal to server-port (19132 by default) it shares RakNet's UDP port; 19134 etc. pins a standalone media port
+            put("server-udp-ports", 19132);
             put("server-ipv6-port", -1);
             put("server-ipv6", "::");
             put("view-distance", 8);
@@ -4141,6 +4202,7 @@ public class Server {
             put("white-list", false);
             put("whitelist-reason", "§cServer is white-listed");
             put("xbox-auth", true);
+            put("keep-existing-session-on-duplicate-login", false);
             put("encryption", true);
 
             put("force-resources", false);

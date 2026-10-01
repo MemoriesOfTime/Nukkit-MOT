@@ -3,6 +3,7 @@ package cn.nukkit.network;
 import cn.nukkit.lang.BaseLang;
 import io.netty.channel.EventLoop;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
 import org.junit.jupiter.api.Test;
 import tel.schich.libdatachannel.PeerConnectionConfiguration;
 
@@ -165,6 +166,52 @@ class NetherNetUdpPortsTest {
     }
 
     @Test
+    void publishesOnRequiresASinglePortMappingOntoThatPort() {
+        assertTrue(NetherNetUdpPorts.parse("19132:19134", LANG).publishesOn(19132), "a single-port mapping onto server-port shares it");
+        assertTrue(NetherNetUdpPorts.parse("203.0.113.10:19132:19134", LANG).publishesOn(19132), "an address prefix does not change that");
+        assertFalse(NetherNetUdpPorts.parse("19132:19134", LANG).publishesOn(25565), "another server-port is a plain external mapping");
+        assertFalse(NetherNetUdpPorts.parse("19134", LANG).publishesOn(19134), "no mapping means nothing is published elsewhere");
+        assertFalse(NetherNetUdpPorts.parse("19132-19140:32000-32008", LANG).publishesOn(19132), "a window is not a single-port mapping");
+    }
+
+    @Test
+    void sharesPortCoversBothSharedSpellingsOnEitherListener() {
+        assertTrue(NetherNetUdpPorts.parse("19132", LANG).sharesPort(19132), "a bare listener port shares it");
+        assertTrue(NetherNetUdpPorts.parse("19132:19134", LANG).sharesPort(19132), "a single-port mapping onto it shares it");
+        assertTrue(NetherNetUdpPorts.parse("19133", LANG).sharesPort(19133), "the IPv6 listener port shares the same way");
+        assertTrue(NetherNetUdpPorts.parse("19133:19134", LANG).sharesPort(19133));
+        assertFalse(NetherNetUdpPorts.parse("19134", LANG).sharesPort(19132), "an unrelated pin is standalone");
+        assertFalse(NetherNetUdpPorts.parse("19132-19140", LANG).sharesPort(19132), "windows never share");
+        assertFalse(NetherNetUdpPorts.parse("19132:19134", LANG).sharesPort(19133), "a mapping onto one listener does not share another");
+    }
+
+    @Test
+    void pinsOnlyIsTheUnmappedSinglePortAndRelayedThroughTurnsItIntoTheMapping() {
+        NetherNetUdpPorts plain = NetherNetUdpPorts.parse("19132", LANG);
+        assertNotNull(plain);
+        assertTrue(plain.pinsOnly(19132), "server-port itself asks for the shared port with an automatic internal port");
+        assertFalse(plain.pinsOnly(19134), "another port is an ordinary pinned media port");
+        assertFalse(plain.publishesOn(19132), "without a mapping nothing is published yet");
+        assertFalse(NetherNetUdpPorts.parse("19132:19134", LANG).pinsOnly(19132), "a mapping already names its internal port");
+        assertFalse(NetherNetUdpPorts.parse("19130-19140", LANG).pinsOnly(19132), "a window is not a single port");
+        assertTrue(NetherNetUdpPorts.parse("203.0.113.10:19132", LANG).pinsOnly(19132), "an address prefix does not change that");
+
+        NetherNetUdpPorts relayed = NetherNetUdpPorts.parse("203.0.113.10:19132", LANG).relayedThrough(19135);
+        assertTrue(relayed.publishesOn(19132), "the relayed form is the single-port mapping onto server-port");
+        assertEquals(19135, relayed.begin());
+        assertEquals(19135, relayed.end());
+        assertEquals(Set.of("203.0.113.10"), relayed.advertisedAddresses(), "the address prefix survives");
+        assertEquals("udp/19135 published as 19132 via [203.0.113.10]", relayed.toString());
+        assertEquals(NetherNetUdpPorts.parse("19132:19135", LANG).toString(), plain.relayedThrough(19135).toString(),
+                "plain 19132 relayed through 19135 reads exactly like the explicit 19132:19135");
+
+        assertThrows(IllegalStateException.class, () -> NetherNetUdpPorts.parse("19132:19134", LANG).relayedThrough(19135),
+                "a mapping cannot be relayed a second time");
+        assertThrows(IllegalStateException.class, () -> NetherNetUdpPorts.parse("19130-19140", LANG).relayedThrough(19135),
+                "a window cannot be relayed through one port");
+    }
+
+    @Test
     void peerConfigPinsTheWindowWithMux() {
         NetherNetUdpPorts ports = NetherNetUdpPorts.parse("19132-19140:32000-32008", LANG);
         assertNotNull(ports, "equal-length ranges are a valid mapping");
@@ -229,7 +276,7 @@ class NetherNetUdpPortsTest {
 
         assertNotNull(decorated);
         assertNotSame(signaling, decorated);
-        decorated.sendFullSdp("peer", "a=candidate:1 1 UDP 2130706431 192.168.1.5 32000 typ host\r\n");
+        decorated.sendDescription("peer", "a=candidate:1 1 UDP 2130706431 192.168.1.5 32000 typ host\r\n");
         assertNotNull(signaling.lastSdp, "the wrapper delegates the answer onward");
         assertTrue(signaling.lastSdp.contains(" 19132 typ host"), "the delegated answer carries the external port");
     }
@@ -247,7 +294,7 @@ class NetherNetUdpPortsTest {
         String lastSdp;
 
         @Override
-        public void sendFullSdp(String targetNetworkId, String sdp) {
+        public void sendDescription(String targetNetworkId, String sdp) {
             this.lastSdp = sdp;
         }
 
@@ -264,11 +311,11 @@ class NetherNetUdpPortsTest {
         }
 
         @Override
-        public void setSignalHandler(long connectionId, SignalHandler handler) {
+        public void setSignalHandler(String connectionId, SignalHandler handler) {
         }
 
         @Override
-        public void removeSignalHandler(long connectionId) {
+        public void removeSignalHandler(String connectionId) {
         }
 
         @Override

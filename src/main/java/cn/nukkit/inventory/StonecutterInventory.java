@@ -23,12 +23,7 @@ public class StonecutterInventory extends FakeBlockUIComponent {
         super.onClose(who);
         who.craftingType = Player.CRAFTING_SMALL;
 
-        Item[] drops = who.getInventory().addItem(this.getItem(0));
-        for (Item drop : drops) {
-            if (!who.dropItem(drop)) {
-                this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), drop);
-            }
-        }
+        who.returnUiItems(this.getItem(0));
 
         this.clear(0);
         who.resetCraftingGridType();

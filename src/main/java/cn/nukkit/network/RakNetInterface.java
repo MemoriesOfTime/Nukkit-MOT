@@ -172,6 +172,23 @@ public class RakNetInterface implements AdvancedSourceInterface {
         this.network = network;
     }
 
+    /**
+     * 底层 UDP 监听 channel（RakServerChannel 的 parent，IPv4 在前、IPv6 监听存在时在后），
+     * 供 NetherNet 共用端口时挂中继分流器。
+     * The raw UDP listener channels (the RakServerChannel parents, IPv4 first, then the IPv6
+     * listener when present), for the NetherNet relay to hook its demultiplexer onto.
+     */
+    public List<Channel> getDatagramChannels() {
+        List<Channel> channels = new ArrayList<>(2);
+        if (this.channel != null && this.channel.parent() != null) {
+            channels.add(this.channel.parent());
+        }
+        if (this.ipv6Channel != null && this.ipv6Channel.parent() != null) {
+            channels.add(this.ipv6Channel.parent());
+        }
+        return channels;
+    }
+
     @Override
     public boolean process() {
         this.expireLoginSessions();

@@ -754,11 +754,12 @@ public class LevelDBPendingWriteTest {
                         throw new AssertionError("backend read was not released");
                     }
                 }
-                return realDb.get(invocation.getArgument(0, byte[].class));
+                // Chunk reads open one iterator per column (ChunkColumnReader), so that is the backend read to wedge.
+                return realDb.iterator();
             } finally {
                 backendLock.readLock().unlock();
             }
-        }).when(nativeStyleDb).get(Mockito.any(byte[].class));
+        }).when(nativeStyleDb).iterator();
         Mockito.doAnswer(invocation -> {
             backendLock.writeLock().lock();
             try {
