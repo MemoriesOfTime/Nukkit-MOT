@@ -327,7 +327,7 @@ public class ServerScheduler {
             }
         } else { // Normal server tick
             for (int i = this.currentTick + 1; i <= currentTick; i++) {
-                runTasks(currentTick);
+                runTasks(i);
             }
         }
         this.currentTick = currentTick;
