@@ -432,23 +432,10 @@ public class Level implements ChunkManager, Metadatable {
     public final boolean isEnd;
 
     private final Class<? extends Generator> generatorClass;
-    private final ThreadLocal<Generator> generators = new ThreadLocal<>() {
-        @Override
-        public Generator initialValue() {
-            try {
-                Generator generator = generatorClass.getConstructor(Map.class).newInstance(requireProvider().getGeneratorOptions());
-                NukkitRandom rand = new NukkitRandom(getSeed());
-                if (Server.getInstance().isPrimaryThread()) {
-                    generator.init(Level.this, rand);
-                }
-                generator.init(new PopChunkManager(getSeed(), Level.this::getDimensionData), rand);
-                return generator;
-            } catch (Throwable e) {
-                Server.getInstance().getLogger().logException(e);
-                return null;
-            }
-        }
-    };
+    // Own the generators in the level. A ThreadLocal value retains this level through
+    // PopChunkManager's dimension supplier even after close() removes the main-thread value.
+    // Weak keys also release generators whose temporary async worker has terminated.
+    private final Map<Thread, Generator> generators = new WeakHashMap<>();
 
     private boolean raining;
     private int rainingIntensity;
@@ -683,7 +670,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void initLevel() {
-        Generator generator = generators.get();
+        Generator generator = getGenerator();
         this.dimensionData = generator.getDimensionData();
         //Anvil 不支持384世界高度
         if (this.dimensionData.getDimensionId() == DIMENSION_OVERWORLD && this.provider instanceof Anvil) {
@@ -693,7 +680,30 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Generator getGenerator() {
-        return generators.get();
+        Thread thread = Thread.currentThread();
+        synchronized (this.generators) {
+            if (this.generators.containsKey(thread)) {
+                return this.generators.get(thread);
+            }
+        }
+        // One thread owns each key. Construct outside the map monitor so provider access
+        // and custom generator initialization cannot invert the lock order during close().
+        Generator generator;
+        try {
+            generator = generatorClass.getConstructor(Map.class).newInstance(requireProvider().getGeneratorOptions());
+            NukkitRandom rand = new NukkitRandom(getSeed());
+            if (Server.getInstance().isPrimaryThread()) {
+                generator.init(this, rand);
+            }
+            generator.init(new PopChunkManager(getSeed(), this::getDimensionData), rand);
+        } catch (Throwable e) {
+            Server.getInstance().getLogger().logException(e);
+            generator = null;
+        }
+        synchronized (this.generators) {
+            this.generators.put(thread, generator);
+        }
+        return generator;
     }
 
     public BlockMetadataStore getBlockMetadata() {
@@ -781,7 +791,9 @@ public class Level implements ChunkManager, Metadatable {
             this.provider = null;
             this.blockMetadata = null;
             this.server.getLevels().remove(this.levelId);
-            this.generators.remove();
+            synchronized (this.generators) {
+                this.generators.clear();
+            }
         } finally {
             this.providerLock.writeLock().unlock();
             if (interrupted) {
