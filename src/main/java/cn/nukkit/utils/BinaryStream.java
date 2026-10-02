@@ -13,6 +13,7 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
@@ -189,6 +190,17 @@ public class BinaryStream {
     }
 
     public int getLInt() {
+        return readLittleEndianInt();
+    }
+
+    private int readLittleEndianInt() {
+        // Keep the old short-read/padded-buffer behavior on malformed input.
+        if (this.offset >= 0 && this.count >= 4 && this.offset <= this.count - 4
+                && this.buffer != null && this.offset <= this.buffer.length - 4) {
+            int value = Binary.readLInt(this.buffer, this.offset);
+            this.offset += 4;
+            return value;
+        }
         return Binary.readLInt(this.get(4));
     }
 
@@ -229,7 +241,8 @@ public class BinaryStream {
     }
 
     public float getLFloat(int accuracy) {
-        return Binary.readLFloat(this.get(4), accuracy);
+        float value = Float.intBitsToFloat(readLittleEndianInt());
+        return accuracy > -1 ? (float) NukkitMath.round(value, accuracy) : value;
     }
 
     public void putLFloat(float v) {
