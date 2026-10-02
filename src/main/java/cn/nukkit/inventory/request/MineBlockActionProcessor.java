@@ -55,7 +55,7 @@ public class MineBlockActionProcessor implements ItemStackRequestActionProcessor
                 itemInHand.isNull() ? 0 : itemInHand.getCount(),
                 itemInHand.getStackNetId(),
                 itemInHand.hasCustomName() ? itemInHand.getCustomName() : "",
-                itemInHand.getDamage(),
+                ItemStackRequestActionProcessor.durabilityCorrection(itemInHand),
                 ""
         );
         return context.success(List.of(new ItemStackResponseContainer(
