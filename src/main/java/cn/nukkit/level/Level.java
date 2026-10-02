@@ -467,6 +467,7 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private ExecutorService asyncChunkLoadExecutor;
+    private volatile boolean chunkLoadsClosing;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
     // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
@@ -737,6 +738,12 @@ public class Level implements ChunkManager, Metadatable {
 
     public void close() {
         boolean interrupted = false;
+        this.chunkLoadsClosing = true;
+        // These read-only results can no longer be mounted. Skip queued disk reads,
+        // but retain the existing drain for reads which already entered the provider.
+        for (PendingChunkLoad pending : this.pendingChunkLoads.values()) {
+            pending.invalidated = true;
+        }
         this.providerLock.writeLock().lock();
         try {
             for (ExecutorService executor : new ExecutorService[]{this.asyncChunkLoadExecutor, this.asyncChuckExecutor}) {
@@ -4715,7 +4722,7 @@ public class Level implements ChunkManager, Metadatable {
      */
     public boolean requestChunkLoadAsync(int x, int z) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
+        if (this.chunkLoadsClosing || levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
             return false;
         }
 
@@ -4729,7 +4736,7 @@ public class Level implements ChunkManager, Metadatable {
             try {
                 this.asyncChunkLoadExecutor.execute(() -> {
                     try {
-                        if (pending.invalidated) {
+                        if (this.chunkLoadsClosing || pending.invalidated) {
                             return;
                         }
                         pending.chunk = levelProvider.readChunkOffThread(x, z);
@@ -4767,7 +4774,7 @@ public class Level implements ChunkManager, Metadatable {
      */
     synchronized void mountChunk(PendingChunkLoad pending) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || levelProvider != pending.provider || pending.invalidated
+        if (this.chunkLoadsClosing || levelProvider == null || levelProvider != pending.provider || pending.invalidated
                 || levelProvider.isChunkLoaded(pending.hash)) {
             return;
         }
