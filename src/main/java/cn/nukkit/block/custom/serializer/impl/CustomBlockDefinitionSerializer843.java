@@ -48,6 +48,14 @@ public class CustomBlockDefinitionSerializer843 extends CustomBlockDefinitionSer
                     material.remove("face_dimming");
                     material.putByte("packed_bools", (byte) (faceDimming ? 0x1 : 0x0));
                 }
+                // 1.21.80+ material overhaul: the legacy "alpha_test" name is silently
+                // ignored by new clients and the material falls back to opaque, so every
+                // transparent texel renders black. Translate to the modern name here;
+                // older clients keep the legacy name they understand.
+                if (material.contains("render_method")
+                        && material.getString("render_method").equals("alpha_test")) {
+                    material.putString("render_method", "alpha_test_single_sided");
+                }
             }
         }
     }

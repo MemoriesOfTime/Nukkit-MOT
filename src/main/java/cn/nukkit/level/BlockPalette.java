@@ -192,13 +192,67 @@ public class BlockPalette {
 
         int legacyId = blockId << Block.DATA_BITS | data;
         this.legacyToRuntimeId.put(legacyId, runtimeId);
-        this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
+        putCanonicalLegacy(this.runtimeIdToLegacy, runtimeId, legacyId);
         int stateHash = Hash.hashBlock(blockState);
-        this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
+        putCanonicalLegacy(this.stateHashToLegacy, stateHash, legacyId);
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
     }
 
+    /**
+     * Reverse lookup keeps the LOWEST legacy value that maps to a state.
+     * <p>
+     * The legacy data table pads every block to a power of two by repeating its default variant:
+     * {@code minecraft:planks} lists oak at data 0, 6 and 7, {@code minecraft:stone} lists stone at
+     * 0 and 7, and 45 more blocks do the same. All of those rows map to one state, so the reverse
+     * entry was decided by registration order — and when a padding row won, the state translated
+     * back to a data value that Nukkit has no block for. The block then read as an unknown one:
+     * hardness 10, no proper tool, and a vanilla break-time check that cancelled every hit, so oak
+     * planks could not be broken at all, by any tool or by hand.
+     * <p>
+     * The lowest value is the real one in every padded row, and picking it makes the reverse
+     * lookup independent of the order states are registered in. Blocks merged by vanilla into
+     * another id keep their own preset (see {@code NukkitLegacyMapper#getOverrideLegacyId}).
+     */
+    private static void putCanonicalLegacy(Int2IntOpenHashMap reverse, int key, int legacyId) {
+        int known = reverse.get(key);
+        if (known == -1 || legacyId < known) {
+            reverse.put(key, legacyId);
+        }
+    }
+
+    /**
+     * Older palettes have one skull block; its block entity carries the head type.
+     * Add outgoing aliases only after all vanilla/custom states have been registered.
+     * Do not register states here: that would change canonical reverse lookups used
+     * for world storage, and mark these compatibility aliases as native states.
+     */
+    private void registerLegacySkullAliases() {
+        int[] heads = {BlockID.WITHER_SKELETON_SKULL, BlockID.ZOMBIE_HEAD,
+                BlockID.PLAYER_HEAD, BlockID.CREEPER_HEAD, BlockID.DRAGON_HEAD,
+                BlockID.PIGLIN_HEAD};
+        for (int meta = 0; meta < 6; meta++) {
+            int skull = BlockID.SKULL_BLOCK << Block.DATA_BITS | meta;
+            int runtimeId = this.legacyToRuntimeId.get(skull);
+            if (runtimeId == -1) {
+                continue;
+            }
+            for (int head : heads) {
+                int fullId = head << Block.DATA_BITS | meta;
+                if (!this.legacyToRuntimeId.containsKey(fullId)) {
+                    this.legacyToRuntimeId.put(fullId, runtimeId);
+                    if (this.legacyToHashId.containsKey(skull)) {
+                        this.legacyToHashId.putIfAbsent(fullId, this.legacyToHashId.get(skull));
+                    }
+                }
+            }
+        }
+        this.legacyToRuntimeIdCache.invalidateAll();
+    }
+
     public void lock() {
+        if (!this.locked) {
+            this.registerLegacySkullAliases();
+        }
         this.locked = true;
         this.trim();
     }

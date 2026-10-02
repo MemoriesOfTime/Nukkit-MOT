@@ -106,15 +106,21 @@ class CustomBlockDefinitionSerializerTest {
     }
 
     @Test
-    void renderMethodIsNeverRewritten() {
-        // 843+ 网络定义仍接受旧名 alpha_test（Geyser 对 1.21.110+ 的适配只转换 packed_bools、render_method 原样透传）
-        // render_method names must pass through untouched on every protocol; clients accept them as-is
+    void legacyAlphaTestFollowsProtocolBoundaryWithoutMutatingSource() {
+        // Patch 0074 aliases only legacy alpha_test on protocol 843+.
+        // Earlier clients and all other render methods retain their original names.
         for (String name : new String[]{"opaque", "alpha_test", "alpha_test_single_sided", "blend", "double_sided"}) {
-            for (int protocol : new int[]{ProtocolInfo.v1_21_100, ProtocolInfo.v1_21_110_26, ProtocolInfo.v1_21_130, ProtocolInfo.v1_26_20, ProtocolInfo.CURRENT_PROTOCOL}) {
-                CompoundTag out = CustomBlockDefinitionSerializer.serialize(nbtWithRenderMethod(name), protocol);
+            CompoundTag source = nbtWithRenderMethod(name);
+            for (int protocol : new int[]{ProtocolInfo.v1_21_80, ProtocolInfo.v1_21_100, ProtocolInfo.v1_21_110_26,
+                    ProtocolInfo.v1_21_130, ProtocolInfo.v1_26_20, ProtocolInfo.CURRENT_PROTOCOL}) {
+                CompoundTag out = CustomBlockDefinitionSerializer.serialize(source, protocol);
+                String expected = protocol >= ProtocolInfo.v1_21_110_26 && name.equals("alpha_test")
+                        ? "alpha_test_single_sided" : name;
 
-                assertEquals(name, material(out, "components", "*").getString("render_method"), name + " / protocol " + protocol);
-                assertEquals(name, material(out, "permutationComponents", "*").getString("render_method"), name + " / protocol " + protocol);
+                assertEquals(expected, material(out, "components", "*").getString("render_method"), name + " / protocol " + protocol);
+                assertEquals(expected, material(out, "permutationComponents", "*").getString("render_method"), name + " / protocol " + protocol);
+                assertEquals(name, material(source, "components", "*").getString("render_method"));
+                assertEquals(name, material(source, "permutationComponents", "*").getString("render_method"));
             }
         }
     }
