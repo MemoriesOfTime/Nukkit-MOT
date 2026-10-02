@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * DEPENDENCIES.txt 解析、路径构建与 sha256 工具的行为锁定。
  * <p>
- * Locks the behavior of DEPENDENCIES.txt parsing, path building and the sha256 helper.
+ * Locks DEPENDENCIES.txt parsing, path building and the sha256 helper.
  */
 class DependencyManifestTest {
 
@@ -49,36 +49,28 @@ class DependencyManifestTest {
     void corruptedEntryThrows() {
         String header = "repos=https://repo1.maven.org/maven2/\n";
 
-        // 字段数不足 / too few fields
         assertThrows(IllegalArgumentException.class, () ->
                 DependencyManifest.parse(header + "it.unimi.dsi:fastutil:8.5.15:fastutil-8.5.15.jar\n"));
-        // 字段数过多 / too many fields
         assertThrows(IllegalArgumentException.class, () ->
                 DependencyManifest.parse(header + "g:a:1.0:a-1.0.jar:" + VALID_SHA + ":extra\n"));
-        // sha256 非法（长度不足） / invalid sha256 length
         assertThrows(IllegalArgumentException.class, () ->
                 DependencyManifest.parse(header + "g:a:1.0:a-1.0.jar:abc123\n"));
-        // sha256 非法（大写十六进制） / uppercase hex is rejected
         assertThrows(IllegalArgumentException.class, () ->
                 DependencyManifest.parse(header + "g:a:1.0:a-1.0.jar:" + "A".repeat(64) + "\n"));
     }
 
     @Test
     void missingOrMalformedReposLineThrows() {
-        // 缺少 repos= 行 / no repos line at all
         assertThrows(IllegalArgumentException.class, () ->
                 DependencyManifest.parse("g:a:1.0:a-1.0.jar:" + VALID_SHA + "\n"));
-        // repos 列表为空 / empty repos list
         assertThrows(IllegalArgumentException.class, () ->
                 DependencyManifest.parse("repos=\ng:a:1.0:a-1.0.jar:" + VALID_SHA + "\n"));
-        // 只有 repos、没有任何条目 / repos but no entries
         assertThrows(IllegalArgumentException.class, () ->
                 DependencyManifest.parse("repos=https://repo1.maven.org/maven2/\n"));
     }
 
     @Test
     void duplicateFileNameThrows() {
-        // lib/ 扁平命名空间：重名文件会互相覆盖 / duplicate fileNames would overwrite each other in lib/
         assertThrows(IllegalArgumentException.class, () -> DependencyManifest.parse(""
                 + "repos=https://repo1.maven.org/maven2/\n"
                 + "g.one:a:1.0:a-1.0.jar:" + VALID_SHA + "\n"
@@ -96,7 +88,6 @@ class DependencyManifestTest {
 
         assertEquals("org/cloudburstmc/protocol/common/3.0.0.Beta13-SNAPSHOT/common-3.0.0.Beta13-20260915.235937-24.jar",
                 entry.repositoryPath());
-        // 缺尾部斜线的仓库基地址要自动补上 / a missing trailing slash is normalized
         assertEquals("https://repo.example.com/releases/org/cloudburstmc/protocol/common/3.0.0.Beta13-SNAPSHOT/common-3.0.0.Beta13-20260915.235937-24.jar",
                 entry.downloadUrl("https://repo.example.com/releases"));
         assertEquals("https://repo.example.com/releases/org/cloudburstmc/protocol/common/3.0.0.Beta13-SNAPSHOT/common-3.0.0.Beta13-20260915.235937-24.jar",

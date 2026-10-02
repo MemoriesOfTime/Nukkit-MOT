@@ -11,12 +11,11 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * DEPENDENCIES.txt 依赖清单的解析模型与 sha256 工具，供 {@link Bootstrap} 下载引导使用。
+ * DEPENDENCIES.txt 依赖清单的解析模型与 sha256 工具，供 {@link Bootstrap} 下载引导使用；
+ * 只允许使用 JDK（引导阶段无任何第三方依赖）。
  * <p>
- * Parsing model and sha256 helpers for the DEPENDENCIES.txt manifest consumed by {@link Bootstrap}.
- * 只允许使用 JDK：本类运行在任何第三方依赖尚未就位的引导阶段。
- * <p>
- * JDK-only by design: it runs before any third-party dependency is on the classpath.
+ * Parsing model and sha256 helpers for the DEPENDENCIES.txt manifest consumed by {@link Bootstrap};
+ * JDK-only by design (runs before any third-party dependency is on the classpath).
  */
 public final class DependencyManifest {
 
@@ -81,8 +80,6 @@ public final class DependencyManifest {
                 throw new IllegalArgumentException(BootstrapLang.get("manifest.lineMalformed", i + 1, line));
             }
             if (!fileNames.add(f[3])) {
-                // lib/ 是扁平命名空间，重名会互相覆盖导致另一依赖缺失 / flat lib/ namespace: a duplicate
-                // fileName would overwrite the other artifact and leave it missing at runtime
                 throw new IllegalArgumentException(BootstrapLang.get("manifest.lineDuplicateFile", i + 1, f[3]));
             }
             entries.add(new Entry(f[0], f[1], f[2], f[3], f[4]));
@@ -96,11 +93,6 @@ public final class DependencyManifest {
         return new DependencyManifest(repos, entries);
     }
 
-    /**
-     * 从 classpath（与 Bootstrap 同一 jar）读取 DEPENDENCIES.txt。
-     * <p>
-     * Loads DEPENDENCIES.txt from the classpath (the same jar as Bootstrap).
-     */
     public static DependencyManifest loadFromClasspath() throws IOException {
         byte[] bytes;
         try (InputStream in = DependencyManifest.class.getResourceAsStream(RESOURCE)) {
@@ -112,7 +104,7 @@ public final class DependencyManifest {
         return parse(new String(bytes, StandardCharsets.UTF_8));
     }
 
-    /** 单条依赖：groupId、artifactId、仓库目录版本、本地文件名与期望 sha256。 */
+    /** 单条依赖：groupId、artifactId、仓库目录版本、本地文件名与期望 sha256 / one dependency entry */
     public static final class Entry {
         private final String groupId;
         private final String artifactId;
@@ -148,17 +140,14 @@ public final class DependencyManifest {
             return sha256;
         }
 
-        /** 落地到 lib/ 目录的文件。 */
         public Path libFile(Path libsDir) {
             return libsDir.resolve(fileName);
         }
 
-        /** 仓库内相对路径：g(点换斜线)/a/dirVersion/fileName。 */
         public String repositoryPath() {
             return groupId.replace('.', '/') + '/' + artifactId + '/' + dirVersion + '/' + fileName;
         }
 
-        /** 仓库基地址（自动补尾部斜线）拼出的下载 URL。 */
         public String downloadUrl(String repoBase) {
             String base = repoBase.endsWith("/") ? repoBase : repoBase + "/";
             return base + repositoryPath();
@@ -170,11 +159,6 @@ public final class DependencyManifest {
         }
     }
 
-    /**
-     * 流式计算文件 sha256，返回小写十六进制。
-     * <p>
-     * Streams the file and returns its sha256 as lowercase hex.
-     */
     public static String sha256Hex(Path file) throws IOException {
         MessageDigest digest;
         try {

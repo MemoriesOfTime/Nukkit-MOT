@@ -14,14 +14,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 就绪判定的完整性核对：lib/ 文件齐全且 sha256 与清单一致才判就绪，
- * 缺失与损坏（篡改、截断）都必须转入下载路径修复；
- * verifyHashes=false（-Dnukkit.libs.verify=false）退化为仅存在性检查，但缺失仍判未就绪。
+ * 就绪判定的完整性核对：缺失与损坏都必须转入下载路径修复；verifyHashes=false 退化为
+ * 仅存在性检查，但缺失仍判未就绪。
  * <p>
- * Locks the integrity half of the readiness check: lib/ passes only when every file is
- * present and sha256-intact; missing and corrupted (tampered, truncated) files must
- * route to the download path for repair; verifyHashes=false (-Dnukkit.libs.verify=false)
- * degrades to presence-only while a missing file still counts as not ready.
+ * Integrity half of the readiness check: missing/corrupted files must route to the download
+ * path; verifyHashes=false degrades to presence-only while missing files still fail.
  */
 class BootstrapLibIntegrityTest {
 
@@ -52,7 +49,6 @@ class BootstrapLibIntegrityTest {
 
     @Test
     void truncatedEmptyFileFails() throws IOException {
-        // 0 字节截断产物 / truncated to zero bytes
         Files.writeString(libsDir.resolve("a-1.0.jar"), "");
         assertFalse(Bootstrap.libFilesMatchManifest(
                 manifestOf("a-1.0.jar", "content-a"), libsDir, true));
@@ -67,8 +63,6 @@ class BootstrapLibIntegrityTest {
 
     @Test
     void verifyDisabledToleratesTamperedContent() throws IOException {
-        // -Dnukkit.libs.verify=false：运维自替换/修补的 jar 不因 sha 不符被回滚
-        // -Dnukkit.libs.verify=false: operator-swapped jars must not be reverted over a sha mismatch
         writeLibFile("a-1.0.jar", "operator-patched");
         writeLibFile("b-2.0.jar", "anything");
         assertTrue(Bootstrap.libFilesMatchManifest(
@@ -84,9 +78,7 @@ class BootstrapLibIntegrityTest {
 
     @Test
     void corruptClassFileCountsAsNotVisible() throws Exception {
-        // CAFEBABE 魔数 + 截断的常量池 → ClassFormatError，探测须按未就绪处理而非裸崩
-        // CAFEBABE magic + truncated constant pool -> ClassFormatError; the probe must treat
-        // it as not ready instead of crashing with a raw Error
+        // CAFEBABE 魔数 + 截断常量池 → ClassFormatError / truncated constant pool
         Path root = Files.createDirectory(libsDir.resolve("classes"));
         Files.createDirectories(root.resolve("corrupt"));
         Files.write(root.resolve("corrupt/Probe.class"), new byte[]{
@@ -102,7 +94,7 @@ class BootstrapLibIntegrityTest {
         Files.writeString(libsDir.resolve(fileName), content, StandardCharsets.UTF_8);
     }
 
-    /** 期望内容与磁盘解耦：sha256 来自期望内容而非 lib/ 里的实际文件。 */
+    /** 期望内容与磁盘解耦：sha256 来自期望内容而非 lib/ 里的实际文件 / sha of the expected content, not the file on disk */
     private DependencyManifest manifestOf(String... fileNameAndExpectedContent) throws IOException {
         StringBuilder text = new StringBuilder("repos=https://repo1.maven.org/maven2/\n");
         for (int i = 0; i < fileNameAndExpectedContent.length; i += 2) {

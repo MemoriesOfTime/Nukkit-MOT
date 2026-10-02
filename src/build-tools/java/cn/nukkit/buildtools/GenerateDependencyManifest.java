@@ -26,20 +26,20 @@ import java.util.regex.Pattern;
 public final class GenerateDependencyManifest {
 
     private static final List<String> DEFAULT_REPOS = List.of(
-            "https://repo.lanink.cn/repository/maven-public/",
             "https://repo1.maven.org/maven2/",
             "https://repo.opencollab.dev/maven-releases/",
             "https://repo.okaeri.cloud/releases",
-            "https://maven.daporkchop.net/"
+            "https://maven.daporkchop.net/",
+            "https://repo.lanink.cn/repository/maven-public/"
     );
 
-    /** dependency:list 输出携带的 ANSI 颜色转义（ESC[36m / ESC[0;1m / ESC[m 等）。 */
+    /** dependency:list 输出携带的 ANSI 颜色转义 / ANSI escapes carried by dependency:list output */
     private static final Pattern ANSI_COLORS = Pattern.compile("\\u001B\\[[0-9;]*m");
 
-    /** dependency:list 中 " -- module xxx [auto]" 后缀的分隔串。 */
+    /** dependency:list 中 " -- module xxx [auto]" 后缀的分隔串 / separator of the " -- module xxx" suffix */
     private static final String MODULE_SUFFIX_SEP = " -- ";
 
-    /** 形如 -20260918.234329-18 的远程快照时间戳版本后缀。 */
+    /** 形如 -20260918.234329-18 的时间戳快照版本后缀 / timestamped snapshot suffix like -20260918.234329-18 */
     private static final Pattern TIMESTAMPED_VERSION = Pattern.compile("-\\d{8}\\.\\d{6}-\\d+$");
 
     private static final Pattern HEX_64 = Pattern.compile("^[0-9a-f]{64}$");
@@ -106,7 +106,8 @@ public final class GenerateDependencyManifest {
     }
 
     static List<Dependency> parseDependencyList(String content) {
-        // 依赖可能出现多个版本（不同 classifier），按 g:a:classifier 去重并保持列表顺序
+        // 依赖可能出现多个版本（不同 classifier），按 g:a:classifier 去重并保持顺序
+        // Dedupe by g:a:classifier, keeping first-seen order
         Map<String, Dependency> unique = new LinkedHashMap<>();
         for (String raw : content.split("\n", -1)) {
             String line = ANSI_COLORS.matcher(raw).replaceAll("").replace("\r", "");
@@ -142,7 +143,7 @@ public final class GenerateDependencyManifest {
     record LocalArtifact(String dirVersion, Path file) {
     }
 
-    /** 仓库目录版本：快照（含时间戳快照）用 baseVersion，release 即版本本身。 */
+    /** 仓库目录版本：快照（含时间戳快照）用 baseVersion，release 即版本本身 / repository dir version */
     static String dirVersion(String version) {
         Matcher m = TIMESTAMPED_VERSION.matcher(version);
         if (version.endsWith("-SNAPSHOT")) {
@@ -174,8 +175,10 @@ public final class GenerateDependencyManifest {
 
         List<SnapshotJar> timestamped = listSnapshotJars(dir, dep.artifactId(), dirVersion, dep.classifier());
         if (!timestamped.isEmpty()) {
-            // 快照产物选择：优先用 a-baseVersion.jar（Maven 解析固定时间戳版本时落下的解析产物副本）的
-            // sha256 精确锁定实际解析的文件；无副本可对照时才回退到目录内最新的时间戳构件
+            // 优先取与 a-baseVersion.jar 副本（Maven 解析固定时间戳版本的产物）sha256 一致的时间戳
+            // 构件，无副本才回退目录内最新；即锁定实际解析的文件
+            // Prefer the timestamped jar matching the a-baseVersion.jar copy's sha256 (what Maven
+            // actually resolved); fall back to the newest one without a copy
             Path plain = dir.resolve(plainName);
             if (Files.isRegularFile(plain)) {
                 String plainSha = sha256Hex(plain);
@@ -214,7 +217,7 @@ public final class GenerateDependencyManifest {
         }
     }
 
-    /** 列出 a-时间戳-序号[-classifier].jar 形态的远程解析产物，按新旧升序。 */
+    /** 列出时间戳快照构件，按新旧升序 / lists timestamped snapshot jars, oldest first */
     private static List<SnapshotJar> listSnapshotJars(Path dir, String artifactId,
                                                        String dirVersion, String classifier) throws IOException {
         String stem = dirVersion.substring(0, dirVersion.length() - "-SNAPSHOT".length());

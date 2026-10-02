@@ -7,10 +7,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * 重启子进程的 JVM 参数继承过滤：运行参数透传、启动器管理参数（及其取值）剔除。
+ * 重启子进程的 JVM 参数继承过滤：运行参数透传，启动器管理参数（及其取值）剔除。
  * <p>
- * Filters the JVM arguments inherited by the re-exec'd child process: runtime flags pass
- * through, launcher-managed options (and their values) are dropped.
+ * Filters the JVM args inherited by the re-exec'd child: runtime flags pass through,
+ * launcher-managed options (and their values) are dropped.
  */
 class BootstrapReexecTest {
 

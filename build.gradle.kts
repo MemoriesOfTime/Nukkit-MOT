@@ -1,4 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
+import java.security.MessageDigest
 
 plugins {
     id("java-library")
@@ -43,12 +44,32 @@ val mockitoAgent by configurations.creating {
     isTransitive = false
 }
 
+// 对齐 pom 的有效 runtime 图：jsr305（Maven provided）与 error_prone_annotations（pom 逐依赖排除）
+// 不进 Maven runtime，Gradle 侧须显式排除
+// Align with the pom's effective runtime graph: neither reaches Maven runtime, exclude here
+configurations.runtimeClasspath {
+    exclude(group = "com.google.code.findbugs", module = "jsr305")
+    exclude(group = "com.google.errorprone", module = "error_prone_annotations")
+}
+
 dependencies {
-    // 与 pom.xml dependencyManagement 同步的传递依赖 pin，防 Gradle 依赖解析漂移
-    // Transitive pins mirroring pom.xml dependencyManagement, guarding against Gradle resolution drift
+    // 与 pom.xml dependencyManagement 同步的传递依赖 pin，防 Gradle 解析漂移
+    // Transitive pins mirroring pom.xml dependencyManagement, guarding against resolution drift
     constraints {
         implementation("net.jodah:expiringmap:${libs.versions.expiringmap.get()}")
         implementation("org.slf4j:slf4j-api:${libs.versions.slf4j.api.get()}")
+        // Maven nearest-wins 解析出 2.18.0，Gradle highest-wins 会漂到 2.20，strictly 钉死对齐
+        // Maven resolves 2.18.0 while Gradle highest-wins drifts to 2.20; pin strictly
+        implementation("com.fasterxml.jackson.core:jackson-annotations") { version { strictly("2.18.0") } }
+        // nbt 3.0.5 把 putList(List) 改成 Collection（二进制不兼容），主代码按 3.0.3 编译；
+        // Maven 有效版本恒为 3.0.3，strictly 钉死对齐
+        // nbt 3.0.5 is binary incompatible (putList(List) -> Collection); Maven stays on 3.0.3
+        implementation("org.cloudburstmc:nbt") { version { strictly("3.0.3.Final") } }
+        // 传递快照按 Maven 解析的时间戳版本 pin，文件名与 Maven 一致（bare -SNAPSHOT 的 Gradle
+        // 缓存文件名远程不可下载）
+        // Pin transitive snapshots to Maven's timestamped versions so file names match
+        implementation("net.daporkchop.lib:common:0.5.9-20250718.163325-7")
+        implementation("net.daporkchop.lib:unsafe:0.5.9-20250718.163325-7")
     }
     api(libs.nethernet) {
         exclude("io.netty")
@@ -170,6 +191,112 @@ publishing {
 }
 
 
+// ---------------------------------------------------------------------------
+// Bootstrap Lite 发行版与 DEPENDENCIES.txt 生成，对齐 Maven 侧管线；
+// 镜像列表双写由 DependencyManifestReposConsistencyTest 守护
+// Bootstrap Lite flavor and DEPENDENCIES.txt generation, mirroring the Maven pipeline;
+// the duplicated mirror list is guarded by DependencyManifestReposConsistencyTest
+// ---------------------------------------------------------------------------
+
+// 与 GenerateDependencyManifest.DEFAULT_REPOS 同步（顺序即下载失败回退优先级）
+// Keep in sync with GenerateDependencyManifest.DEFAULT_REPOS (order is failover priority)
+val dependencyDownloadRepos = listOf(
+    "https://repo1.maven.org/maven2/",
+    "https://repo.opencollab.dev/maven-releases/",
+    "https://repo.okaeri.cloud/releases",
+    "https://maven.daporkchop.net/",
+    "https://repo.lanink.cn/repository/maven-public/"
+)
+
+// 与 GenerateDependencyManifest.dirVersion 同步：时间戳快照版本折回 baseVersion-SNAPSHOT 仓库目录
+// （正则里 \$ 是字面美元符而非行尾锚，用 \Z 表输入结尾）
+// Mirrors GenerateDependencyManifest.dirVersion: timestamped snapshots fold back to the
+// baseVersion-SNAPSHOT directory (\$ is a literal dollar, \Z is end-of-input)
+val timestampedSnapshotSuffix = Regex("-\\d{8}\\.\\d{6}-\\d+\\Z")
+
+fun repositoryDirVersion(version: String): String {
+    if (version.endsWith("-SNAPSHOT")) {
+        return version
+    }
+    val match = timestampedSnapshotSuffix.find(version) ?: return version
+    return version.substring(0, match.range.first) + "-SNAPSHOT"
+}
+
+fun sha256Hex(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) {
+                break
+            }
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+}
+
+val generatedDependencyManifest = layout.buildDirectory.file("generated/dependency-manifest/DEPENDENCIES.txt")
+
+// 解析 runtimeClasspath 生成与 Maven 同格式的 DEPENDENCIES.txt；不复用 GenerateDependencyManifest
+// 是因为它按 ~/.m2 布局定位构件，Gradle-only 机器不可用
+// Not reusing GenerateDependencyManifest: it locates artifacts via the ~/.m2 layout
+val generateDependencyManifest by tasks.registering {
+    val runtimeClasspath = configurations.runtimeClasspath.get()
+    inputs.files(runtimeClasspath)
+    outputs.file(generatedDependencyManifest)
+    doLast {
+        val entries = LinkedHashMap<String, String>()
+        for (artifact in runtimeClasspath.incoming.artifacts.resolvedArtifacts.get()) {
+            val component = artifact.id.componentIdentifier
+            check(component is ModuleComponentIdentifier) {
+                "非外部模块构件无法进下载清单 / non-module artifact in runtime classpath: ${artifact.file}"
+            }
+            val line = "${component.group}:${component.module}:" +
+                    "${repositoryDirVersion(component.version)}:${artifact.file.name}:${sha256Hex(artifact.file)}"
+            val previous = entries.putIfAbsent(artifact.file.name, line)
+            check(previous == null || previous == line) {
+                "lib/ 文件名冲突 / duplicate lib file name: ${artifact.file.name}"
+            }
+        }
+        generatedDependencyManifest.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(
+                "repos=" + dependencyDownloadRepos.joinToString("|") + "\n" +
+                        entries.values.joinToString("\n") + "\n"
+            )
+        }
+        logger.lifecycle("Generated DEPENDENCIES.txt with {} runtime dependencies", entries.size)
+    }
+}
+
+// Bootstrap 引导的 Lite thin jar：Main-Class=Bootstrap + Class-Path=lib/... + 内嵌清单，
+// 产物名与落点（target/*-Lite.jar）与 Maven 侧 antrun 改名一致
+// Bootstrap-flavored thin jar named and placed like the Maven-side antrun rename
+val liteJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("Lite")
+    destinationDirectory.set(file("$projectDir/target"))
+    dependsOn(generateDependencyManifest)
+    from(sourceSets.main.get().output)
+    from(generatedDependencyManifest)
+    doFirst {
+        // Class-Path 从生成的清单派生，文件名与 DEPENDENCIES.txt 严格一致（对应 maven-jar-plugin 的
+        // addClasspath + classpathPrefix lib/）
+        // Class-Path derives from the generated manifest so names always match DEPENDENCIES.txt
+        val libs = generatedDependencyManifest.get().asFile.readText().lines()
+            .filter { it.isNotBlank() && !it.startsWith("repos=") }
+            .map { "lib/" + it.split(":")[3] }
+        manifest.attributes(
+            mapOf(
+                "Main-Class" to "cn.nukkit.Bootstrap",
+                "Class-Path" to libs.joinToString(" ")
+            )
+        )
+    }
+}
+
+
 tasks {
     compileJava {
         options.encoding = "UTF-8"
@@ -216,6 +343,10 @@ tasks {
         archiveClassifier.set("dev")
     }
 
+    assemble {
+        dependsOn(liteJar)
+    }
+
     shadowJar {
         manifest.attributes["Multi-Release"] = "true"
 
@@ -231,6 +362,11 @@ tasks {
         // Backwards compatible jar directory
         destinationDirectory.set(file("$projectDir/target"))
         archiveClassifier.set("")
+
+        // 与 Maven shaded jar 对齐：内嵌 DEPENDENCIES.txt（Bootstrap 不在其入口，仅随包分发）
+        // Match the Maven shaded jar, which also embeds DEPENDENCIES.txt
+        dependsOn(generateDependencyManifest)
+        from(generatedDependencyManifest)
 
         exclude("javax/annotation/**")
 

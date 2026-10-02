@@ -14,14 +14,12 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 防御测试：Bootstrap 及其同包辅助类只准 import JDK，任何第三方依赖都会让引导阶段在依赖
- * 下载完成前崩溃；且用户可见文本必须走 {@link BootstrapLang}，源码字符串字面量里不得再
- * 出现硬编码的中文消息（注释里的中文不受限）。
+ * 防御测试：Bootstrap 及其同包辅助类只准 import JDK（第三方导入会让引导阶段在依赖
+ * 下载完成前崩溃）；用户可见文本必须走 {@link BootstrapLang}，字符串字面量里不得
+ * 出现硬编码中文（注释不受限）。
  * <p>
- * Defensive tests: Bootstrap and its same-package helpers may only import the JDK (a third-party
- * import would crash the bootstrap phase before any dependency has been downloaded), and all
- * user-visible text must go through {@link BootstrapLang} — no hardcoded CJK messages inside
- * string literals (comments are exempt).
+ * Defensive tests: bootstrap classes may only import the JDK, and user-visible text must go
+ * through {@link BootstrapLang} — no hardcoded CJK inside string literals (comments exempt).
  */
 class BootstrapJdkOnlyImportsTest {
 

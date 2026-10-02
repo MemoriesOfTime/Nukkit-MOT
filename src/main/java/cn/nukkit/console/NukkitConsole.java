@@ -29,9 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>
  * Console input loop for the server: reads commands via jline and dispatches them through the scheduler.
  * <p>
- * Adapted from terminalconsoleappender (<a href="https://github.com/Minecrell/terminalconsoleappender">terminalconsoleappender</a>):
- * the read loop replicates SimpleTerminalConsole with one fix — EOF on a non-TTY stdin (pipes or
- * redirection) is permanent, so the loop stops instead of re-printing the prompt forever.
+ * Adapted from terminalconsoleappender (<a href="https://github.com/Minecrell/terminalconsoleappender">terminalconsoleappender</a>).
  */
 @RequiredArgsConstructor
 public class NukkitConsole extends SimpleTerminalConsole {
@@ -100,11 +98,7 @@ public class NukkitConsole extends SimpleTerminalConsole {
         }
     }
 
-    /**
-     * 复刻父类 start()，仅为把读取循环换成本类修复了 EOF 死循环的版本。
-     * <p>
-     * Replicates the parent start() only to substitute the read loop with the EOF-safe variant below.
-     */
+    /** 复刻父类 start()，仅为换用下方 EOF 安全的读取循环 / replicates the parent to swap in the EOF-safe loop */
     @Override
     public void start() {
         try {
@@ -120,12 +114,11 @@ public class NukkitConsole extends SimpleTerminalConsole {
     }
 
     /**
-     * 复刻 SimpleTerminalConsole 的终端读取循环，唯一差异：非 TTY 终端（管道/重定向，脚本部署常见）
-     * 的 EOF 是永久关闭，直接退出而不是继续循环重复打印 "> " 提示符（上游无限忙转，日志以 MB 级膨胀）。
+     * 复刻 SimpleTerminalConsole 的终端读取循环，唯一差异：非 TTY 终端（管道/重定向）的
+     * EOF 是永久关闭，直接退出而非无限重复打印提示符。
      * <p>
-     * Mirrors SimpleTerminalConsole's terminal loop with one difference: on a non-TTY terminal
-     * (piped or redirected stdin) EOF is permanent, so the loop returns instead of spinning and
-     * re-printing the "> " prompt forever.
+     * Mirrors SimpleTerminalConsole's loop except EOF on a non-TTY terminal is permanent:
+     * return instead of spinning and re-printing the prompt.
      */
     private void readCommands(Terminal terminal) {
         LineReader reader = buildReader(LineReaderBuilder.builder().terminal(terminal));
@@ -154,7 +147,7 @@ public class NukkitConsole extends SimpleTerminalConsole {
         }
     }
 
-    /** 复刻 SimpleTerminalConsole 的流读取回退（无终端时用 BufferedReader，无提示符）。 */
+    /** 复刻 SimpleTerminalConsole 的流读取回退（无终端时用 BufferedReader）/ the stream fallback without a terminal */
     private void readCommands(InputStream stream) throws IOException {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
             String line;

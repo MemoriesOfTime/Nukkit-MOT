@@ -663,12 +663,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>3.7.0</version>
-                <!-- 快照构件按实际解析产物（时间戳文件名）复制而非 baseVersion 名：
-                     与 DEPENDENCIES.txt / MANIFEST Class-Path 的精确 pin 对齐，
+                <!-- 快照按实际解析的时间戳文件名复制，与 DEPENDENCIES.txt / Class-Path 的精确 pin 对齐，
                      copy-dependencies 预置的 lib/ 可被引导直接判定就绪
-                     Copy snapshots under their resolved timestamped file names instead of
-                     baseVersion names, matching the exact pins in DEPENDENCIES.txt and the
-                     manifest Class-Path, so a preset lib/ passes the bootstrap readiness check -->
+                     Copy snapshots under resolved timestamped names, matching the exact pins -->
                 <configuration>
                     <useBaseVersion>false</useBaseVersion>
                 </configuration>
@@ -680,8 +677,8 @@
                             <goal>properties</goal>
                         </goals>
                     </execution>
-                    <!-- 运行时依赖清单输入：供 GenerateDependencyManifest 在 prepare-package 生成 DEPENDENCIES.txt
-                         Feeds GenerateDependencyManifest with the resolved runtime dependency list -->
+                    <!-- 运行时依赖清单输入，供 GenerateDependencyManifest 生成 DEPENDENCIES.txt
+                         Feeds GenerateDependencyManifest with the runtime dependency list -->
                     <execution>
                         <id>runtime-dependency-list</id>
                         <phase>generate-resources</phase>
@@ -718,8 +715,8 @@
                             </arguments>
                         </configuration>
                     </execution>
-                    <!-- 生成 target/classes/DEPENDENCIES.txt（随 package 进 jar，供 Bootstrap 下载引导）
-                         Emits target/classes/DEPENDENCIES.txt for the runtime bootstrap -->
+                    <!-- 生成 target/classes/DEPENDENCIES.txt，随 package 进 jar 供 Bootstrap 使用
+                         Emits target/classes/DEPENDENCIES.txt, packaged for Bootstrap -->
                     <execution>
                         <id>generate-dependency-manifest</id>
                         <phase>prepare-package</phase>
@@ -799,9 +796,8 @@
                         <transformer
                                 implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer">
                         </transformer>
-                        <!-- 分发用 shaded jar 仍是自包含的：显式固定 Main-Class，避免继承 jar 插件清单里的 Bootstrap 入口
-                             The shaded distribution jar stays self-contained; pin Main-Class explicitly instead of
-                             inheriting the Bootstrap entry from the jar plugin's manifest -->
+                        <!-- shaded jar 保持自包含：显式固定 Main-Class，避免继承 jar 插件清单的 Bootstrap 入口
+                             Pin Main-Class so the shaded jar stays self-contained -->
                         <transformer
                                 implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                             <mainClass>cn.nukkit.Nukkit</mainClass>
@@ -809,6 +805,32 @@
                     </transformers>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
                 </configuration>
+            </plugin>
+            <plugin>
+                <!-- shade 把 thin jar 留成 original-<finalName>.jar，改名 <finalName>-Lite.jar 作为引导
+                     自动下载发行版（original- 前缀匹配不到 CI 的 Nukkit-*.jar 归档通配）；
+                     shade 被跳过（central-release）时无此文件，failonerror=false 容忍
+                     Rename the shade leftover to the Lite flavor; failonerror=false tolerates
+                     its absence when shading is skipped -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>rename-thin-jar-to-lite</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                    <move file="${project.build.directory}/original-${project.build.finalName}.jar"
+                                          tofile="${project.build.directory}/${project.build.finalName}-Lite.jar"
+                                          failonerror="false"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>pl.project13.maven</groupId>

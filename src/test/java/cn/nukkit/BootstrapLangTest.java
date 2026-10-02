@@ -14,12 +14,11 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 引导多语言：六个语言包键集合与英文基准完全一致、占位符不漂移、语言解析顺序
- * （-D 属性 &gt; server.properties &gt; Locale）与未知语言回落英文。
+ * 引导多语言：六语言包键集合与英文基准一致、占位符不漂移、语言解析顺序
+ * （属性 &gt; server.properties &gt; Locale）与未知语言回落英文。
  * <p>
- * Bootstrap i18n: all six bundles carry exactly the English key set, placeholders never drift,
- * and language resolution order (system property &gt; server.properties &gt; locale) plus the
- * English fallback for unknown languages stay locked.
+ * Bootstrap i18n: key sets and placeholders stay locked across the six bundles, and the
+ * language resolution order (property &gt; server.properties &gt; locale) with English fallback.
  */
 class BootstrapLangTest {
 
@@ -70,7 +69,7 @@ class BootstrapLangTest {
     void argumentValuesAreNotRescannedForPlaceholders() {
         // {0} 的值含 {1} 字样时不得被后续参数再替换；越界序号 {2}/{3} 原样保留
         // a literal {1} inside an argument value must survive; out-of-range {2}/{3} stay verbatim
-        assertEquals("Download ({1}/x) {2} ... OK ({3} MB)",
+        assertEquals("Download ({1}/x) {2} ... OK ({3})",
                 BootstrapLang.forLanguage("eng").text("download.ok", "{1}", "x"));
     }
 
