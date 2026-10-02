@@ -182,6 +182,10 @@ class BootstrapParallelDownloadTest {
         serverPool = Executors.newFixedThreadPool(8);
         server.setExecutor(serverPool);
         server.createContext("/", exchange -> {
+            // Count at handler entry: a finally-position increment races the client — the body is
+            // already flushed once the stream closes, so downloadAll can return before the counter
+            // catches up
+            requests.incrementAndGet();
             int now = inFlight.incrementAndGet();
             peakInFlight.accumulateAndGet(now, Math::max);
             try {
@@ -199,7 +203,6 @@ class BootstrapParallelDownloadTest {
                 Thread.currentThread().interrupt();
             } finally {
                 inFlight.decrementAndGet();
-                requests.incrementAndGet();
                 exchange.close();
             }
         });
