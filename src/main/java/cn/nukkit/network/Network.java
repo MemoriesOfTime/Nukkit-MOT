@@ -125,9 +125,7 @@ public class Network {
     }
 
     public void processInterfaces() {
-        // 异常分支的 unregisterInterface 会边迭代边从 this.interfaces 删除，拷贝防 CME
-        // unregisterInterface mutates the set mid-iteration; copy to avoid CME
-        for (SourceInterface interfaz : new ArrayList<>(this.interfaces)) {
+        for (SourceInterface interfaz : this.interfaces) {
             try {
                 interfaz.process();
             } catch (Exception e) {
