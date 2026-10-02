@@ -193,6 +193,7 @@ class PlayerCreativeUiResetTest {
 
     private static List<Station> stations() {
         return List.of(
+                new Station("anvil", Player.ANVIL_WINDOW_ID, AnvilInventory::new, 2),
                 new Station("enchant", Player.ENCHANT_WINDOW_ID, EnchantInventory::new, 2),
                 new Station("grindstone", Player.GRINDSTONE_WINDOW_ID, GrindstoneInventory::new, 2),
                 new Station("smithing", Player.SMITHING_WINDOW_ID, SmithingInventory::new, 3),
