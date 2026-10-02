@@ -57,7 +57,8 @@ public class StateBlockStorage {
     private NibbleArray blockData;
 
     public StateBlockStorage() {
-        this(BitArrayVersion.V2);
+        // A fresh layer contains only air: allocate cell words on its first mutation.
+        this(BitArrayVersion.V0);
     }
 
     public StateBlockStorage(BitArrayVersion version) {
@@ -384,6 +385,12 @@ public class StateBlockStorage {
     }
 
     private void grow(BitArrayVersion version) {
+        if (this.bitArray.getVersion() == BitArrayVersion.V0 && this.bitArray.get(0) == 0) {
+            // A singleton has only index zero. Start at the previous default width
+            // without copying 4096 zeros or immediately growing through V1 again.
+            this.bitArray = BitArrayVersion.V2.createPalette(SECTION_SIZE);
+            return;
+        }
         BitArray newBitArray = version.createPalette(SECTION_SIZE);
         for (int i = 0; i < SECTION_SIZE; i++) {
             newBitArray.set(i, this.bitArray.get(i));
