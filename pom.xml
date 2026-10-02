@@ -663,9 +663,10 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>3.7.0</version>
-                <!-- 快照按实际解析的时间戳文件名复制，与 DEPENDENCIES.txt / Class-Path 的精确 pin 对齐，
-                     copy-dependencies 预置的 lib/ 可被引导直接判定就绪
-                     Copy snapshots under resolved timestamped names, matching the exact pins -->
+                <!-- 快照按实际解析的时间戳文件名复制，与 DEPENDENCIES.txt / Class-Path 的精确 pin 对齐；
+                     仅作用于手动执行 dependency:copy-dependencies 预置的 lib/，使其可被引导直接判定就绪
+                     Copies snapshots under resolved timestamped names matching the exact pins; applies to
+                     manually invoked dependency:copy-dependencies so a pre-populated lib/ verifies as ready -->
                 <configuration>
                     <useBaseVersion>false</useBaseVersion>
                 </configuration>

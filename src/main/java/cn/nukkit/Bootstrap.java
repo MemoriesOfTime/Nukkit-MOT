@@ -64,7 +64,7 @@ public final class Bootstrap {
     /** 运维逃生口：恢复重启进程路径 / escape hatch reviving the process-restart path */
     private static final String FORCE_REEXEC_PROPERTY = "nukkit.bootstrap.reexec.force";
     /**
-     * 仅作 classpath 可见性探测（无清单的 shaded jar、IDE 运行、libs.dir 指向别处时），
+     * 仅作 classpath 可见性探测（IDE 等无清单运行、libs.dir 指向别处时），
      * 就绪与否以 lib/ 文件齐全为准，避免清单缺该依赖导致循环重启。
      * <p>
      * Visibility probe only; readiness is decided by the lib/ files, not this class.
@@ -156,13 +156,14 @@ public final class Bootstrap {
      * 就绪判定：有清单时逐条校验 lib/ 文件存在且 sha256 一致（{@code verifyHashes=false} 退化为
      * 仅存在性检查），再以探测类确认当前 classpath 真正可见——jar 清单的 Class-Path 按 jar 位置
      * 解析，工作目录≠jar 目录时覆盖不到，由同进程启动以显式 classpath 兜底；无清单或非 jar 运行
-     * （shaded jar / IDE）退回探测类单检，维持旧语义。
+     * （IDE 等）退回探测类单检。shaded jar 虽同样内嵌清单，但入口是 Nukkit，正常启动到不了这里。
      * <p>
      * Readiness: with a manifest, every lib/ file must exist with a matching sha256
      * (presence-only under verifyHashes=false) and the probe class must be visible on the
      * current classpath — the jar manifest's Class-Path resolves against the jar location,
      * so the in-process launch backs it up with an explicit classpath. Without a manifest
-     * (shaded jar / IDE) the probe alone decides.
+     * or when not run from a jar (IDE) the probe alone decides. The shaded jar embeds the
+     * manifest too, but its entry point is Nukkit, so a normal launch never reaches here.
      */
     private static boolean dependenciesReady(boolean verifyHashes) {
         DependencyManifest manifest;

@@ -198,6 +198,17 @@ publishing {
 // the duplicated mirror list is guarded by DependencyManifestReposConsistencyTest
 // ---------------------------------------------------------------------------
 
+// build-tools 源码由 Maven 侧（build-helper 编译 + exec 运行），Gradle 不消费；
+// 单独源集只为编译检查，防该文件只在 Gradle 工作流下改动时烂掉。
+// Maven 侧与主代码同 classpath 编译（MinifyJsonResources 用 Gson），此处同样挂主 classpath
+// The build-tools sources are compiled and run by the Maven pipeline only; this standalone
+// source set is a compile check so Gradle-side edits cannot rot the file. Maven compiles
+// them against the main classpath (MinifyJsonResources uses Gson); mirrored here.
+val buildTools = sourceSets.create("buildTools") {
+    java.srcDir("src/build-tools/java")
+}
+buildTools.compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
+
 // 与 GenerateDependencyManifest.DEFAULT_REPOS 同步（顺序即下载失败回退优先级）
 // Keep in sync with GenerateDependencyManifest.DEFAULT_REPOS (order is failover priority)
 val dependencyDownloadRepos = listOf(
@@ -310,6 +321,16 @@ tasks {
 
     compileTestJava {
         options.encoding = "UTF-8"
+    }
+
+    // 见上方 buildTools 源集：编译检查挂在 check 上 / compile check for the Maven-only
+    // build-tools sources, wired into check (build reaches it transitively)
+    named<JavaCompile>(buildTools.compileJavaTaskName) {
+        options.encoding = "UTF-8"
+    }
+
+    check {
+        dependsOn(buildTools.compileJavaTaskName)
     }
 
     test {
