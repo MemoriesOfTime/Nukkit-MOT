@@ -113,6 +113,27 @@ public class PalettedBlockStorage {
         }
     }
 
+    /**
+     * {@link #setBlock(int, int)} that also returns the palette index the cell received. A caller that feeds
+     * many cells with the same runtime ID may pass that index to {@link #setPaletteIndex(int, int)} for the
+     * following cells: indices never change once assigned (growing the bit array copies them), so the result
+     * is exactly what repeated setBlock calls would produce.
+     */
+    public int setBlockReturningIndex(int index, int runtimeId) {
+        try {
+            int id = this.idFor(runtimeId);
+            this.bitArray.set(index, id);
+            return id;
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Unable to set block runtime ID: " + runtimeId + ", palette: " + palette, e);
+        }
+    }
+
+    /** Points a cell at a palette index returned earlier by {@link #setBlockReturningIndex(int, int)}. */
+    public void setPaletteIndex(int index, int paletteIndex) {
+        this.bitArray.set(index, paletteIndex);
+    }
+
     public void setBlock(BlockVector3 pos, int value) {
         this.setBlock(getIndex(pos.x, pos.y, pos.z), value);
     }

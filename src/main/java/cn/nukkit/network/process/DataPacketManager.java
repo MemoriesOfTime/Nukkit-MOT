@@ -1,6 +1,8 @@
 package cn.nukkit.network.process;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.PlayerHandle;
+import cn.nukkit.Server;
 import cn.nukkit.network.process.processor.ServerboundDataDrivenScreenClosedProcessor;
 import cn.nukkit.network.process.processor.ServerboundDataStoreProcessor;
 import cn.nukkit.network.process.processor.common.*;
@@ -32,19 +34,18 @@ import java.util.concurrent.ConcurrentHashMap;
 @SuppressWarnings("rawtypes")
 public final class DataPacketManager {
 
-    private static final LinkedList<Integer> PROTOCOL_PROCESSORS_KEYS = new LinkedList<>();
-
-    private static final Int2ObjectOpenHashMap<Object2ObjectOpenHashMap<Class<? extends DataPacket>, DataPacketProcessor>> PROTOCOL_PROCESSORS_BY_CLASS = new Int2ObjectOpenHashMap<>();
-    private static final ObjectOpenHashSet REGISTERED_PACKETS_BY_CLASS = new ObjectOpenHashSet<Class>();
-    private static final IntOpenHashSet UNREGISTERED_PACKETS_BY_CLASS = new IntOpenHashSet();
-
+    // 注册表：registerProcessor 按协议阈值注册的分桶，与具体客户端无关
+    // Registration tables bucketed by protocol threshold, independent of any client
     private static final Int2ObjectOpenHashMap<Int2ObjectOpenHashMap<DataPacketProcessor>> PROTOCOL_PROCESSORS = new Int2ObjectOpenHashMap<>();
-
+    private static final Int2ObjectOpenHashMap<Object2ObjectOpenHashMap<Class<? extends DataPacket>, DataPacketProcessor>> PROTOCOL_PROCESSORS_BY_CLASS = new Int2ObjectOpenHashMap<>();
+    private static final LinkedList<Integer> PROTOCOL_PROCESSORS_KEYS = new LinkedList<>();
     private static final IntOpenHashSet REGISTERED_PACKETS = new IntOpenHashSet();
-    private static final IntOpenHashSet UNREGISTERED_PACKETS = new IntOpenHashSet();
+    private static final ObjectOpenHashSet REGISTERED_PACKETS_BY_CLASS = new ObjectOpenHashSet<Class>();
 
-    // 无锁解析缓存：packetClass → [protocol, processor|NO_PROCESSOR, ...] 平铺数组（已解析含负结果）；注册时整体失效
-    // Lock-free resolution cache: per-class flat [protocol, result] arrays (nulls cached too); cleared on registration
+    // 无锁解析缓存：packetClass → [gameVersion, processor|NO_PROCESSOR, ...] 平铺数组（已解析含负结果）；注册时整体失效。
+    // 键用 GameVersion 而非协议号：标准/网易同协议号互不污染
+    // Lock-free resolution cache: per-class flat [gameVersion, result] arrays (nulls cached too);
+    // keyed by GameVersion (not protocol number) so standard/NetEase never share entries; cleared on registration
     private static final ConcurrentHashMap<Class<? extends DataPacket>, Object[]> RESOLUTION_CACHE = new ConcurrentHashMap<>();
     private static final Object NO_PROCESSOR = new Object();
 
@@ -69,73 +70,62 @@ public final class DataPacketManager {
             PROTOCOL_PROCESSORS_KEYS.sort(Comparator.reverseOrder());
         }
 
-        UNREGISTERED_PACKETS_BY_CLASS.clear();
-        UNREGISTERED_PACKETS.clear();
         RESOLUTION_CACHE.clear();
     }
 
-    public static boolean canProcess(int protocol, int packetId) {
-        return getProcessor(protocol, packetId) != null;
+    public static boolean canProcess(GameVersion gameVersion, int packetId) {
+        return getProcessor(gameVersion, packetId) != null;
     }
 
-    public static boolean canProcess(int protocol, Class<? extends DataPacket> packet) {
-        return getProcessor(protocol, packet) != null;
+    public static boolean canProcess(GameVersion gameVersion, Class<? extends DataPacket> packet) {
+        return getProcessor(gameVersion, packet) != null;
     }
 
-    public static DataPacketProcessor getProcessor(int protocol, Class<? extends DataPacket> packet) {
-        Object cached = lookupResolutionCache(protocol, packet);
+    public static DataPacketProcessor getProcessor(GameVersion gameVersion, Class<? extends DataPacket> packet) {
+        Object cached = lookupResolutionCache(gameVersion, packet);
         if (cached != null) {
             return cached == NO_PROCESSOR ? null : (DataPacketProcessor) cached;
         }
-        return resolveProcessor(protocol, packet);
+        return resolveProcessor(gameVersion, packet);
     }
 
-    private static synchronized DataPacketProcessor resolveProcessor(int protocol, Class<? extends DataPacket> packet) {
+    private static synchronized DataPacketProcessor resolveProcessor(GameVersion gameVersion, Class<? extends DataPacket> packet) {
         // 双检：等锁期间其他线程可能已完成解析并写回缓存
-        Object cached = lookupResolutionCache(protocol, packet);
+        Object cached = lookupResolutionCache(gameVersion, packet);
         if (cached != null) {
             return cached == NO_PROCESSOR ? null : (DataPacketProcessor) cached;
         }
-        DataPacketProcessor processor = getProcessorUncached(protocol, packet);
-        // 懒注册路径的 registerProcessor 会清缓存，须在其后写回
-        cacheResolution(protocol, packet, processor);
+        DataPacketProcessor processor = getProcessorUncached(gameVersion, packet);
+        cacheResolution(gameVersion, packet, processor);
         return processor;
     }
 
-    private static DataPacketProcessor getProcessorUncached(int protocol, Class<? extends DataPacket> packet) {
-        int index = getIndex(protocol, packet);
-        if (!REGISTERED_PACKETS_BY_CLASS.contains(packet) || UNREGISTERED_PACKETS_BY_CLASS.contains(index)) {
+    private static DataPacketProcessor getProcessorUncached(GameVersion gameVersion, Class<? extends DataPacket> packet) {
+        if (!REGISTERED_PACKETS_BY_CLASS.contains(packet)) {
             return null;
         }
 
-        DataPacketProcessor processor = getProcessor0(protocol, packet);
-        if (processor != null) {
-            return processor;
-        }
-
+        int protocol = gameVersion.getProtocol();
         for (int p : PROTOCOL_PROCESSORS_KEYS) {
             if (p > protocol) {
                 continue;
             }
 
-            processor = getProcessor0(p, packet);
-            if (processor != null && processor.isSupported(protocol)) {
-                registerProcessor(protocol, processor);
+            DataPacketProcessor processor = getProcessor0(p, packet);
+            if (processor != null && processor.isSupported(gameVersion)) {
                 return processor;
             }
         }
-
-        UNREGISTERED_PACKETS_BY_CLASS.add(index);
         return null;
     }
 
-    private static Object lookupResolutionCache(int protocol, Class<? extends DataPacket> packet) {
+    private static Object lookupResolutionCache(GameVersion gameVersion, Class<? extends DataPacket> packet) {
         Object[] table = RESOLUTION_CACHE.get(packet);
         if (table == null) {
             return null;
         }
         for (int i = 0; i < table.length; i += 2) {
-            if ((Integer) table[i] == protocol) {
+            if (table[i] == gameVersion) {
                 return table[i + 1];
             }
         }
@@ -143,15 +133,15 @@ public final class DataPacketManager {
     }
 
     // 仅在 resolveProcessor 的类监视器内调用：平铺数组的读-改-写非原子，靠该锁串行
-    private static void cacheResolution(int protocol, Class<? extends DataPacket> packet, DataPacketProcessor processor) {
+    private static void cacheResolution(GameVersion gameVersion, Class<? extends DataPacket> packet, DataPacketProcessor processor) {
         Object value = processor == null ? NO_PROCESSOR : processor;
         Object[] old = RESOLUTION_CACHE.get(packet);
         if (old == null) {
-            RESOLUTION_CACHE.put(packet, new Object[]{protocol, value});
+            RESOLUTION_CACHE.put(packet, new Object[]{gameVersion, value});
             return;
         }
         for (int i = 0; i < old.length; i += 2) {
-            if ((Integer) old[i] == protocol) {
+            if (old[i] == gameVersion) {
                 Object[] copy = old.clone();
                 copy[i + 1] = value;
                 RESOLUTION_CACHE.put(packet, copy);
@@ -159,9 +149,28 @@ public final class DataPacketManager {
             }
         }
         Object[] updated = Arrays.copyOf(old, old.length + 2);
-        updated[old.length] = protocol;
+        updated[old.length] = gameVersion;
         updated[old.length + 1] = value;
         RESOLUTION_CACHE.put(packet, updated);
+    }
+
+    public static synchronized DataPacketProcessor getProcessor(GameVersion gameVersion, int packetId) {
+        if (!REGISTERED_PACKETS.contains(packetId)) {
+            return null;
+        }
+
+        int protocol = gameVersion.getProtocol();
+        for (int p : PROTOCOL_PROCESSORS_KEYS) {
+            if (p > protocol) {
+                continue;
+            }
+
+            DataPacketProcessor processor = getProcessor0(p, packetId);
+            if (processor != null && processor.isSupported(gameVersion)) {
+                return processor;
+            }
+        }
+        return null;
     }
 
     private static DataPacketProcessor getProcessor0(int protocol, Class<? extends DataPacket> packet) {
@@ -173,33 +182,6 @@ public final class DataPacketManager {
         return map.get(packet);
     }
 
-    public static synchronized DataPacketProcessor getProcessor(int protocol, int packetId) {
-        int index = getIndex(protocol, packetId);
-        if (!REGISTERED_PACKETS.contains(packetId) || UNREGISTERED_PACKETS.contains(index)) {
-            return null;
-        }
-
-        DataPacketProcessor processor = getProcessor0(protocol, packetId);
-        if (processor != null) {
-            return processor;
-        }
-
-        for (int p : PROTOCOL_PROCESSORS_KEYS) {
-            if (p > protocol) {
-                continue;
-            }
-
-            processor = getProcessor0(p, packetId);
-            if (processor != null && processor.isSupported(protocol)) {
-                registerProcessor(protocol, processor);
-                return processor;
-            }
-        }
-
-        UNREGISTERED_PACKETS.add(index);
-        return null;
-    }
-
     private static DataPacketProcessor getProcessor0(int protocol, int packetId) {
         Int2ObjectOpenHashMap<DataPacketProcessor> map = PROTOCOL_PROCESSORS.get(protocol);
         if (map == null) {
@@ -209,16 +191,65 @@ public final class DataPacketManager {
         return map.get(packetId);
     }
 
-    private static int getIndex(int protocol, int packetId) {
-        return protocol * 10000 + packetId;
+    /**
+     * 以协议号判断能否处理。
+     * <p>
+     * 已弃用，待删除：int 无法区分网易与标准客户端（同协议号共享同一 GameVersion 协议空间），
+     * 混合模式下按标准客户端解析。请使用 {@link #canProcess(GameVersion, int)}。
+     * <p>
+     * Deprecated, pending removal: an int cannot distinguish NetEase from standard clients
+     * (same number, parallel GameVersion spaces); resolves as standard in mixed mode.
+     * Use {@link #canProcess(GameVersion, int)} instead.
+     */
+    @Deprecated
+    public static boolean canProcess(int protocol, int packetId) {
+        return canProcess(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), packetId);
     }
 
-    private static int getIndex(int protocol, Class<? extends DataPacket> packet) {
-        return protocol + packet.getName().hashCode();
+    /**
+     * 以协议号判断能否处理。
+     * <p>
+     * 已弃用，待删除：int 无法区分网易与标准客户端，混合模式下按标准客户端解析。
+     * 请使用 {@link #canProcess(GameVersion, Class)}。
+     * <p>
+     * Deprecated, pending removal: an int cannot distinguish NetEase from standard clients.
+     * Use {@link #canProcess(GameVersion, Class)} instead.
+     */
+    @Deprecated
+    public static boolean canProcess(int protocol, Class<? extends DataPacket> packet) {
+        return canProcess(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), packet);
+    }
+
+    /**
+     * 以协议号获取处理器。
+     * <p>
+     * 已弃用，待删除：int 无法区分网易与标准客户端，混合模式下按标准客户端解析。
+     * 请使用 {@link #getProcessor(GameVersion, Class)}。
+     * <p>
+     * Deprecated, pending removal: an int cannot distinguish NetEase from standard clients.
+     * Use {@link #getProcessor(GameVersion, Class)} instead.
+     */
+    @Deprecated
+    public static DataPacketProcessor getProcessor(int protocol, Class<? extends DataPacket> packet) {
+        return getProcessor(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), packet);
+    }
+
+    /**
+     * 以协议号获取处理器。
+     * <p>
+     * 已弃用，待删除：int 无法区分网易与标准客户端，混合模式下按标准客户端解析。
+     * 请使用 {@link #getProcessor(GameVersion, int)}。
+     * <p>
+     * Deprecated, pending removal: an int cannot distinguish NetEase from standard clients.
+     * Use {@link #getProcessor(GameVersion, int)} instead.
+     */
+    @Deprecated
+    public static DataPacketProcessor getProcessor(int protocol, int packetId) {
+        return getProcessor(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), packetId);
     }
 
     public static void processPacket(@NotNull PlayerHandle playerHandle, @NotNull DataPacket packet) {
-        DataPacketProcessor processor = getProcessor(playerHandle.getProtocol(), packet.getClass());
+        DataPacketProcessor processor = getProcessor(packet.gameVersion, packet.getClass());
         if (processor != null) {
             //noinspection unchecked
             processor.handle(playerHandle, packet);
@@ -232,7 +263,7 @@ public final class DataPacketManager {
      * Single-lock fast path replacing the canProcess+processPacket pair.
      */
     public static boolean tryProcessPacket(@NotNull PlayerHandle playerHandle, @NotNull DataPacket packet) {
-        DataPacketProcessor processor = getProcessor(playerHandle.getProtocol(), packet.getClass());
+        DataPacketProcessor processor = getProcessor(packet.gameVersion, packet.getClass());
         if (processor != null) {
             //noinspection unchecked
             processor.handle(playerHandle, packet);
