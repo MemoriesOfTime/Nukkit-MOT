@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class BootstrapParallelDownloadTest {
 
-    /** 服务端人为延迟：3 条依赖串行 ≥900ms，默认并行 3 应显著低于该线 / server-side delay per artifact */
+    /** 服务端人为延迟：拉长请求在服务端的存活窗口，使并发下载的重叠可被可靠观测 / server-side delay per artifact, widening the in-flight window so overlap is reliably observable */
     private static final long SLOW_RESPONSE_MILLIS = 300;
     private static final String THREADS_PROPERTY = "nukkit.libs.threads";
 
@@ -62,10 +62,10 @@ class BootstrapParallelDownloadTest {
         artifacts.put(artifactPath("c"), bytes("c"));
         startServer(artifacts);
 
-        long start = System.nanoTime();
+        // 不做墙钟断言：绝对/相对耗时在机器负载下都会假失败，重叠证据由 peakInFlight 断言承担
+        // No wall-clock assertion: absolute or relative timing false-fails under machine load; peakInFlight carries the overlap proof
         List<Bootstrap.DownloadFailure> failures = Bootstrap.downloadAll(
                 manifest("a", "b", "c").entries(), repos(), libs, true);
-        long elapsedMillis = (System.nanoTime() - start) / 1_000_000;
 
         assertTrue(failures.isEmpty(), "应无下载失败 / expected no failures: " + failures);
         for (String name : new String[]{"a", "b", "c"}) {
@@ -75,8 +75,6 @@ class BootstrapParallelDownloadTest {
         }
         assertEquals(3, requests.get(), "每条依赖恰好一个请求 / exactly one request per entry");
         assertTrue(peakInFlight.get() >= 2, "服务端应观测到请求重叠，实际峰值 " + peakInFlight.get() + " / requests must overlap, peak=" + peakInFlight.get());
-        assertTrue(elapsedMillis < 3 * SLOW_RESPONSE_MILLIS - 50,
-                "并行 3 应快于串行 " + 3 * SLOW_RESPONSE_MILLIS + "ms，实际 " + elapsedMillis + "ms / parallel must beat the serial floor");
     }
 
     @Test
