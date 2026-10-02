@@ -6,6 +6,8 @@ import cn.nukkit.entity.passive.EntityHorseBase;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemNamespaceId;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.math.Vector3;
+import cn.nukkit.network.protocol.ContainerOpenPacket;
 import cn.nukkit.network.protocol.MobArmorEquipmentPacket;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,6 +90,44 @@ class HorseInventoryTest {
         assertEquals(77L, packet.eid);
         assertEquals(Item.DIAMOND_HORSE_ARMOR, packet.slots[1].getId());
         assertEquals(Item.DIAMOND_HORSE_ARMOR, packet.body.getId());
+    }
+
+
+    @Test
+    void openingTheScreenAnnouncesTheHorseContainer() {
+        Player viewer = Mockito.mock(Player.class);
+        EntityHorseBase horse = Mockito.mock(EntityHorseBase.class);
+        Mockito.when(horse.canWearHorseArmor()).thenReturn(true);
+        Mockito.when(horse.getId()).thenReturn(91L);
+        Mockito.when(horse.getViewers()).thenReturn(Map.of());
+        HorseInventory inventory = new HorseInventory(horse, 0);
+
+        inventory.onOpen(viewer);
+
+        ArgumentCaptor<DataPacket> captor = ArgumentCaptor.forClass(DataPacket.class);
+        verify(viewer, atLeastOnce()).dataPacket(captor.capture());
+        ContainerOpenPacket open = captor.getAllValues().stream()
+                .filter(ContainerOpenPacket.class::isInstance)
+                .map(ContainerOpenPacket.class::cast)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("the horse screen was never announced"));
+        assertEquals(InventoryType.HORSE.getNetworkType(), open.type);
+        assertEquals(91L, open.entityId);
+    }
+
+    @Test
+    void crouchingOpensTheScreenWithoutMounting() throws Exception {
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSneaking()).thenReturn(true);
+        EntityHorseBase horse = Mockito.mock(EntityHorseBase.class, Mockito.CALLS_REAL_METHODS);
+        Mockito.doReturn(Map.of()).when(horse).getViewers();
+        Mockito.doReturn(false).when(horse).isBaby();
+        HorseInventory inventory = new HorseInventory(horse, 0);
+        setHorseInventory(horse, inventory);
+
+        assertFalse(horse.onInteract(player, Item.get(Item.DIAMOND, 0, 1), new Vector3()));
+
+        verify(player).addWindow(inventory);
     }
 
     private static void setHorseInventory(EntityHorseBase horse, HorseInventory inventory) throws Exception {

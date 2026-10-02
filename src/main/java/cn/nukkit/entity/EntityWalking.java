@@ -143,6 +143,16 @@ public abstract class EntityWalking extends BaseEntity {
         return false;
     }
 
+    /**
+     * Keep the body aligned with the pathfinder while the head tracks a live target.
+     */
+    protected void turnBodyTowardsAndLookAt(double bodyYaw, Vector3 headTarget) {
+        this.turnBodyTowards(bodyYaw);
+        if (headTarget != null) {
+            this.lookHeadAt(headTarget);
+        }
+    }
+
     @Override
     public Vector3 updateMove(int tickDiff) {
         if (!this.isInTickingRange()) {
@@ -181,6 +191,7 @@ public abstract class EntityWalking extends BaseEntity {
             }
 
             if (this.getServer().getMobAiEnabled()) {
+                Vector3 headTarget = null;
                 if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.target != null && this.followTarget.canBeFollowed()) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
@@ -209,7 +220,7 @@ public abstract class EntityWalking extends BaseEntity {
                         }
                     }
                     if (this.noRotateTicks <= 0 && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && this.stayTime <= 0 && diff != 0) {
-                        this.lookAt(this.followTarget);
+                        headTarget = this.followTarget;
                     }
                 }
 
@@ -248,8 +259,12 @@ public abstract class EntityWalking extends BaseEntity {
                         }
                     }
                     if (this.noRotateTicks <= 0 && !distance && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && this.stayTime <= 0 && diff > 0.001) {
-                        this.turnBodyTowards(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                        this.turnBodyTowardsAndLookAt(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)), headTarget);
+                        headTarget = null;
                     }
+                }
+                if (headTarget != null) {
+                    this.lookHeadAt(headTarget);
                 }
             }
 
