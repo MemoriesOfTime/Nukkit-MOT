@@ -21,7 +21,6 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.netty.buffer.*;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -599,7 +598,17 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        return ImmutableMap.copyOf(chunks);
+        // Chunk-coordinate Long keys often share x ^ z, which makes Guava's boxed
+        // snapshot overflow its buckets and rebuild through an exception.
+        // Keep the detached, read-only snapshot contract and synchronize iteration.
+        synchronized (this.chunks) {
+            Long2ObjectOpenHashMap<BaseFullChunk> snapshot = new Long2ObjectOpenHashMap<>(this.chunks);
+            // Match ImmutableMap's non-null value contract for callers of the unsafe map API.
+            if (snapshot.containsValue(null)) {
+                throw new NullPointerException("Loaded chunk snapshot contains a null chunk");
+            }
+            return Collections.unmodifiableMap(snapshot);
+        }
     }
 
     public Long2ObjectMap<? extends FullChunk> getLoadedChunksUnsafe() {
