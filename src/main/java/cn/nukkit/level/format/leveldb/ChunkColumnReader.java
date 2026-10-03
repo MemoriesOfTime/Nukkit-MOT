@@ -100,6 +100,10 @@ final class ChunkColumnReader implements DB {
                 && Arrays.equals(key, 0, this.column.length, this.column, 0, this.column.length);
     }
 
+    boolean hasColumnData() {
+        return !this.columnValues().isEmpty();
+    }
+
     private Map<ByteBuffer, byte[]> columnValues() {
         if (this.columnValues == null) {
             Map<ByteBuffer, byte[]> values = new HashMap<>();
