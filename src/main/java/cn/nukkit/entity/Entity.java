@@ -1,6 +1,7 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.AdventureSettings.Type;
+import cn.nukkit.AdventureSettings;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -24,7 +25,6 @@ import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
 import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemTotem;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
@@ -43,6 +43,7 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.*;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -424,6 +425,10 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v975 1.26.20
      */
     public static final int DATA_FLAG_NAMEPLATE_DEPTH_TESTED = 129;
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int DATA_FLAG_NOT_PICKABLE_FROM_INSIDE = 130;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
@@ -1084,9 +1089,26 @@ public abstract class Entity extends Location implements Metadatable {
             return;
         }
 
-        if (cause != null) {
-            Effect oldEffect = this.effects.get(effect.getId());
+        Effect oldEffect = this.effects.get(effect.getId());
 
+        if (oldEffect != null && (oldEffect.getAmplifier() > effect.getAmplifier()
+            || (oldEffect.getAmplifier() == effect.getAmplifier() && oldEffect.getDuration() >= effect.getDuration()))) {
+            // A weaker/shorter absorption effect must not replace the stronger icon or its
+            // duration, but consuming the item still replenishes the amount granted by that
+            // item. Without this, a normal golden apple eaten while enchanted-apple
+            // Absorption IV is still visible gives zero yellow hearts after the old pool was
+            // depleted: addEffect returns before Effect.add can refill anything.
+            if (effect.getId() == Effect.ABSORPTION
+                    && cause == EntityPotionEffectEvent.Cause.FOOD) {
+                float grantedAbsorption = (effect.getAmplifier() + 1) << 2;
+                if (grantedAbsorption > this.getAbsorption()) {
+                    this.setAbsorption(grantedAbsorption);
+                }
+            }
+            return;
+        }
+
+        if (cause != null) {
             EntityPotionEffectEvent event = new EntityPotionEffectEvent(
                     this,
                     oldEffect,
@@ -1411,7 +1433,7 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    private static int correctEntityIdentifiersProtocol(int protocolId) {
+    public static int correctEntityIdentifiersProtocol(int protocolId) {
         if (protocolId >= ProtocolInfo.v1_19_80) {
             return ProtocolInfo.v1_19_80;
         } else if (protocolId >= ProtocolInfo.v1_19_20) {
@@ -1708,13 +1730,33 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     /**
-     * 检查玩家的攻击是否应为暴击 / Check if player's hit should be critical
+     * Whether this melee hit can be a critical one.
      *
-     * @param player player
-     * @return can make a critical hit
+     * <p>Conditions follow vanilla Bedrock as implemented by PocketMine-MP
+     * ({@code Player::attackEntity}): the attacker has to be falling, must not be sprinting,
+     * flying or riding, must not be blinded and must not be in water.
+     *
+     * <p>Sprinting and flying were missing here. Both make the 1.5x bonus nearly permanent
+     * instead of a timed hit: Bedrock players sprint by default, so every sprint-jump landed a
+     * critical, and a player with creative or plugin-granted flight critically hit for free while
+     * hovering, with no fall to commit to.
+     *
+     * @param player the attacker
+     * @return whether the hit can be critical
+     *
+     * <p>{@code speed} is the previous position minus the current one, so falling is a POSITIVE
+     * y — the check reads backwards but is correct.
      */
     private static boolean canCriticalHit(Player player) {
-        if (player.isOnGround() || player.riding != null || player.speed == null || player.speed.y <= 0 || player.hasEffect(Effect.BLINDNESS)) return false;
+        if (player.isOnGround()
+                || player.riding != null
+                || player.speed == null
+                || player.speed.y <= 0
+                || player.isSprinting()
+                || player.getAdventureSettings().get(AdventureSettings.Type.FLYING)
+                || player.hasEffect(Effect.BLINDNESS)) {
+            return false;
+        }
         int b = player.getLevel().getBlockIdAt(player.chunk, player.getFloorX(), player.getFloorY(), player.getFloorZ());
         return b != Block.LADDER && b != Block.VINES && !Block.isWater(b);
     }
@@ -1726,7 +1768,11 @@ public abstract class Entity extends Location implements Metadatable {
                 && !source.isApplicable(EntityDamageEvent.DamageModifier.CRITICAL)
                 && damageByEntityEvent.getDamager() instanceof Player damager
                 && canCriticalHit(damager)) {
-            source.setDamage(getDamageBeforeTargetReductions(source) * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
+            // vanilla: 暴击基数取护甲前伤害(护甲同时减免暴击);legacy: 取护甲后伤害(5306387d1^ 之前行为)
+            float base = Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction()
+                    ? getDamageBeforeTargetReductions(source)
+                    : source.getFinalDamage();
+            source.setDamage(base * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
         }
     }
 
@@ -1750,6 +1796,17 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
+    /**
+     * 判断是否为不死图腾：按数字 id 而非 instanceof，插件直构的 plain Item 也能识别。
+     * <p>
+     * Whether the item is a totem, matched by numeric id so plugin-created plain
+     * {@code Item} stacks are recognized as well as typed {@code ItemTotem}s.
+     */
+    @ApiStatus.Internal
+    public static boolean isTotem(Item item) {
+        return item != null && item.getId() == Item.TOTEM && item.getCount() > 0;
+    }
+
     public boolean attack(EntityDamageEvent source) {
         if (hasEffect(Effect.FIRE_RESISTANCE)
                 && (source.getCause() == DamageCause.FIRE
@@ -1758,7 +1815,8 @@ public abstract class Entity extends Location implements Metadatable {
             return false;
         }
 
-        if (!(this instanceof EntityHumanType)) {
+        // legacy 不重算抗性(保持 ctor 预算值)
+        if (!(this instanceof EntityHumanType) && Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction()) {
             this.recalculateResistanceDamage(source);
         }
 
@@ -1819,11 +1877,12 @@ public abstract class Entity extends Location implements Metadatable {
             if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.SUICIDE) {
                 boolean totem = false;
                 boolean isOffhand = false;
-                if (p.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                // A deliberately held totem takes precedence over the offhand.
+                if (isTotem(p.getInventory().getItemInHandFast())) {
+                    totem = true;
+                } else if (isTotem(p.getOffhandInventory().getItemFast(0))) {
                     totem = true;
                     isOffhand = true;
-                } else if (p.getInventory().getItemInHandFast() instanceof ItemTotem) {
-                    totem = true;
                 }
                 if (totem) {
                     this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_TOTEM);
@@ -1843,15 +1902,15 @@ public abstract class Entity extends Location implements Metadatable {
                     p.dataPacket(pk);
 
                     if (isOffhand) {
-                        p.getOffhandInventory().clear(0);
+                        p.getOffhandInventory().decreaseCount(0);
                     } else {
-                        p.getInventory().clear(p.getInventory().getHeldItemIndex());
+                        p.getInventory().decreaseCount(p.getInventory().getHeldItemIndex());
                     }
 
                     source.setCancelled(true);
                     return false;
                 }
-            } else if (p.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+            } else if (isTotem(p.getOffhandInventory().getItemFast(0))) {
                 // This damage bypasses the totem (SUICIDE/VOID) and will kill the player. Hide the
                 // offhand totem before the death/damage signal reaches the client to prevent its
                 // local auto-revival creating a "ghost" state; the real item is left untouched.
@@ -2066,6 +2125,26 @@ public abstract class Entity extends Location implements Metadatable {
     @Deprecated
     public boolean entityBaseTick() {
         return this.entityBaseTick(1);
+    }
+
+    /**
+     * Whether the level may skip {@link #onUpdate(int)} for this entity on this tick. A skipped entity stays
+     * scheduled; its next update runs with the whole elapsed time as {@code tickDiff}. Only mobs far from every
+     * player opt in, see {@link BaseEntity#isActivationThrottled(int)}.
+     */
+    public boolean isActivationThrottled(int currentTick) {
+        return false;
+    }
+
+    /**
+     * Whether any value in {@code [start, start + span - 1]} is congruent to {@code residue} modulo
+     * {@code period}. With {@code span == 1} this is exactly {@code start % period == residue} for the
+     * non-negative residues used by the tick cadences, so a caught-up update fires a periodic action at
+     * most once instead of skipping it because the counter jumped over the matching value.
+     */
+    protected static boolean hitsResidue(long start, int span, int period, int residue) {
+        long last = start + Math.max(1, span) - 1;
+        return Math.floorDiv(last - residue, period) != Math.floorDiv(start - 1 - residue, period);
     }
 
     /**
@@ -2472,7 +2551,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setAbsorption(float absorption) {
-        if (absorption != this.absorption) {
+        if (absorption != this.absorption || (this instanceof Player player && player.protocol >= ProtocolInfo.v1_21_60)) {
             this.absorption = absorption;
             if (this instanceof Player player) player.setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
         }
@@ -2541,6 +2620,13 @@ public abstract class Entity extends Location implements Metadatable {
             if (!this.hasEffect(Effect.SLOW_FALLING)) {
                 Block down = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() - 1, this.getFloorZ(), 0, true);
                 int floor = down.getId();
+
+                EntityFallEvent event = new EntityFallEvent(this, down, fallDistance);
+                this.server.getPluginManager().callEvent(event);
+                if (event.isCancelled()) {
+                    return;
+                }
+                fallDistance = event.getFallDistance();
 
                 if (!this.noFallDamage) {
                     float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));
@@ -2705,7 +2791,7 @@ public abstract class Entity extends Location implements Metadatable {
         this.level.addEntity(this);
         this.chunk = null;
 
-        if (this instanceof Player) {
+        if (this instanceof Player player && player.isOnline()) {
             this.afterSwitchLevel();
         }
         return true;
@@ -2737,8 +2823,28 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean isSubmerged() {
         double y = this.y + this.getEyeHeight();
-        Block block = this.level.getBlock(this.temporalVector.setComponents(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(y), NukkitMath.floorDouble(this.z)));
+        int blockX = NukkitMath.floorDouble(this.x);
+        int blockY = NukkitMath.floorDouble(y);
+        int blockZ = NukkitMath.floorDouble(this.z);
+        // Every living entity asks this every tick, and the answer is almost always "no": read the two
+        // ids from the entity's own chunk and materialise blocks only when one of them can be water.
+        FullChunk chunk = this.chunk;
+        if (chunk != null && this.level != null && chunk.getX() == blockX >> 4 && chunk.getZ() == blockZ >> 4
+                && this.level.isYInRange(blockY)
+                && !mayMaterialiseAsWater(chunk.getBlockId(blockX & 0x0f, blockY, blockZ & 0x0f, 0))
+                && !mayMaterialiseAsWater(chunk.getBlockId(blockX & 0x0f, blockY, blockZ & 0x0f, 1))) {
+            return false;
+        }
+        Block block = this.level.getBlock(this.temporalVector.setComponents(blockX, blockY, blockZ));
         return block instanceof BlockWater || this.level.getBlock(block, 1) instanceof BlockWater;
+    }
+
+    /**
+     * Whether a raw block id can come out of {@link Block#get} as a {@link BlockWater}: the two water ids,
+     * and custom or out-of-range ids whose factory is unknown.
+     */
+    static boolean mayMaterialiseAsWater(int id) {
+        return id == Block.WATER || id == Block.STILL_WATER || id < 0 || id >= Block.MAX_BLOCK_ID;
     }
 
     public boolean isInsideOfWater() {
@@ -2788,7 +2894,19 @@ public abstract class Entity extends Location implements Metadatable {
 
         AxisAlignedBB newBB = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
 
-        if (server.getAllowFlight() || !this.level.hasCollision(this, newBB, false)) {
+        // The float eye-position round trip can place a player's head a few
+        // millionths of a block inside a ceiling. Rejecting all three axes for
+        // that contact turns batched sprint-jumps into horizontal speed setbacks.
+        // Retry only a colliding player's ceiling with a bounded tolerance. Keep
+        // the feet unchanged: raising minY can skip a fence's lower block cell
+        // even though its collision shape extends half a block above that cell.
+        boolean canMove = server.getAllowFlight() || !this.level.hasCollision(this, newBB, false);
+        if (!canMove && this instanceof Player) {
+            AxisAlignedBB ceilingContact = newBB.clone();
+            ceilingContact.setMaxY(ceilingContact.getMaxY() - 1.0E-4);
+            canMove = !this.level.hasCollision(this, ceilingContact, false);
+        }
+        if (canMove) {
             this.boundingBox = newBB;
         }
 
@@ -3088,7 +3206,7 @@ public abstract class Entity extends Location implements Metadatable {
                 this.z = pos.z;
 
                 // Dimension change
-                if (this instanceof Player player && newLevel.getDimension() != oldLevel.getDimension()) {
+                if (this instanceof Player player && player.isOnline() && newLevel.getDimension() != oldLevel.getDimension()) {
                     player.setDimension(newLevel.getDimension());
                 }
 
@@ -3660,7 +3778,7 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if(Objects.equals(property.getIdentifier(), identifier) && property instanceof EnumEntityProperty enumEntityProperty) {
+            if(property instanceof EnumEntityProperty enumEntityProperty && Objects.equals(property.getIdentifier(), identifier)) {
                 int index = enumEntityProperty.findIndex(value);
 
                 if(index >= 0) {
@@ -3677,11 +3795,16 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if (!identifier.equals(property.getIdentifier()) ||
-                    !(property instanceof EnumEntityProperty enumProperty)) {
+            if (!(property instanceof EnumEntityProperty enumProperty) ||
+                    !identifier.equals(property.getIdentifier())) {
                 continue;
             }
-            return enumProperty.getEnums()[intProperties.get(identifier)];
+            String[] values = enumProperty.getEnums();
+            Integer index = intProperties.get(identifier);
+            if (index == null || index < 0 || index >= values.length) {
+                return enumProperty.getDefaultValue();
+            }
+            return values[index];
         }
         return null;
     }

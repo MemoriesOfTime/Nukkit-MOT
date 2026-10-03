@@ -107,6 +107,7 @@ public class Binary {
         return appendBytes(writeLLong(uuid.getMostSignificantBits()), writeLLong(uuid.getLeastSignificantBits()));
     }
 
+    @Deprecated
     public static byte[] writeMetadata(EntityMetadata metadata) {
         Server.mvw("Binary#writeMetadata(EntityMetadata)");
         return writeMetadata(GameVersion.getLastVersion(), metadata);
@@ -175,6 +176,9 @@ public class Binary {
 
             entryStream.putUnsignedVarInt(id);
             entryStream.putUnsignedVarInt(type);
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                entryStream.putByte((byte) type);
+            }
 
             if (forceEmptyData) {
                 // forceEmptyData requires type to be DATA_TYPE_INT so that putVarInt(0) matches the declared type
@@ -314,7 +318,7 @@ public class Binary {
                         int offset = stream.getOffset();
                         FastByteArrayInputStream fbais = new FastByteArrayInputStream(stream.get());
                         try {
-                            CompoundTag tag = NBTIO.read(fbais, ByteOrder.LITTLE_ENDIAN, true);
+                            CompoundTag tag = NBTIO.readSafely(fbais, ByteOrder.LITTLE_ENDIAN, true);
                             value = new NBTEntityData(key, tag);
                         } catch (IOException e) {
                             throw new RuntimeException(e);

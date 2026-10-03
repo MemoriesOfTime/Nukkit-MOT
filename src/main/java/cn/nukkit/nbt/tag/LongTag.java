@@ -38,7 +38,7 @@ public final class LongTag extends NumberTag<Long> {
     }
 
     @Override
-    void load(NBTInputStream dis) throws IOException {
+    void load(NBTInputStream dis, int nested) throws IOException {
         data = dis.readLong();
     }
 

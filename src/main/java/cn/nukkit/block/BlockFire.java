@@ -120,7 +120,7 @@ public class BlockFire extends BlockFlowable {
                     this.getLevel().canBlockSeeSky(this.south()) ||
                     this.getLevel().canBlockSeeSky(this.north());
 
-            if (!forever && this.getLevel().isRaining() && canBlockSeeSky) {
+            if (!forever && canBlockSeeSky && this.getLevel().isRaining()) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
             }
 

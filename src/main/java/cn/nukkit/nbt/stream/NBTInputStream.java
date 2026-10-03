@@ -7,9 +7,11 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -20,10 +22,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class NBTInputStream implements DataInput, AutoCloseable {
 
+    /**
+     * Largest allocation made up front for a length read from the stream. Longer payloads grow
+     * with the bytes that actually arrive, so a forged length costs at most this much before
+     * the stream runs dry.
+     */
+    static final int SAFE_INITIAL_BYTES = 64 * 1024;
+
     private final DataInputStream stream;
     private final ByteOrder endianness;
     private final boolean network;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    // When true, large allocations (length/size > 64) use growing backed lists
+    // instead of pre-allocating a single big array, mitigating malicious oversized NBT.
+    private boolean readSafely = true;
 
     public NBTInputStream(InputStream stream) {
         this(stream, ByteOrder.BIG_ENDIAN);
@@ -45,6 +57,21 @@ public class NBTInputStream implements DataInput, AutoCloseable {
 
     public boolean isNetwork() {
         return network;
+    }
+
+    public boolean isReadSafely() {
+        return readSafely;
+    }
+
+    /**
+     * Enable safe reading with allocation limits. When enabled, tags with a
+     * declared length/size greater than 64 use growing backed lists instead of
+     * pre-allocating a single large array, mitigating malicious oversized NBT
+     * payloads. Safe mode is on by default.
+     */
+    public NBTInputStream readSafely() {
+        this.readSafely = true;
+        return this;
     }
 
     @Override
@@ -88,11 +115,9 @@ public class NBTInputStream implements DataInput, AutoCloseable {
 
     @Override
     public int readUnsignedShort() throws IOException {
-        int s = this.stream.readUnsignedShort();
-        if (endianness == ByteOrder.LITTLE_ENDIAN) {
-            s = Integer.reverseBytes(s) >> 16;
-        }
-        return s;
+        // The former little-endian branch used a signed shift: 32768..65535 came back
+        // negative, so a long string in a chunk or block entity could not be read at all.
+        return this.readShort() & 0xFFFF;
     }
 
     @Override
@@ -154,10 +179,73 @@ public class NBTInputStream implements DataInput, AutoCloseable {
 
     @Override
     public String readUTF() throws IOException {
-        int length = (int) (network ? VarInt.readUnsignedVarInt(stream) : this.readUnsignedShort());
-        byte[] bytes = new byte[length];
-        this.stream.read(bytes);
-        return new String(bytes, StandardCharsets.UTF_8);
+        long length = network ? VarInt.readUnsignedVarInt(stream) : this.readUnsignedShort();
+        if (length > Integer.MAX_VALUE) {
+            throw new IOException("NBT string length out of range: " + length);
+        }
+        return new String(this.readByteArray((int) length), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Reads exactly {@code length} bytes in bulk.
+     * <p>
+     * In safe mode the declared length is not trusted for the allocation: up to
+     * {@link #SAFE_INITIAL_BYTES} are reserved at once, then the buffer doubles only after it has
+     * been filled from the stream, so a forged length fails with an {@link java.io.EOFException}
+     * after an allocation bounded by twice the bytes that really arrived. This keeps the
+     * protection of the former byte-by-byte list while copying the payload with
+     * {@link DataInputStream#readFully(byte[], int, int)}.
+     */
+    public byte[] readByteArray(int length) throws IOException {
+        if (length < 0) {
+            throw new IOException("Negative NBT array length: " + length);
+        }
+        if (!this.readSafely || length <= SAFE_INITIAL_BYTES) {
+            byte[] bytes = new byte[length];
+            this.stream.readFully(bytes);
+            return bytes;
+        }
+        byte[] bytes = new byte[SAFE_INITIAL_BYTES];
+        int filled = 0;
+        while (true) {
+            this.stream.readFully(bytes, filled, bytes.length - filled);
+            filled = bytes.length;
+            if (filled == length) {
+                return bytes;
+            }
+            bytes = Arrays.copyOf(bytes, (int) Math.min(length, (long) filled << 1));
+        }
+    }
+
+    /**
+     * Reads {@code length} ints. Fixed-width encodings are copied in bulk through
+     * {@link #readByteArray(int)} (same allocation bound); the network VarInt encoding has no
+     * fixed width and is decoded element by element into a buffer that grows with the input.
+     */
+    public int[] readIntArray(int length) throws IOException {
+        if (length < 0) {
+            throw new IOException("Negative NBT array length: " + length);
+        }
+        if (this.network) {
+            int[] ints = new int[this.readSafely ? Math.min(length, SAFE_INITIAL_BYTES / Integer.BYTES) : length];
+            for (int i = 0; i < length; i++) {
+                if (i == ints.length) {
+                    ints = Arrays.copyOf(ints, (int) Math.min(length, (long) i << 1));
+                }
+                ints[i] = VarInt.readVarInt(this.stream);
+            }
+            return ints;
+        }
+        if (length > Integer.MAX_VALUE / Integer.BYTES) {
+            throw new IOException("NBT int array length out of range: " + length);
+        }
+        // The payload first: readByteArray bounds its allocation by the bytes that arrive, so a
+        // forged length (item NBT from a client is read in this format) fails before an int[] of
+        // that length - up to 2 GiB - is reserved.
+        byte[] payload = this.readByteArray(length * Integer.BYTES);
+        int[] ints = new int[length];
+        ByteBuffer.wrap(payload).order(this.endianness).asIntBuffer().get(ints);
+        return ints;
     }
 
     public Object readTag() throws IOException {
@@ -208,9 +296,7 @@ public class NBTInputStream implements DataInput, AutoCloseable {
                     return new DoubleTag("", readDouble());
                 case Tag.TAG_Byte_Array:
                     arraySize = this.readInt();
-                    byte[] bytes = new byte[arraySize];
-                    this.readFully(bytes);
-                    return new ByteArrayTag("", bytes);
+                    return new ByteArrayTag("", this.readByteArray(arraySize));
                 case Tag.TAG_String:
                     return new StringTag("", this.readUTF());
                 case Tag.TAG_Compound:
@@ -224,7 +310,10 @@ public class NBTInputStream implements DataInput, AutoCloseable {
                 case Tag.TAG_List:
                     int typeId = this.readUnsignedByte();
                     int listLength = this.readInt();
-                    List<Tag> list = new ArrayList<>(listLength);
+                    if (typeId == Tag.TAG_End) {
+                        return new ListTag<>(typeId, new ArrayList<Tag>());
+                    }
+                    List<Tag> list = new ArrayList<>(this.readSafely && listLength > 64 ? 64 : listLength);
 
                     for (int i = 0; i < listLength; ++i) {
                         list.add(this.deserialize(typeId, maxDepth - 1));
@@ -232,12 +321,7 @@ public class NBTInputStream implements DataInput, AutoCloseable {
                     return new ListTag<>(typeId, list);
                 case Tag.TAG_Int_Array:
                     arraySize = this.readInt();
-                    int[] ints = new int[arraySize];
-
-                    for (int i = 0; i < arraySize; ++i) {
-                        ints[i] = this.readInt();
-                    }
-                    return new IntArrayTag("", ints);
+                    return new IntArrayTag("", this.readIntArray(arraySize));
                 default:
                     throw new IllegalArgumentException("Unknown type " + type);
             }

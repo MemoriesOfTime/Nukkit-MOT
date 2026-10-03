@@ -76,7 +76,11 @@ public class CreativeContentPacket extends DataPacket {
     }
 
     private void writeGroup(CreativeItemGroup group) {
-        this.putLInt(group.getCategory().ordinal());
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putByte((byte) group.getCategory().ordinal());
+        } else {
+            this.putLInt(group.getCategory().ordinal());
+        }
         this.putString(group.getName());
         this.putSlot(gameVersion, group.getIcon(), true);
     }

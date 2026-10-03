@@ -26,13 +26,15 @@ public class V975PacketRegressionTest extends AbstractPacketRegressionTest {
     }
 
     /**
-     * v975 (1.26.20) and v1001 (1.26.30) both implement the ServerStoreInfoPacket
+     * v975 (1.26.20) / v1001 (1.26.30) / v2168 (1.26.40) all implement the ServerStoreInfoPacket
      * and the outer ServerPresenceInfoPacket envelope identically.
+     * (v2168 presence body reverts to the v975 plain-string form — CB's v2168 helper extends v975.)
      */
     static Stream<Arguments> v975AndV1001() {
         return Stream.of(
                 Arguments.of(975),
-                Arguments.of(ProtocolInfo.v1_26_30)
+                Arguments.of(ProtocolInfo.v1_26_30),
+                Arguments.of(ProtocolInfo.v1_26_40)
         );
     }
 
@@ -86,8 +88,15 @@ public class V975PacketRegressionTest extends AbstractPacketRegressionTest {
                 crossDecode(nukkitPacket, org.cloudburstmc.protocol.bedrock.packet.ServerPresenceInfoPacket.class);
 
         assertNotNull(cbPacket.getPresenceConfiguration(), "PresenceConfiguration should not be null");
-        assertEquals("exp-name", cbPacket.getPresenceConfiguration().getExperienceName());
-        assertEquals("world-name", cbPacket.getPresenceConfiguration().getWorldName());
+        if (protocolVersion >= ProtocolInfo.v1_26_40) {
+            // v2168 起线上仅剩 optional richPresenceId / only an optional richPresenceId remains on the wire since v2168
+            assertNull(cbPacket.getPresenceConfiguration().getExperienceName());
+            assertNull(cbPacket.getPresenceConfiguration().getWorldName());
+            assertNull(cbPacket.getPresenceConfiguration().getRichPresenceId());
+        } else {
+            assertEquals("exp-name", cbPacket.getPresenceConfiguration().getExperienceName());
+            assertEquals("world-name", cbPacket.getPresenceConfiguration().getWorldName());
+        }
     }
 
     @ParameterizedTest(name = "ServerPresenceInfoPacket null config v{0}")

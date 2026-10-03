@@ -56,11 +56,13 @@ public class NukkitMath {
     }
 
     public static int floorDouble(double n) {
+        if (n <= Integer.MIN_VALUE || n >= Integer.MAX_VALUE) throw new IllegalArgumentException("double to int overflow: " + n);
         int i = (int) n;
         return n >= i ? i : i - 1;
     }
 
     public static int ceilDouble(double n) {
+        if (n <= Integer.MIN_VALUE || n >= Integer.MAX_VALUE) throw new IllegalArgumentException("double to int overflow: " + n);
         int i = (int) (n + 1);
         return n >= i ? i : i - 1;
     }

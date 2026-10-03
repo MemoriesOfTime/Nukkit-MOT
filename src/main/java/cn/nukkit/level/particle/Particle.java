@@ -150,6 +150,18 @@ public abstract class Particle extends Vector3 {
      * @since v975
      */
     public static final int TYPE_SULFUR_CUBE = dynamic(101);
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int TYPE_ORANGE_POPLAR_LEAVES = dynamic(102);
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int TYPE_RED_POPLAR_LEAVES = dynamic(103);
+    /**
+     * @since v2168 1.26.40
+     */
+    public static final int TYPE_YELLOW_POPLAR_LEAVES = dynamic(104);
 
     private static final Set<Integer> DEFINED_TYPE_IDS = getDefinedTypeIds();
 
@@ -169,6 +181,7 @@ public abstract class Particle extends Vector3 {
         super(x, y, z);
     }
 
+    @Deprecated
     public DataPacket[] encode() {
         Server.mvw("Particle#encode()");
         return this.mvEncode(GameVersion.getLastVersion());

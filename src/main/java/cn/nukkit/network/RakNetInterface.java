@@ -15,8 +15,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollDatagramChannel;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.epoll.EpollIoHandler;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.nio.NioDatagramChannel;
@@ -28,6 +28,7 @@ import org.cloudburstmc.netty.channel.raknet.config.RakChannelOption;
 import org.cloudburstmc.netty.handler.codec.raknet.server.RakServerRateLimiter;
 
 import java.lang.reflect.Constructor;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -36,7 +37,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.function.IntFunction;
 
 /**
  * @author MagicDroidX
@@ -45,15 +45,21 @@ import java.util.function.IntFunction;
 @Log4j2
 public class RakNetInterface implements AdvancedSourceInterface {
 
+    static final int MAX_INBOUND_PACKETS_PER_INTERFACE_TICK = 2048;
+    static final long MAX_INBOUND_BYTES_PER_INTERFACE_TICK = 6L * 1024L * 1024L;
+
     private final Server server;
     private Network network;
 
     private final Channel channel;
+    private final Channel ipv6Channel;
+    private final EventLoopGroup eventLoopGroup;
     private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final long serverId = ThreadLocalRandom.current().nextLong();
+    private int inboundRoundRobinCursor;
 
     public RakNetInterface(Server server) {
         this.server = server;
@@ -62,16 +68,16 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
         Transport transport;
         if (!disableNative && Epoll.isAvailable()) {
-            transport = new Transport(EpollDatagramChannel.class, EpollEventLoopGroup::new);
+            transport = new Transport(EpollDatagramChannel.class, EpollIoHandler.newFactory());
         } else {
-            transport = new Transport(NioDatagramChannel.class, NioEventLoopGroup::new);
+            transport = new Transport(NioDatagramChannel.class, NioIoHandler.newFactory());
         }
 
-        EventLoopGroup group = transport.eventLoopGroupFactory.apply(Runtime.getRuntime().availableProcessors());
+        this.eventLoopGroup = new MultiThreadIoEventLoopGroup(Runtime.getRuntime().availableProcessors(), transport.ioHandlerFactory);
 
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .channelFactory(RakChannelFactory.server(transport.datagramChannel))
-                .group(group)
+                .group(this.eventLoopGroup)
                 .option(RakChannelOption.RAK_GUID, this.serverId)
                 .option(RakChannelOption.RAK_SUPPORTED_PROTOCOLS, new int[]{8, 9, 10, 11})
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)
@@ -112,12 +118,50 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
         String address = this.server.getIp().isBlank() ? "0.0.0.0" : this.server.getIp();
 
-        this.channel = bootstrap.bind(address, this.server.getPort()).awaitUninterruptibly().channel();
-
+        Channel v4Channel = null;
+        Channel v6Channel = null;
         try {
-            RakServerRateLimiter rakServerRateLimiter = this.channel.pipeline().get(RakServerRateLimiter.class);
+            ChannelFuture v4Future = bootstrap.bind(address, this.server.getPort()).awaitUninterruptibly();
+            if (!v4Future.isSuccess()) {
+                throw new RuntimeException("Failed to bind IPv4 listener on " + address + ":" + this.server.getPort(), v4Future.cause());
+            }
+            v4Channel = v4Future.channel();
+            addLocalhostExceptions(v4Channel);
+
+            if (this.server.isIpv6Enabled()) {
+                String ipv6Address = this.server.getIpv6Address().isBlank() ? "::" : this.server.getIpv6Address();
+                ChannelFuture v6Future = bootstrap.bind(ipv6Address, this.server.getIpv6Port()).awaitUninterruptibly();
+                if (!v6Future.isSuccess()) {
+                    throw new RuntimeException("Failed to bind IPv6 listener on [" + ipv6Address + "]:" + this.server.getIpv6Port(), v6Future.cause());
+                }
+                v6Channel = v6Future.channel();
+                addLocalhostExceptions(v6Channel);
+            }
+        } catch (RuntimeException e) {
+            closeQuietly(v4Channel);
+            closeQuietly(v6Channel);
+            this.eventLoopGroup.shutdownGracefully();
+            throw e;
+        }
+        this.channel = v4Channel;
+        this.ipv6Channel = v6Channel;
+    }
+
+    private static void closeQuietly(Channel channel) {
+        if (channel != null) {
+            channel.close().awaitUninterruptibly();
+        }
+    }
+
+    private static void addLocalhostExceptions(Channel channel) {
+        try {
+            RakServerRateLimiter rakServerRateLimiter = channel.pipeline().get(RakServerRateLimiter.class);
+            if (rakServerRateLimiter == null) {
+                return;
+            }
             rakServerRateLimiter.addException(InetAddress.getLocalHost());
             rakServerRateLimiter.addException(InetAddress.getByName("127.0.0.1"));
+            rakServerRateLimiter.addException(InetAddress.getByName("::1"));
         } catch (UnknownHostException e) {
             log.error("Failed to add localhost to exception list", e);
         }
@@ -126,6 +170,23 @@ public class RakNetInterface implements AdvancedSourceInterface {
     @Override
     public void setNetwork(Network network) {
         this.network = network;
+    }
+
+    /**
+     * 底层 UDP 监听 channel（RakServerChannel 的 parent，IPv4 在前、IPv6 监听存在时在后），
+     * 供 NetherNet 共用端口时挂中继分流器。
+     * The raw UDP listener channels (the RakServerChannel parents, IPv4 first, then the IPv6
+     * listener when present), for the NetherNet relay to hook its demultiplexer onto.
+     */
+    public List<Channel> getDatagramChannels() {
+        List<Channel> channels = new ArrayList<>(2);
+        if (this.channel != null && this.channel.parent() != null) {
+            channels.add(this.channel.parent());
+        }
+        if (this.ipv6Channel != null && this.ipv6Channel.parent() != null) {
+            channels.add(this.ipv6Channel.parent());
+        }
+        return channels;
     }
 
     @Override
@@ -160,6 +221,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
             }
         }
 
+        List<RakNetPlayerSession> activeSessions = new ArrayList<>(this.sessions.size());
         Iterator<RakNetPlayerSession> iterator = this.sessions.values().iterator();
         while (iterator.hasNext()) {
             RakNetPlayerSession nukkitSession = iterator.next();
@@ -174,10 +236,32 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 this.clearProxyProtocolMapping(nukkitSession);
                 iterator.remove();
             } else {
-                nukkitSession.serverTick();
+                activeSessions.add(nukkitSession);
             }
         }
+        this.drainInboundFairly(activeSessions);
         return true;
+    }
+
+    void drainInboundFairly(List<RakNetPlayerSession> activeSessions) {
+        if (activeSessions.isEmpty()) {
+            this.inboundRoundRobinCursor = 0;
+            return;
+        }
+        int size = activeSessions.size();
+        int start = Math.floorMod(this.inboundRoundRobinCursor, size);
+        int remainingPackets = MAX_INBOUND_PACKETS_PER_INTERFACE_TICK;
+        long remainingBytes = MAX_INBOUND_BYTES_PER_INTERFACE_TICK;
+        int visited = 0;
+        while (visited < size && remainingPackets > 0 && remainingBytes > 0L) {
+            RakNetPlayerSession nukkitSession = activeSessions.get((start + visited) % size);
+            RakNetPlayerSession.InboundDrain drained =
+                    nukkitSession.serverTick(remainingPackets, remainingBytes);
+            remainingPackets -= drained.packets();
+            remainingBytes -= drained.bytes();
+            visited++;
+        }
+        this.inboundRoundRobinCursor = (start + (visited < size ? visited : 1)) % size;
     }
 
     public void queueSessionForPlayerCreation(RakNetPlayerSession session) {
@@ -215,6 +299,10 @@ public class RakNetInterface implements AdvancedSourceInterface {
         this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
+        if (this.ipv6Channel != null) {
+            this.ipv6Channel.close().awaitUninterruptibly();
+        }
+        this.eventLoopGroup.shutdownGracefully();
     }
 
     @Override
@@ -222,21 +310,48 @@ public class RakNetInterface implements AdvancedSourceInterface {
         this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
+        if (this.ipv6Channel != null) {
+            this.ipv6Channel.close().awaitUninterruptibly();
+        }
+        this.eventLoopGroup.shutdownGracefully();
     }
 
     @Override
     public void blockAddress(InetAddress address) {
-        this.channel.pipeline().get(RakServerRateLimiter.class).blockAddress(new InetSocketAddress(address, 0), 100, TimeUnit.DAYS);
+        blockAddressOnChannel(this.channel, address, 100, TimeUnit.DAYS);
+        blockAddressOnChannel(this.ipv6Channel, address, 100, TimeUnit.DAYS);
     }
 
     @Override
     public void blockAddress(InetAddress address, int timeout) {
-        this.channel.pipeline().get(RakServerRateLimiter.class).blockAddress(new InetSocketAddress(address, 0), timeout, TimeUnit.SECONDS);
+        blockAddressOnChannel(this.channel, address, timeout, TimeUnit.SECONDS);
+        blockAddressOnChannel(this.ipv6Channel, address, timeout, TimeUnit.SECONDS);
     }
 
     @Override
     public void unblockAddress(InetAddress address) {
-        this.channel.pipeline().get(RakServerRateLimiter.class).unblockAddress(new InetSocketAddress(address, 0));
+        unblockAddressOnChannel(this.channel, address);
+        unblockAddressOnChannel(this.ipv6Channel, address);
+    }
+
+    private static void blockAddressOnChannel(Channel channel, InetAddress address, long timeout, TimeUnit timeUnit) {
+        if (channel == null) {
+            return;
+        }
+        RakServerRateLimiter limiter = channel.pipeline().get(RakServerRateLimiter.class);
+        if (limiter != null) {
+            limiter.blockAddress(new InetSocketAddress(address, 0), timeout, timeUnit);
+        }
+    }
+
+    private static void unblockAddressOnChannel(Channel channel, InetAddress address) {
+        if (channel == null) {
+            return;
+        }
+        RakServerRateLimiter limiter = channel.pipeline().get(RakServerRateLimiter.class);
+        if (limiter != null) {
+            limiter.unblockAddress(new InetSocketAddress(address, 0));
+        }
     }
 
     private void expireLoginSessions() {
@@ -276,10 +391,16 @@ public class RakNetInterface implements AdvancedSourceInterface {
     }
 
     private void clearProxyProtocolMapping(RakNetPlayerSession session) {
-        if (this.channel == null) {
+        // In dual-stack mode the session may belong to either the IPv4 or IPv6 listener.
+        // Prefer the IPv6 listener when the session's parent channel matches it; otherwise
+        // fall back to the IPv4 channel. This also keeps tests working, since they inject
+        // the mocked handler via the "channel" field rather than the session parent chain.
+        Channel parentChannel = session.getChannel().parent();
+        Channel owningChannel = parentChannel == this.ipv6Channel ? this.ipv6Channel : this.channel;
+        if (owningChannel == null) {
             return;
         }
-        ProxyProtocolHandler proxyProtocolHandler = getProxyProtocolHandler(this.channel);
+        ProxyProtocolHandler proxyProtocolHandler = getProxyProtocolHandler(owningChannel);
         if (proxyProtocolHandler == null) {
             return;
         }
@@ -299,7 +420,10 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     @Override
     public void sendRawPacket(InetSocketAddress socketAddress, ByteBuf payload) {
-        this.channel.write(new DatagramPacket(payload, socketAddress));
+        Channel channel = (this.ipv6Channel != null && socketAddress.getAddress() instanceof Inet6Address)
+                ? this.ipv6Channel
+                : this.channel;
+        channel.write(new DatagramPacket(payload, socketAddress));
     }
 
     @Override
@@ -308,7 +432,8 @@ public class RakNetInterface implements AdvancedSourceInterface {
         String[] names = name.split("!@#"); // Split double names within the program
         String motd = Utils.rtrim(names[0].replace(";", "\\;"), '\\');
         String subMotd = names.length > 1 ? Utils.rtrim(names[1].replace(";", "\\;"), '\\') : "";
-        String port = Integer.toString(this.server.getPort());
+        String ipv4Port = Integer.toString(this.server.getPort());
+        String ipv6Port = Integer.toString(this.ipv6Channel != null ? this.server.getIpv6Port() : this.server.getPort());
         StringJoiner joiner = new StringJoiner(";", "", ";")
                 .add("MCPE")
                 .add(motd)
@@ -320,12 +445,15 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .add(subMotd)
                 .add(this.server.getDefaultGamemode() == 1 ? "Creative" : "Survival")
                 .add("1") // not nintendo limited
-                .add(port) // ipv4 port
-                .add(port); // ipv6 port
+                .add(ipv4Port) // ipv4 port
+                .add(ipv6Port); // ipv6 port
 
         byte[] advertisement = joiner.toString().getBytes(StandardCharsets.UTF_8);
 
         this.channel.config().setOption(RakChannelOption.RAK_ADVERTISEMENT, Unpooled.wrappedBuffer(advertisement));
+        if (this.ipv6Channel != null) {
+            this.ipv6Channel.config().setOption(RakChannelOption.RAK_ADVERTISEMENT, Unpooled.wrappedBuffer(advertisement));
+        }
     }
 
     public Network getNetwork() {
@@ -335,11 +463,11 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private static class Transport {
 
         private final Class<? extends DatagramChannel> datagramChannel;
-        private final IntFunction<EventLoopGroup> eventLoopGroupFactory;
+        private final IoHandlerFactory ioHandlerFactory;
 
-        private Transport(Class<? extends DatagramChannel> datagramChannel, IntFunction<EventLoopGroup> eventLoopGroupFactory) {
+        private Transport(Class<? extends DatagramChannel> datagramChannel, IoHandlerFactory ioHandlerFactory) {
             this.datagramChannel = datagramChannel;
-            this.eventLoopGroupFactory = eventLoopGroupFactory;
+            this.ioHandlerFactory = ioHandlerFactory;
         }
     }
 

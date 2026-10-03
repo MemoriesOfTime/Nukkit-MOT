@@ -2,10 +2,13 @@ package cn.nukkit.level.format.leveldb.serializer;
 
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.format.Chunk;
+import cn.nukkit.level.format.ChunkSection;
+import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.format.leveldb.LevelDBKey;
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
+import java.util.function.Consumer;
 import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
 import cn.nukkit.utils.ChunkException;
 import cn.nukkit.utils.Utils;
@@ -24,30 +27,38 @@ public class ChunkSerializerV3 implements ChunkSerializer {
 
     @Override
     public void serializer(WriteBatch writeBatch, Chunk chunk) {
+        serializer(writeBatch, chunk, ignored -> { });
+    }
+
+    @Override
+    public void serializer(WriteBatch writeBatch, Chunk chunk, Consumer<LevelDBChunkSection.SaveToken> snapshots) {
         DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
         for (int ySection = dimensionData.getMinSectionY(); ySection <= dimensionData.getMaxSectionY(); ++ySection) {
             byte[] key = LevelDBKey.SUB_CHUNK_PREFIX.getKey(
                     chunk.getX(), chunk.getZ(), ySection, dimensionData.getDimensionId()
             );
 
-            LevelDBChunkSection section = (LevelDBChunkSection) chunk.getSection(ySection);
-            if (section == null) {
+            ChunkSection section0 = chunk.getSection(ySection);
+            if (section0 == null || section0 instanceof EmptyChunkSection) {
+                // 空 section 与缺失等价：删除旧 key，防止历史数据在下次加载时复活
+                // Empty == absent: drop any stale key so historical data cannot resurrect on next load
                 writeBatch.delete(key);
                 continue;
             }
+            LevelDBChunkSection section = (LevelDBChunkSection) section0;
 
-            if (!section.isDirty()) {
-                continue;
-            }
-
-            ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
-            try {
-                byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
-                ChunkSectionSerializers.serializer(byteBuf, section.getStorages(), ySection, CURRENT_LEVEL_SUBCHUNK_VERSION);
-                writeBatch.put(key, Utils.convertByteBuf2Array(byteBuf));
-            } finally {
-                byteBuf.release();
-            }
+            final int capturedSectionY = ySection;
+            LevelDBChunkSection.SaveToken token = section.captureSave(chunk, ySection, storages -> {
+                ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+                try {
+                    byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
+                    ChunkSectionSerializers.serializer(byteBuf, storages, capturedSectionY, CURRENT_LEVEL_SUBCHUNK_VERSION);
+                    writeBatch.put(key, Utils.convertByteBuf2Array(byteBuf));
+                } finally {
+                    byteBuf.release();
+                }
+            });
+            if (token != null) snapshots.accept(token);
         }
     }
 

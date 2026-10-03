@@ -32,21 +32,26 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
 
     @Override
     public List<ResourcePack> loadPacks() {
+        cleanSnapshotCache();
         BaseLang baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
-        for (File pack : this.path.listFiles()) {
+        for (File pack : ResourcePackLoader.listFilesInNameOrder(this.path)) {
+            if (shouldIgnoreFile(pack.getName())) {
+                continue;
+            }
             try {
                 ZippedBehaviourPack resourcePack = null;
                 String fileExt = Files.getFileExtension(pack.getName());
+                ResourcePack.SupportType packType = detectSupportType(pack.getName());
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null)
-                        resourcePack = new ZippedBehaviourPack(file, this.supportType);
-                } else if (!fileExt.equals("key")) {
+                        resourcePack = new ZippedBehaviourPack(file, packType, true);
+                } else {
                     switch (fileExt) {
                         case "zip":
                         case "mcpack":
-                            resourcePack = new ZippedBehaviourPack(pack, this.supportType);
+                            resourcePack = new ZippedBehaviourPack(pack, packType);
                             break;
                         default:
                             log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
@@ -57,7 +62,9 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
                     loadedResourcePacks.add(resourcePack);
                     log.info(baseLang.translateString("nukkit.resources.zip.loaded", pack.getName()));
                 }
-            } catch (IllegalArgumentException e) {
+            } catch (RuntimeException e) {
+                // IllegalArgumentException = bad pack (skip); RuntimeException also covers
+                // loadDirectoryPack I/O failures, so one broken pack cannot abort the whole load
                 log.warn(baseLang.translateString("nukkit.resources.fail", pack.getName(), e.getMessage()), e);
             }
         }

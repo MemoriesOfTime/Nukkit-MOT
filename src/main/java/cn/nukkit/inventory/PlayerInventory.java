@@ -201,6 +201,9 @@ public class PlayerInventory extends BaseInventory {
         if (index >= this.getSize()) {
             this.sendArmorSlot(index, this.getViewers());
             this.sendArmorSlot(index, this.getHolder().getViewers().values());
+            if (holder instanceof Player player) {
+                player.sendKnockBackResistanceAttribute();
+            }
         } else {
             super.onSlotChange(index, before, send);
         }
@@ -305,9 +308,13 @@ public class PlayerInventory extends BaseInventory {
             ensureUniqueBundleId(index, bundle);
         }
 
+        Item[] parts = splitOverstack(item);
+        item = parts[0];
+
         Item old = this.getItem(index);
         this.slots.put(index, item.clone());
         this.onSlotChange(index, old, send);
+        this.routeOverflow(parts[1]);
         return true;
     }
 
@@ -557,38 +564,38 @@ public class PlayerInventory extends BaseInventory {
             }
         }
 
+        Item item = this.getItem(index);
+
         InventorySlotPacket pk = new InventorySlotPacket();
         pk.slot = index;
-        pk.item = this.getItem(index).clone();
+        pk.item = item;
 
-        ContainerSetSlotPacket_v113 pk2 = new ContainerSetSlotPacket_v113();
-        pk2.slot = index;
-        pk2.item = pk.item.clone();
+        ContainerSetSlotPacket_v113 pk2 = null;
 
         for (Player player : players) {
+            int id;
             if (player.equals(this.getHolder())) {
-                pk.inventoryId = ContainerIds.INVENTORY;
-                pk.containerNameData = resolvePlayerSlotContainerName(index, ContainerIds.INVENTORY);
-                pk2.windowid = 0;
-                if (player.protocol >= ProtocolInfo.v1_2_0) {
-                    player.dataPacket(pk);
-                } else {
-                    player.dataPacket(pk2);
-                }
+                id = ContainerIds.INVENTORY;
             } else {
-                int id = player.getWindowId(this);
+                id = player.getWindowId(this);
                 if (id == -1) {
                     this.close(player);
                     continue;
                 }
+            }
+
+            if (player.protocol >= ProtocolInfo.v1_2_0) {
                 pk.inventoryId = id;
                 pk.containerNameData = resolvePlayerSlotContainerName(index, id);
-                pk2.windowid = id;
-                if (player.protocol >= ProtocolInfo.v1_2_0) {
-                    player.dataPacket(pk.clone());
-                } else {
-                    player.dataPacket(pk2.clone());
+                player.dataPacket(pk);
+            } else {
+                if (pk2 == null) {
+                    pk2 = new ContainerSetSlotPacket_v113();
+                    pk2.slot = index;
+                    pk2.item = item.clone();
                 }
+                pk2.windowid = id;
+                player.dataPacket(pk2);
             }
         }
     }

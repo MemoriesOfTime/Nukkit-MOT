@@ -26,7 +26,7 @@ public class BlockEntityShelf extends BlockEntitySpawnable implements InventoryH
     protected void initBlockEntity() {
         this.inventory = new ShelfInventory(this);
 
-        if (this.namedTag.contains("Items") && this.namedTag.get("Items") instanceof ListTag) {
+        if (this.namedTag.get("Items") instanceof ListTag) {
             ListTag<CompoundTag> list = this.namedTag.getList("Items", CompoundTag.class);
             for (CompoundTag compound : list.getAll()) {
                 Item item = NBTIO.getItemHelper(compound);

@@ -33,19 +33,9 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
      *
      * @param map map
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings("unchecked")
     public ConfigSection(LinkedHashMap<String, Object> map) {
-        this();
-        if (map == null || map.isEmpty()) return;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (entry.getValue() instanceof LinkedHashMap linkedHashMap) {
-                super.put(entry.getKey(), new ConfigSection(linkedHashMap));
-            } else if (entry.getValue() instanceof List list) {
-                super.put(entry.getKey(), parseList(list));
-            } else {
-                super.put(entry.getKey(), entry.getValue());
-            }
-        }
+        this((Map<String, Object>) map);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -53,12 +43,10 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         this();
         if (map == null || map.isEmpty()) return;
         for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (entry.getValue() instanceof LinkedHashMap linkedHashMap) {
-                super.put(entry.getKey(), new ConfigSection(linkedHashMap));
-            } else if (entry.getValue() instanceof Map map1) {
+            if (entry.getValue() instanceof Map map1) {
                 super.put(entry.getKey(), new ConfigSection(map1));
-            } else if (entry.getValue() instanceof List) {
-                super.put(entry.getKey(), parseList((List) entry.getValue()));
+            } else if (entry.getValue() instanceof List list) {
+                super.put(entry.getKey(), parseList(list));
             } else {
                 super.put(entry.getKey(), entry.getValue());
             }
@@ -70,8 +58,8 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         List<Object> newList = new ArrayList<>();
 
         for (Object o : list) {
-            if (o instanceof LinkedHashMap) {
-                newList.add(new ConfigSection((LinkedHashMap) o));
+            if (o instanceof Map) {
+                newList.add(new ConfigSection((Map) o));
             } else {
                 newList.add(o);
             }
@@ -118,21 +106,21 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         if (key == null || key.isEmpty()) return defaultValue;
         if (super.containsKey(key)) {
             var value = super.get(key);
-            if (defaultValue != null && !defaultValue.getClass().isInstance(value)) {
+            if (defaultValue != null && value != null && !defaultValue.getClass().isInstance(value)) {
                 if (value instanceof Map map && defaultValue instanceof ConfigSection) {
                     return (T) new ConfigSection(map);
                 }
             }
             return (T) value;
         }
-        String[] keys = key.split("\\.", 2);
-        if (!super.containsKey(keys[0])) return defaultValue;
-        Object value = super.get(keys[0]);
+        int dot = key.indexOf('.');
+        if (dot < 0) return defaultValue;
+        Object value = super.get(key.substring(0, dot));
         if (value instanceof ConfigSection section) {
-            return section.get(keys[1], defaultValue);
+            return section.get(key.substring(dot + 1), defaultValue);
         } else if (value instanceof Map map) {
             ConfigSection section = new ConfigSection(map);
-            return section.get(keys[1], defaultValue);
+            return section.get(key.substring(dot + 1), defaultValue);
         }
         return defaultValue;
     }
@@ -144,14 +132,17 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
      * @param value value
      */
     public void set(String key, Object value) {
-        String[] subKeys = key.split("\\.", 2);
-        if (subKeys.length > 1) {
-            ConfigSection childSection = new ConfigSection();
-            if (this.containsKey(subKeys[0]) && super.get(subKeys[0]) instanceof ConfigSection)
-                childSection = (ConfigSection) super.get(subKeys[0]);
-            childSection.set(subKeys[1], value);
-            super.put(subKeys[0], childSection);
-        } else super.put(subKeys[0], value);
+        int dot = key.indexOf('.');
+        if (dot < 0) {
+            super.put(key, value);
+            return;
+        }
+        String first = key.substring(0, dot);
+        ConfigSection childSection = new ConfigSection();
+        if (super.get(first) instanceof ConfigSection section)
+            childSection = section;
+        childSection.set(key.substring(dot + 1), value);
+        super.put(first, childSection);
     }
 
     /**
@@ -722,10 +713,10 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
     public void remove(String key) {
         if (key == null || key.isEmpty()) return;
         if (super.remove(key) != null) return;
-        if (key.contains(".")) {
-            String[] keys = key.split("\\.", 2);
-            if (super.get(keys[0]) instanceof ConfigSection section) {
-                section.remove(keys[1]);
+        int dot = key.indexOf('.');
+        if (dot >= 0) {
+            if (super.get(key.substring(0, dot)) instanceof ConfigSection section) {
+                section.remove(key.substring(dot + 1));
             }
         }
     }

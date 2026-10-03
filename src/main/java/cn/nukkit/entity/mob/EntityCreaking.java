@@ -133,6 +133,6 @@ public class EntityCreaking extends EntityWalkingMob {
     }
 
     private boolean hasHeartPosition() {
-        return this.namedTag.contains(TAG_HEART_X) || this.creakingHeart != null;
+        return this.creakingHeart != null || this.namedTag.contains(TAG_HEART_X);
     }
 }

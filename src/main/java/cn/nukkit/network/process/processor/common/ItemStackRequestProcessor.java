@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.common;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
@@ -30,12 +31,12 @@ public class ItemStackRequestProcessor extends DataPacketProcessor<ItemStackRequ
             return;
         }
 
-        // Only process if server authoritative inventory is enabled
-        if (!player.isInventoryServerAuthoritative()) {
-            return;
-        }
-
-        // Handle the requests
+        // ItemStackRequest is the modern (1.16.100+) authoritative inventory path
+        // and must be processed regardless of the server's SAI config. Proxies
+        // (e.g. WDPE) may advertise a different SAI flag to the client than the
+        // backend's setting; gating on the backend flag would drop requests and
+        // leave the client without an ItemStackResponse, causing it to roll back
+        // legitimate container edits (e.g. chest item moves).
         if (!pk.getRequests().isEmpty()) {
             player.handleItemStackRequests(pk.getRequests());
         }
@@ -52,8 +53,8 @@ public class ItemStackRequestProcessor extends DataPacketProcessor<ItemStackRequ
     }
 
     @Override
-    public boolean isSupported(int protocol) {
+    public boolean isSupported(GameVersion gameVersion) {
         // Protocols before v419 use the old ItemStackResponse success boolean.
-        return protocol >= ProtocolInfo.v1_16_100;
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_16_100;
     }
 }

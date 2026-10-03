@@ -27,19 +27,12 @@ public final class IntArrayTag extends Tag {
 
     @Override
     void write(NBTOutputStream dos) throws IOException {
-        dos.writeInt(data.length);
-        for (int aData : data) {
-            dos.writeInt(aData);
-        }
+        dos.writeIntArray(data);
     }
 
     @Override
-    void load(NBTInputStream dis) throws IOException {
-        int length = dis.readInt();
-        data = new int[length];
-        for (int i = 0; i < length; i++) {
-            data[i] = dis.readInt();
-        }
+    void load(NBTInputStream dis, int nested) throws IOException {
+        data = dis.readIntArray(dis.readInt());
     }
 
     @Override

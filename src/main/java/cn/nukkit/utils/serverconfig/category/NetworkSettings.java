@@ -6,7 +6,6 @@ import eu.okaeri.configs.annotation.CustomKey;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
-import org.cloudburstmc.netty.channel.raknet.RakConstants;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +14,10 @@ import java.util.List;
 @Setter
 @Accessors(fluent = true)
 public class NetworkSettings extends OkaeriConfig {
+
+    @Comment("NetherNet (WebRTC) transport settings, runs alongside RakNet. Restricted-network clients 1.21.90+ join over HTTP signaling + WebRTC")
+    @CustomKey("nethernet")
+    private NetherNetSettings netherNetSettings = new NetherNetSettings();
 
     @Comment("ZLIB compression provider (2 recommended)")
     @CustomKey("zlib-provider")
@@ -36,15 +39,15 @@ public class NetworkSettings extends OkaeriConfig {
     @CustomKey("use-snappy-compression")
     private boolean useSnappyCompression = false;
 
-    @Comment("RakNet packet limit per tick")
+    @Comment("Max RakNet packets per 10ms per IP")
     @CustomKey("rak-packet-limit")
-    private int rakPacketLimit = RakConstants.DEFAULT_PACKET_LIMIT;
+    private int rakPacketLimit = 2000;
 
     @Comment("RakNet cookie mode (active, offloaded, offloaded_psk, off, none, stateless)")
     @CustomKey("rak-cookie-mode")
     private String rakCookieMode = "active";
 
-    @Comment("Client timeout in milliseconds (reserved, not yet applied)")
+    @Comment("Login timeout in milliseconds, also bounds the NetherNet WebRTC handshake phase (30s fallback when 0)")
     @CustomKey("timeout-milliseconds")
     private int timeoutMilliseconds = 25000;
 

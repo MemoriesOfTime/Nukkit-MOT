@@ -12,7 +12,9 @@ import cn.nukkit.network.protocol.mapping.LevelSoundEventMap;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.camera.CameraFadeInstruction;
+import cn.nukkit.network.protocol.types.camera.CameraFovInstruction;
 import cn.nukkit.network.protocol.types.camera.CameraPreset;
+import cn.nukkit.network.protocol.types.camera.CameraSplineInstruction;
 import org.cloudburstmc.protocol.bedrock.data.SoundEvent;
 import org.cloudburstmc.protocol.common.util.OptionalBoolean;
 import org.junit.jupiter.api.BeforeAll;
@@ -823,7 +825,7 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.spawnX = 0;
         nukkitPacket.spawnY = 64;
         nukkitPacket.spawnZ = 0;
-        nukkitPacket.gameRules = new GameRules();
+        nukkitPacket.gameRules = GameRules.getDefault();
         nukkitPacket.levelId = "level-1";
         nukkitPacket.worldName = "TestWorld";
         nukkitPacket.premiumWorldTemplateId = "";
@@ -840,6 +842,8 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.worldId = "world-1";
         nukkitPacket.scenarioId = "scenario-1";
         nukkitPacket.ownerIdentifier = "owner-1";
+        nukkitPacket.eduEditionOffer = 1;
+        nukkitPacket.permissionLevel = 1;
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -855,6 +859,17 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals("scenario-1", cbPacket.getScenarioId());
         assertEquals("owner-1", cbPacket.getOwnerId());
         assertFalse(cbPacket.isInventoriesServerAuthoritative());
+        assertEquals(1, cbPacket.getEduEditionOffers());
+        assertEquals(1, cbPacket.getDefaultPlayerPermission().ordinal());
+        assertEquals(38, cbPacket.getGamerules().size());
+        for (var rule : cbPacket.getGamerules()) {
+            if ("randomtickspeed".equals(rule.getName())) {
+                assertEquals(3, rule.getValue());
+            }
+            if ("dodaylightcycle".equals(rule.getName())) {
+                assertEquals(true, rule.getValue());
+            }
+        }
     }
 
     @ParameterizedTest(name = "StartGamePacket v{0} (legacy minimal)")
@@ -922,7 +937,8 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.mapId = 1;
         nukkitPacket.dimensionId = 0;
         nukkitPacket.isLocked = false;
-        nukkitPacket.origin = new BlockVector3(0, 0, 0);
+        // non-zero + negative origin: zigzag vs unsigned block-position encodings differ here
+        nukkitPacket.origin = new BlockVector3(10, 64, -5);
         nukkitPacket.scale = 4;
         nukkitPacket.eids = new long[]{10L};
         nukkitPacket.encode();
@@ -930,8 +946,13 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.ClientboundMapItemDataPacket.class);
 
-        assertEquals(1, cbPacket.getUniqueMapId());
-        assertEquals(4, cbPacket.getScale());
+        assertEquals(1L, cbPacket.getUniqueMapId());
+        assertEquals(Byte.valueOf((byte) 4), cbPacket.getScale());
+        if (protocolVersion >= ProtocolInfo.v1_19_20) {
+            assertEquals(10, cbPacket.getOrigin().getX());
+            assertEquals(64, cbPacket.getOrigin().getY());
+            assertEquals(-5, cbPacket.getOrigin().getZ());
+        }
     }
 
     static Stream<Arguments> versionsFrom544() {
@@ -949,7 +970,7 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.mapId = 2;
         nukkitPacket.dimensionId = 0;
         nukkitPacket.isLocked = true;
-        nukkitPacket.origin = new BlockVector3(100, 64, 200);
+        nukkitPacket.origin = new BlockVector3(100, 64, -200);
         nukkitPacket.scale = 1;
 
         var tracked = new ClientboundMapItemDataPacket.MapTrackedObject();
@@ -974,6 +995,142 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
 
         assertEquals(2, cbPacket.getUniqueMapId());
         assertTrue(cbPacket.isLocked());
+        assertEquals(100, cbPacket.getOrigin().getX());
+        assertEquals(64, cbPacket.getOrigin().getY());
+        assertEquals(-200, cbPacket.getOrigin().getZ());
+        assertEquals(1, cbPacket.getDecorations().size());
+        var cbDecoration = cbPacket.getDecorations().get(0);
+        assertEquals(8, cbDecoration.getRotation());
+        assertEquals(10, cbDecoration.getXOffset());
+        assertEquals(20, cbDecoration.getYOffset());
+    }
+
+    @Test
+    void testClientboundMapItemDataPacketImageV2168() {
+        var nukkitPacket = new ClientboundMapItemDataPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
+        nukkitPacket.mapId = 3;
+        nukkitPacket.dimensionId = 0;
+        nukkitPacket.scale = 0;
+        nukkitPacket.width = 2;
+        nukkitPacket.height = 2;
+        nukkitPacket.image = new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ClientboundMapItemDataPacket.class);
+
+        assertEquals(2, cbPacket.getWidth().intValue());
+        assertEquals(2, cbPacket.getHeight().intValue());
+        assertEquals(4, cbPacket.getColors().length, "image pixels must be sent as colors on v2168");
+    }
+
+    // ==================== CraftingDataPacket v2168 (real data) ====================
+
+    @Test
+    void testCraftingDataPacketV2168RealData() {
+        var nukkitPacket = new cn.nukkit.network.protocol.CraftingDataPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
+
+        // shaped with an empty slot (INVALID ingredient path)
+        var shaped = new cn.nukkit.inventory.ShapedRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.STICK),
+                new String[]{"A", " "}, java.util.Map.of('A', cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL)),
+                java.util.Collections.emptyList());
+        shaped.setId(UUID.randomUUID());
+        nukkitPacket.addShapedRecipe(shaped);
+
+        // shapeless with a normal ingredient (DEFAULT descriptor path)
+        var shapeless = new cn.nukkit.inventory.ShapelessRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.STICK),
+                java.util.List.of(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL)));
+        shapeless.setId(UUID.randomUUID());
+        nukkitPacket.addShapelessRecipe(shapeless);
+
+        // furnace + blast furnace + smoker (no longer crash: FurnaceRecipe must not be cast to ShapelessRecipe)
+        var furnace = new cn.nukkit.inventory.FurnaceRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL));
+        furnace.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(furnace);
+        var blast = new cn.nukkit.inventory.BlastFurnaceRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COAL));
+        blast.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(blast);
+        var smoker = new cn.nukkit.inventory.SmokerRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COOKED_BEEF),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.RAW_BEEF));
+        smoker.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(smoker);
+
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.CraftingDataPacket.class,
+                helperWithItemDefinitions());
+
+        assertEquals(1, cbPacket.getShapedData().size());
+        assertEquals(4, cbPacket.getShapelessData().size(), "shapeless + 3 furnace recipes");
+        assertEquals("furnace", cbPacket.getShapelessData().get(1).getTag());
+        assertEquals("blast_furnace", cbPacket.getShapelessData().get(2).getTag());
+        assertEquals("smoker", cbPacket.getShapelessData().get(3).getTag());
+        assertEquals(1, cbPacket.getShapelessData().get(1).getIngredients().size(), "furnace ingredient");
+        assertEquals(2, cbPacket.getShapedData().get(0).getIngredients().size(),
+                "shaped ingredients must match width*height incl. the empty slot");
+    }
+
+    private static java.util.function.Consumer<org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper> helperWithItemDefinitions() {
+        var gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
+        return helper -> {
+            var itemDefinitions = org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                    .<org.cloudburstmc.protocol.bedrock.data.definitions.ItemDefinition>builder();
+            var seen = new java.util.HashSet<Integer>();
+            for (var entry : cn.nukkit.item.RuntimeItems.getMapping(gameVersion).getItemPaletteEntries()) {
+                if (!seen.add(entry.getRuntimeId())) {
+                    continue;
+                }
+                itemDefinitions.add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleItemDefinition(
+                        entry.getIdentifier(), entry.getRuntimeId(), false));
+            }
+            helper.setItemDefinitions(itemDefinitions.build());
+            helper.setBlockDefinitions(org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                    .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder().build());
+        };
+    }
+
+    // ==================== CraftingDataPacket blast/smoker (all versions) ====================
+
+    /**
+     * 烟熏炉/高炉配方编码在所有协议版本上都不能崩溃 / Smoker & blast furnace
+     * recipe encoding must not crash on any protocol version.
+     * <p>
+     * 低版本走 legacy furnace 编码（tag 固定 CRAFTING_TAG_FURNACE），
+     * v1_26_20_26+ 走 shapeless tag 区分，v2168 走 encodeV2168。
+     */
+    @ParameterizedTest(name = "CraftingDataPacket blast+smoker v{0}")
+    @MethodSource("allVersions")
+    void testCraftingDataPacketBlastSmokerAllVersions(int protocolVersion) {
+        var nukkitPacket = new cn.nukkit.network.protocol.CraftingDataPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+
+        var furnace = new cn.nukkit.inventory.FurnaceRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT));
+        furnace.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(furnace);
+
+        var blast = new cn.nukkit.inventory.BlastFurnaceRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.IRON_INGOT));
+        blast.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(blast);
+
+        var smoker = new cn.nukkit.inventory.SmokerRecipe(cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.COOKED_BEEF),
+                cn.nukkit.item.Item.get(cn.nukkit.item.ItemID.RAW_BEEF));
+        smoker.setId(UUID.randomUUID());
+        nukkitPacket.addFurnaceRecipe(smoker);
+
+        // 仅验证编码不抛异常；跨版本解码需要每版本物品定义注册表，此处不覆盖。
+        // Encoding must not throw; cross-version decode needs per-version item-definition
+        // registries and is intentionally not covered here.
+        assertDoesNotThrow(nukkitPacket::encode, "CraftingDataPacket with blast+smoker recipes must encode on protocol " + protocolVersion);
     }
 
     // ==================== CameraInstructionPacket ====================
@@ -996,6 +1153,70 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
 
         assertTrue(cbPacket.getClear().isPresent());
         assertTrue(cbPacket.getClear().getAsBoolean());
+    }
+
+    static Stream<Arguments> versionsFrom827() {
+        return filteredVersions(ProtocolInfo.v1_21_100);
+    }
+
+    @ParameterizedTest(name = "CameraInstructionPacket v{0} (fov)")
+    @MethodSource("versionsFrom827")
+    void testCameraInstructionPacketFov(int protocolVersion) {
+        var nukkitPacket = new CameraInstructionPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.setFovInstruction(new CameraFovInstruction(85.0f, 0.5f,
+                cn.nukkit.network.protocol.types.camera.CameraEase.EASE_IN_QUAD, true));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.CameraInstructionPacket.class);
+
+        assertEquals(85.0f, cbPacket.getFovInstruction().getFov(), 0.001f);
+        assertEquals(0.5f, cbPacket.getFovInstruction().getEaseTime(), 0.001f);
+        // v944+ carries the ease as serialize name; ordinal 6 must not leak through as a wrong name
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.EASE_IN_QUAD,
+                cbPacket.getFovInstruction().getEaseType());
+        assertTrue(cbPacket.getFovInstruction().isClear());
+    }
+
+    @ParameterizedTest(name = "CameraInstructionPacket v{0} (spline)")
+    @MethodSource("versionsFrom859")
+    void testCameraInstructionPacketSpline(int protocolVersion) {
+        var nukkitPacket = new CameraInstructionPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.setSplineInstruction(new CameraSplineInstruction(
+                2.0f,
+                cn.nukkit.network.protocol.types.camera.CameraSplineType.CATMULL_ROM,
+                java.util.List.of(),
+                java.util.List.of(new CameraSplineInstruction.SplineProgressOption(0.5f, 1.0f,
+                        cn.nukkit.network.protocol.types.camera.CameraEase.SPRING)),
+                java.util.List.of(new CameraSplineInstruction.SplineRotationOption(new Vector3f(10f, 20f, 30f), 0.25f,
+                        cn.nukkit.network.protocol.types.camera.CameraEase.EASE_IN_QUAD)),
+                "main_menu", true));
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.CameraInstructionPacket.class);
+
+        var cbSpline = cbPacket.getSplineInstruction();
+        assertNotNull(cbSpline);
+        assertEquals(2.0f, cbSpline.getTotalTime(), 0.001f);
+        assertEquals(1, cbSpline.getProgressKeyFrames().size());
+        var cbProgress = cbSpline.getProgressKeyFrames().get(0);
+        assertEquals(0.5f, cbProgress.getValue(), 0.001f);
+        assertEquals(1.0f, cbProgress.getTime(), 0.001f);
+        var cbRotation = cbSpline.getRotationOption().get(0);
+        assertEquals(10.0f, cbRotation.getKeyFrameValues().getX(), 0.001f);
+        assertEquals(0.25f, cbRotation.getKeyFrameTimes(), 0.001f);
+        if (protocolVersion >= ProtocolInfo.v1_26_0) {
+            // v924+ carries eases plus identifier/json; string vs byte is verified byte-for-byte by crossDecode
+            assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.SPRING, cbProgress.getEase());
+            assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.EASE_IN_QUAD, cbRotation.getEase());
+            assertEquals("main_menu", cbSpline.getSplineIdentifier());
+            assertTrue(cbSpline.isLoadFromJson());
+        }
     }
 
     @ParameterizedTest(name = "CameraInstructionPacket v{0} (fade)")

@@ -31,46 +31,34 @@ public enum EnchantmentType {
         } else if (this == BREAKABLE && item.getMaxDurability() >= 0) {
             return true;
 
+        } else if (item instanceof ItemBook) {
+            return true;
+
         } else if (item instanceof ItemArmor) {
             if (this == WEARABLE || (this == ARMOR && item.isArmor())) {
                 return true;
             }
 
-            switch (this) {
-                case ARMOR_HEAD:
-                    return item.isHelmet();
-                case ARMOR_TORSO:
-                    return item.isChestplate();
-                case ARMOR_LEGS:
-                    return item.isLeggings();
-                case ARMOR_FEET:
-                    return item.isBoots();
-                default:
-                    return false;
-            }
+            return switch (this) {
+                case ARMOR_HEAD -> item.isHelmet();
+                case ARMOR_TORSO -> item.isChestplate();
+                case ARMOR_LEGS -> item.isLeggings();
+                case ARMOR_FEET -> item.isBoots();
+                default -> false;
+            };
         } else {
-            switch (this) {
-                case SWORD:
-                    return item.isSword();
-                case DIGGER:
-                    return item.isPickaxe() || item.isShovel() || item.isAxe() || item.isHoe();
-                case BOW:
-                    return item instanceof ItemBow;
-                case FISHING_ROD:
-                    return item instanceof ItemFishingRod;
-                case WEARABLE:
-                    return item instanceof ItemSkull;
-                case TRIDENT:
-                    return item instanceof ItemTrident;
-                case CROSSBOW:
-                    return item instanceof ItemCrossbow;
-                case MACE:
-                    return item instanceof ItemMace;
-                case SPEAR:
-                    return item.isSpear();
-                default:
-                    return false;
-            }
+            return switch (this) {
+                case SWORD -> item.isSword() && !(item instanceof ItemTrident);
+                case DIGGER -> item.isPickaxe() || item.isShovel() || item.isAxe() || item.isHoe();
+                case BOW -> item instanceof ItemBow;
+                case FISHING_ROD -> item instanceof ItemFishingRod;
+                case WEARABLE -> item instanceof ItemSkull;
+                case TRIDENT -> item instanceof ItemTrident;
+                case CROSSBOW -> item instanceof ItemCrossbow;
+                case MACE -> item instanceof ItemMace;
+                case SPEAR -> item.isSpear();
+                default -> false;
+            };
         }
     }
 }

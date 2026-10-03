@@ -15,6 +15,7 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTurtleShell;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Sound;
@@ -39,6 +40,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     public EntityLiving(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+        // Players defer initEntity until login; mobs have already loaded their effects in super.
+        this.initializeMovementState();
     }
 
     @Override
@@ -54,7 +57,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     protected int attackTime = 0;
     protected int knockBackTime = 0;
 
-    protected float movementSpeed = 0.1f;
+    protected float movementSpeed;
 
     protected int turtleTicks = 0;
 
@@ -62,10 +65,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     protected final boolean isDrowned = this instanceof EntityDrowned;
 
-    private final Map<String, EntityMovementSpeedModifier> movementSpeedModifiers = new HashMap<>();
+    private Map<String, EntityMovementSpeedModifier> movementSpeedModifiers;
+
+    private void initializeMovementState() {
+        if (this.movementSpeedModifiers == null) {
+            this.movementSpeedModifiers = new HashMap<>();
+            this.movementSpeed = 0.1f;
+        }
+    }
 
     @Override
     protected void initEntity() {
+        // Entity's constructor loads ActiveEffects through this virtual method, before field
+        // initializers would run. Initialize both values here and never overwrite the loaded speed.
+        this.initializeMovementState();
         super.initEntity();
 
         if (this.namedTag.contains("HealF")) {
@@ -73,7 +86,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             this.namedTag.remove("HealF");
         }
 
-        if (!this.namedTag.contains("Health") || !(this.namedTag.get("Health") instanceof FloatTag)) {
+        if (!(this.namedTag.get("Health") instanceof FloatTag)) {
             this.namedTag.putFloat("Health", this.getMaxHealth());
         }
 
@@ -204,9 +217,19 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         this.knockBack(attacker, damage, x, z, 0.3);
     }
 
+    /** Fraction of an incoming knockback impulse resisted, from zero to one. */
+    public double getKnockBackResistance() {
+        return 0;
+    }
+
     public void knockBack(Entity attacker, double damage, double x, double z, double base) {
         double f = Math.sqrt(x * x + z * z);
         if (f <= 0) {
+            return;
+        }
+
+        double kept = 1 - Math.max(0, Math.min(1, this.getKnockBackResistance()));
+        if (kept <= 0) {
             return;
         }
 
@@ -217,9 +240,9 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         motion.x /= 2d;
         motion.y /= 2d;
         motion.z /= 2d;
-        motion.x += x * f * base;
-        motion.y += base;
-        motion.z += z * f * base;
+        motion.x += x * f * base * kept;
+        motion.y += base * kept;
+        motion.z += z * f * base * kept;
 
         if (motion.y > base) {
             motion.y = base;
@@ -270,13 +293,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     @Override
     public boolean entityBaseTick(int tickDiff) {
         boolean inWater = this.isSubmerged();
+        int respirationTick = 1;
 
         if (this instanceof Player && !this.closed) {
             Player p = (Player) this;
             boolean isBreathing = !inWater;
 
             PlayerInventory inv = p.getInventory();
-            if (isBreathing && inv != null && inv.getHelmetFast() instanceof ItemTurtleShell) {
+            Item helmet = inv == null ? null : inv.getHelmetFast();
+
+            if (helmet != null && helmet.isHelmet()) {
+                respirationTick = helmet.getEnchantmentLevel(Enchantment.ID_WATER_BREATHING) + 1;
+            }
+
+            if (isBreathing && helmet instanceof ItemTurtleShell) {
                 turtleTicks = 200;
             } else if (turtleTicks > 0) {
                 isBreathing = true;
@@ -343,7 +373,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 if (this instanceof EntitySwimming || this.isDrowned || this instanceof EntitySkeletonHorse || this instanceof EntityIronGolem || this instanceof Player player && (player.isCreative() || player.isSpectator())) {
                     this.setAirTicks(400);
                 } else {
-                    if (turtleTicks == 0) {
+                    if (turtleTicks <= 0 && level.getCurrentTick() % respirationTick == 0) {
                         hasUpdate = true;
                         int airTicks = this.getAirTicks() - tickDiff;
 
@@ -377,7 +407,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             // Check collisions with blocks
-            if ((this instanceof Player || this instanceof BaseEntity) && this.riding == null && this.age % (this instanceof Player ? 2 : 10) == 0) {
+            int floorProbePeriod = this instanceof Player ? 2 : 10;
+            boolean floorProbeDue = tickDiff <= 1 || this instanceof Player
+                    ? this.age % floorProbePeriod == 0
+                    // A caught-up mob tick covers the ages [age - tickDiff + 1, age] (age was already advanced).
+                    : hitsResidue((long) this.age - tickDiff + 1, tickDiff, floorProbePeriod, 0);
+            if ((this instanceof Player || this instanceof BaseEntity) && this.riding == null && floorProbeDue) {
                 int floorY = NukkitMath.floorDouble(this.y - 0.25);
                 if (floorY != getFloorY()) {
                     Block block = this.level.getBlock(this.chunk, getFloorX(), floorY, getFloorZ(), false);
@@ -513,7 +548,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public float getMovementSpeed() {
         return this.movementSpeed;
     }
-    
+
     public int getAirTicks() {
         return this.airTicks;
     }

@@ -27,6 +27,10 @@ public class GameFeatureSettings extends OkaeriConfig {
     @CustomKey("explosion-break-blocks")
     private boolean explosionBreakBlocks = true;
 
+    @Comment("Maximum blocks moved by one piston (1-64; invalid values use 12)")
+    @CustomKey("piston-push-limit")
+    private int pistonPushLimit = 12;
+
     @Comment("Allow spawners to drop when broken")
     @CustomKey("drop-spawners")
     private boolean dropSpawners = true;
@@ -90,4 +94,12 @@ public class GameFeatureSettings extends OkaeriConfig {
     @Comment("Check operator movement for cheating")
     @CustomKey("check-op-movement")
     private boolean checkOpMovement = false;
+
+    @Comment("Use vanilla armor damage reduction formula (non-linear with toughness/breach, deterministic EPF). Set false for legacy linear formula")
+    @CustomKey("vanilla-armor-reduction")
+    private boolean vanillaArmorReduction = true;
+
+    @Comment("Apply vanilla armor knockback resistance (each netherite piece resists 10% of incoming knockback). Set false for legacy full-strength knockback")
+    @CustomKey("vanilla-knockback-resistance")
+    private boolean vanillaKnockbackResistance = true;
 }

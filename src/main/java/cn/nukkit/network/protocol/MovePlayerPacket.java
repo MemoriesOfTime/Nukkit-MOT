@@ -29,21 +29,6 @@ public class MovePlayerPacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (protocol < ProtocolInfo.v1_2_0) {
-            this.eid = this.getEntityUniqueId();
-            Vector3f v = this.getVector3f();
-            this.x = v.x;
-            this.y = v.y;
-            this.z = v.z;
-            this.pitch = this.getLFloat();
-            this.yaw = this.getLFloat();
-            this.headYaw = this.getLFloat();
-            this.mode = this.getByte();
-            this.onGround = this.getBoolean();
-            this.ridingEid = this.getEntityUniqueId();
-            return;
-        }
-
         this.eid = this.getEntityRuntimeId();
         Vector3f v = this.getVector3f();
         this.x = v.x;
@@ -55,7 +40,13 @@ public class MovePlayerPacket extends DataPacket {
         this.mode = this.getByte();
         this.onGround = this.getBoolean();
         this.ridingEid = this.getEntityRuntimeId();
-        if (this.mode == MODE_TELEPORT) {
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            // v2168 wraps the teleport block in a single outer boolean
+            if (this.getBoolean()) {
+                this.teleportCause = this.getLInt();
+                this.teleportItem = this.getLInt();
+            }
+        } else if (this.mode == MODE_TELEPORT) {
             this.teleportCause = this.getLInt();
             this.teleportItem = this.getLInt();
         }
@@ -67,18 +58,6 @@ public class MovePlayerPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (protocol < ProtocolInfo.v1_2_0) {
-            this.putEntityUniqueId(this.eid);
-            this.putVector3f(this.x, this.y, this.z);
-            this.putLFloat(this.pitch);
-            this.putLFloat(this.yaw);
-            this.putLFloat(this.headYaw);
-            this.putByte((byte) this.mode);
-            this.putBoolean(this.onGround);
-            this.putEntityUniqueId(this.ridingEid);
-            return;
-        }
-
         this.putEntityRuntimeId(this.eid);
         this.putVector3f(this.x, this.y, this.z);
         this.putLFloat(this.pitch);
@@ -87,7 +66,13 @@ public class MovePlayerPacket extends DataPacket {
         this.putByte((byte) this.mode);
         this.putBoolean(this.onGround);
         this.putEntityRuntimeId(this.ridingEid);
-        if (this.mode == MODE_TELEPORT) {
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putBoolean(this.mode == MODE_TELEPORT);
+            if (this.mode == MODE_TELEPORT) {
+                this.putLInt(this.teleportCause);
+                this.putLInt(this.teleportItem);
+            }
+        } else if (this.mode == MODE_TELEPORT) {
             this.putLInt(this.teleportCause);
             this.putLInt(this.teleportItem);
         }

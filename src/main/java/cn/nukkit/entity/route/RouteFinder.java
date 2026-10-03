@@ -113,7 +113,11 @@ public abstract class RouteFinder {
             if (node != null) {
                 Vector3 cur = node.getVector3();
                 if (cur != null && this.hasNext()) {
-                    return vec.getX() == cur.getX() && vec.getZ() == cur.getZ();
+                    // Exact equality never happens (nodes are grid-aligned, entity coords are
+                    // fractional), so node advancement never fired. Accept arrival within 1 block.
+                    double dx = vec.getX() - cur.getX();
+                    double dz = vec.getZ() - cur.getZ();
+                    return dx * dx + dz * dz < 1.0D;
                 }
             }
             return false;

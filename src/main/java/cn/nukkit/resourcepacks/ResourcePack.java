@@ -28,6 +28,16 @@ public interface ResourcePack {
         return "";
     }
 
+    /**
+     * 设置资源包加密密钥
+     * <p>
+     * Set the encryption key for this resource pack
+     *
+     * @param key the encryption key, or null/empty for no encryption
+     */
+    default void setEncryptionKey(String key) {
+    }
+
     default String getSubPackName() {
         return "";
     }
@@ -52,6 +62,17 @@ public interface ResourcePack {
      */
     default String getCDNUrl() {
         return "";
+    }
+
+    /**
+     * 设置资源包的 CDN URL
+     * <p>
+     * Set the CDN URL for this resource pack
+     *
+     * @param cdnUrl the CDN URL, or null/empty to disable CDN delivery
+     * @since v748 1.21.40
+     */
+    default void setCDNUrl(String cdnUrl) {
     }
 
     /**

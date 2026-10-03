@@ -1,5 +1,6 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.AdventureSettings;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
@@ -20,6 +21,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.potion.Effect;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -29,8 +31,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -46,6 +47,7 @@ public class ArmorDamageReductionTest {
     @BeforeAll
     static void initServer() {
         MockServer.init();
+        Effect.init();
     }
 
     /** 同包直接访问 protected static / direct call (same package, protected static) */
@@ -101,7 +103,9 @@ public class ArmorDamageReductionTest {
     public void testEntityBaseTickAppliesLavaDamageWhileStandingInLava() {
         Level level = newMockLevel();
         stubLevelAsLava(level);
-        TestLiving target = new TestLiving(newMockChunk(level), baseNbt());
+        FullChunk chunk = newMockChunk(level);
+        stubChunkAsLava(chunk);
+        TestLiving target = new TestLiving(chunk, baseNbt());
 
         assertTrue(target.isInsideOfLava());
         for (int i = 0; i < 10; i++) {
@@ -442,6 +446,308 @@ public class ArmorDamageReductionTest {
                         + ") because RESISTANCE was applied on full BASE");
     }
 
+    // ============== 旧公式(vanilla-armor-reduction=false)回归测试 / Legacy formula tests ==============
+
+    /** 临时关闭原版护甲公式执行 body,结束后恢复 / Temporarily disable vanilla armor formula, restore after */
+    private void withLegacyArmor(Runnable body) {
+        var settings = MockServer.get().getServerConfig().gameFeatureSettings();
+        boolean previous = settings.vanillaArmorReduction();
+        settings.vanillaArmorReduction(false);
+        try {
+            body.run();
+        } finally {
+            settings.vanillaArmorReduction(previous);
+        }
+    }
+
+    @Test
+    public void testLegacyLinearArmorFormulaMatchesOldBehavior() {
+        // 纯线性:finalDamage = damage × (1 - armorPoints × 0.04);忽略韧性
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.getInventory().setArmorContents(new Item[]{
+                Item.get(ItemID.DIAMOND_HELMET),
+                Item.get(ItemID.DIAMOND_CHESTPLATE),
+                Item.get(ItemID.DIAMOND_LEGGINGS),
+                Item.get(ItemID.DIAMOND_BOOTS)
+        });
+
+        EntityDamageEvent event = new EntityDamageEvent(target,
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK, 10f);
+
+        withLegacyArmor(() -> assertTrue(target.attack(event)));
+
+        // 20 护甲 × 0.04 = 0.80 → 10 × 0.20 = 2.0
+        assertEquals(2.0f, event.getFinalDamage(), 0.001f,
+                "Legacy linear formula should reduce 10 dmg by 80% with 20 armor points");
+        assertEquals(-8.0f, event.getDamage(EntityDamageEvent.DamageModifier.ARMOR), 0.001f);
+    }
+
+    @Test
+    public void testLegacyFormulaReductionIsDamageIndependent() {
+        Level level = newMockLevel();
+        withLegacyArmor(() -> {
+            for (float dmg : new float[]{4f, 10f, 20f, 50f}) {
+                TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+                target.getInventory().setArmorContents(new Item[]{
+                        Item.get(ItemID.IRON_HELMET),
+                        Item.get(ItemID.IRON_CHESTPLATE),
+                        Item.get(ItemID.IRON_LEGGINGS),
+                        Item.get(ItemID.IRON_BOOTS)
+                });
+                EntityDamageEvent event = new EntityDamageEvent(target,
+                        EntityDamageEvent.DamageCause.ENTITY_ATTACK, dmg);
+                assertTrue(target.attack(event));
+                // 铁套 15 护甲 → 固定 60% 抵消
+                assertEquals(dmg * 0.40f, event.getFinalDamage(), 0.001f,
+                        "Legacy reduction fraction must be constant across damage values at dmg=" + dmg);
+            }
+        });
+    }
+
+    @Test
+    public void testLegacyMagicDamageBypassesArmor() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.getInventory().setArmorContents(new Item[]{
+                Item.get(ItemID.DIAMOND_HELMET),
+                Item.get(ItemID.DIAMOND_CHESTPLATE),
+                Item.get(ItemID.DIAMOND_LEGGINGS),
+                Item.get(ItemID.DIAMOND_BOOTS)
+        });
+
+        EntityDamageEvent event = new EntityDamageEvent(target,
+                EntityDamageEvent.DamageCause.MAGIC, 8f);
+
+        withLegacyArmor(() -> assertTrue(target.attack(event)));
+        assertEquals(8f, event.getFinalDamage(), 0.001f);
+        assertFalse(event.isApplicable(EntityDamageEvent.DamageModifier.ARMOR),
+                "Legacy formula should not apply ARMOR modifier to MAGIC damage");
+    }
+
+    @Test
+    public void testLegacyEpfRandomFactorStaysWithinBounds() {
+        Level level = newMockLevel();
+        withLegacyArmor(() -> {
+            for (int i = 0; i < 200; i++) {
+                TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+                target.getInventory().setArmorContents(new Item[]{
+                        prot4(ItemID.DIAMOND_HELMET),
+                        prot4(ItemID.DIAMOND_CHESTPLATE),
+                        prot4(ItemID.DIAMOND_LEGGINGS),
+                        prot4(ItemID.DIAMOND_BOOTS)
+                });
+                EntityDamageEvent event = new EntityDamageEvent(target,
+                        EntityDamageEvent.DamageCause.ENTITY_ATTACK, 10f);
+                assertTrue(target.attack(event));
+                float finalDmg = event.getFinalDamage();
+                // 护甲后 2.0;EPF=16 随机系数 [0.5,1.0] → 抵消 [0.32,0.64] → final [0.72,1.36]
+                assertTrue(finalDmg >= 0.70f && finalDmg <= 1.40f,
+                        "Legacy EPF randomization out of expected bounds: " + finalDmg);
+            }
+        });
+    }
+
+    // ============== 旧公式暴击(vanilla-armor-reduction=false)回归测试 / Legacy crit formula tests ==============
+
+    @Test
+    public void testLegacyCriticalBaseIsPostArmorForHuman() {
+        // 钻石套 20 护甲,10 基础伤害,无附魔:ARMOR=-8, postArmor=2, CRITICAL=2×0.5=1, final=3.0
+        Level level = newMockLevel();
+        FullChunk chunk = newMockChunk(level);
+        TestHuman target = new TestHuman(chunk, baseNbt());
+        target.getInventory().setArmorContents(new Item[]{
+                Item.get(ItemID.DIAMOND_HELMET),
+                Item.get(ItemID.DIAMOND_CHESTPLATE),
+                Item.get(ItemID.DIAMOND_LEGGINGS),
+                Item.get(ItemID.DIAMOND_BOOTS)
+        });
+        Player damager = newCriticalDamager(level, chunk);
+
+        EntityDamageByEntityEvent event = new EntityDamageByEntityEvent(damager, target,
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK, 10f);
+
+        withLegacyArmor(() -> assertTrue(target.attack(event)));
+        assertEquals(-8.0f, event.getDamage(EntityDamageEvent.DamageModifier.ARMOR), 0.001f,
+                "Legacy linear armor: 10 × 0.80 = 8");
+        assertEquals(1.0f, event.getDamage(EntityDamageEvent.DamageModifier.CRITICAL), 0.001f,
+                "Legacy crit base is post-armor finalDamage (2.0) × 0.5 = 1.0");
+        assertEquals(3.0f, event.getFinalDamage(), 0.001f);
+        assertEquals(17.0f, target.getHealth(), 0.001f);
+    }
+
+    @Test
+    public void testLegacyCriticalBaseIncludesAbsorption() {
+        // legacy CRITICAL 在 ABSORPTION 后设置,基数含 ABSORPTION:ARMOR=-8→2; ABSORP=-2→0; CRIT=0×0.5=0
+        Level level = newMockLevel();
+        FullChunk chunk = newMockChunk(level);
+        TestHuman target = new TestHuman(chunk, baseNbt());
+        target.setAbsorption(6f);
+        target.getInventory().setArmorContents(new Item[]{
+                Item.get(ItemID.DIAMOND_HELMET),
+                Item.get(ItemID.DIAMOND_CHESTPLATE),
+                Item.get(ItemID.DIAMOND_LEGGINGS),
+                Item.get(ItemID.DIAMOND_BOOTS)
+        });
+        Player damager = newCriticalDamager(level, chunk);
+
+        EntityDamageByEntityEvent event = new EntityDamageByEntityEvent(damager, target,
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK, 10f);
+
+        withLegacyArmor(() -> assertTrue(target.attack(event)));
+        assertEquals(-2.0f, event.getDamage(EntityDamageEvent.DamageModifier.ABSORPTION), 0.001f,
+                "Absorption caps at post-armor finalDamage (2.0)");
+        assertEquals(0.0f, event.getDamage(EntityDamageEvent.DamageModifier.CRITICAL), 0.001f,
+                "Legacy crit base is post-absorption finalDamage (0.0) × 0.5 = 0 — absorption ate the crit base");
+        assertEquals(0.0f, event.getFinalDamage(), 0.001f);
+        assertEquals(20.0f, target.getHealth(), 0.001f);
+        assertEquals(4.0f, target.getAbsorption(), 0.001f);
+    }
+
+    @Test
+    public void testLegacyCriticalOnLivingUsesFinalDamage() {
+        // 怪物无护甲:10 base → CRITICAL=10×0.5=5, final=15
+        Level level = newMockLevel();
+        FullChunk chunk = newMockChunk(level);
+        TestLiving target = new TestLiving(chunk, baseNbt());
+        Player damager = newCriticalDamager(level, chunk);
+
+        EntityDamageByEntityEvent event = new EntityDamageByEntityEvent(damager, target,
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK, 10f);
+
+        withLegacyArmor(() -> assertTrue(target.attack(event)));
+        assertEquals(5f, event.getDamage(EntityDamageEvent.DamageModifier.CRITICAL), 0.001f);
+        assertEquals(15f, event.getFinalDamage(), 0.001f);
+        assertEquals(5f, target.getHealth(), 0.001f);
+    }
+
+    @Test
+    public void testVanillaCriticalIsHigherThanLegacyForArmoredTarget() {
+        // 穿甲目标:vanilla 暴击(基数=护甲前)应造成更多最终伤害
+        float base = 10f;
+        Level level = newMockLevel();
+        FullChunk chunk = newMockChunk(level);
+
+        // Vanilla path
+        TestHuman vanillaTarget = new TestHuman(chunk, baseNbt());
+        vanillaTarget.getInventory().setArmorContents(new Item[]{
+                Item.get(ItemID.DIAMOND_HELMET),
+                Item.get(ItemID.DIAMOND_CHESTPLATE),
+                Item.get(ItemID.DIAMOND_LEGGINGS),
+                Item.get(ItemID.DIAMOND_BOOTS)
+        });
+        EntityDamageByEntityEvent vanillaEvent = new EntityDamageByEntityEvent(
+                newCriticalDamager(level, chunk), vanillaTarget,
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK, base);
+        assertTrue(vanillaTarget.attack(vanillaEvent));
+
+        // Legacy path
+        TestHuman legacyTarget = new TestHuman(chunk, baseNbt());
+        legacyTarget.getInventory().setArmorContents(new Item[]{
+                Item.get(ItemID.DIAMOND_HELMET),
+                Item.get(ItemID.DIAMOND_CHESTPLATE),
+                Item.get(ItemID.DIAMOND_LEGGINGS),
+                Item.get(ItemID.DIAMOND_BOOTS)
+        });
+        EntityDamageByEntityEvent legacyEvent = new EntityDamageByEntityEvent(
+                newCriticalDamager(level, chunk), legacyTarget,
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK, base);
+        withLegacyArmor(() -> assertTrue(legacyTarget.attack(legacyEvent)));
+
+        assertTrue(vanillaEvent.getFinalDamage() > legacyEvent.getFinalDamage(),
+                "Vanilla crit final (" + vanillaEvent.getFinalDamage()
+                        + ") should exceed legacy crit final (" + legacyEvent.getFinalDamage()
+                        + ") for armored targets");
+    }
+
+    // ============== 旧公式 MAGIC/抗性遗漏点回归测试 / Legacy MAGIC/resistance regression tests ==============
+
+    @Test
+    public void testLegacyProtectionDoesNotReduceMagicDamage() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.getInventory().setArmorContents(new Item[]{
+                prot4(ItemID.DIAMOND_HELMET),
+                prot4(ItemID.DIAMOND_CHESTPLATE),
+                prot4(ItemID.DIAMOND_LEGGINGS),
+                prot4(ItemID.DIAMOND_BOOTS)
+        });
+
+        EntityDamageEvent event = new EntityDamageEvent(target, EntityDamageEvent.DamageCause.MAGIC, 10f);
+
+        withLegacyArmor(() -> assertTrue(target.attack(event)));
+        assertEquals(0f, event.getDamage(EntityDamageEvent.DamageModifier.ARMOR), 0.001f);
+        assertEquals(0f, event.getDamage(EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS), 0.001f,
+                "Legacy Protection should NOT reduce MAGIC damage");
+        assertEquals(10f, event.getFinalDamage(), 0.001f);
+        assertEquals(10f, target.getHealth(), 0.001f);
+    }
+
+    @Test
+    public void testLegacyResistanceNotRecomputedForNonHuman() {
+        Level level = newMockLevel();
+        FullChunk chunk = newMockChunk(level);
+        TestLiving target = new TestLiving(chunk, baseNbt());
+
+        EntityDamageByEntityEvent event = new EntityDamageByEntityEvent(
+                Mockito.mock(Entity.class), target,
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK, 20f);
+        event.setDamage(-4f, EntityDamageEvent.DamageModifier.RESISTANCE);
+
+        withLegacyArmor(() -> assertTrue(target.attack(event)));
+        // legacy 不重算 → RESISTANCE 保持 ctor 预算值 -4
+        assertEquals(-4f, event.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE), 0.001f,
+                "Legacy should keep ctor-pre-computed RESISTANCE for non-HumanType entities");
+    }
+
+    @Test
+    public void testWeakerAbsorptionRefillsItsOwnHeartsWithoutReplacingStrongerEffect() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.addEffect(Effect.getEffect(Effect.ABSORPTION).setAmplifier(3).setDuration(6000));
+        target.setAbsorption(0f);
+
+        target.addEffect(
+                Effect.getEffect(Effect.ABSORPTION).setAmplifier(0).setDuration(2400),
+                cn.nukkit.event.entity.EntityPotionEffectEvent.Cause.FOOD);
+
+        assertEquals(4f, target.getAbsorption(), 0.001f,
+                "A normal golden apple must refill its four absorption points");
+        assertEquals(3, target.getEffect(Effect.ABSORPTION).getAmplifier(),
+                "The weaker apple must not replace enchanted-apple Absorption IV");
+        assertEquals(6000, target.getEffect(Effect.ABSORPTION).getDuration(),
+                "The weaker apple must not shorten the stronger effect");
+    }
+
+    @Test
+    public void testRejectedAbsorptionRefreshNeverReducesRemainingHearts() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.addEffect(Effect.getEffect(Effect.ABSORPTION).setAmplifier(3).setDuration(6000));
+        target.setAbsorption(10f);
+
+        target.addEffect(
+                Effect.getEffect(Effect.ABSORPTION).setAmplifier(0).setDuration(2400),
+                cn.nukkit.event.entity.EntityPotionEffectEvent.Cause.FOOD);
+
+        assertEquals(10f, target.getAbsorption(), 0.001f);
+    }
+
+    @Test
+    public void testRejectedNonFoodAbsorptionDoesNotRefillHearts() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.addEffect(Effect.getEffect(Effect.ABSORPTION).setAmplifier(3).setDuration(6000));
+        target.setAbsorption(0f);
+
+        target.addEffect(
+                Effect.getEffect(Effect.ABSORPTION).setAmplifier(0).setDuration(2400),
+                cn.nukkit.event.entity.EntityPotionEffectEvent.Cause.UNKNOWN);
+
+        assertEquals(0f, target.getAbsorption(), 0.001f,
+                "Only consumed food may replenish a rejected absorption effect");
+    }
+
     private static Item prot4(int id) {
         Item item = Item.get(id);
         item.addEnchantment(Enchantment.getEnchantment(Enchantment.ID_PROTECTION_ALL).setLevel(4));
@@ -453,8 +759,10 @@ public class ArmorDamageReductionTest {
         damager.chunk = chunk;
         damager.speed = new Vector3(0, 1, 0);
         lenient().when(damager.getLevel()).thenReturn(level);
+        lenient().when(damager.getAdventureSettings()).thenReturn(new cn.nukkit.AdventureSettings(damager));
         lenient().when(damager.getBoundingBox()).thenReturn(new SimpleAxisAlignedBB(0, 0, 0, 1, 2, 1));
         lenient().when(damager.isOnGround()).thenReturn(false);
+        lenient().when(damager.getAdventureSettings()).thenReturn(mock(AdventureSettings.class));
         return damager;
     }
 
@@ -505,6 +813,13 @@ public class ArmorDamageReductionTest {
                         invocation.getArgument(1, Integer.class),
                         invocation.getArgument(2, Integer.class),
                         invocation.getArgument(3, Integer.class)));
+    }
+
+    /** Keep the raw block IDs consistent with the Level#getBlock lava fixture. */
+    private static void stubChunkAsLava(FullChunk chunk) {
+        lenient().when(chunk.getBlockId(anyInt(), anyInt(), anyInt())).thenReturn(Block.LAVA);
+        lenient().when(chunk.getBlockId(anyInt(), anyInt(), anyInt(), anyInt())).thenAnswer(
+                invocation -> invocation.getArgument(3, Integer.class) == 0 ? Block.LAVA : Block.AIR);
     }
 
     private static Block blockAt(Level level, int id, int x, int y, int z) {

@@ -135,6 +135,27 @@ public class NBTIO {
     }
 
     /**
+     * Reads a compound tag with safe allocation enabled on the underlying stream.
+     * Use this for untrusted (network) NBT payloads so that oversized length/size
+     * values use growing backed lists instead of pre-allocating a single large array.
+     *
+     * @see NBTInputStream#readSafely()
+     */
+    public static CompoundTag readSafely(InputStream inputStream, ByteOrder endianness, boolean network) throws IOException {
+        try (NBTInputStream stream = new NBTInputStream(inputStream, endianness, network).readSafely()) {
+            Tag tag = Tag.readNamedTag(stream);
+            if (tag instanceof CompoundTag) {
+                return (CompoundTag) tag;
+            }
+            throw new IOException("Root tag must be a named compound tag");
+        }
+    }
+
+    public static CompoundTag readSafely(InputStream inputStream, ByteOrder endianness) throws IOException {
+        return readSafely(inputStream, endianness, false);
+    }
+
+    /**
      * Reads a headerless tag value (no leading type id / name), the counterpart of
      * {@link #writeValue(Tag, ByteOrder, boolean)}. Used by {@code LevelEventGenericPacket}.
      * Adapted from PowerNukkitX.
@@ -174,7 +195,16 @@ public class NBTIO {
     }
 
     public static CompoundTag readCompressed(InputStream inputStream, ByteOrder endianness) throws IOException {
-        return read(new BufferedInputStream(new GZIPInputStream(inputStream)), endianness);
+        return read(gzipInput(inputStream), endianness);
+    }
+
+    /**
+     * GZIPInputStream pulls compressed input through a 512-byte buffer by default, i.e. one
+     * read call on a file per 512 bytes of a player profile. 8 KiB on both layers keeps a
+     * profile read to a handful of calls; payloads themselves are copied in bulk by NBTInputStream.
+     */
+    private static InputStream gzipInput(InputStream compressed) throws IOException {
+        return new BufferedInputStream(new GZIPInputStream(compressed, 8192), 8192);
     }
 
     public static CompoundTag readCompressed(byte[] data) throws IOException {
@@ -204,7 +234,7 @@ public class NBTIO {
     }
 
     public static CompoundTag readNetworkCompressed(InputStream inputStream, ByteOrder endianness) throws IOException {
-        return read(new BufferedInputStream(new GZIPInputStream(inputStream)), endianness);
+        return read(gzipInput(inputStream), endianness);
     }
 
     public static CompoundTag readNetworkCompressed(byte[] data) throws IOException {

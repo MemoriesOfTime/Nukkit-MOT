@@ -18,7 +18,7 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 只想玩新版本？不妨试试 [Lumi](https://github.com/KoshakMineDEV/Lumi) 或 [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 ### Nukkit-MOT 的新特性
-1. 支持 1.2 – 1.26.30 版本（可在配置中设置最低协议版本）
+1. 支持 1.2 – 1.26.50 版本（可在配置中设置最低协议版本）
 2. 支持大多数实体的AI
 3. 支持下界（Nether）和末地（The End）世界
 4. 生成地牢和洞穴
@@ -33,6 +33,22 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 > **警告：**
 > 此分支针对最新 **Java 25+** 进行了性能优化，运行 **Java 17** 及更低版本的遗留代码时可能 **不稳定**。
 > 如果遇到问题，请切换到 [master](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster) 分支。
+
+### 使用 Docker 运行
+```bash
+docker run -d --name nukkit-mot \
+  -p 19132:19132/udp \
+  -p 19132:19132/tcp \
+  -v $(pwd)/data:/data \
+  -e JAVA_OPTS="-Xms2G -Xmx2G" \
+  --restart unless-stopped \
+  memoriesoftime/nukkit-mot:latest
+```
+- `:latest` 和 `:<短SHA>` 是基于 master 分支构建的开发快照。
+- `:1.26.30-R1` 这种 tag 是与 Maven Central 对应的稳定发布版。
+- 所有 worlds、plugins、players、`server.properties` 都存放在 `/data` 卷下。
+- `19132/udp` 为 RakNet 游戏端口，`19132/tcp` 为 NetherNet（WebRTC）信令端口；NetherNet 媒体复用同一个 UDP 端口，默认映射这两个端口即可。如不使用 NetherNet，可在 `nukkit-mot.yml` 关闭 `network-settings.nethernet`。
+- 想让 NetherNet 媒体走独立 UDP 端口？在 `server.properties` 设置 `server-udp-ports`（如 `19134`，并补 `-p 19134:19134/udp`）。
 
 ## 相关链接
 - __🌐 下载地址: [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Afeature/java-25)__
@@ -59,7 +75,7 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
     <dependency>
         <groupId>com.nukkit-mot</groupId>
         <artifactId>nukkit-mot</artifactId>
-        <version>1.26.30-R1</version>
+        <version>1.26.40-R1</version>
         <scope>provided</scope>
     </dependency>
 </dependencies>
@@ -89,7 +105,7 @@ repositories {
 ```kts
 // 发布版
 dependencies {
-    compileOnly("com.nukkit-mot:nukkit-mot:1.26.30-R1")
+    compileOnly("com.nukkit-mot:nukkit-mot:1.26.40-R1")
 }
 
 // 开发版 (SNAPSHOT)

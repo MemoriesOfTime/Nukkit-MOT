@@ -9,12 +9,9 @@ import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.FloatEntityData;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.event.vehicle.VehicleMoveEvent;
-import cn.nukkit.event.vehicle.VehicleUpdateEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.level.GameRule;
-import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
@@ -65,8 +62,8 @@ public class EntityBoat extends EntityVehicle {
     public EntityBoat(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
 
-        this.setMaxHealth(40);
-        this.setHealth(40);
+        this.setMaxHealth(4);
+        this.setHealth(4);
     }
 
     @Override
@@ -117,8 +114,6 @@ public class EntityBoat extends EntityVehicle {
         if (invulnerable) {
             return false;
         } else {
-            source.setDamage(source.getDamage() * 2);
-
             boolean attack = super.attack(source);
 
             if (isAlive()) {
@@ -182,14 +177,7 @@ public class EntityBoat extends EntityVehicle {
 
         this.move(this.motionX, this.motionY, this.motionZ);
 
-        Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
-        Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
-
-        this.getServer().getPluginManager().callEvent(new VehicleUpdateEvent(this));
-
-        if (!from.equals(to)) {
-            this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
-        }
+        dispatchVehicleMovementEvents();
 
         if (this.age % 5 == 0) {
             if (!this.passengers.isEmpty() && this.passengers.get(0) instanceof Player) {
@@ -201,6 +189,10 @@ public class EntityBoat extends EntityVehicle {
                             this.level.dropItem(block, Item.get(Item.LILY_PAD, 0, 1));
                         });
             }
+        }
+
+        if (this.isAlive() && this.health < this.getMaxHealth()) {
+            this.health = Math.min(this.getMaxHealth(), this.health + 0.1f);
         }
 
         // We call super here after movement code so block collision checks use up-to-date position
@@ -479,7 +471,7 @@ public class EntityBoat extends EntityVehicle {
         pk.motionY = (float) motionY;
         pk.motionZ = (float) motionZ;
         for (Player player : getViewers().values()) {
-            if (passengers.indexOf(player) == RIDER_INDEX && player.protocol < ProtocolInfo.v1_21_130_28) {
+            if (player.protocol < ProtocolInfo.v1_21_130_28 && passengers.indexOf(player) == RIDER_INDEX) {
                 continue;
             }
             player.dataPacket(pk);

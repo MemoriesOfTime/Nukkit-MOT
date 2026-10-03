@@ -24,19 +24,19 @@ public class BlockEntityBell extends BlockEntitySpawnable {
 
     @Override
     protected void initBlockEntity() {
-        if (!namedTag.contains("Ringing") || !(namedTag.get("Ringing") instanceof ByteTag)) {
+        if (!(namedTag.get("Ringing") instanceof ByteTag)) {
             ringing = false;
         } else {
             ringing = namedTag.getBoolean("Ringing");
         }
 
-        if (!namedTag.contains("Direction") || !(namedTag.get("Direction") instanceof IntTag)) {
+        if (!(namedTag.get("Direction") instanceof IntTag)) {
             direction = 255;
         } else {
             direction = namedTag.getInt("Direction");
         }
 
-        if (!namedTag.contains("Ticks") || !(namedTag.get("Ticks") instanceof IntTag)) {
+        if (!(namedTag.get("Ticks") instanceof IntTag)) {
             ticks = 0;
         } else {
             ticks = namedTag.getInt("Ticks");

@@ -8,7 +8,6 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Hash;
-import cn.nukkit.utils.NetEaseConverter;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
@@ -63,87 +62,71 @@ public class BlockPalette {
     }
 
     private ListTag<CompoundTag> paletteFor(int protocol) {
-        ListTag<CompoundTag> tag;
-        String name = "runtime_block_states_" + protocol + ".dat";
-        boolean useNetEaseConversion = false;
-
-        if (gameVersion.isNetEase()) {
-            String neteaseName = "runtime_block_states_netease_" + protocol + ".dat";
-            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseName);
-            if (neteaseStream != null) {
-                name = neteaseName;
-                try {
-                    neteaseStream.close();
-                } catch (IOException ignored) {
-                }
-            } else {
-                log.debug("NetEase resource file not found: {}, will convert from standard version", neteaseName);
-                useNetEaseConversion = true;
-            }
-        }
-
+        String name = locatePaletteResource(protocol);
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
             if (stream == null) {
                 throw new AssertionError("Unable to locate block state nbt " + protocol);
             }
             //noinspection unchecked
-            tag = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
-
-            if (useNetEaseConversion) {
-                ListTag<CompoundTag> fullPalette = loadFullBlockPalette(protocol);
-                log.info("Using full block_palette_{}.nbt for NetEase conversion ({} blocks)", protocol, fullPalette.size());
-                tag = NetEaseConverter.convertBlockStates(fullPalette, true);
-            }
-        } catch (IOException | NullPointerException e) {
+            return (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
+        } catch (IOException e) {
             throw new AssertionError("Unable to load block palette " + protocol, e);
         }
-        return tag;
     }
 
     /**
-     * Loads the full block palette.
-     * The block_palette contains all block states, while runtime_block_states
-     * only contains a subset of them.
-     *
-     * @param protocol the protocol version
-     * @return the full block palette, or {@code null} if the file does not exist
+     * 无专属 dat 时按协议号向下回退到最近有资源的版本；网易版优先借同协议标准调色板（hashid 使 rid 序号不进线）。
+     * <p>
+     * Falls back to the nearest lower protocol with a resource; a NetEase version prefers the
+     * standard palette of the same protocol (hash ids keep rid ordering off the wire).
      */
-    private ListTag<CompoundTag> loadFullBlockPalette(int protocol) {
-        String paletteName = "BlockPaletteRaw/block_palette_" + protocol + ".nbt";
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(paletteName)) {
-            if (stream == null) {
-                return null;
+    private String locatePaletteResource(int protocol) {
+        if (gameVersion.isNetEase()) {
+            String ownName = "runtime_block_states_netease_" + protocol + ".dat";
+            if (resourceExists(ownName)) {
+                return ownName;
             }
-
-            Object tag = NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
-
-            if (tag instanceof ListTag) {
-                //noinspection unchecked
-                return (ListTag<CompoundTag>) tag;
-            } else if (tag instanceof CompoundTag) {
-                CompoundTag compoundTag = (CompoundTag) tag;
-                if (compoundTag.contains("")) {
-                    //noinspection unchecked
-                    return (ListTag<CompoundTag>) compoundTag.get("");
-                }
-                // 尝试其他可能的 key
-                for (String key : compoundTag.getTags().keySet()) {
-                    Object value = compoundTag.get(key);
-                    if (value instanceof ListTag) {
-                        //noinspection unchecked
-                        return (ListTag<CompoundTag>) value;
-                    }
-                }
-                log.error("Could not find ListTag in CompoundTag for palette: {}", paletteName);
-                return null;
-            } else {
-                log.error("Unexpected tag type for palette {}: {}", paletteName, tag.getClass().getName());
-                return null;
+            // borrow the same-protocol standard palette (floored) first, then the NetEase ladder
+            String standard = findNearestPaletteResource("runtime_block_states_", protocol);
+            if (standard != null) {
+                log.info("{} missing dedicated palette, using standard palette {}", gameVersion, standard);
+                return standard;
             }
-        } catch (IOException e) {
-            log.error("Error loading full block palette: {}", paletteName, e);
-            return null;
+            String netease = findNearestPaletteResource("runtime_block_states_netease_", protocol);
+            return netease != null ? netease : ownName;
         }
+        String standard = findNearestPaletteResource("runtime_block_states_", protocol);
+        return standard != null ? standard : "runtime_block_states_" + protocol + ".dat";
+    }
+
+    private boolean resourceExists(String name) {
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
+            return stream != null;
+        } catch (IOException ignored) {
+            return false;
+        }
+    }
+
+    private String findNearestPaletteResource(String prefix, int protocol) {
+        GameVersion[] values = GameVersion.values();
+        boolean netease = prefix.endsWith("netease_");
+        for (int i = values.length - 1; i >= 0; i--) { // values() declared ascending; backwards = descending protocol
+            GameVersion candidate = values[i];
+            if (candidate.isNetEase() != netease || candidate.getProtocol() > protocol) {
+                continue;
+            }
+            String name = prefix + candidate.getProtocol() + ".dat";
+            try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
+                if (stream != null) {
+                    if (candidate.getProtocol() != protocol) {
+                        log.info("{} missing dedicated palette, falling back to {} palette", gameVersion, candidate);
+                    }
+                    return name;
+                }
+            } catch (IOException ignored) {
+            }
+        }
+        return null;
     }
 
     private void loadBlockStates(ListTag<CompoundTag> blockStates) {
@@ -239,6 +222,9 @@ public class BlockPalette {
         int runtimeId;
         runtimeId = legacyToRuntimeId.get(legacyId);
         if (runtimeId == -1) {
+            runtimeId = getMaskedMeta(legacyToRuntimeId, id, meta);
+        }
+        if (runtimeId == -1) {
             runtimeId = legacyToRuntimeId.get(id << Block.DATA_BITS);
             if (runtimeId == -1) {
                 Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyId);
@@ -302,6 +288,9 @@ public class BlockPalette {
         int legacyId = protocol >= 388 ? ((id << Block.DATA_BITS) | meta) : ((id << 4) | meta);
         int hashId = legacyToHashId.get(legacyId);
         if (hashId == -1) {
+            hashId = getMaskedMeta(legacyToHashId, id, meta);
+        }
+        if (hashId == -1) {
             hashId = legacyToHashId.get(id << Block.DATA_BITS);
             if (hashId == -1) {
                 hashId = legacyToHashId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
@@ -316,6 +305,9 @@ public class BlockPalette {
      */
     public int getRuntimeIdByFullId(int legacyFullId) {
         int runtimeId = legacyToRuntimeId.get(legacyFullId);
+        if (runtimeId == -1) {
+            runtimeId = getMaskedMeta(legacyToRuntimeId, legacyFullId >> Block.DATA_BITS, legacyFullId & Block.DATA_MASK);
+        }
         if (runtimeId == -1) {
             int id = legacyFullId >> Block.DATA_BITS;
             runtimeId = legacyToRuntimeId.get(id << Block.DATA_BITS);
@@ -340,6 +332,9 @@ public class BlockPalette {
     public int getHashIdByFullId(int legacyFullId) {
         int hashId = legacyToHashId.get(legacyFullId);
         if (hashId == -1) {
+            hashId = getMaskedMeta(legacyToHashId, legacyFullId >> Block.DATA_BITS, legacyFullId & Block.DATA_MASK);
+        }
+        if (hashId == -1) {
             int id = legacyFullId >> Block.DATA_BITS;
             hashId = legacyToHashId.get(id << Block.DATA_BITS);
             if (hashId == -1) {
@@ -347,6 +342,33 @@ public class BlockPalette {
             }
         }
         return hashId;
+    }
+
+    /**
+     * 按 1.26.50 连接/角落位的 meta 降级查询：完整 meta 未命中时依次尝试剥离高 4 位、高 3 位，
+     * 让旧协议调色板（无 connection/corner 变体）与 LevelDB 存储仍能按基础 meta
+     * （朝向/颜色/木种等）命中，而不是直接跌落到 data=0。
+     * <p>
+     * Degrades meta carrying 1.26.50 connection/corner bits: when the full meta misses, retry with
+     * the upper bits (first 4, then 3) stripped so older-protocol palettes (without connection/corner
+     * variants) and LevelDB storage still resolve the base meta (orientation/color/wood) instead of
+     * falling straight through to data=0.
+     */
+    private int getMaskedMeta(Int2IntOpenHashMap map, int id, int meta) {
+        int shift = protocol >= 388 ? Block.DATA_BITS : 4;
+        if (meta > 0x07) {
+            int value = map.get((id << shift) | (meta & 0x0f));
+            if (value != -1) {
+                return value;
+            }
+        }
+        if (meta > 0x03) {
+            int value = map.get((id << shift) | (meta & 0x07));
+            if (value != -1) {
+                return value;
+            }
+        }
+        return -1;
     }
 
     private void logMissingRuntimeIdMapping(String message, Object... args) {

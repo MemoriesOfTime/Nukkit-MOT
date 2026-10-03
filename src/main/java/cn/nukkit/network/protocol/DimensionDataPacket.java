@@ -8,6 +8,7 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.UUID;
 
 @ToString
 public class DimensionDataPacket extends DataPacket {
@@ -38,7 +39,9 @@ public class DimensionDataPacket extends DataPacket {
                 // Bedrock dimension definitions use an open upper bound.
                 dimensionData.getMaxHeight() + 1,
                 dimensionData.getMinHeight(),
-                getGeneratorType(dimension)
+                getGeneratorType(dimension),
+                0,
+                new UUID(0, 0)
         );
     }
 
@@ -61,9 +64,24 @@ public class DimensionDataPacket extends DataPacket {
         this.reset();
         this.putArray(this.definitions, dimensionDefinition -> {
             this.putString(dimensionDefinition.getId());
-            this.putVarInt(dimensionDefinition.getMaximumHeight());
-            this.putVarInt(dimensionDefinition.getMinimumHeight());
+            if (this.protocol >= ProtocolInfo.v1_26_50_27) {
+                this.putVarInt(dimensionDefinition.getMinimumHeight());
+                this.putVarInt(dimensionDefinition.getMaximumHeight() - dimensionDefinition.getMinimumHeight());
+            } else {
+                this.putVarInt(dimensionDefinition.getMaximumHeight());
+                this.putVarInt(dimensionDefinition.getMinimumHeight());
+            }
             this.putVarInt(dimensionDefinition.getGeneratorType());
+            if (this.protocol >= ProtocolInfo.v1_26_20) {
+                this.putVarInt(dimensionDefinition.getDimensionType());
+                if (this.protocol >= ProtocolInfo.v1_26_40) {
+                    this.putUUID(dimensionDefinition.getPackId());
+                    if (this.protocol >= ProtocolInfo.v1_26_50_27) {
+                        // v2192 新增默认生物群系 / default biome added in v2192
+                        this.putString(dimensionDefinition.getDefaultBiome() != null ? dimensionDefinition.getDefaultBiome() : "");
+                    }
+                }
+            }
         });
     }
 }

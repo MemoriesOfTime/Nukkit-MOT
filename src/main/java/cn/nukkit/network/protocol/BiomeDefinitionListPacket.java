@@ -31,6 +31,11 @@ public class BiomeDefinitionListPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.BIOME_DEFINITION_LIST_PACKET;
 
+    private static final Gson GSON = new GsonBuilder()
+            .registerTypeAdapter(Color.class, new ColorTypeAdapter())
+            .registerTypeAdapter(Block.class, new BlockSerializer()) //避免GSON错误的扫描所有涉及方块的其他类
+            .create();
+
     private static final DataPacket CACHED_PACKET_361;
     private static final BatchPacket CACHED_PACKET_419;
     private static final BatchPacket CACHED_PACKET_486;
@@ -38,12 +43,15 @@ public class BiomeDefinitionListPacket extends DataPacket {
     private static final BatchPacket CACHED_PACKET_544;
     private static final BatchPacket CACHED_PACKET_567;
     private static final BatchPacket CACHED_PACKET_786;
-    private static final BatchPacket CACHED_PACKET_800;
-    private static final BatchPacket CACHED_PACKET_827;
-    private static final BatchPacket CACHED_PACKET;
 
-    private static final BatchPacket CACHED_PACKET_819_NETEASE;
-    private static final BatchPacket CACHED_PACKET_860_NETEASE;
+    // These caches embed block network IDs (via putBlockNetId), so they must be rebuilt
+    // whenever the hashed-block-network-ids toggle changes after static init (e.g. custom blocks force-enable it).
+    // 这些缓存内嵌方块网络 ID (经 putBlockNetId)，故静态初始化后若哈希开关变化 (如自定义方块强制开启) 必须重建
+    private static volatile BatchPacket CACHED_PACKET_800;
+    private static volatile BatchPacket CACHED_PACKET_827;
+    private static volatile BatchPacket CACHED_PACKET;
+    private static volatile BatchPacket CACHED_PACKET_819_NETEASE;
+    private static volatile BatchPacket CACHED_PACKET_860_NETEASE;
 
     private static final byte[] TAG_361;
     private static final byte[] TAG_419;
@@ -127,13 +135,20 @@ public class BiomeDefinitionListPacket extends DataPacket {
             throw new AssertionError("Error whilst loading biome definitions 786", e);
         }
 
-        Gson gson = new GsonBuilder()
-                .registerTypeAdapter(Color.class, new ColorTypeAdapter())
-                .registerTypeAdapter(Block.class, new BlockSerializer()) //避免GSON错误的扫描所有涉及方块的其他类
-                .create();
+        rebuildHashSensitiveCaches();
+    }
+
+    /**
+     * Rebuild the v1.21.80+ biome caches (which embed block network IDs) using the current
+     * hashed-block-network-ids state. Call after the toggle or block palette changes post-startup.
+     * <p>
+     * 使用当前哈希方块网络 ID 状态重建 v1.21.80+ 生物群系缓存 (内嵌方块网络 ID)；
+     * 在启动后开关或方块调色板变化时调用
+     */
+    public static void rebuildHashSensitiveCaches() {
         try {
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
-            pk.biomeDefinitions = gson.fromJson(
+            pk.biomeDefinitions = GSON.fromJson(
                     Utils.loadJsonResource("stripped_biome_definitions_800.json"),
                     new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
             );
@@ -152,7 +167,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
         try {
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
-            pk.biomeDefinitions = gson.fromJson(
+            pk.biomeDefinitions = GSON.fromJson(
                     Utils.loadJsonResource("biome/stripped_biome_definitions_827.json"),
                     new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
             );
@@ -170,7 +185,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
         try {
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
-            pk.biomeDefinitions = gson.fromJson(
+            pk.biomeDefinitions = GSON.fromJson(
                     Utils.loadJsonResource("biome/stripped_biome_definitions_844.json"),
                     new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
             );

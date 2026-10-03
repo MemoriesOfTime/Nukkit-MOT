@@ -1,0 +1,415 @@
+package cn.nukkit.network.protocol.regression.decode;
+
+import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
+import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse;
+import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseContainer;
+import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseSlot;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * v2192 (1.26.50) 线格式变更的 CB 交叉验证：
+ * 单 bool 化（PlayerAuthInput 可选段 / InventorySource / ItemStackResponse）、
+ * 新增尾部字段（MoveEntityDelta ticks、PlaySound bypass/playbackPos）、
+ * BossEvent 移除 playerEid，以及两个新包 351/352。
+ * <p>
+ * CB cross-validation for v2192 (1.26.50) wire changes: single-bool optional
+ * sections (PlayerAuthInput / InventorySource / ItemStackResponse), trailing
+ * fields (MoveEntityDelta ticks, PlaySound bypass/playbackPos), BossEvent
+ * dropping playerEid, and the two new packets 351/352.
+ */
+public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
+
+    @org.junit.jupiter.api.BeforeAll
+    static void setUp() {
+        cn.nukkit.MockServer.init();
+    }
+
+    private static final int V2192 = cn.nukkit.network.protocol.ProtocolInfo.v1_26_50_27;
+
+    // ==================== PlayerAuthInputPacket：可选段单 bool 化 ====================
+
+    /**
+     * v2192 起各可选段仅一个存在性 bool（v2168~v2169 为恒 true 外层 + 内层双 bool），
+     * inputData 列表前不再有外层 bool。
+     */
+    @ParameterizedTest(name = "PlayerAuthInputPacket v2192 optional sections v{0}")
+    @ValueSource(ints = {V2192})
+    void playerAuthInputV2192OptionalSections(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket();
+        cb.setRotation(org.cloudburstmc.math.vector.Vector3f.from(10.5f, 20.5f, 30.5f));
+        cb.setPosition(org.cloudburstmc.math.vector.Vector3f.from(1.25f, 64.0f, -3.5f));
+        cb.setMotion(org.cloudburstmc.math.vector.Vector2f.from(0.25f, -0.5f));
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.UP);
+        cb.getInputData().add(org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData.PERFORM_BLOCK_ACTIONS);
+        cb.setInputMode(org.cloudburstmc.protocol.bedrock.data.InputMode.MOUSE);
+        cb.setInputInteractionModel(org.cloudburstmc.protocol.bedrock.data.InputInteractionModel.CROSSHAIR);
+        cb.setPlayMode(org.cloudburstmc.protocol.bedrock.data.ClientPlayMode.NORMAL);
+        cb.setInteractRotation(org.cloudburstmc.math.vector.Vector2f.from(0f, 0f));
+        cb.setAnalogMoveVector(org.cloudburstmc.math.vector.Vector2f.from(0f, 0f));
+        cb.setCameraOrientation(org.cloudburstmc.math.vector.Vector3f.from(0f, 0f, 0f));
+        cb.setRawMoveVector(org.cloudburstmc.math.vector.Vector2f.from(0f, 0f));
+        cb.setTick(1234L);
+        cb.setDelta(org.cloudburstmc.math.vector.Vector3f.from(0.1f, -0.2f, 0.3f));
+        // 无 itemUseTransaction / itemStackRequest / vehicle 段（各写单个 false bool）
+
+        PlayerAuthInputPacket nk = crossEncode(cb, PlayerAuthInputPacket::new, protocol);
+
+        assertTrue(nk.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.UP));
+        assertTrue(nk.getInputData().contains(cn.nukkit.network.protocol.types.AuthInputAction.PERFORM_BLOCK_ACTIONS));
+        assertEquals(1234L, nk.getTick());
+        assertEquals(0, nk.getBlockActionData().size(), "no block actions payload expected");
+    }
+
+    // ==================== InventoryTransactionPacket：InventorySource 单 bool ====================
+
+    @Test
+    void inventoryTransactionV2192SingleBoolSource() {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket();
+        cb.setLegacyRequestId(-1);
+        cb.setTransactionType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType.NORMAL);
+        cb.getActions().add(new org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryActionData(
+                org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventorySource.fromContainerWindowId(12),
+                3, org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR, org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR));
+
+        InventoryTransactionPacket nk = crossEncode(cb, InventoryTransactionPacket::new, V2192);
+
+        assertEquals(1, nk.actions.length);
+        assertEquals(cn.nukkit.network.protocol.types.NetworkInventoryAction.SOURCE_CONTAINER, nk.actions[0].sourceType);
+        assertEquals(12, nk.actions[0].windowId);
+        assertEquals(3, nk.actions[0].inventorySlot);
+    }
+
+    /**
+     * v2192 ITEM_USE 在 hotbarSlot 后新增 hand 单字节（CB #355 修正类型，非 VarUInt），
+     * 副手(hand=1)时后续字段不得错位。
+     * <p>
+     * v2192 ITEM_USE inserts a single hand byte after hotbarSlot (type corrected by CB #355,
+     * not VarUInt); off-hand (hand=1) must not shift the remaining fields.
+     */
+    @Test
+    void inventoryTransactionV2192ItemUseHandByte() {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket();
+        cb.setLegacyRequestId(-1);
+        cb.setTransactionType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType.ITEM_USE);
+        cb.setActionType(0);
+        cb.setTriggerType(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.TriggerType.PLAYER_INPUT);
+        cb.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(10, 64, -20));
+        cb.setBlockFace(1);
+        cb.setHotbarSlot(3);
+        cb.setHand(1); // 副手 / off-hand
+        cb.setItemInHand(org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR);
+        cb.setPlayerPosition(org.cloudburstmc.math.vector.Vector3f.from(10.5f, 65f, -19.5f));
+        cb.setClickPosition(org.cloudburstmc.math.vector.Vector3f.from(0.25f, 0.5f, 0.75f));
+        cb.setBlockDefinition(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                "test:block_55", 55, org.cloudburstmc.nbt.NbtMap.EMPTY));
+        cb.setClientInteractPrediction(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.ItemUseTransaction.PredictedResult.SUCCESS);
+        cb.setClientCooldownState(2);
+
+        InventoryTransactionPacket nk = crossEncode(cb, InventoryTransactionPacket::new, V2192, helper -> {
+            var builder = org.cloudburstmc.protocol.common.SimpleDefinitionRegistry
+                    .<org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition>builder();
+            builder.add(new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition(
+                    "test:block_55", 55, org.cloudburstmc.nbt.NbtMap.EMPTY));
+            helper.setBlockDefinitions(builder.build());
+        });
+
+        var use = assertInstanceOf(cn.nukkit.inventory.transaction.data.UseItemData.class, nk.transactionData);
+        assertEquals(0, use.actionType);
+        assertEquals(1, use.triggerType);
+        assertEquals(10, use.blockPos.x);
+        assertEquals(64, use.blockPos.y);
+        assertEquals(-20, use.blockPos.z);
+        assertEquals(1, use.face.getIndex());
+        assertEquals(3, use.hotbarSlot);
+        assertEquals(55, use.blockRuntimeId);
+        assertEquals(1, use.clientInteractPrediction);
+        assertEquals((byte) 2, use.clientCooldownState);
+    }
+
+    // ==================== ItemStackResponsePacket：容器/stackNetworkId 单 bool ====================
+
+    @Test
+    void itemStackResponseV2192SingleBoolContainers() {
+        ItemStackResponsePacket nk = new ItemStackResponsePacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.entries.add(new ItemStackResponse(
+                cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus.OK,
+                77,
+                List.of(new ItemStackResponseContainer(
+                        cn.nukkit.network.protocol.types.inventory.ContainerSlotType.LEVEL_ENTITY,
+                        List.of(new ItemStackResponseSlot(1, 2, 5, 99, "custom", 0, null)),
+                        new FullContainerName(cn.nukkit.network.protocol.types.inventory.ContainerSlotType.LEVEL_ENTITY, null)))
+        ));
+
+        nk.encode();
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket.class);
+
+        assertEquals(1, cb.getEntries().size());
+        var entry = cb.getEntries().get(0);
+        assertEquals(77, entry.getRequestId());
+        assertEquals(1, entry.getContainers().size());
+        var slot = entry.getContainers().get(0).getItems().get(0);
+        assertEquals(1, slot.getSlot());
+        assertEquals(2, slot.getHotbarSlot());
+        assertEquals(5, slot.getCount());
+        assertEquals(99, slot.getStackNetworkId());
+        assertEquals("custom", slot.getCustomName());
+    }
+
+    @Test
+    void itemStackResponseV2192EmptyContainers() {
+        ItemStackResponsePacket nk = new ItemStackResponsePacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.entries.add(new ItemStackResponse(
+                cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus.ERROR,
+                78,
+                List.of()));
+
+        nk.encode();
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket.class);
+
+        assertEquals(1, cb.getEntries().size());
+        assertTrue(cb.getEntries().get(0).getContainers().isEmpty());
+    }
+
+    // ==================== BossEventPacket：移除 playerEid ====================
+
+    @Test
+    void bossEventV2192DropsPlayerEid() {
+        BossEventPacket nk = new BossEventPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.bossEid = 12345L;
+        nk.playerEid = 999L; // v2192 下应被忽略 / ignored on v2192
+        nk.type = BossEventPacket.TYPE_SHOW;
+        nk.title = "Boss Title";
+        nk.filteredTitle = "Filtered";
+        nk.healthPercent = 0.75f;
+        nk.color = 1;
+        nk.overlay = 2;
+
+        nk.encode();
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.BossEventPacket.class);
+
+        assertEquals(12345L, cb.getBossUniqueEntityId());
+        assertEquals(org.cloudburstmc.protocol.bedrock.packet.BossEventPacket.Action.CREATE, cb.getAction());
+        assertEquals("Boss Title", cb.getTitle().toString());
+        assertEquals("Filtered", cb.getFilteredTitle().toString());
+    }
+
+    // ==================== MoveEntityDeltaPacket：尾部 ticks ====================
+
+    @Test
+    void moveEntityDeltaV2192TrailingTicks() {
+        MoveEntityDeltaPacket nk = new MoveEntityDeltaPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.eid = 42L;
+        nk.flags = MoveEntityDeltaPacket.FLAG_HAS_X | MoveEntityDeltaPacket.FLAG_HAS_Y;
+        nk.x = 1.5f;
+        nk.y = 64f;
+        nk.onGround = true;
+
+        nk.encode();
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.MoveEntityDeltaPacket.class);
+
+        assertEquals(42L, cb.getRuntimeEntityId());
+        assertEquals(1.5f, cb.getX());
+        assertEquals(64f, cb.getY());
+        assertEquals(0f, cb.getZ());
+        assertTrue(cb.isOnGround());
+        assertEquals(0L, cb.getTicks());
+    }
+
+    // ==================== PlaySoundPacket：bypass + playbackPositionSeconds ====================
+
+    @Test
+    void playSoundV2192NewTrailingFields() {
+        PlaySoundPacket nk = new PlaySoundPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.name = "mob.pig.say";
+        nk.x = 10;
+        nk.y = 64;
+        nk.z = -20;
+        nk.volume = 1f;
+        nk.pitch = 0.5f;
+        nk.loopCount = 3;
+        nk.bypassListenerRangeCheck = true;
+        nk.serverSoundHandle = 0xAABBCCDDL;
+        nk.playbackPositionSeconds = 1.25f;
+
+        nk.encode();
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.PlaySoundPacket.class);
+
+        assertEquals("mob.pig.say", cb.getSound());
+        assertEquals(3, cb.getLoopCount());
+        assertTrue(cb.isBypassListenerRangeCheck());
+        assertEquals(0xAABBCCDDL, cb.getServerSoundHandle());
+        assertEquals(1.25f, cb.getPlaybackPositionSeconds());
+    }
+
+    // ==================== RecordStartedPacket（新包 352，S→C） ====================
+
+    @ParameterizedTest(name = "RecordStartedPacket v{0}")
+    @ValueSource(ints = {V2192})
+    void recordStartedPacketRoundTrip(int protocol) {
+        RecordStartedPacket nk = new RecordStartedPacket();
+        nk.protocol = protocol;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(protocol, false);
+        nk.blockPos = new BlockVector3(10, 64, -20);
+        nk.serverSoundHandle = 0x1122334455667788L;
+
+        nk.encode();
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.RecordStartedPacket.class);
+
+        assertEquals(org.cloudburstmc.math.vector.Vector3i.from(10, 64, -20), cb.getBlockPos());
+        assertEquals(0x1122334455667788L, cb.getServerSoundHandle());
+    }
+
+    // ==================== SetPlayerFurnaceOptionsPacket（新包 351，C→S） ====================
+
+    @ParameterizedTest(name = "SetPlayerFurnaceOptionsPacket v{0}")
+    @ValueSource(ints = {V2192})
+    void setPlayerFurnaceOptionsDecode(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.SetPlayerFurnaceOptionsPacket();
+        cb.setType(org.cloudburstmc.protocol.bedrock.packet.SetPlayerFurnaceOptionsPacket.FurnaceType.BLAST_FURNACE);
+        cb.setOptions(new org.cloudburstmc.protocol.bedrock.data.FurnaceOptions(
+                org.cloudburstmc.protocol.bedrock.data.FurnaceOptions.FurnaceLeftTabIndex.RECIPE_FOOD,
+                true,
+                org.cloudburstmc.protocol.bedrock.data.FurnaceOptions.FurnaceLayout.INVENTORY_ONLY));
+
+        SetPlayerFurnaceOptionsPacket nk = crossEncode(cb, SetPlayerFurnaceOptionsPacket::new, protocol);
+
+        assertEquals(SetPlayerFurnaceOptionsPacket.FurnaceType.BLAST_FURNACE, nk.type);
+        assertEquals(SetPlayerFurnaceOptionsPacket.FurnaceLeftTabIndex.RECIPE_FOOD, nk.leftTabIndex);
+        assertTrue(nk.filtering);
+        assertEquals(SetPlayerFurnaceOptionsPacket.FurnaceLayout.INVENTORY_ONLY, nk.layout);
+    }
+
+    // ==================== v2192 尾部追加字段的其余包 ====================
+
+    @Test
+    void cameraPresetsV2192TrailingFields() {
+        var nk = new cn.nukkit.network.protocol.CameraPresetsPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        var preset = new cn.nukkit.network.protocol.types.camera.CameraPreset();
+        preset.setIdentifier("minecraft:free");
+        preset.setParentPreset("");
+        preset.setApplyInheritedStartingRotation(true);
+        preset.setStartingRotation(new cn.nukkit.math.Vector2f(30f, 60f));
+        nk.getPresets().add(preset);
+        nk.encode();
+
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.CameraPresetsPacket.class);
+
+        var cbPreset = cb.getPresets().get(0);
+        assertEquals("minecraft:free", cbPreset.getIdentifier());
+        assertTrue(cbPreset.isApplyInheritedStartingRotation());
+        assertEquals(30f, cbPreset.getStartingRotation().getX());
+        assertEquals(60f, cbPreset.getStartingRotation().getY());
+    }
+
+    @Test
+    void dimensionDataV2192DefaultBiome() {
+        var nk = new cn.nukkit.network.protocol.DimensionDataPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.definitions.add(new cn.nukkit.network.protocol.types.DimensionDefinition(
+                "minecraft:test_dim", 320, -64, 1, 0, new java.util.UUID(0, 0), "minecraft:plains"));
+        nk.encode();
+
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.DimensionDataPacket.class);
+
+        var def = cb.getDefinitions().get(0);
+        assertEquals("minecraft:test_dim", def.getId());
+        assertEquals("minecraft:plains", def.getDefaultBiome());
+        // v2192 前导对 =（下限, 跨度 320-(-64)=384）；CB 将跨度读入其 maximumHeight 字段
+        // Leading pair since v2192 = (min, span 384); CB reads the span into its maximumHeight field
+        assertEquals(-64, def.getMinimumHeight());
+        assertEquals(384, def.getMaximumHeight());
+    }
+
+    @Test
+    void attributeLayerSyncV2192NoiseAlignment() {
+        var nk = new cn.nukkit.network.protocol.ClientboundAttributeLayerSyncPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        var env = new cn.nukkit.network.protocol.types.attributelayer.EnvironmentAttributeData(
+                "fog_density", null,
+                new cn.nukkit.network.protocol.types.attributelayer.FloatAttributeData(
+                        0.5f, cn.nukkit.network.protocol.types.attributelayer.FloatAttributeData.Operation.OVERRIDE, null, null),
+                null, 10, 20,
+                cn.nukkit.network.protocol.types.attributelayer.EnvironmentAttributeData.CameraEase.LINEAR, 5, false);
+        env.noiseAlignment = new cn.nukkit.network.protocol.types.attributelayer.EnvironmentAttributeData.NoiseAlignment(
+                cn.nukkit.network.protocol.types.attributelayer.EnvironmentAttributeData.NoiseAlignment.Type.MIN_LOCAL_TRANSITION_END, 7);
+        nk.data = new cn.nukkit.network.protocol.types.attributelayer.UpdateEnvironmentAttributesData(
+                "test_layer", 0, List.of(env));
+        nk.encode();
+
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.ClientboundAttributeLayerSyncPacket.class);
+
+        var payload = assertInstanceOf(
+                org.cloudburstmc.protocol.bedrock.data.attributelayer.UpdateEnvironmentAttributesData.class, cb.getData());
+        var attr = payload.getAttributes().get(0);
+        assertEquals("fog_density", attr.getAttributeName());
+        var na = attr.getNoiseAlignment();
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.attributelayer.NoiseAlignment.Type.MIN_LOCAL_TRANSITION_END, na.getType());
+        assertEquals(7, na.getValue());
+    }
+
+    @Test
+    void debugDrawerV2192LineGapHeight() {
+        var nk = new cn.nukkit.network.protocol.DebugDrawerPacket();
+        nk.protocol = V2192;
+        nk.gameVersion = cn.nukkit.GameVersion.byProtocol(V2192, false);
+        nk.shapes.add(new cn.nukkit.network.protocol.types.debugshape.DebugText(
+                1L, 0, null, null, null, null, null, null, "hello", true, java.awt.Color.RED, 1.5f, true, false, true));
+        nk.encode();
+
+        var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.DebugDrawerPacket.class);
+
+        var text = assertInstanceOf(org.cloudburstmc.protocol.bedrock.data.debugshape.DebugText.class, cb.getShapes().get(0));
+        assertEquals("hello", text.getText());
+        assertTrue(text.isUseRotation());
+        assertEquals(1.5f, text.getLineGapHeight());
+        assertTrue(text.isDepthTest());
+        assertFalse(text.isShowBackface());
+        assertTrue(text.isShowTextBackface());
+    }
+
+    @Test
+    void serverboundDiagnosticsV2192TrailingFields() {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ServerboundDiagnosticsPacket();
+        cb.setAvgFps(60f);
+        cb.getEntityDiagnostics().add(new org.cloudburstmc.protocol.bedrock.data.diagnostics.EntityDiagnosticTimingInfo(
+                "pig", "minecraft:pig", 123L, (byte) 50,
+                org.cloudburstmc.math.vector.Vector3f.from(1f, 2f, 3f), "minecraft:overworld"));
+
+        cn.nukkit.network.protocol.ServerboundDiagnosticsPacket nk = crossEncode(cb, cn.nukkit.network.protocol.ServerboundDiagnosticsPacket::new, V2192);
+
+        assertEquals(60f, nk.avgFps);
+        assertEquals(1, nk.entityDiagnostics.size());
+        var info = nk.entityDiagnostics.get(0);
+        assertEquals("pig", info.displayName);
+        assertEquals("minecraft:pig", info.entity);
+        assertEquals(123L, info.timeInNs);
+        assertEquals((byte) 50, info.percentOfTotal);
+        assertEquals(1f, info.position.x);
+        assertEquals(2f, info.position.y);
+        assertEquals(3f, info.position.z);
+        assertEquals("minecraft:overworld", info.dimension);
+    }
+}

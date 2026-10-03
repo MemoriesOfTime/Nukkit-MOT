@@ -100,14 +100,22 @@ class RuntimeItemMappingStringItemCreativeTest {
 
         BinaryStream decoded = new BinaryStream(encoded.getBuffer());
         RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
-        assertEquals(mapping.getNetworkId(input), decoded.getVarInt());
-        assertEquals(1, decoded.getLShort());
-        assertEquals(0, decoded.getUnsignedVarInt());
-        assertFalse(decoded.getBoolean());
-
         int expectedBlockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, Block.BAMBOO_DOOR, 0);
         assertTrue(expectedBlockRuntimeId != 0);
-        assertEquals(expectedBlockRuntimeId, decoded.getVarInt());
+        if (gameVersion.getProtocol() >= cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            // v2168 NSD: shortLE id + shortLE count + VarUInt aux + boolean netId + VarUInt blockRuntimeId
+            assertEquals(mapping.getNetworkId(input), (short) decoded.getLShort());
+            assertEquals(1, decoded.getLShort());
+            assertEquals(0, decoded.getUnsignedVarInt());
+            assertFalse(decoded.getBoolean());
+            assertEquals(expectedBlockRuntimeId, (int) decoded.getUnsignedVarInt());
+        } else {
+            assertEquals(mapping.getNetworkId(input), decoded.getVarInt());
+            assertEquals(1, decoded.getLShort());
+            assertEquals(0, decoded.getUnsignedVarInt());
+            assertFalse(decoded.getBoolean());
+            assertEquals(expectedBlockRuntimeId, decoded.getVarInt());
+        }
     }
 
     @Test

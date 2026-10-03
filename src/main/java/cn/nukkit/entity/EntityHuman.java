@@ -11,10 +11,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
-import cn.nukkit.network.protocol.AddPlayerPacket;
-import cn.nukkit.network.protocol.PlayerListPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.SetEntityLinkPacket;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.utils.*;
 
 import java.nio.charset.StandardCharsets;
@@ -127,7 +124,7 @@ public class EntityHuman extends EntityHumanType {
                 this.setNameTag(this.namedTag.getString("NameTag"));
             }
 
-            if (this.namedTag.contains("Skin") && this.namedTag.get("Skin") instanceof CompoundTag) {
+            if (this.namedTag.get("Skin") instanceof CompoundTag) {
                 CompoundTag skinTag = this.namedTag.getCompound("Skin");
                 if (!skinTag.contains("Transparent")) {
                     skinTag.putBoolean("Transparent", false);
@@ -138,6 +135,9 @@ public class EntityHuman extends EntityHumanType {
                 }
                 if (skinTag.contains("PlayFabId")) {
                     newSkin.setPlayFabId(skinTag.getString("PlayFabId"));
+                }
+                if (skinTag.contains("ProfileHash")) {
+                    newSkin.setProfileHash(skinTag.getString("ProfileHash"));
                 }
                 if (skinTag.contains("Data")) {
                     byte[] data = skinTag.getByteArray("Data");
@@ -259,6 +259,7 @@ public class EntityHuman extends EntityHumanType {
                     .putBoolean("CapeOnClassicSkin", this.getSkin().isCapeOnClassic())
                     .putString("ArmSize", this.getSkin().getArmSize())
                     .putString("SkinColor", this.getSkin().getSkinColor())
+                    .putString("ProfileHash", this.getSkin().getProfileHash())
                     .putBoolean("IsTrustedSkin", this.getSkin().isTrusted());
 
             List<SkinAnimation> animations = this.getSkin().getAnimations();
@@ -284,8 +285,8 @@ public class EntityHuman extends EntityHumanType {
                 ListTag<CompoundTag> piecesTag = new ListTag<>("PersonaPieces");
                 for (PersonaPiece piece : personaPieces) {
                     piecesTag.add(new CompoundTag().putString("PieceId", piece.id)
-                            .putString("PieceType", piece.type)
-                            .putString("PackId", piece.packId)
+                            .putString("PieceType", piece.type.getSerializeName())
+                            .putString("PackId", piece.packId.toString())
                             .putBoolean("IsDefault", piece.isDefault)
                             .putString("ProductId", piece.productId));
                 }
@@ -298,7 +299,7 @@ public class EntityHuman extends EntityHumanType {
                     ListTag<StringTag> colors = new ListTag<>("Colors");
                     colors.setAll(tint.colors.stream().map(s -> new StringTag("", s)).collect(Collectors.toList()));
                     tintsTag.add(new CompoundTag()
-                            .putString("PieceType", tint.pieceType)
+                            .putString("PieceType", tint.pieceType.getSerializeName())
                             .putList(colors));
                 }
             }
@@ -325,10 +326,30 @@ public class EntityHuman extends EntityHumanType {
                 throw new IllegalStateException(this.getClass().getSimpleName() + " must have a valid skin set");
             }
 
+            boolean netEaseSkinHandshake = !(this instanceof Player)
+                    && PlayerEntitySkinSender.requiresRetainedEntry(player);
+            boolean postSpawnSkinHandshake = !(this instanceof Player)
+                    && PlayerEntitySkinSender.requiresPostSpawnSkin(player, this.getSkin());
+            boolean retainNpcListEntry = netEaseSkinHandshake || postSpawnSkinHandshake;
             if (this instanceof Player) {
-                this.server.updatePlayerListData(
-                        new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
-                        new Player[]{player});
+                if (!player.sentSkins.contains(this.uuid)) {
+                    this.server.updatePlayerListData(
+                            new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
+                            new Player[]{player});
+                }
+            } else if (netEaseSkinHandshake) {
+                if (!PlayerEntitySkinSender.sendInitialSkinIfAbsent(
+                        player, this.uuid, this.getId(), this.getName(), this.getSkin(), "",
+                        this::getSkin)) {
+                    this.hasSpawned.remove(player.getLoaderId());
+                    return;
+                }
+            } else if (postSpawnSkinHandshake) {
+                if (!PlayerEntitySkinSender.registerPostSpawnSkinIfAbsent(
+                        player, this.uuid, this.getId(), this.getName(), "", this::getSkin)) {
+                    this.hasSpawned.remove(player.getLoaderId());
+                    return;
+                }
             } else {
                 this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.getSkin(), new Player[]{player});
             }
@@ -353,6 +374,10 @@ public class EntityHuman extends EntityHumanType {
             pk.metadata = this.dataProperties.clone();
             player.dataPacket(pk);
 
+            if (postSpawnSkinHandshake) {
+                PlayerEntitySkinSender.sendSkinAfterSpawn(player, this.uuid, this.getSkin());
+            }
+
             if (playerInventory != null) {
                 if (this instanceof Player) {
                     playerInventory.sendArmorContents(player);
@@ -371,9 +396,20 @@ public class EntityHuman extends EntityHumanType {
                 player.dataPacket(pkk);
             }
 
-            if (!(this instanceof Player)) {
+            // Retained handshake entries are removed by PlayerEntitySkinSender after the skin settles.
+            if (!(this instanceof Player) && !retainNpcListEntry) {
                 this.server.removePlayerListData(this.uuid, player);
             }
+        }
+    }
+
+    @Override
+    public void despawnFrom(Player player) {
+        boolean removeRetainedNpcEntry = !(this instanceof Player)
+                && this.hasSpawned.containsKey(player.getLoaderId());
+        super.despawnFrom(player);
+        if (removeRetainedNpcEntry) {
+            PlayerEntitySkinSender.sendRemoveAndClear(player, this.uuid);
         }
     }
 

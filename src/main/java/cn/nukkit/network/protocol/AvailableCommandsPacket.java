@@ -531,7 +531,7 @@ public class AvailableCommandsPacket extends DataPacket {
                 CommandParam commandParam = COMMAND_PARAMS.getType(parameter.type.getId()); //正常来说应该传入最新版的数字id
 
                 if ("execute".equals(name)) {// Hook
-                    if ("command".equals(parameter.name) && protocol >= 575) {
+                    if (protocol >= 575 && "command".equals(parameter.name)) {
                         commandParam = CommandParam.SLASH_COMMAND;
                     }
                 }

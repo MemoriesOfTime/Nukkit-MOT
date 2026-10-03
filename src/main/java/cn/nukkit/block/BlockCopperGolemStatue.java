@@ -84,6 +84,9 @@ public class BlockCopperGolemStatue extends BlockTransparentMeta implements Oxid
     @Override
     public Item toItem() {
         Item item = new ItemBlock(Block.get(this.getId()), 0);
+        if (this.level == null) {
+            return item;
+        }
         BlockEntityCopperGolemStatue blockEntity = getBlockEntity();
         if (blockEntity != null) {
             CompoundTag customBlockData = new CompoundTag();

@@ -3,6 +3,7 @@ package cn.nukkit.network.protocol.regression.encode;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.entity.Attribute;
+import cn.nukkit.entity.data.Skin;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -73,7 +74,8 @@ public class NetEasePacketRegressionTest {
                 GameVersion.V1_21_2_NETEASE,
                 GameVersion.V1_21_50_NETEASE,
                 GameVersion.V1_21_93_NETEASE,
-                GameVersion.V1_21_124_NETEASE
+                GameVersion.V1_21_124_NETEASE,
+                GameVersion.V1_21_130_NETEASE
         ).map(Arguments::of);
     }
 
@@ -178,6 +180,44 @@ public class NetEasePacketRegressionTest {
         return out.toByteArray();
     }
 
+    // ==================== NeteaseJsonPacket ====================
+
+    @ParameterizedTest(name = "NeteaseJsonPacket SET_LEVEL_GRAVITY v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testNeteaseJsonPacketSetLevelGravity(int protocolVersion) {
+        // Mirrors Player#sendNetEaseLevelGravityReset
+        com.google.gson.JsonObject payload = new com.google.gson.JsonObject();
+        payload.addProperty("eventName", cn.nukkit.network.protocol.netease.NeteaseJsonPacket.EVENT_SET_LEVEL_GRAVITY);
+        payload.addProperty("gravity", -0.08f);
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.NeteaseJsonPacket();
+        nukkitPacket.json = payload.toString();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecodeNetEase(nukkitPacket,
+                dev.mot.protocol.extension.packet.NetEaseJsonPacket.class);
+
+        assertEquals("{\"eventName\":\"SET_LEVEL_GRAVITY\",\"gravity\":-0.08}", cbPacket.getJson());
+    }
+
+    @ParameterizedTest(name = "NeteaseJsonPacket decode v{0}")
+    @MethodSource("allNetEaseVersions")
+    void testNeteaseJsonPacketDecode(int protocolVersion) {
+        var cbPacket = new dev.mot.protocol.extension.packet.NetEaseJsonPacket();
+        cbPacket.setJson("{\"eventName\":\"SET_LEVEL_GRAVITY\",\"gravity\":-0.02}");
+        BedrockCodec codec = NETEASE_CODECS.get(protocolVersion);
+        byte[] buffer = PacketBridgeUtil.cbPacketToNukkitBuffer(
+                cbPacket, codec, codec.createHelper(), ProtocolInfo.NETEASE_JSON_PACKET, protocolVersion);
+
+        var nukkitPacket = new cn.nukkit.network.protocol.netease.NeteaseJsonPacket();
+        prepareNetEasePacket(nukkitPacket, protocolVersion);
+        nukkitPacket.setBuffer(buffer);
+        nukkitPacket.getUnsignedVarInt();
+        nukkitPacket.decode();
+
+        assertEquals("{\"eventName\":\"SET_LEVEL_GRAVITY\",\"gravity\":-0.02}", nukkitPacket.json);
+    }
+
     // ==================== ConfirmSkinPacket ====================
 
     @ParameterizedTest(name = "ConfirmSkinPacket empty v{0}")
@@ -238,7 +278,7 @@ public class NetEasePacketRegressionTest {
         assertEquals(uuid, entry.getUuid());
         assertArrayEquals(new byte[0], entry.getSkinBytes());
         assertEquals("", entry.getUidStr());
-        assertEquals("", entry.getGeoStr());
+        assertEquals(Skin.STEVE_GEOMETRY, entry.getGeoStr());
     }
 
     @ParameterizedTest(name = "ConfirmSkinPacket null optional fields v{0}")
@@ -260,7 +300,7 @@ public class NetEasePacketRegressionTest {
         assertEquals(uuid, entry.getUuid());
         assertArrayEquals(new byte[0], entry.getSkinBytes());
         assertEquals("", entry.getUidStr());
-        assertEquals("", entry.getGeoStr());
+        assertEquals(Skin.STEVE_GEOMETRY, entry.getGeoStr());
     }
 
     // ==================== PyRpcPacket ====================
@@ -719,6 +759,66 @@ public class NetEasePacketRegressionTest {
 
         assertEquals(0, cbPacket.getType().ordinal()); // RAW
         assertEquals("Server message", cbPacket.getMessage().toString());
+    }
+
+    // ==================== AnimatePacket NetEase attackId tail ====================
+
+    @ParameterizedTest(name = "AnimatePacket NetEase attackId tail v{0}")
+    @MethodSource("netEasePacketPoolVersions")
+    void testAnimatePacketNetEaseAttackIdTail(GameVersion gameVersion) {
+        var nukkitPacket = buildNetEaseAnimatePacket(gameVersion, 1L);
+        nukkitPacket.encode();
+        byte[] encoded = nukkitPacket.getBuffer();
+
+        if (gameVersion.getProtocol() >= GameVersion.V1_21_130_NETEASE.getProtocol()) {
+            // NetEase tail is ActorUniqueID = zigzag varint64: zigzag(1) = 2 -> 0x02.
+            // A uvarlong(1) would emit 0x01 instead, so this pins the wire type.
+            assertEquals(0x02, encoded[encoded.length - 1] & 0xFF,
+                    "attackId must be zigzag varint64, not unsigned varlong");
+
+            var decoded = new cn.nukkit.network.protocol.AnimatePacket();
+            decoded.protocol = gameVersion.getProtocol();
+            decoded.gameVersion = gameVersion;
+            decoded.setBuffer(encoded);
+            decoded.getUnsignedVarInt();
+            decoded.decode();
+            assertEquals(1L, decoded.attackId);
+        } else {
+            // Older NetEase versions carry no tail field: encoding is byte-identical whatever attackId holds
+            var zeroAttack = buildNetEaseAnimatePacket(gameVersion, 0L);
+            zeroAttack.encode();
+            assertArrayEquals(zeroAttack.getBuffer(), encoded);
+        }
+    }
+
+    @Test
+    void testAnimatePacketNetEaseAttackIdNegativeIsSingleByte() {
+        var nukkitPacket = buildNetEaseAnimatePacket(GameVersion.V1_21_130_NETEASE, -1L);
+        nukkitPacket.encode();
+        byte[] encoded = nukkitPacket.getBuffer();
+
+        // zigzag(-1) = 1 -> single byte 0x01; uvarlong(-1) would need 9 bytes (FF FF FF FF FF FF FF FF 01)
+        assertEquals(0x01, encoded[encoded.length - 1] & 0xFF);
+
+        var decoded = new cn.nukkit.network.protocol.AnimatePacket();
+        decoded.protocol = GameVersion.V1_21_130_NETEASE.getProtocol();
+        decoded.gameVersion = GameVersion.V1_21_130_NETEASE;
+        decoded.setBuffer(encoded);
+        decoded.getUnsignedVarInt();
+        decoded.decode();
+        assertEquals(-1L, decoded.attackId);
+    }
+
+    private static cn.nukkit.network.protocol.AnimatePacket buildNetEaseAnimatePacket(GameVersion gameVersion, long attackId) {
+        var nukkitPacket = new cn.nukkit.network.protocol.AnimatePacket();
+        nukkitPacket.protocol = gameVersion.getProtocol();
+        nukkitPacket.gameVersion = gameVersion;
+        nukkitPacket.action = cn.nukkit.network.protocol.AnimatePacket.Action.SWING_ARM;
+        nukkitPacket.eid = 42;
+        nukkitPacket.data = 0.0f;
+        nukkitPacket.swingSource = cn.nukkit.network.protocol.AnimatePacket.SwingSource.NONE;
+        nukkitPacket.attackId = attackId;
+        return nukkitPacket;
     }
 
     // ==================== Standard packets via NetEase codecs ====================

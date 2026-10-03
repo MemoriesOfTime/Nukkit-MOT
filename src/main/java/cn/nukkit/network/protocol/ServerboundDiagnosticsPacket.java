@@ -46,6 +46,11 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
      * @since v1001
      */
     public List<WhiskerScopeDataSummary> whiskerScopes = new ArrayList<>();
+    /**
+     * System category diagnostics. / 系统分类诊断信息。
+     * @since v2168 v1_26_40
+     */
+    public List<SystemCategory> systemCategories = new ArrayList<>();
 
     @Override
     public int packetId() {
@@ -75,14 +80,28 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         }
 
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50_27;
             this.entityDiagnostics = new ArrayList<>();
-            this.getArray(this.entityDiagnostics, bs -> new EntityDiagnosticTimingInfo(bs.getString(), bs.getString(), bs.getLLong(), (byte) bs.getByte()));
+            this.getArray(this.entityDiagnostics, bs -> new EntityDiagnosticTimingInfo(bs.getString(), bs.getString(), bs.getLLong(), (byte) bs.getByte(),
+                    // v2192 尾部新增 position + dimension / trailing position + dimension added in v2192
+                    v2192 ? bs.getVector3f() : null,
+                    v2192 ? bs.getString() : null));
 
             this.systemDiagnostics = new ArrayList<>();
             this.getArray(this.systemDiagnostics, bs -> new SystemDiagnosticTimingInfo(bs.getString(), bs.getLLong(), bs.getLLong(), (byte) bs.getByte()));
         }
 
-        if (this.protocol >= ProtocolInfo.v1_26_30) {
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_40) {
+            this.whiskerScopes = new ArrayList<>();
+            this.getArray(this.whiskerScopes, bs -> new WhiskerScopeDataSummary(
+                    bs.getString(), bs.getString(), bs.getLLong(), bs.getLLong(), bs.getLLong()));
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.systemCategories = new ArrayList<>();
+            this.getArray(this.systemCategories, bs -> new SystemCategory(
+                    bs.getString(), bs.getLLong()));
+
             this.whiskerScopes = new ArrayList<>();
             this.getArray(this.whiskerScopes, bs -> new WhiskerScopeDataSummary(
                     bs.getString(), bs.getString(), bs.getLLong(), bs.getLLong(), bs.getLLong()));
@@ -110,11 +129,17 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         }
 
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50_27;
             this.putArray(this.entityDiagnostics, info -> {
                 this.putString(info.displayName);
                 this.putString(info.entity);
                 this.putLLong(info.timeInNs);
                 this.putByte(info.percentOfTotal);
+                if (v2192) {
+                    // v2192 尾部新增 position + dimension / trailing position + dimension added in v2192
+                    this.putVector3f(info.position);
+                    this.putString(info.dimension != null ? info.dimension : "");
+                }
             });
 
             this.putArray(this.systemDiagnostics, info -> {
@@ -125,7 +150,22 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
             });
         }
 
-        if (this.protocol >= ProtocolInfo.v1_26_30) {
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_40) {
+            this.putArray(this.whiskerScopes, info -> {
+                this.putString(info.label);
+                this.putString(info.indentation);
+                this.putLLong(info.totalHighCostNS);
+                this.putLLong(info.totalMidCostNS);
+                this.putLLong(info.totalLowCostNS);
+            });
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putArray(this.systemCategories, info -> {
+                this.putString(info.categoryName);
+                this.putLLong(info.systemIndex);
+            });
+
             this.putArray(this.whiskerScopes, info -> {
                 this.putString(info.label);
                 this.putString(info.indentation);
@@ -160,6 +200,14 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         public String entity;
         public long timeInNs;
         public byte percentOfTotal;
+        /**
+         * @since v2192 v1_26_50_27
+         */
+        public cn.nukkit.math.Vector3f position;
+        /**
+         * @since v2192 v1_26_50_27
+         */
+        public String dimension;
     }
 
     /**
@@ -189,5 +237,17 @@ public class ServerboundDiagnosticsPacket extends DataPacket {
         public long totalHighCostNS;
         public long totalMidCostNS;
         public long totalLowCostNS;
+    }
+
+    /**
+     * System category diagnostic info. / 系统分类诊断信息。
+     * @since v2168 (v1_26_40)
+     */
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class SystemCategory {
+        public String categoryName;
+        public long systemIndex;
     }
 }

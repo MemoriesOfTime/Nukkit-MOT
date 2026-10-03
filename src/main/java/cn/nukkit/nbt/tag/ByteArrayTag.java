@@ -37,10 +37,9 @@ public class ByteArrayTag extends Tag {
     }
 
     @Override
-    void load(NBTInputStream dis) throws IOException {
-        int length = dis.readInt();
-        data = new byte[length];
-        dis.readFully(data);
+    void load(NBTInputStream dis, int nested) throws IOException {
+        // Bulk copy with an allocation bounded by the bytes that arrive, see readByteArray.
+        data = dis.readByteArray(dis.readInt());
     }
 
     @Override

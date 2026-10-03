@@ -39,20 +39,9 @@ public class EnchantInventory extends FakeBlockUIComponent {
     @Override
     public void onClose(Player who) {
         super.onClose(who);
-        // Return input slots, dropping the unplaced remainder so it isn't lost.
-        for (int i = 0; i < 2; ++i) {
-            Item item = this.getItem(i);
-            if (item.isNull()) {
-                continue;
-            }
-            Item[] drops = who.getInventory().addItem(item);
-            for (Item drop : drops) {
-                if (!who.dropItem(drop)) {
-                    this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), drop);
-                }
-            }
-            this.clear(i);
-        }
+        who.returnUiItems(this.getItem(0), this.getItem(1));
+        this.clear(0);
+        this.clear(1);
         releasePublishedOptions();
         who.craftingType = Player.CRAFTING_SMALL;
         who.resetCraftingGridType();
@@ -79,7 +68,7 @@ public class EnchantInventory extends FakeBlockUIComponent {
     private void publishOptions(Item input) {
         releasePublishedOptions();
         long seed = System.nanoTime();
-        List<PlayerEnchantOptionsPacket.EnchantOptionData> generated = EnchantmentHelper.generateOptions(input, seed);
+        List<PlayerEnchantOptionsPacket.EnchantOptionData> generated = EnchantmentHelper.generateOptions(this.getHolder(), input, seed);
         if (generated.isEmpty()) {
             sendEmptyOptions();
             return;
