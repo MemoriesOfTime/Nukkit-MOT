@@ -258,6 +258,9 @@ public class EntityItem extends Entity {
                             packet.data = newAmount;
                             packet.event = EntityEventPacket.MERGE_ITEMS;
                             Server.broadcastPacket(this.getViewers().values(), packet);
+                            if (this.item.getCount() >= this.item.getMaxStackSize()) {
+                                break;
+                            }
                         }
                     }
                 }
