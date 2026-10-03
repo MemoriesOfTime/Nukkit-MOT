@@ -98,7 +98,35 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected AtomicLong changes = new AtomicLong();
 
-    protected boolean isInit;
+    protected volatile boolean isInit;
+    private volatile Throwable chunkLoadFailure;
+    private volatile boolean readFailurePlaceholder;
+
+    /** Whether entity and block-entity initialization has completed for this live object. */
+    public boolean isInitialized() {
+        return this.isInit;
+    }
+
+    /** A failed mount must not later be reported as a successful cached load. */
+    public Throwable getChunkLoadFailure() {
+        return this.chunkLoadFailure;
+    }
+
+    /** Lifecycle errors are diagnostic only: decoded terrain and live entities remain writable. */
+    public void markChunkLoadFailure(Throwable failure) {
+        if (this.chunkLoadFailure == null) this.chunkLoadFailure = failure;
+    }
+
+    /** Only an empty stand-in for an unreadable chunk may discard changes on unload. */
+    public void markChunkReadFailure(Throwable failure) {
+        this.markChunkLoadFailure(failure);
+        this.readFailurePlaceholder = true;
+        this.setGenerated(false);
+    }
+
+    public boolean isReadFailurePlaceholder() {
+        return this.readFailurePlaceholder;
+    }
 
     protected boolean lightPopulated;
 
