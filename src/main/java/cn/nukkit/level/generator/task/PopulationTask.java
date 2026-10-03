@@ -152,11 +152,11 @@ public class PopulationTask extends AsyncTask {
 
             for (BaseFullChunk chunk : this.chunks) {
                 if (chunk != null) {
-                    level.generateChunkCallback(chunk.getX(), chunk.getZ(), chunk);
+                    level.handleGenerationCallback(chunk.getX(), chunk.getZ(), chunk, true);
                 }
             }
 
-            level.generateChunkCallback(centerChunk.getX(), centerChunk.getZ(), centerChunk, isPopulated);
+            level.handleGenerationCallback(centerChunk.getX(), centerChunk.getZ(), centerChunk, isPopulated);
         }
     }
 }

@@ -49,4 +49,9 @@ public class ToggleCrafterSlotRequestPacket extends DataPacket {
         this.putByte(this.slot);
         this.putBoolean(this.disabled);
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

@@ -17,6 +17,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -120,6 +121,10 @@ class PlayerLoginVerificationTest {
         field = cn.nukkit.entity.Entity.class.getDeclaredField("server");
         field.setAccessible(true);
         field.set(player, MockServer.get());
+        // Probe 的 close 先置 closed 再走幂等 teardown 分支，mock 无字段初始化，须预置为已拆除
+        field = Player.class.getDeclaredField("closeTeardownExecuted");
+        field.setAccessible(true);
+        field.set(player, new AtomicBoolean(true));
         return player;
     }
 

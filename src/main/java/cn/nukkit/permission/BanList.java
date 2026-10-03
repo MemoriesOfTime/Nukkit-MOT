@@ -22,7 +22,7 @@ public class BanList {
 
     private final String file;
 
-    private boolean enable = true;
+    private volatile boolean enable = true;
 
     public BanList(String file) {
         this.file = file;
@@ -36,12 +36,12 @@ public class BanList {
         this.enable = enable;
     }
 
-    public LinkedHashMap<String, BanEntry> getEntires() {
+    public synchronized LinkedHashMap<String, BanEntry> getEntires() {
         removeExpired();
-        return this.list;
+        return new LinkedHashMap<>(this.list);
     }
 
-    public boolean isBanned(String name) {
+    public synchronized boolean isBanned(String name) {
         if (!this.enable || name == null) {
             return false;
         } else {
@@ -51,7 +51,7 @@ public class BanList {
         }
     }
 
-    public void add(BanEntry entry) {
+    public synchronized void add(BanEntry entry) {
         this.list.put(entry.getName(), entry);
         this.save();
     }
@@ -79,7 +79,7 @@ public class BanList {
         return entry;
     }
 
-    public void remove(String name) {
+    public synchronized void remove(String name) {
         name = name.toLowerCase(Locale.ROOT);
         if (this.list.containsKey(name)) {
             this.list.remove(name);
@@ -88,7 +88,7 @@ public class BanList {
     }
 
 
-    public void removeExpired() {
+    public synchronized void removeExpired() {
         for (String name : new ArrayList<>(this.list.keySet())) {
             BanEntry entry = this.list.get(name);
             if (entry.hasExpired()) {
@@ -97,7 +97,7 @@ public class BanList {
         }
     }
 
-    public void load() {
+    public synchronized void load() {
         this.list = new LinkedHashMap<>();
         File file = new File(this.file);
         try {
@@ -117,7 +117,7 @@ public class BanList {
         }
     }
 
-    public void save() {
+    public synchronized void save() {
         this.removeExpired();
 
         try {
