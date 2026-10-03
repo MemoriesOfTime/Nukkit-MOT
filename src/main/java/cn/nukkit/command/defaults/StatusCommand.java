@@ -33,15 +33,15 @@ import java.util.concurrent.TimeUnit;
 public class StatusCommand extends VanillaCommand {
 
     private static final String UPTIME_FORMAT = TextFormat.RED + "%d" + TextFormat.GOLD + " days " +
-            TextFormat.RED + "%d" + TextFormat.GOLD + " hours " +
-            TextFormat.RED + "%d" + TextFormat.GOLD + " minutes " +
-            TextFormat.RED + "%d" + TextFormat.GOLD + " seconds";
+        TextFormat.RED + "%d" + TextFormat.GOLD + " hours " +
+        TextFormat.RED + "%d" + TextFormat.GOLD + " minutes " +
+        TextFormat.RED + "%d" + TextFormat.GOLD + " seconds";
 
     private static final Map<String, String> vmVendor = new HashMap<>(10, 0.99f);
     private static final Map<String, String> vmMac = new HashMap<>(10, 0.99f);
     private static final String[] vmModelArray = new String[]{"Linux KVM", "Linux lguest", "OpenVZ", "Qemu",
-            "Microsoft Virtual PC", "VMWare", "linux-vserver", "Xen", "FreeBSD Jail", "VirtualBox", "Parallels",
-            "Linux Containers", "LXC", "Bochs"};
+        "Microsoft Virtual PC", "VMWare", "linux-vserver", "Xen", "FreeBSD Jail", "VirtualBox", "Parallels",
+        "Linux Containers", "LXC", "Bochs"};
 
     static {
         vmVendor.put("bhyve", "bhyve");
@@ -69,10 +69,10 @@ public class StatusCommand extends VanillaCommand {
 
     public StatusCommand(String name) {
         super(name, "%nukkit.command.status.description", "%nukkit.command.status.usage");
-        this.setPermission(Permission.DEFAULT_TRUE);
+        this.setPermission("nukkit.command.status");
         this.commandParameters.clear();
         this.addCommandParameters("default", new CommandParameter[]{
-                CommandParameter.newEnum("mode", true, new String[]{"full", "simple"})
+            CommandParameter.newEnum("mode", true, new String[]{"full", "simple"})
         });
     }
 
@@ -238,7 +238,7 @@ public class StatusCommand extends VanillaCommand {
             }
 
             sender.sendMessage(TextFormat.GOLD + "Players: " + playerColor + server.getOnlinePlayers().size() + TextFormat.GREEN + " online, " +
-                    TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
+                TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
 
             // NetherNet 传输状态（未启用时不显示） Transport state, hidden when NetherNet is disabled
             sendNetherNetStatus(sender, server, false);
@@ -273,7 +273,7 @@ public class StatusCommand extends VanillaCommand {
                     playerColor = TextFormat.GOLD;
                 }
                 sender.sendMessage(TextFormat.GOLD + "Players: " + playerColor + server.getOnlinePlayers().size() + TextFormat.GREEN + " online, " +
-                        TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
+                    TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
                 // 各个世界的情况
                 for (Level level : server.getLevels().values()) {
                     sender.sendMessage(buildWorldInfo(level));
@@ -286,8 +286,8 @@ public class StatusCommand extends VanillaCommand {
                 RuntimeMXBean mxBean = ManagementFactory.getRuntimeMXBean();
                 sender.sendMessage(TextFormat.YELLOW + ">>> " + TextFormat.WHITE + "OS & JVM Info" + TextFormat.YELLOW + " <<<" + TextFormat.RESET);
                 sender.sendMessage(TextFormat.GOLD + "OS: " + TextFormat.AQUA + os.getFamily() + " " + os.getManufacturer() + " " +
-                        os.getVersionInfo().getVersion() + " " + os.getVersionInfo().getCodeName() + " " + os.getBitness() + "bit, " +
-                        "build " + os.getVersionInfo().getBuildNumber());
+                    os.getVersionInfo().getVersion() + " " + os.getVersionInfo().getCodeName() + " " + os.getBitness() + "bit, " +
+                    "build " + os.getVersionInfo().getBuildNumber());
                 sender.sendMessage(TextFormat.GOLD + "JVM: " + TextFormat.AQUA + mxBean.getVmName() + " " + mxBean.getVmVendor() + " " + mxBean.getVmVersion());
                 try {
                     String vm = isInVM(systemInfo.getHardware());
@@ -328,10 +328,10 @@ public class StatusCommand extends VanillaCommand {
                 CentralProcessor cpu = systemInfo.getHardware().getProcessor();
                 sender.sendMessage(TextFormat.YELLOW + ">>> " + TextFormat.WHITE + "CPU Info" + TextFormat.YELLOW + " <<<" + TextFormat.RESET);
                 sender.sendMessage(TextFormat.GOLD + "CPU: " + TextFormat.AQUA + cpu.getProcessorIdentifier().getName() + TextFormat.GRAY +
-                        " (" + formatFreq(cpu.getMaxFreq()) + " baseline; " + cpu.getPhysicalProcessorCount() + " cores, " + cpu.getLogicalProcessorCount() + " logical cores)");
+                    " (" + formatFreq(cpu.getMaxFreq()) + " baseline; " + cpu.getPhysicalProcessorCount() + " cores, " + cpu.getLogicalProcessorCount() + " logical cores)");
                 sender.sendMessage(TextFormat.GOLD + "Thread count: " + TextFormat.GREEN + Thread.getAllStackTraces().size());
                 sender.sendMessage(TextFormat.GOLD + "CPU Features: " + TextFormat.RESET + (cpu.getProcessorIdentifier().isCpu64bit() ? "64bit, " : "32bit, ") +
-                        cpu.getProcessorIdentifier().getModel() + ", micro-arch: " + cpu.getProcessorIdentifier().getMicroarchitecture());
+                    cpu.getProcessorIdentifier().getModel() + ", micro-arch: " + cpu.getProcessorIdentifier().getMicroarchitecture());
                 sender.sendMessage("");
             }
             // 内存信息
@@ -399,13 +399,13 @@ public class StatusCommand extends VanillaCommand {
 
     private static String buildWorldInfo(Level level) {
         return TextFormat.GOLD + "World \"" + level.getFolderName() + "\""
-                + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": "
-                + TextFormat.RED + level.getChunks().size() + TextFormat.GREEN + " chunks, "
-                + TextFormat.RED + level.getEntities().length + TextFormat.GREEN + " entities, "
-                + TextFormat.RED + level.getBlockEntities().size() + TextFormat.GREEN + " blockEntities."
-                + " Time " + ((level.getTickRate() > 1 || level.getTickRateTime() > 40) ? TextFormat.RED : TextFormat.YELLOW)
-                + NukkitMath.round(level.getTickRateTime(), 2) + "ms"
-                + (level.getTickRate() > 1 ? " (tick rate " + (19 - level.getTickRate()) + ")" : "");
+            + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": "
+            + TextFormat.RED + level.getChunks().size() + TextFormat.GREEN + " chunks, "
+            + TextFormat.RED + level.getEntities().length + TextFormat.GREEN + " entities, "
+            + TextFormat.RED + level.getBlockEntities().size() + TextFormat.GREEN + " blockEntities."
+            + " Time " + ((level.getTickRate() > 1 || level.getTickRateTime() > 40) ? TextFormat.RED : TextFormat.YELLOW)
+            + NukkitMath.round(level.getTickRateTime(), 2) + "ms"
+            + (level.getTickRate() > 1 ? " (tick rate " + (19 - level.getTickRate()) + ")" : "");
     }
 
     public enum ComputerSystemEntry {
