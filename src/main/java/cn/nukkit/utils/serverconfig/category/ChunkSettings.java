@@ -52,6 +52,10 @@ public class ChunkSettings extends OkaeriConfig {
     @CustomKey("async-chunks")
     private boolean asyncChunks = true;
 
+    @Comment("Count cold chunk IO by caller in bounded RAM diagnostics")
+    @CustomKey("cold-chunk-load-counters")
+    private boolean coldChunkLoadCounters = true;
+
     @Comment("Max pending chunk writes per world before unloading pauses (backpressure)")
     @CustomKey("max-pending-chunk-writes")
     private int maxPendingChunkWrites = 128;
