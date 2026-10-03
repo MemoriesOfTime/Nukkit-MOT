@@ -26,9 +26,13 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 6. 支持网易客户端
 
 ## 如何安装？
-1. 安装 Java 17 或更高版本
+1. 安装 Java 25 或更高版本
 2. 从下方链接下载 `.jar` 文件
 3. 运行命令：`java -jar Nukkit-MOT-SNAPSHOT.jar`（将 `Nukkit-MOT-SNAPSHOT.jar` 替换为你下载的文件名）
+
+> **警告：**
+> 此分支针对最新 **Java 25+** 进行了性能优化，运行 **Java 17** 及更低版本的遗留代码时可能 **不稳定**。
+> 如果遇到问题，请切换到 [master](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster) 分支。
 
 ### 使用 Docker 运行
 ```bash
@@ -47,7 +51,7 @@ docker run -d --name nukkit-mot \
 - 想让 NetherNet 媒体走独立 UDP 端口？在 `server.properties` 设置 `server-udp-ports`（如 `19134`，并补 `-p 19134:19134/udp`）。
 
 ## 相关链接
-- __🌐 下载地址: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
+- __🌐 下载地址: [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Afeature/java-25)__
 - __💬 交流社区: [Discord](https://discord.gg/pJjQDQC) / [QQ 群](https://jq.qq.com/?_wv=1027&k=5aIuYMH)__
 - __🔌 插件资源: [Nukkit 论坛](https://cloudburstmc.org/resources/categories/nukkit-plugins.1/) / [Nukkit-MOT 论坛](https://bbs.nukkit-mot.com/resources/)__
 - __🐞 [提交问题反馈](https://github.com/MemoriesOfTime/Nukkit-MOT/issues/new/choose)__

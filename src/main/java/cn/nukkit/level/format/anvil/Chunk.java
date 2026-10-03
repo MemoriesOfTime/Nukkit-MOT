@@ -142,7 +142,7 @@ public class Chunk extends BaseChunk {
         if (updateEntries != null && updateEntries.size() > 0 && updateEntries.size() < 10000) {
             // 解析 TileTicks 收集为延迟条目,避免在(可能异步的)解码阶段直接 scheduleUpdate 触碰 Level;实际调度由主线程 initChunk 回放
             // Parse TileTicks into deferred entries; scheduling happens on the main thread in initChunk to avoid touching Level during (potentially off-thread) decode
-            List<BaseFullChunk.PendingBlockUpdate> ticking = null;
+            List<PendingBlockUpdate> ticking = null;
             for (CompoundTag entryNBT : updateEntries.getAll()) {
                 Block block = null;
 
@@ -169,7 +169,7 @@ public class Chunk extends BaseChunk {
                 if (ticking == null) {
                     ticking = new ArrayList<>();
                 }
-                ticking.add(new BaseFullChunk.PendingBlockUpdate(block, entryNBT.getInt("x"), entryNBT.getInt("y"), entryNBT.getInt("z"), 0, entryNBT.getInt("t"), entryNBT.getInt("p")));
+                ticking.add(new PendingBlockUpdate(block, entryNBT.getInt("x"), entryNBT.getInt("y"), entryNBT.getInt("z"), 0, entryNBT.getInt("t"), entryNBT.getInt("p")));
             }
             this.pendingBlockUpdates = ticking;
         }
@@ -462,9 +462,9 @@ public class Chunk extends BaseChunk {
             }
         }
 
-        List<BaseFullChunk.PendingBlockUpdate> deferred = this.getDeferredBlockUpdates();
+        List<PendingBlockUpdate> deferred = this.getDeferredBlockUpdates();
         if (deferred != null) {
-            for (BaseFullChunk.PendingBlockUpdate entry : deferred) {
+            for (PendingBlockUpdate entry : deferred) {
                 tileTickTag.add(new CompoundTag()
                         .putString("i", entry.getBlock().getSaveId())
                         .putInt("x", entry.getX())
@@ -480,8 +480,8 @@ public class Chunk extends BaseChunk {
     @Override
     public int getBlockSkyLight(int x, int y, int z) {
         cn.nukkit.level.format.ChunkSection section = this.sections[y >> 4];
-        if (section instanceof cn.nukkit.level.format.anvil.ChunkSection) {
-            cn.nukkit.level.format.anvil.ChunkSection anvilSection = (cn.nukkit.level.format.anvil.ChunkSection) section;
+        if (section instanceof ChunkSection) {
+            ChunkSection anvilSection = (ChunkSection) section;
             if (anvilSection.skyLight != null) {
                 return section.getBlockSkyLight(x, y & 0x0f, z);
             } else if (!anvilSection.hasSkyLight) {
@@ -504,8 +504,8 @@ public class Chunk extends BaseChunk {
     @Override
     public int getBlockLight(int x, int y, int z) {
         cn.nukkit.level.format.ChunkSection section = this.sections[y >> 4];
-        if (section instanceof cn.nukkit.level.format.anvil.ChunkSection) {
-            cn.nukkit.level.format.anvil.ChunkSection anvilSection = (cn.nukkit.level.format.anvil.ChunkSection) section;
+        if (section instanceof ChunkSection) {
+            ChunkSection anvilSection = (ChunkSection) section;
             if (anvilSection.blockLight != null) {
                 return section.getBlockLight(x, y & 0x0f, z);
             } else if (!anvilSection.hasBlockLight) {

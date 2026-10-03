@@ -5,7 +5,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 
 import java.io.IOException;
 
-public class FloatTag extends NumberTag<Float> {
+public final class FloatTag extends NumberTag<Float> {
 
     public float data;
 

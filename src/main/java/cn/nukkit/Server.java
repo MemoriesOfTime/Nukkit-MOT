@@ -3934,6 +3934,15 @@ public class Server {
     }
 
     /**
+     * Get the console thread
+     *
+     * @return console thread
+     */
+    Thread getConsoleThread() {
+        return consoleThread;
+    }
+
+    /**
      * Get the mob spawner task
      *
      * @return spawner task

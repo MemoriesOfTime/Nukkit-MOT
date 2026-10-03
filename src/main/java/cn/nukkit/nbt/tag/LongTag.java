@@ -5,7 +5,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 
 import java.io.IOException;
 
-public class LongTag extends NumberTag<Long> {
+public final class LongTag extends NumberTag<Long> {
 
     public long data;
 

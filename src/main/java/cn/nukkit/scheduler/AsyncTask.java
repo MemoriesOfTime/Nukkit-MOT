@@ -13,9 +13,9 @@ public abstract class AsyncTask implements Runnable {
 
     public static final Queue<AsyncTask> FINISHED_LIST = new ConcurrentLinkedQueue<>();
 
-    private Object result;
-    private int taskId;
-    private boolean finished = false;
+    private volatile Object result;
+    private volatile int taskId;
+    private volatile boolean finished = false;
 
     @Override
     public void run() {
@@ -47,6 +47,14 @@ public abstract class AsyncTask implements Runnable {
 
     public int getTaskId() {
         return this.taskId;
+    }
+
+    /**
+     * Whether this task should run on a virtual thread.
+     * Override and return true for I/O-bound tasks (e.g., file writes, network requests).
+     */
+    protected boolean isVirtual() {
+        return false;
     }
 
     public Object getFromThreadStore(String identifier) {
@@ -82,8 +90,8 @@ public abstract class AsyncTask implements Runnable {
                 task.onCompletion(Server.getInstance());
             } catch (Exception e) {
                 Server.getInstance().getLogger().critical("Exception while async task "
-                        + task.taskId
-                        + " invoking onCompletion", e);
+                    + task.getTaskId()
+                    + " invoking onCompletion", e);
             }
         }
     }

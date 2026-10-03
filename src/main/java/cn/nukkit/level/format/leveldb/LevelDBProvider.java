@@ -1503,7 +1503,7 @@ public class LevelDBProvider implements LevelProvider {
                 drained = this.executor.awaitTermination(this.closeDrainTimeoutMillis, TimeUnit.MILLISECONDS);
                 if (!drained) {
                     log.warn("LevelDB executor did not terminate in time, forcing shutdown for: {}", this.getName());
-                    java.util.List<Runnable> droppedTasks = this.executor.shutdownNow();
+                    List<Runnable> droppedTasks = this.executor.shutdownNow();
                     if (!droppedTasks.isEmpty()) {
                         log.warn("Dropped {} pending tasks during forced shutdown", droppedTasks.size());
                     }

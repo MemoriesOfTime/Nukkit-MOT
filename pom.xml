@@ -1,4 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
@@ -31,20 +33,59 @@
     </scm>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <log4j2.version>2.26.1</log4j2.version>
-        <lombok.version>1.18.46</lombok.version>
-        <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
         <argLine></argLine>
+
+        <!-- Main -->
+        <log4j2.version>2.26.1</log4j2.version>
         <jline.version>3.30.15</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.11</leveldb-mcpe-jni.version>
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
         <netty.version>4.2.16.Final</netty.version>
+
+        <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
+
+        <caffeine.version>3.2.3</caffeine.version>
+        <guava.version>33.1.0-jre</guava.version>
+        <gson.version>2.13.2</gson.version>
+        <fastutil.version>8.5.15</fastutil.version>
+        <snakeyaml.version>2.5</snakeyaml.version>
+        <snakeyaml-engine.version>2.9</snakeyaml-engine.version>
+        <nimbus-jose.version>10.9</nimbus-jose.version>
+        <asm.version>9.9.1</asm.version>
+        <lombok.version>1.18.48</lombok.version>
+        <terminalconsoleappender.version>1.3.0</terminalconsoleappender.version>
+        <jsr305.version>3.0.2</jsr305.version>
+        <snappy.version>0.5</snappy.version>
+        <daporkchop-natives.version>0.5.9-20250718.163325-7</daporkchop-natives.version>
+        <sentry.version>6.25.0</sentry.version>
+        <commons-math3.version>3.6.1</commons-math3.version>
+        <snappy-java.version>1.1.10.8</snappy-java.version>
+        <oshi.version>6.6.5</oshi.version>
+        <annotations.version>26.0.2</annotations.version>
+        <jose4j.version>0.9.6</jose4j.version>
+        <nukkitx-natives.version>1.0.3</nukkitx-natives.version>
+        <raknet.version>1.1.0.CR1-20260822.064033-5</raknet.version>
+        <cloudburst-common.version>3.0.0.Beta13-20260915.235937-24</cloudburst-common.version>
+        <cloudburst-codec.version>3.0.0.Beta13-20260916.122344-26</cloudburst-codec.version>
+        <jackson-dataformat-toml.version>2.20.1</jackson-dataformat-toml.version>
+        <eu.okaeri.version>6.1.0-beta.1</eu.okaeri.version>
+
+        <!-- Test -->
+        <allaymc.version>0.1.6</allaymc.version>
+        <cloudburstmc-math.version>2.0-20220327.162752-1</cloudburstmc-math.version>
+        <junit.version>5.10.2</junit.version>
+        <junit-platform.version>1.10.2</junit-platform.version>
+        <mockito.version>5.23.0</mockito.version>
+        <bytebuddy.version>1.18.8</bytebuddy.version>
+        <objenesis.version>3.4</objenesis.version>
+
+        <error-prone.version>2.41.0</error-prone.version>
         <maven.shade.skip>false</maven.shade.skip>
         <!-- Reproducible build: entry timestamps follow the last commit time -->
         <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
@@ -101,9 +142,8 @@
             <dependency>
                 <groupId>com.google.errorprone</groupId>
                 <artifactId>error_prone_annotations</artifactId>
-                <version>2.41.0</version>
+                <version>${error-prone.version}</version>
             </dependency>
-            <!-- libdatachannel 与 raknet/oshi 传递依赖版本分叉，统一固定；Pin diverging transitive versions -->
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
@@ -118,18 +158,17 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- Network depends -->
         <dependency>
             <groupId>org.cloudburstmc.netty</groupId>
             <artifactId>netty-transport-nethernet</artifactId>
             <version>2.0.0.CR4-20260928.175532-10</version>
             <scope>compile</scope>
             <exclusions>
-                <!-- 统一使用服务器自带的 Netty 4.2.x；Use the Netty version this server ships with (4.2.x) -->
                 <exclusion>
                     <groupId>io.netty</groupId>
                     <artifactId>*</artifactId>
                 </exclusion>
-                <!-- 改用下方 arch-detect：自带全部平台原生库；Use arch-detect below, it bundles every platform's natives -->
                 <exclusion>
                     <groupId>dev.opencollab</groupId>
                     <artifactId>libdatachannel-java</artifactId>
@@ -157,7 +196,7 @@
         <dependency>
             <groupId>dev.mot.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.1.0.CR1-20260822.064033-5</version>
+            <version>${raknet.version}</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -207,13 +246,13 @@
         <dependency>
             <groupId>com.nukkitx</groupId>
             <artifactId>natives</artifactId>
-            <version>1.0.3</version>
+            <version>${nukkitx-natives.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta13-20260915.235937-24</version>
+            <version>${cloudburst-common.version}</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -234,16 +273,18 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <!-- Utils and libs -->
         <dependency>
             <groupId>it.unimi.dsi</groupId>
             <artifactId>fastutil</artifactId>
-            <version>8.5.15</version>
+            <version>${fastutil.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>33.1.0-jre</version>
+            <version>${guava.version}</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -255,7 +296,7 @@
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.13.2</version>
+            <version>${gson.version}</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -267,7 +308,7 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
-            <version>3.2.3</version>
+            <version>${caffeine.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.checkerframework</groupId>
@@ -279,52 +320,62 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <!-- YAML and TOML -->
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>2.5</version>
+            <version>${snakeyaml.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.snakeyaml</groupId>
             <artifactId>snakeyaml-engine</artifactId>
-            <version>2.9</version>
+            <version>${snakeyaml-engine.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-toml</artifactId>
-            <version>2.20.1</version>
+            <version>${jackson-dataformat-toml.version}</version>
             <scope>compile</scope>
-            <!--<exclusions>
-                <exclusion>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                    <artifactId>jackson-databind</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                    <artifactId>jackson-core</artifactId>
-                </exclusion>
-            </exclusions>-->
         </dependency>
         <dependency>
             <groupId>eu.okaeri</groupId>
             <artifactId>okaeri-configs-yaml-snakeyaml</artifactId>
-            <version>6.1.0-beta.1</version>
+            <version>${eu.okaeri.version}</version>
             <scope>compile</scope>
         </dependency>
+
+        <!-- Safety and JWT -->
         <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
-            <version>10.9</version>
+            <version>${nimbus-jose.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>org.bitbucket.b_c</groupId>
+            <artifactId>jose4j</artifactId>
+            <version>${jose4j.version}</version>
+            <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- ASM -->
+        <dependency>
             <groupId>org.ow2.asm</groupId>
             <artifactId>asm</artifactId>
-            <version>9.9.1</version>
+            <version>${asm.version}</version>
             <scope>compile</scope>
         </dependency>
+
+        <!-- Logs -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
@@ -349,6 +400,8 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <!-- Lombok and Annotations -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -356,9 +409,23 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <version>${jsr305.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>${annotations.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Terminal and Console -->
+        <dependency>
             <groupId>net.minecrell</groupId>
             <artifactId>terminalconsoleappender</artifactId>
-            <version>1.3.0</version>
+            <version>${terminalconsoleappender.version}</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -391,16 +458,18 @@
             <version>${jline.version}</version>
             <scope>compile</scope>
         </dependency>
-        <dependency>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>jsr305</artifactId>
-            <version>3.0.2</version>
-            <scope>provided</scope>
-        </dependency>
+
+        <!-- Compression and LevelDB -->
         <dependency>
             <groupId>org.iq80.snappy</groupId>
             <artifactId>snappy</artifactId>
-            <version>0.5</version>
+            <version>${snappy.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial.snappy</groupId>
+            <artifactId>snappy-java</artifactId>
+            <version>${snappy-java.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -450,7 +519,7 @@
         <dependency>
             <groupId>net.daporkchop.lib</groupId>
             <artifactId>natives</artifactId>
-            <version>0.5.9-20250718.163325-7</version>
+            <version>${daporkchop-natives.version}</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -459,54 +528,31 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <!-- Monitoring and Math -->
         <dependency>
             <groupId>io.sentry</groupId>
             <artifactId>sentry</artifactId>
-            <version>6.25.0</version>
+            <version>${sentry.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-math3</artifactId>
-            <version>3.6.1</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.xerial.snappy</groupId>
-            <artifactId>snappy-java</artifactId>
-            <version>1.1.10.8</version>
+            <version>${commons-math3.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.github.oshi</groupId>
             <artifactId>oshi-core</artifactId>
-            <version>6.6.5</version>
+            <version>${oshi.version}</version>
             <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
-            <version>26.0.2</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.bitbucket.b_c</groupId>
-            <artifactId>jose4j</artifactId>
-            <version>0.9.6</version>
-            <scope>compile</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-api</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.cloudburstmc</groupId>
             <artifactId>block-state-updater</artifactId>
             <version>${block-state-updater.version}</version>
             <scope>compile</scope>
-            <!--jackson-dataformat-toml导入新版依赖-->
             <exclusions>
                 <exclusion>
                     <groupId>com.fasterxml.jackson.core</groupId>
@@ -519,59 +565,61 @@
             </exclusions>
         </dependency>
 
-        <!-- Test -->
+        <!-- Test dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.10.2</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.10.2</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.platform</groupId>
             <artifactId>junit-platform-launcher</artifactId>
-            <version>1.10.2</version>
+            <version>${junit-platform.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>5.23.0</version>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
-            <version>5.23.0</version>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy</artifactId>
-            <version>1.18.8</version>
+            <version>${bytebuddy.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy-agent</artifactId>
-            <version>1.18.8</version>
+            <version>${bytebuddy.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.objenesis</groupId>
             <artifactId>objenesis</artifactId>
-            <version>3.4</version>
+            <version>${objenesis.version}</version>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>bedrock-codec</artifactId>
-            <version>3.0.0.Beta13-20260916.122344-26</version>
+            <version>${cloudburst-codec.version}</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -583,7 +631,7 @@
         <dependency>
             <groupId>org.cloudburstmc.math</groupId>
             <artifactId>immutable</artifactId>
-            <version>2.0-20220327.162752-1</version>
+            <version>${cloudburstmc-math.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -592,7 +640,6 @@
             <version>1.21.124-R1</version>
             <scope>test</scope>
         </dependency>
-        <!-- Test -->
     </dependencies>
 
     <build>
@@ -609,16 +656,20 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>cn.nukkit.Bootstrap</mainClass>
+                            <Main-Class>cn.nukkit.Nukkit</Main-Class>
                         </manifest>
                     </archive>
                 </configuration>
             </plugin>
+
+            <!-- FIX: Using stable version 3.13.0 instead of 3.15.0 -->
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${maven.compiler.plugin.version}</version>
                 <configuration>
-                    <release>${maven.compiler.target}</release>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                    <!-- FIX: Added log4j-core back to annotation processors -->
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
@@ -633,6 +684,7 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
@@ -655,31 +707,19 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.5</version>
-                <configuration>
-                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>3.7.0</version>
-                <!-- 快照按实际解析的时间戳文件名复制，与 DEPENDENCIES.txt / Class-Path 的精确 pin 对齐；
-                     仅作用于手动执行 dependency:copy-dependencies 预置的 lib/，使其可被引导直接判定就绪
-                     Copies snapshots under resolved timestamped names matching the exact pins; applies to
-                     manually invoked dependency:copy-dependencies so a pre-populated lib/ verifies as ready -->
                 <configuration>
                     <useBaseVersion>false</useBaseVersion>
                 </configuration>
                 <executions>
                     <execution>
-                        <id>test-dependency-properties</id>
-                        <phase>initialize</phase>
-                        <goals>
-                            <goal>properties</goal>
-                        </goals>
+                        <id>attach-javadocs</id>
+                        <phase>none</phase>
                     </execution>
-                    <!-- 运行时依赖清单输入，供 GenerateDependencyManifest 生成 DEPENDENCIES.txt
-                         Feeds GenerateDependencyManifest with the runtime dependency list -->
                     <execution>
                         <id>runtime-dependency-list</id>
                         <phase>generate-resources</phase>
@@ -694,11 +734,6 @@
                 </executions>
             </plugin>
             <plugin>
-                <!-- Minify every .json resource in the build output to shrink the JAR.
-                     Source files stay readable; only the copied artifacts under target/classes are minified.
-                     Runs in process-classes (after compile, before package) so the helper class is compiled,
-                     and after the default process-resources copy. Idempotent: already-minified files are unchanged.
-                     Uses Gson (compile classpath) to parse and re-serialize without whitespace. -->
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
@@ -716,8 +751,6 @@
                             </arguments>
                         </configuration>
                     </execution>
-                    <!-- 生成 target/classes/DEPENDENCIES.txt，随 package 进 jar 供 Bootstrap 使用
-                         Emits target/classes/DEPENDENCIES.txt, packaged for Bootstrap -->
                     <execution>
                         <id>generate-dependency-manifest</id>
                         <phase>prepare-package</phase>
@@ -743,7 +776,7 @@
                         <id>enforce</id>
                         <configuration>
                             <rules>
-                                <DependencyConvergence />
+                                <DependencyConvergence/>
                             </rules>
                         </configuration>
                         <goals>
@@ -784,8 +817,6 @@
                                 <exclude>module-info.class</exclude>
                             </excludes>
                         </filter>
-                        <!-- Exclude build-time helper classes from the shaded JAR.
-                             MinifyJsonResources only runs during process-classes. -->
                         <filter>
                             <artifact>${project.groupId}:${project.artifactId}</artifact>
                             <excludes>
@@ -795,12 +826,10 @@
                     </filters>
                     <transformers>
                         <transformer
-                                implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer">
+                            implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer">
                         </transformer>
-                        <!-- shaded jar 保持自包含：显式固定 Main-Class，避免继承 jar 插件清单的 Bootstrap 入口
-                             Pin Main-Class so the shaded jar stays self-contained -->
                         <transformer
-                                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                            implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                             <mainClass>cn.nukkit.Nukkit</mainClass>
                         </transformer>
                     </transformers>
@@ -808,11 +837,6 @@
                 </configuration>
             </plugin>
             <plugin>
-                <!-- shade 把 thin jar 留成 original-<finalName>.jar，改名 <finalName>-Lite.jar 作为引导
-                     自动下载发行版（original- 前缀匹配不到 CI 的 Nukkit-*.jar 归档通配）；
-                     shade 被跳过（central-release）时无此文件，failonerror=false 容忍
-                     Rename the shade leftover to the Lite flavor; failonerror=false tolerates
-                     its absence when shading is skipped -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>3.1.0</version>
@@ -825,9 +849,9 @@
                         </goals>
                         <configuration>
                             <target>
-                                    <move file="${project.build.directory}/original-${project.build.finalName}.jar"
-                                          tofile="${project.build.directory}/${project.build.finalName}-Lite.jar"
-                                          failonerror="false"/>
+                                <move file="${project.build.directory}/original-${project.build.finalName}.jar"
+                                      tofile="${project.build.directory}/${project.build.finalName}-Lite.jar"
+                                      failonerror="false"/>
                             </target>
                         </configuration>
                     </execution>
@@ -845,7 +869,6 @@
                         </goals>
                     </execution>
                 </executions>
-
                 <configuration>
                     <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
                     <prefix>git</prefix>
@@ -862,10 +885,6 @@
                     <failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
                     <skip>false</skip>
                     <runOnlyOnce>true</runOnlyOnce>
-                    <!-- Only commit-determined fields; the rest vary with the build
-                         environment. git.commit.time must stay listed: this filter also
-                         drops injected properties, and outputTimestamp resolves against
-                         it (see dateFormat below). -->
                     <includeOnlyProperties>
                         <includeOnlyProperty>^git.commit.id.abbrev$</includeOnlyProperty>
                         <includeOnlyProperty>^git.commit.time$</includeOnlyProperty>

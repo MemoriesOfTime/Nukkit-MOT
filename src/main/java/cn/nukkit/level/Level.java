@@ -1494,7 +1494,7 @@ public class Level implements ChunkManager, Metadatable {
             this.activationSkippedUpdates++;
             return true;
         }
-        if (entity instanceof cn.nukkit.entity.BaseEntity) {
+        if (entity instanceof BaseEntity) {
             this.activationRunUpdates++;
         }
         return entity.onUpdate(currentTick);

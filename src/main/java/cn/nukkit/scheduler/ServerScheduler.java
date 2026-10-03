@@ -304,7 +304,7 @@ public class ServerScheduler {
     }
 
     public void mainThreadHeartbeat(int currentTick) {
-         // Accepts pending.
+        // Accepts pending.
         TaskHandler task;
         while ((task = pending.poll()) != null) {
             int tick = Math.max(currentTick, task.getNextRunTick()); // Do not schedule in the past
@@ -348,7 +348,7 @@ public class ServerScheduler {
                         taskHandler.run(currentTick);
                     } catch (Throwable e) {
                         Server.getInstance().getLogger().critical("Could not execute taskHandler " + taskHandler.getTaskId() + ": " + e.getMessage(),
-                                e instanceof Exception ? e : new RuntimeException(e));
+                            e instanceof Exception ? e : new RuntimeException(e));
                     }
                 }
                 if (taskHandler.isRepeating()) {

@@ -2,6 +2,7 @@ package cn.nukkit;
 
 import com.fasterxml.jackson.dataformat.toml.TomlMapper;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import javax.xml.parsers.DocumentBuilder;

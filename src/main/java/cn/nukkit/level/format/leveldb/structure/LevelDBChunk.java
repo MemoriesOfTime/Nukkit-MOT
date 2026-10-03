@@ -324,12 +324,12 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
-    public void setBiome(int x, int y, int z, cn.nukkit.level.biome.Biome biome) {
+    public void setBiome(int x, int y, int z, Biome biome) {
         this.setBiomeId(x, y, z, biome.getId());
     }
 
     @Override
-    public void setBiome(int x, int z, cn.nukkit.level.biome.Biome biome) {
+    public void setBiome(int x, int z, Biome biome) {
         setBiomeId(x, z, biome.getId());
     }
 

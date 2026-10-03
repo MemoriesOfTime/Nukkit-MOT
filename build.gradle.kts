@@ -1,4 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
+
 import java.security.MessageDigest
 
 plugins {
@@ -19,11 +20,11 @@ abstract class JavaAgentArgumentProvider : CommandLineArgumentProvider {
 }
 
 group = "cn.nukkit"
-version = "MOT-SNAPSHOT"
+version = "SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
     withSourcesJar()
     withJavadocJar()
@@ -190,7 +191,6 @@ publishing {
     }
 }
 
-
 // ---------------------------------------------------------------------------
 // Bootstrap Lite 发行版与 DEPENDENCIES.txt 生成，对齐 Maven 侧管线；
 // 镜像列表双写由 DependencyManifestReposConsistencyTest 守护
@@ -307,7 +307,6 @@ val liteJar by tasks.registering(Jar::class) {
     }
 }
 
-
 tasks {
     compileJava {
         options.encoding = "UTF-8"
@@ -370,6 +369,7 @@ tasks {
 
     shadowJar {
         manifest.attributes["Multi-Release"] = "true"
+        manifest.attributes["Main-Class"] = "cn.nukkit.Nukkit"
 
         // Shadow 9 defaults to EXCLUDE, which feeds only one source of the duplicated
         // Log4j2Plugins.dat to the transformer below. The project's own (near-empty) cache
@@ -380,7 +380,6 @@ tasks {
 
         transform(Log4j2PluginsCacheFileTransformer())
 
-        // Backwards compatible jar directory
         destinationDirectory.set(file("$projectDir/target"))
         archiveClassifier.set("")
 

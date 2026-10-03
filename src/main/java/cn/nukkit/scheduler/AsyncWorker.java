@@ -7,7 +7,9 @@ import java.util.LinkedList;
 /**
  * @author MagicDroidX
  * Nukkit Project
+ * @deprecated Use {@link AsyncPool} or virtual threads instead
  */
+@Deprecated
 public class AsyncWorker extends Thread implements InterruptibleThread {
 
     private final LinkedList<AsyncTask> stack = new LinkedList<>();
