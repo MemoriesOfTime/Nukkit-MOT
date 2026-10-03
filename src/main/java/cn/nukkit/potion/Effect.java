@@ -208,6 +208,8 @@ public class Effect implements Cloneable {
     public boolean canTick() {
         int interval;
         switch (this.id) {
+            case Effect.SATURATION:
+                return this.duration > 0;
             case Effect.POISON:
             case Effect.FATAL_POISON:
                 if ((interval = (25 >> this.amplifier)) > 0) {
@@ -243,6 +245,13 @@ public class Effect implements Cloneable {
             case Effect.REGENERATION:
                 if (entity.getHealth() < entity.getMaxHealth()) {
                     entity.heal(new EntityRegainHealthEvent(entity, 1, EntityRegainHealthEvent.CAUSE_MAGIC));
+                }
+                break;
+            case Effect.SATURATION:
+                if (entity instanceof Player player) {
+                    int amount = (int) Math.min(player.getFoodData().getMaxLevel(),
+                            Math.max(0L, (long) this.amplifier + 1));
+                    player.getFoodData().addFoodLevel(amount, amount * 2.0F);
                 }
                 break;
         }

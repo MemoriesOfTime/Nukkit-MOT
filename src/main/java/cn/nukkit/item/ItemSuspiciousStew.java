@@ -1,6 +1,8 @@
 package cn.nukkit.item;
 
 import cn.nukkit.GameVersion;
+import cn.nukkit.Player;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemSuspiciousStew extends ItemEdible {
@@ -29,9 +31,15 @@ public class ItemSuspiciousStew extends ItemEdible {
     }
 
     @Override
+    public boolean onClickAir(Player player, Vector3 directionVector) {
+        return !player.isSpectator() && this.isSupportedOn(player.getGameVersion());
+    }
+
+    @Override
     public boolean isSupportedOn(GameVersion protocolId) {
-        int meta = this.getDamage();
-        if (protocolId.getProtocol() < ProtocolInfo.v1_13_0) {
+        int meta = this.meta;
+        if (!this.hasMeta() || meta < 0 || meta > MAX_SUPPORTED_META
+                || protocolId.getProtocol() < ProtocolInfo.v1_13_0) {
             return false;
         }
 
