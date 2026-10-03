@@ -57,6 +57,50 @@ class CollisionHelperAirTest {
     }
 
     @Test
+    void inclusiveBlockRangesDoNotVisitAnExtraFractionalUpperLayer() {
+        for (double[] range : new double[][]{{0.1, 0.9}, {-0.9, -0.1}, {-1.9, -1.1},
+                {-0.1, 0.1}, {0.0, 1.0}, {-1.0, 0.0}, {-16.1, -15.9}}) {
+            AxisAlignedBB box = new SimpleAxisAlignedBB(range[0], 64.1, 0.1, range[1], 64.9, 0.9);
+            List<Block> result = CollisionHelper.getCollisionBlocks(level, box, entity, false, true,
+                    block -> block.getId() == Block.AIR);
+            List<Integer> expected = java.util.stream.IntStream.rangeClosed((int) Math.floor(range[0]),
+                    (int) Math.floor(range[1])).boxed().toList();
+            assertEquals(expected, result.stream().map(Block::getFloorX).toList(),
+                    "inclusive cells for " + range[0] + ".." + range[1]);
+            assertTrue(result.stream().allMatch(block -> block.getFloorY() == 64 && block.getFloorZ() == 0));
+        }
+        verify(level, never()).getChunk(anyInt(), anyInt());
+    }
+
+    @Test
+    void entityQueriesUseInclusiveContainingChunksWithoutAnExtraFractionalChunk() {
+        java.util.List<String> visited = new java.util.ArrayList<>();
+        Level scanned = mock(Level.class, CALLS_REAL_METHODS);
+        doAnswer(i -> {
+            visited.add(i.getArgument(0) + ":" + i.getArgument(1));
+            return null;
+        }).when(scanned).getChunkIfLoaded(anyInt(), anyInt());
+        for (int shift : new int[]{-16, 0, 16}) {
+            for (double end : new double[]{12.1, 14.0}) {
+                AxisAlignedBB box = new SimpleAxisAlignedBB(2.1 + shift, 64, 2.1 + shift,
+                        end + shift, 65, end + shift);
+                int min = shift / 16;
+                int max = (int) Math.floor((end + shift + 2) / 16);
+                java.util.List<String> expected = new java.util.ArrayList<>();
+                for (int x = min; x <= max; x++) {
+                    for (int z = min; z <= max; z++) expected.add(x + ":" + z);
+                }
+                visited.clear();
+                assertTrue(CollisionHelper.getCollidingEntities(scanned, box, null).isEmpty());
+                assertEquals(expected, visited);
+                visited.clear();
+                assertEquals(0, scanned.getNearbyEntities(box, null, false, false).length);
+                assertEquals(expected, visited);
+            }
+        }
+    }
+
+    @Test
     void defaultQueriesSkipAirWithoutMaterializingBlocksOrLoadingMissingChunks() {
         addChunk(0, 0, Block.AIR);
 
