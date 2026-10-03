@@ -3,6 +3,7 @@ package cn.nukkit.network.session;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
+import cn.nukkit.level.Level;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
@@ -337,6 +338,43 @@ class RakNetPlayerSessionTest {
 
         verify(fixture.player, times(burst)).handleDataPacket(any(DataPacket.class));
         assertEquals(0, fixture.session.queuedInboundPacketCount());
+    }
+
+    @Test
+    void serverTickRoutesLevelSyncPacketsToParallelLevelThread() {
+        SessionFixture fixture = createSession(false);
+        Level parallelLevel = mock(Level.class);
+        when(parallelLevel.isParallelTickEnabled()).thenReturn(true);
+        when(fixture.player.getLevel()).thenReturn(parallelLevel);
+
+        LevelSyncTestPacket syncPacket = new LevelSyncTestPacket();
+        assertTrue(fixture.session.enqueueDecodedBatch(java.util.List.of(syncPacket, new TestPacket())));
+
+        drainServerTick(fixture.session);
+
+        // 白名单包投递所属世界线程队列串行处理，非白名单包仍主线程直接处理
+        // Level-sync packet goes to the owning level's queue; the plain packet is handled inline
+        verify(parallelLevel).addSyncPacketToQueue(fixture.player, syncPacket);
+        verify(fixture.player, never()).handleDataPacket(same(syncPacket));
+        verify(fixture.player, times(1)).handleDataPacket(any(DataPacket.class));
+    }
+
+    @Test
+    void serverTickHandlesLevelSyncPacketsInlineWhenParallelTickDisabled() {
+        SessionFixture fixture = createSession(false);
+        Level plainLevel = mock(Level.class);
+        when(plainLevel.isParallelTickEnabled()).thenReturn(false);
+        when(fixture.player.getLevel()).thenReturn(plainLevel);
+
+        LevelSyncTestPacket syncPacket = new LevelSyncTestPacket();
+        assertTrue(fixture.session.enqueueDecodedBatch(java.util.List.of(syncPacket)));
+
+        drainServerTick(fixture.session);
+
+        // 并行关闭：master 语义，全部包主线程直接处理
+        // Parallel tick off: master semantics, every packet handled inline
+        verify(fixture.player).handleDataPacket(syncPacket);
+        verify(plainLevel, never()).addSyncPacketToQueue(any(), any());
     }
 
     @Test
@@ -910,6 +948,26 @@ class RakNetPlayerSessionTest {
         public void encode() {
             this.reset();
             this.putByte((byte) 0x7f);
+        }
+    }
+
+    private static final class LevelSyncTestPacket extends DataPacket {
+        @Override
+        public byte pid() {
+            return 0;
+        }
+
+        @Override
+        public void decode() {
+        }
+
+        @Override
+        public void encode() {
+        }
+
+        @Override
+        public boolean isLevelSyncPacket() {
+            return true;
         }
     }
 

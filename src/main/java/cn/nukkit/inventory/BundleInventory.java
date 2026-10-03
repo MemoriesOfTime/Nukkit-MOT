@@ -153,8 +153,12 @@ public class BundleInventory extends BaseInventory {
 
     private int getWeight(Set<Integer> visitedBundleIds) {
         int weight = 0;
-        for (Item item : this.slots.values()) {
-            weight += getWeight(item, visitedBundleIds);
+        // synchronizedMap 惯例：迭代须持其监视器（见 BaseInventory.slots）
+        // synchronizedMap idiom: iteration must hold the map's monitor (see BaseInventory.slots)
+        synchronized (this.slots) {
+            for (Item item : this.slots.values()) {
+                weight += getWeight(item, visitedBundleIds);
+            }
         }
         return weight;
     }

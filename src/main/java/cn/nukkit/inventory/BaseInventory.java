@@ -45,7 +45,12 @@ public abstract class BaseInventory implements Inventory {
 
     protected final String title;
 
-    public final Map<Integer, Item> slots = new HashMap<>();
+    // synchronizedMap：level-sync 背包包在世界线程写、插件任务在主线程写同一 slots 表，
+    // 裸 HashMap 并发写会损坏结构丢物品；null 值语义保留（HashMap 底层）
+    // synchronizedMap: level-sync inventory packets write on the world thread while plugin
+    // tasks write on the main thread; a bare HashMap corrupts and loses items. Null values
+    // stay allowed (HashMap backing). Iteration still needs caller-side synchronization
+    public final Map<Integer, Item> slots = Collections.synchronizedMap(new HashMap<>());
 
     protected final Set<Player> viewers = ConcurrentHashMap.newKeySet();
 
@@ -150,7 +155,9 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public Map<Integer, Item> getContents() {
-        return new HashMap<>(this.slots);
+        synchronized (this.slots) {
+            return new HashMap<>(this.slots);
+        }
     }
 
     @Override
@@ -643,9 +650,13 @@ public abstract class BaseInventory implements Inventory {
 
     protected void ensureUniqueBundleId(int targetSlot, ItemBundle bundle) {
         HashSet<Integer> existingBundleIds = new HashSet<>();
-        for (var entry : this.slots.entrySet()) {
-            if (entry.getKey() != targetSlot) {
-                collectBundleIds(entry.getValue(), existingBundleIds, new HashSet<>());
+        // synchronizedMap 惯例：迭代须持其监视器（多线程改背包时的 CME 防护）
+        // synchronizedMap idiom: iteration must hold the map's monitor
+        synchronized (this.slots) {
+            for (var entry : this.slots.entrySet()) {
+                if (entry.getKey() != targetSlot) {
+                    collectBundleIds(entry.getValue(), existingBundleIds, new HashSet<>());
+                }
             }
         }
         while (existingBundleIds.contains(bundle.getBundleId())) {
@@ -774,17 +785,19 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public boolean isFull() {
-        if (this.slots.size() < this.getSize()) {
-            return false;
-        }
-
-        for (Item item : this.slots.values()) {
-            if (item == null || item.getId() == 0 || item.getCount() < item.getMaxStackSize() || item.getCount() < this.maxStackSize) {
+        synchronized (this.slots) {
+            if (this.slots.size() < this.getSize()) {
                 return false;
             }
-        }
 
-        return true;
+            for (Item item : this.slots.values()) {
+                if (item == null || item.getId() == 0 || item.getCount() < item.getMaxStackSize() || item.getCount() < this.maxStackSize) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 
     @Override
@@ -793,9 +806,11 @@ public abstract class BaseInventory implements Inventory {
             return false;
         }
 
-        for (Item item : this.slots.values()) {
-            if (item != null && item.getId() != 0 && item.getCount() > 0) {
-                return false;
+        synchronized (this.slots) {
+            for (Item item : this.slots.values()) {
+                if (item != null && item.getId() != 0 && item.getCount() > 0) {
+                    return false;
+                }
             }
         }
 

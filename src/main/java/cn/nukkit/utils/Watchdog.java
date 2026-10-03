@@ -103,7 +103,12 @@ public class Watchdog extends Thread {
         Set<String> stillHanging = new HashSet<>();
         for (Level level : this.server.getLevels().values()) {
             long lastTick = level.getLevelThreadLastTickMillis();
-            if (!level.isParallelTickEnabled() || lastTick == 0 || now - lastTick <= this.time) {
+            // 存档中的世界线程单 tick 可合法超过阈值（大世界全量落盘），不按卡死告警；
+            // 存档结束后仍无推进才重新布防告警
+            // A saving level thread can legitimately spend longer than the threshold in one
+            // tick (full save of a big world); skip the hang alarm while it saves and re-arm
+            // afterwards only if the thread still makes no progress
+            if (!level.isParallelTickEnabled() || lastTick == 0 || level.isSaveInProgress() || now - lastTick <= this.time) {
                 continue;
             }
             String name = level.getName();

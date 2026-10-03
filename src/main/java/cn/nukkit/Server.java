@@ -156,7 +156,9 @@ public class Server {
     private final ServerScheduler scheduler;
 
     private volatile int tickCounter;
-    private long nextTick;
+    // Watchdog 跨线程读取；reload/forceShutdown 各等待点的刷新依赖其可见性
+    // Read cross-thread by the Watchdog; the reload/forceShutdown wait-point refreshes rely on its visibility
+    private volatile long nextTick;
     private final float[] tickAverage = {20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20};
     private final float[] useAverage = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     private float maxTick = 20;
@@ -1493,6 +1495,9 @@ public class Server {
     }
 
     private void allowLevelThreadsAndStartExisting() {
+        if (this.hasStopped) {
+            return;
+        }
         this.levelThreadsStartAllowed = true;
         this.startDeferredLevelThreads();
     }
@@ -1535,7 +1540,11 @@ public class Server {
         if (sender == null) {
             throw new ServerException("CommandSender is not valid");
         }
-        if (!this.isPrimaryThread() && isPrimaryThreadCommand(commandLine)) {
+        // 并行 tick 开启时才转投（异步调用方与世界线程并发写 Config 需串行化）；
+        // 配置关闭时保持 master 语义——调用线程内联执行，控制台/RCON 行为不变
+        // Re-dispatch only when parallel tick is enabled (async callers would race level
+        // threads); with the config off this keeps master semantics - inline execution
+        if (this.parallelLevelTick && !this.isPrimaryThread() && isPrimaryThreadCommand(commandLine)) {
             this.scheduler.scheduleTask(InternalPlugin.INSTANCE, () -> {
                 try {
                     this.dispatchCommand(sender, commandLine);
@@ -1576,13 +1585,26 @@ public class Server {
     }
 
     public void reload() {
+        // 与并发 forceShutdown（watchdog/关闭钩子）无互斥：关停已开始则不再 reload，
+        // 否则末尾会重启世界线程、在关停序列中途"复活"它们
+        // No mutual exclusion with a concurrent forceShutdown (watchdog/shutdown hook):
+        // once shutdown has begun, abort so the tail of reload cannot restart level
+        // threads in the middle of the shutdown sequence
+        if (this.hasStopped) {
+            log.warn("Skipping reload: server is shutting down");
+            return;
+        }
         log.info("Reloading...");
 
         log.info("Saving levels...");
+        // reload 经主线程调度任务执行，期间主循环停跳、nextTick 冻结；各等待点刷新防 Watchdog 误杀
+        // reload runs in a scheduled main-thread task so the tick loop stalls; refresh
+        // nextTick at each bounded wait so the Watchdog stays calm
+        this.nextTick = System.currentTimeMillis();
 
         List<CompletableFuture<java.lang.Void>> saveFutures = new ArrayList<>();
         for (Level level : this.levelArray) {
-            if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+            if (level.isParallelTickEnabled()) {
                 saveFutures.add(level.scheduleSyncTaskAndWait(() -> level.save()));
             } else {
                 level.save();
@@ -1590,6 +1612,7 @@ public class Server {
         }
         // 并发保存汇总为单次 30s 上限，避免逐个等待冻住主线程
         try {
+            this.nextTick = System.currentTimeMillis();
             CompletableFuture.allOf(saveFutures.toArray(new CompletableFuture[0])).get(30, TimeUnit.SECONDS);
         } catch (Exception e) {
             log.error("Timed out or failed waiting for level saves during reload; continuing", e);
@@ -1605,10 +1628,19 @@ public class Server {
             stops.add(CompletableFuture.runAsync(level::stopLevelThread));
         }
         try {
+            this.nextTick = System.currentTimeMillis();
             CompletableFuture.allOf(stops.toArray(new CompletableFuture[0])).get(35, TimeUnit.SECONDS);
         } catch (Exception e) {
             log.error("Timed out or failed stopping level threads during reload; continuing", e);
         }
+        // 等待期间 watchdog/关闭钩子可能已并发进入 forceShutdown：到此为止，勿重启线程/插件
+        // A watchdog/shutdown hook may have entered forceShutdown concurrently during
+        // the waits: stop here instead of restarting threads and plugins
+        if (this.hasStopped) {
+            log.warn("Aborting reload: server is shutting down");
+            return;
+        }
+        this.nextTick = System.currentTimeMillis();
 
         this.pluginManager.clearPlugins();
         this.commandMap.clearCommands();
@@ -1654,7 +1686,7 @@ public class Server {
     }
 
     private void restartStoppedLevelThreads() {
-        if (!this.parallelLevelTick || !this.levelThreadsStartAllowed) {
+        if (!this.parallelLevelTick || !this.levelThreadsStartAllowed || this.hasStopped) {
             return;
         }
         for (Level level : this.levelArray) {
@@ -1693,10 +1725,16 @@ public class Server {
                 stops.add(CompletableFuture.runAsync(level::stopLevelThread));
             }
             try {
+                // 停线程等待（≤35s）发生在 nextTick 刷新点之前，先刷新防止 Watchdog 在世界
+                // 存档（unloadLevel）前 System.exit(1) 硬杀
+                // Refresh nextTick before the bounded stop wait so the Watchdog cannot
+                // hard-kill the process before the worlds are saved
+                this.nextTick = System.currentTimeMillis();
                 CompletableFuture.allOf(stops.toArray(new CompletableFuture[0])).get(35, TimeUnit.SECONDS);
             } catch (Exception e) {
                 log.error("Timed out or failed stopping level threads during shutdown; continuing", e);
             }
+            this.nextTick = System.currentTimeMillis();
 
             if (this.holdWorldSave) {
                 this.getLogger().warning("World save hold was not released! Any backup currently being taken may be invalid");
@@ -1996,8 +2034,12 @@ public class Server {
         if (this.alwaysTickPlayers) {
             for (Player p : new ArrayList<>(this.players.values())) {
                 // 并行世界的玩家已由其世界线程 tick，主线程跳过
-                if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled()) {
+                if (p.getLevel() != null && p.getLevel().isParallelTickEnabled()) {
                     continue;
+                }
+                // 接管点：线程停止期间由主线程 tick 的世界，记录服务器时基并处理域切换
+                if (p.getLevel() != null) {
+                    p.getLevel().noteMainThreadTakeoverTick(currentTick);
                 }
                 p.onUpdate(currentTick);
             }
@@ -2005,7 +2047,7 @@ public class Server {
 
         for (Player p : this.getOnlinePlayers().values()) {
             // 已出生的并行世界玩家由其世界线程 drain 发送计数器（与写入方同线程），主线程跳过
-            if (this.parallelLevelTick && p.getLevel() != null && p.getLevel().isParallelTickEnabled() && p.isSpawnInitCompleted()) {
+            if (p.getLevel() != null && p.getLevel().isParallelTickEnabled() && p.isSpawnInitCompleted()) {
                 continue;
             }
             p.resetPacketCounters();
@@ -2018,8 +2060,9 @@ public class Server {
             }
 
             // Parallel tick: skip levels that have their own thread
-            if (this.parallelLevelTick && level.isParallelTickEnabled()) {
-                // Level ticks in its own GameLoop thread; autoTickRate is not applicable
+            // 门控只看线程存活（isParallelTickEnabled 已含存活判定），与 GC/存档路由一致，
+            // 插件在配置关闭时直调 startLevelThread 也不会造成主线程双 tick
+            if (level.isParallelTickEnabled()) {
                 continue;
             }
 
@@ -2033,29 +2076,16 @@ public class Server {
                 if (level.getProvider() == null) {//世界在其他线程上卸载
                     continue;
                 }
+                // 接管点：线程停止期间由主线程 tick 的世界，记录服务器时基并处理域切换
+                level.noteMainThreadTakeoverTick(currentTick);
                 level.doTick(currentTick);
                 int tickMs = (int) (System.currentTimeMillis() - levelTime);
                 level.tickRateTime = tickMs;
 
-                if (this.autoTickRate) {
-                    if (tickMs < 50 && level.getTickRate() > this.baseTickRate) {
-                        int r;
-                        level.setTickRate(r = level.getTickRate() - 1);
-                        if (r > this.baseTickRate) {
-                            level.tickRateCounter = level.getTickRate();
-                        }
-                        this.getLogger().debug("Raising level \"" + level.getName() + "\" tick rate to " + level.getTickRate() + " ticks");
-                    } else if (tickMs >= 50) {
-                        if (level.getTickRate() == this.baseTickRate) {
-                            level.setTickRate(Math.max(this.baseTickRate + 1, Math.min(this.autoTickRateLimit, tickMs / 50)));
-                            this.getLogger().debug("Level \"" + level.getName() + "\" took " + tickMs + "ms, setting tick rate to " + level.getTickRate() + " ticks");
-                        } else if ((tickMs / level.getTickRate()) >= 50 && level.getTickRate() < this.autoTickRateLimit) {
-                            level.setTickRate(level.getTickRate() + 1);
-                            this.getLogger().debug("Level \"" + level.getName() + "\" took " + tickMs + "ms, setting tick rate to " + level.getTickRate() + " ticks");
-                        }
-                        level.tickRateCounter = level.getTickRate();
-                    }
-                }
+                // 与并行路径（Level.levelThreadTick）共用实现，防止两份 autoTickRate 拷贝漂移
+                // Shared with the parallel path (Level.levelThreadTick) so the two
+                // autoTickRate copies cannot drift apart
+                level.adjustAutoTickRate(tickMs);
             } catch (Exception e) {
                 log.error(this.baseLang.translateString("nukkit.level.tickError", new String[]{level.getFolderName(), Utils.getExceptionMessage(e)}));
             } finally {
@@ -2070,7 +2100,7 @@ public class Server {
                 if (player.isOnline()) {
                     // 快照须在世界线程上生成
                     Level playerLevel = player.getLevel();
-                    if (this.parallelLevelTick && playerLevel != null && playerLevel.isParallelTickEnabled()) {
+                    if (playerLevel != null && playerLevel.isParallelTickEnabled()) {
                         playerLevel.scheduleSyncTask(() -> {
                             // 投递后玩家可能已断线或已切世界
                             if (player.isOnline() && player.getLevel() == playerLevel) {
@@ -2087,7 +2117,7 @@ public class Server {
 
             for (Level level : this.levelArray) {
                 if (!nonAutoSaveWorlds.contains(level.getName())) {
-                    if (this.parallelLevelTick && level.isParallelTickEnabled()) {
+                    if (level.isParallelTickEnabled()) {
                         level.scheduleSyncTask(() -> level.save());
                     } else {
                         level.save();
@@ -2134,7 +2164,7 @@ public class Server {
 
             for (Player player : new ArrayList<>(this.players.values())) {
                 // 出生初始化收尾前的登录序列留在主线程，收尾后由世界线程接管 checkNetwork
-                if (this.parallelLevelTick && player.isSpawnInitCompleted() && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
+                if (player.isSpawnInitCompleted() && player.getLevel() != null && player.getLevel().isParallelTickEnabled()) {
                     continue;
                 }
                 player.checkNetwork();
@@ -2487,6 +2517,14 @@ public class Server {
 
     public int getBaseTickRate() {
         return baseTickRate;
+    }
+
+    public boolean isAutoTickRate() {
+        return autoTickRate;
+    }
+
+    public int getAutoTickRateLimit() {
+        return autoTickRateLimit;
     }
 
     /**

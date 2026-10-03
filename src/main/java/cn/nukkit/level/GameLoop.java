@@ -121,12 +121,15 @@ public final class GameLoop {
     public float getTPS() {
         // 从 ringIndex（volatile）起按时间序读：volatile 读与 updateMSPT 的写配对，使已完成的环形槽位对本线程可见
         // Volatile read of ringIndex pairs with updateMSPT's write so completed slots are visible
+        // 跳过刻记 -1：计入分母、不计入分子，限流/冻结中的世界 TPS 才会真实回落
+        // Skipped ticks are stored as -1: they count in the denominator only, so a
+        // rate-limited/frozen level reports a falling TPS instead of a flat ~20
         int oldest = this.ringIndex;
         float sum = 0;
         int count = 0;
         for (int i = 0; i < tickSummary.length; i++) {
             float t = tickSummary[(oldest + i) % tickSummary.length];
-            if (t > 0) { sum += t; count++; }
+            if (t != 0) { sum += Math.max(t, 0); count++; }
         }
         return count > 0 ? sum / count : 0;
     }
@@ -157,10 +160,12 @@ public final class GameLoop {
         ringIndex = (ringIndex + 1) % tickSummary.length;
     }
 
-    // 跳过/异常刻记零并推进环：停跳期间旧样本会被逐槽冲掉，而不是滞留在均值窗口里
-    // Skipped ticks age stale samples out of the window instead of leaving them in the average
+    // 跳过/异常刻记 -1 并推进环：计入 TPS 分母（见 getTPS），停跳期间 TPS 真实回落；
+    // mspt 记 0 表示无样本，getMSPT 只对执行过的刻求均值
+    // Skipped ticks are stored as -1 (counted in the TPS denominator, see getTPS) so TPS
+    // drops during stalls; mspt stays 0 = no sample and getMSPT averages executed ticks only
     private void recordSkippedTick() {
-        tickSummary[ringIndex] = 0;
+        tickSummary[ringIndex] = -1;
         msptSummary[ringIndex] = 0;
         ringIndex = (ringIndex + 1) % tickSummary.length;
     }

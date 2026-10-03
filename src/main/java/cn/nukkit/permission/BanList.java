@@ -36,9 +36,17 @@ public class BanList {
         this.enable = enable;
     }
 
+    /**
+     * 返回内部封禁表活引用（master 语义，插件惯用法 {@code getEntires().remove(name)} 依赖此行为）。
+     * 并行 tick 开启时跨线程迭代/修改须调用方自行同步；结构化操作请走 {@link #add}/{@link #remove}。
+     * <p>
+     * Returns the live internal map (master semantics; the common plugin idiom
+     * {@code getEntires().remove(name)} relies on it). Under parallel tick, cross-thread
+     * iteration/mutation is the caller's responsibility; prefer {@link #add}/{@link #remove}.
+     */
     public synchronized LinkedHashMap<String, BanEntry> getEntires() {
         removeExpired();
-        return new LinkedHashMap<>(this.list);
+        return this.list;
     }
 
     public synchronized boolean isBanned(String name) {

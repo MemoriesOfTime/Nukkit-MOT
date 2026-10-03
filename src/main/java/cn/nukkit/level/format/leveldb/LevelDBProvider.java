@@ -1454,11 +1454,16 @@ public class LevelDBProvider implements LevelProvider {
         chunk.setPosition(chunkX, chunkZ);
         long index = Level.chunkHash(chunkX, chunkZ);
 
-        FullChunk oldChunk = this.chunks.get(index);
-        if (oldChunk != null && !oldChunk.equals(chunk)) {
-            this.unloadChunk(chunkX, chunkZ, false);
-        }
+        // get→unload→put 须整段原子：世界线程生成回调与主线程 Level.setChunk 并发写同坐标时，
+        // 后写者会跳过 unload 直接覆盖先写者（实体/方块实体丢失或重复）
+        // The get-unload-put sequence must be atomic: concurrent writers to the same
+        // coordinate (world-thread generation callback vs primary-thread Level.setChunk)
+        // would skip the unload and overwrite each other, losing or duplicating entities
         synchronized (this) {
+            FullChunk oldChunk = this.chunks.get(index);
+            if (oldChunk != null && !oldChunk.equals(chunk)) {
+                this.unloadChunk(chunkX, chunkZ, false);
+            }
             this.chunks.put(index, (LevelDBChunk) chunk);
         }
     }
@@ -1493,6 +1498,15 @@ public class LevelDBProvider implements LevelProvider {
     private synchronized LevelDBChunk readOrCreateChunk(int chunkX, int chunkZ, boolean create) {
         // 读取前提交挂起写。/ Commit pending data before reading.
         this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
+        // 锁内复查：loadChunk 的 containsKey 预检在锁外，并发加载同坐标时这里返回既有实例，
+        // 避免产生双实例后 put 覆盖先装载者的修改
+        // Re-check under the lock: loadChunk's containsKey pre-check is outside it, so a
+        // concurrent load of the same coordinate returns the existing instance instead of
+        // creating a second one whose put overwrites the first loader's changes
+        LevelDBChunk existing = (LevelDBChunk) this.chunks.get(Level.chunkHash(chunkX, chunkZ));
+        if (existing != null) {
+            return existing;
+        }
         LevelDBChunk chunk = null;
         try {
             chunk = this.readChunk(chunkX, chunkZ);

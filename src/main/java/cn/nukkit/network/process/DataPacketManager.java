@@ -47,6 +47,10 @@ public final class DataPacketManager {
     // Lock-free resolution cache: per-class flat [gameVersion, result] arrays (nulls cached too);
     // keyed by GameVersion (not protocol number) so standard/NetEase never share entries; cleared on registration
     private static final ConcurrentHashMap<Class<? extends DataPacket>, Object[]> RESOLUTION_CACHE = new ConcurrentHashMap<>();
+    // packetId 版缓存（deprecated int 桥仍为插件可达 API，高频调用不应退化为持类锁全量遍历）
+    // packetId-keyed cache (the deprecated int bridges remain plugin-reachable and must not
+    // degrade into a full scan under the class monitor on hot paths)
+    private static final ConcurrentHashMap<Integer, Object[]> RESOLUTION_CACHE_BY_ID = new ConcurrentHashMap<>();
     private static final Object NO_PROCESSOR = new Object();
 
     public static synchronized void registerProcessor(int protocol, @NotNull DataPacketProcessor... processors) {
@@ -71,6 +75,7 @@ public final class DataPacketManager {
         }
 
         RESOLUTION_CACHE.clear();
+        RESOLUTION_CACHE_BY_ID.clear();
     }
 
     public static boolean canProcess(GameVersion gameVersion, int packetId) {
@@ -154,7 +159,29 @@ public final class DataPacketManager {
         RESOLUTION_CACHE.put(packet, updated);
     }
 
-    public static synchronized DataPacketProcessor getProcessor(GameVersion gameVersion, int packetId) {
+    // packetId 版与 Class 版同款：无锁缓存命中 + 类监视器内双检解析，热点不再持锁全量遍历
+    // Same pattern as the Class version: lock-free cache hit + double-checked resolve under
+    // the class monitor, so hot paths no longer scan everything while holding the lock
+    public static DataPacketProcessor getProcessor(GameVersion gameVersion, int packetId) {
+        Object cached = lookupResolutionCacheById(gameVersion, packetId);
+        if (cached != null) {
+            return cached == NO_PROCESSOR ? null : (DataPacketProcessor) cached;
+        }
+        return resolveProcessorById(gameVersion, packetId);
+    }
+
+    private static synchronized DataPacketProcessor resolveProcessorById(GameVersion gameVersion, int packetId) {
+        // 双检：等锁期间其他线程可能已完成解析并写回缓存
+        Object cached = lookupResolutionCacheById(gameVersion, packetId);
+        if (cached != null) {
+            return cached == NO_PROCESSOR ? null : (DataPacketProcessor) cached;
+        }
+        DataPacketProcessor processor = getProcessorUncached(gameVersion, packetId);
+        cacheResolutionById(gameVersion, packetId, processor);
+        return processor;
+    }
+
+    private static DataPacketProcessor getProcessorUncached(GameVersion gameVersion, int packetId) {
         if (!REGISTERED_PACKETS.contains(packetId)) {
             return null;
         }
@@ -171,6 +198,41 @@ public final class DataPacketManager {
             }
         }
         return null;
+    }
+
+    private static Object lookupResolutionCacheById(GameVersion gameVersion, int packetId) {
+        Object[] table = RESOLUTION_CACHE_BY_ID.get(packetId);
+        if (table == null) {
+            return null;
+        }
+        for (int i = 0; i < table.length; i += 2) {
+            if (table[i] == gameVersion) {
+                return table[i + 1];
+            }
+        }
+        return null;
+    }
+
+    // 仅在 resolveProcessorById 的类监视器内调用（与 cacheResolution 同锁串行）
+    private static void cacheResolutionById(GameVersion gameVersion, int packetId, DataPacketProcessor processor) {
+        Object value = processor == null ? NO_PROCESSOR : processor;
+        Object[] old = RESOLUTION_CACHE_BY_ID.get(packetId);
+        if (old == null) {
+            RESOLUTION_CACHE_BY_ID.put(packetId, new Object[]{gameVersion, value});
+            return;
+        }
+        for (int i = 0; i < old.length; i += 2) {
+            if (old[i] == gameVersion) {
+                Object[] copy = old.clone();
+                copy[i + 1] = value;
+                RESOLUTION_CACHE_BY_ID.put(packetId, copy);
+                return;
+            }
+        }
+        Object[] updated = Arrays.copyOf(old, old.length + 2);
+        updated[old.length] = gameVersion;
+        updated[old.length + 1] = value;
+        RESOLUTION_CACHE_BY_ID.put(packetId, updated);
     }
 
     private static DataPacketProcessor getProcessor0(int protocol, Class<? extends DataPacket> packet) {

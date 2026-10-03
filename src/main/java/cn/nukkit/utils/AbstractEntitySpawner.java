@@ -10,6 +10,11 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Base class of the default mob spawners
  */
@@ -23,9 +28,33 @@ public abstract class AbstractEntitySpawner implements EntitySpawner {
 
     @Override
     public void spawn() {
+        // 按世界分组：并行世界转投其世界线程执行（与本分支 GC/存档转投同策略），
+        // 主线程不再直接读写并行世界，避免与其 doTick 竞态
+        // Group by level: parallel levels are handled on their own tick thread (same
+        // policy as the GC/save routing in this branch) so the primary thread no longer
+        // reads/writes a parallel level concurrently with its doTick
+        Map<Level, List<Player>> byLevel = new HashMap<>();
         for (Player player : Server.getInstance().getOnlinePlayers().values()) {
-            if (isSpawningAllowed(player)) {
-                spawnTo(player);
+            if (player.getLevel() != null && isSpawningAllowed(player)) {
+                byLevel.computeIfAbsent(player.getLevel(), k -> new ArrayList<>()).add(player);
+            }
+        }
+        for (Map.Entry<Level, List<Player>> entry : byLevel.entrySet()) {
+            Level level = entry.getKey();
+            List<Player> players = entry.getValue();
+            if (level.isParallelTickEnabled()) {
+                level.scheduleSyncTask(() -> {
+                    // 投递后玩家可能已断线或已切世界
+                    for (Player player : players) {
+                        if (player.isOnline() && player.getLevel() == level) {
+                            spawnTo(player);
+                        }
+                    }
+                });
+            } else {
+                for (Player player : players) {
+                    spawnTo(player);
+                }
             }
         }
     }

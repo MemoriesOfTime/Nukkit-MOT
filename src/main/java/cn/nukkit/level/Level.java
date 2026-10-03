@@ -535,13 +535,25 @@ public class Level implements ChunkManager, Metadatable {
     private volatile GameLoop gameLoop;
     private volatile Thread levelThread;
     private volatile long nextLevelThreadTick;
+    // 主线程在世界线程停止期间接管 tick 的最新服务器 tick；重启线程时判断实体 lastUpdate 所处时基域
+    // Latest server tick while the primary thread ticked this level during a thread stop;
+    // used on restart to pick the time-base domain the entities' lastUpdate values live in
+    private volatile long mainThreadTakeoverTick;
     private final Queue<Runnable> syncTaskQueue = new ConcurrentLinkedQueue<>();
     private final Queue<SyncPacketEntry> syncPacketQueue = new ConcurrentLinkedQueue<>();
+    // 世界线程卡死（isAlive 但不消费）时防止无界累积 OOM 的队列上限，超限回落主线程处理
+    // Cap that prevents unbounded growth (and OOM) when the level thread is wedged; overflow falls back to the primary thread
+    private static final int MAX_SYNC_PACKET_QUEUE_SIZE = 8192;
+    private long lastQueueCapLogMillis;
     // 生命周期锁：串化 start/stop 与接纳判定+入队；锁内绝不 join
     private final Object lifecycleLock = new Object();
     private volatile boolean acceptingWork;
     // 读锁内触发的延迟关闭标记，供 unload() 区分"延迟中"与"卡死中止"
     private volatile boolean closeDeferred;
+    // 全量存档进行中（世界线程），Watchdog 据此不把合法长存档误报为卡死
+    // A full save is running on the level thread; the Watchdog uses this to skip
+    // false "stopped responding" alarms for legitimately long saves
+    private volatile boolean saveInProgress;
     private static final int QUEUE_WARN_THRESHOLD = 1000;
     private static final int QUEUE_CHECK_INTERVAL = 200;
     private int queueCheckCounter;
@@ -775,13 +787,32 @@ public class Level implements ChunkManager, Metadatable {
                 return;
             }
             this.parallelTickEnabled = true;
-            // 首次启动对齐服务器 tick；重启从自身上次 tick 续跑（不取 max，避免滞后差值一次性前跳）
-            long initialTick = this.nextLevelThreadTick > 0 ? this.nextLevelThreadTick : (long) server.getTick();
+            // 首次启动对齐服务器 tick；正常重启从自身上次 tick 续跑（不取 max，避免滞后差值一次性前跳）；
+            // 但线程停止期间主线程以服务器 tick 接管过的世界必须重新对齐——实体 lastUpdate 已在服务器
+            // 时基，从旧 loop tick 续跑会令 tickDiff 恒负（实体被移出 updateEntities/玩家冻结）
+            // First start aligns to the server tick; a normal restart resumes the loop's own tick;
+            // but after a primary-thread takeover the entities' lastUpdate live in the server-tick
+            // domain, so resuming the stale loop tick would freeze them with negative tickDiff
+            long initialTick;
+            boolean alignToServerTick = this.mainThreadTakeoverTick > this.nextLevelThreadTick;
+            if (this.nextLevelThreadTick <= 0 || alignToServerTick) {
+                initialTick = (long) server.getTick();
+            } else {
+                initialTick = this.nextLevelThreadTick;
+            }
             this.nextLevelThreadTick = initialTick;
+            this.mainThreadTakeoverTick = 0L;
+            if (alignToServerTick) {
+                // 域切回 loop 时基：统一重置实体 lastUpdate，首帧 tickDiff 恰为 1 而非停机时长
+                // Domain switch back to the loop base: reset lastUpdate so the first tickDiff is 1
+                for (Entity entity : this.getEntities()) {
+                    entity.resetLastUpdate(initialTick);
+                }
+            }
             AtomicBoolean intentionalStop = new AtomicBoolean(false);
             this.currentIntentionalStop = intentionalStop;
-            // 兜底卡死-死亡（跳过排空）的滞留任务
-            this.syncTaskQueue.clear();
+            // 兜底卡死-死亡（未转投）的滞留任务：转投主线程而非丢弃（自动存档、生成回调等不可丢）
+            this.drainSyncTasksToPrimary();
             // 滞留包可能是停线程窗口内的活包，转投而非丢弃
             this.forwardQueuedSyncPacketsToPrimary();
             this.gameLoop = GameLoop.builder()
@@ -791,11 +822,23 @@ public class Level implements ChunkManager, Metadatable {
                     .onIdle(this::handleSyncPackets)
                     .onStop(() -> {
                         server.unregisterLevelThread(Thread.currentThread());
-                        // 仅当退出的是当前线程时才清状态
-                        if (Thread.currentThread() == this.levelThread) {
-                            this.parallelTickEnabled = false;
-                            // 非正常死亡也关闭接纳，生产者不再向已死线程投递
-                            this.acceptingWork = false;
+                        // 锁内清状态：与生产者的"判定+入队"互斥（锁外写会有包滞留已死线程队列的窗口），
+                        // 并顺带把滞留任务/包转投主线程，不随线程死亡丢弃（自动存档、生成回调等）
+                        // Clear state under the lock so it mutually excludes the producers'
+                        // check-then-offer, and forward stranded tasks/packets to the primary
+                        // thread instead of losing them with the dying thread
+                        synchronized (lifecycleLock) {
+                            // 仅当退出的仍是当前代线程时才清状态（防误关并发 startLevelThread 已开的新代）
+                            if (Thread.currentThread() == this.levelThread) {
+                                this.parallelTickEnabled = false;
+                                // 非正常死亡也关闭接纳，生产者不再向已死线程投递
+                                this.acceptingWork = false;
+                                try {
+                                    this.forwardQueuedSyncPacketsToPrimary();
+                                } finally {
+                                    this.drainSyncTasksToPrimary();
+                                }
+                            }
                         }
                         if (!intentionalStop.get()) {
                             server.getLogger().error("Level thread for '" + this.getName()
@@ -898,6 +941,46 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     /**
+     * 残留同步任务转投主线程（线程死亡/重启兜底），避免滞留任务随线程丢失。
+     * <p>
+     * Forward stranded sync tasks to the primary thread (died-thread / restart backstop)
+     * so queued work such as auto-saves and generation callbacks is not silently lost.
+     */
+    private void drainSyncTasksToPrimary() {
+        // 须在 lifecycleLock 内调用；一律经调度器转投——调用线程可能是主线程（startLevelThread），
+        // 内联执行会在持锁状态下跑重 IO 任务
+        // Must be called under lifecycleLock; always reschedule - the caller may be the
+        // primary thread (startLevelThread) and running a heavy task inline under the lock
+        Runnable task;
+        while ((task = this.syncTaskQueue.poll()) != null) {
+            server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, task);
+        }
+    }
+
+    /**
+     * 主线程在本世界线程停止期间接管 tick 时调用（Server.checkTickUpdates 两个接管点）：
+     * 记录服务器时基；首次接管（域切换瞬间）统一重置全体实体 lastUpdate，避免跨域
+     * tickDiff 巨跳（age 一次性结算/实体被移出 updateEntities）。从未并行的世界为 no-op。
+     * <p>
+     * Called when the primary thread ticks this level while its thread is stopped: records the
+     * server-tick domain, and on the first takeover (domain switch) resets every entity's
+     * lastUpdate so the first cross-domain tickDiff stays ~1 instead of jumping by the drift.
+     * No-op for levels that never ran a thread.
+     */
+    public void noteMainThreadTakeoverTick(long serverTick) {
+        if (this.gameLoop == null || serverTick <= this.mainThreadTakeoverTick) {
+            return;
+        }
+        boolean firstTakeover = this.mainThreadTakeoverTick == 0L;
+        this.mainThreadTakeoverTick = serverTick;
+        if (firstTakeover) {
+            for (Entity entity : this.getEntities()) {
+                entity.resetLastUpdate(serverTick);
+            }
+        }
+    }
+
+    /**
      * @return elapsed nanoseconds if tick executed, or -1 if skipped (tick rate limiting)
      */
     private long levelThreadTick(int currentTick, long startNanos) {
@@ -917,7 +1000,7 @@ public class Level implements ChunkManager, Metadatable {
 
         // Handle player chunk network on level thread to avoid concurrent chunk state modification
         for (Player player : new ArrayList<>(this.getPlayers().values())) {
-            // 出生初始化未收尾的玩家登录序列由主线程驱动（doFirstSpawn 尾部才发布接管）
+            // 出生初始化未收尾的玩家登录序列由主线程驱动（主线程收尾完成、publishSpawnInitCompleted 后才发布接管）
             if (!player.isSpawnInitCompleted()) {
                 continue;
             }
@@ -940,9 +1023,10 @@ public class Level implements ChunkManager, Metadatable {
         if (this.isTickRateLimited()) {
             return -1;
         }
-        if (this.tickRate > this.server.getBaseTickRate()) {
-            this.tickRateCounter = this.tickRate;
-        }
+        // 计数器重排与升/降速统一在下方 doTick 后的 autoTickRate 块内（master 语义）：
+        // autoTickRate 关闭时 master 从不重排计数器（限流退化），此前每刻无条件重排与其不等价
+        // Counter rearming and rate adjustment live in the autoTickRate block after doTick
+        // (master semantics); with autoTickRate off, master never arms the counter
 
         this.providerLock.readLock().lock();
         try {
@@ -954,6 +1038,10 @@ public class Level implements ChunkManager, Metadatable {
             this.doTick(currentTick);
             this.nextLevelThreadTick = currentTick + 1L;
             this.tickRateTime = (int) (System.currentTimeMillis() - start);
+            // autoTickRate 升/降速与 Server.checkTickUpdates 共用实现（master 语义：耗时回落时
+            // 自动把 tickRate 降回 baseTickRate 自愈，避免限流被永久保持）
+            // autoTickRate self-heal shared with Server.checkTickUpdates (master semantics)
+            this.adjustAutoTickRate(this.tickRateTime);
         } finally {
             this.providerLock.readLock().unlock();
         }
@@ -967,6 +1055,37 @@ public class Level implements ChunkManager, Metadatable {
      */
     boolean isTickRateLimited() {
         return this.tickRate > this.server.getBaseTickRate() && --this.tickRateCounter > 0;
+    }
+
+    /**
+     * master 的 autoTickRate 升/降速逻辑（Server.checkTickUpdates 原块），并行/非并行路径
+     * 共用同一实现防止两份拷贝漂移；调用方须已测得本世界本次 tick 耗时。
+     * <p>
+     * master's autoTickRate raise/lower logic, shared by the parallel and non-parallel
+     * paths so the two copies cannot drift; callers pass this level's measured tick time.
+     */
+    public void adjustAutoTickRate(int tickMs) {
+        if (!this.server.isAutoTickRate()) {
+            return;
+        }
+        if (tickMs < 50 && this.tickRate > this.server.getBaseTickRate()) {
+            int r;
+            this.setTickRate(r = this.tickRate - 1);
+            if (r > this.server.getBaseTickRate()) {
+                this.tickRateCounter = this.tickRate;
+            }
+            this.server.getLogger().debug("Raising level \"" + this.getName() + "\" tick rate to " + this.tickRate + " ticks");
+        } else if (tickMs >= 50) {
+            if (this.tickRate == this.server.getBaseTickRate()) {
+                this.setTickRate(Math.max(this.server.getBaseTickRate() + 1,
+                        Math.min(this.server.getAutoTickRateLimit(), tickMs / 50)));
+                this.server.getLogger().debug("Level \"" + this.getName() + "\" took " + tickMs + "ms, setting tick rate to " + this.tickRate + " ticks");
+            } else if ((tickMs / this.tickRate) >= 50 && this.tickRate < this.server.getAutoTickRateLimit()) {
+                this.setTickRate(this.tickRate + 1);
+                this.server.getLogger().debug("Level \"" + this.getName() + "\" took " + tickMs + "ms, setting tick rate to " + this.tickRate + " ticks");
+            }
+            this.tickRateCounter = this.tickRate;
+        }
     }
 
     // 置 intentionalStop 再停循环，onStop 才不会误报 "stopped unexpectedly"
@@ -992,12 +1111,27 @@ public class Level implements ChunkManager, Metadatable {
     public void addSyncPacketToQueue(Player player, DataPacket packet) {
         synchronized (lifecycleLock) {
             if (levelThreadAcceptingWork()) {
-                this.syncPacketQueue.offer(new SyncPacketEntry(player, packet));
-                if (this.gameLoop != null) this.gameLoop.wakeUp();
-                return;
+                if (this.syncPacketQueue.size() >= MAX_SYNC_PACKET_QUEUE_SIZE) {
+                    // 世界线程卡死（isAlive 但不消费）时防无界累积 OOM：回落主线程（等价 master 行为）
+                    // 限流告警，避免每包刷屏
+                    // Cap reached: the level thread is likely wedged (alive but not consuming).
+                    // Fall back to primary-thread handling (master-equivalent) instead of growing
+                    // the queue without bound; rate-limit the warning
+                    long now = System.currentTimeMillis();
+                    if (now - this.lastQueueCapLogMillis > 10_000L) {
+                        this.lastQueueCapLogMillis = now;
+                        server.getLogger().warning("Sync packet queue for world '" + this.getName()
+                                + "' is full (" + MAX_SYNC_PACKET_QUEUE_SIZE + "); level thread appears stuck, "
+                                + "falling back to primary-thread processing for player " + player.getName());
+                    }
+                } else {
+                    this.syncPacketQueue.offer(new SyncPacketEntry(player, packet));
+                    if (this.gameLoop != null) this.gameLoop.wakeUp();
+                    return;
+                }
             }
         }
-        // 未接纳（线程已死/停止中）：转主线程处理，此时主线程已接管该世界
+        // 未接纳（线程已死/停止中）或队列超限：转主线程处理，此时主线程已接管该世界
         runOrScheduleOnPrimary(() -> {
             try {
                 player.handleDataPacket(packet);
@@ -2325,20 +2459,38 @@ public class Level implements ChunkManager, Metadatable {
             return false;
         }
 
-        this.server.getPluginManager().callEvent(new LevelSaveEvent(this));
+        // 大世界全量落盘可远超 Watchdog 阈值：标记进行中，看门狗对存档中的世界线程不误报卡死
+        // A full save of a big world can far exceed the Watchdog threshold: mark it so
+        // the watchdog does not misreport a saving level thread as hung
+        this.saveInProgress = true;
+        try {
+            this.server.getPluginManager().callEvent(new LevelSaveEvent(this));
 
-        LevelProvider levelProvider = requireProvider();
-        levelProvider.setTime(this.time);
-        levelProvider.setRaining(this.raining);
-        levelProvider.setRainTime(this.rainTime);
-        levelProvider.setThundering(this.thundering);
-        levelProvider.setThunderTime(this.thunderTime);
-        levelProvider.setCurrentTick(this.levelCurrentTick);
-        levelProvider.setGameRules(this.gameRules);
-        this.saveChunks();
-        levelProvider.saveLevelData();
+            LevelProvider levelProvider = requireProvider();
+            levelProvider.setTime(this.time);
+            levelProvider.setRaining(this.raining);
+            levelProvider.setRainTime(this.rainTime);
+            levelProvider.setThundering(this.thundering);
+            levelProvider.setThunderTime(this.thunderTime);
+            levelProvider.setCurrentTick(this.levelCurrentTick);
+            levelProvider.setGameRules(this.gameRules);
+            this.saveChunks();
+            levelProvider.saveLevelData();
 
-        return true;
+            return true;
+        } finally {
+            this.saveInProgress = false;
+        }
+    }
+
+    /**
+     * 该世界是否正在世界线程上执行全量存档（供 Watchdog 区分合法长存档与卡死）。
+     * <p>
+     * Whether a full save is currently running on this level's thread (lets the
+     * Watchdog tell a legitimately long save apart from a hang).
+     */
+    public boolean isSaveInProgress() {
+        return this.saveInProgress;
     }
 
     public void saveChunks() {
@@ -4275,10 +4427,25 @@ public class Level implements ChunkManager, Metadatable {
      * Entry point for generation-task completion, hopped to the level thread when parallel-ticked.
      */
     public void handleGenerationCallback(int x, int z, BaseFullChunk chunk, boolean isPopulated) {
+        runGenerationCallbacks(() -> this.generateChunkCallback(x, z, chunk, isPopulated));
+    }
+
+    /**
+     * 多个生成回调须捆绑为单任务投递：逐个投递时世界线程可在邻居回调与中心回调之间
+     * 插入完整 tick，丢失 master 同线程连续执行的序列原子性（setChunk 不合并方块数据，
+     * 区块可被整块替换）。单个回调等价 {@link #handleGenerationCallback}。
+     * <p>
+     * Multiple generation callbacks must be bundled into one scheduled task: offered
+     * one by one, the level thread can run a full tick between the neighbour and center
+     * callbacks, losing master's same-thread sequence atomicity (setChunk does not merge
+     * block data; a chunk can be replaced wholesale). A single callback is equivalent to
+     * {@link #handleGenerationCallback}.
+     */
+    public void runGenerationCallbacks(Runnable callbacks) {
         if (isParallelTickEnabled()) {
-            scheduleSyncTask(() -> this.generateChunkCallback(x, z, chunk, isPopulated));
+            scheduleSyncTask(callbacks);
         } else {
-            this.generateChunkCallback(x, z, chunk, isPopulated);
+            callbacks.run();
         }
     }
 

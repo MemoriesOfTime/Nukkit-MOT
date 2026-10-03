@@ -55,14 +55,24 @@ public abstract class MetadataStore {
         }
     }
 
-    public synchronized void invalidateAll(Plugin owningPlugin) {
+    public void invalidateAll(Plugin owningPlugin) {
         if (owningPlugin == null) {
             throw new PluginException("Plugin cannot be null");
         }
-        for (Map value : this.metadataMap.values()) {
-            if (value.containsKey(owningPlugin)) {
-                ((MetadataValue) value.get(owningPlugin)).invalidate();
+        // 快照持锁、invalidate() 在锁外执行：它是插件可覆写的外来代码，持监视器调用存在死锁面
+        // Snapshot under the monitor, invoke invalidate() outside it: it is foreign,
+        // plugin-overridable code and must not run while holding this store's monitor
+        List<MetadataValue> toInvalidate = new ArrayList<>();
+        synchronized (this) {
+            for (Map value : this.metadataMap.values()) {
+                MetadataValue metadataValue = (MetadataValue) value.get(owningPlugin);
+                if (metadataValue != null) {
+                    toInvalidate.add(metadataValue);
+                }
             }
+        }
+        for (MetadataValue metadataValue : toInvalidate) {
+            metadataValue.invalidate();
         }
     }
 

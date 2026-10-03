@@ -1,7 +1,7 @@
 package cn.nukkit.entity;
 
-import cn.nukkit.AdventureSettings.Type;
 import cn.nukkit.AdventureSettings;
+import cn.nukkit.AdventureSettings.Type;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -2557,6 +2557,17 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
+    /**
+     * 时基域切换时重置 lastUpdate：跨世界 switchLevel 或世界线程停止/重启的域切换点调用，
+     * 避免双时基混算产生巨负/巨正 tickDiff（实体被移出 updateEntities 或 age 一次性结算）。
+     * <p>
+     * Resets lastUpdate at a time-base domain switch (cross-level switchLevel, or level
+     * thread stop/restart) so a mixed-domain tickDiff cannot freeze or fast-forward the entity.
+     */
+    public void resetLastUpdate(long tick) {
+        this.lastUpdate = (int) tick;
+    }
+
     public boolean isOnFire() {
         return this.fireTicks > 0;
     }
@@ -2812,6 +2823,9 @@ public abstract class Entity extends Location implements Metadatable {
         }
 
         this.setLevel(targetLevel);
+        // 跨世界后 lastUpdate 须换到目标世界时基（并行=GameLoop tick，否则服务器 tick），
+        // 否则源/目标两域计数漂移会令 tickDiff 恒负（实体停 tick）或巨正（age 跳变）
+        this.resetLastUpdate(targetLevel.getTickForEntityInit());
         this.level.addEntity(this);
         this.chunk = null;
 
@@ -3530,45 +3544,51 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setDataFlag(int propertyId, int id, boolean value, boolean send) {
-        if (this.getDataFlag(propertyId, id) != value) {
-            if (propertyId == EntityHuman.DATA_PLAYER_FLAGS) {
-                byte flags = (byte) this.getDataPropertyByte(propertyId);
-                flags ^= 1 << id;
-                this.setDataProperty(new ByteEntityData(propertyId, flags), send);
-            } else {
-                LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
-                long flags = longEntityData.getData() ^ 1L << id;
-                LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
-                if (propertyId == DATA_FLAGS) {
-                    long data291;
-                    long data223;
-                    long data137;
+        // 读-异或-写是复合操作：与 EntityMetadata 各方法同监视器（this.dataProperties）整体持锁，
+        // 并行 tick 下两线程翻转同一实体不同标志位不再丢更新
+        // The read-xor-write is compound: hold the same monitor as EntityMetadata's methods
+        // so two threads flipping different flags of one entity cannot lose updates
+        synchronized (this.dataProperties) {
+            if (this.getDataFlag(propertyId, id) != value) {
+                if (propertyId == EntityHuman.DATA_PLAYER_FLAGS) {
+                    byte flags = (byte) this.getDataPropertyByte(propertyId);
+                    flags ^= 1 << id;
+                    this.setDataProperty(new ByteEntityData(propertyId, flags), send);
+                } else {
+                    LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
+                    long flags = longEntityData.getData() ^ 1L << id;
+                    LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
+                    if (propertyId == DATA_FLAGS) {
+                        long data291;
+                        long data223;
+                        long data137;
 
-                    int id291 = id > 46 ? id - 1 : id;
-                    int id223 = id291 > 30 ? id291 - 1 : id291;
-                    int id137 = (id223 >= 23 && id223 < 43) || (id223 >= 46) ? id223 - 1 : id223;
+                        int id291 = id > 46 ? id - 1 : id;
+                        int id223 = id291 > 30 ? id291 - 1 : id291;
+                        int id137 = (id223 >= 23 && id223 < 43) || (id223 >= 46) ? id223 - 1 : id223;
 
-                    if (longEntityData.dataVersions != null && longEntityData.dataVersions.length == 3) {
-                        data291 = longEntityData.dataVersions[2];
-                        data223 = longEntityData.dataVersions[1];
-                        data137 = longEntityData.dataVersions[0];
-                    } else {
-                        data291 = 0L;
-                        data223 = 0L;
-                        data137 = 0L;
+                        if (longEntityData.dataVersions != null && longEntityData.dataVersions.length == 3) {
+                            data291 = longEntityData.dataVersions[2];
+                            data223 = longEntityData.dataVersions[1];
+                            data137 = longEntityData.dataVersions[0];
+                        } else {
+                            data291 = 0L;
+                            data223 = 0L;
+                            data137 = 0L;
+                        }
+
+                        newLongEntityData.dataVersions = new long[] {
+                                data137 ^ 1L << id137,
+                                data223 ^ 1L << id223,
+                                data291 ^ 1L << id291
+                        };
+                    } else if (propertyId == DATA_FLAGS_EXTENDED) {
+                        int id2 = id > 46 ? id - 1 : id;
+                        flags = longEntityData.dataVersions != null && longEntityData.dataVersions.length == 1 ? longEntityData.dataVersions[0] : 0L;
+                        newLongEntityData.dataVersions = new long[]{flags ^ 1L << id2};
                     }
-
-                    newLongEntityData.dataVersions = new long[] {
-                            data137 ^ 1L << id137,
-                            data223 ^ 1L << id223,
-                            data291 ^ 1L << id291
-                    };
-                } else if (propertyId == DATA_FLAGS_EXTENDED) {
-                    int id2 = id > 46 ? id - 1 : id;
-                    flags = longEntityData.dataVersions != null && longEntityData.dataVersions.length == 1 ? longEntityData.dataVersions[0] : 0L;
-                    newLongEntityData.dataVersions = new long[]{flags ^ 1L << id2};
+                    this.setDataProperty(newLongEntityData, send);
                 }
-                this.setDataProperty(newLongEntityData, send);
             }
         }
     }

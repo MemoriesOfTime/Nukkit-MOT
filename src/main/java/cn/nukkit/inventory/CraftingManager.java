@@ -21,11 +21,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -74,6 +70,11 @@ public class CraftingManager {
         }
     }
 
+    // 裸 ArrayDeque 的迭代/变更须持本对象监视器（并行 tick 下世界线程迭代与主线程插件
+    // registerRecipe/unregisterRecipe 并发会损坏队列结构）；getRecipes() 返回活引用，外部迭代同理
+    // Iteration and mutation of this bare ArrayDeque must hold its monitor (world-thread
+    // iteration races main-thread plugin register/unregister under parallel tick);
+    // getRecipes() hands out the live collection - external iteration follows the same rule
     public final Collection<Recipe> recipes = new ArrayDeque<>();
 
     private static BatchPacket packet313;
@@ -910,7 +911,11 @@ public class CraftingManager {
         CraftingDataPacket pk = new CraftingDataPacket();
         pk.protocol = protocol;
         pk.gameVersion = gameVersion;
-        for (Recipe recipe : this.getRecipes()) {
+        java.util.List<Recipe> snapshot;
+        synchronized (this.recipes) {
+            snapshot = new java.util.ArrayList<>(this.recipes);
+        }
+        for (Recipe recipe : snapshot) {
             if (recipe instanceof ShapedRecipe shapedRecipe) {
                 boolean isSupported = true;
                 for (Item item : shapedRecipe.getAllResults()) {
@@ -1375,6 +1380,14 @@ public class CraftingManager {
         return this.getSmithingRecipes();
     }
 
+    /**
+     * 返回内部配方表的活引用（master 语义）。迭代须持 {@code synchronized (recipes)} 监视器：
+     * 并行 tick 下世界线程迭代与插件 register/unregister 并发会损坏 ArrayDeque。
+     * <p>
+     * Returns the live recipe collection (master semantics). Iteration must hold the
+     * {@code synchronized (recipes)} monitor: under parallel tick, world-thread iteration
+     * racing plugin register/unregister corrupts the ArrayDeque.
+     */
     public Collection<Recipe> getRecipes() {
         return this.recipes;
     }
@@ -1555,7 +1568,9 @@ public class CraftingManager {
         } else if (recipe instanceof CraftingRecipe) {
             UUID id = Utils.dataToUUID(String.valueOf(++RECIPE_COUNT), String.valueOf(recipe.getResult().getId()), String.valueOf(recipe.getResult().getDamage()), String.valueOf(recipe.getResult().getCount()), Arrays.toString(recipe.getResult().getCompoundTag()));
             ((CraftingRecipe) recipe).setId(id);
-            this.recipes.add(recipe);
+            synchronized (this.recipes) {
+                this.recipes.add(recipe);
+            }
             if (recipe instanceof ShapedRecipe) {
                 this.registerShapedRecipe((ShapedRecipe) recipe);
             } else if (recipe instanceof ShapelessRecipe) {
@@ -1611,7 +1626,9 @@ public class CraftingManager {
         }
         boolean removed = false;
         if (recipe instanceof ShapedRecipe shapedRecipe) {
-            removed |= this.recipes.remove(recipe);
+            synchronized (this.recipes) {
+                removed |= this.recipes.remove(recipe);
+            }
             int resultHash = getItemHash(shapedRecipe.getResult());
             Map<UUID, ShapedRecipe> resultRecipes = this.shapedRecipes.get(resultHash);
             if (resultRecipes != null) {
@@ -1628,7 +1645,9 @@ public class CraftingManager {
             removed |= this.smithingRecipes.remove(hash, smithingRecipe);
             this.networkIdRecipes.remove(smithingRecipe.getNetworkId(), recipe);
         } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
-            removed |= this.recipes.remove(recipe);
+            synchronized (this.recipes) {
+                removed |= this.recipes.remove(recipe);
+            }
             int resultHash = getItemHash(shapelessRecipe.getResult());
             Map<UUID, ShapelessRecipe> resultRecipes = this.shapelessRecipes.get(resultHash);
             if (resultRecipes != null) {

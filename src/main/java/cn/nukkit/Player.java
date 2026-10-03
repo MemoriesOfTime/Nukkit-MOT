@@ -213,7 +213,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public boolean playedBefore;
     public volatile boolean spawned = false;
-    // doFirstSpawn 尾部才置位（晚于 spawned），世界线程据此接管 tick 与包路由
+    // 主线程出生收尾完成后由 publishSpawnInitCompleted 置位（晚于 spawned），世界线程据此接管 tick 与包路由
     private volatile boolean spawnInitCompleted = false;
     private final AtomicBoolean closeTeardownExecuted = new AtomicBoolean(false);
     // 登录期同步包延迟队列：入队与 doFirstSpawn 的排空/置位共用此锁，保持与出生后直达包的全序
@@ -241,6 +241,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int lastMovementVibrationZ = Integer.MIN_VALUE;
 
     protected int windowCnt = MINIMUM_OTHER_WINDOW_ID;
+
+    // 窗口/表单 ID 分配锁：包处理（世界线程）与插件 API（主线程）并发分配时保证唯一
+    // Lock for window/form id allocation across the world-thread packet path and main-thread plugin APIs
+    private final Object windowIdLock = new Object();
 
     protected final BiMap<Inventory, Integer> windows = Maps.synchronizedBiMap(HashBiMap.create());
     protected final BiMap<Integer, Inventory> windowIndex = windows.inverse();
@@ -1278,19 +1282,38 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private boolean levelThreadUnresponsive(CompletableFuture<Void> future, Level level) {
-        try {
-            future.get(10, TimeUnit.SECONDS);
-            return false;
-        } catch (TimeoutException e) {
-            this.server.getLogger().warning("Level thread for '" + level.getName() + "' still unresponsive after 15s; treating as stuck");
-            return true;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return true;
-        } catch (ExecutionException e) {
-            this.server.getLogger().logException(e.getCause());
-            return false;
+        // 进度感知：等待期间世界线程仍在推进（合法长 tick/大存档/GC 停顿/慢插件）时延长等待，
+        // 而不是一律按卡死停掉线程；连续无推进或持续忙而不完成才判定卡死
+        // Progress-aware: extend the wait while the level thread keeps ticking (legit long
+        // tick / big save / GC pause / slow plugin) instead of always stopping it as stuck;
+        // declare stuck only after sustained no-progress or never-completing busyness
+        long lastProgressMillis = level.getLevelThreadLastTickMillis();
+        for (int round = 0; round < 5; round++) {
+            try {
+                future.get(10, TimeUnit.SECONDS);
+                return false;
+            } catch (TimeoutException e) {
+                long nowProgress = level.getLevelThreadLastTickMillis();
+                if (nowProgress > lastProgressMillis) {
+                    lastProgressMillis = nowProgress;
+                    this.server.getLogger().warning("Level thread for '" + level.getName()
+                            + "' is still busy (ticks are progressing); extending the wait");
+                    continue;
+                }
+                this.server.getLogger().warning("Level thread for '" + level.getName()
+                        + "' still unresponsive after 15s with no tick progress; treating as stuck");
+                return true;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return true;
+            } catch (ExecutionException e) {
+                this.server.getLogger().logException(e.getCause());
+                return false;
+            }
         }
+        this.server.getLogger().warning("Level thread for '" + level.getName()
+                + "' keeps ticking but never completes the task; treating as stuck");
+        return true;
     }
 
     private void runAfterLevelThreadStops(Level level, String action, Runnable queuedAction) {
@@ -1507,6 +1530,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             if (protocol <= ProtocolInfo.v1_5_0) {
                 this.server.getPluginManager().callEvent(new PlayerLocallyInitializedEvent(this));
+                // 收尾（sendPlayStatus+事件）完成后才发布接管，世界线程不与主线程并发操作该玩家
+                // Publish the handover only after finalization so the level thread cannot
+                // race the primary thread's remaining work on this player
+                this.publishSpawnInitCompleted();
             }
         }
     }
@@ -1641,6 +1668,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
+        // 排空中处理的包可能触发 kick/close（拆除后 inventory 已置 null），后续收尾不得再执行
+        // A packet drained above may have kicked/closed this player (teardown nulls the
+        // inventory); none of the finalization below may run afterwards
+        if (this.closed) {
+            return;
+        }
+
         this.sendMovementSpeed();
 
         if (this.protocol < ProtocolInfo.v1_2_0) {
@@ -1701,7 +1735,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             });
         }
 
-        // 同上方 spawned 发布协议：排空出生体期间延迟到达的包后再置位，此后直达路由
+        // 同上方 spawned 发布协议：排空出生体期间延迟到达的包；接管发布（spawnInitCompleted）
+        // 延迟到调用方（现代协议=v282 处理器发完事件后、老协议=checkNetwork 收尾后），
+        // 避免主线程收尾工作与世界线程接管并发操作同一玩家
+        // Drain login-phase packets; the handover flag itself is published by the caller
+        // (modern: the v282 processor after its event; legacy: after checkNetwork finishes)
+        // so primary-thread finalization cannot race the level thread's takeover
+        this.drainPreSpawnPackets();
+    }
+
+    /**
+     * 发布出生接管：主线程对玩家的出生收尾（sendPlayStatus、PlayerLocallyInitializedEvent 等）
+     * 全部完成后再调用，此后世界线程才接管该玩家的 checkNetwork/包路由。自带排空-置位循环，
+     * 与延迟包队列保持全序。
+     * <p>
+     * Publish the spawn handover: call this only after the primary thread has finished all
+     * spawn finalization for the player (sendPlayStatus, PlayerLocallyInitializedEvent, ...);
+     * the level thread takes over checkNetwork/packet routing afterwards. Drains deferred
+     * packets before setting the flag to keep total ordering with the deferral queue.
+     * <p>
+     * 插件不应调用（内部时序协议的一部分）。Plugins must not call this.
+     */
+    public void publishSpawnInitCompleted() {
         while (true) {
             this.drainPreSpawnPackets();
             synchronized (this.preSpawnPacketLock) {
@@ -5369,7 +5424,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        int currentTick = this.server.getTick();
+        // 去重窗口 tick 取所属世界时基：世界线程的 drain 批次内该值恒定；此前读服务器 tick
+        // 会被主线程并发推进，同批次两次读取跨 tick 边界即清空去重集、重复执行同 id 请求
+        // Dedup-window tick uses the owning level's time base, which stays constant for a
+        // world-thread drain batch; the server tick can advance mid-batch (primary thread)
+        // and would clear the dedup set between two packets of the same batch
+        int currentTick = this.level != null ? (int) this.level.getTickForEntityInit() : this.server.getTick();
         if (this.processedItemStackRequestTick != currentTick) {
             this.processedItemStackRequestTick = currentTick;
             this.processedItemStackRequestIds.clear();
@@ -7154,7 +7214,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         AtomicBoolean saved = new AtomicBoolean(false);
         Runnable saveOnce = () -> {
-            if (!this.closed && saved.compareAndSet(false, true)) {
+            if (this.closed) {
+                // master 在此路径会抛异常并留日志；静默跳过会让断线存档丢失无从排查
+                // master surfaced this as a logged exception; skipping silently would make
+                // the lost disconnect save invisible
+                this.server.getLogger().warning("Skipping disconnect save for " + this.getName()
+                        + ": player already closed (progress since the last save is lost)");
+                return;
+            }
+            if (saved.compareAndSet(false, true)) {
                 this.save();
             }
         };
@@ -8140,7 +8208,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return form id to use in {@link PlayerFormRespondedEvent}
      */
     public int showFormWindow(FormWindow window) {
-        return showFormWindow(window, this.formWindowCount++);
+        return showFormWindow(window, nextFormWindowId());
+    }
+
+    /**
+     * 表单 ID 自增须与窗口 ID 同锁：主线程插件 API 与世界线程包处理并发自增会重号。
+     * <p>
+     * Form-id increment shares the window-id lock: concurrent increments from main-thread
+     * plugin APIs and world-thread packet handling would mint duplicate ids.
+     */
+    private int nextFormWindowId() {
+        synchronized (this.windowIdLock) {
+            return this.formWindowCount++;
+        }
     }
 
     /**
@@ -8213,7 +8293,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return form id to use in {@link PlayerFormRespondedEvent}
      */
     public int addServerSettings(FormWindow window) {
-        int id = this.formWindowCount++;
+        int id = nextFormWindowId();
 
         this.serverSettings.put(id, window);
         return id;
@@ -8318,16 +8398,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public int addWindow(Inventory inventory, Integer forceId, boolean isPermanent, boolean alwaysOpen) {
-        if (this.windows.containsKey(inventory)) {
-            return this.windows.get(inventory);
-        }
         int cnt;
-        if (forceId == null) {
-            this.windowCnt = cnt = Math.max(MINIMUM_OTHER_WINDOW_ID, ++this.windowCnt % 99);
-        } else {
-            cnt = forceId;
+        // 窗口 ID 分配为"检查-自增-写入"复合操作：包处理在世界线程、插件 API 在主线程，
+        // 并发进入会分配重复 ID 且 forcePut 静默驱逐同 ID 旧映射
+        // Window-id allocation is a check-then-increment-then-put compound: world-thread
+        // packet handling races main-thread plugin APIs and would mint duplicate ids
+        synchronized (this.windowIdLock) {
+            if (this.windows.containsKey(inventory)) {
+                return this.windows.get(inventory);
+            }
+            if (forceId == null) {
+                this.windowCnt = cnt = Math.max(MINIMUM_OTHER_WINDOW_ID, ++this.windowCnt % 99);
+            } else {
+                cnt = forceId;
+            }
+            this.windows.forcePut(inventory, cnt);
         }
-        this.windows.forcePut(inventory, cnt);
 
         if (isPermanent) {
             this.permanentWindows.add(cnt);

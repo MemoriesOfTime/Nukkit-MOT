@@ -33,6 +33,10 @@ public class GarbageCollectorCommand extends VanillaCommand {
         int entitiesCollected = 0;
         int tilesCollected = 0;
         long memory = Runtime.getRuntime().freeMemory();
+        // 超时跳过的世界：其统计不计入（任务在线程恢复后仍会执行），输出须明示而非静默计 0
+        // Levels skipped on timeout: their stats are excluded (the queued task still runs
+        // once the thread recovers); say so instead of silently reporting zeros
+        java.util.List<String> skippedLevels = new java.util.ArrayList<>();
 
         for (Level level : sender.getServer().getLevels().values()) {
             // 并行世界的区块卸载须在其世界线程执行，等待结果以保持统计准确
@@ -60,6 +64,7 @@ public class GarbageCollectorCommand extends VanillaCommand {
                     Thread.currentThread().interrupt();
                     sender.getServer().getLogger().warning("Interrupted while waiting for level GC; skipping GC for '"
                             + level.getName() + "' and remaining levels");
+                    skippedLevels.add(level.getName() + " (interrupted)");
                     break;
                 } catch (ExecutionException e) {
                     sender.getServer().getLogger().logException(e.getCause());
@@ -67,6 +72,7 @@ public class GarbageCollectorCommand extends VanillaCommand {
                     // GC 为维护性操作：超时放弃该世界本轮，排队任务在线程恢复后自行执行
                     sender.getServer().getLogger().error("Level thread for '" + level.getName()
                             + "' did not run garbage collection within 5s; skipping GC for this level");
+                    skippedLevels.add(level.getName());
                 }
             } else {
                 collection.run();
@@ -85,6 +91,10 @@ public class GarbageCollectorCommand extends VanillaCommand {
         sender.sendMessage(TextFormat.GOLD + "Entities: " + TextFormat.RED + entitiesCollected);
         sender.sendMessage(TextFormat.GOLD + "Block Entities: " + TextFormat.RED + tilesCollected);
         sender.sendMessage(TextFormat.GOLD + "Memory freed: " + TextFormat.RED + NukkitMath.round(freedMemory / 1024d / 1024d, 2) + " MB");
+        if (!skippedLevels.isEmpty()) {
+            sender.sendMessage(TextFormat.GOLD + "Skipped (level thread busy, GC runs there later): " + TextFormat.RED
+                    + String.join(", ", skippedLevels));
+        }
         return true;
     }
 }
