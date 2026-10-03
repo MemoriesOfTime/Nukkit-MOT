@@ -111,6 +111,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         try {
             LibDataChannelArchDetect.initialize();
         } catch (Throwable t) {
+            log.fatal(server.getLanguage().translateString("nukkit.nethernet.nativeInit.failed"));
             throw new IllegalStateException("Unable to initialize NetherNet: the native libdatachannel library may be missing for this platform", t);
         }
         NetherNetLogging.setNativeLogLevel("WARN");

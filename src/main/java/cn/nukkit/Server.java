@@ -1007,7 +1007,24 @@ public class Server {
         NetherNetSettings netherNetSettings = this.serverConfig != null
                 ? this.serverConfig.networkSettings().netherNetSettings() : null;
         if (netherNetSettings != null && netherNetSettings.enabled()) {
-            this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
+            try {
+                this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
+            } catch (Throwable t) {
+                // NetherNet 启动失败（原生库缺失、端口配置错误等）按致命错误处理：提示根因与关闭方式后中止启动，
+                // 不带残缺的网络栈继续运行（与下方 defaultLevel 加载失败同路）
+                // A NetherNet startup failure (missing native lib, bad port config, ...) is fatal:
+                // report the root cause and the disable hint, then abort like a defaultLevel load failure
+                Throwable cause = t;
+                while (cause.getCause() != null) {
+                    cause = cause.getCause();
+                }
+                this.getLogger().emergency(this.baseLang.translateString("nukkit.nethernet.startFailed",
+                        cause.getMessage() != null ? cause.getMessage() : cause.toString()));
+                this.getLogger().emergency(this.baseLang.translateString("nukkit.nethernet.startFailed.hint"));
+                log.debug("NetherNet startup aborted", t);
+                this.forceShutdown();
+                return;
+            }
         }
 
         EntityProperty.init();
