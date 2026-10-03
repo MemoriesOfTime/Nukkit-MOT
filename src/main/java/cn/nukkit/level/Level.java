@@ -73,7 +73,10 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import it.unimi.dsi.fastutil.ints.*;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.*;
 import lombok.AllArgsConstructor;
@@ -908,7 +911,7 @@ public class Level implements ChunkManager, Metadatable {
 
         // 快速路径：世界已关闭时直接停循环
         if (this.getProvider() == null) {
-            this.gameLoop.stop();
+            this.stopGameLoopIntentionally();
             return -1;
         }
 
@@ -932,18 +935,19 @@ public class Level implements ChunkManager, Metadatable {
             return -1;
         }
 
-        // Tick rate limiting
-        if (this.tickRate > 1 && --this.tickRateCounter > 0) {
+        // Tick rate limiting（门槛对齐 Server.checkTickUpdates 的 tickRate > baseTickRate，
+        // base-tick-rate > 1 时并行/非并行世界行为一致）
+        if (this.isTickRateLimited()) {
             return -1;
         }
-        if (this.tickRate > 1) {
+        if (this.tickRate > this.server.getBaseTickRate()) {
             this.tickRateCounter = this.tickRate;
         }
 
         this.providerLock.readLock().lock();
         try {
             if (this.getProvider() == null) {
-                this.gameLoop.stop();
+                this.stopGameLoopIntentionally();
                 return -1;
             }
             long start = System.currentTimeMillis();
@@ -954,6 +958,24 @@ public class Level implements ChunkManager, Metadatable {
             this.providerLock.readLock().unlock();
         }
         return System.nanoTime() - startNanos;
+    }
+
+    /**
+     * 限流判定与非并行路径（Server.checkTickUpdates）共用同一门槛：tickRate > baseTickRate。
+     * <p>
+     * Uses the same gate as the non-parallel path so both agree when base-tick-rate is configured above 1.
+     */
+    boolean isTickRateLimited() {
+        return this.tickRate > this.server.getBaseTickRate() && --this.tickRateCounter > 0;
+    }
+
+    // 置 intentionalStop 再停循环，onStop 才不会误报 "stopped unexpectedly"
+    private void stopGameLoopIntentionally() {
+        AtomicBoolean intentionalStop = this.currentIntentionalStop;
+        if (intentionalStop != null) {
+            intentionalStop.set(true);
+        }
+        this.gameLoop.stop();
     }
 
     private void processScheduledTasks() {

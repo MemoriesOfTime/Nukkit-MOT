@@ -73,6 +73,7 @@ public final class GameLoop {
                 } else {
                     // Skipped or errored tick - still account for actual elapsed time
                     nanoSleepTime += idealNanoPerTick - (System.nanoTime() - startTime);
+                    recordSkippedTick();
                 }
                 // Limit catch-up to 1 tick to prevent burst after lag spikes
                 nanoSleepTime = Math.max(nanoSleepTime, -idealNanoPerTick);
@@ -118,18 +119,24 @@ public final class GameLoop {
     }
 
     public float getTPS() {
+        // 从 ringIndex（volatile）起按时间序读：volatile 读与 updateMSPT 的写配对，使已完成的环形槽位对本线程可见
+        // Volatile read of ringIndex pairs with updateMSPT's write so completed slots are visible
+        int oldest = this.ringIndex;
         float sum = 0;
         int count = 0;
-        for (float t : tickSummary) {
+        for (int i = 0; i < tickSummary.length; i++) {
+            float t = tickSummary[(oldest + i) % tickSummary.length];
             if (t > 0) { sum += t; count++; }
         }
         return count > 0 ? sum / count : 0;
     }
 
     public float getMSPT() {
+        int oldest = this.ringIndex;
         float sum = 0;
         int count = 0;
-        for (float m : msptSummary) {
+        for (int i = 0; i < msptSummary.length; i++) {
+            float m = msptSummary[(oldest + i) % msptSummary.length];
             if (m > 0) { sum += m; count++; }
         }
         return count > 0 ? sum / count : 0;
@@ -147,6 +154,14 @@ public final class GameLoop {
 
     private void updateMSPT(long timeTakenNanos) {
         msptSummary[ringIndex] = timeTakenNanos / 1_000_000f;
+        ringIndex = (ringIndex + 1) % tickSummary.length;
+    }
+
+    // 跳过/异常刻记零并推进环：停跳期间旧样本会被逐槽冲掉，而不是滞留在均值窗口里
+    // Skipped ticks age stale samples out of the window instead of leaving them in the average
+    private void recordSkippedTick() {
+        tickSummary[ringIndex] = 0;
+        msptSummary[ringIndex] = 0;
         ringIndex = (ringIndex + 1) % tickSummary.length;
     }
 

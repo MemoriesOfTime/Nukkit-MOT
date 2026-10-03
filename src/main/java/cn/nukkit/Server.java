@@ -1670,8 +1670,15 @@ public class Server {
 
             // 先停世界线程再关玩家/插件（player.close 含存档）
             this.levelThreadsStartAllowed = false;
+            // 并发停止（join 各自有界 5s，与 /reload 同策略），避免 N 个卡死世界串行 N×5s 拖延关服
+            List<CompletableFuture<java.lang.Void>> stops = new ArrayList<>();
             for (Level level : this.levelArray) {
-                level.stopLevelThread();
+                stops.add(CompletableFuture.runAsync(level::stopLevelThread));
+            }
+            try {
+                CompletableFuture.allOf(stops.toArray(new CompletableFuture[0])).get(35, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                log.error("Timed out or failed stopping level threads during shutdown; continuing", e);
             }
 
             if (this.holdWorldSave) {
@@ -2459,6 +2466,10 @@ public class Server {
      */
     public int getTick() {
         return tickCounter;
+    }
+
+    public int getBaseTickRate() {
+        return baseTickRate;
     }
 
     /**
