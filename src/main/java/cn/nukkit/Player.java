@@ -3110,8 +3110,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public boolean onUpdate(int currentTick) {
-        if (!this.loggedIn || !this.spawnInitCompleted) {
-            // 出生收尾前不 tick（doFirstSpawn 仍在主线程）；lastUpdate 照常推进，防止收尾后首个 tickDiff 累积烧掉按刻状态
+        if (!this.loggedIn) {
+            return false;
+        }
+
+        // Parallel mode only: spawn finalization runs on the primary thread, so the level thread
+        // must not tick the player until handover; advance lastUpdate to avoid a huge first tickDiff
+        if (this.level != null && this.level.isParallelTickEnabled() && !this.spawnInitCompleted) {
             this.lastUpdate = currentTick;
             return true;
         }
