@@ -38,6 +38,9 @@ public class LevelDBChunkSection implements ChunkSection {
     protected final int y;
     protected StateBlockStorage[] storages;
 
+    // Positive-only memo: extra work is safe; a newly added plant must never be missed.
+    private volatile boolean randomTickBlocksSeen;
+
 
     protected byte[] blockLight;
     protected byte[] skyLight;
@@ -758,6 +761,26 @@ public class LevelDBChunkSection implements ChunkSection {
 
     public StateBlockStorage[] getStorages() {
         return storages;
+    }
+
+    @Override
+    public boolean mayHaveRandomTickBlocks() {
+        if (this.randomTickBlocksSeen) {
+            return true;
+        }
+        // A busy writer is not evidence of an inert section; use the usual samples.
+        if (!this.readLock.tryLock()) {
+            return true;
+        }
+        try {
+            if (this.hasLayerUnsafe(0) && this.storages[0].mayHaveRandomTickBlocks()) {
+                this.randomTickBlocksSeen = true;
+                return true;
+            }
+            return false;
+        } finally {
+            this.readLock.unlock();
+        }
     }
 
     @Override
