@@ -14,6 +14,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.TaskHandler;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
@@ -29,7 +30,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 import java.util.regex.Matcher;
@@ -63,10 +63,9 @@ public class Anvil2LevelDBConverter {
         this.targetLevel.isBeingConverted = true;
 
         // DO NOT INCREASE THREAD COUNT
-        ThreadFactory virtualFactory = Thread.ofVirtual()
-                .name("Converter Thread " + sourceLevel.getFolderName() + " #", 0)
-                .factory();
-        this.executor = Executors.newSingleThreadExecutor(virtualFactory);
+        this.executor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
+                .setNameFormat("Converted Thread " + sourceLevel.getFolderName() + " - %s")
+                .build());
     }
 
     public CompletableFuture<Void> convert() {

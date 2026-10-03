@@ -324,12 +324,12 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
-    public void setBiome(int x, int y, int z, cn.nukkit.level.biome.Biome biome) {
+    public void setBiome(int x, int y, int z, Biome biome) {
         this.setBiomeId(x, y, z, biome.getId());
     }
 
     @Override
-    public void setBiome(int x, int z, cn.nukkit.level.biome.Biome biome) {
+    public void setBiome(int x, int z, Biome biome) {
         setBiomeId(x, z, biome.getId());
     }
 
@@ -613,12 +613,12 @@ public class LevelDBChunk extends BaseChunk {
 
             for (BlockUpdateEntry entry : entries) {
                 CompoundTag entryNBT = new CompoundTag()
-                    .putString("i", entry.block.getSaveId())
-                    .putInt("x", entry.pos.getFloorX())
-                    .putInt("y", entry.pos.getFloorY())
-                    .putInt("z", entry.pos.getFloorZ())
-                    .putInt("t", (int) (entry.delay - totalTime))
-                    .putInt("p", entry.priority);
+                        .putString("i", entry.block.getSaveId())
+                        .putInt("x", entry.pos.getFloorX())
+                        .putInt("y", entry.pos.getFloorY())
+                        .putInt("z", entry.pos.getFloorZ())
+                        .putInt("t", (int) (entry.delay - totalTime))
+                        .putInt("p", entry.priority);
                 tileTickTag.add(entryNBT);
             }
 

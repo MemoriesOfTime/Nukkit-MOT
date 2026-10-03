@@ -594,16 +594,12 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public BaseFullChunk getLoadedChunk(long hash) {
-        synchronized (this.chunks) {
-            return this.chunks.get(hash);
-        }
+        return this.chunks.get(hash);
     }
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        synchronized (this.chunks) {
-            return ImmutableMap.copyOf(chunks);
-        }
+        return ImmutableMap.copyOf(chunks);
     }
 
     public Long2ObjectMap<? extends FullChunk> getLoadedChunksUnsafe() {
@@ -726,7 +722,6 @@ public class LevelDBProvider implements LevelProvider {
         if (chunk == null) {
             return false;
         }
-
         if (chunk instanceof LevelDBChunk levelDBChunk) {
             // async-chunks 同时控制保存。/ async-chunks also controls saving.
             if (Server.getInstance().asyncChunkSending) {
@@ -759,7 +754,6 @@ public class LevelDBProvider implements LevelProvider {
             return false;
         }
         this.chunks.remove(index, chunk);
-
         return true;
     }
 
@@ -1424,16 +1418,14 @@ public class LevelDBProvider implements LevelProvider {
     @Override
     public void setChunk(int chunkX, int chunkZ, FullChunk chunk) {
         if (!(chunk instanceof LevelDBChunk)) throw new IllegalArgumentException("Only LevelDB chunks are supported");
-
-        long index = Level.chunkHash(chunkX, chunkZ);
-
-        BaseFullChunk oldChunk = this.chunks.remove(index);
-        if (oldChunk != null && oldChunk != chunk) {
-            oldChunk.setProvider(null);
-        }
-
         chunk.setProvider(this);
         chunk.setPosition(chunkX, chunkZ);
+        long index = Level.chunkHash(chunkX, chunkZ);
+
+        FullChunk oldChunk = this.chunks.get(index);
+        if (oldChunk != null && !oldChunk.equals(chunk)) {
+            this.unloadChunk(chunkX, chunkZ, false);
+        }
         this.chunks.put(index, (LevelDBChunk) chunk);
     }
 
@@ -1511,7 +1503,7 @@ public class LevelDBProvider implements LevelProvider {
                 drained = this.executor.awaitTermination(this.closeDrainTimeoutMillis, TimeUnit.MILLISECONDS);
                 if (!drained) {
                     log.warn("LevelDB executor did not terminate in time, forcing shutdown for: {}", this.getName());
-                    java.util.List<Runnable> droppedTasks = this.executor.shutdownNow();
+                    List<Runnable> droppedTasks = this.executor.shutdownNow();
                     if (!droppedTasks.isEmpty()) {
                         log.warn("Dropped {} pending tasks during forced shutdown", droppedTasks.size());
                     }

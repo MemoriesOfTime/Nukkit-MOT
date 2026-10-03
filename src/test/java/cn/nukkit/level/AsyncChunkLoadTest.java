@@ -27,7 +27,6 @@ import java.util.concurrent.*;
  *
  * @author LT_Name
  */
-@Disabled("Skipping due to internal mock inconsistencies with Level loaders")
 public class AsyncChunkLoadTest {
 
     private Server server;

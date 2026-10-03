@@ -19,7 +19,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@Disabled("Skipping due to internal mock inconsistencies with Level loaders")
 class LevelChunkLoaderIndexTest {
     private final Level level = mock(Level.class);
 

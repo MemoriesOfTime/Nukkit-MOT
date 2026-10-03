@@ -22,7 +22,6 @@ import java.util.TreeMap;
  * - Gradle 依赖：从 libs.versions.toml 的 [libraries] 提取 module (groupId:artifactId) -> version
  * - 自动匹配并比较版本，完全一致
  */
-@Disabled()
 public class DependencyVersionConsistencyTest {
 
     @Test

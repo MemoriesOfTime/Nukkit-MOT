@@ -177,17 +177,10 @@ public class Anvil extends BaseLevelProvider {
                 if (!iter.hasNext()) break;
                 BaseFullChunk chunk = iter.next();
                 if (chunk == null) continue;
-
-                if (!level.isChunkInUse(chunk.getX(), chunk.getZ())) {
-                    if (chunk.hasChanged()) {
-                        this.saveChunk(chunk.getX(), chunk.getZ());
-                    }
-                    this.unloadChunk(chunk.getX(), chunk.getZ(), true);
-                } else if (chunk.isGenerated() && chunk.isPopulated() && chunk instanceof Chunk) {
+                if (chunk.isGenerated() && chunk.isPopulated() && chunk instanceof Chunk) {
                     chunk.compress();
+                    if (System.currentTimeMillis() - start >= time) break;
                 }
-
-                if (System.currentTimeMillis() - start >= time) break;
             }
         }
         lastPosition += i;
@@ -195,11 +188,6 @@ public class Anvil extends BaseLevelProvider {
 
     @Override
     public synchronized BaseFullChunk loadChunk(long index, int chunkX, int chunkZ, boolean create) {
-        BaseFullChunk existing = this.chunks.get(index);
-        if (existing != null) {
-            return existing;
-        }
-
         int regionX = getRegionIndexX(chunkX);
         int regionZ = getRegionIndexZ(chunkZ);
         BaseRegionLoader region = this.loadRegion(regionX, regionZ);
@@ -242,15 +230,15 @@ public class Anvil extends BaseLevelProvider {
     @Override
     public synchronized void saveChunk(int X, int Z) {
         BaseFullChunk chunk = this.getChunk(X, Z);
-        if (chunk != null && chunk.hasChanged()) {
+        if (chunk != null) {
             try {
                 this.loadRegion(X >> 5, Z >> 5).writeChunk(chunk);
-                chunk.setChanged(false);
             } catch (Exception e) {
                 throw new ChunkException("Error saving chunk (" + X + ", " + Z + ')', e);
             }
         }
     }
+
 
     @Override
     public synchronized void saveChunk(int x, int z, FullChunk chunk) {
