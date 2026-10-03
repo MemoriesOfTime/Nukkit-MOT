@@ -330,6 +330,301 @@ public class LevelDBPendingWriteTest {
     }
 
     @Test
+    public void autosaveGroupsDirtyChunksAndDoesNotRewriteCleanChunks() throws Exception {
+        Field field = LevelDBProvider.class.getDeclaredField("db");
+        field.setAccessible(true);
+        DB real = (DB) field.get(this.provider);
+        DB observed = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(real));
+        AtomicInteger writes = new AtomicInteger();
+        Mockito.doAnswer(call -> {
+            writes.incrementAndGet();
+            real.write(call.getArgument(0, WriteBatch.class));
+            return null;
+        }).when(observed).write(Mockito.any(WriteBatch.class));
+        field.set(this.provider, observed);
+        CountDownLatch release = this.pauseExecutor();
+        try {
+            for (int x = 0; x < 33; x++) this.newDirtyChunk(x, 70, BLOCK_A);
+            this.provider.saveChunks();
+            Assertions.assertEquals(33, this.provider.getPendingWriteCount());
+            Assertions.assertEquals(0, writes.get(), "snapshot stage must not write on caller");
+            release.countDown();
+            this.drainExecutor();
+            Assertions.assertEquals(3, writes.get(), "33 snapshots fit in 16 + 16 + 1 writes");
+            Assertions.assertEquals(0, this.provider.getPendingWriteCount());
+            for (int x = 0; x < 33; x++) Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(x, 70));
+            this.provider.saveChunks();
+            this.drainExecutor();
+            Assertions.assertEquals(3, writes.get(), "clean autosave must not write again");
+        } finally {
+            release.countDown();
+            this.drainExecutor();
+            field.set(this.provider, real);
+        }
+    }
+
+    @Test
+    public void failedGroupRetainsDirtySnapshotsUntilIndividualRetriesSucceed() throws Exception {
+        LevelDBChunk first = this.newDirtyChunk(1, 71, BLOCK_A);
+        LevelDBChunk second = this.newDirtyChunk(2, 71, BLOCK_B);
+        Field field = LevelDBProvider.class.getDeclaredField("db");
+        field.setAccessible(true);
+        DB real = (DB) field.get(this.provider);
+        DB observed = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(real));
+        AtomicInteger attempts = new AtomicInteger();
+        Mockito.doAnswer(call -> {
+            if (attempts.incrementAndGet() == 1) throw new DBException("group fault");
+            Assertions.assertTrue(first.hasChanged() || second.hasChanged(), "failed ACK must not clean both chunks");
+            real.write(call.getArgument(0, WriteBatch.class));
+            return null;
+        }).when(observed).write(Mockito.any(WriteBatch.class));
+        field.set(this.provider, observed);
+        CountDownLatch release = this.pauseExecutor();
+        try {
+            this.provider.saveChunks();
+            release.countDown();
+            this.drainExecutor();
+            Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(1, 71));
+            Assertions.assertEquals(BLOCK_B, this.readBlockFromDisk(2, 71));
+            Assertions.assertFalse(first.hasChanged());
+            Assertions.assertFalse(second.hasChanged());
+            Assertions.assertEquals(0, this.provider.getPendingWriteCount());
+        } finally {
+            release.countDown(); this.drainExecutor(); field.set(this.provider, real);
+        }
+    }
+
+    @Test
+    public void groupWriteErrorRestoresEveryDetachedSnapshotBeforeRethrowing() throws Exception {
+        this.assertGroupErrorRetainsSnapshots(false, false);
+    }
+
+    @Test
+    public void groupBatchCreationErrorRestoresEveryDetachedSnapshotBeforeRethrowing() throws Exception {
+        this.assertGroupErrorRetainsSnapshots(true, false);
+    }
+
+    @Test
+    public void capturedActorFallbackRetainsSnapshotsWhenNativeBatchCreationThrowsError() throws Exception {
+        this.assertGroupErrorRetainsSnapshots(true, true);
+    }
+
+    @Test
+    public void capturedActorFallbackRetainsSnapshotsWhenNativeWriteThrowsError() throws Exception {
+        this.assertGroupErrorRetainsSnapshots(false, true);
+    }
+
+    private void assertGroupErrorRetainsSnapshots(boolean failBatchCreation, boolean capturedFallback) throws Exception {
+        LevelDBChunk first = this.newDirtyChunk(1, 77, BLOCK_A);
+        LevelDBChunk second = this.newDirtyChunk(2, 77, BLOCK_B);
+        Field field = LevelDBProvider.class.getDeclaredField("db");
+        field.setAccessible(true);
+        DB real = (DB) field.get(this.provider);
+        DB observed = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(real));
+        AssertionError failure = new AssertionError("synthetic group worker error");
+        if (failBatchCreation) {
+            Mockito.doThrow(failure).when(observed).createWriteBatch();
+        } else {
+            Mockito.doThrow(failure).when(observed).write(Mockito.any(WriteBatch.class));
+        }
+        CountDownLatch release = this.pauseExecutor();
+        java.util.Map<Long, WriteBatch> captured = new java.util.LinkedHashMap<>();
+        try {
+            this.provider.saveChunks();
+            this.pendingWrites().forEach((hash, slot) -> captured.put(hash, slot.batch));
+            long firstHash = Level.chunkHash(1, 77);
+            if (capturedFallback) {
+                // Actor-bearing autosave snapshots intentionally use the individual writer.
+                byte[] actorKey = java.util.Arrays.copyOf(LevelDBKey.ACTOR_PREFIX, LevelDBKey.ACTOR_PREFIX.length + 8);
+                captured.get(firstHash).put(actorKey, new byte[]{1});
+                Assertions.assertFalse(((CapturedWriteBatch) captured.get(firstHash)).canGroup());
+            }
+            field.set(this.provider, observed);
+            var groupWrite = capturedFallback
+                    ? LevelDBProvider.class.getDeclaredMethod("commitPendingWrite", long.class)
+                    : LevelDBProvider.class.getDeclaredMethod("commitPendingWriteGroup", java.util.List.class);
+            groupWrite.setAccessible(true);
+            var thrown = Assertions.assertThrows(java.lang.reflect.InvocationTargetException.class,
+                    () -> groupWrite.invoke(this.provider, capturedFallback
+                            ? firstHash : new java.util.ArrayList<>(captured.keySet())));
+            Assertions.assertSame(failure, thrown.getCause());
+            Assertions.assertTrue(first.hasChanged());
+            Assertions.assertTrue(second.hasChanged());
+            for (var entry : captured.entrySet()) {
+                var pending = this.pendingWrites().get(entry.getKey());
+                Assertions.assertNotNull(pending);
+                Assertions.assertFalse(pending.writing, "an escaped Error must release every writing flag");
+                Assertions.assertSame(entry.getValue(), pending.batch, "failed snapshots must remain retryable");
+            }
+        } finally {
+            // Also permit baseline failure teardown: its detached snapshots would otherwise strand close().
+            for (var entry : captured.entrySet()) {
+                var pending = this.pendingWrites().get(entry.getKey());
+                if (pending != null && pending.batch == null) {
+                    pending.batch = entry.getValue();
+                    pending.writing = false;
+                }
+            }
+            field.set(this.provider, real);
+            release.countDown();
+            this.drainExecutor();
+        }
+        Assertions.assertEquals(0, this.provider.getPendingWriteCount());
+        Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(1, 77));
+        Assertions.assertEquals(BLOCK_B, this.readBlockFromDisk(2, 77));
+        Assertions.assertFalse(first.hasChanged());
+        Assertions.assertFalse(second.hasChanged());
+    }
+
+    private static class InterceptingSaveProvider extends LevelDBProvider {
+        int calls;
+        InterceptingSaveProvider(Level level, String path) throws java.io.IOException { super(level, path); }
+        @Override public void saveChunk(int x, int z, cn.nukkit.level.format.FullChunk chunk) { calls++; }
+    }
+
+    private static class InterceptingFutureProvider extends LevelDBProvider {
+        int calls;
+        InterceptingFutureProvider(Level level, String path) throws java.io.IOException { super(level, path); }
+        @Override public CompletableFuture<Void> saveChunkFuture(int x, int z, cn.nukkit.level.format.FullChunk chunk) {
+            calls++;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    @Test
+    public void autosaveHonorsProviderSaveChunkOverride() throws Exception {
+        this.provider.close();
+        var custom = new InterceptingSaveProvider(this.level, this.tempDir.toString());
+        this.provider = custom;
+        LevelDBChunk chunk = this.newDirtyChunk(1, 78, BLOCK_A);
+        custom.saveChunks();
+        Assertions.assertEquals(1, custom.calls);
+        Assertions.assertEquals(0, custom.getPendingWriteCount());
+        Assertions.assertTrue(chunk.hasChanged());
+    }
+
+    @Test
+    public void autosaveHonorsProviderSaveChunkFutureOverride() throws Exception {
+        this.provider.close();
+        var custom = new InterceptingFutureProvider(this.level, this.tempDir.toString());
+        this.provider = custom;
+        LevelDBChunk chunk = this.newDirtyChunk(1, 79, BLOCK_A);
+        custom.saveChunks();
+        Assertions.assertEquals(1, custom.calls);
+        Assertions.assertEquals(0, custom.getPendingWriteCount());
+        Assertions.assertTrue(chunk.hasChanged());
+    }
+
+    @Test
+    public void newerExplicitSnapshotWaitsBehindGroupAndWinsOnDisk() throws Exception {
+        LevelDBChunk first = this.newDirtyChunk(1, 72, BLOCK_A);
+        LevelDBChunk second = this.newDirtyChunk(2, 72, BLOCK_A);
+        Field field = LevelDBProvider.class.getDeclaredField("db");
+        field.setAccessible(true);
+        DB real = (DB) field.get(this.provider);
+        DB observed = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(real));
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger writes = new AtomicInteger();
+        Mockito.doAnswer(call -> {
+            if (writes.incrementAndGet() == 1) {
+                entered.countDown();
+                Assertions.assertTrue(release.await(5, TimeUnit.SECONDS));
+            }
+            real.write(call.getArgument(0, WriteBatch.class));
+            return null;
+        }).when(observed).write(Mockito.any(WriteBatch.class));
+        field.set(this.provider, observed);
+        try {
+            this.provider.saveChunks();
+            Assertions.assertTrue(entered.await(5, TimeUnit.SECONDS));
+            first.setBlock(0, 64, 0, BLOCK_B);
+            CompletableFuture<Void> ack = Assertions.assertTimeout(java.time.Duration.ofSeconds(1),
+                    () -> this.provider.saveChunkFuture(1, 72, first));
+            Assertions.assertFalse(ack.isDone());
+            Assertions.assertTrue(first.hasChanged());
+            release.countDown();
+            ack.get(10, TimeUnit.SECONDS);
+            this.drainExecutor();
+            Assertions.assertEquals(BLOCK_B, this.readBlockFromDisk(1, 72));
+            Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(2, 72));
+            Assertions.assertFalse(first.hasChanged());
+            Assertions.assertFalse(second.hasChanged());
+        } finally {
+            release.countDown(); this.drainExecutor(); field.set(this.provider, real);
+        }
+    }
+
+    @Test
+    public void serializationFailureStillSubmitsEarlierSnapshots() throws Exception {
+        this.newDirtyChunk(1, 74, BLOCK_A);
+        this.newDirtyChunk(2, 74, BLOCK_B);
+        var chunks = new java.util.ArrayList<>(this.provider.chunks.values());
+        LevelDBChunk valid = (LevelDBChunk) chunks.get(0);
+        LevelDBChunk broken = Mockito.spy((LevelDBChunk) chunks.get(1));
+        this.provider.setChunk(broken.getX(), broken.getZ(), broken);
+        Mockito.doThrow(new IllegalStateException("snapshot fault")).when(broken).prepareStorageSave();
+        Assertions.assertThrows(IllegalStateException.class, () -> this.provider.saveChunks());
+        this.drainExecutor();
+        Assertions.assertFalse(valid.hasChanged());
+        Assertions.assertEquals(valid.getBlockId(0, 64, 0), this.readBlockFromDisk(valid.getX(), valid.getZ()));
+        Assertions.assertTrue(broken.hasChanged());
+    }
+
+    @Test
+    public void configuredWorldBatchLimitAndOversizedChunksStillMakeProgress() throws Exception {
+        var settings = Server.getInstance().getServerConfig().worldSettings().worlds();
+        var entry = new cn.nukkit.utils.serverconfig.category.WorldEntry();
+        entry.saveBatchChunks(2);
+        entry.saveBatchBytes(65536);
+        var previous = settings.put("bounded-save-test", entry);
+        Mockito.when(this.level.getFolderName()).thenReturn("bounded-save-test");
+        Field field = LevelDBProvider.class.getDeclaredField("db");
+        field.setAccessible(true);
+        DB real = (DB) field.get(this.provider);
+        DB observed = Mockito.mock(DB.class, AdditionalAnswers.delegatesTo(real));
+        AtomicInteger writes = new AtomicInteger();
+        Mockito.doAnswer(call -> {
+            writes.incrementAndGet();
+            real.write(call.getArgument(0, WriteBatch.class));
+            return null;
+        }).when(observed).write(Mockito.any(WriteBatch.class));
+        field.set(this.provider, observed);
+        CountDownLatch release = this.pauseExecutor();
+        try {
+            for (int x = 0; x < 5; x++) this.newDirtyChunk(x, 75, BLOCK_A);
+            this.provider.saveChunks();
+            release.countDown();
+            this.drainExecutor();
+            Assertions.assertEquals(3, writes.get(), "configured 2 + 2 + 1 chunks");
+            writes.set(0);
+            release = this.pauseExecutor();
+            for (int x = 0; x < 3; x++) this.newDirtyChunk(x, 76, BLOCK_A);
+            this.provider.saveChunks();
+            // Emulate large immutable section payloads arriving before the worker claims them.
+            for (var pending : this.pendingWrites().values()) {
+                pending.batch.put(new byte[]{100, (byte) pending.changeSnapshot}, new byte[70000]);
+            }
+            release.countDown();
+            this.drainExecutor();
+            Assertions.assertEquals(3, writes.get(), "oversized single snapshots must not starve");
+            for (int x = 0; x < 3; x++) Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(x, 76));
+        } finally {
+            release.countDown(); this.drainExecutor(); field.set(this.provider, real);
+            if (previous == null) settings.remove("bounded-save-test");
+            else settings.put("bounded-save-test", previous);
+        }
+    }
+
+    @Test
+    public void shutdownDrainsGroupedSnapshots() throws Exception {
+        for (int x = 0; x < 19; x++) this.newDirtyChunk(x, 73, BLOCK_A);
+        this.provider.saveChunks();
+        this.provider.close();
+        this.provider = new LevelDBProvider(this.level, this.tempDir.toString());
+        for (int x = 0; x < 19; x++) Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(x, 73));
+    }
+
+    @Test
     public void unloadDirtyChunkPersistsWithoutBlockingAndDrains() throws Exception {
         this.newDirtyChunk(5, 7, BLOCK_A);
 
