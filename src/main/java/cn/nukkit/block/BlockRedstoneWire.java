@@ -296,8 +296,8 @@ public class BlockRedstoneWire extends BlockFlowable {
         Vector3 v = pos.getSide(side);
         Block block = this.level.getBlock(v);
         boolean flag = block.isNormalBlock();
-        boolean flag1 = this.level.getBlock(pos.up()).isNormalBlock();
-        return !flag1 && flag && canConnectUpwardsTo(this.level, v.up()) || (canConnectTo(block, side) || !flag && canConnectUpwardsTo(this.level, block.down()));
+        boolean flag1 = flag && this.level.getBlock(pos.up()).isNormalBlock();
+        return !flag1 && flag && canConnectUpwardsTo(this.level, v.up()) || (canConnectTo(block, side) || !flag && canConnectUpwardsTo(block.down()));
     }
 
     protected static boolean canConnectUpwardsTo(Level level, Vector3 pos) {
