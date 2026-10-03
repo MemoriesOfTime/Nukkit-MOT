@@ -1480,7 +1480,7 @@ public class LevelDBProvider implements LevelProvider {
             return null;
         }
 
-        this.chunks.put(hash, chunk);
+        this.chunks.put(Level.chunkHash(chunkX, chunkZ), chunk);
         return chunk;
     }
 

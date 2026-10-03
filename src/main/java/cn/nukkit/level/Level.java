@@ -573,7 +573,7 @@ public class Level implements ChunkManager, Metadatable {
         this.levelCurrentTick = levelProvider.getCurrentTick();
         this.updateQueue = new BlockUpdateScheduler(this, levelCurrentTick);
 
-        this.chunkTickRadius = Math.clamp(this.server.getServerConfig().chunkSettings().tickingRadius(), 1, this.server.getViewDistance());
+        this.chunkTickRadius = Math.min(this.server.getViewDistance(), Math.max(1, this.server.getServerConfig().chunkSettings().tickingRadius()));
         this.chunksPerTicks = this.server.getServerConfig().chunkSettings().tickingPerTick();
         this.chunkGenerationQueueSize = this.server.getServerConfig().chunkSettings().generationQueueSize();
         this.chunkPopulationQueueSize = this.server.getServerConfig().chunkSettings().generationPopulationQueueSize();
@@ -1166,7 +1166,7 @@ public class Level implements ChunkManager, Metadatable {
 
         Map<Integer, ChunkLoader> chunkLoadersIndex = this.chunkLoaders.get(index);
         if (chunkLoadersIndex != null) {
-            ChunkLoader oldLoader = chunkLoadersIndex.remove(hash);
+            ChunkLoader oldLoader = chunkLoadersIndex.remove(index);
             if (oldLoader != null) {
                 if (chunkLoadersIndex.isEmpty()) {
                     this.chunkLoaders.remove(index);
@@ -1175,8 +1175,10 @@ public class Level implements ChunkManager, Metadatable {
                     this.unloadChunkRequest(chunkX, chunkZ, true);
                 } else {
                     Map<Integer, Player> playerLoadersIndex = this.playerLoaders.get(index);
-                    playerLoadersIndex.remove(hash);
+                    playerLoadersIndex.remove(index);
                 }
+            }
+        }
 
         if (loader instanceof Player) {
             Map<Integer, Player> playerLoadersIndex = this.playerLoaders.get(index);

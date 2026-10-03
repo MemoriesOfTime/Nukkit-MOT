@@ -164,7 +164,7 @@ public class Server {
     private float maxUse = 0;
 
     private final NukkitConsole console;
-    private final Thread consoleThread;
+    private final ConsoleThread consoleThread;
 
     private final SimpleCommandMap commandMap;
     private final CraftingManager craftingManager;
@@ -4149,6 +4149,13 @@ public class Server {
             } else {
                 getInstance().getLogger().warning("Default " + action + " used by a plugin. This can cause instability with the multiversion.");
             }
+        }
+    }
+
+    private class ConsoleThread extends Thread implements InterruptibleThread {
+        @Override
+        public void run() {
+            console.start();
         }
     }
 
