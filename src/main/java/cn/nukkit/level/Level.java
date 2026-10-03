@@ -1766,7 +1766,7 @@ public class Level implements ChunkManager, Metadatable {
             final boolean doRandomTick = this.randomTickingEnabled();
             final int randomTickSpeed = doRandomTick ? gameRules.getInteger(GameRule.RANDOM_TICK_SPEED) : 0;
 
-            ObjectIterator<Long2IntMap.Entry> iter = chunkTickList.long2IntEntrySet().iterator();
+            ObjectIterator<Long2IntMap.Entry> iter = Long2IntMaps.fastIterator(chunkTickList);
             while (iter.hasNext()) {
                 Long2IntMap.Entry entry = iter.next();
                 long index = entry.getLongKey();
