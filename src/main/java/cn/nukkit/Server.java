@@ -513,6 +513,7 @@ public class Server {
      * Player data is saved by player uuid instead of by player name.
      */
     public boolean savePlayerDataByUuid;
+    public boolean experiencePickupEvent = true;
     /**
      * More vanilla like portal logics enabled.
      */
@@ -4071,6 +4072,7 @@ public class Server {
         // Player
         this.shouldSavePlayerData = config.playerSettings().savePlayerData();
         this.savePlayerDataByUuid = config.playerSettings().savePlayerDataByUuid();
+        this.experiencePickupEvent = config.playerSettings().experiencePickupEvent();
         this.personaSkins = config.playerSettings().personaSkins();
         this.skinChangeCooldown = config.playerSettings().skinChangeCooldown();
         this.doNotLimitSkinGeometry = config.playerSettings().doNotLimitSkinGeometry();
