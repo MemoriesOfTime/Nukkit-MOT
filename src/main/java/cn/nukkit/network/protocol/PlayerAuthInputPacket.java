@@ -2,19 +2,14 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.inventory.transaction.data.UseItemData;
-import cn.nukkit.math.Vector2;
-import cn.nukkit.math.Vector2f;
-import cn.nukkit.math.Vector3f;
+import cn.nukkit.math.*;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @ToString
 @Setter
@@ -44,9 +39,40 @@ public class PlayerAuthInputPacket extends DataPacket {
      */
     @OnlyNetEase
     private boolean cameraDeparted;
+    /**
+     * 网易尾部块（v1_21_50 起追加于 rawMoveVector 之后）。
+     * <p>
+     * NetEase tail block, appended after rawMoveVector since v1_21_50.
+     */
+    @OnlyNetEase
+    private boolean thirdPersonPerspective;
+    /**
+     * netease only, see {@link #thirdPersonPerspective}
+     */
+    @OnlyNetEase
+    private Vector2f playerRotationToCamera;
+    /**
+     * netease only, see {@link #thirdPersonPerspective}
+     */
+    @OnlyNetEase
+    private boolean readyPosDeltaDirty;
+    /**
+     * netease only, see {@link #thirdPersonPerspective}
+     */
+    @OnlyNetEase
+    private boolean onGround;
+    /**
+     * netease only, see {@link #thirdPersonPerspective}
+     */
+    @OnlyNetEase
+    private byte resetPosition;
     private InventoryTransactionPacket itemUseTransaction;
     private ItemStackRequest itemStackRequest;
     private Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
+    /** All decoded actions in wire order; the legacy map can retain only the last of each type. */
+    private final List<PlayerBlockActionData> decodedBlockActions = new ArrayList<>();
+    @Getter(lombok.AccessLevel.NONE)
+    private final Map<PlayerActionType, PlayerBlockActionData> decodedBlockActionSnapshot = new EnumMap<>(PlayerActionType.class);
     /**
      * @since v748
      */
@@ -92,33 +118,52 @@ public class PlayerAuthInputPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.blockActionData.clear();
+        this.decodedBlockActions.clear();
+        this.decodedBlockActionSnapshot.clear();
         this.pitch = this.getLFloat();
         this.yaw = this.getLFloat();
         this.position = this.getVector3f();
         this.motion = new Vector2(this.getLFloat(), this.getLFloat());
         this.headYaw = this.getLFloat();
 
-        long inputData = this.getUnsignedVarLong();
-        int netEaseExtraInputFlags = this.getNetEaseExtraInputFlags();
-        int firstNetEaseOnlyInputOrdinal = AuthInputAction.RECEIVED_SERVER_DATA.ordinal();
-        int firstShiftedInputOrdinal = firstNetEaseOnlyInputOrdinal + netEaseExtraInputFlags;
-        for (int i = 0; i < Math.min(AuthInputAction.size(), Long.SIZE); i++) {
-            int offset = 0;
-            if (netEaseExtraInputFlags > 0 && i >= firstNetEaseOnlyInputOrdinal) {
-                if (i < firstShiftedInputOrdinal) {
-                    continue;
-                }
-                offset = -netEaseExtraInputFlags;
+        boolean v2168 = this.protocol >= ProtocolInfo.v1_26_40;
+        boolean v2192 = this.protocol >= ProtocolInfo.v1_26_50_27;
+        if (v2168) {
+            if (!v2192) {
+                this.getBoolean(); // v2168~v2169 外层 true，丢弃；v2192 起移除 / outer true, discarded; removed in v2192
             }
-            if ((inputData & (1L << i)) != 0) {
-                this.inputData.add(AuthInputAction.from(i + offset));
+            int count = (int) this.getUnsignedVarInt();
+            for (int i = 0; i < Math.min(count, 256); i++) {
+                int ordinal = this.getVarInt();
+                if (ordinal >= 0 && ordinal < AuthInputAction.size()) {
+                    this.inputData.add(AuthInputAction.from(ordinal));
+                }
+            }
+        } else {
+            long inputData = this.getUnsignedVarLong();
+            int netEaseExtraInputFlags = this.getNetEaseExtraInputFlags();
+            int firstNetEaseOnlyInputOrdinal = AuthInputAction.RECEIVED_SERVER_DATA.ordinal();
+            int firstShiftedInputOrdinal = firstNetEaseOnlyInputOrdinal + netEaseExtraInputFlags;
+            for (int i = 0; i < Math.min(AuthInputAction.size(), Long.SIZE); i++) {
+                int offset = 0;
+                if (netEaseExtraInputFlags > 0 && i >= firstNetEaseOnlyInputOrdinal) {
+                    if (i < firstShiftedInputOrdinal) {
+                        continue;
+                    }
+                    offset = -netEaseExtraInputFlags;
+                }
+                if ((inputData & (1L << i)) != 0) {
+                    this.inputData.add(AuthInputAction.from(i + offset));
+                }
             }
         }
 
         this.inputMode = InputMode.fromOrdinal((int) this.getUnsignedVarInt());
         this.playMode = ClientPlayMode.fromOrdinal((int) this.getUnsignedVarInt());
         if (this.protocol >= ProtocolInfo.v1_19_0_29) {
-            this.interactionModel = AuthInteractionModel.fromOrdinal((int) this.getUnsignedVarInt());
+            // v2168: 改为有符号 VarInt（zigzag）/ v2168 uses signed (zigzag) VarInt
+            this.interactionModel = AuthInteractionModel.fromOrdinal(v2168 ? this.getVarInt() : (int) this.getUnsignedVarInt());
         }
 
         if (protocol >= ProtocolInfo.v1_21_40) {
@@ -136,43 +181,56 @@ public class PlayerAuthInputPacket extends DataPacket {
             this.cameraDeparted = this.getBoolean();
         }
 
-        if (this.inputData.contains(AuthInputAction.PERFORM_ITEM_INTERACTION)) {
-            this.itemUseTransaction = this.readItemUseTransaction();
-        }
-
-        if (this.inputData.contains(AuthInputAction.PERFORM_ITEM_STACK_REQUEST)) {
-            this.itemStackRequest = this.readItemStackRequest(this.gameVersion);
-        }
-
-        if (this.inputData.contains(AuthInputAction.PERFORM_BLOCK_ACTIONS)) {
-            int arraySize = this.getVarInt();
-            if (arraySize > 256) {
-                throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
+        if (v2168) {
+            // v2192 起各可选段仅一个 bool（v2168~v2169 为恒 true 外层 + 内层双 bool）
+            // Since v2192 each optional section has a single bool (v2168~v2169 used a constant outer + inner bool pair)
+            if (this.optSectionPresent(v2192)) {
+                this.itemUseTransaction = this.readItemUseTransaction();
             }
-            for (int i = 0; i < arraySize; i++) {
-                PlayerActionType type = PlayerActionType.from(this.getVarInt());
-                switch (type) {
-                    case START_DESTROY_BLOCK:
-                    case ABORT_DESTROY_BLOCK:
-                    case CRACK_BLOCK:
-                    case PREDICT_DESTROY_BLOCK:
-                    case CONTINUE_DESTROY_BLOCK:
-                        this.blockActionData.put(type, new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
-                        break;
-                    default:
-                        this.blockActionData.put(type, new PlayerBlockActionData(type, null, -1));
+            if (this.optSectionPresent(v2192)) {
+                this.itemStackRequest = this.readItemStackRequest(this.gameVersion);
+            }
+            if (this.optSectionPresent(v2192)) {
+                int arraySize = (int) this.getUnsignedVarInt();
+                if (arraySize > 256) {
+                    throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
+                }
+                this.decodeBlockActions(arraySize, true);
+            }
+            if (this.optSectionPresent(v2192)) {
+                this.vehicleRotation = this.getVector2f();
+            }
+            if (this.optSectionPresent(v2192)) {
+                this.predictedVehicle = this.getVarLong();
+            }
+        } else {
+            if (this.inputData.contains(AuthInputAction.PERFORM_ITEM_INTERACTION)) {
+                this.itemUseTransaction = this.readItemUseTransaction();
+            }
+
+            if (this.inputData.contains(AuthInputAction.PERFORM_ITEM_STACK_REQUEST)) {
+                this.itemStackRequest = this.readItemStackRequest(this.gameVersion);
+            }
+
+            if (this.inputData.contains(AuthInputAction.PERFORM_BLOCK_ACTIONS)) {
+                int arraySize = this.getVarInt();
+                if (arraySize > 256) {
+                    throw new IllegalArgumentException("PlayerAuthInputPacket PERFORM_BLOCK_ACTIONS is too long: " + arraySize);
+                }
+                this.decodeBlockActions(arraySize, false);
+            }
+
+            if (protocol >= ProtocolInfo.v1_19_70_24) {
+                if (protocol >= ProtocolInfo.v1_20_60 && this.inputData.contains(AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE)) {
+                    if (protocol >= ProtocolInfo.v1_20_70) {
+                        this.vehicleRotation = this.getVector2f();
+                    }
+                    this.predictedVehicle = this.getVarLong();
                 }
             }
         }
 
         if (protocol >= ProtocolInfo.v1_19_70_24) {
-            if (protocol >= ProtocolInfo.v1_20_60 && this.inputData.contains(AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE)) {
-                if (protocol >= ProtocolInfo.v1_20_70) {
-                    this.vehicleRotation = this.getVector2f();
-                }
-                this.predictedVehicle = this.getVarLong();
-            }
-
             this.analogMoveVector = this.getVector2f();
 
             if (protocol >= ProtocolInfo.v1_21_40) {
@@ -182,6 +240,97 @@ public class PlayerAuthInputPacket extends DataPacket {
                 this.rawMoveVector = this.getVector2f();
             }
         }
+
+        if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_50 && !v2168) {
+            // fixed NetEase tail block; skipping it desynchronizes the stream
+            this.thirdPersonPerspective = this.getBoolean();
+            this.playerRotationToCamera = this.getVector2f();
+            this.readyPosDeltaDirty = this.getBoolean();
+            this.onGround = this.getBoolean();
+            this.resetPosition = (byte) this.getByte();
+        }
+    }
+
+    /**
+     * v2192 起可选段仅一个存在性 bool；v2168~v2169 为「恒 true 外层 + 内层」双 bool。
+     * <p>
+     * Since v2192 an optional section carries a single presence bool; v2168~v2169 used a
+     * constant-true outer bool plus an inner bool.
+     */
+    private boolean optSectionPresent(boolean v2192) {
+        return v2192 ? this.getBoolean() : this.getBoolean() && this.getBoolean();
+    }
+
+    /**
+     * v2168 起每条 block action 固定为 action+position+face（与类型无关）；pre-v2168 仅 5 种动作带 position+face。
+     * <p>
+     * From v2168 every block action is action+position+face unconditionally; pre-v2168 only 5 action types carry them.
+     *
+     * @param unconditional v2168+ 传 true，每条动作都读取 position+face / true for v2168+: read position+face per action
+     */
+    private void decodeBlockActions(int arraySize, boolean unconditional) {
+        for (int i = 0; i < arraySize; i++) {
+            PlayerActionType type = PlayerActionType.fromOrNull(this.getVarInt());
+            if (unconditional) {
+                // v2168+: position+face 总是存在 / always present
+                BlockVector3 position = this.getSignedBlockPosition();
+                int facing = this.getVarInt();
+                if (type == null) {
+                    continue;
+                }
+                this.addDecodedBlockAction(new PlayerBlockActionData(type, position, facing));
+            } else {
+                // pre-v2168: 仅 5 种动作携带 position+face / only 5 action types carry position+face
+                if (type == null) {
+                    continue;
+                }
+                switch (type) {
+                    case START_DESTROY_BLOCK:
+                    case ABORT_DESTROY_BLOCK:
+                    case CRACK_BLOCK:
+                    case PREDICT_DESTROY_BLOCK:
+                    case CONTINUE_DESTROY_BLOCK:
+                        this.addDecodedBlockAction(new PlayerBlockActionData(type, this.getSignedBlockPosition(), this.getVarInt()));
+                        break;
+                    default:
+                        this.addDecodedBlockAction(new PlayerBlockActionData(type, null, -1));
+                }
+            }
+        }
+        // Packet listeners may mutate the legacy map, its actions or their coordinates.
+        // Preserve those filters instead of replaying an unfiltered decoded sequence.
+        this.blockActionData.forEach((type, action) ->
+                this.decodedBlockActionSnapshot.put(type, copyBlockAction(action)));
+    }
+
+    /**
+     * Returns a read-only snapshot of the decoded sequence for replay, or an empty list when a
+     * legacy map edit requires fallback. Snapshot actions and positions are defensive copies;
+     * packet listeners should use {@link #getBlockActionData()} or {@link #setBlockActionData(Map)}
+     * to filter or replace actions.
+     */
+    public List<PlayerBlockActionData> getDecodedBlockActions() {
+        return this.blockActionData.equals(this.decodedBlockActionSnapshot)
+                ? this.decodedBlockActions.stream().map(PlayerAuthInputPacket::copyBlockAction).toList()
+                : List.of();
+    }
+
+    private static PlayerBlockActionData copyBlockAction(PlayerBlockActionData action) {
+        BlockVector3 pos = action.getPosition();
+        return new PlayerBlockActionData(action.getAction(),
+                pos == null ? null : new BlockVector3(pos.x, pos.y, pos.z), action.getFacing());
+    }
+
+    private void addDecodedBlockAction(PlayerBlockActionData action) {
+        this.decodedBlockActions.add(action);
+        this.blockActionData.put(action.getAction(), action);
+    }
+
+    /** Replacing the legacy map explicitly also replaces the decoded action sequence. */
+    public void setBlockActionData(Map<PlayerActionType, PlayerBlockActionData> actions) {
+        this.decodedBlockActions.clear();
+        this.decodedBlockActionSnapshot.clear();
+        this.blockActionData = actions;
     }
 
     private InventoryTransactionPacket readItemUseTransaction() {
@@ -192,14 +341,26 @@ public class PlayerAuthInputPacket extends DataPacket {
         packet.setBuffer(this.getBufferUnsafe());
         packet.setCount(this.getCount());
         packet.setOffset(this.getOffset());
-        packet.legacyRequestId = packet.getVarInt();
 
-        if (packet.legacyRequestId < -1 && (packet.legacyRequestId & 1) == 0) {
+        boolean v2168Shape = packet.protocol >= ProtocolInfo.v1_26_40;
+        boolean v2192Shape = packet.protocol >= ProtocolInfo.v1_26_50_27;
+        packet.legacyRequestId = packet.getVarInt();
+        boolean hasLegacySlots = v2168Shape
+                ? packet.getBoolean() && packet.legacyRequestId < -1 && (packet.legacyRequestId & 1) == 0
+                : packet.legacyRequestId < -1 && (packet.legacyRequestId & 1) == 0;
+        if (hasLegacySlots) {
             int legacySlotsCount = Math.min((int) packet.getUnsignedVarInt(), 256);
             for (int i = 0; i < legacySlotsCount; i++) {
                 packet.getByte();
                 int slotCount = (int) packet.getUnsignedVarInt();
                 packet.get(slotCount);
+            }
+        }
+
+        if (v2168Shape && !v2192Shape) {
+            // v2168~v2169 actions 前有双 bool；v2192 起移除 / double bool before actions, removed in v2192
+            if (!(packet.getBoolean() && packet.getBoolean())) {
+                throw new IllegalStateException("Expected InventoryActionData");
             }
         }
 
@@ -209,24 +370,27 @@ public class PlayerAuthInputPacket extends DataPacket {
         int actionCount = Math.min((int) packet.getUnsignedVarInt(), 4096);
         packet.actions = new NetworkInventoryAction[actionCount];
         for (int i = 0; i < packet.actions.length; i++) {
-            packet.actions[i] = new NetworkInventoryAction().read(packet);
+            packet.actions[i] = new NetworkInventoryAction().read(packet, v2168Shape);
         }
 
         UseItemData itemData = new UseItemData();
-        itemData.actionType = (int) packet.getUnsignedVarInt();
+        itemData.actionType = v2168Shape ? packet.getVarInt() : (int) packet.getUnsignedVarInt();
         if (packet.protocol >= ProtocolInfo.v1_21_20) {
-            itemData.triggerType = (int) packet.getUnsignedVarInt();
+            itemData.triggerType = v2168Shape ? packet.getByte() & 0xff : (int) packet.getUnsignedVarInt();
         }
         itemData.blockPos = packet.getBlockVector3();
-        itemData.face = packet.getBlockFace();
+        itemData.face = v2168Shape ? BlockFace.fromIndex(packet.getByte() & 0xff) : packet.getBlockFace();
         itemData.hotbarSlot = packet.getVarInt();
-        itemData.itemInHand = packet.getSlot(packet.gameVersion);
+        if (packet.protocol >= ProtocolInfo.v1_26_50_27) {
+           itemData.hand = packet.getByte();
+        }
+        itemData.itemInHand = v2168Shape ? packet.getNetworkItemStackDescriptor(packet.gameVersion) : packet.getSlot(packet.gameVersion);
         itemData.playerPos = packet.getVector3f().asVector3();
         itemData.clickPos = packet.getVector3f();
         if (packet.protocol >= ProtocolInfo.v1_16_210) {
             itemData.blockRuntimeId = (int) packet.getUnsignedVarInt();
             if (packet.protocol >= ProtocolInfo.v1_21_20) {
-                itemData.clientInteractPrediction = (int) packet.getUnsignedVarInt();
+                itemData.clientInteractPrediction = v2168Shape ? packet.getByte() & 0xff : (int) packet.getUnsignedVarInt();
             }
         }
         if (packet.protocol >= ProtocolInfo.v1_26_10) {

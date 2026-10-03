@@ -417,8 +417,8 @@ public class EntityWolf extends EntityTameableMob implements InventoryHolder {
     @Override
     public void attackEntity(Entity entity) {
         if (entity instanceof Player && (
-            !this.isAngry() && this.isBeggingItem(((Player) entity).getInventory().getItemInHandFast()) ||
-                this.hasOwner() && entity.equals(this.getOwner())
+            this.hasOwner() && entity.equals(this.getOwner()) ||
+                !this.isAngry() && this.isBeggingItem(((Player) entity).getInventory().getItemInHandFast())
         )) return;
 
         if (this.attackDelay > 23 && this.distanceSquared(entity) < 1.5) {
@@ -519,6 +519,7 @@ public class EntityWolf extends EntityTameableMob implements InventoryHolder {
             item.getId() == ItemID.ROTTEN_FLESH;
     }
 
+    @Override
     public boolean isBreedingItem(Item item) {
         return item.getId() == ItemID.RAW_CHICKEN ||
             item.getId() == ItemID.COOKED_CHICKEN ||
@@ -531,6 +532,11 @@ public class EntityWolf extends EntityTameableMob implements InventoryHolder {
             item.getId() == ItemID.RAW_RABBIT ||
             item.getId() == ItemID.COOKED_RABBIT ||
             item.getId() == ItemID.ROTTEN_FLESH;
+    }
+
+    @Override
+    public boolean isTamingItem(Item item) {
+        return item.getId() == ItemID.BONE;
     }
 
     public int getHealableItem(Item item) {

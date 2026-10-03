@@ -54,6 +54,21 @@ public abstract class InventoryAction {
     }
 
     /**
+     * Replaces the source item of this action. Workstation transactions use this
+     * when an event authoritatively changes an output after actions were parsed.
+     */
+    public void setSourceItem(Item sourceItem) {
+        this.sourceItem = sourceItem;
+    }
+
+    /**
+     * Replaces the target item of this action.
+     */
+    public void setTargetItem(Item targetItem) {
+        this.targetItem = targetItem;
+    }
+
+    /**
      * Called by inventory transactions before any actions are processed. If this returns false, the transaction will
      * be cancelled.
      *

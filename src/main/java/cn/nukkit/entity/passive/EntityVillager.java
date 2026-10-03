@@ -138,7 +138,7 @@ public class EntityVillager extends EntityWalkingAnimal implements InventoryHold
         } else {
             this.canTrade = this.namedTag.getBoolean("canTrade");
         }
-        if (!this.namedTag.contains("displayName") && profession != 0) {
+        if (profession != 0 && !this.namedTag.contains("displayName")) {
             this.setDisplayName(getProfessionName(profession));
         } else {
             this.displayName = this.namedTag.getString("displayName");

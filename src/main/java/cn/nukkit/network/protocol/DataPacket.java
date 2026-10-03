@@ -57,7 +57,7 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
             } else {
                 int packetId;
                 try {
-                    packetId = Server.getInstance().getNetwork().getPacketPool(protocol).getPacketId(this.getClass());
+                    packetId = Server.getInstance().getNetwork().getPacketPool(gameVersion).getPacketId(this.getClass());
                 } catch (IllegalArgumentException e) {
                     packetId = 0x6a; //使用1.1不存在的id，所有不支持的数据包
                     if (Nukkit.DEBUG > 1) {
@@ -144,6 +144,40 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
             Server.getInstance().getLogger().debug("Warning: encode() not implemented for " + this.getClass().getName());
             Thread.dumpStack();
         }
+    }
+
+    @Override
+    public long getEntityUniqueId() {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            return this.getUnsignedVarInt();
+        }
+        return super.getEntityUniqueId();
+    }
+
+    @Override
+    public void putEntityUniqueId(long eid) {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.putUnsignedVarInt(eid);
+            return;
+        }
+        super.putEntityUniqueId(eid);
+    }
+
+    @Override
+    public long getEntityRuntimeId() {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            return this.getUnsignedVarInt();
+        }
+        return super.getEntityRuntimeId();
+    }
+
+    @Override
+    public void putEntityRuntimeId(long eid) {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.putUnsignedVarInt(eid);
+            return;
+        }
+        super.putEntityRuntimeId(eid);
     }
 
     @Override

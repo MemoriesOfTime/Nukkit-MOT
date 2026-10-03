@@ -3,6 +3,7 @@ package cn.nukkit.inventory.special;
 import cn.nukkit.Player;
 import cn.nukkit.inventory.MultiRecipe;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemDurable;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,7 +21,7 @@ public class RepairItemRecipe extends MultiRecipe {
             Item item1 = inputs.get(0);
             Item item2 = inputs.get(1);
             if (item1.equals(item2, false, false)) {
-                if (item1.isTool() || item1.isArmor()) {
+                if (item1 instanceof ItemDurable) {
                     int damage = calculateDamage(item1.getDamage(), item2.getDamage(), item1.getMaxDurability());
                     if (outputItem.equals(item1, false, true)) {
                         return outputItem.getDamage() == damage;
@@ -30,7 +31,7 @@ public class RepairItemRecipe extends MultiRecipe {
         } else if (inputs.size() == 1) {
             Item item = inputs.get(0);
             if (item.getCount() == 2) {
-                if (item.isTool() || item.isArmor()) {
+                if (item instanceof ItemDurable) {
                     int damage = calculateDamage(item.getDamage(), item.getDamage(), item.getMaxDurability());
                     if (outputItem.equals(item, false, true)) {
                         return outputItem.getDamage() == damage;

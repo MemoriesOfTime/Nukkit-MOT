@@ -1,5 +1,6 @@
 package cn.nukkit.utils.serverconfig;
 
+import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import eu.okaeri.configs.OkaeriConfig;
 import eu.okaeri.configs.schema.FieldDeclaration;
 import lombok.extern.log4j.Log4j2;
@@ -9,6 +10,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -19,6 +21,57 @@ import java.util.Properties;
 public class ConfigComments {
 
     private static final String FALLBACK_LANG = "eng";
+
+    private static final String PROPERTIES_PREFIX = "properties.";
+
+    private static final String UNRECOGNIZED_KEY = "properties.__unrecognized__";
+
+    /**
+     * 加载 server.properties 的逐键注释表（键去掉 "properties." 前缀）
+     * <p>
+     * Load per-key comments for server.properties (with the "properties." prefix stripped).
+     * English entries fill in any keys missing from the requested language.
+     *
+     * @param lang the language code (e.g. "eng", "chs")
+     * @return key -> comment map, empty if no "properties.*" entries exist in any language
+     */
+    public static Map<String, String> loadPropertyComments(String lang) {
+        Map<String, String> comments = new HashMap<>();
+        collectPropertyEntries(loadComments(FALLBACK_LANG), comments);
+        if (!FALLBACK_LANG.equals(lang)) {
+            collectPropertyEntries(loadComments(lang), comments);
+        }
+        return comments;
+    }
+
+    /**
+     * 加载未识别配置项段的分隔注释（可含换行）
+     * <p>
+     * Load the separator comment for the trailing unrecognized-keys block (newlines allowed).
+     *
+     * @param lang the language code (e.g. "eng", "chs")
+     * @return comment text, null if not defined in any language
+     */
+    public static String loadUnrecognizedPropertyComment(String lang) {
+        Properties target = FALLBACK_LANG.equals(lang) ? null : loadComments(lang);
+        String value = target != null ? target.getProperty(UNRECOGNIZED_KEY) : null;
+        if (value == null) {
+            Properties eng = loadComments(FALLBACK_LANG);
+            value = eng != null ? eng.getProperty(UNRECOGNIZED_KEY) : null;
+        }
+        return value;
+    }
+
+    private static void collectPropertyEntries(Properties props, Map<String, String> out) {
+        if (props == null) {
+            return;
+        }
+        for (String name : props.stringPropertyNames()) {
+            if (name.startsWith(PROPERTIES_PREFIX) && !name.equals(UNRECOGNIZED_KEY)) {
+                out.put(name.substring(PROPERTIES_PREFIX.length()), props.getProperty(name));
+            }
+        }
+    }
 
     /**
      * Apply localized comments to the server config.
@@ -39,25 +92,32 @@ public class ConfigComments {
         applyFieldComments(config, comments, null);
 
         // Field-level comments on each category config
-        Map<String, OkaeriConfig> categories = Map.of(
-                "performanceSettings", config.performanceSettings(),
-                "networkSettings", config.networkSettings(),
-                "chunkSettings", config.chunkSettings(),
-                "entitySettings", config.entitySettings(),
-                "worldSettings", config.worldSettings(),
-                "playerSettings", config.playerSettings(),
-                "debugSettings", config.debugSettings(),
-                "gameFeatureSettings", config.gameFeatureSettings(),
-                "neteaseSettings", config.neteaseSettings()
-        );
+        Map<String, OkaeriConfig> categories = new HashMap<>();
+        categories.put("performanceSettings", config.performanceSettings());
+        categories.put("networkSettings", config.networkSettings());
+        categories.put("chunkSettings", config.chunkSettings());
+        categories.put("entitySettings", config.entitySettings());
+        categories.put("worldSettings", config.worldSettings());
+        categories.put("playerSettings", config.playerSettings());
+        categories.put("debugSettings", config.debugSettings());
+        categories.put("gameFeatureSettings", config.gameFeatureSettings());
+        categories.put("neteaseSettings", config.neteaseSettings());
+        categories.put("customBlockSettings", config.customBlockSettings());
 
         for (Map.Entry<String, OkaeriConfig> entry : categories.entrySet()) {
             applyFieldComments(entry.getValue(), comments, entry.getKey());
         }
+
+        // WorldEntry values inside the worlds map; a fresh instance primes the declaration
+        // cache so its (localized) fields survive the save-time ConfigDeclaration.of lookup
+        applyFieldComments(new WorldEntry(), comments, "worldEntry");
+        for (WorldEntry entry : config.worldSettings().worlds().values()) {
+            applyFieldComments(entry, comments, "worldEntry");
+        }
     }
 
     /**
-     * Apply comments to fields of an OkaeriConfig.
+     * Apply comments to fields of an OkaeriConfig, recursing into nested sub-config fields.
      * <p>
      * Updates both the current declaration instances and the static FieldDeclaration cache.
      * The cache update is necessary because during save, the configurer resolves
@@ -84,6 +144,16 @@ public class ConfigComments {
                     lines = withBlank;
                 }
                 field.setComment(lines);
+            }
+
+            // Recurse into nested sub-configs (e.g. NetworkSettings.netherNetSettings);
+            // top-level category fields are handled by the categories map above
+            if (prefix != null && field.getField() != null
+                    && OkaeriConfig.class.isAssignableFrom(field.getField().getType())) {
+                Object value = field.getValue();
+                if (value instanceof OkaeriConfig) {
+                    applyFieldComments((OkaeriConfig) value, comments, key);
+                }
             }
         }
 

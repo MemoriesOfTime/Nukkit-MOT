@@ -27,7 +27,11 @@ public class AddPaintingPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putEntityUniqueId(this.entityUniqueId);
-        this.putEntityRuntimeId(this.entityRuntimeId);
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.entityRuntimeId);
+        } else {
+            this.putEntityRuntimeId(this.entityRuntimeId);
+        }
         if (protocol < 361) {
             this.putBlockVector3((int) this.x, (int) this.y, (int) this.z);
         } else {

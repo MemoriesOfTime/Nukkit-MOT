@@ -27,7 +27,7 @@ public abstract class EnchantmentDamage extends Enchantment {
 
     @Override
     public boolean canEnchant(Item item) {
-        return item.isAxe() || super.canEnchant(item);
+        return item.isAxe() || item.isSpear() || super.canEnchant(item);
     }
 
     @Override

@@ -139,7 +139,9 @@ public class BlockRedstoneWire extends BlockFlowable {
 
             if (meta != maxStrength) {
                 if (stillExists) {
-                    this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, meta, maxStrength));
+                    if (BlockRedstoneEvent.getHandlers().getRegisteredListeners().length != 0) {
+                        this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, meta, maxStrength));
+                    }
                     this.setDamage(maxStrength);
                     this.level.setBlock(this, this, false, false);
                 }
@@ -227,11 +229,13 @@ public class BlockRedstoneWire extends BlockFlowable {
             return Level.BLOCK_UPDATE_NORMAL;
         }
 
-        // Redstone event
-        RedstoneUpdateEvent ev = new RedstoneUpdateEvent(this);
-        getLevel().getServer().getPluginManager().callEvent(ev);
-        if (ev.isCancelled()) {
-            return 0;
+        // This event has its own handler list, separate from BlockUpdateEvent.
+        if (RedstoneUpdateEvent.getHandlers().getRegisteredListeners().length != 0) {
+            RedstoneUpdateEvent ev = new RedstoneUpdateEvent(this);
+            getLevel().getServer().getPluginManager().callEvent(ev);
+            if (ev.isCancelled()) {
+                return 0;
+            }
         }
 
         this.calculateCurrentChanges(false, true);
@@ -272,9 +276,13 @@ public class BlockRedstoneWire extends BlockFlowable {
                     }
                 }
 
-                if (side.getAxis().isHorizontal() && enumset.isEmpty()) {
+                BlockFace outputSide = side.getAxis().isHorizontal() ? side.getOpposite() : side;
+                if (outputSide.getAxis().isHorizontal() && enumset.isEmpty()) {
                     return power;
-                } else if (enumset.contains(side) && !enumset.contains(side.rotateYCCW()) && !enumset.contains(side.rotateY())) {
+                } else if (enumset.size() == 1) {
+                    BlockFace connectedSide = enumset.iterator().next();
+                    return outputSide == connectedSide || outputSide == connectedSide.getOpposite() ? power : 0;
+                } else if (enumset.contains(outputSide)) {
                     return power;
                 } else {
                     return 0;

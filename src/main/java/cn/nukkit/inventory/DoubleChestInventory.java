@@ -7,8 +7,13 @@ import cn.nukkit.level.Level;
 import cn.nukkit.network.protocol.BlockEventPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
+import org.jetbrains.annotations.ApiStatus;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -59,17 +64,40 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
 
     @Override
     public Item getItem(int index) {
-        return index < this.left.getSize() ? this.left.getItem(index) : this.right.getItem(index - this.right.getSize());
+        return index < this.left.getSize() ? this.left.getItem(index) : this.right.getItem(index - this.left.getSize());
+    }
+
+    @Override
+    @ApiStatus.Internal
+    public Item getUnclonedItem(int index) {
+        return index < this.left.getSize()
+                ? this.left.getUnclonedItem(index)
+                : this.right.getUnclonedItem(index - this.left.getSize());
     }
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
-        return index < this.left.getSize() ? this.left.setItem(index, item, send) : this.right.setItem(index - this.right.getSize(), item, send);
+        return index < this.left.getSize() ? this.left.setItem(index, item, send) : this.right.setItem(index - this.left.getSize(), item, send);
+    }
+
+    @Override
+    @ApiStatus.Internal
+    public void setItemForce(int index, Item item) {
+        if (index < this.left.getSize()) {
+            this.left.setItemForce(index, item);
+        } else {
+            this.right.setItemForce(index - this.left.getSize(), item);
+        }
     }
 
     @Override
     public boolean clear(int index) {
-        return index < this.left.getSize() ? this.left.clear(index) : this.right.clear(index - this.right.getSize());
+        return this.clear(index, true);
+    }
+
+    @Override
+    public boolean clear(int index, boolean send) {
+        return index < this.left.getSize() ? this.left.clear(index, send) : this.right.clear(index - this.left.getSize(), send);
     }
 
     @Override
@@ -93,6 +121,9 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
             items = newItems;
         }
 
+        // 与 BaseInventory.setContents 相同：溢出延后到槽位定稿后再装
+        // Same as BaseInventory.setContents: route overflow after slots are final
+        List<Item> deferredOverflow = new ArrayList<>();
         for (int i = 0; i < this.size; i++) {
             if (!items.containsKey(i)) {
                 if (i < this.left.size) {
@@ -102,9 +133,19 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
                 } else if (this.right.slots.containsKey(i - this.left.size)) {
                     this.clear(i);
                 }
-            } else if (!this.setItem(i, items.get(i))) {
-                this.clear(i);
+            } else {
+                Item[] parts = splitOverstack(items.get(i));
+                if (this.setItem(i, parts[0])) {
+                    if (parts[1] != null) {
+                        deferredOverflow.add(parts[1]);
+                    }
+                } else {
+                    this.clear(i);
+                }
             }
+        }
+        for (Item overflow : deferredOverflow) {
+            this.routeOverflow(overflow);
         }
     }
 
@@ -188,6 +229,7 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
                 continue;
             }
             pk.inventoryId = id;
+            pk.containerNameData = new FullContainerName(ContainerSlotType.LEVEL_ENTITY, null);
             player.dataPacket(pk);
         }
     }

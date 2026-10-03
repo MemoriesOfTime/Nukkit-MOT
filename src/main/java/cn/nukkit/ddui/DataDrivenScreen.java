@@ -8,6 +8,7 @@ import cn.nukkit.ddui.properties.ObjectProperty;
 import cn.nukkit.network.protocol.ClientboundDataDrivenUICloseScreenPacket;
 import cn.nukkit.network.protocol.ClientboundDataDrivenUIShowScreenPacket;
 import cn.nukkit.network.protocol.ClientboundDataStorePacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.datastore.DataStoreChange;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.TaskHandler;
@@ -38,6 +39,21 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
 
     public abstract String getProperty();
 
+    public String getClientProperty(Player player) {
+        Integer formId = playerFormIds.get(player);
+        if (formId == null) {
+            return getProperty();
+        }
+        return getClientProperty(player.protocol, formId);
+    }
+
+    String getClientProperty(int protocol, int formId) {
+        if (protocol >= ProtocolInfo.v1_26_20) {
+            return getProperty() + "_" + formId;
+        }
+        return getProperty();
+    }
+
     private final Set<Player> viewers = new CopyOnWriteArraySet<>();
 
     private final Map<Player, Integer> playerFormIds = new ConcurrentHashMap<>();
@@ -51,6 +67,8 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
     }
 
     public void show(Player player) {
+        if (player.protocol < ProtocolInfo.v1_26_0) return;
+
         // Cancel any pending delayed show for this player
         TaskHandler pending = PENDING_SHOW_TASKS.asMap().remove(player);
         if (pending != null) {
@@ -85,6 +103,7 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
 
     private void doShow(Player player) {
         if (!player.isConnected()) return;
+        if (player.protocol < ProtocolInfo.v1_26_0) return;
 
         // Allocate a new unique formId for this screen on this player
         int formId = DDUI_FORM_ID_COUNTER.updateAndGet(v -> (v == Integer.MAX_VALUE) ? 0 : v + 1);
@@ -92,7 +111,7 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
         String dataStore = getIdentifier().split(":")[0];
         DataStoreChange change = new DataStoreChange();
         change.setDataStoreName(dataStore);
-        change.setProperty(getProperty());
+        change.setProperty(getClientProperty(player.protocol, formId));
         change.setUpdateCount(1);
         change.setNewValue(toChangeValue());
 
@@ -102,6 +121,9 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
         ClientboundDataDrivenUIShowScreenPacket show = new ClientboundDataDrivenUIShowScreenPacket();
         show.screenId = getIdentifier();
         show.formId = formId;
+        if (player.protocol >= ProtocolInfo.v1_26_20) {
+            show.dataInstanceId = formId;
+        }
 
         // Send new screen packets
         player.dataPacket(data);
@@ -118,6 +140,7 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
     public void close(Player player) {
         Integer formId = playerFormIds.get(player);
         if (formId == null) return;
+        if (player.protocol < ProtocolInfo.v1_26_0) return;
 
         removeViewer(player);
 

@@ -21,8 +21,8 @@ public class EnchantmentMaceWindBurst extends EnchantmentMace {
 
     @Override
     public void doAttack(Entity attacker, Entity entity) {
-        double fallDistance = attacker.highestPosition - entity.y;
-        if (fallDistance < 2 || attacker.isOnGround()) {
+        double fallDistance = attacker.highestPosition - attacker.y;
+        if (fallDistance < 1.5d || attacker.isOnGround()) {
             return;
         }
         if (attacker instanceof Player player && player.getAdventureSettings().get(AdventureSettings.Type.FLYING)) {
@@ -33,6 +33,16 @@ public class EnchantmentMaceWindBurst extends EnchantmentMace {
         attacker.resetFallDistance();
     }
 
+    /**
+     * 应用风爆击退与气浪粒子。此处不播放猛击音效，避免与
+     * {@link cn.nukkit.item.ItemMace#onPostAttack} 重复。参考 Allay 的
+     * {@code ItemMaceBaseComponentImpl}（风爆仅负责击退与气浪，音效统一在
+     * {@code applySmashEffects} 处理）。
+     * <p>
+     * Applies wind-burst knockback and wind particle. Smash sounds are handled
+     * solely by {@link cn.nukkit.item.ItemMace#onPostAttack} to avoid duplicates,
+     * matching Allay's {@code ItemMaceBaseComponentImpl}.
+     */
     protected void knockBack(Entity entity, double knockbackScaling) {
         Vector3 knockback = new Vector3(entity.motionX, entity.motionY, entity.motionZ);
         knockback.x /= 2d;
@@ -42,7 +52,6 @@ public class EnchantmentMaceWindBurst extends EnchantmentMace {
 
         entity.setMotion(knockback);
         entity.getLevel().addParticle(new GenericParticle(entity, Particle.TYPE_WIND_EXPLOSION));
-        entity.getLevel().addLevelSoundEvent(entity, 520);
-        entity.getLevel().addSound(entity, "mace.heavy_smash_ground");
     }
 }
+

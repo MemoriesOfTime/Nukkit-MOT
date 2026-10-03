@@ -20,7 +20,7 @@ public class PlayerArmorDamagePacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (this.protocol >= ProtocolInfo.v1_21_110) {
+        if (this.protocol >= ProtocolInfo.v1_21_111) {
             this.getArray(this.flags, stream -> {
                 int ordinal = stream.getVarInt();
                 PlayerArmorDamageFlag flag = PlayerArmorDamageFlag.values()[ordinal];
@@ -42,7 +42,7 @@ public class PlayerArmorDamagePacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (this.protocol >= ProtocolInfo.v1_21_110) {
+        if (this.protocol >= ProtocolInfo.v1_21_111) {
             this.putArray(this.flags, flag -> {
                 this.putVarInt(flag.ordinal());
                 this.putLShort(this.damage[flag.ordinal()]);

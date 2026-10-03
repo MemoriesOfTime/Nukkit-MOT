@@ -6,7 +6,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 /**
  * @author Glorydark
  */
-public class ItemChestplateCopper extends StringItemBase {
+public class ItemChestplateCopper extends StringItemArmorBase {
 
     public ItemChestplateCopper() {
         super(COPPER_CHESTPLATE, "Copper Chestplate");

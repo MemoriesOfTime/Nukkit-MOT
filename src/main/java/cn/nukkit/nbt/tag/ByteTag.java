@@ -5,7 +5,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 
 import java.io.IOException;
 
-public class ByteTag extends NumberTag<Integer> {
+public final class ByteTag extends NumberTag<Integer> {
 
     public int data;
 
@@ -38,7 +38,7 @@ public class ByteTag extends NumberTag<Integer> {
     }
 
     @Override
-    void load(NBTInputStream dis) throws IOException {
+    void load(NBTInputStream dis, int nested) throws IOException {
         data = dis.readByte();
     }
 

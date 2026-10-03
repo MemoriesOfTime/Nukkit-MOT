@@ -8,7 +8,7 @@ import java.io.PrintStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class ListTag<T extends Tag> extends Tag {
+public final class ListTag<T extends Tag> extends Tag {
 
     private List<T> list = new ArrayList<>();
 
@@ -48,14 +48,19 @@ public class ListTag<T extends Tag> extends Tag {
 
     @Override
     @SuppressWarnings("unchecked")
-    void load(NBTInputStream dis) throws IOException {
+    void load(NBTInputStream dis, int nested) throws IOException {
         type = dis.readByte();
         int size = dis.readInt();
 
-        list = new ArrayList<>(size);
+        if (type == TAG_End) {
+            list = new ArrayList<>();
+            return;
+        }
+
+        list = new ArrayList<>(dis.isReadSafely() && size > 64 ? 64 : size);
         for (int i = 0; i < size; i++) {
             Tag tag = Tag.newTag(type, null);
-            tag.load(dis);
+            tag.load(dis, nested + 1);
             tag.setName("");
             list.add((T) tag);
         }
@@ -70,7 +75,7 @@ public class ListTag<T extends Tag> extends Tag {
     public String toString() {
         StringJoiner joiner = new StringJoiner(",\n\t");
         list.forEach(tag -> joiner.add(tag.toString().replace("\n", "\n\t")));
-        return "ListTag '" + this.getName() + "' (" + list.size() + " entries of type " + Tag.getTagName(type) + ") {\n\t" + joiner.toString() + "\n}";
+        return "ListTag '" + this.getName() + "' (" + list.size() + " entries of type " + Tag.getTagName(type) + ") {\n\t" + joiner + "\n}";
     }
 
     @Override

@@ -2,7 +2,6 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.resourcepacks.ResourcePack;
-import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
 
@@ -29,11 +28,7 @@ public class ResourcePackStackPacket extends DataPacket {
      */
     public boolean hasEditorPacks;
 
-    /**
-     * 兼容NK插件，MOT不使用这个字段
-     */
-    @Deprecated
-    public String gameVersion = Utils.getVersionByProtocol(ProtocolInfo.CURRENT_PROTOCOL);
+    public String gameVersion = "*";
 
     @Override
     public void decode() {
@@ -67,7 +62,7 @@ public class ResourcePackStackPacket extends DataPacket {
                 this.putBoolean(isExperimental);
             }
             if (protocol >= 388) {
-                this.putString(Utils.getVersionByProtocol(protocol));
+                this.putString(this.gameVersion);
             }
             if (protocol >= ProtocolInfo.v1_16_100) {
                 this.putLInt(this.experiments.size());

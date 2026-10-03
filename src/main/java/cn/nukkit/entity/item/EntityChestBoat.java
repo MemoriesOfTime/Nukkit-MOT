@@ -95,7 +95,7 @@ public class EntityChestBoat extends EntityBoat implements InventoryHolder {
         super.initEntity();
 
         this.inventory = new ChestBoatInventory(this);
-        if (this.namedTag.contains("Items") && this.namedTag.get("Items") instanceof ListTag) {
+        if (this.namedTag.get("Items") instanceof ListTag) {
             ListTag<CompoundTag> inventoryList = this.namedTag.getList("Items", CompoundTag.class);
             for (CompoundTag item : inventoryList.getAll()) {
                 this.inventory.setItem(item.getByte("Slot"), NBTIO.getItemHelper(item));

@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityCombustByEntityEvent;
+import cn.nukkit.item.Item;
 
 /**
  * @author MagicDroidX
@@ -28,6 +29,11 @@ public class EnchantmentFireAspect extends Enchantment {
     @Override
     public int getMaxLevel() {
         return 2;
+    }
+
+    @Override
+    public boolean canEnchant(Item item) {
+        return item.isSpear() || super.canEnchant(item);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.ddui.DataDrivenScreen;
@@ -31,7 +32,7 @@ public class ServerboundDataStoreProcessor extends DataPacketProcessor<Serverbou
 
             String dataStore = screen.getIdentifier().split(":")[0];
             if (!dataStore.equals(update.getDataStoreName())) return;
-            if (!screen.getProperty().equals(update.getProperty())) return;
+            if (!screen.getClientProperty(player).equals(update.getProperty())) return;
 
             DataDrivenProperty<?, ?> property = screen.resolvePath(update.getPath());
             if (property == null) return;
@@ -67,7 +68,7 @@ public class ServerboundDataStoreProcessor extends DataPacketProcessor<Serverbou
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_21_130_28;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_21_130_28;
     }
 }

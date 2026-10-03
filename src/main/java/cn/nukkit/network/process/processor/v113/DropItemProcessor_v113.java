@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.v113;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.Server;
@@ -10,7 +11,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.v113.DropItemPacketV113;
+import cn.nukkit.network.protocol.v113.DropItemPacket_v113;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -19,12 +20,12 @@ import org.jetbrains.annotations.NotNull;
  * @author LT_Name
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class DropItemProcessor_v113 extends DataPacketProcessor<DropItemPacketV113> {
+public class DropItemProcessor_v113 extends DataPacketProcessor<DropItemPacket_v113> {
 
     public static final DropItemProcessor_v113 INSTANCE = new DropItemProcessor_v113();
 
     @Override
-    public void handle(@NotNull PlayerHandle playerHandle, @NotNull DropItemPacketV113 pk) {
+    public void handle(@NotNull PlayerHandle playerHandle, @NotNull DropItemPacket_v113 pk) {
         Player player = playerHandle.player;
         if (!player.spawned || !player.isAlive() || pk.item.getId() <= 0) {
             return;
@@ -52,16 +53,16 @@ public class DropItemProcessor_v113 extends DataPacketProcessor<DropItemPacketV1
 
     @Override
     public int getPacketId() {
-        return ProtocolInfo.toNewProtocolID(DropItemPacketV113.NETWORK_ID);
+        return ProtocolInfo.toNewProtocolID(DropItemPacket_v113.NETWORK_ID);
     }
 
     @Override
     public Class<? extends DataPacket> getPacketClass() {
-        return DropItemPacketV113.class;
+        return DropItemPacket_v113.class;
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol < ProtocolInfo.v1_2_0;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() < ProtocolInfo.v1_2_0;
     }
 }

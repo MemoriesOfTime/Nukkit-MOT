@@ -81,21 +81,20 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
                 || id == Item.BEETROOT;
     }
 
+    // 胡萝卜钓竿仅用于骑乘转向，不触发繁殖
+    @Override
+    public boolean isBreedingItem(Item item) {
+        int id = item.getId();
+        return id == Item.CARROT
+                || id == Item.POTATO
+                || id == Item.BEETROOT;
+    }
+
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.CARROT && !this.isBaby() && !this.isInLoveCooldown()) {
+        if (this.isBreedingItem(item) && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-            this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0),Item.get(Item.CARROT)));
-            this.setInLove();
-            return true;
-        } else if (item.getId() == Item.POTATO && !this.isBaby() && !this.isInLoveCooldown()) {
-            player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-            this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0),Item.get(Item.POTATO)));
-            this.setInLove();
-            return true;
-        } else if (item.getId() == Item.BEETROOT && !this.isBaby() && !this.isInLoveCooldown()) {
-            player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-            this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0),Item.get(Item.BEETROOT)));
+            this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0), Item.get(item.getId())));
             this.setInLove();
             return true;
         } else if (item.getId() == Item.SADDLE && !this.isSaddled() && !this.isBaby() && !this.isInLoveCooldown()) {

@@ -76,19 +76,18 @@ public class Observable<T> {
 
             Object actualValue = element.getValue();
 
-            DataStoreUpdate update = new DataStoreUpdate();
-            update.setDataStoreName(screen.getIdentifier().split(":")[0]);
-            update.setProperty(screen.getProperty());
-            update.setPath(element.getPath());
-            update.setType(element.getType());
-            update.setData(actualValue);
-            update.setPropertyUpdateCount(1);
-            update.setPathUpdateCount(1);
-
-            ClientboundDataStorePacket cbDataStore = new ClientboundDataStorePacket();
-            cbDataStore.setUpdates(List.of(update));
-
             for (Player viewer : screen.getAllViewers()) {
+                DataStoreUpdate update = new DataStoreUpdate();
+                update.setDataStoreName(screen.getIdentifier().split(":")[0]);
+                update.setProperty(screen.getClientProperty(viewer));
+                update.setPath(element.getPath());
+                update.setType(element.getType());
+                update.setData(actualValue);
+                update.setPropertyUpdateCount(1);
+                update.setPathUpdateCount(1);
+
+                ClientboundDataStorePacket cbDataStore = new ClientboundDataStorePacket();
+                cbDataStore.setUpdates(List.of(update));
                 viewer.dataPacket(cbDataStore);
             }
         }

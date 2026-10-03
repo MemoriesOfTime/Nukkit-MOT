@@ -5,7 +5,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 
 import java.io.IOException;
 
-public class FloatTag extends NumberTag<Float> {
+public final class FloatTag extends NumberTag<Float> {
 
     public float data;
 
@@ -38,7 +38,7 @@ public class FloatTag extends NumberTag<Float> {
     }
 
     @Override
-    void load(NBTInputStream dis) throws IOException {
+    void load(NBTInputStream dis, int nested) throws IOException {
         data = dis.readFloat();
     }
 

@@ -34,6 +34,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -44,7 +45,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -78,10 +79,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     public static final String UNKNOWN_STR = "Unknown";
     public static Class<?>[] list = null;
     public static final Map<String, Supplier<Item>> NAMESPACED_ID_ITEM = new HashMap<>();
+    private static final Set<String> REGISTERED_STRING_ITEM_IDENTIFIERS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> REGISTERED_NON_STRING_ITEM_IDENTIFIERS = ConcurrentHashMap.newKeySet();
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
-    private static final AtomicInteger STACK_NETWORK_ID_COUNTER = new AtomicInteger(0);
     /**
      * 存储需要在 initCreativeItems 后重新添加的创造物品
      * Stores creative items that need to be re-added after initCreativeItems
@@ -106,18 +108,38 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      */
     protected int stackNetId = 0;
 
+    /**
+     * 直构的裸 Item 不携带类型化行为（堆叠上限、名称、食用/工具/盔甲等），
+     * 已注册 id 必须经 {@link #get(int, Integer, int)} 或 {@link #fromString(String)} 获取。
+     * <p>
+     * A directly constructed bare {@code Item} carries no typed behavior (stack limit,
+     * name, food/tool/armor overrides); registered ids must be obtained via
+     * {@link #get(int, Integer, int)} or {@link #fromString(String)}.
+     */
+    @ApiStatus.Internal
     public Item(int id) {
         this(id, 0, 1, UNKNOWN_STR);
     }
 
+    @ApiStatus.Internal
     public Item(int id, Integer meta) {
         this(id, meta, 1, UNKNOWN_STR);
     }
 
+    @ApiStatus.Internal
     public Item(int id, Integer meta, int count) {
         this(id, meta, count, UNKNOWN_STR);
     }
 
+    /**
+     * 直构的裸 Item 不携带类型化行为（堆叠上限、名称、食用/工具/盔甲等），
+     * 已注册 id 必须经 {@link #get(int, Integer, int)} 或 {@link #fromString(String)} 获取。
+     * <p>
+     * A directly constructed bare {@code Item} carries no typed behavior (stack limit,
+     * name, food/tool/armor overrides); registered ids must be obtained via
+     * {@link #get(int, Integer, int)} or {@link #fromString(String)}.
+     */
+    @ApiStatus.Internal
     public Item(int id, Integer meta, int count, String name) {
         //this.id = id & 0xffff;
         this.id = id;
@@ -294,6 +316,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[QUARTZ] = ItemQuartz.class; //406
             list[MINECART_WITH_TNT] = ItemMinecartTNT.class; //407
             list[MINECART_WITH_HOPPER] = ItemMinecartHopper.class; //408
+            list[COMMAND_BLOCK_MINECART] = ItemMinecartCommandBlock.class; //443
             list[PRISMARINE_SHARD] = ItemPrismarineShard.class; //409
             list[HOPPER] = ItemHopper.class;
             list[RAW_RABBIT] = ItemRabbitRaw.class; //411
@@ -576,6 +599,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                     Item item = Item.get(id, damage);
                     if (item.getId() != 0 && !NAMESPACED_ID_ITEM.containsKey(entity.getKey())) {
                         NAMESPACED_ID_ITEM.put(entity.getKey(), () -> item);
+                        markRegisteredStringItemIdentifier(entity.getKey(), false);
                     }
                 } catch (Exception ignored) {
 
@@ -594,7 +618,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
 
         // Only load the latest version; runtime filtering via isSupportedOn per protocol
-        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_110, CREATIVE_ITEMS);
+        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_111, CREATIVE_ITEMS);
 
         isInitializingCreativeItems = false;
         creativeItemsInitialized = true;
@@ -779,7 +803,21 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void removeCreativeItem(Item item) {
-        CREATIVE_ITEMS.getContents().remove(item);
+        // Item 未重写 hashCode，Map.remove 按身份哈希定位，传入新构造的实例永远匹配失败，
+        // 必须按 equals 语义迭代删除
+        // Item does not override hashCode, so Map.remove locates by identity hash and never
+        // matches a freshly constructed instance; iterate with equals semantics instead
+        var contents = CREATIVE_ITEMS.getContents();
+        boolean checkDamage = !item.isTool();
+        contents.keySet().removeIf(existing -> item.equals(existing, checkDamage));
+
+        Set<CreativeItemGroup> referenced = new HashSet<>();
+        for (CreativeItemGroup group : contents.values()) {
+            if (group != null) {
+                referenced.add(group);
+            }
+        }
+        CREATIVE_ITEMS.getGroups().removeIf(group -> !referenced.contains(group));
     }
 
     /**
@@ -878,18 +916,69 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Constructor<? extends StringItem> declaredConstructor = item.getDeclaredConstructor();
         var Item = declaredConstructor.newInstance();
         registerNamespacedIdItem(Item.getNamespaceId(), stringItemSupplier(declaredConstructor));
+        markRegisteredStringItemIdentifier(Item.getNamespaceId(), true);
     }
 
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Constructor<? extends Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
         NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ROOT), itemSupplier(constructor));
+        markRegisteredStringItemIdentifier(namespacedId, StringItem.class.isAssignableFrom(constructor.getDeclaringClass()));
     }
 
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Supplier<Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
-        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ROOT), constructor);
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        NAMESPACED_ID_ITEM.put(normalizedNamespacedId, constructor);
+        clearRegisteredStringItemIdentifierCache(normalizedNamespacedId);
+    }
+
+    public static boolean isRegisteredStringItemIdentifier(@NotNull String namespacedId) {
+        Preconditions.checkNotNull(namespacedId, "namespacedId is null");
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        if (REGISTERED_STRING_ITEM_IDENTIFIERS.contains(normalizedNamespacedId)) {
+            return true;
+        }
+        if (REGISTERED_NON_STRING_ITEM_IDENTIFIERS.contains(normalizedNamespacedId)) {
+            return false;
+        }
+
+        Supplier<Item> constructor = NAMESPACED_ID_ITEM.get(normalizedNamespacedId);
+        if (constructor == null) {
+            return false;
+        }
+
+        try {
+            boolean isStringItem = constructor.get() instanceof StringItem;
+            markRegisteredStringItemIdentifier(normalizedNamespacedId, isStringItem);
+            return isStringItem;
+        } catch (Exception e) {
+            log.warn("Could not determine whether {} is a StringItem", normalizedNamespacedId, e);
+            markRegisteredStringItemIdentifier(normalizedNamespacedId, false);
+            return false;
+        }
+    }
+
+    private static String normalizeNamespacedItemIdentifier(@NotNull String namespacedId) {
+        return namespacedId.toLowerCase(Locale.ROOT);
+    }
+
+    private static void markRegisteredStringItemIdentifier(@NotNull String namespacedId, boolean stringItem) {
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        if (stringItem) {
+            REGISTERED_NON_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+            REGISTERED_STRING_ITEM_IDENTIFIERS.add(normalizedNamespacedId);
+        } else {
+            REGISTERED_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+            REGISTERED_NON_STRING_ITEM_IDENTIFIERS.add(normalizedNamespacedId);
+        }
+    }
+
+    private static void clearRegisteredStringItemIdentifierCache(@NotNull String namespacedId) {
+        String normalizedNamespacedId = normalizeNamespacedItemIdentifier(namespacedId);
+        REGISTERED_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
+        REGISTERED_NON_STRING_ITEM_IDENTIFIERS.remove(normalizedNamespacedId);
     }
 
     @NotNull
@@ -929,11 +1018,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static OK<?> registerCustomItem(@NotNull Class<? extends CustomItem> clazz, boolean addCreativeItem) {
-        if (!Server.getInstance().enableExperimentMode) {
-            Server.getInstance().getLogger().warning("The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-            return new OK<>(false, "The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-        }
-
         CustomItem customItem;
         Supplier<Item> supplier;
 
@@ -960,6 +1044,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CustomItemDefinition customDef = customItem.getDefinition();
         CUSTOM_ITEM_DEFINITIONS.put(customItem.getNamespaceId(), customDef);
         registerNamespacedIdItem(customItem.getNamespaceId(), supplier);
+        markRegisteredStringItemIdentifier(customItem.getNamespaceId(), true);
 
         // 在服务端注册自定义物品的tag
         if (customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components") instanceof CompoundTag componentTag) {
@@ -970,7 +1055,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         // Register custom item in all RuntimeItemMappings
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+        for (RuntimeItemMapping mapping : RuntimeItems.values()) {
             mapping.registerCustomItem(customItem);
         }
 
@@ -994,9 +1079,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             PENDING_CREATIVE_ITEMS.remove(namespaceId);
 
             // Remove from all RuntimeItemMappings
-            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+            for (RuntimeItemMapping mapping : RuntimeItems.values()) {
                 mapping.deleteCustomItem((CustomItem) customItem);
             }
+
+            ItemTag.removeItemTag(namespaceId);
+            NAMESPACED_ID_ITEM.remove(normalizeNamespacedItemIdentifier(namespaceId));
+            clearRegisteredStringItemIdentifierCache(namespaceId);
 
             // Remove from creative items
             removeCreativeItem(customItem);
@@ -1012,6 +1101,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return new HashMap<>(CUSTOM_ITEM_DEFINITIONS);
     }
 
+    /** Direct lookup without cloning; for hot paths instead of {@link #getCustomItemDefinition()}{@code .get(id)}. */
+    public static CustomItemDefinition getCustomItemDefinition(String namespaceId) {
+        return CUSTOM_ITEM_DEFINITIONS.get(namespaceId);
+    }
+
     public static Item get(int id) {
         return get(id, 0);
     }
@@ -1022,6 +1116,44 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static Item get(int id, Integer meta, int count) {
         return get(id, meta, count, new byte[0]);
+    }
+
+    /**
+     * Creates the item form of a block ID.
+     * <p>
+     * Block IDs above 255 use the negative legacy alias in the item registry;
+     * keeping this conversion explicit avoids confusing overlapping item and
+     * block ID spaces in {@link #get(int, Integer, int)}.
+     *
+     * @param blockId the block ID
+     * @return the item form of the block
+     */
+    public static Item getBlockItem(int blockId) {
+        return getBlockItem(blockId, 0, 1);
+    }
+
+    /**
+     * Creates the item form of a block ID with metadata.
+     *
+     * @param blockId the block ID
+     * @param meta block metadata
+     * @return the item form of the block
+     */
+    public static Item getBlockItem(int blockId, Integer meta) {
+        return getBlockItem(blockId, meta, 1);
+    }
+
+    /**
+     * Creates the item form of a block ID with metadata and count.
+     *
+     * @param blockId the block ID
+     * @param meta block metadata
+     * @param count item count
+     * @return the item form of the block
+     */
+    public static Item getBlockItem(int blockId, Integer meta, int count) {
+        int itemId = blockId > 255 ? 255 - blockId : blockId;
+        return get(itemId, meta, count);
     }
 
     public static Item get(int id, Integer meta, int count, byte[] tags) {
@@ -1040,7 +1172,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             Item item;
 
             if (c == null) {
-                item = new Item(id, meta, count);
+                item = createFallbackItem(id, meta, count);
             } else if (id < 256 && id != 166) {
                 if (meta >= 0) {
                     item = new ItemBlock(Block.get(id, meta), meta, count);
@@ -1057,8 +1189,56 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
             return item;
         } catch (Exception e) {
-            return new Item(id, meta, count).setCompoundTag(tags);
+            return createFallbackItem(id, meta, count).setCompoundTag(tags);
         }
+    }
+
+    /**
+     * 已在告警过的未知物品 id，避免网络/NBT 路径重复刷日志。
+     * <p>
+     * Unknown item ids already warned about, so network/NBT paths do not spam.
+     */
+    private static final Set<Integer> warnedUnknownIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    /**
+     * 无注册类的数字 id 回退：先按映射表反查标识符归一到类型化物品（如 519 -> ItemCopperIngot，
+     * 消灭同一物品的双 id 表示）；有名字但无类的（教育版物品等）至少带上正确名称；
+     * 完全未知的 id 才落回裸 Item 并每个 id 告警一次。
+     * <p>
+     * Fallback for numeric ids without a registered class: resolve the identifier
+     * from the legacy mapping first and normalize to the typed item (e.g. 519 ->
+     * ItemCopperIngot, removing the dual-id representation of one item); ids that
+     * have a name but no class (education items etc.) at least carry the proper
+     * name; only truly unknown ids fall back to a bare Item, warned once per id.
+     */
+    private static Item createFallbackItem(int id, Integer meta, int count) {
+        String identifier = RuntimeItems.getLegacyStringFromLegacyId(id);
+        if (identifier != null) {
+            Supplier<Item> supplier = NAMESPACED_ID_ITEM.get(identifier);
+            if (supplier != null) {
+                try {
+                    Item item = supplier.get();
+                    if (item != null) {
+                        // 无类型类的标识符注册的是共享原型 supplier（() -> item），克隆后才能改状态
+                        item = item.clone();
+                    }
+                    if (item != null) {
+                        item.setCount(count);
+                        if (meta != null && meta >= 0) {
+                            item.setDamage(meta);
+                        }
+                        return item;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            String fallbackName = identifier.indexOf(':') >= 0 ? StringItem.createItemName(identifier) : identifier;
+            return new Item(id, meta, count, fallbackName);
+        }
+        if (warnedUnknownIds.add(id)) {
+            log.warn("Unknown item id {}, falling back to a bare Item", id);
+        }
+        return new Item(id, meta, count);
     }
 
     public static Item fromString(String str) {
@@ -1216,7 +1396,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         CompoundTag tag = this.getNamedTag();
-        return tag.contains("BlockEntityTag") && tag.get("BlockEntityTag") instanceof CompoundTag;
+        return tag.get("BlockEntityTag") instanceof CompoundTag;
 
     }
 
@@ -1226,7 +1406,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
         CompoundTag tag = this.getNamedTag();
 
-        if (tag.contains("BlockEntityTag") && tag.get("BlockEntityTag") instanceof CompoundTag) {
+        if (tag.get("BlockEntityTag") instanceof CompoundTag) {
             tag.remove("BlockEntityTag");
             this.setNamedTag(tag);
         }
@@ -1396,7 +1576,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CompoundTag tag = this.getNamedTag();
         if (tag.contains("display")) {
             Tag tag1 = tag.get("display");
-            return tag1 instanceof CompoundTag && ((CompoundTag) tag1).contains("Name") && ((CompoundTag) tag1).get("Name") instanceof StringTag;
+            return tag1 instanceof CompoundTag && ((CompoundTag) tag1).get("Name") instanceof StringTag;
         }
 
         return false;
@@ -1410,7 +1590,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         CompoundTag tag = this.getNamedTag();
         if (tag.contains("display")) {
             Tag tag1 = tag.get("display");
-            if (tag1 instanceof CompoundTag && ((CompoundTag) tag1).contains("Name") && ((CompoundTag) tag1).get("Name") instanceof StringTag) {
+            if (tag1 instanceof CompoundTag && ((CompoundTag) tag1).get("Name") instanceof StringTag) {
                 return ((CompoundTag) tag1).getString("Name");
             }
         }
@@ -1434,7 +1614,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         } else {
             tag = this.getNamedTag();
         }
-        if (tag.contains("display") && tag.get("display") instanceof CompoundTag) {
+        if (tag.get("display") instanceof CompoundTag) {
             tag.getCompound("display").putString("Name", name);
         } else {
             tag.putCompound("display", new CompoundTag("display")
@@ -1452,7 +1632,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
         CompoundTag tag = this.getNamedTag();
 
-        if (tag.contains("display") && tag.get("display") instanceof CompoundTag) {
+        if (tag.get("display") instanceof CompoundTag) {
             tag.getCompound("display").remove("Name");
             if (tag.getCompound("display").isEmpty()) {
                 tag.remove("display");
@@ -1508,7 +1688,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     public Tag getNamedTagEntry(String name) {
         CompoundTag tag = this.getNamedTag();
         if (tag != null) {
-            return tag.contains(name) ? tag.get(name) : null;
+            return tag.get(name);
         }
 
         return null;
@@ -1631,10 +1811,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     final public Short getFuelTime() {
+        if (this instanceof StringItem stringItem) {
+            return Fuel.getDuration(stringItem.getNamespaceId());
+        }
         if (!Fuel.duration.containsKey(id)) {
             return null;
         }
-        if (this.id != BUCKET || this.meta == 10) {
+        if (this.id != BUCKET || this.meta == ItemBucket.LAVA_BUCKET) {
             return Fuel.duration.get(this.id);
         }
         return null;
@@ -1692,6 +1875,17 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    public boolean canBePutInOffhandSlot() {
+        return this.isShield()
+                || this.id == ARROW
+                || this.id == TOTEM
+                || this.id == MAP
+                || this.id == EMPTY_MAP
+                || this.id == FIREWORKS
+                || this.id == NAUTILUS_SHELL
+                || this.id == SPARKLER;
+    }
+
     public boolean isHelmet() {
         return false;
     }
@@ -1741,6 +1935,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public int getToughness() {
+        return 0;
+    }
+
+    public double getKnockBackResistance() {
         return 0;
     }
 
@@ -1975,7 +2173,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     /**
-     * Allocates a fresh positive stack network id from Item's internal counter
+     * Allocates a fresh positive stack network id from ItemStackNetManager
      * and assigns it to this item. Call this whenever a new, distinct stack is
      * produced server-side (for example, the output of a crafting / enchanting
      * / grindstone operation) so the client can reference it in subsequent
@@ -1984,7 +2182,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * @return this item for chaining
      */
     public Item autoAssignStackNetworkId() {
-        this.stackNetId = STACK_NETWORK_ID_COUNTER.updateAndGet(current -> current == Integer.MAX_VALUE ? 1 : current + 1);
+        this.stackNetId = ItemStackNetManager.allocate();
         return this;
     }
 
@@ -2005,6 +2203,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return RuntimeItems.getMapping(protocolId).toRuntime(this.getId(), this.getDamage());
     }
 
+    @Deprecated
     public final int getNetworkId() {
         Server.mvw("Item#getNetworkId()");
         return this.getNetworkId(GameVersion.getLastVersion());

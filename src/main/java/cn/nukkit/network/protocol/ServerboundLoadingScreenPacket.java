@@ -39,6 +39,7 @@ public class ServerboundLoadingScreenPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putVarInt(this.loadingScreenType);
         this.putOptionalNull(this.loadingScreenId, this::putLInt);
     }

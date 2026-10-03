@@ -25,7 +25,9 @@ import cn.nukkit.level.format.leveldb.LevelDBConstants;
 import cn.nukkit.level.format.leveldb.NukkitLegacyMapper;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.BiomeDefinitionListPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.utils.VanillaPaletteDownloader;
 import com.google.gson.*;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.objects.*;
@@ -89,6 +91,10 @@ public class CustomBlockManager {
             } catch (IOException e) {
                 throw new IllegalStateException("Failed to create BIN_DIRECTORY", e);
             }
+        }
+
+        if (this.server.getServerConfig().customBlockSettings().autoDownloadVanillaPalette()) {
+            VanillaPaletteDownloader.downloadMissing(filesPath);
         }
 
         this.loadIdMapping();
@@ -258,6 +264,10 @@ public class CustomBlockManager {
 
         RuntimeItems.registerCustomBlockLegacyId(identifier, itemId);
 
+        for (RuntimeItemMapping mapping : RuntimeItems.values()) {
+            mapping.registerCustomBlockItem(identifier, itemId, 0);
+        }
+
         if (properties != null) {
             BlockProperties finalProperties = properties;
             variantGenerations(properties, properties.getNames().toArray(new String[0]))
@@ -266,10 +276,6 @@ public class CustomBlockManager {
 
                         for (String name : states.keySet()) {
                             meta = finalProperties.setValue(meta, name, states.get(name));
-                        }
-
-                        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
-                            mapping.registerCustomBlockItem(identifier, itemId, meta);
                         }
 
                         CustomBlockState state;
@@ -281,10 +287,6 @@ public class CustomBlockManager {
                         }
                         this.legacy2CustomState.put(state.getLegacyId(), state);
                     });
-        } else {
-            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
-                mapping.registerCustomBlockItem(identifier, itemId, 0);
-            }
         }
 
         if (blockDefinition != null && blockDefinition.shouldRegisterCreativeItem()) {
@@ -391,6 +393,8 @@ public class CustomBlockManager {
         }
 
         GlobalBlockPalette.compactCaches();
+
+        BiomeDefinitionListPacket.rebuildHashSensitiveCaches();
 
         log.info("Custom block registry closed in {}ms", (System.currentTimeMillis() - startTime));
         this.saveIdMapping();

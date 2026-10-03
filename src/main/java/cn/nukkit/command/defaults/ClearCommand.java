@@ -130,7 +130,6 @@ public class ClearCommand extends VanillaCommand {
 
                 if (count == 0) {
                     log.addError("commands.clear.failure.no.items", target.getName()).output();
-                    return 0;
                 } else {
                     log.addSuccess("commands.clear.testing", target.getName(), String.valueOf(count)).output();
                 }
@@ -167,7 +166,6 @@ public class ClearCommand extends VanillaCommand {
 
                 if (count == 0) {
                     log.addError("commands.clear.failure.no.items", target.getName()).output();
-                    return 0;
                 } else {
                     log.addSuccess("commands.clear.success", target.getName(), String.valueOf(count)).output();
                 }
@@ -234,7 +232,6 @@ public class ClearCommand extends VanillaCommand {
 
                 if (remaining == maxCount) {
                     log.addError("commands.clear.failure.no.items", target.getName()).output();
-                    return 0;
                 } else {
                     log.addSuccess("commands.clear.success", target.getName(), String.valueOf(maxCount - remaining)).output();
                 }

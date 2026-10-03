@@ -115,7 +115,7 @@ public class SmithingInventory extends FakeBlockUIComponent {
         super.onClose(who);
         who.craftingType = Player.CRAFTING_SMALL;
 
-        who.giveItem(getItem(EQUIPMENT), getItem(INGREDIENT), getItem(TEMPLATE));
+        who.returnUiItems(getItem(EQUIPMENT), getItem(INGREDIENT), getItem(TEMPLATE));
 
         this.clear(EQUIPMENT);
         this.clear(INGREDIENT);
@@ -170,6 +170,14 @@ public class SmithingInventory extends FakeBlockUIComponent {
         }
 
         if (item instanceof ItemTool && item.getTier() == ItemTool.TIER_DIAMOND) {
+            return true;
+        }
+
+        // Diamond horse armor and nautilus armor are not ItemTool; allow them
+        // into the equipment slot explicitly for the netherite upgrade.
+        String namespaceId = item.getNamespaceId();
+        if ("minecraft:diamond_horse_armor".equals(namespaceId)
+                || Item.DIAMOND_NAUTILUS_ARMOR.equals(namespaceId)) {
             return true;
         }
 

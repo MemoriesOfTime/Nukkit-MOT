@@ -144,9 +144,11 @@ public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable
 
     @Override
     public Item toItem() {
-        BlockEntity blockEntity = getLevel().getBlockEntity(this);
         int itemMeta = 0;
-        if (blockEntity != null) itemMeta = blockEntity.namedTag.getByte("SkullType");
+        if (this.level != null) {
+            BlockEntity blockEntity = getLevel().getBlockEntity(this);
+            if (blockEntity != null) itemMeta = blockEntity.namedTag.getByte("SkullType");
+        }
         return Item.get(Item.SKULL, itemMeta);
     }
 

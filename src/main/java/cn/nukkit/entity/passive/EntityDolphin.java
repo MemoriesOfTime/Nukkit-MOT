@@ -56,8 +56,13 @@ public class EntityDolphin extends EntityWaterAnimal {
     }
 
     @Override
+    public boolean isBreedingItem(Item item) {
+        return item.getId() == Item.RAW_FISH;
+    }
+
+    @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.RAW_FISH && !this.isBaby() && !this.isInLoveCooldown()) {
+        if (this.isBreedingItem(item) && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
             this.level.addParticle(new ItemBreakParticle(this.add(0, this.getMountedYOffset(), 0), Item.get(Item.RAW_FISH)));

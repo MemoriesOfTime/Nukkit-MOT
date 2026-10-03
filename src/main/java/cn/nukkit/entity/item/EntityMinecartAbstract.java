@@ -13,13 +13,10 @@ import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.event.vehicle.VehicleMoveEvent;
-import cn.nukkit.event.vehicle.VehicleUpdateEvent;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMinecart;
 import cn.nukkit.level.GameRule;
-import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -177,19 +174,12 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
 
         setRotation(yawToChange, pitch);
 
-        Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
-        Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
-
-        this.getServer().getPluginManager().callEvent(new VehicleUpdateEvent(this));
-
-        if (!from.equals(to)) {
-            this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
-        }
+        dispatchVehicleMovementEvents();
 
         // Collisions
         if (this instanceof InventoryHolder) {
             for (cn.nukkit.entity.Entity entity : level.getNearbyEntities(boundingBox.grow(0.2D, 0, 0.2D), this)) {
-                if (!passengers.contains(entity) && entity instanceof EntityMinecartAbstract) {
+                if (entity instanceof EntityMinecartAbstract && !passengers.contains(entity)) {
                     entity.applyEntityCollision(this);
                 }
             }
@@ -314,8 +304,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 motiveZ *= 1 + entityCollisionReduction;
                 motiveX *= 0.5D;
                 motiveZ *= 0.5D;
-                if (entity instanceof EntityMinecartAbstract) {
-                    EntityMinecartAbstract mine = (EntityMinecartAbstract) entity;
+                if (entity instanceof EntityMinecartAbstract mine) {
                     double desinityX = mine.x - x;
                     double desinityZ = mine.z - z;
                     Vector3 vector = new Vector3(desinityX, 0, desinityZ).normalize();
@@ -737,11 +726,20 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             if (namedTag.getBoolean("CustomDisplayTile")) {
                 int display = namedTag.getInt("DisplayTile");
                 int offSet = namedTag.getInt("DisplayOffset");
+                if (blockInside == null && display != 0) {
+                    blockInside = Block.get(display & 0xFFFF, (display >> 16) & 0xFFFF);
+                }
                 setDataProperty(new ByteEntityData(DATA_HAS_DISPLAY, 1));
                 setDataProperty(new IntEntityData(DATA_DISPLAY_ITEM, display));
                 setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, offSet));
             }
         } else {
+            if (blockInside == null) {
+                Block defaultBlock = getDefaultDisplayBlock();
+                if (defaultBlock != null && defaultBlock.isNormalBlock()) {
+                    blockInside = defaultBlock;
+                }
+            }
             int display = blockInside == null ? 0
                     : blockInside.getId()
                     | blockInside.getDamage() << 16;
@@ -755,14 +753,35 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         }
     }
 
+    /**
+     * The block this minecart type shows by default when freshly spawned (no
+     * persisted {@code CustomDisplayTile} NBT and no plugin override). Returns
+     * {@code null} for plain minecarts. Called from {@link #prepareDataProperty()},
+     * which runs during {@link #initEntity()} — before the subclass constructor
+     * body — so this hook is the only chance to set the default display block
+     * before the spawn metadata is computed.
+     *
+     * @return the default display block, or {@code null} for none
+     */
+    protected Block getDefaultDisplayBlock() {
+        return null;
+    }
+
     private void saveEntityData() {
+        if (blockInside == null && super.getDataPropertyByte(DATA_HAS_DISPLAY) == 1) {
+            int display = getDataPropertyInt(DATA_DISPLAY_ITEM);
+            if (display != 0) {
+                blockInside = Block.get(display & 0xFFFF, (display >> 16) & 0xFFFF);
+            }
+        }
         boolean hasDisplay = super.getDataPropertyByte(DATA_HAS_DISPLAY) == 1
                 || blockInside != null;
         int display;
         int offSet;
         namedTag.putBoolean("CustomDisplayTile", hasDisplay);
         if (hasDisplay) {
-            display = blockInside.getId()
+            display = blockInside == null ? 0
+                    : blockInside.getId()
                     | blockInside.getDamage() << 16;
             offSet = getDataPropertyInt(DATA_DISPLAY_OFFSET);
             namedTag.putInt("DisplayTile", display);

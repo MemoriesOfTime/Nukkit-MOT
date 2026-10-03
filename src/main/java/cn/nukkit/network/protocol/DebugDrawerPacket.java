@@ -56,7 +56,12 @@ public class DebugDrawerPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_26_0) {
             this.putOptionalNull(shape.getAttachedToEntityId(), val -> this.putUnsignedVarLong(val));
         }
-        this.putUnsignedVarInt(this.toPayloadType(shape.getType()));
+        int payloadType = this.toPayloadType(shape.getType());
+        if (payloadType > 5 && this.protocol < ProtocolInfo.v1_26_30) {
+            // CYLINDER/PYRAMID/ELLIPSOID/CONE are only defined since v1001; older wire formats treat 6-9 as undefined
+            throw new IllegalStateException("DebugDrawer shape " + shape.getType() + " requires v1.26.30+ client");
+        }
+        this.putUnsignedVarInt(payloadType);
 
         if (shape.getType() != null) {
             switch (shape.getType()) {
@@ -89,10 +94,38 @@ public class DebugDrawerPacket extends DataPacket {
                     if (this.protocol >= ProtocolInfo.v1_26_20_26) {
                         this.putBoolean(text.isUseRotation());
                         this.putOptionalNull(text.getBackgroundColor(), color -> this.putLInt(color.getRGB()));
+                        if (this.protocol >= ProtocolInfo.v1_26_50_27) {
+                            // v2192 新增行间距 / line gap height added in v2192
+                            this.putLFloat(text.getLineGapHeight());
+                        }
                         this.putBoolean(text.isDepthTest());
                         this.putBoolean(text.isShowBackface());
                         this.putBoolean(text.isShowTextBackface());
                     }
+                    break;
+                case CYLINDER:
+                    DebugCylinder cylinder = (DebugCylinder) shape;
+                    this.putVector2f(cylinder.getRadiusX());
+                    this.putVector2f(cylinder.getRadiusZ());
+                    this.putLFloat(cylinder.getHeight());
+                    this.putByte((byte) cylinder.getSegments());
+                    break;
+                case PYRAMID:
+                    DebugPyramid pyramid = (DebugPyramid) shape;
+                    this.putLFloat(pyramid.getWidth());
+                    this.putOptionalNull(pyramid.getDepth(), this::putLFloat);
+                    this.putLFloat(pyramid.getHeight());
+                    break;
+                case ELLIPSOID:
+                    DebugEllipsoid ellipsoid = (DebugEllipsoid) shape;
+                    this.putVector3f(ellipsoid.getRadii());
+                    this.putByte((byte) ellipsoid.getSegments());
+                    break;
+                case CONE:
+                    DebugCone cone = (DebugCone) shape;
+                    this.putVector2f(cone.getRadii());
+                    this.putLFloat(cone.getHeight());
+                    this.putByte((byte) cone.getSegments());
                     break;
             }
         }
@@ -173,7 +206,10 @@ public class DebugDrawerPacket extends DataPacket {
             case BOX -> 3;
             case LINE -> 4;
             case SPHERE, CIRCLE -> 5;
-            default -> throw new IllegalStateException("Unknown debug shape type");
+            case CYLINDER -> 6;
+            case PYRAMID -> 7;
+            case ELLIPSOID -> 8;
+            case CONE -> 9;
         };
     }
 

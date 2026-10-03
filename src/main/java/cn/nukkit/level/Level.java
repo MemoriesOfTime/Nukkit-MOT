@@ -5,6 +5,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.api.NonComputationAtomic;
 import cn.nukkit.block.*;
+import cn.nukkit.block.util.RedstoneToggleHelper;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
@@ -49,6 +50,10 @@ import cn.nukkit.level.particle.Particle;
 import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.level.persistence.impl.DelegatePersistentDataContainer;
 import cn.nukkit.level.sound.Sound;
+import cn.nukkit.level.vibration.SimpleVibrationManager;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationManager;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
 import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.metadata.BlockMetadataStore;
@@ -57,6 +62,7 @@ import cn.nukkit.metadata.Metadatable;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.types.clock.*;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
@@ -68,10 +74,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.*;
 import lombok.AllArgsConstructor;
@@ -115,6 +118,16 @@ public class Level implements ChunkManager, Metadatable {
 
     public static final int TIME_FULL = 24000;
 
+    // 客户端内置的主世界时钟 ID 与时间标记 ID，值需与原版客户端一致
+    private static final long OVERWORLD_CLOCK_ID = 7194480507151251734L;
+    private static final List<TimeMarkerData> OVERWORLD_TIME_MARKERS = List.of(
+            new TimeMarkerData(2625810911898139949L, "minecraft:sunrise", TIME_SUNRISE, TIME_FULL),
+            new TimeMarkerData(4918950784056990566L, "minecraft:night", TIME_NIGHT, TIME_FULL),
+            new TimeMarkerData(6827470627776846754L, "minecraft:noon", TIME_NOON, TIME_FULL),
+            new TimeMarkerData(-7184653752370368672L, "minecraft:midnight", TIME_MIDNIGHT, TIME_FULL),
+            new TimeMarkerData(-4807795260250801598L, "minecraft:day", TIME_DAY, TIME_FULL),
+            new TimeMarkerData(-1781951082890426794L, "minecraft:sunset", TIME_SUNSET, TIME_FULL));
+
     public static final int DIMENSION_OVERWORLD = 0;
     public static final int DIMENSION_NETHER = 1;
     public static final int DIMENSION_THE_END = 2;
@@ -156,6 +169,7 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.WATER] = true;
         randomTickBlocks[Block.STILL_WATER] = true;
         randomTickBlocks[Block.CAULDRON_BLOCK] = true;
+        randomTickBlocks[Block.POINTED_DRIPSTONE] = true;
 
         randomTickBlocks[Block.BAMBOO] = true;
         randomTickBlocks[Block.BAMBOO_SAPLING] = true;
@@ -299,9 +313,15 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Int2IntMap loaderCounter = new Int2IntOpenHashMap();
 
-    private final Map<Long, Map<Integer, ChunkLoader>> chunkLoaders = new ConcurrentHashMap<>();
+    /**
+     * Primitive keys avoid boxing and mix both coordinates of {@link #chunkHash(int, int)}.
+     * Long.hashCode folds them into x ^ z, causing colliding bins for diagonal chunks.
+     * Keep concurrent outer-map reads available to the chunk-loading pipeline.
+     */
+    private final Long2ObjectNonBlockingMap<Map<Integer, ChunkLoader>> chunkLoaders = new Long2ObjectNonBlockingMap<>();
 
-    private final Map<Long, Map<Integer, Player>> playerLoaders = new ConcurrentHashMap<>();
+    // Same coordinate mixing and concurrent publication as chunkLoaders, without boxed tree bins.
+    private final Long2ObjectNonBlockingMap<Map<Integer, Player>> playerLoaders = new Long2ObjectNonBlockingMap<>();
 
     private final Map<Long, Deque<DataPacket>> chunkPackets = new ConcurrentHashMap<>();
 
@@ -320,11 +340,39 @@ public class Level implements ChunkManager, Metadatable {
     private final Long2ObjectOpenHashMap<SoftReference<Map<Integer, Object>>> changedBlocks = new Long2ObjectOpenHashMap<>();
     // Storing the vector is redundant
     private final Object changeBlocksPresent = new Object();
-    // Storing extra blocks past 512 is redundant
+    // 哨兵:标记区块变更过多,tick 末尾整块重发;它永不写入,因此不能用 size() 判定
+    // Sentinel marking "too many changes, resend the whole chunk"; never populated, so never test it via size()
     private final Int2ObjectOpenHashMap<Object> changeBlocksFullMap = new Int2ObjectOpenHashMap<>();
+
+    /**
+     * Hard ceiling on how many normal block updates one tick is allowed to perform.
+     *
+     * <p>The normal update queue is re-entrant: an update performed while draining it can push
+     * more updates into the very same drain, so a runaway cascade (liquids, falling blocks,
+     * redstone loops, a huge fill) keeps the main thread busy for as long as it produces work -
+     * until the watchdog kills the server and the worlds are saved from whatever state they were
+     * in. The ceiling turns that freeze into a stutter: the remainder simply stays in the queue
+     * and is performed by the next tick, so nothing is lost. Ordinary play never reaches it.
+     */
+    private static final int MAX_NORMAL_UPDATES_PER_TICK =
+            Math.max(1024, Integer.getInteger("nukkit.maxBlockUpdatesPerTick", 200_000));
+
+    /** Block update work slower than this gets a line in the server log. */
+    private static final long SLOW_BLOCK_UPDATE_NANOS =
+            Math.max(1L, Long.getLong("nukkit.slowBlockUpdateMillis", 50L)) * 1_000_000L;
+
+    /** At most one block update report per level per this many milliseconds. */
+    private static final long BLOCK_UPDATE_REPORT_INTERVAL_MS = 10_000L;
 
     private final BlockUpdateScheduler updateQueue;
     private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
+    /** Size of {@link #normalUpdateQueue}: the queue itself only counts in linear time. */
+    private final AtomicInteger normalUpdateQueueSize = new AtomicInteger();
+    private int normalBlockUpdatesLastTick;
+    private int scheduledBlockUpdatesLastTick;
+    private long blockUpdateNanosLastTick;
+    private long blockUpdateFuseTrips;
+    private long lastBlockUpdateReport;
     private final Map<Long, Set<Integer>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
 
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
@@ -346,6 +394,8 @@ public class Level implements ChunkManager, Metadatable {
     private final Long2ObjectOpenHashMap<Boolean> chunkGenerationQueue = new Long2ObjectOpenHashMap<>();
     private final int chunkGenerationQueueSize;
     private final int chunkPopulationQueueSize;
+
+    private final VibrationManager vibrationManager = new SimpleVibrationManager(this);
 
     private boolean autoSave;
     private boolean autoCompaction;
@@ -417,15 +467,65 @@ public class Level implements ChunkManager, Metadatable {
 
     @Getter
     private ExecutorService asyncChuckExecutor;
+    private ExecutorService asyncChunkLoadExecutor;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
+
+    // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
+    // Posted to main thread to clear tasks (tasks isn't thread-safe; async worker can't touch it)
+    private final Queue<FailedChunkRequest> asyncChunkRequestFailedQueue = new ConcurrentLinkedQueue<>();
+
+    // 任务提交 tick,用于超时自愈 / Submit tick for timeout self-healing
+    private final Long2LongOpenHashMap chunkSendTaskStartTick = new Long2LongOpenHashMap();
+
+    /**
+     * 连接/角落位驱动的方块 id 白名单（楼梯/栅栏/玻璃板/铁栏/绊线），延迟初始化。
+     * <p>
+     * Lazy-initialized id whitelist of connection/corner-driven blocks (stairs/fences/panes/bars/tripwire).
+     */
+    private static volatile IntSet connectionDrivenBlockIds;
+    private static final int CHUNK_SEND_TIMEOUT_TICKS = 200;
+
+    // 异步区块加载:pending 去重 + 完成队列,主线程 doTick 中挂载 / Async chunk loading: pending dedup + completion queue, mounted on the main thread in doTick
+    // 包内可见以便单元测试 / package-private for unit tests
+    final ConcurrentHashMap<Long, PendingChunkLoad> pendingChunkLoads = new ConcurrentHashMap<>();
+    final Queue<PendingChunkLoad> completedChunkLoads = new ConcurrentLinkedQueue<>();
+
+    static final class PendingChunkLoad {
+        final int x;
+        final int z;
+        final long hash;
+        final LevelProvider provider;
+        volatile BaseFullChunk chunk;
+        volatile Throwable failure;
+        volatile boolean invalidated;
+
+        PendingChunkLoad(int x, int z, long hash, LevelProvider provider) {
+            this.x = x;
+            this.z = z;
+            this.hash = hash;
+            this.provider = provider;
+        }
+    }
+
+    static final class FailedChunkRequest {
+        final GameVersion protocol;
+        final int x;
+        final int z;
+
+        FailedChunkRequest(GameVersion protocol, int x, int z) {
+            this.protocol = protocol;
+            this.x = x;
+            this.z = z;
+        }
+    }
 
     private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
 
     private final boolean antiXray;
 
-    // 用于实现世界监听的回调
+    // 用于实现世界监听的回调，参数为 (previousBlock, newBlock) / Callbacks for world listening, params (previousBlock, newBlock)
     private static final AtomicInteger callbackIdCounter = new AtomicInteger();
-    private final Int2ObjectMap<Consumer<Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<BiConsumer<Block, Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<BiConsumer<Long, DataPacket>> callbackChunkPacketSend = new Int2ObjectOpenHashMap<>();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
@@ -494,7 +594,13 @@ public class Level implements ChunkManager, Metadatable {
 
         if (this.server.asyncChunkSending) {
             this.asyncChuckExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("AsyncChunkThread for " + name).build());
+            this.asyncChunkLoadExecutor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+                    new ArrayBlockingQueue<>(Math.max(16, this.chunkGenerationQueueSize)),
+                    new ThreadFactoryBuilder().setNameFormat("AsyncChunkLoadThread for " + name).build());
         }
+
+        // 注册方块变更回调，用于清理红石 override 标记 (issue #782)
+        this.addCallbackBlockSet(RedstoneToggleHelper::onBlockChanged);
     }
 
     public static long chunkHash(int x, int z) {
@@ -631,12 +737,31 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void close() {
+        boolean interrupted = false;
         this.providerLock.writeLock().lock();
         try {
-            if (this.asyncChuckExecutor != null) {
-                this.asyncChuckExecutor.shutdownNow();
+            for (ExecutorService executor : new ExecutorService[]{this.asyncChunkLoadExecutor, this.asyncChuckExecutor}) {
+                if (executor == null) {
+                    continue;
+                }
+                // 有界关闭:先优雅排空 in-flight 异步区块读取,超时则 shutdownNow 再做一次有界等待;绝不无界等待,
+                // 避免任务卡在不可中断 I/O(垂死磁盘 / NFS / LevelDB JNI)时持有 providerLock 永久挂起关服与后续存档
+                // Bounded shutdown: drain in-flight async chunk reads, then shutdownNow + one more bounded await on timeout; never waits
+                // unbounded, so a task wedged in uninterruptible I/O (dying disk / NFS / LevelDB JNI) cannot hang level close (and the save after it) forever while holding providerLock
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+                        this.server.getLogger().warning("Async chunk executor for level " + this.getName() + " did not terminate in time, forcing shutdown");
+                        executor.shutdownNow();
+                        if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                            this.server.getLogger().warning("Async chunk executor for level " + this.getName() + " did not terminate even after forced shutdown; abandoning drain");
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    interrupted = true;
+                }
             }
-
             LevelProvider levelProvider = this.provider;
             if (levelProvider != null) {
                 if (this.autoSave) {
@@ -660,6 +785,9 @@ public class Level implements ChunkManager, Metadatable {
             this.generators.remove();
         } finally {
             this.providerLock.writeLock().unlock();
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -1039,9 +1167,17 @@ public class Level implements ChunkManager, Metadatable {
 
         Map<Integer, ChunkLoader> chunkLoadersIndex = this.chunkLoaders.get(index);
         if (chunkLoadersIndex != null) {
-            chunkLoadersIndex.remove(loaderId);
-            if (chunkLoadersIndex.isEmpty()) {
-                this.chunkLoaders.remove(index);
+            ChunkLoader oldLoader = chunkLoadersIndex.remove(index);
+            if (oldLoader != null) {
+                if (chunkLoadersIndex.isEmpty()) {
+                    this.chunkLoaders.remove(index);
+                    this.playerLoaders.remove(index);
+                    this.invalidatePendingChunkLoad(index);
+                    this.unloadChunkRequest(chunkX, chunkZ, true);
+                } else {
+                    Map<Integer, Player> playerLoadersIndex = this.playerLoaders.get(index);
+                    playerLoadersIndex.remove(index);
+                }
             }
         }
 
@@ -1077,14 +1213,60 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void sendTime(Player... players) {
-        SetTimePacket pk = new SetTimePacket();
-        pk.time = this.time;
-
-        Server.broadcastPacket(players, pk);
+        List<Player> legacyPlayers = null;
+        List<Player> initPlayers = null;
+        List<Player> syncPlayers = null;
+        for (Player player : players) {
+            if (player.protocol < ProtocolInfo.v1_26_30) {
+                if (legacyPlayers == null) {
+                    legacyPlayers = new ArrayList<>();
+                }
+                legacyPlayers.add(player);
+            } else if (player.worldClockSynced) {
+                if (syncPlayers == null) {
+                    syncPlayers = new ArrayList<>();
+                }
+                syncPlayers.add(player);
+            } else {
+                if (initPlayers == null) {
+                    initPlayers = new ArrayList<>();
+                }
+                initPlayers.add(player);
+            }
+        }
+        if (legacyPlayers != null) {
+            SetTimePacket pk = new SetTimePacket();
+            pk.time = this.time;
+            Server.broadcastPacket(legacyPlayers.toArray(Player.EMPTY_ARRAY), pk);
+        }
+        if (initPlayers != null) {
+            // InitializeRegistryData 本身携带 time/paused，首次同步即完成注册表初始化
+            SyncWorldClocksPacket pk = new SyncWorldClocksPacket();
+            pk.data = new InitializeRegistryData(List.of(new WorldClockData(
+                    OVERWORLD_CLOCK_ID, "minecraft:overworld", this.time, this.isWorldClockPaused(), OVERWORLD_TIME_MARKERS)));
+            for (Player player : initPlayers) {
+                player.worldClockSynced = true;
+            }
+            Server.broadcastPacket(initPlayers.toArray(Player.EMPTY_ARRAY), pk);
+        }
+        if (syncPlayers != null) {
+            SyncWorldClocksPacket pk = new SyncWorldClocksPacket();
+            pk.data = new SyncStateData(List.of(new SyncWorldClockStateData(OVERWORLD_CLOCK_ID, this.time, this.isWorldClockPaused())));
+            Server.broadcastPacket(syncPlayers.toArray(Player.EMPTY_ARRAY), pk);
+        }
     }
 
     public void sendTime() {
         sendTime(this.players.values().toArray(Player.EMPTY_ARRAY));
+    }
+
+    /**
+     * 世界时钟是否暂停，语义与 {@link #checkTime()} 的时间推进条件保持一致。
+     * <p>
+     * Whether the world clock is paused, matching the time-advance condition in {@link #checkTime()}.
+     */
+    public boolean isWorldClockPaused() {
+        return this.stopTime || !this.gameRules.getBoolean(GameRule.DO_DAYLIGHT_CYCLE);
     }
 
     public GameRules getGameRules() {
@@ -1152,10 +1334,14 @@ public class Level implements ChunkManager, Metadatable {
             this.unloadChunks();
         }
 
-        this.updateQueue.tick(this.levelCurrentTick);
+        long blockUpdateStart = System.nanoTime();
+        this.scheduledBlockUpdatesLastTick = this.updateQueue.tick(this.levelCurrentTick);
 
+        int performed = 0;
         QueuedUpdate queuedUpdate;
-        while ((queuedUpdate = this.normalUpdateQueue.poll()) != null) {
+        while (performed < MAX_NORMAL_UPDATES_PER_TICK && (queuedUpdate = this.normalUpdateQueue.poll()) != null) {
+            this.normalUpdateQueueSize.decrementAndGet();
+            performed++;
             Block block = getBlock(queuedUpdate.block, queuedUpdate.block.layer);
             BlockUpdateEvent event = new BlockUpdateEvent(block);
             this.server.getPluginManager().callEvent(event);
@@ -1168,6 +1354,17 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
+        this.normalBlockUpdatesLastTick = performed;
+        this.blockUpdateNanosLastTick = System.nanoTime() - blockUpdateStart;
+
+        boolean fuseTripped = performed >= MAX_NORMAL_UPDATES_PER_TICK && !this.normalUpdateQueue.isEmpty();
+        if (fuseTripped) {
+            this.blockUpdateFuseTrips++;
+        }
+        if (fuseTripped || this.blockUpdateNanosLastTick > SLOW_BLOCK_UPDATE_NANOS) {
+            this.reportBlockUpdateLoad(fuseTripped);
+        }
+
         if (!this.updateEntities.isEmpty()) {
             for (long id : this.updateEntities.keySetLong()) {
                 Entity entity = this.updateEntities.get(id);
@@ -1175,11 +1372,13 @@ public class Level implements ChunkManager, Metadatable {
                     this.updateEntities.remove(id);
                     continue;
                 }
-                if (entity.closed || !entity.onUpdate(currentTick)) {
+                if (!this.updateEntity(entity, currentTick)) {
                     this.updateEntities.remove(id);
                 }
             }
         }
+
+        this.reportEntityActivation();
 
         var updateBlockEntities = this.updateBlockEntities.iterator();
         while (updateBlockEntities.hasNext()) {
@@ -1205,7 +1404,7 @@ public class Level implements ChunkManager, Metadatable {
                         Map<Integer, Object> blocks = entry.getValue().get();
                         int chunkX = Level.getHashX(index);
                         int chunkZ = Level.getHashZ(index);
-                        if (blocks == null || blocks.size() > MAX_BLOCK_CACHE) {
+                        if (this.shouldResendWholeChunk(blocks)) {
                             FullChunk chunk = this.getChunk(chunkX, chunkZ);
                             if (chunk != null) {
                                 for (Player p : this.getChunkPlayers(chunkX, chunkZ).values()) {
@@ -1236,6 +1435,27 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
+        // 清 tasks 后下 tick 守卫(!contains)重新成立即自动重试
+        // Clearing tasks lets the guard re-accept it next tick
+        if (!this.asyncChunkRequestFailedQueue.isEmpty()) {
+            FailedChunkRequest failed;
+            while ((failed = this.asyncChunkRequestFailedQueue.poll()) != null) {
+                this.getChunkSendTasks(failed.protocol).remove(Level.chunkHash(failed.x, failed.z));
+                this.chunkSendTaskStartTick.remove(Level.chunkHash(failed.x, failed.z));
+            }
+        }
+
+        // 挂载异步加载完成的区块;不以配置为 gate,保证配置热切换后残留 pending 也能排空
+        // Mount async-loaded chunks; not gated by config so leftover pending drains after a hot config toggle
+        if (!this.completedChunkLoads.isEmpty()) {
+            PendingChunkLoad pending;
+            int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
+            for (int i = 0; i < count && (pending = this.completedChunkLoads.poll()) != null; ++i) {
+                this.pendingChunkLoads.remove(pending.hash);
+                this.mountChunk(pending);
+            }
+        }
+
         this.processChunkRequest();
 
         if (this.sleepTicks > 0 && --this.sleepTicks <= 0) {
@@ -1262,6 +1482,58 @@ public class Level implements ChunkManager, Metadatable {
             Server.broadcastPacket(players.values().toArray(Player.EMPTY_ARRAY), packet);
             gameRules.refresh();
         }
+    }
+
+    /** Mob updates skipped by entity activation since the last report. */
+    private long activationSkippedUpdates;
+    /** Mob updates actually run since the last report. */
+    private long activationRunUpdates;
+    private long lastActivationReport = System.currentTimeMillis();
+    private static final long ACTIVATION_REPORT_INTERVAL_MS = 600_000L;
+
+    public long getActivationSkippedUpdates() {
+        return this.activationSkippedUpdates;
+    }
+
+    public long getActivationRunUpdates() {
+        return this.activationRunUpdates;
+    }
+
+    /**
+     * Runs one scheduled entity update. A mob asleep under entity activation is skipped but stays scheduled.
+     *
+     * @return {@code false} when the entity leaves the update list
+     */
+    boolean updateEntity(Entity entity, int currentTick) {
+        if (entity.closed) {
+            return false;
+        }
+        if (entity.isActivationThrottled(currentTick)) {
+            this.activationSkippedUpdates++;
+            return true;
+        }
+        if (entity instanceof cn.nukkit.entity.BaseEntity) {
+            this.activationRunUpdates++;
+        }
+        return entity.onUpdate(currentTick);
+    }
+
+    /** One line per level every ten minutes: how much mob work entity activation saved. Silent when idle. */
+    private void reportEntityActivation() {
+        long now = System.currentTimeMillis();
+        if (now - this.lastActivationReport < ACTIVATION_REPORT_INTERVAL_MS) {
+            return;
+        }
+        this.lastActivationReport = now;
+        long skipped = this.activationSkippedUpdates;
+        long run = this.activationRunUpdates;
+        this.activationSkippedUpdates = 0;
+        this.activationRunUpdates = 0;
+        if (skipped == 0) {
+            return;
+        }
+        this.server.getLogger().info("Entity activation in level " + this.getFolderName() + ": skipped " + skipped
+                + " of " + (skipped + run) + " mob updates (" + (skipped * 100 / (skipped + run)) + "%) in the last 10 min");
     }
 
     private void performThunder(long index, FullChunk chunk) {
@@ -1338,7 +1610,7 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
-        if (playerCount > 0 && sleepingPlayerCount / playerCount * 100 >= this.gameRules.getInteger(GameRule.PLAYERS_SLEEPING_PERCENTAGE)) {
+        if (playerCount > 0 && sleepingPlayerCount * 100 / playerCount >= this.gameRules.getInteger(GameRule.PLAYERS_SLEEPING_PERCENTAGE)) {
             int time = this.getTime() % Level.TIME_FULL;
 
             if ((time >= Level.TIME_NIGHT && time < Level.TIME_SUNRISE) || this.isThundering()) {
@@ -1649,6 +1921,11 @@ public class Level implements ChunkManager, Metadatable {
                     block1.onUpdate(BLOCK_UPDATE_REDSTONE);
                 } else if (block1.isNormalBlock()) {
                     pos = pos.getSideVec(face);
+                    // Same rule as the first ring above: a block behind the solid one may sit in the
+                    // next chunk, and a comparator there is not in memory - do not load it from disk.
+                    if (!this.isChunkLoaded((int) pos.x >> 4, (int) pos.z >> 4)) {
+                        continue;
+                    }
                     block1 = this.getBlock(pos);
 
                     if (BlockRedstoneDiode.isDiode(block1)) {
@@ -1688,8 +1965,13 @@ public class Level implements ChunkManager, Metadatable {
     public void updateAround(Vector3 pos, int layer) {
         Block block = getBlock(pos);
         for (BlockFace face : BlockFace.values()) {
-            normalUpdateQueue.add(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
+            this.queueNormalUpdate(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
         }
+    }
+
+    private void queueNormalUpdate(QueuedUpdate update) {
+        this.normalUpdateQueue.add(update);
+        this.normalUpdateQueueSize.incrementAndGet();
     }
 
     @Deprecated
@@ -1780,6 +2062,67 @@ public class Level implements ChunkManager, Metadatable {
 
     public Set<BlockUpdateEntry> getPendingBlockUpdates(AxisAlignedBB boundingBox) {
         return updateQueue.getPendingBlockUpdates(boundingBox);
+    }
+
+    /**
+     * Normal block updates waiting for the next tick. A backlog that keeps growing means this
+     * level produces block update work faster than the tick can perform it.
+     */
+    public int getNormalBlockUpdateBacklog() {
+        return this.normalUpdateQueueSize.get();
+    }
+
+    /** Scheduled block updates waiting for their tick. */
+    public int getScheduledBlockUpdateBacklog() {
+        return this.updateQueue.getPendingCount();
+    }
+
+    /** Normal block updates performed by the last tick of this level. */
+    public int getNormalBlockUpdatesLastTick() {
+        return this.normalBlockUpdatesLastTick;
+    }
+
+    /** Scheduled block updates performed by the last tick of this level. */
+    public int getScheduledBlockUpdatesLastTick() {
+        return this.scheduledBlockUpdatesLastTick;
+    }
+
+    /** How long the last tick spent on both block update queues, in nanoseconds. */
+    public long getBlockUpdateNanosLastTick() {
+        return this.blockUpdateNanosLastTick;
+    }
+
+    /**
+     * How many times the per-tick ceiling deferred normal block updates to the next tick. Anything
+     * above zero is a cascade worth looking at: ordinary play never reaches the ceiling.
+     */
+    public long getBlockUpdateFuseTrips() {
+        return this.blockUpdateFuseTrips;
+    }
+
+    /** The per-tick ceiling on normal block updates currently in force. */
+    public static int getMaxNormalBlockUpdatesPerTick() {
+        return MAX_NORMAL_UPDATES_PER_TICK;
+    }
+
+    private void reportBlockUpdateLoad(boolean fuseTripped) {
+        long now = System.currentTimeMillis();
+        if (now - this.lastBlockUpdateReport < BLOCK_UPDATE_REPORT_INTERVAL_MS) {
+            return;
+        }
+        this.lastBlockUpdateReport = now;
+
+        String load = "Block updates in level " + this.getFolderName()
+                + ": normal " + this.normalBlockUpdatesLastTick + " done, " + this.normalUpdateQueueSize.get() + " queued"
+                + "; scheduled " + this.scheduledBlockUpdatesLastTick + " done, " + this.updateQueue.getPendingCount() + " queued"
+                + "; took " + (this.blockUpdateNanosLastTick / 1_000_000L) + "ms";
+
+        if (fuseTripped) {
+            this.server.getLogger().warning(load + "; hit the per-tick ceiling of " + MAX_NORMAL_UPDATES_PER_TICK
+                    + ", the rest waits for the next tick (ceiling hit " + this.blockUpdateFuseTrips + " time(s) so far)");
+        } else {
+            this.server.getLogger().info(load);
+        }
     }
 
     /**
@@ -2316,10 +2659,16 @@ public class Level implements ChunkManager, Metadatable {
         block.z = z;
         block.level = this;
         block.layer = layer;
+        // blockPrevious 来自 Block.get(id, damage)，未设置 level/坐标；此处补全供回调使用
+        blockPrevious.x = x;
+        blockPrevious.y = y;
+        blockPrevious.z = z;
+        blockPrevious.level = this;
+        blockPrevious.layer = layer;
 
         try {
-            for (Consumer<Block> callback : this.callbackBlockSet.values()) {
-                callback.accept(block);
+            for (BiConsumer<Block, Block> callback : this.callbackBlockSet.values()) {
+                callback.accept(blockPrevious, block);
             }
         } catch (Exception e) {
             Server.getInstance().getLogger().error("Error while calling block set callback", e);
@@ -2371,7 +2720,6 @@ public class Level implements ChunkManager, Metadatable {
             this.setBlock(block, Block.get(Block.AIR));
             Position position = block.add(0.5, 0.5, 0.5);
             this.addParticle(new DestroyBlockParticle(position, block));
-            //this.getVibrationManager().callVibrationEvent(new VibrationEvent(null, position, VibrationType.BLOCK_DESTROY));
         }
     }
 
@@ -2392,6 +2740,16 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
         }
+    }
+
+    /**
+     * 判断区块本 tick 是否需整块重发:引用被回收、命中哨兵、或变更数超过缓存上限。
+     * <p>
+     * Whether the chunk must be resent as a whole this tick: reference collected, sentinel hit,
+     * or changes above the cache cap. The sentinel is never populated, so it cannot be detected by size.
+     */
+    private boolean shouldResendWholeChunk(Map<Integer, Object> blocks) {
+        return blocks == null || blocks == changeBlocksFullMap || blocks.size() > MAX_BLOCK_CACHE;
     }
 
     public void antiXrayOnBlockChange(@Nullable Player player, @NotNull Vector3 vector3, int type) {
@@ -2729,7 +3087,8 @@ public class Level implements ChunkManager, Metadatable {
             item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
         }
 
-        if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)) {
+        if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)
+                && !CreativePlacementDropGuard.suppresses(this, player, target)) {
             if (!isSilkTouch && player != null && drops.length != 0) { // For example no xp from redstone if it's mined with stone pickaxe
                 if (player.isSurvival() || player.isAdventure()) {
                     this.dropExpOrb(vector.add(0.5, 0.5, 0.5), dropExp);
@@ -2742,6 +3101,8 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
         }
+
+        this.vibrationManager.callVibrationEvent(new VibrationEvent(player, vector.add(0.5, 0.5, 0.5), VibrationType.BLOCK_DESTROY));
 
         return item;
     }
@@ -2937,7 +3298,10 @@ public class Level implements ChunkManager, Metadatable {
             }
 
             if (server.mobsFromBlocks) {
-                if (item.getId() == Item.JACK_O_LANTERN || item.getId() == Item.PUMPKIN) {
+                boolean canSpawnGolem = item.getId() == Item.JACK_O_LANTERN
+                        || item.getBlockId() == BlockID.CARVED_PUMPKIN
+                        || (player.protocol < ProtocolInfo.v1_4_0 && item.getId() == Item.PUMPKIN);
+                if (canSpawnGolem) {
                     if (block.getSide(BlockFace.DOWN).getId() == Item.SNOW_BLOCK && block.getSide(BlockFace.DOWN, 2).getId() == Item.SNOW_BLOCK) {
                         block.getLevel().setBlock(target, Block.get(BlockID.AIR));
                         block.getLevel().setBlock(target.add(0, -1, 0), Block.get(BlockID.AIR));
@@ -3007,7 +3371,12 @@ public class Level implements ChunkManager, Metadatable {
             this.scheduleUpdate(block, 1);
         }
 
-        if (!hand.place(item, block, target, face, fx, fy, fz, player)) {
+        boolean placed;
+        try (CreativePlacementDropGuard.Scope ignored =
+                     CreativePlacementDropGuard.enter(this, player, hand)) {
+            placed = hand.place(item, block, target, face, fx, fy, fz, player);
+        }
+        if (!placed) {
             if (liquidMoved) {
                 this.setBlock(block, 0, block, false, false);
                 this.setBlock(block, 1, Block.get(BlockID.AIR), false, false);
@@ -3035,6 +3404,7 @@ public class Level implements ChunkManager, Metadatable {
         if (item.getCount() <= 0) {
             item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
         }
+        this.vibrationManager.callVibrationEvent(new VibrationEvent(player, hand.add(0.5, 0.5, 0.5), VibrationType.BLOCK_PLACE));
         return item;
     }
 
@@ -3043,7 +3413,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Entity getEntity(long entityId) {
-        return this.entities.containsKey(entityId) ? this.entities.get(entityId) : null;
+        return this.entities.get(entityId);
     }
 
     public Entity[] getEntities() {
@@ -3146,7 +3516,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public BlockEntity getBlockEntityById(long blockEntityId) {
-        return this.blockEntities.containsKey(blockEntityId) ? this.blockEntities.get(blockEntityId) : null;
+        return this.blockEntities.get(blockEntityId);
     }
 
     @NonComputationAtomic
@@ -3437,6 +3807,11 @@ public class Level implements ChunkManager, Metadatable {
         BaseFullChunk chunk = this.requireProvider().getLoadedChunk(index);
         if (chunk == null) {
             chunk = this.forceLoadChunk(index, chunkX, chunkZ, create);
+        } else if (this.server.isPrimaryThread()) {
+            // Provider-direct loads bypass Level mounting; replay only their deferred ticks here
+            // without changing entity initialization or ChunkLoadEvent lifecycle semantics.
+            // provider 直载绕过 Level 挂载;这里只回放延迟方块刻,不改变实体初始化与事件生命周期
+            chunk.replayDeferredBlockUpdates();
         }
         return chunk;
     }
@@ -3458,6 +3833,12 @@ public class Level implements ChunkManager, Metadatable {
                 return;
             }
             long index = Level.chunkHash(x, z);
+            // 生成/population 经 chunk.setBlock 与 level.setBlockAt 直写，不触发方块更新，
+            // 连接/角落位从未计算；挂上迁移标志，交给挂载/发送路径按邻居补算
+            // Generation/population writes via chunk.setBlock and level.setBlockAt, bypassing
+            // block updates, so connection/corner bits were never computed; flag the chunk for
+            // the mount/send paths to recompute them from neighbours
+            chunk.setNeedsLegacyConnectionFix(true);
             if (this.chunkPopulationQueue.containsKey(index)) {
                 FullChunk oldChunk = this.getChunk(x, z, false);
                 for (int xx = -1; xx <= 1; ++xx) {
@@ -3475,6 +3856,10 @@ public class Level implements ChunkManager, Metadatable {
                     for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
                         loader.onChunkPopulated(chunk);
                     }
+
+                    // population 完成才放行邻居的四邻门控：唤醒仍带迁移标志的邻居重试
+                    // Population completion unblocks neighbours' four-neighbour gating: wake flagged neighbours to retry
+                    this.retryLegacyConnectionFixForNeighbours(x, z);
                 }
             } else if (this.chunkGenerationQueue.containsKey(index) || this.chunkPopulationLock.containsKey(index)) {
                 this.chunkGenerationQueue.remove(index);
@@ -3506,6 +3891,9 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         long index = Level.chunkHash(chunkX, chunkZ);
+        // 区块对象即将被替换,任何 in-flight 异步读取结果都已过期,挂载时须丢弃
+        // The chunk object is about to be replaced; any in-flight async read result is now stale and must be dropped on mount
+        this.invalidatePendingChunkLoad(index);
         FullChunk oldChunk = this.getChunk(chunkX, chunkZ, false);
 
         if (oldChunk != chunk) {
@@ -3905,6 +4293,7 @@ public class Level implements ChunkManager, Metadatable {
         }
         queue.remove(index);
         tasks.remove(index);
+        this.chunkSendTaskStartTick.remove(index);
     }
 
     private void processChunkRequest() {
@@ -3917,6 +4306,14 @@ public class Level implements ChunkManager, Metadatable {
             LongSet tasks = this.getChunkSendTasks(protocolId);
             ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocolId);
             for (long index : pending) {
+                // 超时未回调则强制清除重试 / Force-clear and retry if no callback within timeout
+                long startTick = this.chunkSendTaskStartTick.get(index);
+                if (startTick != 0 && this.server.getTick() - startTick > CHUNK_SEND_TIMEOUT_TICKS
+                        && tasks.contains(index)) {
+                    server.getLogger().warning("Chunk send task timed out for index " + index + " in level " + this.getName() + ", forcing retry");
+                    tasks.remove(index);
+                    this.chunkSendTaskStartTick.remove(index);
+                }
                 if (!tasks.contains(index) && queue.containsKey(index)) {
                     chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
                     tasks.add(index);
@@ -3928,6 +4325,167 @@ public class Level implements ChunkManager, Metadatable {
         this.chunkRequestInternal(chunkRequests);
     }
 
+    /**
+     * 旧世界迁移：1.26.50 之前保存的玻璃板/铁栏/栅栏/楼梯/绊线没有连接/角落位，而 v2193+ 客户端
+     * 渲染完全由这些状态驱动。按邻居重算并写回，使已有建筑立即恢复连接外观。
+     * <p>
+     * 挂载尾段（finishChunkLoad）为主触发点（光照 population 同款模式），发送路径保留为兜底。
+     * 标志由区块加载/生成路径设置（LevelDB 反序列化时检测磁盘状态缺 corner/connection 键；
+     * 生成的区块经 chunk.setBlock/setBlockAt 直写不触发 update，也需补算；Anvil 连接位虽可经
+     * DataExtra 落盘，但无法区分区块是否由旧版本保存，每次进程启动首个触发点保守重算一次）。
+     * 四邻区块未加载或未 populate 时保留标志推迟重试（population 完成时会唤醒邻居重试），
+     * 避免把跨界连接误算为断开；扫描成功后才清标志（中途异常保留待重试），重算后的状态
+     * 落盘即升级为 1.26.50，标志自然消失。新放置方块的连接由 place/onUpdate 路径维护。
+     * <p>
+     * Legacy-world migration: panes/bars/fences/stairs/tripwire saved before 1.26.50 carry no
+     * connection/corner bits, yet v2193+ clients render them purely from those states. Recompute
+     * the bits from neighbours so existing builds regain their looks.
+     * <p>
+     * Primarily triggered from the mount tail (finishChunkLoad, same pattern as light
+     * population), with the send path kept as a fallback. The flag is set on the chunk-load and
+     * generation paths (LevelDB: a persisted per-chunk migration marker is the authoritative
+     * source — missing/0 means recompute pending — because the load path upgrades keyless states
+     * to keyed all-false ones that a save-before-recompute would otherwise bake, permanently
+     * hiding the need; generated chunks are written via chunk.setBlock/setBlockAt which bypass
+     * block updates and need the recompute too; Anvil bits persist via DataExtra, but a save
+     * predating this fix cannot be told apart, so it conservatively recomputes once per process
+     * start at the first trigger). While any horizontal neighbour chunk is
+     * unloaded or unpopulated the flag is kept (population completion wakes flagged neighbours),
+     * avoiding miscomputing cross-border connections as disconnected;
+     * the flag is cleared only after a successful scan (an aborted one stays flagged for retry),
+     * and the chunk is marked changed so the LevelDB marker persists (a missing marker would
+     * retrigger the idempotent scan on every load).
+     * Freshly placed blocks maintain connections via place/onUpdate.
+     */
+    private void fixLegacyBlockConnections(int x, int z, BaseFullChunk chunk) {
+        if (chunk.getProvider() instanceof Anvil && !chunk.isLegacyConnectionsFixed()) {
+            // Anvil：连接位虽可经 DataExtra(8bit) 落盘，但无法区分本次加载的区块是否由
+            // 旧版本保存（缺连接位）；会话内首个触发点保守重算一次
+            // Anvil: connection bits do persist via DataExtra (8-bit), but a chunk loaded this
+            // process cannot be told apart from one last saved by an older build without them;
+            // conservatively recompute once at the first trigger
+            chunk.setNeedsLegacyConnectionFix(true);
+        }
+        if (!chunk.isNeedsLegacyConnectionFix()) {
+            return;
+        }
+        if (!this.areHorizontalNeighboursPopulated(x, z)) {
+            return;
+        }
+        IntSet targetIds = connectionDrivenBlockIds();
+        try {
+            int minY = this.getMinBlockY();
+            int maxY = this.getMaxBlockY();
+            int baseX = x << 4;
+            int baseZ = z << 4;
+            for (int blockY = minY; blockY <= maxY; blockY++) {
+                for (int bx = 0; bx < 16; bx++) {
+                    for (int bz = 0; bz < 16; bz++) {
+                        // getBlockIdAt 需要世界坐标；此处 bx/bz 是局部坐标，须走 getBlockId
+                        // getBlockIdAt expects world coords while bx/bz are chunk-local; use getBlockId
+                        int id = chunk.getBlockId(bx, blockY, bz);
+                        if (id == 0 || !targetIds.contains(id)) {
+                            continue;
+                        }
+                        Block block = this.getBlock(baseX + bx, blockY, baseZ + bz, 0);
+                        if (block == null) {
+                            continue;
+                        }
+                        boolean changed = false;
+                        if (block instanceof BlockThin thin) {
+                            changed = thin.updateConnections();
+                        } else if (block instanceof BlockFence fence) {
+                            changed = fence.updateConnections();
+                        } else if (block instanceof BlockStairs stairs) {
+                            changed = stairs.updateCorner();
+                        } else if (block instanceof BlockTripWire wire) {
+                            changed = wire.updateConnections();
+                        }
+                        if (changed) {
+                            this.setBlock(block, 0, block, true, false);
+                        }
+                    }
+                }
+            }
+            // 成功完成后才清标志：中途异常保留标志，待发送/邻居挂载时重试
+            // Clear the flag only after a full pass; an aborted scan stays flagged for retry
+            chunk.setNeedsLegacyConnectionFix(false);
+            chunk.setLegacyConnectionsFixed(true);
+            // 置脏让 LevelDB 落盘迁移完成标记：否则无方块改动的干净区块永不保存，
+            // 标记缺失导致每次加载重复扫描
+            // Mark changed so LevelDB persists the migration-done marker; otherwise a clean
+            // chunk (no block writes) would never save and rescan on every load
+            chunk.setChanged();
+        } catch (Throwable t) {
+            this.server.getLogger().error("Failed to fix legacy block connections in chunk " + x + ", " + z + " of level " + this.getFolderName(), t);
+        }
+    }
+
+    /**
+     * 四邻须已加载且已 populate：population 直写不触发方块更新，邻居只生成未填充时扫描会把
+     * 跨界连接误算为断开。旧世界磁盘区块加载即 populated，门控行为不变。
+     * <p>
+     * All four horizontal neighbours must be loaded AND populated: population writes bypass block
+     * updates, so scanning next to a generated-but-unpopulated neighbour would miscompute
+     * cross-border connections as disconnected. Disk chunks are populated on load, so the gate is
+     * unchanged for legacy worlds.
+     */
+    private boolean areHorizontalNeighboursPopulated(int x, int z) {
+        return isChunkLoadedAndPopulated(x + 1, z) && isChunkLoadedAndPopulated(x - 1, z)
+                && isChunkLoadedAndPopulated(x, z + 1) && isChunkLoadedAndPopulated(x, z - 1);
+    }
+
+    private boolean isChunkLoadedAndPopulated(int x, int z) {
+        BaseFullChunk chunk = this.getChunkIfLoaded(x, z);
+        return chunk != null && chunk.isPopulated();
+    }
+
+    /**
+     * 新区块挂载或 populate 完成后唤醒四邻中仍带迁移标志的区块重试——它们的四邻门控可能因此凑齐。
+     * <p>
+     * After a chunk mounts or completes population, re-attempt flagged neighbours — this may
+     * complete their four-neighbour gating.
+     */
+    private void retryLegacyConnectionFixForNeighbours(int x, int z) {
+        this.retryLegacyConnectionFix(x + 1, z);
+        this.retryLegacyConnectionFix(x - 1, z);
+        this.retryLegacyConnectionFix(x, z + 1);
+        this.retryLegacyConnectionFix(x, z - 1);
+    }
+
+    private void retryLegacyConnectionFix(int x, int z) {
+        BaseFullChunk chunk = this.getChunkIfLoaded(x, z);
+        if (chunk != null && chunk.isNeedsLegacyConnectionFix()) {
+            this.fixLegacyBlockConnections(x, z, chunk);
+        }
+    }
+
+    private static IntSet connectionDrivenBlockIds() {
+        IntSet ids = connectionDrivenBlockIds;
+        if (ids != null) {
+            return ids;
+        }
+        synchronized (Level.class) {
+            if (connectionDrivenBlockIds == null) {
+                IntOpenHashSet found = new IntOpenHashSet();
+                Class<?>[] list = Block.list;
+                if (list != null) {
+                    for (int id = 0; id < list.length; id++) {
+                        Class<?> type = list[id];
+                        if (type != null && (BlockThin.class.isAssignableFrom(type)
+                                || BlockFence.class.isAssignableFrom(type)
+                                || BlockStairs.class.isAssignableFrom(type)
+                                || BlockTripWire.class.isAssignableFrom(type))) {
+                            found.add(id);
+                        }
+                    }
+                }
+                connectionDrivenBlockIds = found;
+            }
+            return connectionDrivenBlockIds;
+        }
+    }
+
     private void chunkRequestInternal(Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests) {
         for (long index : chunkRequests.keySet()) {
             ObjectSet<GameVersion> protocols = new ObjectOpenHashSet<>(chunkRequests.get(index));
@@ -3937,6 +4495,9 @@ public class Level implements ChunkManager, Metadatable {
             for (GameVersion protocol : chunkRequests.get(index)) {
                 BaseFullChunk chunk = this.getChunk(x, z);
                 if (chunk != null) {
+                    // 兜底：挂载尾段邻居未齐而保留标志的区块，发送前最后重试一次 / Fallback:
+                    // last retry before sending for chunks still flagged after the mount tail
+                    this.fixLegacyBlockConnections(x, z, chunk);
                     BatchPacket packet = chunk.getChunkPacket(protocol);
                     if (packet != null) {
                         //this.sendChunk(x, z, index, packet);
@@ -3950,12 +4511,22 @@ public class Level implements ChunkManager, Metadatable {
                 continue;
             }
 
+            this.chunkSendTaskStartTick.put(index, this.server.getTick());
             this.requireProvider().requestChunkTask(protocols, x, z);
         }
     }
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
         this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp, x, z, subChunkCount, payload));
+    }
+
+    /**
+     * async 线程调用,仅入队(主线程 doTick 排空才清 tasks)。
+     * <p>
+     * Async-thread entry; just enqueues (main thread drains & clears tasks).
+     */
+    public void onAsyncChunkRequestFailed(GameVersion protocol, int x, int z) {
+        this.asyncChunkRequestFailedQueue.add(new FailedChunkRequest(protocol, x, z));
     }
 
     @Deprecated
@@ -3993,6 +4564,7 @@ public class Level implements ChunkManager, Metadatable {
 
             queue.remove(index);
             tasks.remove(index);
+            this.chunkSendTaskStartTick.remove(index);
         }
     }
 
@@ -4065,8 +4637,13 @@ public class Level implements ChunkManager, Metadatable {
 
     public boolean loadChunk(int x, int z, boolean generate) {
         long index = Level.chunkHash(x, z);
-        if (this.requireProvider().isChunkLoaded(index)) {
-            return true;
+        LevelProvider levelProvider = this.requireProvider();
+        if (levelProvider.isChunkLoaded(index)) {
+            BaseFullChunk chunk = levelProvider.getLoadedChunk(index);
+            if (chunk != null && this.server.isPrimaryThread()) {
+                chunk.replayDeferredBlockUpdates();
+            }
+            return chunk != null;
         }
         return forceLoadChunk(index, x, z, generate) != null;
     }
@@ -4081,7 +4658,20 @@ public class Level implements ChunkManager, Metadatable {
             return null;
         }
 
+        return this.finishChunkLoad(index, x, z, chunk);
+    }
+
+    /**
+     * 区块进入缓存后的共享挂载尾段:事件、实体初始化、光照任务、loader 通知;同步与异步加载路径共用
+     * <p>
+     * Shared mount tail after a chunk enters the cache: events, entity init, light task, loader callbacks; used by both sync and async load paths
+     */
+    private BaseFullChunk finishChunkLoad(long index, int x, int z, BaseFullChunk chunk) {
         if (chunk.getProvider() != null) {
+            // Persisted ticks historically enter the Level scheduler before ChunkLoadEvent, while
+            // entities and block entities remain initialized afterwards by initChunk().
+            // 持久化方块刻应在 ChunkLoadEvent 前进入调度器;实体与方块实体仍由事件后的 initChunk 初始化
+            chunk.replayDeferredBlockUpdates();
             this.server.getPluginManager().callEvent(new ChunkLoadEvent(chunk, !chunk.isGenerated()));
         } else {
             this.unloadChunk(x, z, false);
@@ -4089,6 +4679,12 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         chunk.initChunk();
+
+        // 旧世界连接/角落位迁移：挂载即重算（光照 population 同款挂载尾段模式），并唤醒邻居重试
+        // Legacy connection/corner-bit migration: fix on mount (same tail pattern as light
+        // population) and wake neighbours so their four-neighbour gating may now pass
+        this.fixLegacyBlockConnections(x, z, chunk);
+        this.retryLegacyConnectionFixForNeighbours(x, z);
 
         if (!chunk.isLightPopulated() && chunk.isPopulated() && this.server.lightUpdates) {
             this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new LightPopulationTask(this, chunk));
@@ -4103,6 +4699,107 @@ public class Level implements ChunkManager, Metadatable {
             this.unloadQueue.put(index, (Long) System.currentTimeMillis());
         }
         return chunk;
+    }
+
+    /**
+     * 是否可用异步区块加载(配置开启且 provider 支持非主线程读取)
+     * <p>
+     * Whether async chunk loading is available (config enabled and provider supports off-thread reads)
+     */
+    public boolean isAsyncChunkLoadEnabled() {
+        if (!this.server.asyncChunkSending || this.asyncChunkLoadExecutor == null) {
+            return false;
+        }
+        LevelProvider levelProvider = this.getProvider();
+        return levelProvider != null && levelProvider.isOffThreadChunkReadSupported();
+    }
+
+    /**
+     * 区块写是否积压(积压时本 tick 暂停继续卸载,削峰;见 provider 的挂起写上限)
+     * <p>
+     * Whether chunk writes are backlogged (unloading pauses this tick while backlogged; see the provider's pending-write cap)
+     */
+    public boolean isChunkSaveBacklogged() {
+        LevelProvider levelProvider = this.getProvider();
+        return levelProvider != null && levelProvider.isChunkSaveBacklogged();
+    }
+
+    /**
+     * 提交异步区块读取(玩家发送路径专用);读取+解码在异步线程,挂载在主线程 doTick 中完成。
+     * 返回 false 表示未受理(不支持/executor 已关),调用方应回退同步路径;true 表示已在加载或已加载。
+     * <p>
+     * Submit an async chunk read (player chunk-sending path); read+decode off-thread, mounting in doTick.
+     * Returns false if rejected (unsupported/executor down) so the caller falls back to the sync path; true if pending or already loaded.
+     */
+    public boolean requestChunkLoadAsync(int x, int z) {
+        LevelProvider levelProvider = this.getProvider();
+        if (levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
+            return false;
+        }
+
+        long index = Level.chunkHash(x, z);
+        if (levelProvider.isChunkLoaded(index)) {
+            return true;
+        }
+
+        return this.pendingChunkLoads.computeIfAbsent(index, hash -> {
+            PendingChunkLoad pending = new PendingChunkLoad(x, z, hash, levelProvider);
+            try {
+                this.asyncChunkLoadExecutor.execute(() -> {
+                    try {
+                        if (pending.invalidated) {
+                            return;
+                        }
+                        pending.chunk = levelProvider.readChunkOffThread(x, z);
+                    } catch (Throwable t) {
+                        pending.failure = t;
+                        this.server.getLogger().error("Failed to read chunk " + x + ", " + z + " asynchronously in level " + getFolderName(), t);
+                        if (t instanceof Error error) {
+                            throw error;
+                        }
+                    } finally {
+                        this.completedChunkLoads.add(pending);
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                return null;
+            }
+            return pending;
+        }) != null;
+    }
+
+    void invalidatePendingChunkLoad(long hash) {
+        PendingChunkLoad pending = this.pendingChunkLoads.get(hash);
+        if (pending != null) {
+            pending.invalidated = true;
+        }
+    }
+
+    /**
+     * 主线程挂载异步读取结果;槽位身份已变化(卸载/替换/同步加载抢先/世界重载)时丢弃解码副本。
+     * 读取失败(failure)或磁盘不存在(chunk==null)时挂载空区块,与同步路径 readOrCreateChunk(create=true) 一致,
+     * 避免坏区块被玩家 loadQueue 每 tick 重复读取造成磁盘/日志风暴
+     * <p>
+     * Mount an async read result on the main thread; drops the decoded copy if the slot identity changed (unload/replace/sync load won/level reload).
+     * On read failure or absent-on-disk, mounts an empty chunk (matching the sync path readOrCreateChunk(create=true)) so a broken chunk isn't re-read every tick by the player's loadQueue, avoiding a disk/log storm
+     */
+    synchronized void mountChunk(PendingChunkLoad pending) {
+        LevelProvider levelProvider = this.getProvider();
+        if (levelProvider == null || levelProvider != pending.provider || pending.invalidated
+                || levelProvider.isChunkLoaded(pending.hash)) {
+            return;
+        }
+
+        BaseFullChunk chunk = pending.chunk;
+        if (chunk == null) {
+            chunk = levelProvider.getEmptyChunk(pending.x, pending.z);
+        }
+
+        if (levelProvider.putChunkIfAbsent(pending.x, pending.z, chunk) != null) {
+            return;
+        }
+
+        this.finishChunkLoad(pending.hash, pending.x, pending.z, chunk);
     }
 
     private void queueUnloadChunk(int x, int z) {
@@ -4150,6 +4847,10 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
+        // 未挂载的异步读取也必须在卸载时失效,避免早退后任务继续读取并重新挂载
+        // Invalidate unmounted async reads too, so the early return cannot let them keep reading and remount the chunk
+        this.invalidatePendingChunkLoad(Level.chunkHash(x, z));
+
         if (!this.isChunkLoaded(x, z)) {
             return true;
         }
@@ -4186,6 +4887,7 @@ public class Level implements ChunkManager, Metadatable {
                     if (chunk.hasChanged()) {
                         levelProvider.setChunk(x, z, chunk);
                         levelProvider.saveChunk(x, z);
+                        this.saveChangedNeighbours(levelProvider, x, z);
                     }
                 }
                 for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
@@ -4229,6 +4931,37 @@ public class Level implements ChunkManager, Metadatable {
         } catch (Exception e) {
             this.server.getLogger().error("Error unloading chunk " + x + "," + z, e);
             return false;
+        }
+    }
+
+    /**
+     * Writes the changed neighbours of a chunk that is being saved on unload.
+     *
+     * <p>A machine on a chunk border (a hopper feeding a chest across it, a double chest, a hopper
+     * chain) moves items between two chunks within one tick. Saving only the unloading chunk leaves
+     * its neighbour on disk in the state of the previous save, so a crash before that neighbour is
+     * written duplicates or loses everything moved since: a hopper that had pushed a stack into a
+     * chest across the border came back with the stack still inside AND the chest full. Saving the
+     * changed neighbours in the same pass lands both sides of the border on disk together; a chunk
+     * that did not change is skipped, so the extra work is bounded by what the unload queue would
+     * have written a moment later anyway.
+     */
+    private void saveChangedNeighbours(LevelProvider levelProvider, int x, int z) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                int nx = x + dx;
+                int nz = z + dz;
+                if (!this.isChunkLoaded(nx, nz)) {
+                    continue;
+                }
+                BaseFullChunk neighbour = this.getChunk(nx, nz, false);
+                if (neighbour != null && neighbour.hasChanged()) {
+                    levelProvider.saveChunk(nx, nz);
+                }
+            }
         }
     }
 
@@ -4311,6 +5044,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public long getCurrentTick() {
         return this.levelCurrentTick;
+    }
+
+    public VibrationManager getVibrationManager() {
+        return this.vibrationManager;
     }
 
     public String getName() {
@@ -4465,6 +5202,9 @@ public class Level implements ChunkManager, Metadatable {
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return;
         }
+        if (!force && this.isChunkSaveBacklogged()) {
+            return;
+        }
 
         if (!this.unloadQueue.isEmpty()) {
             long now = System.currentTimeMillis();
@@ -4516,6 +5256,11 @@ public class Level implements ChunkManager, Metadatable {
     private boolean unloadChunks(long now, long allocatedTime, boolean force) {
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return false;
+        }
+        // 写积压时本 tick 暂停卸载(unloadQueue 保留,下 tick 重试);返回 true 让 provider GC 继续用剩余预算
+        // Pause unloading this tick while writes are backlogged (unloadQueue kept, retried next tick); return true so provider GC still uses the remaining budget
+        if (!force && this.isChunkSaveBacklogged()) {
+            return true;
         }
 
         if (!this.unloadQueue.isEmpty()) {
@@ -5289,15 +6034,21 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     /**
-     * 添加方块设置回调，当世界中有方块被更改时，会触发回调
-     *
-     * @param consumer 回调
-     * @return 回调id
+     * 添加方块变更回调，参数为 (previousBlock, newBlock)。
+     * <p>Adds a callback fired when a block changes; params are (previousBlock, newBlock).
      */
-    public int addCallbackBlockSet(Consumer<Block> consumer) {
+    public int addCallbackBlockSet(BiConsumer<Block, Block> consumer) {
         int id = callbackIdCounter.incrementAndGet();
         callbackBlockSet.put(id, consumer);
         return id;
+    }
+
+    /**
+     * 仅传递新方块的旧版重载，保留以兼容现有插件。
+     * <p>Legacy overload forwarding only the new block, kept for plugin compatibility.
+     */
+    public int addCallbackBlockSet(Consumer<Block> consumer) {
+        return addCallbackBlockSet((previous, current) -> consumer.accept(current));
     }
 
     public void removeCallbackBlockSet(int id) {
@@ -5371,7 +6122,11 @@ public class Level implements ChunkManager, Metadatable {
     private GameVersion getChunkProtocol(GameVersion version) {
         int protocol = version.getProtocol();
         if (version.isNetEase()) {
-            if (protocol >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
+            if (protocol >= GameVersion.V1_21_130_NETEASE.getProtocol()) {
+                return GameVersion.V1_21_130_NETEASE;
+            } else if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+                return GameVersion.V1_21_124_NETEASE;
+            } else if (protocol >= GameVersion.V1_21_93_NETEASE.getProtocol()) {
                 return GameVersion.V1_21_93_NETEASE;
             } else if (protocol >= GameVersion.V1_21_50_NETEASE.getProtocol()) {
                 return GameVersion.V1_21_50_NETEASE;
@@ -5380,12 +6135,19 @@ public class Level implements ChunkManager, Metadatable {
             }
             return GameVersion.V1_20_50_NETEASE;
         }
-        if (protocol >= GameVersion.V1_26_20_26.getProtocol()) {
+
+        if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
+            return GameVersion.V1_26_50;
+        } else if (protocol >= GameVersion.V1_26_40.getProtocol()) {
+            return GameVersion.V1_26_40;
+        } else if (protocol >= GameVersion.V1_26_30.getProtocol()) {
+            return GameVersion.V1_26_30;
+        } else if (protocol >= GameVersion.V1_26_20_26.getProtocol()) {
             return GameVersion.V1_26_20;
         } else if (protocol >= GameVersion.V1_26_10.getProtocol()) {
             return GameVersion.V1_26_10;
         } else if (protocol >= GameVersion.V1_21_110_26.getProtocol()) {
-            return GameVersion.V1_21_110;
+            return GameVersion.V1_21_111;
         } else if (protocol >= GameVersion.V1_21_100.getProtocol()) {
             return GameVersion.V1_21_100;
         } else if (protocol >= ProtocolInfo.v1_21_90) {
@@ -5533,10 +6295,17 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_21_90)
             if (player >= ProtocolInfo.v1_21_90) if (player <= ProtocolInfo.v1_21_93) return true;
         if (chunk == GameVersion.V1_21_100.getProtocol()) if (player == GameVersion.V1_21_100.getProtocol()) return true;
-        if (chunk == GameVersion.V1_21_110.getProtocol())
+        if (chunk == GameVersion.V1_21_111.getProtocol())
             if (player >= GameVersion.V1_21_110_26.getProtocol()) if (player <= GameVersion.V1_26_0.getProtocol()) return true;
         if (chunk == GameVersion.V1_26_10.getProtocol())  if (player == GameVersion.V1_26_10.getProtocol()) return true;
-        if (chunk == GameVersion.V1_26_20.getProtocol())  if (player >= GameVersion.V1_26_20_26.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_20.getProtocol())
+            if (player >= GameVersion.V1_26_20_26.getProtocol()) if (player < GameVersion.V1_26_30.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_30.getProtocol())
+            if (player >= GameVersion.V1_26_30.getProtocol()) if (player < GameVersion.V1_26_40.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_40.getProtocol())
+            if (player >= GameVersion.V1_26_40.getProtocol()) if (player < GameVersion.V1_26_50_27.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_50.getProtocol())
+            if (player >= GameVersion.V1_26_50_27.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

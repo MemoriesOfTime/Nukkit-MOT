@@ -5,6 +5,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemCake;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
@@ -121,6 +123,7 @@ public class BlockCake extends BlockTransparentMeta {
         }
         if (player != null && player.canEat(false)) {
             if (getDamage() <= 0x06) setDamage(getDamage() + 1);
+            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player, this.add(0.5, 0.5, 0.5), VibrationType.EAT));
             if (getDamage() > 0x06) {
                 getLevel().setBlock(this, Block.get(BlockID.AIR), true);
             } else {

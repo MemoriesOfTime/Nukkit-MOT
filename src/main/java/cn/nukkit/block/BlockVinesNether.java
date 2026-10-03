@@ -379,8 +379,18 @@ public abstract class BlockVinesNether extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean canBePushed() {
+    public boolean breaksWhenMoved() {
+        return true;
+    }
+
+    @Override
+    public boolean sticksToPiston() {
         return false;
+    }
+
+    @Override
+    public boolean canBePushed() {
+        return true;
     }
 
     @Override

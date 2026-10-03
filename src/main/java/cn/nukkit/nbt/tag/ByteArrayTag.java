@@ -3,10 +3,12 @@ package cn.nukkit.nbt.tag;
 import cn.nukkit.nbt.stream.NBTInputStream;
 import cn.nukkit.nbt.stream.NBTOutputStream;
 import cn.nukkit.utils.Binary;
+import lombok.Getter;
 
 import java.io.IOException;
 import java.util.Arrays;
 
+@Getter
 public class ByteArrayTag extends Tag {
 
     public byte[] data;
@@ -35,14 +37,9 @@ public class ByteArrayTag extends Tag {
     }
 
     @Override
-    void load(NBTInputStream dis) throws IOException {
-        int length = dis.readInt();
-        data = new byte[length];
-        dis.readFully(data);
-    }
-
-    public byte[] getData() {
-        return data;
+    void load(NBTInputStream dis, int nested) throws IOException {
+        // Bulk copy with an allocation bounded by the bytes that arrive, see readByteArray.
+        data = dis.readByteArray(dis.readInt());
     }
 
     @Override

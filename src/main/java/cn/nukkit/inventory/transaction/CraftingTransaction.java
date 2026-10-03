@@ -4,6 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.transaction.action.CraftingTakeResultAction;
+import cn.nukkit.inventory.transaction.action.CraftingTransferMaterialAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -76,10 +78,16 @@ public class CraftingTransaction extends InventoryTransaction {
     }
 
     public void setPrimaryOutput(Item item) {
+        if (item == null || item.isNull()) {
+            throw new IllegalArgumentException("Primary result item must not be null or air");
+        }
         if (primaryOutput == null) {
             primaryOutput = item.clone();
-        } else if (!primaryOutput.equals(item)) {
+        } else if (!primaryOutput.equals(item, true, false) || primaryOutput.getCount() != item.getCount()) {
             throw new RuntimeException("Primary result item has already been set and does not match the current item (expected " + primaryOutput + ", got " + item + ')');
+        } else {
+            // Same item identity may still carry event-authored NBT.
+            primaryOutput = item.clone();
         }
     }
 
@@ -104,18 +112,42 @@ public class CraftingTransaction extends InventoryTransaction {
             MultiRecipe multiRecipe = source.getServer().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
             if (multiRecipe != null) {
                 recipe = multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList());
+                // Multi-recipe output is rebuilt authoritatively by the server, overriding the client NBT (#798).
+                applyAuthoritativeOutput(recipe.getResult());
             }
         }
         this.setTransactionRecipe(recipe);
         return this.getTransactionRecipe() != null && super.canExecute();
     }
 
+    /**
+     * Replaces the client-authored output with the server-rebuilt one, covering primaryOutput,
+     * parsed result actions and inventory targets so that authoritative NBT lands
+     * in the player's inventory.
+     */
+    void applyAuthoritativeOutput(Item authoritativeOutput) {
+        Item rewritten = applyEventOutputToActions(this.primaryOutput, authoritativeOutput);
+        if (rewritten == null) {
+            return;
+        }
+        this.primaryOutput = rewritten;
+    }
+
     @Override
     protected boolean callExecuteEvent() {
         CraftItemEvent ev;
+        Item originalOutput = this.primaryOutput == null ? null : this.primaryOutput.clone();
 
         this.source.getServer().getPluginManager().callEvent(ev = new CraftItemEvent(this));
-        return !ev.isCancelled();
+        if (ev.isCancelled()) {
+            return false;
+        }
+        Item rewritten = applyEventOutputToActions(originalOutput, this.primaryOutput);
+        if (rewritten == null) {
+            return false;
+        }
+        this.primaryOutput = rewritten;
+        return true;
     }
 
     @Override
@@ -168,5 +200,15 @@ public class CraftingTransaction extends InventoryTransaction {
         }
         Server.getInstance().getLogger().debug("No actions on the list");
         return false;
+    }
+
+    @Override
+    public void addAction(InventoryAction action) {
+        if (!(action instanceof CraftingTakeResultAction || action instanceof CraftingTransferMaterialAction || action instanceof SlotChangeAction)) {
+            this.invalid = true;
+            Server.getInstance().getLogger().debug("Failed to add InventoryAction for " + source.getName() + ": unexpected action in crafting transaction: " + action);
+            return;
+        }
+        super.addAction(action);
     }
 }

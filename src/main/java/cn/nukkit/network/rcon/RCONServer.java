@@ -206,7 +206,11 @@ public class RCONServer extends Thread {
     }
 
     private void send(SocketChannel channel, RCONPacket packet) {
-        if (!channel.keyFor(this.selector).isValid()) {
+        SelectionKey key = channel.keyFor(this.selector);
+        if (key == null || !key.isValid()) {
+            // The client may be gone by the time an answer is ready: a deferred reply is sent
+            // ticks after the command, and a closed channel has no key left. Reading isValid()
+            // off null threw out of Server#tick and killed the whole tick.
             return;
         }
 

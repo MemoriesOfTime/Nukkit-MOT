@@ -21,6 +21,12 @@ import java.util.Map;
  * @since 2016/1/23
  */
 public class EffectCommand extends VanillaCommand {
+    // Bounds taken from vanilla /effect: 1,000,000s duration cap (introduced in BE 1.16.200), amplifier 0-255.
+    // Out-of-range values are rejected like Java Edition does; vanilla Bedrock clamps duration to the cap instead.
+    // Both stay overflow-safe: 1000000s * 20 ticks < Integer.MAX_VALUE, (255+1) << 2 absorption hearts render fine.
+    public static final int MAX_DURATION_SECONDS = 1_000_000;
+    public static final int MAX_AMPLIFIER = 255;
+
     public EffectCommand(String name) {
         super(name, "commands.effect.description", "nukkit.command.effect.usage");
         this.setPermission("nukkit.command.effect");
@@ -74,22 +80,30 @@ public class EffectCommand extends VanillaCommand {
                 int amplification = 0;
                 if (list.hasResult(2)) {
                     duration = list.getResult(2);
+                    if (!isSafeDurationSeconds(duration)) {
+                        if (duration < 0) {
+                            log.addNumTooSmall(2, 0).output();
+                        } else {
+                            log.addError("commands.generic.double.tooBig", String.valueOf(duration), String.valueOf(MAX_DURATION_SECONDS)).output();
+                        }
+                        return 0;
+                    }
                     if (!(effect instanceof InstantEffect)) {
                         duration *= 20;
                     }
                 } else if (effect instanceof InstantEffect) {
                     duration = 1;
                 }
-                if (duration < 0) {
-                    log.addNumTooSmall(2, 0).output();
-                    return 0;
-                }
 
                 if (list.hasResult(3)) {
                     amplification = list.getResult(3);
                 }
-                if (amplification < 0) {
-                    log.addNumTooSmall(3, 0).output();
+                if (!isSafeAmplifier(amplification)) {
+                    if (amplification < 0) {
+                        log.addNumTooSmall(3, 0).output();
+                    } else {
+                        log.addError("commands.generic.double.tooBig", String.valueOf(amplification), String.valueOf(MAX_AMPLIFIER)).output();
+                    }
                     return 0;
                 }
 
@@ -137,5 +151,13 @@ public class EffectCommand extends VanillaCommand {
                 return 0;
             }
         }
+    }
+
+    static boolean isSafeDurationSeconds(int durationSeconds) {
+        return durationSeconds >= 0 && durationSeconds <= MAX_DURATION_SECONDS;
+    }
+
+    static boolean isSafeAmplifier(int amplifier) {
+        return amplifier >= 0 && amplifier <= MAX_AMPLIFIER;
     }
 }

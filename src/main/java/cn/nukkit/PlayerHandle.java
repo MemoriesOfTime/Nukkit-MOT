@@ -12,6 +12,7 @@ import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.PlayerFogPacket;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.login.NetworkSessionState;
+import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.LoginChainData;
@@ -65,6 +66,10 @@ public final class PlayerHandle {
         return player.networkSession;
     }
 
+    public void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {
+        player.queueResourcePackChunk(resourcePack, chunkIndex);
+    }
+
 
     public void sendPlayStatus(int status) {
         player.sendPlayStatus(status);
@@ -72,6 +77,10 @@ public final class PlayerHandle {
 
     public void sendPlayStatus(int status, boolean immediate) {
         player.sendPlayStatus(status, immediate);
+    }
+
+    public boolean handleRespawnRequest() {
+        return player.handleRespawnRequest();
     }
 
     /*public long getBreakingBlockTime() {

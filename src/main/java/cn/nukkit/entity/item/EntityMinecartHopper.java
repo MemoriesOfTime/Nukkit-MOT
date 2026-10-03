@@ -34,8 +34,12 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
 
     public EntityMinecartHopper(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
-        setDisplayBlock(Block.get(Block.HOPPER_BLOCK), false);
         setName("Minecart with Hopper");
+    }
+
+    @Override
+    protected Block getDefaultDisplayBlock() {
+        return Block.get(Block.HOPPER_BLOCK);
     }
 
     @Override
@@ -95,7 +99,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
         super.initEntity();
 
         this.inventory = new MinecartHopperInventory(this);
-        if (this.namedTag.contains("Items") && this.namedTag.get("Items") instanceof ListTag) {
+        if (this.namedTag.get("Items") instanceof ListTag) {
             ListTag<CompoundTag> inventoryList = this.namedTag.getList("Items", CompoundTag.class);
             for (CompoundTag item : inventoryList.getAll()) {
                 this.inventory.setItem(item.getByte("Slot"), NBTIO.getItemHelper(item));
@@ -221,7 +225,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                             item.count--;
                             pushedItem = true;
                         }
-                    } else if (targetInv.getSmelting().getId() == itemToAdd.getId() && targetInv.getSmelting().getDamage() == itemToAdd.getDamage() && smelting.count < smelting.getMaxStackSize()) {
+                    } else if (smelting.getId() == itemToAdd.getId() && smelting.getDamage() == itemToAdd.getDamage() && smelting.count < smelting.getMaxStackSize()) {
                         event = new InventoryMoveItemEvent(this.inventory, targetInv, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
                         this.server.getPluginManager().callEvent(event);
 

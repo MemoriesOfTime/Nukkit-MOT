@@ -10,14 +10,19 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.particle.SmokeParticle;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -83,6 +88,46 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
         return true;
     }
 
+    private AxisAlignedBB[] recalculateCollisionBoxes() {
+        double rim = 2d / 16d;
+        double bottom = 5d / 16d;
+        return new AxisAlignedBB[]{
+                new SimpleAxisAlignedBB(x, y, z, x + 1d, y + bottom, z + 1d),
+                new SimpleAxisAlignedBB(x, y, z, x + rim, y + 1d, z + 1d),
+                new SimpleAxisAlignedBB(x + 1d - rim, y, z, x + 1d, y + 1d, z + 1d),
+                new SimpleAxisAlignedBB(x, y, z, x + 1d, y + 1d, z + rim),
+                new SimpleAxisAlignedBB(x, y, z + 1d - rim, x + 1d, y + 1d, z + 1d)
+        };
+    }
+
+    private boolean collidesWithCauldron(AxisAlignedBB bb) {
+        for (AxisAlignedBB collisionBox : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(collisionBox)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb) {
+        return collidesWithCauldron(bb);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb, boolean collisionBB) {
+        return collisionBB ? collidesWithCauldron(bb) : super.collidesWithBB(bb, false);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        for (AxisAlignedBB collisionBox : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(collisionBox)) {
+                collidingBoxes.add(collisionBox);
+            }
+        }
+    }
+
     public boolean isFull() {
         return (this.getDamage() & 0x06) == 0x06;
     }
@@ -141,6 +186,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
                         this.level.setBlock(this, this, true);
                         cauldron.clearCustomColor();
                         this.getLevel().addSoundToViewers(this, Sound.CAULDRON_TAKEWATER);
+                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player, this.add(0.5, 0.5, 0.5), VibrationType.FLUID_PICKUP));
                     }
                 } else if (item.getDamage() == 8 || item.getDamage() == 10) {//water and lava buckets
                     if (isFull() && !cauldron.isCustomColor() && !cauldron.hasPotion() && item.getDamage() == 8) {
@@ -164,6 +210,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
                             cauldron.clearCustomColor();
                             this.level.setBlock(this, this, true);
                             this.getLevel().addSoundToViewers(this, Sound.CAULDRON_FILLWATER);
+                            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(player, this.add(0.5, 0.5, 0.5), VibrationType.FLUID_PLACE));
                         } else { // lava bucket
                             if (!isEmpty()) {
                                 clearWithFizz(cauldron);

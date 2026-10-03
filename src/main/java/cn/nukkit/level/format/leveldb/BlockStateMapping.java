@@ -5,7 +5,8 @@ import cn.nukkit.block.Block;
 import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterChunker;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterVanilla;
-import cn.nukkit.level.format.leveldb.updater.BlockStateUpdater_1_21_110_NoVersionBump;
+import cn.nukkit.level.format.leveldb.updater.BlockStateUpdater_1_26_30;
+import cn.nukkit.level.format.leveldb.updater.BlockStateUpdater_1_26_50;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -106,7 +107,9 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_21_30.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_40.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_60.INSTANCE);
-        blockStateUpdaters.add(BlockStateUpdater_1_21_110_NoVersionBump.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_110.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_26_30.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_26_50.INSTANCE);
 
         blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
 
@@ -134,6 +137,25 @@ public class BlockStateMapping {
     }
 
     public void registerState(int runtimeId, NbtMap state) {
+        registerState(runtimeId, state, -1, -1);
+    }
+
+    /**
+     * 注册一个块状态，可选地预设 legacyId/legacyData。
+     * <p>
+     * 用于修正 vanilla 合并方块（如 lava_cauldron 在 1.20+ 合并进 cauldron）的反查遮蔽问题：
+     * {@code runtimeIdToLegacy.putIfAbsent} 会让主 id 先注册而遮蔽被合并 id，预设 legacyId 可覆盖。
+     * <p>
+     * Registers a block state with optional preset legacyId/legacyData. Fixes reverse-lookup shadowing
+     * for merged vanilla blocks (e.g. lava_cauldron merged into cauldron in 1.20+), where
+     * {@code runtimeIdToLegacy.putIfAbsent} lets the primary id win and shadow the merged id.
+     *
+     * @param runtimeId palette 中的运行时 id / runtime id in the palette
+     * @param state     vanilla 块状态 NbtMap / vanilla block state NbtMap
+     * @param legacyId  预设 legacy id（-1 表示延迟从调色板反查）/ preset legacy id (-1 = lazy lookup)
+     * @param legacyData 预设 legacy data（-1 表示延迟从调色板反查）/ preset legacy data (-1 = lazy lookup)
+     */
+    public void registerState(int runtimeId, NbtMap state, int legacyId, int legacyData) {
         Preconditions.checkArgument(!this.runtime2State.containsKey(runtimeId),
                 "Mapping for runtimeId " + runtimeId + " is already created!");
         Preconditions.checkArgument(!this.paletteMap.containsKey(state),
@@ -143,6 +165,8 @@ public class BlockStateMapping {
                 .version(this.version)
                 .vanillaState(state)
                 .runtimeId(runtimeId)
+                .legacyId(legacyId)
+                .legacyData(legacyData)
                 .build();
         this.runtime2State.put(runtimeId, blockState);
         this.paletteMap.put(state, blockState);

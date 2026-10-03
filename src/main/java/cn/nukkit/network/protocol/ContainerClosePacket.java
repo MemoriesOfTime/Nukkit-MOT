@@ -41,7 +41,7 @@ public class ContainerClosePacket extends DataPacket {
         this.putByte((byte) this.windowId);
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (protocol >= ProtocolInfo.v1_21_0) {
-                this.putByte((byte) this.type.ordinal());
+                this.putByte((byte) this.type.getId());
             }
             this.putBoolean(this.wasServerInitiated);
         }

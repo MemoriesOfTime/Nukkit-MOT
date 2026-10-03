@@ -3,13 +3,13 @@ package cn.nukkit.scheduler;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.PluginException;
-import cn.nukkit.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
@@ -21,7 +21,6 @@ public class ServerScheduler {
     public static int WORKERS = 4;
 
     private final AsyncPool asyncPool;
-    private final ExecutorService virtualPool;
 
     private final Queue<TaskHandler> pending;
     private final Map<Integer, ArrayDeque<TaskHandler>> queueMap;
@@ -36,18 +35,6 @@ public class ServerScheduler {
         this.queueMap = new ConcurrentHashMap<>();
         this.taskMap = new ConcurrentHashMap<>();
         this.asyncPool = new AsyncPool(Server.getInstance(), WORKERS);
-
-        ThreadFactory virtualFactory = Thread.ofVirtual()
-            .name("Nukkit Virtual Task #", 0)
-            .uncaughtExceptionHandler((t, e) -> Server.getInstance().getLogger()
-                .critical("Exception in virtual task " + t.getName() + ": " + e.getMessage(),
-                    e instanceof Exception ? e : new RuntimeException(e)))
-            .factory();
-        this.virtualPool = Executors.newThreadPerTaskExecutor(virtualFactory);
-    }
-
-    public AsyncPool getAsyncPool() {
-        return asyncPool;
     }
 
     @Deprecated
@@ -77,10 +64,6 @@ public class ServerScheduler {
         return addTask(plugin, task, 0, 0, asynchronous);
     }
 
-    public TaskHandler scheduleTask(@NotNull Plugin plugin, @NotNull Runnable task, boolean asynchronous, boolean virtual) {
-        return addTask(plugin, task, 0, 0, asynchronous, virtual);
-    }
-
     public TaskHandler scheduleTask(@NotNull Plugin plugin,
                                     @NotNull BiConsumer<Task, Integer> task,
                                     boolean asynchronous) {
@@ -95,11 +78,11 @@ public class ServerScheduler {
 
     @Deprecated
     public TaskHandler scheduleAsyncTask(@NotNull AsyncTask task) {
-        return addTask(null, task, 0, 0, true, task.isVirtual());
+        return addTask(null, task, 0, 0, true);
     }
 
     public TaskHandler scheduleAsyncTask(@NotNull Plugin plugin, @NotNull AsyncTask task) {
-        return addTask(plugin, task, 0, 0, true, task.isVirtual());
+        return addTask(plugin, task, 0, 0, true);
     }
 
     @Deprecated
@@ -147,10 +130,6 @@ public class ServerScheduler {
         return addTask(plugin, task, delay, 0, asynchronous);
     }
 
-    public TaskHandler scheduleDelayedTask(@NotNull Plugin plugin, @NotNull Runnable task, int delay, boolean asynchronous, boolean virtual) {
-        return addTask(plugin, task, delay, 0, asynchronous, virtual);
-    }
-
     @Deprecated
     public TaskHandler scheduleRepeatingTask(@NotNull Runnable task, int period) {
         return addTask(null, task, 0, period, false);
@@ -167,10 +146,6 @@ public class ServerScheduler {
 
     public TaskHandler scheduleRepeatingTask(@NotNull Plugin plugin, @NotNull Runnable task, int period, boolean asynchronous) {
         return addTask(plugin, task, 0, period, asynchronous);
-    }
-
-    public TaskHandler scheduleRepeatingTask(@NotNull Plugin plugin, @NotNull Runnable task, int period, boolean asynchronous, boolean virtual) {
-        return addTask(plugin, task, 0, period, asynchronous, virtual);
     }
 
     @Deprecated
@@ -225,10 +200,6 @@ public class ServerScheduler {
 
     public TaskHandler scheduleDelayedRepeatingTask(@NotNull Plugin plugin, @NotNull Runnable task, int delay, int period, boolean asynchronous) {
         return addTask(plugin, task, delay, period, asynchronous);
-    }
-
-    public TaskHandler scheduleDelayedRepeatingTask(@NotNull Plugin plugin, @NotNull Runnable task, int delay, int period, boolean asynchronous, boolean virtual) {
-        return addTask(plugin, task, delay, period, asynchronous, virtual);
     }
 
     public TaskHandler scheduleDelayedRepeatingTask(@NotNull Plugin plugin,
@@ -286,9 +257,19 @@ public class ServerScheduler {
         this.currentTaskId.set(0);
     }
 
+    /**
+     * Gracefully shut down the async worker pool. Call after {@link #cancelAllTasks()}
+     * and the final {@link #mainThreadHeartbeat(int)} so any submitted async tasks
+     * get a chance to finish and their {@code onCompletion} callbacks run.
+     */
     public void shutdown() {
-        this.asyncPool.shutdownNow();
-        this.virtualPool.shutdownNow();
+        shutdown(5);
+    }
+
+    public void shutdown(long timeoutSeconds) {
+        this.asyncPool.shutdownGracefully(timeoutSeconds);
+        // Flush any onCompletion callbacks queued by tasks that finished during shutdown.
+        AsyncTask.collectTask();
     }
 
     public boolean isQueued(int taskId) {
@@ -300,21 +281,14 @@ public class ServerScheduler {
     }
 
     private TaskHandler addTask(Plugin plugin, Runnable task, int delay, int period, boolean asynchronous) {
-        return addTask(plugin, task, delay, period, asynchronous, false);
-    }
-
-    private TaskHandler addTask(Plugin plugin, Runnable task, int delay, int period, boolean asynchronous, boolean virtual) {
         if (plugin != null && plugin.isDisabled()) {
             throw new PluginException("Plugin '" + plugin.getName() + "' attempted to register a task while disabled.");
         }
         if (delay < 0 || period < 0) {
             throw new PluginException("Attempted to register a task with negative delay or period.");
         }
-        if (virtual && !asynchronous) {
-            throw new PluginException("Virtual thread tasks must be asynchronous.");
-        }
 
-        TaskHandler taskHandler = new TaskHandler(plugin, task, nextTaskId(), asynchronous, virtual);
+        TaskHandler taskHandler = new TaskHandler(plugin, task, nextTaskId(), asynchronous);
         taskHandler.setDelay(delay);
         taskHandler.setPeriod(period);
         taskHandler.setNextRunTick(taskHandler.isDelayed() ? currentTick + taskHandler.getDelay() : currentTick);
@@ -334,7 +308,14 @@ public class ServerScheduler {
         TaskHandler task;
         while ((task = pending.poll()) != null) {
             int tick = Math.max(currentTick, task.getNextRunTick()); // Do not schedule in the past
-            ArrayDeque<TaskHandler> queue = Utils.getOrCreate(queueMap, ArrayDeque.class, tick);
+            ArrayDeque<TaskHandler> queue = queueMap.get(tick);
+            if (queue == null) {
+                ArrayDeque<TaskHandler> created = new ArrayDeque<>();
+                queue = queueMap.putIfAbsent(tick, created);
+                if (queue == null) {
+                    queue = created;
+                }
+            }
             queue.add(task);
         }
         if (currentTick - this.currentTick > queueMap.size()) { // A large number of ticks have passed since the last execution
@@ -346,7 +327,7 @@ public class ServerScheduler {
             }
         } else { // Normal server tick
             for (int i = this.currentTick + 1; i <= currentTick; i++) {
-                runTasks(currentTick);
+                runTasks(i);
             }
         }
         this.currentTick = currentTick;
@@ -361,11 +342,7 @@ public class ServerScheduler {
                     taskMap.remove(taskHandler.getTaskId());
                     continue;
                 } else if (taskHandler.isAsynchronous()) {
-                    if (taskHandler.isVirtual()) {
-                        virtualPool.execute(taskHandler.getTask());
-                    } else {
-                        asyncPool.execute(taskHandler.getTask());
-                    }
+                    asyncPool.execute(taskHandler.getTask());
                 } else {
                     try {
                         taskHandler.run(currentTick);

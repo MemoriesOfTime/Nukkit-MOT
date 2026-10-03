@@ -5,25 +5,28 @@ import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
+import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterVanilla;
 import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
-import org.cloudburstmc.nbt.NBTInputStream;
-import org.cloudburstmc.nbt.NBTOutputStream;
-import org.cloudburstmc.nbt.NbtMap;
-import org.cloudburstmc.nbt.NbtUtils;
+import org.cloudburstmc.nbt.*;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -34,10 +37,20 @@ import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 @Log4j2
 public class StateBlockStorage {
 
+    /**
+     * PocketMine-MP writes this private key into every block state it stores. Vanilla palettes
+     * do not contain it and states are matched as whole NBT maps, so a world saved by PMMP
+     * matches nothing at all - down to minecraft:air - and loads as solid info_update.
+     * Dropping the key here keeps everything downstream working with plain vanilla states.
+     */
+    private static final String PMMP_DATA_VERSION = "PMMPDataVersion";
+
     private static final int SECTION_SIZE = 16 * 16 * 16;
 
     private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
+    // Snapshot acknowledgements must also notice public storage mutations that bypass section setters.
+    private volatile int version;
 
     //用于兼容1.13以下版本
     private byte[] blockIds;
@@ -101,6 +114,7 @@ public class StateBlockStorage {
     }
 
     public void readFromStorage(ByteBuf buffer, ChunkBuilder chunkBuilder) {
+        this.version++;
         short header = buffer.readUnsignedByte();
 
         if (header == -1) {
@@ -136,11 +150,21 @@ public class StateBlockStorage {
             for (int i = 0; i < paletteSize; ++i) {
                 try {
                     NbtMap state = (NbtMap) inputStream.readTag();
+                    if (state.containsKey(PMMP_DATA_VERSION)) {
+                        NbtMapBuilder withoutForeignKeys = state.toBuilder();
+                        withoutForeignKeys.remove(PMMP_DATA_VERSION);
+                        state = withoutForeignKeys.build();
+                    }
                     //noinspection ResultOfMethodCallIgnored
                     state.hashCode(); // cache hashCode
 
                     BlockStateSnapshot blockState = BlockStateMapping.get().getStateUnsafe(state);
                     if (blockState == null) {
+                        // 磁盘状态缺 1.26.50 corner/connection 键 => 区块发送前需按邻居重算连接位
+                        // Serialized state lacks 1.26.50 corner/connection keys => recompute from neighbours before sending
+                        if (BlockStateUpdaterVanilla.needsConnectionRecompute(state)) {
+                            chunkBuilder.needsLegacyConnectionFix();
+                        }
                         NbtMap updatedState = BlockStateMapping.get().updateVanillaState(state);
                         blockState = BlockStateMapping.get().getUpdatedOrCustom(state, updatedState);
                         if (!blockState.isCustom()) {
@@ -205,7 +229,13 @@ public class StateBlockStorage {
             }
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unable to set value: " + value + ", palette: " + palette, e);
+        } finally {
+            this.version++;
         }
+    }
+
+    public int getVersion() {
+        return this.version;
     }
 
     public void set(int x, int y, int z, BlockStateSnapshot value) {
@@ -226,21 +256,131 @@ public class StateBlockStorage {
     }
 
     public void writeTo(GameVersion protocol, BinaryStream stream, boolean antiXray) {
+        if (protocol.getProtocol() >= ProtocolInfo.v1_16_100 && this.palette.size() > 4) {
+            writeSizedNetworkPalette(protocol, stream, antiXray);
+            return;
+        }
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
-        for (int i = 0; i < SECTION_SIZE; i++) {
-            int fullId = get(i);
-            int id = fullId >> Block.DATA_BITS;
-            int meta = fullId & Block.DATA_MASK;
-            if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
-                id = Block.STONE;
-                meta = 0;
+        // Resolve the palette and network-ID format once per section, as in anvil BlockStorage.
+        // Older protocols still need GlobalBlockPalette's legacy runtime-ID tables.
+        if (protocol.getProtocol() >= ProtocolInfo.v1_16_100) {
+            BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocol);
+            boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
+            // A section holds 4096 cells but only a handful of states. Translate each palette entry once, when
+            // a cell first uses it, instead of looking the state up in the protocol palette for every cell.
+            // Cells are still fed to the network storage one by one in the same order with the same ids, so
+            // the encoded section is byte for byte what the per-cell lookup produced, for every protocol.
+            // The network palette index a cell gets depends only on its state and on which states came first,
+            // so it is resolved once per storage palette entry as well; -1 marks an entry not met yet.
+            int paletteSize = this.palette.size();
+            int[] networkIndex = new int[paletteSize];
+            Arrays.fill(networkIndex, -1);
+            for (int i = 0; i < SECTION_SIZE; i++) {
+                int local = this.bitArray.get(i);
+                if (local >= 0 && local < paletteSize) {
+                    int known = networkIndex[local];
+                    if (known >= 0) {
+                        palettedBlockStorage.setPaletteIndex(i, known);
+                    } else {
+                        BlockStateSnapshot snapshot = this.palette.get(local);
+                        int networkId = networkId(blockPalette, useHash, antiXray,
+                                snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData());
+                        networkIndex[local] = palettedBlockStorage.setBlockReturningIndex(i, networkId);
+                    }
+                } else {
+                    // Out of the palette: keep the per-cell read, including the exception it throws.
+                    palettedBlockStorage.setBlock(i, networkId(blockPalette, useHash, antiXray, get(i)));
+                }
             }
-            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, id, meta);
-            palettedBlockStorage.setBlock(i, runtimeId);
+        } else {
+            for (int i = 0; i < SECTION_SIZE; i++) {
+                int fullId = get(i);
+                int id = fullId >> Block.DATA_BITS;
+                int meta = fullId & Block.DATA_MASK;
+                if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
+                    id = Block.STONE;
+                    meta = 0;
+                }
+                palettedBlockStorage.setBlock(i, GlobalBlockPalette.getOrCreateRuntimeId(protocol, id, meta));
+            }
         }
 
         palettedBlockStorage.writeTo(stream);
+    }
+
+    private static int networkId(BlockPalette blockPalette, boolean useHash, boolean antiXray, int fullId) {
+        int id = fullId >> Block.DATA_BITS;
+        int meta = fullId & Block.DATA_MASK;
+        if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
+            id = Block.STONE;
+            meta = 0;
+        }
+        return useHash ? blockPalette.getHashId(id, meta) : blockPalette.getRuntimeId(id, meta);
+    }
+
+    /**
+     * Discover the emitted palette before allocating cell words. Growing V2 through every intermediate
+     * width allocates another 4096-cell array and copies all cells at each boundary. Keep the original
+     * first-use ordering, air at index zero, alias merging and minimum V2 width on the wire.
+     */
+    private void writeSizedNetworkPalette(GameVersion protocol, BinaryStream stream, boolean antiXray) {
+        BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocol);
+        boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
+        int[] networkIndex = new int[this.palette.size()];
+        Arrays.fill(networkIndex, -1);
+        IntArrayList networkPalette = new IntArrayList(16);
+        Int2IntOpenHashMap paletteIndex = new Int2IntOpenHashMap(16);
+        paletteIndex.defaultReturnValue(-1);
+        int air = GlobalBlockPalette.getOrCreateRuntimeId(protocol, 0);
+        networkPalette.add(air);
+        paletteIndex.put(air, 0);
+
+        int remaining = networkIndex.length;
+        for (int i = 0; i < SECTION_SIZE; i++) {
+            int local = this.bitArray.get(i);
+            if (local < 0 || local >= networkIndex.length) {
+                get(i); // Preserve the original palette-read exception for corrupt cell indices.
+            }
+            if (networkIndex[local] >= 0) {
+                continue;
+            }
+            BlockStateSnapshot snapshot = this.palette.get(local);
+            int fullId = snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData();
+            int id = networkId(blockPalette, useHash, antiXray, fullId);
+            int index = paletteIndex.get(id);
+            if (index < 0) {
+                index = networkPalette.size();
+                networkPalette.add(id);
+                paletteIndex.put(id, index);
+            }
+            networkIndex[local] = index;
+            if (--remaining == 0) {
+                break;
+            }
+        }
+
+        BitArrayVersion version = BitArrayVersion.V2;
+        while (networkPalette.size() - 1 > version.getMaxEntryValue()) {
+            version = version.next();
+        }
+        BitArray words = version.createPalette(SECTION_SIZE);
+        for (int i = 0; i < SECTION_SIZE; i++) {
+            int local = this.bitArray.get(i);
+            if (local < 0 || local >= networkIndex.length) {
+                get(i); // Also validate cells beyond an early palette-discovery exit.
+            }
+            words.set(i, networkIndex[local]);
+        }
+
+        stream.putByte((byte) getPaletteHeader(version, true));
+        for (int word : words.getWords()) {
+            stream.putLInt(word);
+        }
+        stream.putVarInt(networkPalette.size());
+        for (int i = 0; i < networkPalette.size(); i++) {
+            stream.putVarInt(networkPalette.getInt(i));
+        }
     }
 
     private void grow(BitArrayVersion version) {
@@ -334,6 +474,7 @@ public class StateBlockStorage {
 
 //            Arrays.fill(this.bitArray.getWords(), 0);
             this.bitArray = BitArrayVersion.V1.createPalette(SECTION_SIZE);
+            this.version++;
             return true;
         }
 
@@ -341,14 +482,26 @@ public class StateBlockStorage {
         BitArray newArray = version.createPalette(SECTION_SIZE);
         List<BlockStateSnapshot> newPalette = new ObjectArrayList<>(count);
         newPalette.add(this.palette.get(0));
+        // Remap each old palette entry once, instead of searching an expanding list
+        // for every cell. Keep entry zero and first-use order exactly as before.
+        int[] remapped = new int[count];
+        Arrays.fill(remapped, -1);
+        remapped[0] = 0;
+        Object2IntOpenHashMap<BlockStateSnapshot> indices = new Object2IntOpenHashMap<>(count);
+        indices.defaultReturnValue(-1);
+        indices.put(this.palette.get(0), 0);
         for (int i = 0; i < SECTION_SIZE; i++) {
             int paletteIndex = this.bitArray.get(i);
-            BlockStateSnapshot snapshot = this.palette.get(paletteIndex);
-            int newIndex = newPalette.indexOf(snapshot);
-
+            int newIndex = remapped[paletteIndex];
             if (newIndex == -1) {
-                newIndex = newPalette.size();
-                newPalette.add(snapshot);
+                BlockStateSnapshot snapshot = this.palette.get(paletteIndex);
+                newIndex = indices.getInt(snapshot);
+                if (newIndex == -1) {
+                    newIndex = newPalette.size();
+                    newPalette.add(snapshot);
+                    indices.put(snapshot, newIndex);
+                }
+                remapped[paletteIndex] = newIndex;
 
                 if (newIndex > version.getMaxEntryValue()) {
                     version = version.next();
@@ -364,6 +517,7 @@ public class StateBlockStorage {
         }
         this.bitArray = newArray;
         this.palette = newPalette;
+        this.version++;
         return true;
     }
 

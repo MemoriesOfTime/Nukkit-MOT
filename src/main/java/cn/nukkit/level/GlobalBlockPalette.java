@@ -95,14 +95,22 @@ public class GlobalBlockPalette {
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_80, GameVersion.V1_21_80);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_90, GameVersion.V1_21_90);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_100, GameVersion.V1_21_100);
-        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_110_26, GameVersion.V1_21_110);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_110_26, GameVersion.V1_21_111);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_10, GameVersion.V1_26_10);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_20_26, GameVersion.V1_26_20);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_30, GameVersion.V1_26_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_40, GameVersion.V1_26_40);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_50_27, GameVersion.V1_26_50);
 
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_20_50_NETEASE.getProtocol(), GameVersion.V1_20_50_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_2_NETEASE.getProtocol(), GameVersion.V1_21_2_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_50_NETEASE.getProtocol(), GameVersion.V1_21_50_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_93_NETEASE.getProtocol(), GameVersion.V1_21_93_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_124_NETEASE.getProtocol(), GameVersion.V1_21_124_NETEASE);
+        // NetEase 898 has no dedicated dat: block network ids go through hash ids (on by default),
+        // so rid ordering never hits the wire; reuse the standard 898 anchor (floors to 844),
+        // switch to V1_21_130_NETEASE once netease_898.dat lands
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_130_NETEASE.getProtocol(), GameVersion.V1_21_111);
     }
 
     private static byte[] compiledTable282;
@@ -384,6 +392,35 @@ public class GlobalBlockPalette {
         return getOrCreateRuntimeId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), id, meta);
     }
 
+
+    /**
+     * 1.26.50 连接/角落位 meta 在 <419 老协议查询表上的降级：meta 先按字段宽掩码，未命中时再依次
+     * 剥离高位（先 &0x0F 再 &0x07）重试，保留楼梯朝向、染色颜色、栅栏木种，而不是跌落到 data=0。
+     * <p>
+     * Degrades meta carrying 1.26.50 connection/corner bits on pre-419 legacy lookup tables: the meta
+     * is masked to the field width first, then retried with upper bits stripped (first &0x0F then
+     * &0x07) to preserve stair orientation, pane color and fence wood instead of collapsing to data=0.
+     */
+    private static int maskedLegacyLookup(Int2IntOpenHashMap map, int id, int meta, int shift) {
+        int value = map.get((id << shift) | (meta & ((1 << shift) - 1)));
+        if (value != -1) {
+            return value;
+        }
+        if (meta > 0x07) {
+            value = map.get((id << shift) | (meta & 0x0f));
+            if (value != -1) {
+                return value;
+            }
+        }
+        if (meta > 0x03) {
+            value = map.get((id << shift) | (meta & 0x07));
+            if (value != -1) {
+                return value;
+            }
+        }
+        return -1;
+    }
+
     public static int getOrCreateRuntimeId(GameVersion gameVersion, int id, int meta) {
         int protocol = gameVersion.getProtocol();
         if (protocol >= ProtocolInfo.v1_16_100) {
@@ -395,54 +432,68 @@ public class GlobalBlockPalette {
         }
 
         if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
-        int legacyId = protocol >= 388 ? ((id << 6) | meta) : ((id << 4) | meta);
+        // 连接/角落位 meta 可达 0xFF，超出 4/6 位 meta 字段；先按字段宽掩码，防止高位溢出污染 id 位
+        // Meta carrying connection/corner bits can reach 0xFF, beyond the 4/6-bit field; mask to the
+        // field width first so the excess bits never bleed into the id bits
+        int legacyId = protocol >= 388 ? ((id << 6) | (meta & 0x3F)) : ((id << 4) | (meta & 0xF));
         int runtimeId;
         switch (protocol) {
             // Versions before this doesn't use runtime IDs
             case 223:
             case 224:
                 runtimeId = legacyToRuntimeId223.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId223, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId223.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 261:
                 runtimeId = legacyToRuntimeId261.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId261, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId261.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 274:
                 runtimeId = legacyToRuntimeId274.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId274, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId274.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 281:
             case 282:
                 runtimeId = legacyToRuntimeId282.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId282, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId282.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 291:
                 runtimeId = legacyToRuntimeId291.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId291, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId291.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 313:
                 runtimeId = legacyToRuntimeId313.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId313, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId313.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 332:
                 runtimeId = legacyToRuntimeId332.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId332, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId332.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 340:
                 runtimeId = legacyToRuntimeId340.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId340, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId340.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 354:
                 runtimeId = legacyToRuntimeId354.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId354, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId354.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 361:
                 runtimeId = legacyToRuntimeId361.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId361, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId361.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 388:
                 runtimeId = legacyToRuntimeId388.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId388, id, meta, 6);
                 if (runtimeId == -1) {
                     runtimeId = legacyToRuntimeId388.get(id << 6);
                     if (runtimeId == -1) runtimeId = legacyToRuntimeId388.get(BlockID.INFO_UPDATE << 6);
@@ -451,6 +502,7 @@ public class GlobalBlockPalette {
             case 389:
             case 390:
                 runtimeId = legacyToRuntimeId389.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId389, id, meta, 6);
                 if (runtimeId == -1) {
                     runtimeId = legacyToRuntimeId389.get(id << 6);
                     if (runtimeId == -1) runtimeId = legacyToRuntimeId389.get(BlockID.INFO_UPDATE << 6);
@@ -462,6 +514,7 @@ public class GlobalBlockPalette {
             case 410:
             case 411:
                 runtimeId = legacyToRuntimeId407.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId407, id, meta, 6);
                 if (runtimeId == -1) {
                     runtimeId = legacyToRuntimeId407.get(id << 6);
                     if (runtimeId == -1) runtimeId = legacyToRuntimeId407.get(BlockID.INFO_UPDATE << 6);
@@ -519,43 +572,53 @@ public class GlobalBlockPalette {
             case 223:
             case 224:
                 runtimeId = legacyToRuntimeId223.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId223, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId223.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 261:
                 runtimeId = legacyToRuntimeId261.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId261, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId261.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 274:
                 runtimeId = legacyToRuntimeId274.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId274, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId274.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 281:
             case 282:
                 runtimeId = legacyToRuntimeId282.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId282, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId282.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 291:
                 runtimeId = legacyToRuntimeId291.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId291, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId291.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 313:
                 runtimeId = legacyToRuntimeId313.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId313, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId313.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 332:
                 runtimeId = legacyToRuntimeId332.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId332, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId332.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 340:
                 runtimeId = legacyToRuntimeId340.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId340, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId340.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 354:
                 runtimeId = legacyToRuntimeId354.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId354, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId354.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             case 361:
                 runtimeId = legacyToRuntimeId361.get(legacyId);
+                if (runtimeId == -1) runtimeId = maskedLegacyLookup(legacyToRuntimeId361, legacyId >> 4, legacyId & 15, 4);
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId361.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             default: // 388+
@@ -660,6 +723,11 @@ public class GlobalBlockPalette {
      * <p>
      * 哈希网络ID是基于方块状态NBT的哈希值，用于支持自定义方块和更灵活的方块状态传输
      * Hashed network IDs are based on block state NBT hash and used to support custom blocks and more flexible block state transmission
+     * <p>
+     * 默认通过 nukkit-mot.yml 的 use-hashed-block-network-ids 开启（默认 true），无论是否注册自定义方块，
+     * 对标准版与网易版同样生效；注册自定义方块时会被强制开启。
+     * Enabled by default via nukkit-mot.yml use-hashed-block-network-ids (default true), regardless of whether
+     * custom blocks are registered, applies to both standard and NetEase clients; force-enabled when custom blocks are registered.
      *
      * @param gameVersion 游戏版本 / game version
      * @return 是否应该使用哈希方块网络ID / whether hashed block network IDs should be used
@@ -682,8 +750,8 @@ public class GlobalBlockPalette {
      * 设置全局哈希方块网络ID功能的启用状态
      * Set the enabled state of global hashed block network IDs feature
      * <p>
-     * 此功能主要用于支持自定义方块，启用后会使用基于NBT哈希的网络ID代替传统的运行时ID
-     * This feature is mainly used to support custom blocks, when enabled it uses NBT hash-based network IDs instead of traditional runtime IDs
+     * 启用后会使用基于NBT哈希的网络ID代替传统的运行时ID
+     * When enabled it uses NBT hash-based network IDs instead of traditional runtime IDs
      *
      * @param enabled 是否启用 / whether to enable
      */
@@ -691,11 +759,13 @@ public class GlobalBlockPalette {
         useHashedBlockNetworkIds = enabled;
     }
 
+    @Deprecated
     public static int getOrCreateRuntimeId(int legacyId) throws NoSuchElementException {
         Server.mvw("GlobalBlockPalette#getOrCreateRuntimeId(int)");
         return getOrCreateRuntimeId(GameVersion.getLastVersion(), legacyId >> 4, legacyId & 0xf);
     }
 
+    @Deprecated
     public static int getLegacyFullId(int runtimeId) {
         Server.mvw("GlobalBlockPalette#getLegacyFullId(int)");
         return getLegacyFullId(GameVersion.getLastVersion(), runtimeId);

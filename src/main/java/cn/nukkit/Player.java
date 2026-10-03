@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.AdventureSettings.Type;
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCampfire;
@@ -15,13 +16,13 @@ import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.data.property.EntityProperty;
+import cn.nukkit.entity.data.warden.WardenWarningData;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityHappyGhast;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
-import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
 import cn.nukkit.event.block.WaterFrostEvent;
 import cn.nukkit.event.entity.*;
@@ -39,14 +40,18 @@ import cn.nukkit.event.server.DataPacketSendEvent;
 import cn.nukkit.form.window.FormWindow;
 import cn.nukkit.form.window.FormWindowDialog;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.request.ItemStackRequestHandler;
 import cn.nukkit.inventory.transaction.*;
+import cn.nukkit.inventory.transaction.action.DropItemAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.item.enchantment.EnchantmentFrostWalker;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.lang.CommandOutputContainer;
 import cn.nukkit.lang.LangCode;
@@ -58,16 +63,27 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.PunchBlockParticle;
 import cn.nukkit.level.sound.ExperienceOrbSound;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
+import cn.nukkit.network.NetherNetInterface;
 import cn.nukkit.network.SourceInterface;
+import cn.nukkit.network.encryption.LoginChainVerifier;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
+import cn.nukkit.network.process.UsingItemReceive;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
+import cn.nukkit.network.protocol.netease.PyRpcPacket;
+import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.debugshape.DebugShape;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode;
 import cn.nukkit.network.session.login.SessionLoginPhase;
@@ -91,6 +107,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -109,17 +126,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
-import java.net.URL;
+import java.net.URI;
 import java.net.URLConnection;
 import java.nio.ByteOrder;
 import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -139,6 +158,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int SPECTATOR = 3;
     public static final int VIEW = SPECTATOR;
 
+    private static final double CREATIVE_BREAK_POSITION_EPSILON = 1.0E-4;
+    // Bedrock resting contact can sit 0.005 blocks below the collision top. This
+    // controls packets only; the authoritative position still stays on the floor.
+    private static final double CREATIVE_BREAK_CORRECTION_TOLERANCE = 0.01;
+    private static final int CREATIVE_BREAK_CORRECTION_TICKS = 5;
+
     public static final int CRAFTING_SMALL = 0;
     public static final int CRAFTING_BIG = 1;
     public static final int ANVIL_WINDOW_ID = 2;
@@ -154,6 +179,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public static final int LECTERN_WINDOW_ID = 7;
     public static final int STONECUTTER_WINDOW_ID = 8;
+    public static final int CARTOGRAPHY_WINDOW_ID = 9;
 
     // 后续创建的窗口应该从此数值开始
     public static final int MINIMUM_OTHER_WINDOW_ID = Utils.dynamic(10);
@@ -181,7 +207,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int PERMISSION_MEMBER = 1;
     public static final int PERMISSION_VISITOR = 0;
 
-    public static final int RESOURCE_PACK_CHUNK_SIZE = 8 * 1024; // 8KB
+    public static final int RESOURCE_PACK_CHUNK_SIZE = 100 * 1024; // 100 KB
 
     protected final SourceInterface interfaz;
     protected final NetworkPlayerSession networkSession;
@@ -197,11 +223,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public long lastBreak = -1;
     private BlockVector3 lastBreakPosition = new BlockVector3();
 
+    protected final WardenWarningData wardenWarningData = new WardenWarningData();
+
+    /**
+     * Last block position (floor coords) at which a STEP/SWIM/ELYTRA_GLIDE vibration was emitted.
+     * Movement vibrations are emitted only when the player crosses into a new block (vanilla
+     * cadence), not on every movement packet.
+     */
+    private int lastMovementVibrationX = Integer.MIN_VALUE;
+    private int lastMovementVibrationY = Integer.MIN_VALUE;
+    private int lastMovementVibrationZ = Integer.MIN_VALUE;
+
     protected int windowCnt = MINIMUM_OTHER_WINDOW_ID;
 
     protected final BiMap<Inventory, Integer> windows = HashBiMap.create();
     protected final BiMap<Integer, Inventory> windowIndex = windows.inverse();
     protected final Set<Integer> permanentWindows = new IntOpenHashSet();
+    // Most recently opened non-permanent window; getTopWindow() is deterministic
+    // regardless of the undefined iteration order of the {@link HashBiMap} windows.
+    protected Inventory topWindow;
     private boolean inventoryOpen;
     protected int closingWindowId = Integer.MIN_VALUE;
 
@@ -223,6 +263,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected long randomClientId;
 
     protected Location forceMovement = null;
+
+    private Level deniedCreativeBreakLevel;
+    private BlockVector3 deniedCreativeBreakBlock;
+    private int deniedCreativeBreakExpiresAtTick;
 
     protected Location teleportPosition = null;
 
@@ -246,7 +290,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Client game version
      */
     @Getter
-    protected GameVersion gameVersion;
+    protected GameVersion gameVersion = GameVersion.getLastVersion();
     /**
      * Client RakNet protocol version
      */
@@ -268,8 +312,34 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private boolean hasSpawnChunks;
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
     protected int nextChunkOrderRun = 1;
+    // 供 checkNetwork 检测跨区块/转向即时重排 / For checkNetwork cross-chunk/turn instant reorder
+    private int lastOrderChunkX = Integer.MIN_VALUE;
+    private int lastOrderChunkZ = Integer.MIN_VALUE;
+    private double lastOrderYaw = Double.NaN;
+    // 借鉴 PNX,默认 100° / Adapted from PNX, default 100°
+    private static final double FOV_DEGREES = 100.0;
 
     protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
+    /** Server tick at which the cool down of an item category ends. */
+    protected final Map<String, Integer> itemCoolDownEnds = new ConcurrentHashMap<>(2);
+
+    /**
+     * 已向本观察者下发 PlayerList(ADD) 的玩家型实体 UUID，用于去重防网易客户端隐形；
+     * 玩家型 NPC 条目在握手后延迟移除（见 {@code PlayerEntitySkinSender}）。
+     * <p>
+     * Player-like entity UUIDs registered via PlayerList ADD for this viewer, deduplicating to avoid
+     * the NetEase invisibility bug; NPC entries are removed shortly after the handshake.
+     */
+    public final Set<UUID> sentSkins = ConcurrentHashMap.newKeySet();
+
+    /**
+     * 已向本观察者确认过的皮肤指纹，键为被观察玩家 UUID；用于抑制网易 V860 的重复皮肤确认
+     * （对同一列表项二次确认会隐藏该实体，见 {@code PlayerEntitySkinSender#prepareConfirmSkin}）。
+     * <p>
+     * Skin fingerprints already confirmed to this viewer, keyed by subject UUID; suppresses duplicate
+     * NetEase V860 confirmations, which would hide the entity when the same entry is confirmed twice.
+     */
+    public final Map<UUID, String> confirmedSkins = new ConcurrentHashMap<>();
 
     protected Vector3 newPosition = null;
 
@@ -355,8 +425,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected Cache<String, FormWindowDialog> dialogWindows = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
+    private LoginChainVerifier.Verification pendingLoginVerification;
     protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
+    /**
+     * onCompletion 有异步派发与资源包流程手动调用两条触发路径，该标记保证 processLogin 只执行一次。
+     * <p>
+     * onCompletion fires both through async collection and a manual call from the pack flow;
+     * this keeps processLogin single-shot.
+     */
+    protected boolean loginDataProcessed = false;
+    private final LinkedHashMap<UUID, PendingResourcePack> pendingResourcePacks = new LinkedHashMap<>();
+    private boolean resourcePackChunkSendScheduled;
 
     private int lastEmote;
     private int lastEnderPearl = 20;
@@ -365,9 +445,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private double lastRightClickTime = 0.0;
     private long lastClickAirTime = 0;
     private BlockVector3 lastRightClickPos = null;
+    private final IntOpenHashSet processedItemStackRequestIds = new IntOpenHashSet();
+    private int processedItemStackRequestTick = Integer.MIN_VALUE;
     public EntityFishingHook fishing = null;
     public boolean formOpen;
     public boolean locallyInitialized;
+    // v1001+（1.26.30）客户端是否已收到世界时钟注册表（InitializeRegistryData），由 Level.sendTime 首次同步时置位
+    public boolean worldClockSynced;
     private boolean foodEnabled = true;
     private int failedTransactions;
     protected int failedMobEquipmentPacket;
@@ -572,6 +656,111 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.adventureSettings.get(Type.ALLOW_FLIGHT);
     }
 
+    /**
+     * Scale the packet and tick movement sanity limits for an authorized player who is actually
+     * flying faster than vanilla. The limits are squared distances, so the speed ratio must be
+     * squared as well. Everyone else keeps the original limits unchanged.
+     */
+    double movementSanityLimitSquared(double vanillaLimitSquared) {
+        if (this.adventureSettings == null
+                || !this.adventureSettings.get(Type.ALLOW_FLIGHT)
+                || !this.adventureSettings.get(Type.FLYING)) {
+            return vanillaLimitSquared;
+        }
+
+        float configuredFlySpeed = this.getFlySpeed();
+        if (!Float.isFinite(configuredFlySpeed) || configuredFlySpeed <= DEFAULT_FLY_SPEED) {
+            return vanillaLimitSquared;
+        }
+
+        double speedRatio = (double) configuredFlySpeed / DEFAULT_FLY_SPEED;
+        return vanillaLimitSquared * speedRatio * speedRatio;
+    }
+
+    void armDeniedCreativeBreakCorrection(BlockVector3 blockPos) {
+        if (!this.isCreative() || this.noClip || this.riding != null
+                || blockPos.distanceSquared(this) > 4
+                || blockPos.getY() + CREATIVE_BREAK_POSITION_EPSILON >= this.y) {
+            return;
+        }
+
+        Block block = this.level.getBlock(blockPos.asVector3(), false);
+        AxisAlignedBB feet = this.boundingBox.clone().shrink(0.05, 0, 0.05);
+        feet.setMinY(this.y - 0.05);
+        feet.setMaxY(this.y + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(feet)) {
+            return;
+        }
+
+        this.deniedCreativeBreakLevel = this.level;
+        this.deniedCreativeBreakBlock = new BlockVector3(
+                blockPos.getX(), blockPos.getY(), blockPos.getZ());
+        this.deniedCreativeBreakExpiresAtTick = this.server.getTick()
+                + CREATIVE_BREAK_CORRECTION_TICKS;
+    }
+
+    private Vector3 correctDeniedCreativeBreakMovement(Vector3 clientPos) {
+        if (this.deniedCreativeBreakBlock == null) {
+            return clientPos;
+        }
+        if (!this.isCreative() || this.noClip || this.riding != null
+                || this.level != this.deniedCreativeBreakLevel
+                || this.server.getTick() > this.deniedCreativeBreakExpiresAtTick) {
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+        if (clientPos.y >= this.y) {
+            return clientPos;
+        }
+
+        Block block = this.level.getBlock(this.deniedCreativeBreakBlock.asVector3(), false);
+        AxisAlignedBB targetFeet = this.boundingBox
+                .getOffsetBoundingBox(clientPos.x - this.x, 0, clientPos.z - this.z)
+                .shrink(0.05, 0, 0.05);
+        targetFeet.setMinY(clientPos.y);
+        targetFeet.setMaxY(this.y + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(targetFeet)) {
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+
+        // Locate the highest crossed surface using the block's actual collision
+        // predicate. getBoundingBox() alone omits the upper half of stairs.
+        // Testing the interval above each midpoint makes the search monotonic,
+        // including blocks whose collision consists of disconnected pieces.
+        double lowerY = clientPos.y;
+        double upperY = this.y + CREATIVE_BREAK_POSITION_EPSILON;
+        for (int probe = 0; probe < 40 && upperY - lowerY > 1.0E-7; probe++) {
+            double middleY = (lowerY + upperY) * 0.5;
+            targetFeet.setMinY(middleY);
+            if (block.collidesWithBB(targetFeet)) {
+                lowerY = middleY;
+            } else {
+                upperY = middleY;
+            }
+        }
+        // A replacement block may enclose the current feet. Preserve the existing
+        // denial guard without pushing the player above their accepted height.
+        double floorY = Math.min(this.y, upperY);
+        double crossedAt = (this.y - floorY) / (this.y - clientPos.y);
+        targetFeet.offset(-(clientPos.x - this.x) * (1 - crossedAt), 0,
+                -(clientPos.z - this.z) * (1 - crossedAt));
+        targetFeet.setMinY(floorY - CREATIVE_BREAK_POSITION_EPSILON);
+        targetFeet.setMaxY(floorY + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(targetFeet)) {
+            // Diagonal motion may enter this column after passing below its top.
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+
+        return new Vector3(clientPos.x, floorY, clientPos.z);
+    }
+
+    private void clearDeniedCreativeBreakCorrection() {
+        this.deniedCreativeBreakLevel = null;
+        this.deniedCreativeBreakBlock = null;
+    }
+
     public void setAllowModifyWorld(boolean value) {
         this.adventureSettings.set(Type.WORLD_IMMUTABLE, !value);
         this.adventureSettings.set(Type.MINE, value);
@@ -637,6 +826,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
         this.hiddenPlayers.put(player.getUniqueId(), player);
+        // 不清 sentSkins：despawn 只发 RemoveEntityPacket，不下发 PlayerList(REMOVE)，
+        // 清掉会让随后的 showPlayer 重发 ADD，触发网易 V860 玩家隐形。保留记录则 spawnTo
+        // 的 ADD 守卫会去重，实体仅由 AddPlayerPacket 重新生成。Tab 条目不受影响。
+        // <p>
+        // Don't clear sentSkins: despawn only sends RemoveEntityPacket, not PlayerList(REMOVE),
+        // so clearing would make showPlayer resend ADD and trigger NetEase V860 invisibility.
+        // Keeping the record lets the spawnTo ADD guard deduplicate; the entity is respawned via
+        // AddPlayerPacket and the Tab entry is untouched.
         player.despawnFrom(this);
     }
 
@@ -781,11 +978,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return commands enabled
      */
     public boolean isEnableClientCommand() {
-        return this.enableClientCommand;
+        return this.enableClientCommand && this.protocol >= ProtocolInfo.v1_2_0;
     }
 
     public void setEnableClientCommand(boolean enable) {
         this.enableClientCommand = enable;
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            return;
+        }
         SetCommandsEnabledPacket pk = new SetCommandsEnabledPacket();
         pk.enabled = enable;
         this.dataPacket(pk);
@@ -793,6 +993,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void sendCommandData() {
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            return;
+        }
         Map<String, CommandDataVersions> data = new HashMap<>();
 
         for (Command command : this.server.getCommandMap().getCommands().values()) {
@@ -879,8 +1082,38 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void setSkin(Skin skin) {
+        if (skin.isFullyTransparent()) {
+            skin = Skin.NO_PERSONA_SKIN;
+        }
+        Skin previousSkin = this.getSkin();
         super.setSkin(skin);
-        updatePlayerListData(true);
+        if (!this.spawned) {
+            return;
+        }
+
+        Player[] playerListViewers = this.server.playerList.values().stream()
+                .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                .filter(viewer -> !PlayerEntitySkinSender.requiresRetainedEntry(viewer))
+                .toArray(Player[]::new);
+        if (playerListViewers.length > 0) {
+            this.server.updatePlayerListData(
+                    new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, skin, this.loginChainData.getXUID(), this.getLocatorBarColor()),
+                    playerListViewers);
+        }
+
+        for (Player viewer : this.server.playerList.values()) {
+            if (!PlayerEntitySkinSender.requiresRetainedEntry(viewer)
+                    || !viewer.sentSkins.contains(this.getUniqueId())) {
+                continue;
+            }
+            viewer.confirmedSkins.remove(this.getUniqueId());
+            PlayerSkinPacket packet = new PlayerSkinPacket();
+            packet.uuid = this.getUniqueId();
+            packet.skin = skin;
+            packet.newSkinName = skin.getSkinId();
+            packet.oldSkinName = previousSkin != null ? previousSkin.getSkinId() : "";
+            viewer.dataPacket(packet);
+        }
     }
 
     public Color getLocatorBarColor() {
@@ -898,9 +1131,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     void updatePlayerListData(boolean onlyWhenSpawned) {
         if (this.spawned || !onlyWhenSpawned) {
-            this.server.updatePlayerListData(
-                    new PlayerListPacket.Entry(this.getUniqueId(), this.getId(), this.displayName, this.getSkin(), this.loginChainData.getXUID(), this.getLocatorBarColor()),
-                    this.server.playerList.values().toArray(new Player[0]));
+            PlayerListPacket.Entry entry = new PlayerListPacket.Entry(
+                    this.getUniqueId(), this.getId(), this.displayName, this.getSkin(),
+                    this.loginChainData.getXUID(), this.getLocatorBarColor());
+            Player[] standardViewers = this.server.playerList.values().stream()
+                    .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                    .filter(viewer -> !PlayerEntitySkinSender.requiresRetainedEntry(viewer))
+                    .toArray(Player[]::new);
+            if (standardViewers.length > 0) {
+                this.server.updatePlayerListData(entry, standardViewers);
+            }
+
+            this.server.playerList.values().stream()
+                    .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
+                    .filter(PlayerEntitySkinSender::requiresRetainedEntry)
+                    .forEach(viewer -> PlayerEntitySkinSender.replacePlayerListEntry(viewer, entry));
         }
     }
 
@@ -1104,6 +1349,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!loadQueue.isEmpty()) {
             int count = 0;
+            boolean asyncLoad = this.level.isAsyncChunkLoadEnabled();
             LongIterator iter = loadQueue.longIterator();
             while (iter.hasNext()) {
                 if (count >= server.chunksPerTick) {
@@ -1120,12 +1366,47 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.usedChunks.put(index, false);
                     this.level.registerChunkLoader(this, chunkX, chunkZ, false);
 
-                    if (!this.level.populateChunk(chunkX, chunkZ)) {
-                        if (this.spawned && this.teleportPosition == null) {
-                            continue;
-                        } else {
-                            break;
+                    // 异步区块加载:读取+解码在异步线程完成,区块由主线程 doTick 挂载后下一 tick 再发送,避免主线程同步读取磁盘
+                    // Async chunk loading: read+decode off-thread; the chunk is mounted in doTick and sent next tick, avoiding a sync disk read on the main thread
+                    if (asyncLoad) {
+                        BaseFullChunk loadedChunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
+                        if (loadedChunk == null) {
+                            if (this.level.requestChunkLoadAsync(chunkX, chunkZ)) {
+                                continue;
+                            }
+                            // 受理失败(executor 关闭等)→ 落到下方原同步路径 / rejected → fall through to the sync path below
+                        } else if (!loadedChunk.isPopulated()) {
+                            boolean neighboursCached = true;
+                            boolean queueRejected = false;
+                            for (int dx = -1; dx <= 1; ++dx) {
+                                for (int dz = -1; dz <= 1; ++dz) {
+                                    if ((dx | dz) == 0) {
+                                        continue;
+                                    }
+                                    if (this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz) == null) {
+                                        // 受理失败(队列已满/executor 关)→ 放弃异步预载,落到下方同步 populateChunk 保证推进,避免队列持续满时该区块永久悬挂
+                                        // Rejected (queue full / executor down) → abandon async preload and fall through to sync populateChunk to guarantee progress, so a saturated queue can't leave this chunk hanging forever
+                                        if (!this.level.requestChunkLoadAsync(chunkX + dx, chunkZ + dz)) {
+                                            queueRejected = true;
+                                            break;
+                                        }
+                                        neighboursCached = false;
+                                    }
+                                }
+                                if (queueRejected) {
+                                    break;
+                                }
+                            }
+                            if (!queueRejected && !neighboursCached) {
+                                continue;
+                            }
                         }
+                    }
+
+                    if (!this.level.populateChunk(chunkX, chunkZ)) {
+                        // 保中心向外顺序,避免外圈幽灵区块(等价 Allay enqueueFirst+break)
+                        // Preserve center-out order, avoiding ghost chunks (cf. Allay enqueueFirst+break)
+                        break;
                     }
 
                     iter.remove();
@@ -1162,6 +1443,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (this.spawned) {
             return;
+        }
+
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.adventureSettings.update();
+            this.sendPotionEffects(this);
+            this.sendData(this, this.dataProperties.clone());
+            this.getLevel().sendTime(this);
         }
 
         if (this.protocol >= ProtocolInfo.v1_21_60) {
@@ -1224,6 +1512,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.spawned = true;
 
+        this.sendMovementSpeed();
+
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.sendAllInventories();
+            this.inventory.sendHeldItemIfNotAir(this);
+        }
+
         PlayerJoinEvent playerJoinEvent = new PlayerJoinEvent(this,
                 new TranslationContainer(TextFormat.YELLOW + "%multiplayer.player.joined", new String[]{this.displayName})
         );
@@ -1254,10 +1549,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.sendFogStack();
         this.sendCameraPresets();
 
+        if (this.canUseNetEaseModApi()) {
+            this.sendNetEaseLevelGravityReset();
+        }
+
         if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
                 try {
-                    URLConnection request = new URL(Nukkit.BRANCH).openConnection();
+                    URLConnection request = URI.create(Nukkit.BRANCH).toURL().openConnection();
                     request.connect();
                     InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
                     String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
@@ -1280,6 +1579,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.nextChunkOrderRun = 20;
+        this.lastOrderChunkX = (int) this.x >> 4;
+        this.lastOrderChunkZ = (int) this.z >> 4;
+        this.lastOrderYaw = this.yaw;
 
         loadQueue.clear();
         Long2ObjectOpenHashMap<Boolean> lastChunk = new Long2ObjectOpenHashMap<>(this.usedChunks);
@@ -1287,8 +1589,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         int centerX = (int) this.x >> 4;
         int centerZ = (int) this.z >> 4;
 
-        int radius = spawned ? this.chunkRadius : server.c_s_spawnThreshold;
+        // Before the first spawn the client already waits for every chunk inside the publisher
+        // radius (chunkRadius, never below 3). Capping the pre-spawn radius to sqrt(spawn-threshold)
+        // left the outer ring unsent, so the client hung in the air until its own timeout and only
+        // then sent SetLocalPlayerAsInitialized. PocketMine-MP and PowerNukkitX send the full view
+        // distance before spawn and use the threshold only to decide when PLAYER_SPAWN goes out.
+        int radius = spawned ? this.chunkRadius : Math.max(this.chunkRadius, server.c_s_spawnThreshold);
         int radiusSqr = radius * radius;
+
+        // FOV 朝向优先(借鉴 PNX):视野内先入队,组内近→远;LongLinkedOpenHashSet 保插入序
+        // FOV direction priority (PNX): in-FOV first, near-to-far within group; LongLinkedOpenHashSet keeps order
+        double dirX = -Math.sin(Math.toRadians(this.yaw));
+        double dirZ = Math.cos(Math.toRadians(this.yaw));
+        double cosFov = Math.cos(Math.toRadians(FOV_DEGREES));
+        LongArrayList inFov = new LongArrayList();
+        LongArrayList outFov = new LongArrayList();
 
         long index;
         for (int x = 0; x <= radius; x++) {
@@ -1298,49 +1613,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (distanceSqr > radiusSqr) continue;
 
                 /* Top right quadrant */
-                if (this.usedChunks.get(index = Level.chunkHash(centerX + x, centerZ + z)) != Boolean.TRUE) {
-                    this.loadQueue.add(index);
-                }
-                lastChunk.remove(index);
+                index = Level.chunkHash(centerX + x, centerZ + z);
+                this.classifyChunkForFov(index, x, z, dirX, dirZ, cosFov, inFov, outFov, lastChunk);
                 /* Top left quadrant */
-                if (this.usedChunks.get(index = Level.chunkHash(centerX - x - 1, centerZ + z)) != Boolean.TRUE) {
-                    this.loadQueue.add(index);
-                }
-                lastChunk.remove(index);
+                index = Level.chunkHash(centerX - x - 1, centerZ + z);
+                this.classifyChunkForFov(index, -x - 1, z, dirX, dirZ, cosFov, inFov, outFov, lastChunk);
                 /* Bottom right quadrant */
-                if (this.usedChunks.get(index = Level.chunkHash(centerX + x, centerZ - z - 1)) != Boolean.TRUE) {
-                    this.loadQueue.add(index);
-                }
-                lastChunk.remove(index);
+                index = Level.chunkHash(centerX + x, centerZ - z - 1);
+                this.classifyChunkForFov(index, x, -z - 1, dirX, dirZ, cosFov, inFov, outFov, lastChunk);
                 /* Bottom left quadrant */
-                if (this.usedChunks.get(index = Level.chunkHash(centerX - x - 1, centerZ - z - 1)) != Boolean.TRUE) {
-                    this.loadQueue.add(index);
-                }
-                lastChunk.remove(index);
+                index = Level.chunkHash(centerX - x - 1, centerZ - z - 1);
+                this.classifyChunkForFov(index, -x - 1, -z - 1, dirX, dirZ, cosFov, inFov, outFov, lastChunk);
                 if (x != z) {
                     /* Top right quadrant mirror */
-                    if (this.usedChunks.get(index = Level.chunkHash(centerX + z, centerZ + x)) != Boolean.TRUE) {
-                        this.loadQueue.add(index);
-                    }
-                    lastChunk.remove(index);
+                    index = Level.chunkHash(centerX + z, centerZ + x);
+                    this.classifyChunkForFov(index, z, x, dirX, dirZ, cosFov, inFov, outFov, lastChunk);
                     /* Top left quadrant mirror */
-                    if (this.usedChunks.get(index = Level.chunkHash(centerX - z - 1, centerZ + x)) != Boolean.TRUE) {
-                        this.loadQueue.add(index);
-                    }
-                    lastChunk.remove(index);
+                    index = Level.chunkHash(centerX - z - 1, centerZ + x);
+                    this.classifyChunkForFov(index, -z - 1, x, dirX, dirZ, cosFov, inFov, outFov, lastChunk);
                     /* Bottom right quadrant mirror */
-                    if (this.usedChunks.get(index = Level.chunkHash(centerX + z, centerZ - x - 1)) != Boolean.TRUE) {
-                        this.loadQueue.add(index);
-                    }
-                    lastChunk.remove(index);
+                    index = Level.chunkHash(centerX + z, centerZ - x - 1);
+                    this.classifyChunkForFov(index, z, -x - 1, dirX, dirZ, cosFov, inFov, outFov, lastChunk);
                     /* Bottom left quadrant mirror */
-                    if (this.usedChunks.get(index = Level.chunkHash(centerX - z - 1, centerZ - x - 1)) != Boolean.TRUE) {
-                        this.loadQueue.add(index);
-                    }
-                    lastChunk.remove(index);
+                    index = Level.chunkHash(centerX - z - 1, centerZ - x - 1);
+                    this.classifyChunkForFov(index, -z - 1, -x - 1, dirX, dirZ, cosFov, inFov, outFov, lastChunk);
                 }
             }
         }
+
+        for (long l : inFov) this.loadQueue.add(l);
+        for (long l : outFov) this.loadQueue.add(l);
 
         LongIterator keys = lastChunk.keySet().iterator();
         while (keys.hasNext()) {
@@ -1358,6 +1660,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return true;
+    }
+
+    private void classifyChunkForFov(long index, int dx, int dz, double dirX, double dirZ, double cosFov,
+                                     LongArrayList inFov, LongArrayList outFov, Long2ObjectOpenHashMap<Boolean> lastChunk) {
+        if (this.usedChunks.get(index) != Boolean.TRUE) {
+            if (isChunkInFov(dx, dz, dirX, dirZ, cosFov)) {
+                inFov.add(index);
+            } else {
+                outFov.add(index);
+            }
+        }
+        lastChunk.remove(index);
+    }
+
+    /**
+     * 视野锥判定(借鉴 PNX);近距离(&lt;4)强制视野内防抖动。
+     * <p>
+     * FOV cone test (PNX); &lt;4 chunks forced in-FOV to avoid jitter.
+     */
+    private static boolean isChunkInFov(int dx, int dz, double dirX, double dirZ, double cosFov) {
+        long distSq = (long) dx * dx + (long) dz * dz;
+        if (distSq < 16) {
+            return true;
+        }
+        double len = Math.sqrt(distSq);
+        double dot = dirX * (dx / len) + dirZ * (dz / len);
+        return dot >= cosFov;
     }
 
     @Deprecated
@@ -1433,6 +1762,58 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
         } : callback), mode);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpcData(byte[] data) {
+        return this.sendPyRpcData(data, PyRpcPacket.DEFAULT_MSG_ID);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpcData(byte[] data, long msgId) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        PyRpcPacket packet = new PyRpcPacket();
+        packet.setData(data);
+        packet.setMsgId(msgId);
+        return this.dataPacket(packet);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket) {
+        return this.sendPyRpc(subPacket, PyRpcPacket.DEFAULT_MSG_ID);
+    }
+
+    @OnlyNetEase
+    public boolean sendPyRpc(PyRpcSubPacket subPacket, long msgId) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createSubPacket(subPacket, msgId));
+    }
+
+    @OnlyNetEase
+    public boolean modNotifyToClient(String modName, String systemName, String eventName, Map<String, ?> eventData) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createModEventPacket(modName, systemName, eventName, eventData));
+    }
+
+    @OnlyNetEase
+    public boolean modNotifyToClientEncrypted(String modName, String systemName, String eventName,
+                                              String data, Function<String, String> encMethod) {
+        if (!this.canUseNetEaseModApi()) {
+            return false;
+        }
+        return this.dataPacket(PyRpcPacket.createEncryptedModEventPacket(
+            modName, systemName, eventName, data, encMethod
+        ));
+    }
+
+    private boolean canUseNetEaseModApi() {
+        return this.gameVersion != null && this.gameVersion.isNetEase();
     }
 
     /**
@@ -1635,6 +2016,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
+        // Resolve transient items under the accepted transition's old mode: recover finite
+        // items and discard creative items before a delayed close can use the new mode.
+        // Cancelled transitions must leave the inventory available to its current owner.
+        this.resetCraftingGridType();
+        this.resolveOpenTradeInputs();
+
         this.gamemode = gamemode;
 
         if (this.server.useClientSpectator) {
@@ -1718,6 +2105,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
+     * 模式切换边界上按旧模式结算已打开交易界面的输入槽：创造物品丢弃、
+     * 有限物品收回背包；交易会话保持打开，与工作站窗口的结算方式一致。
+     * Resolve open trade inputs at a mode-switch boundary under the old mode, so a
+     * delayed close under the new mode cannot resurrect or destroy them; the trade
+     * session itself stays open, mirroring how station windows are resolved.
+     */
+    private void resolveOpenTradeInputs() {
+        TradeInventory tradeInventory = this.getTradeInventory();
+        if (tradeInventory == null) {
+            return;
+        }
+        this.returnUiItems(tradeInventory.getItem(0), tradeInventory.getItem(1));
+        tradeInventory.clear(0);
+        tradeInventory.clear(1);
+    }
+
+    /**
      * Send adventure settings
      */
     public void sendSettings() {
@@ -1758,6 +2162,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public boolean isAdventure() {
         return this.gamemode == ADVENTURE;
+    }
+
+    /**
+     * Whether this player's client can render a {@code MobEffectPacket} for the
+     * given effect id without crashing. Effects are still applied server-side
+     * regardless of this value; it only gates whether the packet is sent.
+     * <p>
+     * Wind Charged / Weaving / Oozing / Infested were introduced in 1.21.0
+     * (protocol v685); sending them to older clients crashes the client.
+     *
+     * @param effectId effect id to check
+     * @return whether the player's client can receive a packet for this effect
+     */
+    public boolean canReceiveEffectPacket(int effectId) {
+        if (this.protocol < ProtocolInfo.v1_21_0) {
+            return effectId != Effect.WIND_CHARGED
+                    && effectId != Effect.WEAVING
+                    && effectId != Effect.OOZING
+                    && effectId != Effect.INFESTED;
+        }
+        return true;
     }
 
     @Override
@@ -1952,19 +2377,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (server.vanillaPortals) {
+                    final Position portalTarget = this.portalPos;
+                    if (portalTarget == null) {
+                        return;
+                    }
                     this.inPortalTicks = 81;
+                    final Level portalOrigin = this.level;
                     this.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
                         @Override
                         public void onRun() {
-                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalPos);
+                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalTarget);
                             getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                                // 目标对象同时标识本次请求，旧回调不能传送玩家或清理新请求。
+                                // The target identifies this attempt; stale callbacks must not teleport or clear a newer attempt.
+                                if (portalPos != portalTarget) {
+                                    return;
+                                }
+                                portalPos = null;
+                                if (!isOnline() || !isAlive() || level != portalOrigin) {
+                                    inPortalTicks = 0;
+                                    return;
+                                }
                                 if (foundPortal == null) {
-                                    BlockNetherPortal.spawnPortal(portalPos);
-                                    teleport(portalPos.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
+                                    BlockNetherPortal.spawnPortal(portalTarget);
+                                    teleport(portalTarget.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
                                 } else {
                                     teleport(BlockNetherPortal.getSafePortal(foundPortal), TeleportCause.NETHER_PORTAL);
                                 }
-                                portalPos = null;
                             });
                         }
                     });
@@ -2074,9 +2513,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         boolean revert = false;
 
         // Extreme distance check
-        if (distanceSquared / tickDiffSq > 225) {
+        double extremeDistanceLimitSquared = movementSanityLimitSquared(225);
+        if (distanceSquared / tickDiffSq > extremeDistanceLimitSquared) {
             revert = true;
-            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > 225 * tickDiffSq=" + (225 * tickDiffSq));
+            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > "
+                    + extremeDistanceLimitSquared + " * tickDiffSq=" + (extremeDistanceLimitSquared * tickDiffSq));
         } else {
             // Chunk generation check
             if (this.chunk == null || !this.chunk.isGenerated()) {
@@ -2092,6 +2533,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
         }
+
+        Vector3 correctedClientPos = this.correctDeniedCreativeBreakMovement(clientPos);
+        boolean correctedDeniedCreativeBreak = correctedClientPos.y - clientPos.y
+                > CREATIVE_BREAK_CORRECTION_TOLERANCE;
+        clientPos = correctedClientPos;
 
         double dx = clientPos.x - this.x;
         double dy = clientPos.y - this.y;
@@ -2149,6 +2595,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.isCollided = this.onGround;
             this.updateFallState(this.onGround);
+            this.checkSwimmingState();
         }
 
         Location from = new Location(
@@ -2180,6 +2627,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.blocksAround = null;
                 this.collisionBlocks = null;
+
+                if (this.isGliding()) {
+                    this.tryEmitMovementVibration(VibrationType.ELYTRA_GLIDE);
+                } else if (this.isSwimming()) {
+                    if (!this.isSneaking()) {
+                        this.tryEmitMovementVibration(VibrationType.SWIM);
+                    }
+                } else if (this.isInsideOfWater() && !this.isSneaking()) {
+                    // Vanilla SWIM fires only when the entity actually swims, not when idling in
+                    // water. Require a real position change this movement packet so standing still
+                    // in water does not spam a swim vibration every block boundary.
+                    if (from.distanceSquared(to) > 1.0E-8) {
+                        this.tryEmitMovementVibration(VibrationType.SWIM);
+                    }
+                } else if (this.isOnGround()) {
+                    if (!this.isSneaking()) {
+                        this.tryEmitMovementVibration(VibrationType.STEP);
+                    }
+                }
 
                 if (!to.equals(moveEvent.getTo())) { // If plugins modify the destination
                     this.teleport(moveEvent.getTo(), null);
@@ -2230,7 +2696,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.speed.setComponents(0, 0, 0);
             }
         } else {
-            this.forceMovement = null;
+            if (correctedDeniedCreativeBreak) {
+                Location correction = this.getLocation().add(0, 0.00001, 0);
+                this.sendPosition(correction, MovePlayerPacket.MODE_NORMAL);
+                this.forceMovement = correction;
+            } else {
+                this.forceMovement = null;
+            }
 
             if (this.speed == null) {
                 speed = new Vector3(from.x - to.x, from.y - to.y, from.z - to.z);
@@ -2239,7 +2711,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             if (this.riding == null && this.inventory != null) {
-                if (this.isFoodEnabled() && this.getServer().getDifficulty() > 0 && distanceSquared >= 0.05) {
+                if (this.isFoodEnabled() && distanceSquared >= 0.05 && this.getServer().getDifficulty() > 0) {
                     double jump = 0;
                     double distance = Math.sqrt(distanceSquared);
                     double swimming = this.isInsideOfWater() ? 0.01 * distance : 0;
@@ -2278,8 +2750,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         Item boots = this.inventory.getBootsFast();
 
         Enchantment frostWalker = boots.getEnchantment(Enchantment.ID_FROST_WALKER);
-        if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
-            int radius = 2 + frostWalker.getLevel();
+        int frostWalkerLevel = frostWalker == null ? 0 : frostWalker.getLevel();
+        if (frostWalkerLevel > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
+            // Take the min before adding 2 so a malformed high level cannot overflow 2 + level negative
+            int radius = 2 + Math.min(frostWalkerLevel, EnchantmentFrostWalker.MAX_FREEZE_RADIUS - 2);
             for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
                 for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
                     Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
@@ -2389,11 +2863,43 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.entries = new Attribute[]{
                 Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getMaxHealth()).setValue(health > 0 ? (health < getMaxHealth() ? health : getMaxHealth()) : 0),
                 Attribute.getAttribute(Attribute.MAX_HUNGER).setValue(this.foodData.getLevel()).setDefaultValue(this.foodData.getMaxLevel()),
-                Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(this.getMovementSpeed()).setDefaultValue(this.getMovementSpeed()),
+                Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(this.speedToSend).setDefaultValue(this.getMovementSpeed()),
+                this.knockBackResistanceAttributeEntry(),
                 Attribute.getAttribute(Attribute.EXPERIENCE_LEVEL).setValue(this.expLevel),
                 Attribute.getAttribute(Attribute.EXPERIENCE).setValue(((float) this.exp) / calculateRequireExperience(this.expLevel))
         };
         this.dataPacket(pk);
+    }
+
+    /**
+     * 上次同步给客户端的击退抗性值，[-1, 0) 表示尚未同步过。
+     * <p>
+     * Last knockback resistance value sent to the client; values in [-1, 0) mean never sent.
+     */
+    private float lastSentKnockBackResistance = -1f;
+
+    /**
+     * 构造击退抗性属性条目并更新已同步值缓存。
+     * <p>
+     * Builds the knockback resistance attribute entry and refreshes the last-sent cache.
+     */
+    private Attribute knockBackResistanceAttributeEntry() {
+        float value = Math.max(0, Math.min(1, (float) this.getKnockBackResistance()));
+        this.lastSentKnockBackResistance = value;
+        return Attribute.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setValue(value);
+    }
+
+    /**
+     * 将当前击退抗性通过属性包同步给客户端，盔甲变化后调用；值未变化时跳过发包。
+     * <p>
+     * Syncs the current knockback resistance to the client via the attribute packet, called after armour changes; skips the packet when the value is unchanged.
+     */
+    public void sendKnockBackResistanceAttribute() {
+        float value = Math.max(0f, Math.min(1f, (float) this.getKnockBackResistance()));
+        if (value == this.lastSentKnockBackResistance) {
+            return;
+        }
+        this.setAttribute(this.knockBackResistanceAttributeEntry());
     }
 
     public void sendFogStack() {
@@ -2408,6 +2914,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         CameraPresetsPacket pk = new CameraPresetsPacket();
         pk.getPresets().addAll(CameraPresetManager.getPresets().values());
+        this.dataPacket(pk);
+    }
+
+    /**
+     * 下发 SET_LEVEL_GRAVITY 消息（NeteaseJsonPacket），将客户端世界重力重置为原版默认 -0.08。
+     * <p>
+     * Sends a SET_LEVEL_GRAVITY message (NeteaseJsonPacket) resetting the client's
+     * level gravity to the vanilla default of -0.08 (negative pulls down).
+     */
+    private void sendNetEaseLevelGravityReset() {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("eventName", NeteaseJsonPacket.EVENT_SET_LEVEL_GRAVITY);
+        payload.addProperty("gravity", -0.08f);
+        NeteaseJsonPacket pk = new NeteaseJsonPacket();
+        pk.json = payload.toString();
         this.dataPacket(pk);
     }
 
@@ -2659,6 +3180,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
+     * Start hold-to-use from AuthInput START_USING_ITEM / PlayerAction START_USING_ITEM
+     * using the <em>server</em> held stack. Java chew/drink is local, so the client
+     * animates even when MOT never entered using; other players only see
+     * {@code DATA_FLAG_ACTION} after this path succeeds.
+     */
+    boolean tryStartUsingHeldItem(Item item) {
+        if (!UsingItemReceive.shouldStartUsing(
+                this.spawned && this.isAlive(),
+                this.isSpectator() && this.server.useClientSpectator,
+                this.isUsingItem(),
+                UsingItemReceive.isHoldToUseItem(item))) {
+            return false;
+        }
+        Vector3 direction = this.getDirectionVector();
+        PlayerInteractEvent interactEvent = new PlayerInteractEvent(this, item, direction, this.getDirection(), Action.RIGHT_CLICK_AIR);
+        if (this.isSpectator()) {
+            interactEvent.setCancelled();
+        }
+        this.server.getPluginManager().callEvent(interactEvent);
+        if (interactEvent.isCancelled()) {
+            this.needSendHeldItem = true;
+            return false;
+        }
+        if (!item.onClickAir(this, direction) || !item.canRelease()) {
+            return false;
+        }
+        if (this.isSurvival() || this.isAdventure()) {
+            if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
+                this.inventory.setItemInHand(item);
+            }
+        }
+        this.setUsingItem(true);
+        return true;
+    }
+
+    /**
      * Processes server-side auto-completion for consumable items.
      *
      * @return true if auto-completion was triggered
@@ -2757,7 +3314,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         nowLevel.providerLock.readLock().lock();
 
         try {
-            if (this.nextChunkOrderRun-- <= 0 || this.chunk == null) {
+            int curChunkX = (int) this.x >> 4;
+            int curChunkZ = (int) this.z >> 4;
+            // 跨区块或转向>45° 立即重排(等价 PNX),不等 nextChunkOrderRun
+            // Reorder on cross-chunk or turn>45° (cf. PNX), not waiting for nextChunkOrderRun
+            boolean crossedChunk = curChunkX != this.lastOrderChunkX || curChunkZ != this.lastOrderChunkZ;
+            double yawDelta = this.yaw - this.lastOrderYaw;
+            yawDelta = ((yawDelta + 180) % 360 + 360) % 360 - 180;   // 归一到 [-180,180) / wrap to [-180,180)
+            boolean turned = !Double.isNaN(this.lastOrderYaw) && Math.abs(yawDelta) > 45.0;
+            if (this.nextChunkOrderRun-- <= 0 || this.chunk == null || crossedChunk || turned) {
                 this.orderChunks();
             }
 
@@ -2783,12 +3348,56 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private boolean canInteractEntity(Vector3 pos, double maxDistance) {
-        if (this.distanceSquared(pos) > Math.pow(maxDistance, 2)) {
+        double pointX = pos.x;
+        double pointZ = pos.z;
+        double distanceSquared;
+        if (pos instanceof Entity entity && !(entity instanceof Player) && entity.boundingBox != null) {
+            // A big body puts its visible head and tail far away from the centre point: the
+            // bounding box can extend well beyond the entity position. Measured from the
+            // centre, a hit on the head was farther than the
+            // reach even though the sword touched the model, and the facing check refused a
+            // player who faced the head while the centre was behind his back. The hit is
+            // measured to the nearest point of the bounding box instead; a player standing
+            // inside the body is at distance zero. Players keep the centre measurement so the
+            // PvP reach does not change by a single block.
+            AxisAlignedBB box = entity.boundingBox;
+            double eyeY = this.y + this.getEyeHeight();
+            double nearestX = NukkitMath.clamp(this.x, box.getMinX(), box.getMaxX());
+            double nearestY = NukkitMath.clamp(eyeY, box.getMinY(), box.getMaxY());
+            double nearestZ = NukkitMath.clamp(this.z, box.getMinZ(), box.getMaxZ());
+            double dx = nearestX - this.x;
+            double dy = nearestY - eyeY;
+            double dz = nearestZ - this.z;
+            distanceSquared = dx * dx + dy * dy + dz * dz;
+            pointX = nearestX;
+            pointZ = nearestZ;
+            if (distanceSquared > maxDistance * maxDistance) {
+                return false;
+            }
+            // A big body overlaps terrain and encloses players standing next to it, so the
+            // client reports a hit while the crosshair rests on a wall.
+            // The swing has to reach the body without crossing a block; see MeleeLineOfSight.
+            Vector3 look = this.getDirectionVector();
+            Level level = this.level;
+            if (!MeleeLineOfSight.clear(this.x, eyeY, this.z, look.x, look.y, look.z, box, maxDistance,
+                    (bx, by, bz) -> {
+                        Block block = level.getBlock(bx, by, bz, false);
+                        if (block == null || block.getId() == BlockID.AIR || block.canPassThrough()) {
+                            return null;
+                        }
+                        return block.getBoundingBox();
+                    })) {
+                return false;
+            }
+        } else {
+            distanceSquared = this.distanceSquared(pos);
+        }
+        if (distanceSquared > maxDistance * maxDistance) {
             return false;
         }
 
         Vector2 dV = this.getDirectionPlane();
-        return (dV.dot(new Vector2(pos.x, pos.z)) - dV.dot(new Vector2(this.x, this.z))) >= -0.87;
+        return (dV.dot(new Vector2(pointX, pointZ)) - dV.dot(new Vector2(this.x, this.z))) >= -0.87;
     }
 
     protected void processLogin() {
@@ -2807,8 +3416,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         for (Player p : new ArrayList<>(this.server.playerList.values())) {
             if (p != this && p.username != null) {
-                if (p.username.equalsIgnoreCase(this.username) || this.getUniqueId().equals(p.getUniqueId())) {
-                    this.close("", "disconnectionScreen.loggedinOtherLocation");
+                if (p.username.equalsIgnoreCase(this.username)) {
+                    if (this.server.isDuplicateLoginKeepingExistingSession()) {
+                        // The session that is already in the world stays and the newcomer is the one
+                        // that is refused: closing the older session hands the world to whoever knocks
+                        // last, so a player carrying loot loses it to a stranger reusing the nickname.
+                        // A stale session still times out by itself.
+                        this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        return;
+                    }
+                    p.close("", "disconnectionScreen.loggedinOtherLocation");
+                    break;
+                }
+                if (this.getUniqueId().equals(p.getUniqueId())) {
+                    if (this.server.isDuplicateLoginKeepingExistingSession()) {
+                        this.server.getLogger().warning("Refused the login of " + this.username + ": "
+                                + p.getName() + " is already playing under identity " + this.getUniqueId());
+                        this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        return;
+                    }
+                    this.server.getLogger().warning("Evicting " + p.getName() + " as a duplicate login of "
+                            + this.username + ": both resolved to identity " + this.getUniqueId());
+                    p.close("", "disconnectionScreen.loggedinOtherLocation");
                     break;
                 }
             }
@@ -2818,9 +3447,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         File legacyDataFile = new File(server.getDataPath() + "players/" + lowerName + ".dat");
         File dataFile = new File(server.getDataPath() + "players/" + this.uuid.toString() + ".dat");
         if (this.server.savePlayerDataByUuid) {
+            if (!loginChainData.isXboxAuthed() && !dataFile.exists()) {
+                // The identity of unauthenticated players is no longer taken from the client, so
+                // data saved under their previous UUID has to follow them over — unless the name
+                // was last used by an Xbox authenticated account, whose data must stay with it.
+                Optional<Server.NameEntry> previousIdentity = this.server.lookupNameEntry(lowerName);
+                boolean authedOwner = previousIdentity.isPresent()
+                        && previousIdentity.get().provenance() == Server.NameProvenance.XBOX_AUTHED;
+                if (authedOwner) {
+                    this.server.getLogger().info("Not migrating player data for " + this.username
+                            + ": the name was last used by an Xbox authenticated account");
+                } else if (previousIdentity.isPresent() && this.server.migratePlayerData(previousIdentity.get().uuid(), this.uuid)
+                        == PlayerDataMigrator.Result.FAILED) {
+                    this.server.getLogger().warning("Aborted login of " + this.username + ": player data migration from "
+                            + previousIdentity.get().uuid() + " to " + this.uuid + " failed and will be retried");
+                    this.close("", "Failed to load your player data, please reconnect");
+                    return;
+                }
+            }
             boolean dataFound = dataFile.exists();
             if (!dataFound && legacyDataFile.exists()) {
-                nbt = this.server.getOfflinePlayerData(lowerName, false);
+                // 按名直读，不经查找表解析——否则条目指向认证账户或塌缩身份时绕过守卫
+                // Read by name directly; lookup resolution would bypass the migration guards
+                nbt = this.server.getLegacyPlayerDataByName(lowerName);
                 if (!legacyDataFile.delete()) {
                     this.server.getLogger().warning("Could not delete legacy player data for " + this.username);
                 }
@@ -2842,7 +3491,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (loginChainData.isXboxAuthed() || !server.xboxAuth) {
-            server.updateName(this.uuid, this.username);
+            server.updateName(this.uuid, this.username, loginChainData.isXboxAuthed());
         }
 
         this.playedBefore = (nbt.getLong("lastPlayed") - nbt.getLong("firstPlayed")) > 1;
@@ -2876,9 +3525,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             nbt.putString("Level", this.level.getName());
             Position sp = this.level.getSpawnLocation();
             nbt.getList("Pos", DoubleTag.class)
-                    .add(new DoubleTag("0", sp.x))
-                    .add(new DoubleTag("1", sp.y))
-                    .add(new DoubleTag("2", sp.z));
+                    .add(0, new DoubleTag("0", sp.x))
+                    .add(1, new DoubleTag("1", sp.y))
+                    .add(2, new DoubleTag("2", sp.z));
         } else {
             this.setLevel(level);
         }
@@ -2915,6 +3564,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         UUID uuid = getUniqueId();
         nbt.putLong("UUIDLeast", uuid.getLeastSignificantBits());
         nbt.putLong("UUIDMost", uuid.getMostSignificantBits());
+        if (loginChainData.isXboxAuthed()) {
+            // 认证账户的存档带 XUID 标记，迁移器拒绝把它移交给离线身份
+            // Authenticated saves carry the XUID marker; the migrator refuses to hand it to an offline identity
+            String xuid = loginChainData.getXUID();
+            nbt.putString("XUID", xuid == null || xuid.isEmpty() ? "authenticated" : xuid);
+        }
 
         if (this.server.getAutoSave()) {
             if (this.server.savePlayerDataByUuid) {
@@ -2939,6 +3594,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.foodData = new PlayerFood(this, this.namedTag.getInt("foodLevel"), this.namedTag.getFloat("foodSaturationLevel"));
+
+        // Restore warden warning state (per-player, persists across reconnect/restart)
+        this.wardenWarningData.warningLevel = this.namedTag.getInt("wardenWarningLevel");
+        this.wardenWarningData.lastWarningTick = this.namedTag.getLong("wardenLastWarningTick");
+        this.wardenWarningData.lastShriekTick = this.namedTag.getLong("wardenLastShriekTick");
 
         if (this.isSpectator()) {
             this.keepMovement = true;
@@ -2968,9 +3628,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.syncLoginPhase(SessionLoginPhase.RESOURCE_PACK);
     }
 
+    private boolean rejectIfServerFull() {
+        return this.server.getOnlinePlayers().size() >= this.server.getMaxPlayers()
+                && this.kick(PlayerKickEvent.Reason.SERVER_FULL, "disconnectionScreen.serverFull", false);
+    }
+
     protected void completeLoginSequence() {
         if (this.loggedIn) {
             this.server.getLogger().debug("(BUG) Tried to call completeLoginSequence but player is already logged in");
+            return;
+        }
+
+        if (this.rejectIfServerFull()) {
             return;
         }
 
@@ -2981,11 +3650,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.completeLegacyLoginSequence();
+            return;
+        }
+
         if (this.protocol >= ProtocolInfo.v1_18_30) {
             DimensionDataPacket dimensionDataPacket = DimensionDataPacket.createIfModified();
             if (dimensionDataPacket != null) {
                 this.forceDataPacket(dimensionDataPacket, null);
             }
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_21_120) {
+            this.forceDataPacket(JigsawStructureDataPacket.getCachedPacket(), null);
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.forceDataPacket(VoxelShapesPacket.getCachedPacket(this.protocol), null);
         }
 
         StartGamePacket startGamePacket = new StartGamePacket();
@@ -3017,6 +3699,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         startGamePacket.authoritativeMovementMode = this.getAuthoritativeMovementMode();
         startGamePacket.isServerAuthoritativeBlockBreaking = this.isServerAuthoritativeBlockBreaking();
+        startGamePacket.isInventoryServerAuthoritative = this.isInventoryServerAuthoritative();
         startGamePacket.blockNetworkIdsHashed = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(this.gameVersion);
         startGamePacket.playerPropertyData = EntityProperty.getPlayerPropertyCache();
         this.forceDataPacket(startGamePacket, null);
@@ -3027,7 +3710,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + this.gameVersion.toString() + ")"));
+                this.protocol + " (" + this.gameVersion.toString() + ", " + this.getTransportName() + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
@@ -3049,7 +3732,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             Set<Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
                             List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
                             entries.addAll(vanillaItems);
-                            if (this.server.enableExperimentMode && !itemDefinitions.isEmpty()) {
+                            if (!itemDefinitions.isEmpty()) {
                                 for (Entry<String, CustomItemDefinition> entry : itemDefinitions) {
                                     try {
                                         Item item = Item.fromString(entry.getKey());
@@ -3068,7 +3751,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             itemComponentPacket.setEntries(entries);
                         } else {
-                            if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
+                            if (!Item.getCustomItemDefinition().isEmpty()) {
                                 HashMap<String, CustomItemDefinition> itemDefinition = Item.getCustomItemDefinition();
                                 List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(itemDefinition.size());
                                 int i = 0;
@@ -3165,8 +3848,80 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    private void completeLegacyLoginSequence() {
+        Position spawnPosition = this.getSpawn();
+
+        this.server.addOnlinePlayer(this);
+        this.loggedIn = true;
+        this.syncLoginPhase(SessionLoginPhase.LOGGED_IN);
+
+        if (this.isCreative()) {
+            this.inventory.setHeldItemSlot(0);
+        } else {
+            this.inventory.setHeldItemSlot(this.inventory.getHotbarSlotIndex(0));
+        }
+
+        if (this.isSpectator()) {
+            this.keepMovement = true;
+        }
+
+        StartGamePacket startGamePacket = new StartGamePacket();
+        startGamePacket.entityUniqueId = this.id;
+        startGamePacket.entityRuntimeId = this.id;
+        startGamePacket.playerGamemode = this.getClientFriendlyGamemode(this.gamemode);
+        startGamePacket.x = (float) this.x;
+        startGamePacket.y = (float) this.y;
+        startGamePacket.z = (float) this.z;
+        startGamePacket.yaw = (float) this.yaw;
+        startGamePacket.pitch = (float) this.pitch;
+        startGamePacket.seed = -1;
+        startGamePacket.dimension = (byte) (this.level.getDimension() & 0xff);
+        startGamePacket.worldGamemode = this.getClientFriendlyGamemode(this.gamemode);
+        startGamePacket.difficulty = this.server.getDifficulty();
+        startGamePacket.spawnX = (int) spawnPosition.x;
+        startGamePacket.spawnY = (int) spawnPosition.y;
+        startGamePacket.spawnZ = (int) spawnPosition.z;
+        startGamePacket.hasAchievementsDisabled = true;
+        startGamePacket.dayCycleStopTime = -1;
+        startGamePacket.eduMode = false;
+        startGamePacket.commandsEnabled = this.isEnableClientCommand();
+        startGamePacket.gameRules = this.getLevel().getGameRules();
+        startGamePacket.levelId = "";
+        startGamePacket.worldName = this.getServer().getNetwork().getName();
+        startGamePacket.version = this.getLoginChainData().getGameVersion();
+        startGamePacket.vanillaVersion = Utils.getVersionByProtocol(this.protocol);
+        this.forceDataPacket(startGamePacket, null);
+
+        this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logIn",
+                TextFormat.AQUA + this.username + TextFormat.WHITE,
+                this.getAddress(),
+                String.valueOf(this.getPort()),
+                this.protocol + " (" + this.gameVersion.toString() + ", " + this.getTransportName() + ")"));
+
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
+        this.setDataProperty(new ByteEntityData(DATA_ALWAYS_SHOW_NAMETAG, 1), false);
+
+        try {
+            this.getLevel().sendTime(this);
+            this.sendAttributes();
+            this.inventory.sendCreativeContents();
+            this.server.sendFullPlayerListData(this);
+
+            if (this.isOp() || this.hasPermission("nukkit.textcolor")) {
+                this.setRemoveFormat(false);
+            }
+
+            this.forceMovement = this.getLocation();
+            this.teleportPosition = this.getLocation();
+        } catch (Exception e) {
+            this.close("", "Internal Server Error");
+            this.server.getLogger().logException(e);
+        }
+    }
+
     public void handleDataPacket(DataPacket packet) {
-        if (!this.connected) {
+        if (!connected) {
             return;
         }
 
@@ -3200,7 +3955,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             log.trace("Inbound {}: {}", this.getName(), packet);
         }
 
-        if (DataPacketManager.canProcess(packet.protocol, packet.getClass())) {
+        if (pid == ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET) {
+            if (this.networkSession != null && this.networkSession.getState() != null) {
+                this.networkSession.getState().getLogin().touchActivity();
+            }
+            return;
+        }
+
+        if (DataPacketManager.canProcess(packet.gameVersion, packet.getClass())) {
             DataPacketManager.processPacket(this.playerHandle, packet);
             return;
         }
@@ -3226,9 +3988,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 LoginPacket loginPacket = (LoginPacket) packet;
 
                 this.protocol = loginPacket.getProtocol();
-                if (this.gameVersion == null) {
-                    // 低版本仅兼容国际版，高于554的版本在RequestNetworkSettingsProcessor_v554中处理
-                    this.gameVersion = GameVersion.byProtocol(this.protocol, false);
+                if (this.gameVersion != loginPacket.getGameVersion()) {
+                    this.gameVersion = loginPacket.getGameVersion();
                     this.syncGameVersion(this.gameVersion);
                 }
 
@@ -3288,125 +4049,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
-                if (this.server.getOnlinePlayers().size() >= this.server.getMaxPlayers() && this.kick(PlayerKickEvent.Reason.SERVER_FULL, "disconnectionScreen.serverFull", false)) {
+                if (this.rejectIfServerFull()) {
                     return;
                 }
 
-                try {
-                    this.loginChainData = ClientChainData.read(loginPacket);
-                } catch (ClientChainData.TooBigSkinException ex) {
-                    this.close("", "disconnectionScreen.invalidSkin");
-                    return;
-                }
-
-                if (!loginChainData.isXboxAuthed() && server.xboxAuth) {
-                    this.close("", "disconnectionScreen.notAuthenticated");
-                    if (server.banXBAuthFailed) {
-                        this.server.getNetwork().blockAddress(this.socketAddress.getAddress(), 5);
-                        this.server.getLogger().notice("Blocked " + getAddress() + " for 5 seconds due to failed Xbox auth");
-                    }
-                    break;
-                }
-
-                if (this.server.isWaterdogCapable() && loginChainData.getWaterdogIP() != null) {
-                    this.socketAddress = new InetSocketAddress(this.loginChainData.getWaterdogIP(), this.getRawPort());
-                }
-
-                this.version = loginChainData.getGameVersion();
-
-                // Use verified identity data from ClientChainData (signature-validated) as the source of truth
-                String verifiedName = TextFormat.clean(loginChainData.getUsername());
-                if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
-                    verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
-                }
-                if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
-                    verifiedName = server.viaProxyUsernamePrefix + verifiedName;
-                }
-
-                this.username = verifiedName;
-                this.unverifiedUsername = null;
-                this.displayName = this.username;
-                this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
-                this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
-
-                this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
-
-                this.randomClientId = loginChainData.getClientId();
-
-                this.uuid = loginChainData.getClientUUID();
-                this.rawUUID = Binary.writeUUID(this.uuid);
-                this.minecraftId = loginChainData.getMinecraftId();
-
-                boolean valid = true;
-                String rawVerifiedName = loginChainData.getUsername();
-                int len = rawVerifiedName.length();
-                if (((len > 16 || len < 3) && !gameVersion.isNetEase())
-                        || rawVerifiedName.trim().isEmpty()) {
-                    valid = false;
-                }
-
-                if (valid && !gameVersion.isNetEase()) {
-                    for (int i = 0; i < len; i++) {
-                        char c = rawVerifiedName.charAt(i);
-                        if ((c >= 'a' && c <= 'z') ||
-                                (c >= 'A' && c <= 'Z') ||
-                                (c >= '0' && c <= '9') ||
-                                c == '_' || c == ' '
-                        ) {
-                            continue;
-                        }
-
-                        valid = false;
-                        break;
-                    }
-                }
-
-                if (!valid || Objects.equals(this.iusername, "rcon") || Objects.equals(this.iusername, "console")) {
-                    this.close("", "disconnectionScreen.invalidName");
-                    break;
-                }
-
-                if (!loginPacket.skin.isValid()) {
-                    this.close("", "disconnectionScreen.invalidSkin");
-                    break;
-                }
-                Skin skin = loginPacket.skin;
-                this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
-
-                PlayerPreLoginEvent playerPreLoginEvent;
-                this.server.getPluginManager().callEvent(playerPreLoginEvent = new PlayerPreLoginEvent(this, "Plugin reason"));
-                if (playerPreLoginEvent.isCancelled()) {
-                    this.close("", playerPreLoginEvent.getKickMessage());
-                    break;
-                }
-
-                if (this.isEnableNetworkEncryption()) {
-                    this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PrepareEncryptionTask(this) {
-                        @Override
-                        public void onCompletion(Server server) {
-                            if (!Player.this.isConnected()) {
-                                return;
-                            }
-
-                            if (this.getHandshakeJwt() == null || this.getEncryptionKey() == null || this.getEncryptionCipher() == null || this.getDecryptionCipher() == null) {
-                                Player.this.close("", "Network Encryption error");
-                                return;
-                            }
-
-                            ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
-                            pk.setJwt(this.getHandshakeJwt());
-                            Player.this.syncLoginPhase(SessionLoginPhase.ENCRYPTION_REQUEST_SENT);
-                            Player.this.forceDataPacket(pk, () -> {
-                                Player.this.syncAwaitingEncryptionHandshake(true);
-                                Player.this.syncLoginPhase(SessionLoginPhase.AWAITING_ENCRYPTION_RESPONSE);
-                                Player.this.getNetworkSession().beginLegacyInboundEncryptionGraceWindow();
-                                Player.this.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
-                            }, ImmediatePacketMode.DIRECT_WRITE);
-                        }
-                    });
-                } else {
-                    this.processPreLogin();
-                }
+                beginLoginVerification(loginPacket, LoginChainVerifier.shared());
                 break;
             case ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET:
                 ResourcePackClientResponsePacket responsePacket = (ResourcePackClientResponsePacket) packet;
@@ -3415,6 +4062,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.close("", "disconnectionScreen.noReason");
                         break;
                     case ResourcePackClientResponsePacket.STATUS_SEND_PACKS:
+                        this.pendingResourcePacks.clear();
                         for (ResourcePackClientResponsePacket.Entry entry : responsePacket.packEntries) {
                             ResourcePack resourcePack = this.server.getResourcePackManager().getPackById(entry.uuid);
                             if (resourcePack == null) {
@@ -3424,6 +4072,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             ResourcePackDataInfoPacket dataInfoPacket = new ResourcePackDataInfoPacket();
                             dataInfoPacket.packId = resourcePack.getPackId();
+                            dataInfoPacket.packVersion = resourcePack.getPackVersion();
                             dataInfoPacket.maxChunkSize = RESOURCE_PACK_CHUNK_SIZE;
                             dataInfoPacket.chunkCount = MathHelper.ceil(resourcePack.getPackSize() / (float) RESOURCE_PACK_CHUNK_SIZE);
                             dataInfoPacket.compressedPackSize = resourcePack.getPackSize();
@@ -3460,17 +4109,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 MovePlayerPacket movePlayerPacket = (MovePlayerPacket) packet;
+                if (!Float.isFinite(movePlayerPacket.x) || !Float.isFinite(movePlayerPacket.y) || !Float.isFinite(movePlayerPacket.z)
+                        || !Float.isFinite(movePlayerPacket.yaw) || !Float.isFinite(movePlayerPacket.pitch) || !Float.isFinite(movePlayerPacket.headYaw)) {
+                    server.getLogger().debug(username + ": infinite move player position");
+                    break;
+                }
                 Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                 double dis = newPos.distanceSquared(this);
 
-                if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
+                if (this.forceMovement == null && dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
                     break;
                 }
 
-                if (dis > 100) {
+                double legacyMoveDistanceLimitSquared = movementSanityLimitSquared(100);
+                if (dis > legacyMoveDistanceLimitSquared) {
                     if (this.lastTeleportTick + 30 < this.server.getTick()) {
                         this.sendPosition(this.getLocation(), MovePlayerPacket.MODE_RESET);
-                        log.debug("{}: move {} > 100", username, dis);
+                        log.debug("{}: move {} > {}", username, dis, legacyMoveDistanceLimitSquared);
                     }
                     break;
                 }
@@ -3481,7 +4136,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = this.getLocation();
                 }
 
-                if (this.forceMovement != null && (newPos.distanceSquared(this.forceMovement) > 0.1 || revert)) {
+                if (this.forceMovement != null && (revert || newPos.distanceSquared(this.forceMovement) > 0.1)) {
                     this.sendPosition(this.forceMovement, MovePlayerPacket.MODE_RESET);
                 } else {
 
@@ -3502,14 +4157,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 break;
             case ProtocolInfo.PLAYER_AUTH_INPUT_PACKET:
+                PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
+                Vector3f inputPos = authPacket.getPosition();
+                if (!Float.isFinite(inputPos.x) || !Float.isFinite(inputPos.y) || !Float.isFinite(inputPos.z)
+                        || !Float.isFinite(authPacket.getYaw()) || !Float.isFinite(authPacket.getPitch()) || !Float.isFinite(authPacket.getHeadYaw())) {
+                    server.getLogger().debug(username + ": infinite input position");
+                    return;
+                }
+                this.handleAuthInputItemStackRequest(authPacket);
+
                 if (!this.isMovementServerAuthoritative()) {
                     return;
                 }
 
-                PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
-
-                if (!authPacket.getBlockActionData().isEmpty()) {
-                    for (PlayerBlockActionData action : authPacket.getBlockActionData().values()) {
+                // A creative client can finish several blocks in one input tick. Replaying the
+                // legacy map silently loses all but the last action of each type, leaving blocks
+                // hidden on the client without ever asking the level to break or restore them.
+                // Only map-only packets need the ordering repair; decoded actions have wire order.
+                List<PlayerBlockActionData> blockActions = authPacket.getDecodedBlockActions();
+                if (blockActions.isEmpty()) {
+                    blockActions = orderBlockActions(authPacket.getBlockActionData().values());
+                }
+                if (!blockActions.isEmpty()) {
+                    for (PlayerBlockActionData action : blockActions) {
                         BlockVector3 blockPos = action.getPosition();
                         if (blockPos == null) {
                             continue;
@@ -3524,7 +4194,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (lastBreakPos != null && (lastBreakPos.getX() != blockPos.getX() ||
                                 lastBreakPos.getY() != blockPos.getY() || lastBreakPos.getZ() != blockPos.getZ())) {
                             this.onBlockBreakAbort(lastBreakPos.asVector3(), BlockFace.DOWN);
-                            this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            if (!endsBlockDestruction(action.getAction())) {
+                                this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            }
                         }
 
                         switch (action.getAction()) {
@@ -3603,6 +4275,34 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                         }
                     }
+                } else if (this.riding instanceof EntityControllable controllable
+                        && this.protocol >= ProtocolInfo.v1_21_80) {
+                    // Since 1.21.80 the client stopped sending PlayerInputPacket, so
+                    // PlayerInputProcessor never runs any more and every controllable ride
+                    // except the boat, the minecart and the happy ghast lost its input: a
+                    // saddled horse could be mounted and then stood still forever. The move
+                    // vector lives in the auth input packet now, and it drives the very same
+                    // EntityControllable hook the legacy packet used to drive.
+                    double moveVecX = NukkitMath.clamp(authPacket.getMotion().getX(), -1, 1);
+                    double moveVecY = NukkitMath.clamp(authPacket.getMotion().getY(), -1, 1);
+                    if (moveVecX != 0 || moveVecY != 0) {
+                        controllable.onPlayerInput(this, moveVecX, moveVecY);
+                    }
+                }
+
+                boolean authStartUsingItem = UsingItemReceive.authInputStartsUsingItem(authPacket);
+                // The inventory is built by initEntity, which runs at login. An auth input that
+                // reaches the session before that (a client that keeps moving while its profile
+                // is still loading) used to throw here and drop the connection.
+                Item authHeldItem = this.inventory == null ? null : this.inventory.getItemInHand();
+                boolean authHoldToUse = UsingItemReceive.isHoldToUseItem(authHeldItem);
+                if (UsingItemReceive.shouldStartUsingFromAuthInput(
+                        this.spawned && this.isAlive(),
+                        this.isSpectator() && this.server.useClientSpectator,
+                        this.isUsingItem(),
+                        authHoldToUse,
+                        authStartUsingItem)) {
+                    this.tryStartUsingHeldItem(authHeldItem);
                 }
 
                 if (authPacket.getInputData().contains(AuthInputAction.START_SPRINTING)) {
@@ -3617,7 +4317,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
-                        this.setUsingItem(false);
+                        if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem)) {
+                            this.setUsingItem(false);
+                        }
                     }
                 }
 
@@ -3665,10 +4368,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (chestplate == null || chestplate.getId() != ItemID.ELYTRA || chestplate.getDamage() >= chestplate.getMaxDurability()) {
                         withoutElytra = true;
                     }
-                    if (withoutElytra && !server.getAllowFlight()) {
-                        this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, MSG_FLYING_NOT_ENABLED, true);
-                        return;
-                    }
+                    // A glide request without elytra is refused, never punished: the client asks
+                    // for it whenever the player double taps jump, which happens all the time when
+                    // a plugin takes the elytra off. Cancelling resyncs the client, and a player who
+                    // keeps rising without wings is still caught by the movement check below.
                     PlayerToggleGlideEvent playerToggleGlideEvent = new PlayerToggleGlideEvent(this, true);
                     if (this.riding != null || this.sleeping != null || withoutElytra) {
                         playerToggleGlideEvent.setCancelled(true);
@@ -3772,7 +4475,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     if (authPacket.getInputData().contains(AuthInputAction.START_FLYING)) {
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Stale request: the client keeps asking after permission is revoked; refuse and
+                            // resync, real flight is still caught by the movement check
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
@@ -3848,13 +4553,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 double distSqrt = clientPosition.distanceSquared(this);
-                if (distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
+                if (this.forceMovement == null && distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
                     break;
                 }
 
-                if (distSqrt > 100) {
+                double authInputDistanceLimitSquared = movementSanityLimitSquared(100);
+                if (distSqrt > authInputDistanceLimitSquared) {
                     this.sendPosition(this.getLocation(), MovePlayerPacket.MODE_RESET);
-                    log.debug("{}: move {} > 100", username, distSqrt);
+                    log.debug("{}: move {} > {}", username, distSqrt, authInputDistanceLimitSquared);
                     return;
                 }
 
@@ -3864,7 +4570,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = this.getLocation();
                 }
 
-                if (this.forceMovement != null && (clientPosition.distanceSquared(this.forceMovement) > 0.1 || revertMotion)) {
+                if (this.forceMovement != null && (revertMotion || clientPosition.distanceSquared(this.forceMovement) > 0.1)) {
                     this.sendPosition(this.forceMovement, MovePlayerPacket.MODE_RESET);
                 } else {
                     float yaw = authPacket.getYaw() % 360;
@@ -3883,6 +4589,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     this.forceMovement = null;
                 }
+
                 break;
             case ProtocolInfo.PLAYER_ACTION_PACKET:
                 PlayerActionPacket playerActionPacket = (PlayerActionPacket) packet;
@@ -3912,11 +4619,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.stopSleep();
                         break;
                     case PlayerActionPacket.ACTION_RESPAWN:
-                        if (!this.spawned || this.isAlive() || !this.isOnline()) {
-                            break;
-                        }
-
-                        this.respawn();
+                        this.handleRespawnRequest();
                         break;
                     case PlayerActionPacket.ACTION_JUMP:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput()) break;
@@ -3985,10 +4688,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (chestplate == null || chestplate.getId() != ItemID.ELYTRA || chestplate.getDamage() >= chestplate.getMaxDurability()) {
                             withoutElytra = true;
                         }
-                        if (withoutElytra && !server.getAllowFlight()) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, MSG_FLYING_NOT_ENABLED, true);
-                            return;
-                        }
+                        // Refused, not punished: see ACTION_START_GLIDING above.
                         PlayerToggleGlideEvent playerToggleGlideEvent = new PlayerToggleGlideEvent(this, true);
                         if (this.riding != null || this.sleeping != null || withoutElytra) {
                             playerToggleGlideEvent.setCancelled(true);
@@ -4031,7 +4731,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case PlayerActionPacket.ACTION_STOP_SWIMMING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput()) break;
                         ptse = new PlayerToggleSwimEvent(this, false);
-                        if (this.riding != null || this.sleeping != null || !this.isInsideOfWater()) {
+                        if (this.riding != null || this.sleeping != null) {
                             ptse.setCancelled(true);
                         }
                         this.server.getPluginManager().callEvent(ptse);
@@ -4089,7 +4789,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case PlayerActionPacket.ACTION_START_FLYING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput() || protocol < ProtocolInfo.v1_20_30_24) break;
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            // Stale request, handled as START_FLYING above
+                            this.needSendAdventureSettings = true;
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
@@ -4110,9 +4811,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.getAdventureSettings().set(Type.FLYING, playerToggleFlightEvent.isFlying());
                         }
                         break packetswitch;
+                    case PlayerActionPacket.ACTION_START_USING_ITEM:
+                        this.tryStartUsingHeldItem(this.inventory.getItemInHand());
+                        break packetswitch;
+                    case PlayerActionPacket.ACTION_START_ITEM_USE_ON:
+                    case PlayerActionPacket.ACTION_STOP_ITEM_USE_ON:
+                        // ViaProxy Java uses these as block-interaction compatibility markers.
+                        if (this.isJavaClient()) {
+                            break packetswitch;
+                        }
+                        break;
                 }
 
-                this.setUsingItem(false);
+                if (UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(this.isJavaClient(), playerActionPacket.action)) {
+                    this.setUsingItem(false);
+                }
                 break;
             case ProtocolInfo.INTERACT_PACKET:
                 if (!this.spawned || !this.isAlive()) {
@@ -4191,12 +4904,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.getServer().getLogger().debug(username + ": Block pick request for a block too far away");
                     return;
                 }
-                Item item = block.toItem();
+                // A placed shulker box keeps the tag of the item it came from (lore, plugin data);
+                // pick block creates a new item and must not copy that tag onto it.
+                Item item = block instanceof BlockShulkerBox shulkerBox ? shulkerBox.toPickItem() : block.toItem();
                 if (pickRequestPacket.addUserData) {
                     BlockEntity blockEntity = this.getLevel().getBlockEntityIfLoaded(this.temporalVector.setComponents(pickRequestPacket.x, pickRequestPacket.y, pickRequestPacket.z));
                     if (blockEntity != null) {
                         CompoundTag nbt = blockEntity.getCleanedNBT();
                         if (nbt != null) {
+                            nbt.remove(BlockShulkerBox.SOURCE_ITEM_TAG);
+                        }
+                        if (nbt != null && !nbt.isEmpty()) {
                             item.setCustomBlockData(nbt);
                             item.setLore("+(DATA)");
                         }
@@ -4383,6 +5101,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         ContainerClosePacket pk = new ContainerClosePacket();
                         pk.windowId = -1;
                         pk.wasServerInitiated = false;
+                        pk.type = containerClosePacket.type;
                         this.dataPacket(pk);
                     }
                     //TODO Find out why the correct id is not returned
@@ -4401,6 +5120,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     ContainerClosePacket pk = new ContainerClosePacket();
                     pk.windowId = containerClosePacket.windowId;
                     pk.wasServerInitiated = false;
+                    pk.type = containerClosePacket.type;
                     this.dataPacket(pk);
 
 //                    for (Inventory open : new ArrayList<>(this.windows.keySet())) {
@@ -4437,763 +5157,935 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
                 break;
-            case ProtocolInfo.INVENTORY_TRANSACTION_PACKET:
-                if (!this.spawned || !this.isAlive()) {
-                    log.debug("Player {} sent inventory transaction packet while not spawned or not alive", this.username);
+            default:
+                break;
+        }
+    }
+
+    public void handleItemStackRequests(List<ItemStackRequest> requests) {
+        if (!this.spawned || !this.isAlive()) {
+            log.debug("Player {} sent item stack request packet while not spawned or not alive", this.username);
+            return;
+        }
+        if (this.isSpectator() && this.server.useClientSpectator) {
+            this.needSendInventory = true;
+            return;
+        }
+        if (requests.isEmpty()) {
+            return;
+        }
+
+        int currentTick = this.server.getTick();
+        if (this.processedItemStackRequestTick != currentTick) {
+            this.processedItemStackRequestTick = currentTick;
+            this.processedItemStackRequestIds.clear();
+        }
+
+        List<ItemStackRequest> pendingRequests = new ArrayList<>(requests.size());
+        for (ItemStackRequest request : requests) {
+            if (this.processedItemStackRequestIds.add(request.getRequestId())) {
+                pendingRequests.add(request);
+            }
+        }
+
+        if (!pendingRequests.isEmpty()) {
+            ItemStackRequestHandler.handleRequests(this, pendingRequests);
+        }
+    }
+
+    private void handleAuthInputItemStackRequest(PlayerAuthInputPacket authPacket) {
+        if (authPacket.getItemStackRequest() != null) {
+            this.handleItemStackRequests(List.of(authPacket.getItemStackRequest()));
+        }
+    }
+
+    public void handleInventoryTransactionPacket(InventoryTransactionPacket transactionPacket) {
+        if (!this.spawned || !this.isAlive()) {
+            log.debug("Player {} sent inventory transaction packet while not spawned or not alive", this.username);
+            return;
+        }
+
+        // 旁观者模式检查：如果启用了客户端旁观模式，则完全阻止交互（不触发事件）
+        // 如果未启用，则允许触发事件但不允许实际操作（假旁观模式，类似创造模式）
+        // Spectator mode check: If client spectator mode is enabled, completely block interaction (no event trigger)
+        // If not enabled, allow event trigger but prevent actual operation (fake spectator mode, similar to creative mode)
+        if (this.isSpectator() && this.server.useClientSpectator) {
+            this.needSendInventory = true;
+            return;
+        }
+
+        PlayerInventory inventory = this.inventory;
+        Level level = this.level;
+        Server server = this.server;
+        BlockFace face;
+        Block block;
+        Item item;
+
+        // Nasty hack because the client won't change the right packet in survival when creating netherite stuff,
+        // so we are emulating what Mojang should be sending
+        if (getWindowById(SMITHING_WINDOW_ID) instanceof SmithingInventory smithingInventory
+                && transactionPacket.transactionType == InventoryTransactionPacket.TYPE_MISMATCH
+                && !smithingInventory.getResult().isNull()) {
+            InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
+            fixedPacket.isRepairItemPart = true;
+            fixedPacket.actions = new NetworkInventoryAction[8];
+
+            Item fromIngredient = smithingInventory.getIngredient().clone();
+            Item toIngredient = fromIngredient.decrement(1);
+
+            Item fromEquipment = smithingInventory.getEquipment().clone();
+            Item toEquipment = fromEquipment.decrement(1);
+
+            Item fromTemplate = smithingInventory.getTemplate().clone();
+            Item toTemplate = fromTemplate.decrement(1);
+
+            Item fromResult = Item.get(Item.AIR);
+            Item toResult = smithingInventory.getResult().clone();
+
+            NetworkInventoryAction action = new NetworkInventoryAction();
+            action.windowId = ContainerIds.UI;
+            action.inventorySlot = SmithingInventory.SMITHING_INGREDIENT_UI_SLOT;
+            action.oldItem = fromIngredient.clone();
+            action.newItem = toIngredient.clone();
+            fixedPacket.actions[0] = action;
+
+            action = new NetworkInventoryAction();
+            action.windowId = ContainerIds.UI;
+            action.inventorySlot = SmithingInventory.SMITHING_EQUIPMENT_UI_SLOT;
+            action.oldItem = fromEquipment.clone();
+            action.newItem = toEquipment.clone();
+            fixedPacket.actions[1] = action;
+
+            action = new NetworkInventoryAction();
+            action.windowId = ContainerIds.UI;
+            action.inventorySlot = SmithingInventory.SMITHING_TEMPLATE_UI_SLOT;
+            action.oldItem = fromTemplate.clone();
+            action.newItem = toTemplate.clone();
+            fixedPacket.actions[2] = action;
+
+            int emptyPlayerSlot = -1;
+            for (int slot = 0; slot < inventory.getSize(); slot++) {
+                if (inventory.getItem(slot).isNull()) {
+                    emptyPlayerSlot = slot;
                     break;
                 }
+            }
+            if (emptyPlayerSlot == -1) {
+                this.needSendInventory = true;
+                return;
+            } else {
+                action = new NetworkInventoryAction();
+                action.windowId = ContainerIds.INVENTORY;
+                action.inventorySlot = emptyPlayerSlot;
+                action.oldItem = Item.get(Item.AIR);
+                action.newItem = toResult.clone();
+                fixedPacket.actions[3] = action;
 
-                // 旁观者模式检查：如果启用了客户端旁观模式，则完全阻止交互（不触发事件）
-                // 如果未启用，则允许触发事件但不允许实际操作（假旁观模式，类似创造模式）
-                // Spectator mode check: If client spectator mode is enabled, completely block interaction (no event trigger)
-                // If not enabled, allow event trigger but prevent actual operation (fake spectator mode, similar to creative mode)
-                if (this.isSpectator() && this.server.useClientSpectator) {
-                    this.needSendInventory = true;
-                    break;
-                }
+                action = new NetworkInventoryAction();
+                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT;
+                action.inventorySlot = 2;
+                action.oldItem = toResult.clone();
+                action.newItem = fromResult.clone();
+                fixedPacket.actions[4] = action;
 
-                InventoryTransactionPacket transactionPacket = (InventoryTransactionPacket) packet;
-                // Nasty hack because the client won't change the right packet in survival when creating netherite stuff,
-                // so we are emulating what Mojang should be sending
-                if (getWindowById(SMITHING_WINDOW_ID) instanceof SmithingInventory smithingInventory
-                        && transactionPacket.transactionType == InventoryTransactionPacket.TYPE_MISMATCH
-                        && !smithingInventory.getResult().isNull()) {
-                    InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
-                    fixedPacket.isRepairItemPart = true;
-                    fixedPacket.actions = new NetworkInventoryAction[8];
+                action = new NetworkInventoryAction();
+                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT;
+                action.inventorySlot = 0;
+                action.oldItem = toEquipment.clone();
+                action.newItem = fromEquipment.clone();
+                fixedPacket.actions[5] = action;
 
-                    Item fromIngredient = smithingInventory.getIngredient().clone();
-                    Item toIngredient = fromIngredient.decrement(1);
+                action = new NetworkInventoryAction();
+                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
+                action.inventorySlot = 1;
+                action.oldItem = toIngredient.clone();
+                action.newItem = fromIngredient.clone();
+                fixedPacket.actions[6] = action;
 
-                    Item fromEquipment = smithingInventory.getEquipment().clone();
-                    Item toEquipment = fromEquipment.decrement(1);
+                action = new NetworkInventoryAction();
+                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
+                action.inventorySlot = 3;
+                action.oldItem = toTemplate.clone();
+                action.newItem = fromTemplate.clone();
+                fixedPacket.actions[7] = action;
 
-                    Item fromTemplate = smithingInventory.getTemplate().clone();
-                    Item toTemplate = fromTemplate.decrement(1);
+                transactionPacket = fixedPacket;
+            }
+        }
 
-                    Item fromResult = Item.get(Item.AIR);
-                    Item toResult = smithingInventory.getResult().clone();
+        List<InventoryAction> actions = new ArrayList<>();
+        for (NetworkInventoryAction networkInventoryAction : transactionPacket.actions) {
+            InventoryAction a = networkInventoryAction.createInventoryAction(this);
 
-                    NetworkInventoryAction action = new NetworkInventoryAction();
-                    action.windowId = ContainerIds.UI;
-                    action.inventorySlot = SmithingInventory.SMITHING_INGREDIENT_UI_SLOT;
-                    action.oldItem = fromIngredient.clone();
-                    action.newItem = toIngredient.clone();
-                    fixedPacket.actions[0] = action;
+            if (a == null) {
+                this.getServer().getLogger().debug("Unmatched inventory action from " + this.username + ": " + networkInventoryAction);
+                this.needSendInventory = true;
+                return;
+            }
 
-                    action = new NetworkInventoryAction();
-                    action.windowId = ContainerIds.UI;
-                    action.inventorySlot = SmithingInventory.SMITHING_EQUIPMENT_UI_SLOT;
-                    action.oldItem = fromEquipment.clone();
-                    action.newItem = toEquipment.clone();
-                    fixedPacket.actions[1] = action;
+            actions.add(a);
+        }
 
+        if (this.isInventoryServerAuthoritative()
+                && transactionPacket.transactionType == InventoryTransactionPacket.TYPE_NORMAL
+                && isServerAuthoritativeLegacyDropTransaction(transactionPacket, actions)) {
+            InventoryTransaction transaction = new InventoryTransaction(this, actions);
+            if (!transaction.execute()) {
+                this.server.getLogger().debug("Failed to execute SAI legacy drop transaction from " + this.username
+                        + " with actions: " + Arrays.toString(transactionPacket.actions));
+                this.needSendInventory = true;
+            }
+            return;
+        }
 
-                    action = new NetworkInventoryAction();
-                    action.windowId = ContainerIds.UI;
-                    action.inventorySlot = SmithingInventory.SMITHING_TEMPLATE_UI_SLOT;
-                    action.oldItem = fromTemplate.clone();
-                    action.newItem = toTemplate.clone();
-                    fixedPacket.actions[2] = action;
+        if (this.shouldRejectLegacyInventoryUiTransaction(transactionPacket)) {
+            this.server.getLogger().debug(this.username + ": dropping legacy InventoryTransaction UI transaction while SAI is enabled");
+            this.needSendInventory = true;
+            return;
+        }
 
-                    int emptyPlayerSlot = -1;
-                    for (int slot = 0; slot < inventory.getSize(); slot++) {
-                        if (inventory.getItem(slot).isNull()) {
-                            emptyPlayerSlot = slot;
-                            break;
-                        }
-                    }
-                    if (emptyPlayerSlot == -1) {
-                        this.needSendInventory = true;
-                        return;
-                    } else {
-                        action = new NetworkInventoryAction();
-                        action.windowId = ContainerIds.INVENTORY;
-                        action.inventorySlot = emptyPlayerSlot; // Cursor
-                        action.oldItem = Item.get(Item.AIR);
-                        action.newItem = toResult.clone();
-                        fixedPacket.actions[3] = action;
-
-                        action = new NetworkInventoryAction();
-                        action.sourceType = NetworkInventoryAction.SOURCE_TODO;
-                        action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT;
-                        action.inventorySlot = 2; // result
-                        action.oldItem = toResult.clone();
-                        action.newItem = fromResult.clone();
-                        fixedPacket.actions[4] = action;
-
-                        action = new NetworkInventoryAction();
-                        action.sourceType = NetworkInventoryAction.SOURCE_TODO;
-                        action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT;
-                        action.inventorySlot = 0; // equipment
-                        action.oldItem = toEquipment.clone();
-                        action.newItem = fromEquipment.clone();
-                        fixedPacket.actions[5] = action;
-
-                        action = new NetworkInventoryAction();
-                        action.sourceType = NetworkInventoryAction.SOURCE_TODO;
-                        action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
-                        action.inventorySlot = 1; // material
-                        action.oldItem = toIngredient.clone();
-                        action.newItem = fromIngredient.clone();
-                        fixedPacket.actions[6] = action;
-
-                        action = new NetworkInventoryAction();
-                        action.sourceType = NetworkInventoryAction.SOURCE_TODO;
-                        action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
-                        action.inventorySlot = 3; // template
-                        action.oldItem = toTemplate.clone();
-                        action.newItem = fromTemplate.clone();
-                        fixedPacket.actions[7] = action;
-
-                        transactionPacket = fixedPacket;
+        if (transactionPacket.isCraftingPart) {
+            if (LoomTransaction.isIn(actions)) {
+                if (this.loomTransaction == null) {
+                    this.loomTransaction = new LoomTransaction(this, actions);
+                } else {
+                    for (InventoryAction action : actions) {
+                        this.loomTransaction.addAction(action);
                     }
                 }
-
-                List<InventoryAction> actions = new ArrayList<>();
-                for (NetworkInventoryAction networkInventoryAction : transactionPacket.actions) {
-                    InventoryAction a = networkInventoryAction.createInventoryAction(this);
-
-                    if (a == null) {
-                        this.getServer().getLogger().debug("Unmatched inventory action from " + this.username + ": " + networkInventoryAction);
-                        this.needSendInventory = true;
-                        break packetswitch;
+                if (this.loomTransaction.canExecute()) {
+                    if (this.loomTransaction.execute()) {
+                        level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_LOOM_USE);
                     }
-
-                    actions.add(a);
                 }
+                this.loomTransaction = null;
+                return;
+            }
 
-                if (transactionPacket.isCraftingPart) {
-                    if (LoomTransaction.isIn(actions)) {
-                        if (this.loomTransaction == null) {
-                            this.loomTransaction = new LoomTransaction(this, actions);
-                        } else {
-                            for (InventoryAction action : actions) {
-                                this.loomTransaction.addAction(action);
-                            }
-                        }
-                        if (this.loomTransaction.canExecute()) {
-                            if (this.loomTransaction.execute()) {
-                                level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_LOOM_USE);
-                            }
-                        }
-                        this.loomTransaction = null; // Must be here or stuff will break
-                        return;
+            if (StonecutterTransaction.isIn(actions)) {
+                if (this.stonecutterTransaction == null) {
+                    this.stonecutterTransaction = new StonecutterTransaction(this, actions);
+                } else {
+                    for (InventoryAction action : actions) {
+                        this.stonecutterTransaction.addAction(action);
                     }
+                }
+                if (this.stonecutterTransaction.canExecute()) {
+                    if (this.stonecutterTransaction.execute()) {
+                        level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_STONECUTTER_USE);
+                    }
+                    this.stonecutterTransaction = null;
+                } else if (this.stonecutterTransaction.getActionList().size() >= 4) {
+                    this.setNeedSendInventory(true);
+                    this.stonecutterTransaction = null;
+                }
+                return;
+            }
 
-                    if (StonecutterTransaction.isIn(actions)) {
-                        if (this.stonecutterTransaction == null) {
-                            this.stonecutterTransaction = new StonecutterTransaction(this, actions);
-                        } else {
-                            for (InventoryAction action : actions) {
-                                this.stonecutterTransaction.addAction(action);
-                            }
-                        }
-                        if (this.stonecutterTransaction.canExecute()) {
-                            if (this.stonecutterTransaction.execute()) {
-                                level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_STONECUTTER_USE);
-                            }
-                            this.stonecutterTransaction = null;
-                        } else if (this.stonecutterTransaction.getActionList().size() >= 4) {
-                            // 切石机操作最多 4 个 action，超过说明数据已损坏
-                            this.setNeedSendInventory(true);
-                            this.stonecutterTransaction = null;
-                        }
-                        return;
-                    }
+            if (this.craftingTransaction == null) {
+                this.craftingTransaction = new CraftingTransaction(this, actions);
+            } else {
+                for (InventoryAction action : actions) {
+                    this.craftingTransaction.addAction(action);
+                }
+            }
 
-                    if (this.craftingTransaction == null) {
-                        this.craftingTransaction = new CraftingTransaction(this, actions);
-                    } else {
-                        for (InventoryAction action : actions) {
-                            this.craftingTransaction.addAction(action);
-                        }
+            if (this.craftingTransaction.getPrimaryOutput() != null && this.craftingTransaction.canExecute()) {
+                try {
+                    this.craftingTransaction.execute();
+                } catch (Exception e) {
+                    this.server.getLogger().debug("Executing crafting transaction failed");
+                }
+                this.craftingTransaction = null;
+            }
+            return;
+        } else if (this.protocol >= ProtocolInfo.v1_16_0 && transactionPacket.isEnchantingPart) {
+            if (this.enchantTransaction == null) {
+                this.enchantTransaction = new EnchantTransaction(this, actions);
+            } else {
+                for (InventoryAction action : actions) {
+                    this.enchantTransaction.addAction(action);
+                }
+            }
+            if (this.enchantTransaction.canExecute()) {
+                this.enchantTransaction.execute();
+                this.enchantTransaction = null;
+            }
+            return;
+        } else if (this.protocol >= ProtocolInfo.v1_16_0 && transactionPacket.isRepairItemPart) {
+            Sound sound = null;
+            if (SmithingTransaction.isIn(actions)) {
+                if (this.smithingTransaction == null) {
+                    this.smithingTransaction = new SmithingTransaction(this, actions);
+                } else {
+                    for (InventoryAction action : actions) {
+                        this.smithingTransaction.addAction(action);
                     }
-
-                    if (this.craftingTransaction.getPrimaryOutput() != null && this.craftingTransaction.canExecute()) {
-                        try {
-                            this.craftingTransaction.execute();
-                        } catch (Exception e) {
-                            this.server.getLogger().debug("Executing crafting transaction failed");
+                }
+                if (this.smithingTransaction.canExecute()) {
+                    try {
+                        if (this.smithingTransaction.execute()) {
+                            sound = Sound.SMITHING_TABLE_USE;
                         }
-                        this.craftingTransaction = null;
+                    } finally {
+                        this.smithingTransaction = null;
                     }
-                    return;
-                } else if (this.protocol >= ProtocolInfo.v1_16_0 && transactionPacket.isEnchantingPart) {
-                    if (this.enchantTransaction == null) {
-                        this.enchantTransaction = new EnchantTransaction(this, actions);
-                    } else {
-                        for (InventoryAction action : actions) {
-                            this.enchantTransaction.addAction(action);
-                        }
+                }
+            } else if (GrindstoneTransaction.isIn(actions)) {
+                if (this.grindstoneTransaction == null) {
+                    this.grindstoneTransaction = new GrindstoneTransaction(this, actions);
+                } else {
+                    for (InventoryAction action : actions) {
+                        this.grindstoneTransaction.addAction(action);
                     }
-                    if (this.enchantTransaction.canExecute()) {
-                        this.enchantTransaction.execute();
-                        this.enchantTransaction = null;
-                    }
-                    return;
-                } else if (this.protocol >= ProtocolInfo.v1_16_0 && transactionPacket.isRepairItemPart) {
-                    Sound sound = null;
-                    if (SmithingTransaction.isIn(actions)) {
-                        if (this.smithingTransaction == null) {
-                            this.smithingTransaction = new SmithingTransaction(this, actions);
-                        } else {
-                            for (InventoryAction action : actions) {
-                                this.smithingTransaction.addAction(action);
-                            }
-                        }
-                        if (this.smithingTransaction.canExecute()) {
-                            try {
-                                if (this.smithingTransaction.execute()) {
-                                    sound = Sound.SMITHING_TABLE_USE;
-                                }
-                            } finally {
-                                this.smithingTransaction = null;
-                            }
-                        }
-                    } else if (GrindstoneTransaction.isIn(actions)) {
-                        if (this.grindstoneTransaction == null) {
-                            this.grindstoneTransaction = new GrindstoneTransaction(this, actions);
-                        } else {
-                            for (InventoryAction action : actions) {
-                                this.grindstoneTransaction.addAction(action);
-                            }
-                        }
-                        if (this.grindstoneTransaction.canExecute()) {
-                            if (this.grindstoneTransaction.execute()) {
-                                Collection<Player> players = level.getChunkPlayers(getChunkX(), getChunkZ()).values();
-                                players.remove(this);
-                                if (!players.isEmpty()) {
-                                    level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_GRINDSTONE_USE);
-                                }
-                                int exp = this.grindstoneTransaction.getExperienceDropped();
-                                if (exp > 0) {
-                                    Inventory grindstoneInv = this.getWindowById(Player.GRINDSTONE_WINDOW_ID);
-                                    if (grindstoneInv instanceof GrindstoneInventory gInv) {
-                                        Position grindstonePos = gInv.getHolder();
-                                        level.dropExpOrb(grindstonePos.add(0.5, 0.5, 0.5), exp);
-                                    }
-                                }
-                            }
-                            this.grindstoneTransaction = null;
-                        }
-                    } else {
-                        if (this.repairItemTransaction == null) {
-                            this.repairItemTransaction = new RepairItemTransaction(this, actions);
-                        } else {
-                            for (InventoryAction action : actions) {
-                                this.repairItemTransaction.addAction(action);
-                            }
-                        }
-                        if (this.repairItemTransaction.canExecute()) {
-                            this.repairItemTransaction.execute();
-                            this.repairItemTransaction = null;
-                        }
-                    }
-
-                    if (sound != null) {
+                }
+                if (this.grindstoneTransaction.canExecute()) {
+                    if (this.grindstoneTransaction.execute()) {
                         Collection<Player> players = level.getChunkPlayers(getChunkX(), getChunkZ()).values();
                         players.remove(this);
                         if (!players.isEmpty()) {
-                            level.addSound(this, sound, 1f, 1f, players);
+                            level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_GRINDSTONE_USE);
                         }
-                    }
-                    return;
-                } else if (transactionPacket.isTradeItemPart) {
-                    if (this.tradingTransaction == null) {
-                        this.tradingTransaction = new TradingTransaction(this, actions);
-                    } else {
-                        for (InventoryAction action : actions) {
-                            this.tradingTransaction.addAction(action);
-                        }
-                    }
-                    if (this.tradingTransaction.canExecute()) {
-                        this.tradingTransaction.execute();
-
-                        for (Inventory inventory : this.tradingTransaction.getInventories()) {
-
-                            if (inventory instanceof TradeInventory tradeInventory) {
-                                EntityVillager ent = tradeInventory.getHolder();
-                                ent.namedTag.putBoolean("traded", true);
-                                for (Tag tag : ent.getRecipes().getAll()) {
-                                    CompoundTag ta = (CompoundTag) tag;
-                                    if (ta.getCompound("buyA").getShort("id") == tradeInventory.getItem(0).getId()) {
-                                        int tradeXP = ta.getInt("traderExp");
-                                        this.addExperience(ta.getByte("rewardExp"));
-                                        ent.addExperience(tradeXP);
-                                        this.level.addSound(this, Sound.RANDOM_ORB, 0,3f, this);
-                                    }
-                                }
+                        int exp = this.grindstoneTransaction.getExperienceDropped();
+                        if (exp > 0) {
+                            Inventory grindstoneInv = this.getWindowById(Player.GRINDSTONE_WINDOW_ID);
+                            if (grindstoneInv instanceof GrindstoneInventory gInv) {
+                                Position grindstonePos = gInv.getHolder();
+                                level.dropExpOrb(grindstonePos.add(0.5, 0.5, 0.5), exp);
                             }
                         }
-
-                        this.tradingTransaction = null;
                     }
-                    return;
-                } else if (this.craftingTransaction != null) {
-                    if (!handleQuickCraft(transactionPacket, actions, this.craftingTransaction)) this.craftingTransaction = null;
-                    return;
-                } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.enchantTransaction != null) {
-                    if (!handleQuickCraft(transactionPacket, actions, this.enchantTransaction)) this.enchantTransaction = null;
-                    return;
-                } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.repairItemTransaction != null) {
-                    if (!handleQuickCraft(transactionPacket, actions, this.repairItemTransaction)) this.repairItemTransaction = null;
-                    return;
-                } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.smithingTransaction != null) {
-                    if (!handleQuickCraft(transactionPacket, actions, this.smithingTransaction)) this.smithingTransaction = null;
-                    return;
-                } else if (this.grindstoneTransaction != null) {
-                    if (!handleQuickCraft(transactionPacket, actions, this.grindstoneTransaction)) this.grindstoneTransaction = null;
-                    return;
+                    this.grindstoneTransaction = null;
+                }
+            } else {
+                if (this.repairItemTransaction == null) {
+                    this.repairItemTransaction = new RepairItemTransaction(this, actions);
+                } else {
+                    for (InventoryAction action : actions) {
+                        this.repairItemTransaction.addAction(action);
+                    }
+                }
+                if (this.repairItemTransaction.canExecute()) {
+                    this.repairItemTransaction.execute();
+                    this.repairItemTransaction = null;
+                }
+            }
+
+            if (sound != null) {
+                Collection<Player> players = level.getChunkPlayers(getChunkX(), getChunkZ()).values();
+                players.remove(this);
+                if (!players.isEmpty()) {
+                    level.addSound(this, sound, 1f, 1f, players);
+                }
+            }
+            return;
+        } else if (transactionPacket.isTradeItemPart) {
+            if (this.tradingTransaction == null) {
+                this.tradingTransaction = new TradingTransaction(this, actions);
+            } else {
+                for (InventoryAction action : actions) {
+                    this.tradingTransaction.addAction(action);
+                }
+            }
+            if (this.tradingTransaction.canExecute()) {
+                this.tradingTransaction.execute();
+
+                for (Inventory tradeInventoryView : this.tradingTransaction.getInventories()) {
+                    if (tradeInventoryView instanceof TradeInventory tradeInventory) {
+                        EntityVillager ent = tradeInventory.getHolder();
+                        ent.namedTag.putBoolean("traded", true);
+                        for (Tag tag : ent.getRecipes().getAll()) {
+                            CompoundTag ta = (CompoundTag) tag;
+                            if (ta.getCompound("buyA").getShort("id") == tradeInventory.getItem(0).getId()) {
+                                int tradeXP = ta.getInt("traderExp");
+                                this.addExperience(ta.getByte("rewardExp"));
+                                ent.addExperience(tradeXP);
+                                this.level.addSound(this, Sound.RANDOM_ORB, 0, 3f, this);
+                            }
+                        }
+                    }
                 }
 
-                switch (transactionPacket.transactionType) {
-                    case InventoryTransactionPacket.TYPE_NORMAL:
-                        InventoryTransaction transaction = new InventoryTransaction(this, actions);
+                this.tradingTransaction = null;
+            }
+            return;
+        } else if (this.craftingTransaction != null) {
+            if (!handleQuickCraft(transactionPacket, actions, this.craftingTransaction)) {
+                this.craftingTransaction = null;
+            }
+            return;
+        } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.enchantTransaction != null) {
+            if (!handleQuickCraft(transactionPacket, actions, this.enchantTransaction)) {
+                this.enchantTransaction = null;
+            }
+            return;
+        } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.repairItemTransaction != null) {
+            if (!handleQuickCraft(transactionPacket, actions, this.repairItemTransaction)) {
+                this.repairItemTransaction = null;
+            }
+            return;
+        } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.smithingTransaction != null) {
+            if (!handleQuickCraft(transactionPacket, actions, this.smithingTransaction)) {
+                this.smithingTransaction = null;
+            }
+            return;
+        } else if (this.grindstoneTransaction != null) {
+            if (!handleQuickCraft(transactionPacket, actions, this.grindstoneTransaction)) {
+                this.grindstoneTransaction = null;
+            }
+            return;
+        }
 
-                        if (!transaction.execute()) {
-                            this.server.getLogger().debug("Failed to execute inventory transaction from " + this.username + " with actions: " + Arrays.toString(transactionPacket.actions));
-                            failedTransactions++;
-                            if (failedTransactions > 15) { //撤回合成事件时，如果玩家点的太快会到12
-                                this.close("", "Too many failed inventory transactions");
-                            }
-                            break packetswitch;
-                        }
-
-                        break packetswitch;
-                    case InventoryTransactionPacket.TYPE_MISMATCH:
-                        if (transactionPacket.actions.length > 0) {
-                            this.server.getLogger().debug("Expected 0 actions for mismatch, got " + transactionPacket.actions.length + ", " + Arrays.toString(transactionPacket.actions));
-                        }
+        boolean resyncInventoryAfterLegacyTransaction = false;
+        try {
+            transactionSwitch:
+            switch (transactionPacket.transactionType) {
+                case InventoryTransactionPacket.TYPE_NORMAL:
+                    if (this.isInventorySAIGateActive()) {
+                        this.server.getLogger().debug(this.username + ": dropping legacy InventoryTransaction TYPE_NORMAL while SAI is enabled");
                         this.needSendInventory = true;
-                        break packetswitch;
-                    case InventoryTransactionPacket.TYPE_USE_ITEM:
-                        UseItemData useItemData;
-                        BlockVector3 blockVector;
+                        break;
+                    }
 
-                        try {
-                            useItemData = (UseItemData) transactionPacket.transactionData;
-                            blockVector = useItemData.blockPos;
-                            face = useItemData.face;
-                        } catch (Exception ignored) {
-                            break packetswitch;
+                    InventoryTransaction transaction = new InventoryTransaction(this, actions);
+                    if (!transaction.execute()) {
+                        this.server.getLogger().debug("Failed to execute inventory transaction from " + this.username + " with actions: " + Arrays.toString(transactionPacket.actions));
+                        failedTransactions++;
+                        if (failedTransactions > 15) {
+                            this.close("", "Too many failed inventory transactions");
                         }
+                    }
+                    break;
+                case InventoryTransactionPacket.TYPE_MISMATCH:
+                    if (transactionPacket.actions.length > 0) {
+                        this.server.getLogger().debug("Expected 0 actions for mismatch, got " + transactionPacket.actions.length + ", " + Arrays.toString(transactionPacket.actions));
+                    }
+                    this.needSendInventory = true;
+                    break;
+                case InventoryTransactionPacket.TYPE_USE_ITEM:
+                    resyncInventoryAfterLegacyTransaction = this.isInventoryServerAuthoritative();
+                    UseItemData useItemData;
+                    BlockVector3 blockVector;
 
-                        if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
-                            inventory.equipItem(useItemData.hotbarSlot);
-                        }
+                    try {
+                        useItemData = (UseItemData) transactionPacket.transactionData;
+                        blockVector = useItemData.blockPos;
+                        face = useItemData.face;
+                    } catch (Exception ignored) {
+                        break;
+                    }
 
-                        switch (useItemData.actionType) {
-                            case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK:
-                                boolean spamming = !server.doNotLimitInteractions
-                                        && lastRightClickPos != null
-                                        && System.currentTimeMillis() - lastRightClickTime < 100.0
-                                        && blockVector.distanceSquared(lastRightClickPos) < 0.00001;
+                    boolean heldSlotChanged = inventory.getHeldItemIndex() != useItemData.hotbarSlot;
+                    if (heldSlotChanged) {
+                        inventory.equipItem(useItemData.hotbarSlot);
+                    }
 
-                                lastRightClickPos = blockVector;
-                                lastRightClickTime = System.currentTimeMillis();
+                    switch (useItemData.actionType) {
+                        case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK:
+                            boolean spamming = !server.doNotLimitInteractions
+                                    && lastRightClickPos != null
+                                    && System.currentTimeMillis() - lastRightClickTime < 100.0
+                                    && blockVector.distanceSquared(lastRightClickPos) < 0.00001;
 
-                                // Hack: Fix client spamming right clicks
-                                // 假旁观模式下也需要防止重复点击，避免事件被多次触发
-                                // Fake spectator mode also needs to prevent duplicate clicks to avoid multiple event triggers
-                                if (spamming && (this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR
-                                        || (this.isSpectator() && !this.server.useClientSpectator))) {
-                                    return;
-                                }
+                            lastRightClickPos = blockVector;
+                            lastRightClickTime = System.currentTimeMillis();
 
-                                this.setUsingItem(false);
+                            if (spamming && ((this.isSpectator() && !this.server.useClientSpectator)
+                                    || this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR)) {
+                                return;
+                            }
 
-                                if (!(this.distance(blockVector.asVector3()) > (this.isCreative() ? 13 : 7))) {
-                                    // 创造模式或假旁观模式（未启用客户端旁观）：允许触发事件但不消耗物品
-                                    // Creative mode or fake spectator mode (client spectator not enabled): Allow event trigger but don't consume items
-                                    if (this.isCreative() || (this.isSpectator() && !this.server.useClientSpectator)) {
-                                        if (this.level.useItemOn(blockVector.asVector3(), inventory.getItemInHand(), face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this) != null) {
-                                            break packetswitch;
-                                        }
-                                    } else {
-                                        Item serverItem = inventory.getItemInHand();
-                                        Item clientItem = useItemData.itemInHand;
+                            Item clickBlockHeld = this.inventory.getItemInHand();
+                            if (UsingItemReceive.shouldKeepUsingOnClickBlock(
+                                    this.isJavaClient(),
+                                    this.isUsingItem(),
+                                    UsingItemReceive.isHoldToUseItem(clickBlockHeld),
+                                    heldSlotChanged)) {
+                                return;
+                            }
+                            this.setUsingItem(false);
 
-                                        // 默认严格检查（equals 不检查数量，所以客户端预测消耗减少数量的情况会自动通过）
-                                        boolean canProceed = serverItem.equals(clientItem);
+                            if (!(this.distance(blockVector.asVector3()) > (this.isCreative() ? 13 : 7))) {
+                                if (this.isCreative() || (this.isSpectator() && !this.server.useClientSpectator)) {
+                                    if (this.level.useItemOn(blockVector.asVector3(), inventory.getItemInHand(), face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this) != null) {
+                                        break transactionSwitch;
+                                    }
+                                } else {
+                                    Item serverItem = inventory.getItemInHand();
+                                    Item clientItem = useItemData.itemInHand;
 
-                                        // 特殊情况：客户端预测完全消耗（变成空气）
-                                        // 条件：服务端是可激活物品且数量为1，客户端是空气
-                                        if (!canProceed && clientItem.isNull()
-                                                && serverItem.getCount() == 1
-                                                && serverItem.canBeActivated()) {
-                                            canProceed = true;
-                                        }
+                                    boolean canProceed = serverItem.equals(clientItem);
+                                    if (!canProceed && clientItem.isNull()
+                                            && serverItem.getCount() == 1
+                                            && serverItem.canBeActivated()) {
+                                        canProceed = true;
+                                    }
 
-                                        if (canProceed) {
-                                            Item i = serverItem;
-                                            Item oldItem = i.clone();
-                                            if ((i = this.level.useItemOn(blockVector.asVector3(), i, face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this)) != null) {
-                                                if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
-                                                    if (oldItem.getId() == i.getId() || i.getId() == 0) {
-                                                        inventory.setItemInHand(i);
-                                                    } else {
-                                                        server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
-                                                    }
-                                                    inventory.sendHeldItem(this.getViewers().values());
+                                    if (canProceed) {
+                                        Item i = serverItem;
+                                        Item oldItem = i.clone();
+                                        if ((i = this.level.useItemOn(blockVector.asVector3(), i, face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this)) != null) {
+                                            boolean itemChanged = !i.equals(oldItem) || i.getCount() != oldItem.getCount();
+                                            if (itemChanged) {
+                                                if (oldItem.getId() == i.getId() || i.getId() == 0) {
+                                                    inventory.setItemInHand(i);
+                                                } else {
+                                                    server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
                                                 }
-                                                break packetswitch;
-                                            } else {
-                                                // useItemOn 返回 null（如事件被取消），需要重同步物品到客户端
+                                                inventory.sendHeldItem(this.getViewers().values());
+                                            } else if (!oldItem.equalsExact(useItemData.itemInHand)) {
                                                 this.needSendHeldItem = true;
                                             }
+                                            break transactionSwitch;
                                         } else {
                                             this.needSendHeldItem = true;
                                         }
-                                    }
-                                }
-
-                                if (blockVector.distanceSquared(this) > 10000) {
-                                    break packetswitch;
-                                }
-
-                                Block target = this.level.getBlock(blockVector.asVector3());
-                                block = target.getSide(face);
-
-                                this.level.sendBlocks(new Player[]{this}, new Block[]{target, block}, UpdateBlockPacket.FLAG_NOGRAPHIC);
-                                this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1), block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_NOGRAPHIC, 1);
-
-                                if (target instanceof BlockDoor) {
-                                    BlockDoor door = (BlockDoor) target;
-
-                                    Block part;
-
-                                    if ((door.getDamage() & 0x08) > 0) {
-                                        part = target.down();
-
-                                        if (part.getId() == target.getId()) {
-                                            target = part;
-                                            this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_NOGRAPHIC);
-                                            this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_NOGRAPHIC, 1);
-                                        }
-                                    }
-                                }
-                                break packetswitch;
-                            case InventoryTransactionPacket.USE_ITEM_ACTION_BREAK_BLOCK:
-                                if (!this.spawned || !this.isAlive()) {
-                                    break packetswitch;
-                                }
-
-                                this.resetCraftingGridType();
-
-                                Item i = this.getInventory().getItemInHand();
-
-                                Item oldItem = i.clone();
-
-                                if (this.canInteract(blockVector.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7) && (i = this.level.useBreakOn(blockVector.asVector3(), face, i, this, true)) != null) {
-                                    if (this.isSurvival() || this.isAdventure()) {
-                                        this.foodData.updateFoodExpLevel(0.005);
-                                        if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
-                                            if (oldItem.getId() == i.getId() || i.getId() == 0) {
-                                                inventory.setItemInHand(i);
-                                            } else {
-                                                server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
-                                            }
-                                            inventory.sendHeldItem(this.getViewers().values());
-                                        }
-                                    }
-                                    break packetswitch;
-                                }
-
-                                inventory.sendContents(this);
-                                inventory.sendHeldItem(this);
-
-                                if (blockVector.distanceSquared(this) < 10000) {
-                                    target = this.level.getBlock(blockVector.asVector3());
-                                    this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-
-                                    BlockEntity blockEntity = this.level.getBlockEntity(blockVector.asVector3());
-                                    if (blockEntity instanceof BlockEntitySpawnable) {
-                                        ((BlockEntitySpawnable) blockEntity).spawnTo(this);
-                                    }
-                                }
-
-                                break packetswitch;
-                            case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR:
-                                // 防止右键点击空气的重复触发
-                                // Prevent duplicate triggers of right-click on air
-                                long currentClickAirTime = System.currentTimeMillis();
-                                if (!server.doNotLimitInteractions && (currentClickAirTime - lastClickAirTime) < 100) {
-                                    return;
-                                }
-                                lastClickAirTime = currentClickAirTime;
-
-                                Vector3 directionVector = this.getDirectionVector();
-
-                                if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
-                                    inventory.equipItem(useItemData.hotbarSlot);
-                                }
-
-                                item = this.inventory.getItemInHand();
-
-                                if (item instanceof ItemCrossbow) {
-                                    if (!item.onClickAir(this, directionVector)) {
-                                        return; // Shoot
-                                    }
-                                }
-
-                                if (!item.equalsFast(useItemData.itemInHand)) {
-                                    this.needSendHeldItem = true;
-                                    break packetswitch;
-                                }
-
-                                PlayerInteractEvent interactEvent = new PlayerInteractEvent(this, item, directionVector, face, Action.RIGHT_CLICK_AIR);
-
-                                this.server.getPluginManager().callEvent(interactEvent);
-
-                                if (interactEvent.isCancelled()) {
-                                    this.needSendHeldItem = true;
-                                    break packetswitch;
-                                }
-
-                                if (item.onClickAir(this, directionVector)) {
-                                    // 假旁观模式：不消耗物品，类似创造模式
-                                    // Fake spectator mode: Don't consume items, similar to creative mode
-                                    if (this.isSurvival() || this.isAdventure()) {
-                                        if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
-                                            this.inventory.setItemInHand(item);
-                                        } else {
-                                            server.getLogger().debug("Tried to set item " + item.getId() + " but " + this.username + " had item " + this.inventory.getItemInHandFast().getId() + " in their hand slot");
-                                        }
-                                    }
-
-                                    if (!this.isUsingItem()) {
-                                        this.setUsingItem(/*true*/ item.canRelease());
-                                        break packetswitch;
-                                    }
-
-                                    // Used item
-                                    int ticksUsed = this.server.getTick() - this.startAction;
-                                    this.setUsingItem(false);
-                                    if (!item.onUse(this, ticksUsed)) {
-                                        this.inventory.sendContents(this);
-                                    }
-                                }
-
-                                break packetswitch;
-                            default:
-                                break;
-                        }
-                        break;
-                    case InventoryTransactionPacket.TYPE_USE_ITEM_ON_ENTITY:
-                        UseItemOnEntityData useItemOnEntityData = (UseItemOnEntityData) transactionPacket.transactionData;
-
-                        Entity target = this.level.getEntity(useItemOnEntityData.entityRuntimeId);
-                        if (target == null) {
-                            return;
-                        }
-
-                        if (inventory.getHeldItemIndex() != useItemOnEntityData.hotbarSlot) {
-                            inventory.equipItem(useItemOnEntityData.hotbarSlot);
-                        }
-
-                        if (!useItemOnEntityData.itemInHand.equalsFast(this.inventory.getItemInHand())) {
-                            this.inventory.sendHeldItem(this);
-                        }
-
-                        item = this.inventory.getItemInHand();
-
-                        switch (useItemOnEntityData.actionType) {
-                            case InventoryTransactionPacket.USE_ITEM_ON_ENTITY_ACTION_INTERACT:
-                                if (this.distanceSquared(target) > 256) { // TODO: Note entity scale
-                                    this.getServer().getLogger().debug(username + ": target entity is too far away");
-                                    return;
-                                }
-
-                                this.breakingBlock = null;
-
-                                this.setUsingItem(false);
-
-                                PlayerInteractEntityEvent playerInteractEntityEvent = new PlayerInteractEntityEvent(this, target, item, useItemOnEntityData.clickPos);
-                                if (this.isSpectator()) playerInteractEntityEvent.setCancelled();
-                                getServer().getPluginManager().callEvent(playerInteractEntityEvent);
-
-                                if (playerInteractEntityEvent.isCancelled()) {
-                                    break;
-                                }
-
-                                if (target.onInteract(this, item, useItemOnEntityData.clickPos) && (this.isSurvival() || this.isAdventure())) {
-                                    if (item.isTool()) {
-                                        if (item.useOn(target) && item.getDamage() >= item.getMaxDurability()) {
-                                            level.addSoundToViewers(this, Sound.RANDOM_BREAK);
-                                            level.addParticle(new ItemBreakParticle(this, item));
-                                            item = new ItemBlock(Block.get(BlockID.AIR));
-                                        }
                                     } else {
-                                        if (item.count > 1) {
-                                            item.count--;
-                                        } else {
-                                            item = new ItemBlock(Block.get(BlockID.AIR));
-                                        }
+                                        this.needSendHeldItem = true;
                                     }
+                                }
+                            }
 
+                            if (blockVector.distanceSquared(this) > 10000) {
+                                break;
+                            }
+
+                            Block target = this.level.getBlock(blockVector.asVector3());
+                            block = target.getSide(face);
+
+                            this.level.sendBlocks(new Player[]{this}, new Block[]{target, block}, UpdateBlockPacket.FLAG_NOGRAPHIC);
+                            this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1), block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_NOGRAPHIC, 1);
+
+                            if (target instanceof BlockDoor door && (door.getDamage() & 0x08) > 0) {
+                                Block part = target.down();
+                                if (part.getId() == target.getId()) {
+                                    target = part;
+                                    this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_NOGRAPHIC);
+                                    this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_NOGRAPHIC, 1);
+                                }
+                            }
+                            break;
+                        case InventoryTransactionPacket.USE_ITEM_ACTION_BREAK_BLOCK:
+                            if (!this.spawned || !this.isAlive()) {
+                                break;
+                            }
+
+                            this.resetCraftingGridType();
+
+                            Item i = this.getInventory().getItemInHand();
+                            Item oldItem = i.clone();
+
+                            if (this.canInteract(blockVector.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7)
+                                    && (i = this.level.useBreakOn(blockVector.asVector3(), face, i, this, true)) != null) {
+                                if (this.isSurvival() || this.isAdventure()) {
+                                    this.foodData.updateFoodExpLevel(0.005);
+                                    if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
+                                        if (oldItem.getId() == i.getId() || i.getId() == 0) {
+                                            inventory.setItemInHand(i);
+                                        } else {
+                                            server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
+                                        }
+                                        inventory.sendHeldItem(this.getViewers().values());
+                                    }
+                                }
+                                break;
+                            }
+
+                            this.armDeniedCreativeBreakCorrection(blockVector);
+                            inventory.sendContents(this);
+                            inventory.sendHeldItem(this);
+
+                            if (blockVector.distanceSquared(this) < 10000) {
+                                target = this.level.getBlock(blockVector.asVector3());
+                                this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
+
+                                BlockEntity blockEntity = this.level.getBlockEntity(blockVector.asVector3());
+                                if (blockEntity instanceof BlockEntitySpawnable) {
+                                    ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+                                }
+                            }
+                            break;
+                        case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR:
+                            long currentClickAirTime = System.currentTimeMillis();
+                            if (!server.doNotLimitInteractions && (currentClickAirTime - lastClickAirTime) < 100) {
+                                return;
+                            }
+                            lastClickAirTime = currentClickAirTime;
+
+                            Vector3 directionVector = this.getDirectionVector();
+                            if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
+                                inventory.equipItem(useItemData.hotbarSlot);
+                            }
+
+                            // 旁观者模式检查：如果启用了客户端旁观模式，则完全阻止交互（不触发事件）
+                            // 如果未启用，则允许触发事件但不允许实际破坏方块（假旁观模式，类似创造模式）
+                            // Spectator mode check: If client spectator mode is enabled, completely block interaction (no event trigger)
+                            // If not enabled, allow event trigger but prevent actual block breaking (fake spectator mode, similar to creative mode)
+                            if (this.isSpectator() && this.server.useClientSpectator) {
+                                return;
+                            }
+
+                            item = this.inventory.getItemInHand();
+                            if (item instanceof ItemCrossbow && (this.isSpectator() || !item.onClickAir(this, directionVector))) {
+                                return;
+                            }
+
+                            if (useItemData.itemInHand == null || !item.equalsFast(useItemData.itemInHand)) {
+                                server.getLogger().debug(this.username + ": CLICK_AIR held item mismatch, server="
+                                        + item + ", client=" + useItemData.itemInHand);
+                                this.needSendHeldItem = true;
+                                break;
+                            }
+
+                            if (UsingItemReceive.shouldIgnoreDuplicateClickAirStart(
+                                    this.isUsingItem(),
+                                    UsingItemReceive.isHoldToUseItem(item),
+                                    this.startAction >= 0 ? this.server.getTick() - this.startAction : 0)) {
+                                break;
+                            }
+
+                            PlayerInteractEvent interactEvent = new PlayerInteractEvent(this, item, directionVector, face, Action.RIGHT_CLICK_AIR);
+                            if (this.isSpectator()) {
+                                interactEvent.setCancelled();
+                            }
+                            this.server.getPluginManager().callEvent(interactEvent);
+
+                            if (interactEvent.isCancelled()) {
+                                this.needSendHeldItem = true;
+                                break;
+                            }
+
+                            if (item.onClickAir(this, directionVector)) {
+                                if (this.isSurvival() || this.isAdventure()) {
                                     if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
                                         this.inventory.setItemInHand(item);
                                     } else {
                                         server.getLogger().debug("Tried to set item " + item.getId() + " but " + this.username + " had item " + this.inventory.getItemInHandFast().getId() + " in their hand slot");
                                     }
                                 }
-                                break;
-                            case InventoryTransactionPacket.USE_ITEM_ON_ENTITY_ACTION_ATTACK:
-                                if (target.getId() == this.getId()) {
-                                    this.kick(PlayerKickEvent.Reason.INVALID_PVP, "Tried to attack invalid player");
-                                    return;
-                                }
 
-                                if (!this.canInteractEntity(target, isCreative() ? 8 : 5)) {
+                                if (!this.isUsingItem()) {
+                                    this.setUsingItem(item.canRelease());
                                     break;
-                                } else if (target instanceof Player) {
-                                    if ((((Player) target).gamemode & 0x01) > 0) {
-                                        break;
-                                    } else if (!this.server.pvpEnabled) {
-                                        break;
-                                    }
                                 }
 
-                                this.breakingBlock = null;
-
+                                int ticksUsed = this.server.getTick() - this.startAction;
                                 this.setUsingItem(false);
-
-                                if (this.sleeping != null) {
-                                    this.getServer().getLogger().debug(username + ": USE_ITEM_ON_ENTITY_ACTION_ATTACK while sleeping");
-                                    return;
+                                if (!item.onUse(this, ticksUsed)) {
+                                    this.inventory.sendContents(this);
                                 }
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                case InventoryTransactionPacket.TYPE_USE_ITEM_ON_ENTITY:
+                    resyncInventoryAfterLegacyTransaction = this.isInventoryServerAuthoritative();
+                    UseItemOnEntityData useItemOnEntityData = (UseItemOnEntityData) transactionPacket.transactionData;
 
-                                if (this.inventoryOpen) {
-                                    this.getServer().getLogger().debug(username + ": USE_ITEM_ON_ENTITY_ACTION_ATTACK while viewing inventory");
-                                    return;
-                                }
+                    Entity target = this.level.getEntity(useItemOnEntityData.entityRuntimeId);
+                    if (target == null) {
+                        return;
+                    }
 
-                                Enchantment[] enchantments = item.getEnchantments();
+                    if (inventory.getHeldItemIndex() != useItemOnEntityData.hotbarSlot) {
+                        inventory.equipItem(useItemOnEntityData.hotbarSlot);
+                    }
 
-                                float itemDamage = item.getAttackDamage(this);
-                                for (Enchantment enchantment : enchantments) {
-                                    itemDamage += enchantment.getDamageBonus(target, this);
-                                }
+                    if (!useItemOnEntityData.itemInHand.equalsFast(this.inventory.getItemInHand())) {
+                        this.inventory.sendHeldItem(this);
+                    }
 
-                                Map<DamageModifier, Float> damage = new EnumMap<>(DamageModifier.class);
-                                damage.put(DamageModifier.BASE, itemDamage);
+                    item = this.inventory.getItemInHand();
 
-                                float knockBack = 0.3f;
-                                Enchantment knockBackEnchantment = item.getEnchantment(Enchantment.ID_KNOCKBACK);
-                                if (knockBackEnchantment != null) {
-                                    knockBack += knockBackEnchantment.getLevel() * 0.1f;
-                                }
+                    switch (useItemOnEntityData.actionType) {
+                        case InventoryTransactionPacket.USE_ITEM_ON_ENTITY_ACTION_INTERACT:
+                            if (this.distanceSquared(target) > 256) {
+                                this.getServer().getLogger().debug(username + ": target entity is too far away");
+                                return;
+                            }
 
-                                EntityDamageByEntityEvent entityDamageByEntityEvent = new EntityDamageByEntityEvent(this, target, DamageCause.ENTITY_ATTACK, damage, knockBack, enchantments);
-                                entityDamageByEntityEvent.setBreakShield(item.canBreakShield());
-                                if (this.isSpectator()) entityDamageByEntityEvent.setCancelled();
-                                if ((target instanceof Player) && !this.level.getGameRules().getBoolean(GameRule.PVP)) {
-                                    entityDamageByEntityEvent.setCancelled();
-                                }
+                            this.breakingBlock = null;
+                            this.setUsingItem(false);
 
-                                if (!target.attack(entityDamageByEntityEvent)) {
-                                    if (item.isTool() && !this.isCreative()) {
-                                        this.inventory.sendContents(this);
-                                    }
-                                    break;
-                                }
+                            PlayerInteractEntityEvent playerInteractEntityEvent = new PlayerInteractEntityEvent(this, target, item, useItemOnEntityData.clickPos);
+                            if (this.isSpectator()) {
+                                playerInteractEntityEvent.setCancelled();
+                            }
+                            getServer().getPluginManager().callEvent(playerInteractEntityEvent);
 
-                                for (Enchantment enchantment : item.getEnchantments()) {
-                                    enchantment.doPostAttack(this, target);
-                                }
+                            if (playerInteractEntityEvent.isCancelled()) {
+                                break;
+                            }
 
-                                if (item.isTool() && !this.isCreative()) {
+                            if (target.onInteract(this, item, useItemOnEntityData.clickPos) && (this.isSurvival() || this.isAdventure())) {
+                                if (item.isTool()) {
                                     if (item.useOn(target) && item.getDamage() >= item.getMaxDurability()) {
                                         level.addSoundToViewers(this, Sound.RANDOM_BREAK);
                                         level.addParticle(new ItemBreakParticle(this, item));
-                                        this.inventory.setItemInHand(Item.get(0));
-                                    } else {
-                                        if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
-                                            this.inventory.setItemInHand(item);
-                                        } else {
-                                            server.getLogger().debug("Tried to set item " + item.getId() + " but " + this.username + " had item " + this.inventory.getItemInHandFast().getId() + " in their hand slot");
-                                        }
+                                        item = new ItemBlock(Block.get(BlockID.AIR));
+                                    }
+                                } else if (item.count > 1) {
+                                    item.count--;
+                                } else {
+                                    item = new ItemBlock(Block.get(BlockID.AIR));
+                                }
+
+                                if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
+                                    this.inventory.setItemInHand(item);
+                                } else {
+                                    server.getLogger().debug("Tried to set item " + item.getId() + " but " + this.username + " had item " + this.inventory.getItemInHandFast().getId() + " in their hand slot");
+                                }
+                            }
+                            break;
+                        case InventoryTransactionPacket.USE_ITEM_ON_ENTITY_ACTION_ATTACK:
+                            if (target.getId() == this.getId()) {
+                                this.kick(PlayerKickEvent.Reason.INVALID_PVP, "Tried to attack invalid player");
+                                return;
+                            }
+
+                            if (!this.canInteractEntity(target, isCreative() ? 8 : 5)) {
+                                break;
+                            } else if (target instanceof Player playerTarget) {
+                                if ((playerTarget.gamemode & 0x01) > 0 || !this.server.pvpEnabled) {
+                                    break;
+                                }
+                            }
+
+                            this.breakingBlock = null;
+                            this.setUsingItem(false);
+
+                            if (this.sleeping != null) {
+                                this.getServer().getLogger().debug(username + ": USE_ITEM_ON_ENTITY_ACTION_ATTACK while sleeping");
+                                return;
+                            }
+
+                            if (this.inventoryOpen) {
+                                this.getServer().getLogger().debug(username + ": USE_ITEM_ON_ENTITY_ACTION_ATTACK while viewing inventory");
+                                return;
+                            }
+
+                            Enchantment[] enchantments = item.getEnchantments();
+                            float itemDamage = item.getAttackDamage(this);
+                            float maceFallDistance = item.isMace() ? (float) (this.highestPosition - this.y) : 0f;
+                            for (Enchantment enchantment : enchantments) {
+                                itemDamage += enchantment.getDamageBonus(target, this);
+                            }
+
+                            Map<DamageModifier, Float> damage = new EnumMap<>(DamageModifier.class);
+                            damage.put(DamageModifier.BASE, itemDamage);
+
+                            float knockBack = 0.3f;
+                            Enchantment knockBackEnchantment = item.getEnchantment(Enchantment.ID_KNOCKBACK);
+                            if (knockBackEnchantment != null) {
+                                knockBack += knockBackEnchantment.getLevel() * 0.1f;
+                            }
+
+                            EntityDamageByEntityEvent entityDamageByEntityEvent = new EntityDamageByEntityEvent(this, target, DamageCause.ENTITY_ATTACK, damage, knockBack, enchantments);
+                            entityDamageByEntityEvent.setBreakShield(item.canBreakShield());
+                            if (this.isSpectator()) {
+                                entityDamageByEntityEvent.setCancelled();
+                            }
+                            if ((target instanceof Player) && !this.level.getGameRules().getBoolean(GameRule.PVP)) {
+                                entityDamageByEntityEvent.setCancelled();
+                            }
+
+                            if (!target.attack(entityDamageByEntityEvent)) {
+                                if (item.isTool() && !this.isCreative()) {
+                                    this.inventory.sendContents(this);
+                                }
+                                break;
+                            }
+
+                            for (Enchantment enchantment : item.getEnchantments()) {
+                                enchantment.doPostAttack(this, target);
+                            }
+
+                            if (item instanceof ItemMace mace) {
+                                mace.onPostAttack(this, target, maceFallDistance, itemDamage);
+                            }
+
+                            if (item.isTool() && !this.isCreative()) {
+                                if (item.useOn(target) && item.getDamage() >= item.getMaxDurability()) {
+                                    level.addSoundToViewers(this, Sound.RANDOM_BREAK);
+                                    level.addParticle(new ItemBreakParticle(this, item));
+                                    this.inventory.setItemInHand(Item.get(0));
+                                } else if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
+                                    this.inventory.setItemInHand(item);
+                                } else {
+                                    server.getLogger().debug("Tried to set item " + item.getId() + " but " + this.username + " had item " + this.inventory.getItemInHandFast().getId() + " in their hand slot");
+                                }
+                            }
+                            return;
+                        default:
+                            break;
+                    }
+                    break;
+                case InventoryTransactionPacket.TYPE_RELEASE_ITEM:
+                    resyncInventoryAfterLegacyTransaction = this.isInventoryServerAuthoritative();
+                    if (this.isSpectator()) {
+                        this.needSendInventory = true;
+                        break;
+                    }
+
+                    ReleaseItemData releaseItemData = (ReleaseItemData) transactionPacket.transactionData;
+                    try {
+                        switch (releaseItemData.actionType) {
+                            case InventoryTransactionPacket.RELEASE_ITEM_ACTION_RELEASE:
+                                if (this.isUsingItem()) {
+                                    item = this.inventory.getItemInHand();
+                                    int ticksUsed = this.server.getTick() - this.startAction;
+                                    if (!item.onRelease(this, ticksUsed)) {
+                                        this.inventory.sendContents(this);
+                                    }
+                                    // 早释放同样必须结束使用：ViaProxy Java 的 RELEASE_USE_ITEM 会翻译到这里，不能因 ticksUsed 小而保留
+                                    // An early release must still end the use: ViaProxy Java RELEASE_USE_ITEM maps here
+                                    this.setUsingItem(false);
+                                } else {
+                                    this.inventory.sendContents(this);
+                                }
+                                return;
+                            case InventoryTransactionPacket.RELEASE_ITEM_ACTION_CONSUME:
+                                if (this.protocol >= 388) {
+                                    break;
+                                }
+
+                                Item itemInHand = this.inventory.getItemInHand();
+                                PlayerItemConsumeEvent consumeEvent = new PlayerItemConsumeEvent(this, itemInHand);
+                                if (itemInHand.getId() == Item.POTION) {
+                                    this.server.getPluginManager().callEvent(consumeEvent);
+                                    if (consumeEvent.isCancelled()) {
+                                        this.inventory.sendContents(this);
+                                        break;
+                                    }
+
+                                    Potion potion = Potion.getPotion(itemInHand.getDamage());
+                                    if (this.gamemode == SURVIVAL || this.gamemode == ADVENTURE) {
+                                        this.getInventory().decreaseCount(this.getInventory().getHeldItemIndex());
+                                        this.inventory.addItem(new ItemGlassBottle());
+                                    }
+                                    this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0, this.getEyeHeight()), VibrationType.DRINK));
+                                    if (potion != null) {
+                                        potion.applyPotion(this);
+                                    }
+                                } else {
+                                    this.server.getPluginManager().callEvent(consumeEvent);
+                                    if (consumeEvent.isCancelled()) {
+                                        this.inventory.sendContents(this);
+                                        break;
+                                    }
+
+                                    Food food = Food.getByRelative(itemInHand);
+                                    if (food != null && food.eatenBy(this)) {
+                                        this.getInventory().decreaseCount(this.getInventory().getHeldItemIndex());
+                                        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0, this.getEyeHeight()), VibrationType.EAT));
                                     }
                                 }
                                 return;
                             default:
+                                this.getServer().getLogger().debug(username + ": unknown release item action type: " + releaseItemData.actionType);
                                 break;
                         }
-
-                        break;
-                    case InventoryTransactionPacket.TYPE_RELEASE_ITEM:
-                        if (this.isSpectator()) {
-                            this.needSendInventory = true;
-                            break packetswitch;
-                        }
-                        ReleaseItemData releaseItemData = (ReleaseItemData) transactionPacket.transactionData;
-
-                        try {
-                            switch (releaseItemData.actionType) {
-                                case InventoryTransactionPacket.RELEASE_ITEM_ACTION_RELEASE:
-                                    if (this.isUsingItem()) {
-                                        item = this.inventory.getItemInHand();
-                                        int ticksUsed = this.server.getTick() - this.startAction;
-                                        if (!item.onRelease(this, ticksUsed)) {
-                                            this.inventory.sendContents(this);
-                                        }
-                                        this.setUsingItem(false);
-                                    } else {
-                                        this.inventory.sendContents(this);
-                                    }
-                                    return;
-                                case InventoryTransactionPacket.RELEASE_ITEM_ACTION_CONSUME:
-                                    if (this.protocol >= 388)
-                                        break; // Usage of potions on 1.13 and later is handled at ItemPotion#onUse
-                                    Item itemInHand = this.inventory.getItemInHand();
-                                    PlayerItemConsumeEvent consumeEvent = new PlayerItemConsumeEvent(this, itemInHand);
-
-                                    if (itemInHand.getId() == Item.POTION) {
-                                        this.server.getPluginManager().callEvent(consumeEvent);
-                                        if (consumeEvent.isCancelled()) {
-                                            this.inventory.sendContents(this);
-                                            break;
-                                        }
-                                        Potion potion = Potion.getPotion(itemInHand.getDamage());
-
-                                        if (this.gamemode == SURVIVAL || this.gamemode == ADVENTURE) {
-                                            this.getInventory().decreaseCount(this.getInventory().getHeldItemIndex());
-                                            this.inventory.addItem(new ItemGlassBottle());
-                                        }
-
-                                        if (potion != null) {
-                                            potion.applyPotion(this);
-                                        }
-                                    } else { // Food
-                                        this.server.getPluginManager().callEvent(consumeEvent);
-                                        if (consumeEvent.isCancelled()) {
-                                            this.inventory.sendContents(this);
-                                            break;
-                                        }
-
-                                        Food food = Food.getByRelative(itemInHand);
-                                        if (food != null && food.eatenBy(this)) {
-                                            this.getInventory().decreaseCount(this.getInventory().getHeldItemIndex());
-                                        }
-                                    }
-                                    return;
-                                default:
-                                    this.getServer().getLogger().debug(username + ": unknown release item action type: " + releaseItemData.actionType);
-                                    break;
-                            }
-                        } finally {
-                            this.setUsingItem(false);
-                        }
-                        break;
-                    default:
-                        this.inventory.sendContents(this);
-                        break;
-                }
-                break;
-            default:
-                break;
+                    } finally {
+                        this.setUsingItem(false);
+                    }
+                    break;
+                default:
+                    this.inventory.sendContents(this);
+                    break;
+            }
+        } finally {
+            if (resyncInventoryAfterLegacyTransaction) {
+                this.needSendInventory = true;
+            }
         }
+    }
+
+    private boolean shouldRejectLegacyInventoryUiTransaction(InventoryTransactionPacket packet) {
+        return this.isInventorySAIGateActive()
+                && (packet.transactionType == InventoryTransactionPacket.TYPE_NORMAL
+                || packet.isCraftingPart
+                || packet.isEnchantingPart
+                || packet.isRepairItemPart
+                || packet.isTradeItemPart);
+    }
+
+    static boolean isServerAuthoritativeLegacyDropTransaction(InventoryTransactionPacket packet, List<InventoryAction> actions) {
+        if (packet.transactionType != InventoryTransactionPacket.TYPE_NORMAL
+                || packet.actions == null
+                || packet.actions.length != 2
+                || actions.size() != 2) {
+            return false;
+        }
+
+        DropItemAction dropAction = null;
+        SlotChangeAction slotChange = null;
+        for (InventoryAction action : actions) {
+            if (action instanceof DropItemAction) {
+                dropAction = (DropItemAction) action;
+            } else if (action instanceof SlotChangeAction) {
+                slotChange = (SlotChangeAction) action;
+            } else {
+                return false;
+            }
+        }
+        if (dropAction == null || slotChange == null) {
+            return false;
+        }
+
+        NetworkInventoryAction worldAction = null;
+        NetworkInventoryAction containerAction = null;
+        for (NetworkInventoryAction networkAction : packet.actions) {
+            if (networkAction.sourceType == NetworkInventoryAction.SOURCE_WORLD) {
+                if (worldAction != null) {
+                    return false;
+                }
+                worldAction = networkAction;
+            } else if (networkAction.sourceType == NetworkInventoryAction.SOURCE_CONTAINER) {
+                if (containerAction != null) {
+                    return false;
+                }
+                containerAction = networkAction;
+            } else {
+                return false;
+            }
+        }
+        if (worldAction == null || containerAction == null) {
+            return false;
+        }
+
+        if (worldAction.inventorySlot != InventoryTransactionPacket.ACTION_MAGIC_SLOT_DROP_ITEM
+                || containerAction.windowId != ContainerIds.INVENTORY
+                || slotChange.getSlot() != containerAction.inventorySlot
+                || !(slotChange.getInventory() instanceof PlayerInventory)) {
+            return false;
+        }
+
+        Item droppedItem = worldAction.newItem;
+        Item oldItem = containerAction.oldItem;
+        Item newItem = containerAction.newItem;
+        if (droppedItem == null || droppedItem.isNull()
+                || oldItem == null || oldItem.isNull()
+                || newItem == null) {
+            return false;
+        }
+        int droppedCount = droppedItem.getCount();
+        // Client may report the emptied slot as AIR with a non-zero count → treat as 0.
+        int remainingCount = newItem.isNull() ? 0 : newItem.getCount();
+        // Count conservation only (drop + remainder = old). NBT is not re-checked
+        // here: SlotChangeAction.isValid() validates it against server slot state.
+        if (droppedCount <= 0 || oldItem.getCount() != remainingCount + droppedCount) {
+            return false;
+        }
+        if (!droppedItem.equals(oldItem, true, false)) {
+            return false;
+        }
+        return newItem.isNull() || newItem.equals(oldItem, true, false);
     }
 
     private boolean handleQuickCraft(InventoryTransactionPacket packet, List<InventoryAction> actions, InventoryTransaction transaction) {
@@ -5210,6 +6102,40 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.needSendInventory = true;
             return false;
         }
+    }
+
+    /**
+     * Replays the block actions of a single input tick in causal order.
+     *
+     * <p>{@link cn.nukkit.network.protocol.PlayerAuthInputPacket} collects the block actions of a
+     * tick into an {@link java.util.EnumMap}, so the order in which the client sent them is lost and
+     * the values are iterated by {@link PlayerActionType} ordinal instead. The client finishes a
+     * block and reaches for the next one in one tick, sending
+     * {@code PREDICT_DESTROY_BLOCK(finished)} followed by {@code START_DESTROY_BLOCK(next)}; the
+     * ordinals replay that backwards, because {@code START_DESTROY_BLOCK} is the first constant of
+     * the enum and {@code PREDICT_DESTROY_BLOCK} is close to the last. Starting the next block first
+     * moves {@code lastBreak} to the current millisecond, and the completion that follows is then
+     * judged against a timer that started an instant ago: {@link cn.nukkit.level.Level#useBreakOn}
+     * reports {@code fastBreak} and the finished block is refused and sent back to the player.
+     *
+     * <p>Actions that END a destruction therefore run before the ones that begin or continue one.
+     * The sort is stable, so actions of the same group keep the order they already had.
+     */
+    static List<PlayerBlockActionData> orderBlockActions(Collection<PlayerBlockActionData> actions) {
+        List<PlayerBlockActionData> ordered = new ArrayList<>(actions);
+        if (ordered.size() > 1) {
+            ordered.sort(Comparator.comparingInt(action -> endsBlockDestruction(action.getAction()) ? 0 : 1));
+        }
+        return ordered;
+    }
+
+    /**
+     * Does this action end the destruction of a block rather than begin or continue one?
+     */
+    static boolean endsBlockDestruction(PlayerActionType action) {
+        return action == PlayerActionType.PREDICT_DESTROY_BLOCK
+                || action == PlayerActionType.ABORT_DESTROY_BLOCK
+                || action == PlayerActionType.STOP_DESTROY_BLOCK;
     }
 
     private void onBlockBreakContinue(Vector3 pos, BlockFace face) {
@@ -5232,7 +6158,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         // HACK: Client spams multiple left clicks so we need to skip them.
-        if ((this.lastBreakPosition.equals(blockPos) && (currentBreak - this.lastBreak) < 10) || pos.distanceSquared(this) > 100) {
+        if (((currentBreak - this.lastBreak) < 10 && this.lastBreakPosition.equals(blockPos)) || pos.distanceSquared(this) > 100) {
             return;
         }
 
@@ -5280,7 +6206,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         int tmpX = target.getFloorX() + each.getXOffset();
                         int tmpY = target.getFloorY() + each.getYOffset();
                         int tmpZ = target.getFloorZ() + each.getZOffset();
-                        if (Level.xrayableBlocks[this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ)]) {
+                        int neighborBlockId = this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ);
+                        if (neighborBlockId < Block.MAX_BLOCK_ID && Level.xrayableBlocks[neighborBlockId]) {
                             vector3s[index] = new Vector3(tmpX, tmpY, tmpZ);
                             index++;
                         }
@@ -5322,6 +6249,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (canInteract) {
             handItem = this.level.useBreakOn(blockPos.asVector3(), face, handItem, this, true);
             if (handItem == null) {
+                this.armDeniedCreativeBreakCorrection(blockPos);
                 this.level.sendBlocks(new Player[]{this}, new Vector3[]{blockPos.asVector3()}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
 
                 BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
@@ -5346,6 +6274,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         inventory.sendContents(this);
         inventory.sendHeldItem(this);
+
+        this.armDeniedCreativeBreakCorrection(blockPos);
 
         if (blockPos.distanceSquared(this) < 10000) {
             Vector3 pos = blockPos.asVector3();
@@ -5374,7 +6304,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         int maxMsgLength = this.protocol >= ProtocolInfo.v1_18_0 ? 512 : 255;
 
         for (String msg : message.split("\n")) {
-            if (!msg.trim().isEmpty() && msg.length() <= maxMsgLength) {
+            if (msg.length() <= maxMsgLength && !msg.trim().isEmpty()) {
                 PlayerChatEvent chatEvent = new PlayerChatEvent(this, msg);
                 this.server.getPluginManager().callEvent(chatEvent);
                 if (!chatEvent.isCancelled()) {
@@ -5691,14 +6621,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
-     * 设置指定itemCategory物品的冷却显示效果，注意该方法仅为客户端显示效果，冷却逻辑实现仍需自己实现
+     * 设置指定itemCategory物品的冷却：服务端记录冷却结束的tick，同时把冷却显示效果发给客户端
      * <p>
-     * Set the cooling display effect of the specified itemCategory items, note that this method is only for client-side display effect, cooling logic implementation still needs to be implemented by itself
+     * Start a cool down for the given item category. The end tick is tracked server side, so
+     * {@link #isItemCoolDownEnd(String)} stays authoritative even when the client ignores the
+     * display packet, and the packet is still sent to clients that understand it.
      *
-     * @param coolDown     the cool down
+     * @param coolDown     the cool down, in ticks; zero or less clears the cool down
      * @param itemCategory the item category
      */
     public void setItemCoolDown(int coolDown, String itemCategory) {
+        if (coolDown > 0) {
+            this.itemCoolDownEnds.put(itemCategory, this.server.getTick() + coolDown);
+        } else {
+            this.itemCoolDownEnds.remove(itemCategory);
+        }
+
         if (this.protocol < ProtocolInfo.v1_18_10) {
             return;
         }
@@ -5706,6 +6644,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.setCoolDownDuration(coolDown);
         pk.setItemCategory(itemCategory);
         this.dataPacket(pk);
+    }
+
+    /**
+     * 获取指定itemCategory冷却结束的tick，没有冷却时返回0
+     * <p>
+     * Gets the server tick at which the cool down of the given item category ends, or {@code 0}
+     * when this player has no running cool down for it.
+     *
+     * @param itemCategory the item category
+     * @return the end tick, or 0
+     */
+    public int getItemCoolDownEnd(String itemCategory) {
+        Integer end = this.itemCoolDownEnds.get(itemCategory);
+        if (end == null) {
+            return 0;
+        }
+        if (this.server.getTick() >= end) {
+            // remove(key, value): an unconditional remove could clobber a cool down recorded concurrently
+            this.itemCoolDownEnds.remove(itemCategory, end);
+            return 0;
+        }
+        return end;
+    }
+
+    /**
+     * 判断指定itemCategory的冷却是否已经结束
+     * <p>
+     * Whether the cool down of the given item category has ended. Item behaviours must ask this
+     * before acting: the cool down belongs to the player, not to a single item stack, so two
+     * identical items in the inventory share one cool down.
+     *
+     * @param itemCategory the item category
+     * @return true when the item may be used again
+     */
+    public boolean isItemCoolDownEnd(String itemCategory) {
+        return this.getItemCoolDownEnd(itemCategory) == 0;
     }
 
     /**
@@ -5759,7 +6733,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(String message, String reason, boolean notify) {
-        this.close(new TextContainer(message), reason, notify);
+        this.close(message, reason, notify, null);
+    }
+
+    /**
+     * @param failReason 断连包的 wire 枚举（v1_20_40+ 编码为序数），null 保持 DISCONNECTED；
+     *                   调用方须确认客户端协议认识该序数
+     * @param failReason the wire fail reason (encoded as an ordinal since v1_20_40);
+     *                   null keeps DISCONNECTED, the caller must ensure the client's protocol knows the ordinal
+     */
+    public void close(String message, String reason, boolean notify, DisconnectFailReason failReason) {
+        this.close(new TextContainer(message), reason, notify, failReason);
     }
 
     public void close(TextContainer message) {
@@ -5771,10 +6755,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(TextContainer message, String reason, boolean notify) {
+        this.close(message, reason, notify, null);
+    }
+
+    public void close(TextContainer message, String reason, boolean notify, DisconnectFailReason failReason) {
+        if (pendingLoginVerification != null) {
+            pendingLoginVerification.cancel();
+            pendingLoginVerification = null;
+        }
         if (this.connected && !this.closed) {
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
-                pk.message = reason;
+                pk.reason = failReason != null ? failReason : DisconnectFailReason.DISCONNECTED;
+                if (!this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_93) {
+                    pk.message = TextFormat.clean(TextFormat.colorize(reason));
+                } else {
+                    pk.message = reason;
+                }
                 this.forceDataPacket(pk, null);
             }
 
@@ -5831,11 +6828,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (this.loggedIn) {
                     this.server.removeOnlinePlayer(this);
+                    // 从曾收到过本玩家皮肤的其他观察者处清理记录（REMOVE 已由 removeOnlinePlayer 广播）。
+                    // Clear this player's UUID from viewers that previously received its list entry;
+                    // the REMOVE itself is broadcast by removeOnlinePlayer.
+                    this.server.getOnlinePlayers().values().stream()
+                            .filter(p -> p != this)
+                            .forEach(p -> {
+                                p.sentSkins.remove(this.getUniqueId());
+                                p.confirmedSkins.remove(this.getUniqueId());
+                            });
                     this.loggedIn = false;
                 }
             }
 
-            if (ev != null && !Objects.equals(this.username, "") && this.spawned && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
                 this.server.broadcastMessage(ev.getQuitMessage());
             }
 
@@ -5847,6 +6853,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     String.valueOf(this.getPort()),
                     this.getServer().getLanguage().translateString(reason)));
             this.windows.clear();
+            this.topWindow = null;
             this.hasSpawned.clear();
             this.spawnPosition = null;
 
@@ -5938,6 +6945,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             });
             this.namedTag.putList(fogIdentifiers);
             this.namedTag.putList(userProvidedFogIds);
+
+            this.namedTag.putInt("wardenWarningLevel", this.wardenWarningData.warningLevel);
+            this.namedTag.putLong("wardenLastWarningTick", this.wardenWarningData.lastWarningTick);
+            this.namedTag.putLong("wardenLastShriekTick", this.wardenWarningData.lastShriekTick);
 
             if (!this.username.isEmpty() && this.namedTag != null) {
                 if (this.server.savePlayerDataByUuid) {
@@ -6133,24 +7144,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             } else {
                 // 发包给客户端清除不死图腾，防止影响自杀等操作
-                if (this.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                if (Entity.isTotem(this.getOffhandInventory().getItemFast(0))) {
                     InventorySlotPacket pk = new InventorySlotPacket();
                     pk.slot = 0;
                     pk.item = Item.AIR_ITEM;
                     int id = this.getWindowId(this.getOffhandInventory());
                     if (id != -1) {
                         pk.inventoryId = id;
+                        pk.containerNameData = new FullContainerName(ContainerSlotType.OFFHAND, ContainerIds.INVENTORY);
                         this.dataPacket(pk);
                     }
                 }
                 int id = this.getWindowId(this.getInventory());
                 if (id != -1) {
                     for (Entry<Integer, Item> entry : this.getInventory().getContents().entrySet()) {
-                        if (entry.getValue() instanceof ItemTotem) {
+                        if (Entity.isTotem(entry.getValue())) {
                             InventorySlotPacket pk = new InventorySlotPacket();
                             pk.slot = entry.getKey();
                             pk.item = Item.AIR_ITEM;
                             pk.inventoryId = id;
+                            pk.containerNameData = new FullContainerName(
+                                    pk.slot < 9 ? ContainerSlotType.HOTBAR : ContainerSlotType.INVENTORY,
+                                    id
+                            );
                             this.dataPacket(pk);
                         }
                     }
@@ -6194,6 +7210,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.dataPacket(healthPk);
             }
         }
+    }
+
+    protected boolean handleRespawnRequest() {
+        if (!this.spawned || this.isAlive() || !this.isOnline()) {
+            return false;
+        }
+
+        this.respawn();
+        return true;
     }
 
     protected void respawn() {
@@ -6251,7 +7276,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.sendData(this);
 
-        this.recalculateMovementSpeed();
+        this.setMovementSpeed(DEFAULT_SPEED);
 
         this.adventureSettings.update();
         this.inventory.sendContents(this);
@@ -6259,6 +7284,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.offhandInventory.sendContents(this);
 
         this.spawnToAll();
+
+        // 观察者死亡期间 spawnTo 被存活守卫跳过且客户端实体已被移除，重生后补驱视野内实体
+        for (long index : this.usedChunks.keySet()) {
+            int chunkX = Level.getHashX(index);
+            int chunkZ = Level.getHashZ(index);
+            for (Entity entity : this.level.getChunkEntities(chunkX, chunkZ, false).values()) {
+                if (this != entity && !entity.closed && entity.isAlive()) {
+                    entity.spawnTo(this);
+                }
+            }
+        }
+
         this.scheduleUpdate();
     }
 
@@ -6368,8 +7405,43 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(pk);
     }
 
+    @Override
+    public void setMovementSpeed(float speed) {
+        setMovementSpeed(speed, true);
+    }
+
+    /**
+     * 设置玩家基础移动速度，修饰符（疾跑、药水等）叠加在该基础值之上。
+     * <p>
+     * Sets the player's base movement speed; modifiers (sprinting, effects, etc.) apply on top of it.
+     *
+     * @param speed 基础移动速度，默认为 {@link #DEFAULT_SPEED} / Base movement speed, defaults to {@link #DEFAULT_SPEED}
+     * @param send  是否向客户端发送更新后的速度属性 / Whether to send the updated speed attribute to the client
+     */
+    public void setMovementSpeed(float speed, boolean send) {
+        if (speed < 0 || !Float.isFinite(speed)) {
+            server.getLogger().debug("Invalid setMovementSpeed: " + speed);
+            return;
+        }
+        super.setMovementSpeed(speed);
+        this.speedToSend = this.recalculateMovementSpeedToSend();
+        if (this.spawned && send) {
+            this.sendMovementSpeed();
+        }
+    }
+
+    /**
+     * 仅重算发送给客户端的速度，不改动基础速度字段。
+     * <p>
+     * Recomputes the client-bound speed only, leaving the base speed field untouched.
+     */
+    @Override
+    public void recalculateMovementSpeed() {
+        this.speedToSend = this.recalculateMovementSpeedToSend();
+    }
+
     public void sendMovementSpeed() {
-        Attribute attribute = Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speedToSend);
+        Attribute attribute = Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speedToSend).setDefaultValue(this.getMovementSpeed());
         this.setAttribute(attribute);
     }
 
@@ -6595,7 +7667,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkX = (int) this.teleportPosition.x >> 4;
             int chunkZ = (int) this.teleportPosition.z >> 4;
 
-            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : this.server.c_s_spawnThreshold);
+            int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : Math.max(this.chunkRadius, this.server.c_s_spawnThreshold));
             int maxChunkOffset = Math.min(TELEPORT_CHUNK_READY_OFFSET, chunkSendRadius);
             long chunkSendRadiusSqr = (long) chunkSendRadius * chunkSendRadius;
             for (int X = -maxChunkOffset; X <= maxChunkOffset; ++X) {
@@ -6651,6 +7723,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
@@ -6681,11 +7754,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.setSwimming(false);
             this.setCrawling(false);
 
+            this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(this, from.clone(), VibrationType.TELEPORT));
+
             this.stopFishing(false);
             return true;
         }
 
         return false;
+    }
+
+    private void cancelPendingPortalTransfer() {
+        // 已完成的传送已清空目标，保留其计时以避免在出口立即回传。
+        // Completed transfers have no target; preserve their timer to prevent an immediate return trip.
+        if (this.portalPos != null) {
+            this.portalPos = null;
+            this.inPortalTicks = 0;
+        }
+    }
+
+    public void checkSwimmingState() {
+        if (this.isSwimming() && !this.isInsideOfWater()) {
+            this.setSwimming(false);
+        }
     }
 
     protected void forceSendEmptyChunks() {
@@ -6710,6 +7800,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void teleportImmediate(Location location, TeleportCause cause) {
         Location from = this.getLocation();
         if (super.teleport(location.add(0, 0.00001, 0), cause)) {
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
@@ -6724,12 +7815,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.dataPacket(pk);
             }
 
-            this.forceMovement = this.getLocation();
+            this.teleportPosition = this.getLocation();
+            this.forceMovement = this.teleportPosition.clone();
             this.sendPosition(this.forceMovement, MovePlayerPacket.MODE_RESET);
 
             this.resetFallDistance();
             this.orderChunks();
             this.nextChunkOrderRun = 0;
+            this.checkTeleportPosition();
             this.resetClientMovement();
 
             this.setSwimming(false);
@@ -6943,12 +8036,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (isPermanent) {
             this.permanentWindows.add(cnt);
+        } else {
+            this.topWindow = inventory;
         }
 
         if (this.spawned && !this.inventoryOpen && inventory.open(this)) {
             return cnt;
         } else if (!alwaysOpen) {
-            this.removeWindow(inventory);
+            if (!this.permanentWindows.contains(cnt)) {
+                this.windows.remove(inventory);
+                if (this.topWindow == inventory) {
+                    this.topWindow = null;
+                }
+            }
 
             return -1;
         } else {
@@ -6959,12 +8059,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public Optional<Inventory> getTopWindow() {
+        if (this.topWindow != null && this.windows.containsKey(this.topWindow)
+                && !this.permanentWindows.contains(this.windows.get(this.topWindow))) {
+            return Optional.of(this.topWindow);
+        }
+        // Re-scan if the tracked reference is stale (e.g. removed outside removeWindow).
+        Inventory fallback = null;
         for (Entry<Inventory, Integer> entry : this.windows.entrySet()) {
             if (!this.permanentWindows.contains(entry.getValue())) {
-                return Optional.of(entry.getKey());
+                fallback = entry.getKey();
+                break;
             }
         }
-        return Optional.empty();
+        this.topWindow = fallback;
+        return Optional.ofNullable(fallback);
     }
 
     public void removeWindow(Inventory inventory) {
@@ -6977,6 +8085,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // Requiring isResponse here causes issues with inventory events and an item duplication glitch
         if (/*isResponse &&*/ !this.permanentWindows.contains(this.getWindowId(inventory))) {
             this.windows.remove(inventory);
+            if (inventory == this.topWindow) {
+                this.topWindow = null;
+            }
         }
     }
 
@@ -7032,7 +8143,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             Item[] drops;
 
             if (this.craftingGrid != null) {
-                drops = this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
+                // Creative UI contents are free items: never return or drop them on reset.
+                // Closing a full inventory must not publish them to survival players.
+                drops = this.isCreative() ? Item.EMPTY_ARRAY
+                        : this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
                 this.craftingGrid.clearAll();
 
                 for (Item drop : drops) {
@@ -7040,7 +8154,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            drops = this.inventory.addItem(this.getCursorInventory().getItem(0));
+            drops = this.isCreative() ? Item.EMPTY_ARRAY
+                    : this.inventory.addItem(this.getCursorInventory().getItem(0));
             this.playerUIInventory.getCursorInventory().clear(0);
 
             for (Item drop : drops) {
@@ -7051,8 +8166,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.moveBlockUIContents(Player.ANVIL_WINDOW_ID); // LOOM_WINDOW_ID is the same as ANVIL_WINDOW_ID?
             this.moveBlockUIContents(Player.ENCHANT_WINDOW_ID);
             this.moveBlockUIContents(Player.BEACON_WINDOW_ID);
+            this.moveBlockUIContents(Player.GRINDSTONE_WINDOW_ID);
             this.moveBlockUIContents(Player.SMITHING_WINDOW_ID);
             this.moveBlockUIContents(Player.STONECUTTER_WINDOW_ID);
+            this.moveBlockUIContents(Player.CARTOGRAPHY_WINDOW_ID);
 
             this.playerUIInventory.clearAll();
 
@@ -7072,7 +8189,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private void moveBlockUIContents(int window) {
         Inventory inventory = this.getWindowById(window);
         if (inventory instanceof FakeBlockUIComponent) {
-            Item[] drops = this.inventory.addItem(inventory.getContents().values().toArray(Item.EMPTY_ARRAY));
+            Item[] drops = this.isCreative() ? Item.EMPTY_ARRAY
+                    : this.inventory.addItem(inventory.getContents().values().toArray(Item.EMPTY_ARRAY));
             inventory.clearAll();
             for (Item drop : drops) {
                 this.level.dropItem(this, drop);
@@ -7403,15 +8521,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         TransferPacket pk = new TransferPacket();
         pk.address = hostName;
         pk.port = port;
-        if (!this.dataPacket(pk)) {
-            return;
-        }
-
-        this.server.getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
-            if (this.connected && !this.closed) {
-                this.close("", "transferred", false);
-            }
-        }, 100);
+        pk.reloadWorld = false;
+        this.dataPacket(pk);
     }
 
     /**
@@ -7488,28 +8599,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
             if (entity instanceof EntityThrownTrident) {
                 // Check Trident is returning to shooter
-                if (!((EntityThrownTrident) entity).hadCollision) {
-                    if (entity.isNoClip()) {
-                        if (!((EntityProjectile) entity).shootingEntity.equals(this)) {
-                            return false;
-                        }
-                    } else {
+                EntityThrownTrident thrownTrident = (EntityThrownTrident) entity;
+                if (thrownTrident.isNoClip()) {
+                    if (thrownTrident.shootingEntity == null || !thrownTrident.shootingEntity.equals(this)) {
                         return false;
                     }
-                }
-
-                if (!((EntityThrownTrident) entity).isPlayer()) {
+                } else if (!thrownTrident.hadCollision) {
                     return false;
                 }
 
-                Item item = ((EntityThrownTrident) entity).getItem();
+                if (!thrownTrident.isPlayer()) {
+                    return false;
+                }
+
+                Item item = thrownTrident.getItem();
                 if (!this.isCreative() && !this.inventory.canAddItem(item)) {
                     return false;
                 }
 
-                InventoryPickupTridentEvent ev = new InventoryPickupTridentEvent(this.inventory, (EntityThrownTrident) entity);
+                InventoryPickupTridentEvent ev = new InventoryPickupTridentEvent(this.inventory, thrownTrident);
 
-                int pickupMode = ((EntityThrownTrident) entity).getPickupMode();
+                int pickupMode = thrownTrident.getPickupMode();
                 if (pickupMode == EntityThrownTrident.PICKUP_NONE || (pickupMode == EntityThrownTrident.PICKUP_CREATIVE && !this.isCreative())) {
                     ev.setCancelled();
                 }
@@ -7525,9 +8635,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Server.broadcastPacket(entity.getViewers().values(), pk);
                 this.dataPacket(pk);
 
-                if (!((EntityThrownTrident) entity).isCreative()) {
-                    if (inventory.getItem(((EntityThrownTrident) entity).getFavoredSlot()).getId() == Item.AIR) {
-                        inventory.setItem(((EntityThrownTrident) entity).getFavoredSlot(), item.clone());
+                if (!thrownTrident.isCreative()) {
+                    if (inventory.getItem(thrownTrident.getFavoredSlot()).getId() == Item.AIR) {
+                        inventory.setItem(thrownTrident.getFavoredSlot(), item.clone());
                     } else {
                         inventory.addItem(item.clone());
                     }
@@ -7634,7 +8744,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
         Player other = (Player) obj;
-        return Objects.equals(this.getUniqueId(), other.getUniqueId()) && this.getId() == other.getId();
+        return this.getId() == other.getId() && Objects.equals(this.getUniqueId(), other.getUniqueId());
     }
 
     public boolean isBreakingBlock() {
@@ -7756,6 +8866,292 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.networkSession;
     }
 
+    private String getTransportName() {
+        return this.interfaz instanceof NetherNetInterface ? "NetherNet" : "RakNet";
+    }
+
+    void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {
+        PendingResourcePack pending = this.pendingResourcePacks.computeIfAbsent(resourcePack.getPackId(),
+                ignored -> new PendingResourcePack(resourcePack));
+        pending.request(chunkIndex);
+        this.scheduleNextResourcePackChunk();
+    }
+
+    private void scheduleNextResourcePackChunk() {
+        if (this.resourcePackChunkSendScheduled || this.pendingResourcePacks.isEmpty()) {
+            return;
+        }
+        this.resourcePackChunkSendScheduled = true;
+        this.server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, this::sendNextResourcePackChunk);
+    }
+
+    private void sendNextResourcePackChunk() {
+        this.resourcePackChunkSendScheduled = false;
+        if (!this.connected) {
+            this.pendingResourcePacks.clear();
+            return;
+        }
+
+        Iterator<PendingResourcePack> iterator = this.pendingResourcePacks.values().iterator();
+        PendingResourcePack pending = null;
+        int chunkIndex = -1;
+        while (iterator.hasNext()) {
+            PendingResourcePack candidate = iterator.next();
+            chunkIndex = candidate.pollChunkIndex();
+            if (candidate.isEmpty()) {
+                iterator.remove();
+            }
+            if (chunkIndex >= 0) {
+                pending = candidate;
+                break;
+            }
+        }
+        if (pending == null) {
+            return;
+        }
+
+        ResourcePackChunkDataPacket dataPacket = new ResourcePackChunkDataPacket();
+        dataPacket.packId = pending.resourcePack.getPackId();
+        dataPacket.packVersion = pending.resourcePack.getPackVersion();
+        dataPacket.chunkIndex = chunkIndex;
+        dataPacket.progress = (long) RESOURCE_PACK_CHUNK_SIZE * chunkIndex;
+        dataPacket.data = pending.resourcePack.getPackChunk(RESOURCE_PACK_CHUNK_SIZE * chunkIndex, RESOURCE_PACK_CHUNK_SIZE);
+        this.dataPacket(dataPacket);
+        if (this.networkSession != null && this.networkSession.getState() != null) {
+            this.networkSession.getState().getLogin().touchActivity();
+        }
+
+        if (!this.pendingResourcePacks.isEmpty()) {
+            this.resourcePackChunkSendScheduled = true;
+            this.server.getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, this::sendNextResourcePackChunk, 1);
+        }
+    }
+
+    /**
+     * Tracks pending chunks per pack to avoid overwhelming clients with burst delivery.
+     * <p>
+     * Adapted from PowerNukkitX (<a href="https://github.com/PowerNukkitX/PowerNukkitX">PowerNukkitX</a>)
+     */
+    static final class PendingResourcePack {
+        private final ResourcePack resourcePack;
+        private final BitSet requestedChunks = new BitSet();
+
+        PendingResourcePack(ResourcePack resourcePack) {
+            this.resourcePack = resourcePack;
+        }
+
+        void request(int chunkIndex) {
+            this.requestedChunks.set(chunkIndex);
+        }
+
+        int pollChunkIndex() {
+            int chunkIndex = this.requestedChunks.nextSetBit(0);
+            if (chunkIndex >= 0) {
+                this.requestedChunks.clear(chunkIndex);
+            }
+            return chunkIndex;
+        }
+
+        boolean isEmpty() {
+            return this.requestedChunks.isEmpty();
+        }
+    }
+
+    void beginLoginVerification(LoginPacket packet, LoginChainVerifier verifier) {
+        if (pendingLoginVerification != null) {
+            return;
+        }
+        Skin loginSkin = packet.skin;
+        pendingLoginVerification = verifier.submit(packet.getBuffer(), (validated, failure) -> {
+            if (pendingLoginVerification == null) {
+                return;
+            }
+            pendingLoginVerification = null;
+            if (this.closed || !this.isConnected() || this.getCurrentLoginPhase() != SessionLoginPhase.LOGIN_RECEIVED) {
+                return;
+            }
+            if (failure instanceof ClientChainData.TooBigSkinException) {
+                this.close("", "disconnectionScreen.invalidSkin");
+                return;
+            }
+            if (failure != null || validated == null || !validated.isAuthenticationCurrent()) {
+                this.server.getLogger().debug("Rejected login verification from " + this.getAddress()
+                        + " (" + (failure == null ? "expired or missing result" : failure.getClass().getSimpleName()) + ")");
+                this.close("", "disconnectionScreen.invalidName");
+                return;
+            }
+            continueVerifiedLogin(loginSkin, validated);
+        });
+        if (pendingLoginVerification == null) {
+            this.sendPlayStatus(PlayStatusPacket.LOGIN_FAILED_SERVER_FULL, true);
+            this.close("", "disconnectionScreen.serverFull");
+        }
+    }
+
+    /**
+     * The name a verified login is known by: format codes removed and whitespace at either end
+     * trimmed.
+     * <p>
+     * Clients can report {@code "Name "} or {@code " Name"} for the account that otherwise logs
+     * in as {@code "Name"}. Left untrimmed, the padded form derived its own offline identity and
+     * its own player data file, so one account owned two inventories and a relog between the two
+     * spellings loaded whatever the other file still held. Trimming also stops the padded form
+     * from slipping past a name ban, the whitelist and the duplicate login check. Spaces inside
+     * the name are part of it and stay.
+     *
+     * @param chainUsername name from the verified login chain
+     * @return the trimmed name, or {@code null} when the chain carries none
+     */
+    static String verifiedLoginName(String chainUsername) {
+        String cleaned = TextFormat.clean(chainUsername);
+        return cleaned == null ? null : cleaned.strip();
+    }
+
+    // Called only by the main-thread AsyncTask completion after successful verification.
+    void continueVerifiedLogin(Skin loginSkin, ClientChainData validated) {
+        this.loginChainData = validated;
+        if (!loginChainData.isXboxAuthed() && server.xboxAuth) {
+            this.close("", "disconnectionScreen.notAuthenticated");
+            if (server.banXBAuthFailed) {
+                this.server.getNetwork().blockAddress(this.socketAddress.getAddress(), 5);
+                this.server.getLogger().notice("Blocked " + getAddress() + " for 5 seconds due to failed Xbox auth");
+            }
+            return;
+        }
+
+        if (this.server.isWaterdogCapable() && loginChainData.getWaterdogIP() != null) {
+            this.socketAddress = new InetSocketAddress(this.loginChainData.getWaterdogIP(), this.getRawPort());
+        }
+
+        this.version = loginChainData.getGameVersion();
+
+        // Use verified identity data from ClientChainData (signature-validated) as the source of truth
+        // The name is trimmed before anything keys on it: whitelist, bans, the duplicate login
+        // check, the name lookup table and the offline identity all see the same string.
+        // Replace mode keeps its historical form ("Name " -> "Name_") and is not trimmed.
+        String verifiedName = this.server.spaceMode == 2
+                ? TextFormat.clean(loginChainData.getUsername())
+                : verifiedLoginName(loginChainData.getUsername());
+        if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
+            verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
+        }
+        if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
+            verifiedName = server.viaProxyUsernamePrefix + verifiedName;
+        }
+
+        this.username = verifiedName;
+        this.unverifiedUsername = null;
+        this.displayName = this.username;
+        this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
+        this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
+
+        this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
+
+        this.randomClientId = loginChainData.getClientId();
+        this.minecraftId = loginChainData.getMinecraftId();
+
+        boolean valid = true;
+        // Length and characters are still checked on the raw name, exactly as before trimming
+        // existed: a short name padded with a space ("gg ") keeps logging in.
+        String rawVerifiedName = loginChainData.getUsername();
+        int len = rawVerifiedName == null ? 0 : rawVerifiedName.length();
+        if (((len > 16 || len < 3) && !gameVersion.isNetEase())
+                || rawVerifiedName == null || rawVerifiedName.trim().isEmpty()
+                || verifiedName == null || verifiedName.isBlank()) {
+            valid = false;
+        }
+
+        if (valid && !gameVersion.isNetEase()) {
+            for (int i = 0; i < len; i++) {
+                char c = rawVerifiedName.charAt(i);
+                if ((c >= 'a' && c <= 'z') ||
+                        (c >= 'A' && c <= 'Z') ||
+                        (c >= '0' && c <= '9') ||
+                        c == '_' || c == ' '
+                ) {
+                    continue;
+                }
+
+                valid = false;
+                break;
+            }
+        }
+
+        if (!valid || Objects.equals(this.iusername, "rcon") || Objects.equals(this.iusername, "console")) {
+            this.close("", "disconnectionScreen.invalidName");
+            return;
+        }
+
+        // An Xbox login has its own profile and is not affected by an unfolded offline name.
+        String foldBlock = loginChainData.isXboxAuthed() ? null : this.server.profileFoldBlockReason(this.iusername);
+        if (foldBlock != null) {
+            this.server.getLogger().warning("Refused the offline login of " + this.username + ": the player data "
+                    + "saved under a padded spelling of this name was not folded at startup (" + foldBlock + ")");
+            this.close("", "Your player data is unavailable, please contact the server administrators");
+            return;
+        }
+
+        // 身份派生须在校验之后：名字清理后为空的登录已在上面被拒绝，派生异常才不会逃逸
+        // Identity derivation must follow validation: names that clean to empty were
+        // rejected above, so the derivation cannot throw past this point
+        this.uuid = loginChainData.getClientUUID(verifiedName);
+        this.rawUUID = Binary.writeUUID(this.uuid);
+
+        if (!loginSkin.isValid()) {
+            this.close("", "disconnectionScreen.invalidSkin");
+            return;
+        }
+        Skin skin = loginSkin;
+        this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
+
+        // NetherNet 跳过加密握手，登录链改用信令身份断言绑定，防止捕获的链被重放
+        // NetherNet skips the encryption handshake, so bind the login chain to the signaling identity instead
+        if (this.interfaz instanceof NetherNetInterface netherNet) {
+            String identityRefusal = netherNet.checkIdentityBinding(
+                    this.networkSession, this.loginChainData.getIdentityPublicKey());
+            if (identityRefusal != null) {
+                log.warn("Refusing a NetherNet login from {}: {}", this.getSocketAddress(), identityRefusal);
+                this.close("", "disconnectionScreen.notAuthenticated");
+                return;
+            }
+        }
+
+        PlayerPreLoginEvent playerPreLoginEvent;
+        this.server.getPluginManager().callEvent(playerPreLoginEvent = new PlayerPreLoginEvent(this, "Plugin reason"));
+        if (playerPreLoginEvent.isCancelled()) {
+            this.close("", playerPreLoginEvent.getKickMessage());
+            return;
+        }
+
+        if (this.isEnableNetworkEncryption()) {
+            this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PrepareEncryptionTask(this) {
+                @Override
+                public void onCompletion(Server server) {
+                    if (!Player.this.isConnected()) {
+                        return;
+                    }
+
+                    if (this.getHandshakeJwt() == null || this.getEncryptionKey() == null || this.getEncryptionCipher() == null || this.getDecryptionCipher() == null) {
+                        Player.this.close("", "Network Encryption error");
+                        return;
+                    }
+
+                    ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
+                    pk.setJwt(this.getHandshakeJwt());
+                    Player.this.syncLoginPhase(SessionLoginPhase.ENCRYPTION_REQUEST_SENT);
+                    Player.this.forceDataPacket(pk, () -> {
+                        Player.this.syncAwaitingEncryptionHandshake(true);
+                        Player.this.syncLoginPhase(SessionLoginPhase.AWAITING_ENCRYPTION_RESPONSE);
+                        Player.this.getNetworkSession().beginLegacyInboundEncryptionGraceWindow();
+                        Player.this.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
+                    }, ImmediatePacketMode.DIRECT_WRITE);
+                }
+            });
+        } else {
+            this.processPreLogin();
+        }
+    }
+
     protected void processPreLogin() {
         this.syncLoginVerified(true);
         this.syncLoginPhase(SessionLoginPhase.PRE_LOGIN);
@@ -7777,8 +9173,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (this.event.getLoginResult() == PlayerAsyncPreLoginEvent.LoginResult.KICK) {
+                    // 拒绝发生在数据迁移与查找表变更之前
                     playerInstance.close(this.event.getKickMessage(), this.event.getKickMessage());
-                } else if (playerInstance.shouldLogin) {
+                    return;
+                }
+
+                // processLogin 须先于 shouldLogin 判断执行：资源包信息由它发出，客户端完成后才置
+                // shouldLogin；守卫防止两条触发路径重复执行
+                // processLogin must run ahead of the shouldLogin check (it sends the pack info
+                // the client needs to finish); the guard keeps the two trigger paths single-shot
+                if (!playerInstance.loginDataProcessed) {
+                    playerInstance.loginDataProcessed = true;
+                    playerInstance.processLogin();
+                    if (!playerInstance.connected) {
+                        return;
+                    }
+                }
+
+                if (playerInstance.shouldLogin) {
                     playerInstance.setSkin(this.event.getSkin());
                     playerInstance.completeLoginSequence();
                     for (Consumer<Server> action : this.event.getScheduledActions()) {
@@ -7789,7 +9201,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         };
 
         this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, this.preLoginEventTask);
-        this.processLogin();
     }
 
     static boolean isPreLoginVerifiedPacketAllowed(SessionLoginPhase phase, int packetId) {
@@ -7801,6 +9212,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
             case ENCRYPTION_RESPONSE_RECEIVED, PRE_LOGIN, RESOURCE_PACK, READY_TO_LOGIN -> packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET)
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET)
+                    || packetId == ProtocolInfo.RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET
                     || packetId == ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET);
             case LOGGED_IN, DISCONNECTED -> false;
         };
@@ -7923,6 +9335,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    /**
+     * 回收界面（工作站/交易）输入物品：有限模式收回背包、溢出掉落在玩家处；
+     * 创造模式物品是免费内容，直接丢弃，绝不让其进入有限世界。
+     * Resolve transient UI input items under the current mode: finite modes recover
+     * them into the backpack and drop the overflow at the player, creative discards
+     * these free items so they never reach finite modes.
+     *
+     * @param items input items held by a transient UI (workstation or trade slots)
+     */
+    public void returnUiItems(Item... items) {
+        // Creative UI contents are free items: never return or drop them on close.
+        if (this.isCreative()) {
+            return;
+        }
+        for (Item item : items) {
+            if (item.isNull()) {
+                continue;
+            }
+            Item[] drops = this.inventory.addItem(item);
+            for (Item drop : drops) {
+                if (!this.dropItem(drop)) {
+                    this.level.dropItem(this, drop);
+                }
+            }
+        }
+    }
+
     public boolean isMovementServerAuthoritative() {
         return this.getAuthoritativeMovementMode() != AuthoritativeMovementMode.CLIENT;
     }
@@ -7941,7 +9380,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.server.serverAuthoritativeBlockBreaking && this.isMovementServerAuthoritative();
     }
 
+    /**
+     * Check if server authoritative inventory is enabled for this player
+     * @return true if enabled and protocol supports it
+     */
+    public boolean isInventoryServerAuthoritative() {
+        return this.server.serverAuthoritativeInventory && this.protocol >= ProtocolInfo.v1_16_100;
+    }
+
+    /**
+     * 后端 SAI 丢包门限是否对该玩家生效。WDPE 代理玩家可能被宣告与后端相反的
+     * SAI 标志，故对其禁用门限，按客户端实际包响应。
+     * <p>
+     * Whether the backend's SAI drop-gates apply to this player. WDPE-proxied
+     * players may be advertised the opposite SAI flag, so
+     * bypass the gates and respond to whichever packet path the client uses.
+     */
+    public boolean isInventorySAIGateActive() {
+        if (this.server.useWaterdog && this.loginChainData != null
+                && this.loginChainData.getWaterdogXUID() != null) {
+            return false;
+        }
+        return this.isInventoryServerAuthoritative();
+    }
+
     public boolean isEnableNetworkEncryption() {
+        // NetherNet 会话已由 DTLS 加密，客户端会以明文回应加密握手导致断连，故跳过
+        // NetherNet rides DTLS and a real client answers the handshake in plaintext, so skip it
+        if (this.interfaz instanceof NetherNetInterface) {
+            return false;
+        }
         return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled /*&& loginChainData.isXboxAuthed()*/;
     }
 
@@ -8082,6 +9550,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.slot = this.inventory.getHeldItemIndex();
         pk.item = this.inventory.getItem(pk.slot);
         pk.inventoryId = ContainerIds.INVENTORY;
+        pk.containerNameData = new FullContainerName(ContainerSlotType.HOTBAR, ContainerIds.INVENTORY);
         this.dataPacket(pk);
     }
 
@@ -8216,7 +9685,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public float recalculateMovementSpeedToSend() {
-        float newMovementSpeed = DEFAULT_SPEED;
+        float newMovementSpeed = this.getMovementSpeed();
         for (EntityMovementSpeedModifier modifier : this.getMovementSpeedModifiers().values()) {
             if (modifier.isSend()) {
                 float value = modifier.getValue();
@@ -8307,5 +9776,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         DebugDrawerPacket packet = new DebugDrawerPacket();
         packet.shapes.addAll(entries);
         this.dataPacket(packet);
+    }
+
+    /**
+     * Returns the warden-related warning data for this player.
+     *
+     * @return the warden warning data
+     */
+    public WardenWarningData getWardenWarningData() {
+        return this.wardenWarningData;
+    }
+
+    /**
+     * Emits a movement vibration (STEP/SWIM/ELYTRA_GLIDE) only when the player has entered a new
+     * block since the last emission — matching vanilla's per-block-boundary cadence instead of
+     * firing on every movement packet.
+     */
+    private void tryEmitMovementVibration(VibrationType type) {
+        int fx = this.getFloorX();
+        int fy = this.getFloorY();
+        int fz = this.getFloorZ();
+        if (fx == this.lastMovementVibrationX && fy == this.lastMovementVibrationY && fz == this.lastMovementVibrationZ) {
+            return;
+        }
+        this.lastMovementVibrationX = fx;
+        this.lastMovementVibrationY = fy;
+        this.lastMovementVibrationZ = fz;
+        this.level.getVibrationManager().callVibrationEvent(
+                new VibrationEvent(this, new Vector3(this.x, this.y + this.getEyeHeight(), this.z), type));
     }
 }

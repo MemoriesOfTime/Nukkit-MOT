@@ -21,7 +21,7 @@ import lombok.experimental.Accessors;
 @Header("########################################")
 @Header("Nukkit-MOT Advanced Configuration")
 @Header("Standard settings are in server.properties")
-@Header("https://github.com/MemoriesOfTime/Nukkit-MOT")
+@Header("Documentation: https://www.nukkit-mot.com/docs/user-guide/server-config/nukkit-mot-yml")
 @Header("########################################")
 public class ServerConfig extends OkaeriConfig {
 
@@ -60,4 +60,8 @@ public class ServerConfig extends OkaeriConfig {
     @Comment({"", "NetEase client support settings"})
     @CustomKey("netease-settings")
     private NeteaseSettings neteaseSettings = new NeteaseSettings();
+
+    @Comment({"", "Custom block settings"})
+    @CustomKey("custom-block-settings")
+    private CustomBlockSettings customBlockSettings = new CustomBlockSettings();
 }

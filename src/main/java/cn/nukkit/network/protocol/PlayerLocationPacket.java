@@ -31,8 +31,14 @@ public class PlayerLocationPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.type = Type.values()[this.getLInt()];
-        this.targetEntityId = this.getEntityUniqueId();
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.targetEntityId = this.getEntityUniqueId();
+            this.type = Type.values()[(int) this.getUnsignedVarInt()];
+            this.getVarInt(); // always-zero filler / 始终为 0 的填充字段
+        } else {
+            this.type = Type.values()[this.getLInt()];
+            this.targetEntityId = this.getEntityUniqueId();
+        }
         if (this.type == Type.COORDINATES) {
             this.position = this.getVector3f();
         }
@@ -41,8 +47,14 @@ public class PlayerLocationPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putLInt(this.type.ordinal());
-        this.putEntityUniqueId(this.targetEntityId);
+        if (this.protocol >= ProtocolInfo.v1_26_40) {
+            this.putEntityUniqueId(this.targetEntityId);
+            this.putUnsignedVarInt(this.type.ordinal());
+            this.putVarInt(0); // always-zero filler / 始终为 0 的填充字段
+        } else {
+            this.putLInt(this.type.ordinal());
+            this.putEntityUniqueId(this.targetEntityId);
+        }
         if (this.type == Type.COORDINATES) {
             this.putVector3f(this.position);
         }

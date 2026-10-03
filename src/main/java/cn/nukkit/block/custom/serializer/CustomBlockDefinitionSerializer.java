@@ -2,6 +2,7 @@ package cn.nukkit.block.custom.serializer;
 
 import cn.nukkit.block.custom.serializer.impl.CustomBlockDefinitionSerializer843;
 import cn.nukkit.block.custom.serializer.impl.CustomBlockDefinitionSerializer898;
+import cn.nukkit.block.custom.serializer.impl.CustomBlockDefinitionSerializer975;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
@@ -25,6 +26,9 @@ public class CustomBlockDefinitionSerializer {
     }
 
     public static CompoundTag serialize(CompoundTag nbt, int protocol) {
+        if (protocol >= ProtocolInfo.v1_26_20) {
+            return CustomBlockDefinitionSerializer975.INSTANCE.serialize(nbt.clone());
+        }
         if (protocol >= ProtocolInfo.v1_21_130) {
             return CustomBlockDefinitionSerializer898.INSTANCE.serialize(nbt.clone());
         }

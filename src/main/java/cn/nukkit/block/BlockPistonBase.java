@@ -10,6 +10,8 @@ import cn.nukkit.event.block.BlockPistonEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.vibration.VibrationEvent;
+import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
@@ -130,10 +132,12 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         if (blockEntity instanceof BlockEntityPistonArm arm) {
             boolean powered = this.isPowered();
 
-            if (arm.state % 2 == 0 && arm.powered != powered && this.checkState(powered)) {
-                arm.powered = powered;
-                if (arm.chunk != null) {
-                    arm.chunk.setChanged();
+            if (arm.state % 2 == 0 && arm.powered != powered) {
+                if (this.checkState(powered)) {
+                    arm.powered = powered;
+                    if (arm.chunk != null) {
+                        arm.chunk.setChanged();
+                    }
                 }
             }
         }
@@ -151,6 +155,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             }
 
             this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_PISTON_OUT);
+            this.getLevel().getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0.5, 0.5, 0.5), VibrationType.BLOCK_ACTIVATE));
             return true;
         } else if (!isPowered && isExtended()) {
             if (!this.doMove(false)) {
@@ -158,6 +163,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             }
 
             this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_PISTON_IN);
+            this.getLevel().getVibrationManager().callVibrationEvent(new VibrationEvent(this, this.add(0.5, 0.5, 0.5), VibrationType.BLOCK_DEACTIVATE));
             return true;
         }
 
@@ -201,6 +207,15 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
         List<BlockVector3> attached = Collections.emptyList();
         if (canMove && (this.sticky || extending)) {
+            List<Block> newBlocks = calculator.getBlocksToMove();
+
+            // Validate before any mutation — a mid-loop return false must not leave side effects.
+            for (Block oldBlock : newBlocks) {
+                if (this.level.getBlock(oldBlock.getLocation()).getId() != oldBlock.getId()) {
+                    return false;
+                }
+            }
+
             List<Block> destroyBlocks = calculator.getBlocksToDestroy();
             for (int i = destroyBlocks.size() - 1; i >= 0; --i) {
                 Block block = destroyBlocks.get(i);
@@ -211,14 +226,11 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                 }
             }
 
-            List<Block> newBlocks = calculator.getBlocksToMove();
             attached = newBlocks.stream().map(Vector3::asBlockVector3).collect(Collectors.toList());
             BlockFace side = extending ? direction : direction.getOpposite();
 
             List<CompoundTag> namedTags = new ArrayList<>();
             for (Block oldBlock : newBlocks){
-                if (this.level.getBlock(oldBlock.getLocation()).getId() != oldBlock.getId()) return false; // The delay between the calculation of blocks and move is small, but it is enough to cancel the action.
-
                 CompoundTag tag = null;
                 BlockEntity blockEntity = this.level.getBlockEntity(oldBlock);
                 if (blockEntity != null && !(blockEntity instanceof BlockEntityMovingBlock)) {
@@ -299,6 +311,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         private final Block blockToMove;
         private final BlockFace moveDirection;
         private final boolean extending;
+        private final int pushLimit;
 
         private final List<Block> toMove = new ArrayList<>();
         private final List<Block> toDestroy = new ArrayList<>();
@@ -306,6 +319,8 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         public BlocksCalculator(boolean extending) {
             this.pistonPos = getLocation();
             this.extending = extending;
+            int configuredLimit = level.getServer().getServerConfig().gameFeatureSettings().pistonPushLimit();
+            this.pushLimit = configuredLimit >= 1 && configuredLimit <= 64 ? configuredLimit : 12;
 
             BlockFace face = getBlockFace();
             if (!extending) {
@@ -377,7 +392,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                 return true;
             }
 
-            if (this.toMove.size() >= 12) {
+            if (this.toMove.size() >= this.pushLimit) {
                 return false;
             }
 
@@ -393,16 +408,22 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                     break;
                 }
 
+                if (this.toMove.contains(block)) {
+                    break;
+                }
+
                 if (block.breaksWhenMoved() && block.sticksToPiston()) {
                     this.toDestroy.add(block);
                     break;
                 }
 
-                if (++count + this.toMove.size() > 12) {
+                // The origin is already in toMove; count only new rear blocks.
+                if (this.toMove.size() + sticked.size() >= this.pushLimit) {
                     return false;
                 }
 
                 sticked.add(block);
+                ++count;
             }
 
             int stickedCount = sticked.size();
@@ -444,7 +465,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                     return true;
                 }
 
-                if (this.toMove.size() >= 12) {
+                if (this.toMove.size() >= this.pushLimit) {
                     return false;
                 }
 

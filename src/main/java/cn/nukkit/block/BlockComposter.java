@@ -121,7 +121,7 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
             return false;
         }
 
-        return !this.addItem(item, player, chance);
+        return this.addItem(item, player, chance);
     }
 
     public boolean addItem(@NotNull Item item, Player player, int chance) {
@@ -133,8 +133,10 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
             return false;
         }
 
-        if (player != null &&!player.isCreative()) {
-            item.setCount(item.getCount() - 1);
+        if (player != null) {
+            if (player.isSurvival()) {
+                item.setCount(item.getCount() - 1);
+            }
         }
 
         if (event.isSuccess()) {
@@ -158,7 +160,7 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
     }
 
     public Item empty(Item item, Player player) {
-        if (isEmpty()) {
+        if (!isFull()) {
             return null;
         }
         ComposterEmptyEvent event = new ComposterEmptyEvent(this, player, item, new ItemDye(DyeColor.WHITE), 0);

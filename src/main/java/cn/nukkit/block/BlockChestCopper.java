@@ -2,12 +2,10 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.properties.enums.OxidizationLevel;
-import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
-import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -129,37 +127,13 @@ public class BlockChestCopper extends BlockChest implements Oxidizable, Waxable 
     }
 
     @Override
-    public boolean tryPair() {
-        BlockEntityChest chest = null;
+    protected void onPaired(BlockEntityChest blockEntity, BlockEntityChest pair) {
+        normalizePairedCopperChest(blockEntity, pair);
+    }
 
-        if (!(this.getLevel().getBlockEntity(this) instanceof BlockEntityChest blockEntity)) {
-            return false;
-        }
-
-        for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
-            if ((this.getDamage() == 4 || this.getDamage() == 5) && (side == BlockFace.WEST || side == BlockFace.EAST)) {
-                continue;
-            } else if ((this.getDamage() == 3 || this.getDamage() == 2) && (side == BlockFace.NORTH || side == BlockFace.SOUTH)) {
-                continue;
-            }
-            Block c = this.getSide(side);
-            if (c instanceof BlockChestCopper && c.getDamage() == this.getDamage()) {
-                BlockEntity entity = this.getLevel().getBlockEntity(c);
-                if (entity instanceof BlockEntityChest && !((BlockEntityChest) entity).isPaired()) {
-                    chest = (BlockEntityChest) entity;
-                    break;
-                }
-            }
-        }
-
-        if (chest != null) {
-            chest.pairWith(blockEntity);
-            blockEntity.pairWith(chest);
-            normalizePairedCopperChest(blockEntity, chest);
-            return true;
-        }
-
-        return false;
+    @Override
+    protected boolean canPairWith(BlockChest chest) {
+        return chest instanceof BlockChestCopper;
     }
 
     private void normalizePairedCopperChest(BlockEntityChest first, BlockEntityChest second) {

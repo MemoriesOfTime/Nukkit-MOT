@@ -6,7 +6,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 /**
  * @author Glorydark
  */
-public class ItemHelmetCopper extends StringItemBase {
+public class ItemHelmetCopper extends StringItemArmorBase {
 
     public ItemHelmetCopper() {
         super(COPPER_HELMET, "Copper Helmet");
@@ -21,7 +21,6 @@ public class ItemHelmetCopper extends StringItemBase {
     public int getTier() {
         return ItemArmor.TIER_COPPER;
     }
-
     @Override
     public boolean isHelmet() {
         return true;

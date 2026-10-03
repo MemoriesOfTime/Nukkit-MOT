@@ -193,8 +193,8 @@ public abstract class EntitySwimmingMob extends EntitySwimming implements Entity
 
     @Override
     public boolean isMeetAttackConditions(Vector3 target) {
-        return this.getServer().getMobAiEnabled() &&
-                (!this.isFriendly() || !(target instanceof Player)) &&
-                target instanceof Entity;
+        return target instanceof Entity &&
+                this.getServer().getMobAiEnabled() &&
+                (!this.isFriendly() || !(target instanceof Player));
     }
 }

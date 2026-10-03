@@ -6,7 +6,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 /**
  * @author Glorydark
  */
-public class ItemBootsCopper extends StringItemBase {
+public class ItemBootsCopper extends StringItemArmorBase {
 
     public ItemBootsCopper() {
         super(COPPER_BOOTS, "Copper Boots");

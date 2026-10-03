@@ -48,14 +48,16 @@ public class InventorySlotPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(this.inventoryId);
-        this.putUnsignedVarInt(this.slot);
         if (this.protocol >= ProtocolInfo.v1_26_20_26) {
+            this.putByte((byte) this.inventoryId);
+            this.putUnsignedVarInt(this.slot);
             this.putBoolean(false); // optional full container name present
             this.putBoolean(false); // optional storage item present
         } else {
+            this.putUnsignedVarInt(this.inventoryId);
+            this.putUnsignedVarInt(this.slot);
             if (this.protocol >= ProtocolInfo.v1_21_30) {
-                this.putByte((byte) this.containerNameData.getContainer().getId());
+                this.putByte((byte) this.containerNameData.getContainer().getId(this.gameVersion));
                 this.putOptionalNull(this.containerNameData.getDynamicId(), this::putLInt);
                 if (this.protocol >= ProtocolInfo.v1_21_40) {
                     this.putSlot(gameVersion, this.storageItem);

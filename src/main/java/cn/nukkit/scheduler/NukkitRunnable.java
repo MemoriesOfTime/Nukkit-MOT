@@ -31,12 +31,6 @@ public abstract class NukkitRunnable implements Runnable {
         return taskHandler.getTask();
     }
 
-    public synchronized Runnable runTaskAsynchronously(Plugin plugin, boolean virtual) throws IllegalArgumentException, IllegalStateException {
-        checkState();
-        this.taskHandler = Server.getInstance().getScheduler().scheduleTask(plugin, this, true, virtual);
-        return taskHandler.getTask();
-    }
-
     public synchronized Runnable runTaskLater(Plugin plugin, int delay) throws IllegalArgumentException, IllegalStateException {
         checkState();
         this.taskHandler = Server.getInstance().getScheduler().scheduleDelayedTask(plugin, this, delay);
@@ -49,12 +43,6 @@ public abstract class NukkitRunnable implements Runnable {
         return taskHandler.getTask();
     }
 
-    public synchronized Runnable runTaskLaterAsynchronously(Plugin plugin, int delay, boolean virtual) throws IllegalArgumentException, IllegalStateException {
-        checkState();
-        this.taskHandler = Server.getInstance().getScheduler().scheduleDelayedTask(plugin, this, delay, true, virtual);
-        return taskHandler.getTask();
-    }
-
     public synchronized Runnable runTaskTimer(Plugin plugin, int delay, int period) throws IllegalArgumentException, IllegalStateException {
         checkState();
         this.taskHandler = Server.getInstance().getScheduler().scheduleDelayedRepeatingTask(plugin, this, delay, period);
@@ -64,12 +52,6 @@ public abstract class NukkitRunnable implements Runnable {
     public synchronized Runnable runTaskTimerAsynchronously(Plugin plugin, int delay, int period) throws IllegalArgumentException, IllegalStateException {
         checkState();
         this.taskHandler = Server.getInstance().getScheduler().scheduleDelayedRepeatingTask(plugin, this, delay, period, true);
-        return taskHandler.getTask();
-    }
-
-    public synchronized Runnable runTaskTimerAsynchronously(Plugin plugin, int delay, int period, boolean virtual) throws IllegalArgumentException, IllegalStateException {
-        checkState();
-        this.taskHandler = Server.getInstance().getScheduler().scheduleDelayedRepeatingTask(plugin, this, delay, period, true, virtual);
         return taskHandler.getTask();
     }
 

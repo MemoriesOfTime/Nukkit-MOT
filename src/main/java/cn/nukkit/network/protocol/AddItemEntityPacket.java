@@ -40,11 +40,17 @@ public class AddItemEntityPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putEntityUniqueId(this.entityUniqueId);
-        this.putEntityRuntimeId(this.entityRuntimeId);
+        if (protocol < ProtocolInfo.v1_2_0) {
+            this.putEntityUniqueId(this.entityRuntimeId);
+        } else {
+            this.putEntityRuntimeId(this.entityRuntimeId);
+        }
         this.putSlot(gameVersion, this.item);
         this.putVector3f(this.x, this.y, this.z);
         this.putVector3f(this.speedX, this.speedY, this.speedZ);
-        this.put(Binary.writeMetadata(gameVersion, metadata));
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.put(Binary.writeMetadata(gameVersion, metadata));
+        }
         if (protocol >= 223) {
             this.putBoolean(this.isFromFishing);
         }

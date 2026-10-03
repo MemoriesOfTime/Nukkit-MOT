@@ -95,6 +95,11 @@ public enum ContainerSlotType {
     }
 
     public int getId(GameVersion gameVersion) {
+        // 网易客户端在标准枚举索引 17 (RECIPE_ITEMS) 处插入了一个额外的
+        // RECIPE_CUSTOM 枚举值，因此所有标准索引 >= 17 的槽位类型在线路上都需要 +1。
+        if (gameVersion.isNetEase() && this.id >= RECIPE_ITEMS.id) {
+            return this.id + 1;
+        }
         int protocol = gameVersion.getProtocol();
         if (protocol >= ProtocolInfo.v1_21_20) {
             return this.id;
@@ -128,6 +133,15 @@ public enum ContainerSlotType {
     }
 
     public static ContainerSlotType fromId(int id, GameVersion gameVersion) {
+        // 网易客户端在线路索引 17 处发送 RECIPE_CUSTOM（标准枚举不存在该值，按未知处理），
+        // 且所有标准索引 >= 17 的槽位类型在线路上都比标准多 1，因此 id >= 18 需 -1 还原。
+        if (gameVersion.isNetEase()) {
+            if (id == RECIPE_ITEMS.id) {
+                // Wire byte 17 is the NetEase-only RECIPE_CUSTOM.
+                return null;
+            }
+            return fromId(id > RECIPE_ITEMS.id ? id - 1 : id);
+        }
         int protocol = gameVersion.getProtocol();
         if (protocol >= ProtocolInfo.v1_21_20) {
             return fromId(id);

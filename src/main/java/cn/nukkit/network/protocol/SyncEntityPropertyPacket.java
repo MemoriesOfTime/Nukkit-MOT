@@ -35,7 +35,8 @@ public class SyncEntityPropertyPacket extends DataPacket {
     public void encode(){
         this.reset();
         try {
-            this.put(NBTIO.write(data, ByteOrder.BIG_ENDIAN, true));
+            // network NBT uses the little-endian variant (zigzag varint int/long); never big-endian
+            this.put(NBTIO.write(data, ByteOrder.LITTLE_ENDIAN, true));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

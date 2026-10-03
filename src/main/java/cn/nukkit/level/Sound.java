@@ -1,5 +1,9 @@
 package cn.nukkit.level;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+
+import java.util.Map;
+
 /**
  * @author CreeperFace
  */
@@ -1260,6 +1264,18 @@ public enum Sound {
     USE_WOOD("use.wood"),
     VR_STUTTERTURN("vr.stutterturn");
 
+    private static final Map<String, Sound> BY_SOUND_NAME = new Object2ObjectOpenHashMap<>();
+
+    static {
+        for (Sound sound : values()) {
+            Sound previous = BY_SOUND_NAME.put(sound.sound, sound);
+            if (previous != null) {
+                throw new IllegalStateException("Duplicate sound definition name: " + sound.sound
+                        + " (" + previous.name() + " vs " + sound.name() + ")");
+            }
+        }
+    }
+
     private final String sound;
 
     Sound(String sound) {
@@ -1268,5 +1284,18 @@ public enum Sound {
 
     public String getSound() {
         return this.sound;
+    }
+
+    /**
+     * 按声音定义名（如 "note.harp"）解析枚举，区别于按 Java 枚举常量名解析的 {@link #valueOf(String)}。
+     * <p>
+     * Resolves the enum by its sound definition name (e.g. "note.harp"),
+     * unlike {@link #valueOf(String)} which matches the Java enum constant name.
+     *
+     * @param name sound definition name
+     * @return the matching sound, or {@code null} if not found
+     */
+    public static Sound fromName(String name) {
+        return name == null ? null : BY_SOUND_NAME.get(name);
     }
 }

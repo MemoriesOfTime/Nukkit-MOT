@@ -14,6 +14,7 @@ public interface BlockContainer {
         return 0;
     }
 
+    @Deprecated
     default int getRuntimeId() {
         Server.mvw("BlockContainer#getRuntimeId()");
         return getRuntimeId(GameVersion.getLastVersion());

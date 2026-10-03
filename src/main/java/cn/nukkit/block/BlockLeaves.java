@@ -10,10 +10,10 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
-import cn.nukkit.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author Angelic47
@@ -107,21 +107,48 @@ public class BlockLeaves extends BlockTransparentMeta {
             if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
                 return new Item[]{this.toItem()};
             }
-            if (this.canDropApple() && Utils.random.nextInt(200) == 0) {
+            int fortune = item.getEnchantmentLevel(Enchantment.ID_FORTUNE_DIGGING);
+            ThreadLocalRandom random = ThreadLocalRandom.current();
+            int appleOdds;
+            int stickOdds;
+            int saplingOdds;
+            boolean isJungle = (this.getDamage() & 0x03) == JUNGLE;
+            switch (fortune) {
+                case 0 -> {
+                    appleOdds = 200;
+                    stickOdds = 50;
+                    saplingOdds = isJungle ? 40 : 20;
+                }
+                case 1 -> {
+                    appleOdds = 180;
+                    stickOdds = 45;
+                    saplingOdds = isJungle ? 36 : 16;
+                }
+                case 2 -> {
+                    appleOdds = 160;
+                    stickOdds = 40;
+                    saplingOdds = isJungle ? 32 : 12;
+                }
+                default -> {
+                    appleOdds = 120;
+                    stickOdds = 30;
+                    saplingOdds = isJungle ? 24 : 10;
+                }
+            }
+            if (this.canDropApple() && random.nextInt(appleOdds) == 0) {
                 return new Item[]{
                         Item.get(Item.APPLE)
                 };
             }
-            if (Utils.random.nextInt(20) == 0) {
-                if (Utils.random.nextBoolean()) {
-                    return new Item[]{
-                            Item.get(Item.STICK, 0, Utils.random.nextInt(1, 2))
-                    };
-                } else if ((this.getDamage() & 0x03) != JUNGLE || Utils.random.nextInt(20) == 0) {
-                    return new Item[]{
-                            this.getSapling()
-                    };
-                }
+            if (random.nextInt(stickOdds) == 0) {
+                return new Item[]{
+                        Item.get(Item.STICK, 0, random.nextInt(1, 3))
+                };
+            }
+            if (random.nextInt(saplingOdds) == 0) {
+                return new Item[]{
+                        this.getSapling()
+                };
             }
         }
         return Item.EMPTY_ARRAY;

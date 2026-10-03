@@ -2,6 +2,7 @@ package cn.nukkit.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.*;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
@@ -79,6 +80,11 @@ public class ItemFlintSteel extends ItemTool {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean useOn(Entity entity) {
+        return super.useOn((Entity) null);
     }
 
     @Override

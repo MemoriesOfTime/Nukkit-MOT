@@ -28,12 +28,12 @@ public class MobArmorEquipmentPacket extends DataPacket {
     public void decode() {
         this.eid = this.getEntityRuntimeId();
         this.slots = new Item[4];
-        this.slots[0] = this.getSlot(this.gameVersion);
-        this.slots[1] = this.getSlot(this.gameVersion);
-        this.slots[2] = this.getSlot(this.gameVersion);
-        this.slots[3] = this.getSlot(this.gameVersion);
+        this.slots[0] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
+        this.slots[1] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
+        this.slots[2] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
+        this.slots[3] = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
         if (this.protocol >= ProtocolInfo.v1_21_20) {
-            this.body = this.getSlot(this.gameVersion);
+            this.body = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
         }
     }
 
@@ -41,12 +41,23 @@ public class MobArmorEquipmentPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putEntityRuntimeId(this.eid);
-        this.putSlot(this.gameVersion, this.slots[0]);
-        this.putSlot(this.gameVersion, this.slots[1]);
-        this.putSlot(this.gameVersion, this.slots[2]);
-        this.putSlot(this.gameVersion, this.slots[3]);
+        if (this.protocol >= ProtocolInfo.v1_26_30) {
+            this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[0]);
+            this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[1]);
+            this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[2]);
+            this.putNetworkItemStackDescriptor(this.gameVersion, this.slots[3]);
+        } else {
+            this.putSlot(this.gameVersion, this.slots[0]);
+            this.putSlot(this.gameVersion, this.slots[1]);
+            this.putSlot(this.gameVersion, this.slots[2]);
+            this.putSlot(this.gameVersion, this.slots[3]);
+        }
         if (this.protocol >= ProtocolInfo.v1_21_20) {
-            this.putSlot(this.gameVersion, this.body);
+            if (this.protocol >= ProtocolInfo.v1_26_30) {
+                this.putNetworkItemStackDescriptor(this.gameVersion, this.body);
+            } else {
+                this.putSlot(this.gameVersion, this.body);
+            }
         }
     }
 }

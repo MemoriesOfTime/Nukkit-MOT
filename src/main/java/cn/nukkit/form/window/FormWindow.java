@@ -24,6 +24,7 @@ public abstract class FormWindow {
     protected transient boolean closed = false;
     protected final transient List<FormResponseHandler> handlers = new ObjectArrayList<>();
 
+    @Deprecated
     public String getJSONData() {
         Server.mvw("FormWindow#getJSONData()");
         return this.getJSONData(GameVersion.getLastVersion());

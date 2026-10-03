@@ -25,4 +25,9 @@ public abstract class ItemCustomProjectile extends StringItemProjectileBase impl
     public String getTextureName() {
         return textureName;
     }
+
+    @Override
+    public boolean canBePutInOffhandSlot() {
+        return CustomItem.isAllowedInOffHand(this);
+    }
 }

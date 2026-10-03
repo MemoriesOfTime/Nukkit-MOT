@@ -83,22 +83,24 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
         this.setDamage(new int[] { 0, 2, 3, 4 });
 
-        if (this.namedTag.contains("Armor") && this.namedTag.get("Armor") instanceof ListTag) {
+        if (this.namedTag.get("Armor") instanceof ListTag) {
             ListTag<CompoundTag> listTag = this.namedTag.getList("Armor", CompoundTag.class);
             Item[] loadedArmor = new Item[4];
-            int count = 0;
+            int index = 0;
+            int discarded = 0;
             for (CompoundTag item : listTag.getAll()) {
-                int slot = item.getByte("Slot");
-                if (slot < 0 || slot > 3) {
-                    this.server.getLogger().error("Failed to load zombie armor: Invalid slot: " + slot);
-                    break;
-                }
-                if (slot < count) {
-                    this.server.getLogger().error("Failed to load zombie armor: Duplicated slot: " + slot);
-                    break;
+                // Older worlds store armor in list order without an explicit Slot tag.
+                int slot = item.contains("Slot") ? item.getByte("Slot") : index;
+                index++;
+                if (slot < 0 || slot >= loadedArmor.length || loadedArmor[slot] != null) {
+                    discarded++;
+                    continue;
                 }
                 loadedArmor[slot] = NBTIO.getItemHelper(item);
-                count++;
+            }
+            if (discarded > 0) {
+                this.server.getLogger().warning("Skipped " + discarded
+                        + " zombie armor entries with invalid or duplicate slots; valid entries retained");
             }
             for (int i = 0; i < 4; i++) {
                 if (loadedArmor[i] == null) {
@@ -155,9 +157,7 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
         }
 
         if (!this.closed && level.shouldMobBurn(this)) {
-            if (this.armor[0] == null) {
-                this.setOnFire(100);
-            } else if (this.armor[0].getId() == 0) {
+            if (this.armor == null || this.armor[0] == null || this.armor[0].getId() == 0) {
                 this.setOnFire(100);
             }
         }

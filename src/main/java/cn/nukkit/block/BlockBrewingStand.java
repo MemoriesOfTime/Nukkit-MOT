@@ -126,7 +126,7 @@ public class BlockBrewingStand extends BlockTransparentMeta implements BlockEnti
                 }
             }
 
-            if (brewing.namedTag.contains("Lock") && brewing.namedTag.get("Lock") instanceof StringTag) {
+            if (brewing.namedTag.get("Lock") instanceof StringTag) {
                 if (!brewing.namedTag.getString("Lock").equals(item.getCustomName())) {
                     return false;
                 }

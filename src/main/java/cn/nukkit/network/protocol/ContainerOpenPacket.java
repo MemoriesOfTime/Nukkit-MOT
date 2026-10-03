@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.math.BlockVector3;
 import lombok.ToString;
 
@@ -35,6 +36,9 @@ public class ContainerOpenPacket extends DataPacket {
         this.y = v.y;
         this.z = v.z;
         this.entityId = this.getEntityUniqueId();
+        if (this.gameVersion.isNetEase() && this.gameVersion.getProtocol() >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+            this.getBoolean(); //mIsIgnoreBlock
+        }
     }
 
     @Override
@@ -44,5 +48,8 @@ public class ContainerOpenPacket extends DataPacket {
         this.putByte((byte) this.type);
         this.putBlockVector3(this.x, this.y, this.z);
         this.putEntityUniqueId(this.entityId);
+        if (this.gameVersion.isNetEase() && this.gameVersion.getProtocol() >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+            this.putBoolean(false); //mIsIgnoreBlock
+        }
     }
 }

@@ -13,15 +13,25 @@ import cn.nukkit.network.protocol.types.AuthoritativeMovementMode;
 import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Binary;
+import cn.nukkit.utils.NbtMapDeserializer;
 import cn.nukkit.utils.Utils;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
+import lombok.Value;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.nbt.NbtMap;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.lang.reflect.Type;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Log4j2
@@ -38,8 +48,34 @@ public class StartGamePacket extends DataPacket {
 
     private static final byte[] EMPTY_UUID;
 
+    /**
+     * v2192 起 vanilla 数据驱动方块属性需随 StartGame 下发（block_properties_2193.json，2192 预览与 2193 正式共用）。
+     * <p>
+     * Since v2192 the vanilla data-driven block properties must be sent in StartGame (block_properties_2193.json,
+     * shared by the 2192 preview and the 2193 stable release).
+     * <p>
+     * Adapted from NukkitPetteriM1Edition (<a href="https://github.com/PetteriM1/NukkitPetteriM1Edition">Nukkit PM1E</a>)
+     */
+    private static final List<BlockPropertyData> vanillaBlockProperties;
+
+    @Value
+    private static class BlockPropertyData {
+        String name;
+        NbtMap properties;
+    }
+
     static {
         EMPTY_UUID = Binary.writeUUID(new UUID(0, 0));
+        try (Reader reader = new InputStreamReader(Objects.requireNonNull(
+                StartGamePacket.class.getClassLoader().getResourceAsStream("block_properties_2193.json")), StandardCharsets.UTF_8)) {
+            Type type = new TypeToken<List<BlockPropertyData>>() {}.getType();
+            vanillaBlockProperties = new GsonBuilder()
+                    .registerTypeAdapter(NbtMap.class, new NbtMapDeserializer())
+                    .create()
+                    .fromJson(reader, type);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -123,6 +159,11 @@ public class StartGamePacket extends DataPacket {
     public AuthoritativeMovementMode authoritativeMovementMode;
     public int rewindHistorySize;
     public boolean isServerAuthoritativeBlockBreaking;
+    /**
+     * Server authoritative inventory mode
+     * @since v1.16.100 (protocol 407+)
+     */
+    public boolean isInventoryServerAuthoritative;
     public long currentTick;
     public int enchantmentSeed;
     public Collection<CustomBlockDefinition> blockDefinitions = CustomBlockManager.get().getBlockDefinitions();
@@ -188,6 +229,18 @@ public class StartGamePacket extends DataPacket {
      */
     @SuppressWarnings("dep-ann")
     public boolean tickDeathSystemsEnabled;
+    /**
+     * @since v1001
+     */
+    public int serverEditorConnectionPolicy;
+    /**
+     * @since v1001
+     */
+    public boolean allowAnonymousBlockDropsInEditorWorlds;
+    /**
+     * @since v1001
+     */
+    public boolean loggingChat;
 
     @Override
     public void decode() {
@@ -201,6 +254,11 @@ public class StartGamePacket extends DataPacket {
         }
 
         this.reset();
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.encodeLegacyStartGame();
+            return;
+        }
+
         this.putEntityUniqueId(this.entityUniqueId);
         this.putEntityRuntimeId(this.entityRuntimeId);
         this.putVarInt(this.playerGamemode);
@@ -236,7 +294,11 @@ public class StartGamePacket extends DataPacket {
         }
         this.putVarInt(this.dayCycleStopTime);
         if (protocol >= 388) {
-            this.putVarInt(this.eduEditionOffer);
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                this.putUnsignedVarInt(this.eduEditionOffer);
+            } else {
+                this.putVarInt(this.eduEditionOffer);
+            }
         } else {
             this.putBoolean(this.eduMode);
         }
@@ -285,7 +347,11 @@ public class StartGamePacket extends DataPacket {
             if (protocol < 332) {
                 this.putBoolean(this.trustPlayers);
             }
-            this.putVarInt(this.permissionLevel);
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                this.putByte((byte) this.permissionLevel);
+            } else {
+                this.putVarInt(this.permissionLevel);
+            }
             if (protocol < 332) {
                 this.putVarInt(this.gamePublish);
             }
@@ -345,6 +411,10 @@ public class StartGamePacket extends DataPacket {
                 }
             }
         }
+        if (protocol >= ProtocolInfo.v1_26_30) {
+            this.putVarInt(this.serverEditorConnectionPolicy);
+            this.putBoolean(this.allowAnonymousBlockDropsInEditorWorlds);
+        }
         /* Level settings end */
 
         this.putString(this.levelId);
@@ -371,7 +441,27 @@ public class StartGamePacket extends DataPacket {
             this.putVarInt(this.enchantmentSeed);
         }
         if (protocol > ProtocolInfo.v1_5_0) {
-            if (protocol >= ProtocolInfo.v1_16_100) {
+            if (protocol >= ProtocolInfo.v1_26_50_27) {
+                // v2192 起 vanilla 数据驱动方块属性与自定义方块合并在同一列表下发
+                // Since v2192 vanilla data-driven block properties and custom blocks share one list
+                boolean hasCustomBlocks = this.blockDefinitions != null && !this.blockDefinitions.isEmpty();
+                this.putUnsignedVarInt(vanillaBlockProperties.size() + (hasCustomBlocks ? this.blockDefinitions.size() : 0));
+                for (BlockPropertyData data : vanillaBlockProperties) {
+                    this.putString(data.name);
+                    this.putNbtTag(data.properties);
+                }
+                if (hasCustomBlocks) {
+                    for (CustomBlockDefinition definition : this.blockDefinitions) {
+                        this.putString(definition.identifier());
+                        try {
+                            CompoundTag serializedNbt = CustomBlockDefinitionSerializer.serialize(definition.nbt(), protocol);
+                            this.put(NBTIO.write(serializedNbt, ByteOrder.LITTLE_ENDIAN, true));
+                        } catch (Exception e) {
+                            log.error("Error while encoding NBT data of CustomBlockDefinition", e);
+                        }
+                    }
+                }
+            } else if (protocol >= ProtocolInfo.v1_16_100) {
                 if (this.blockDefinitions != null && !this.blockDefinitions.isEmpty()) {
                     this.putUnsignedVarInt(this.blockDefinitions.size());
                     for (CustomBlockDefinition definition : this.blockDefinitions) {
@@ -396,7 +486,7 @@ public class StartGamePacket extends DataPacket {
             if (protocol == 354 && version != null && version.startsWith("1.11.4")) {
                 this.putBoolean(this.isOnlySpawningV1Villagers);
             } else if (protocol >= ProtocolInfo.v1_16_0) {
-                this.putBoolean(false); // isInventoryServerAuthoritative
+                this.putBoolean(protocol >= ProtocolInfo.v1_16_100 && this.isInventoryServerAuthoritative);
                 if (protocol >= ProtocolInfo.v1_16_230_50) {
                     this.putString(""); // serverEngine
                     if (protocol >= ProtocolInfo.v1_18_0) {
@@ -420,6 +510,9 @@ public class StartGamePacket extends DataPacket {
                                             this.putBoolean(this.tickDeathSystemsEnabled);
                                         }
                                         this.putBoolean(this.networkPermissions.isServerAuthSounds());
+                                        if (protocol >= ProtocolInfo.v1_26_30 && protocol < ProtocolInfo.v1_26_40) {
+                                            this.putBoolean(this.loggingChat);
+                                        }
                                         if (protocol >= ProtocolInfo.v1_26_0) {
                                             // v924: Server telemetry data
                                             this.putBoolean(false); // containServerJoinInformation
@@ -436,6 +529,32 @@ public class StartGamePacket extends DataPacket {
                 }
             }
         }
+    }
+
+    private void encodeLegacyStartGame() {
+        this.putEntityUniqueId(this.entityUniqueId);
+        this.putEntityRuntimeId(this.entityRuntimeId);
+        this.putVarInt(this.playerGamemode);
+        this.putVector3f(this.x, this.y, this.z);
+        this.putLFloat(this.pitch);
+        this.putLFloat(this.yaw);
+        this.putVarInt(this.seed);
+        this.putVarInt(this.dimension);
+        this.putVarInt(this.generator);
+        this.putVarInt(this.worldGamemode);
+        this.putVarInt(this.difficulty);
+        this.putBlockVector3(this.spawnX, this.spawnY, this.spawnZ);
+        this.putBoolean(this.hasAchievementsDisabled);
+        this.putVarInt(this.dayCycleStopTime);
+        this.putBoolean(this.eduMode);
+        this.putLFloat(this.rainLevel);
+        this.putLFloat(this.lightningLevel);
+        this.putBoolean(this.commandsEnabled);
+        this.putBoolean(this.isTexturePacksRequired);
+        this.putGameRules(this.gameVersion, this.gameRules, true);
+        this.putString(this.levelId);
+        this.putString(this.worldName);
+        this.putString(this.premiumWorldTemplateId);
     }
 
     @SuppressWarnings("unused")

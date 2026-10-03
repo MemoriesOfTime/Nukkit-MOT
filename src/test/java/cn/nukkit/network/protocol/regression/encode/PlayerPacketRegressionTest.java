@@ -8,11 +8,14 @@ import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
+import cn.nukkit.utils.BinaryStream;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.awt.*;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -46,6 +49,39 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersionsRange(291, 553);
     }
 
+    @ParameterizedTest(name = "PlayerListPacket ADD v{0}")
+    @MethodSource("versionsFrom313")
+    void testPlayerListPacketAdd(int protocolVersion) {
+        var nukkitPacket = new PlayerListPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
+        nukkitPacket.type = PlayerListPacket.TYPE_ADD;
+        nukkitPacket.entries = new PlayerListPacket.Entry[]{
+                new PlayerListPacket.Entry(
+                        UUID.fromString("12345678-1234-1234-1234-123456789abc"),
+                        42,
+                        "TestPlayer",
+                        createMinimalSkin(),
+                        "xuid",
+                        Color.WHITE
+                )
+        };
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket.class);
+
+        // v2168 made action per-entry; packet-level action is no longer set by the codec
+        if (protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket.Action.ADD, cbPacket.getAction());
+        } else {
+            assertEquals(org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket.Action.ADD, cbPacket.getEntries().get(0).getAction());
+        }
+        assertEquals(1, cbPacket.getEntries().size());
+        assertEquals("TestPlayer", cbPacket.getEntries().get(0).getName());
+        assertEquals(42, cbPacket.getEntries().get(0).getEntityId());
+    }
+
     @ParameterizedTest(name = "PlayerListPacket REMOVE v{0}")
     @MethodSource("versionsFrom313")
     void testPlayerListPacketRemove(int protocolVersion) {
@@ -61,8 +97,58 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket.class);
 
-        assertEquals(org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket.Action.REMOVE, cbPacket.getAction());
+        // v2168 made action per-entry; packet-level action is no longer set by the codec
+        if (protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40) {
+            assertEquals(org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket.Action.REMOVE, cbPacket.getAction());
+        } else {
+            assertEquals(org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket.Action.REMOVE, cbPacket.getEntries().get(0).getAction());
+        }
         assertEquals(1, cbPacket.getEntries().size());
+    }
+
+    @Test
+    void testPlayerListPacketAddPre223DoesNotWriteUuid() {
+        var nukkitPacket = new PlayerListPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_2_10;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_2_10, false);
+        nukkitPacket.type = PlayerListPacket.TYPE_ADD;
+        nukkitPacket.entries = new PlayerListPacket.Entry[]{
+                new PlayerListPacket.Entry(
+                        UUID.fromString("12345678-1234-1234-1234-123456789abc"),
+                        42,
+                        "TestPlayer",
+                        createMinimalSkin(),
+                        "xuid"
+                )
+        };
+        nukkitPacket.encode();
+
+        BinaryStream stream = new BinaryStream(nukkitPacket.getBuffer());
+        stream.getByte(); // packet id
+        stream.getShort(); // sender sub-client id + target sub-client id
+        assertEquals(PlayerListPacket.TYPE_ADD, stream.getByte());
+        assertEquals(1, stream.getUnsignedVarInt());
+        assertEquals(42, stream.getVarLong());
+        assertEquals("TestPlayer", stream.getString());
+    }
+
+    @Test
+    void testPlayerListPacketRemovePre223DoesNotWriteUuid() {
+        var nukkitPacket = new PlayerListPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_2_10;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_2_10, false);
+        nukkitPacket.type = PlayerListPacket.TYPE_REMOVE;
+        nukkitPacket.entries = new PlayerListPacket.Entry[]{
+                new PlayerListPacket.Entry(UUID.fromString("12345678-1234-1234-1234-123456789abc"))
+        };
+        nukkitPacket.encode();
+
+        BinaryStream stream = new BinaryStream(nukkitPacket.getBuffer());
+        stream.getByte(); // packet id
+        stream.getShort(); // sender sub-client id + target sub-client id
+        assertEquals(PlayerListPacket.TYPE_REMOVE, stream.getByte());
+        assertEquals(1, stream.getUnsignedVarInt());
+        assertEquals(0, stream.readableBytes());
     }
 
     // ==================== CorrectPlayerMovePredictionPacket ====================
@@ -105,6 +191,8 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.setTick(12345L);
         nukkitPacket.setPredictionType(CorrectPlayerMovePredictionPacket.PredictionType.VEHICLE);
         nukkitPacket.setVehicleRotation(new Vector2f(90.0f, 45.0f));
+        // non-null value: endianness of the optional float is invisible when it is never written
+        nukkitPacket.setVehicleAngularVelocity(1.5f);
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -114,6 +202,9 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(100.5f, cbPacket.getPosition().getX(), 0.001f);
         assertEquals(90.0f, cbPacket.getVehicleRotation().getX(), 0.001f);
         assertEquals(45.0f, cbPacket.getVehicleRotation().getY(), 0.001f);
+        if (protocolVersion >= ProtocolInfo.v1_21_20) {
+            assertEquals(1.5f, cbPacket.getVehicleAngularVelocity(), 0.001f);
+        }
     }
 
     // ==================== PlayerEnchantOptionsPacket ====================
@@ -156,6 +247,13 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
     @ParameterizedTest(name = "AddPlayerPacket v{0}")
     @MethodSource("versionsFrom291")
     void testAddPlayerPacket(int protocolVersion) {
+        // CB v2168 codec still uses the v534 PlayerAbilities helper which cannot parse
+        // the expanded ability flag set encoded by Nukkit-MOT for v2168. Skip cross-decode
+        // until the upstream reference codec is updated.
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_40,
+                "CB v2168 codec PlayerAbilities helper is WIP");
+
         var nukkitPacket = new AddPlayerPacket();
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
@@ -223,5 +321,17 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
 
         assertEquals("newSkin", cbPacket.getNewSkinName());
         assertEquals("oldSkin", cbPacket.getOldSkinName());
+    }
+
+    private static Skin createMinimalSkin() {
+        var skin = new Skin();
+        skin.setSkinId("test_skin_id");
+        skin.setSkinData(new byte[64 * 32 * 4]);
+        skin.setCapeData(new byte[0]);
+        skin.setGeometryName("geometry.humanoid.custom");
+        skin.setGeometryData(Skin.STEVE_GEOMETRY);
+        skin.setSkinResourcePatch("{\"geometry\":{\"default\":\"geometry.humanoid.custom\"}}");
+        skin.setTrusted(true);
+        return skin;
     }
 }

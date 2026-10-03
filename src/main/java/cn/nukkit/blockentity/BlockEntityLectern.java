@@ -69,7 +69,7 @@ public class BlockEntityLectern extends BlockEntitySpawnable {
     }
 
     public boolean hasBook() {
-        return this.namedTag.contains("book") && this.namedTag.get("book") instanceof CompoundTag;
+        return this.namedTag.get("book") instanceof CompoundTag;
     }
 
     public Item getBook() {
