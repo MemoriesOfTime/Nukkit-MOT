@@ -5,6 +5,7 @@ import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.network.CompressionProvider;
+import cn.nukkit.network.NetEaseZlibStreamCompression;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.protocol.BatchPacket;
@@ -17,6 +18,8 @@ import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.SnappyCompression;
+import cn.nukkit.utils.Zlib;
 import com.google.common.base.Preconditions;
 import com.nukkitx.natives.sha256.Sha256;
 import com.nukkitx.natives.util.Natives;
@@ -37,6 +40,7 @@ import org.cloudburstmc.netty.handler.codec.raknet.common.RakSessionCodec;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -402,7 +406,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                         toBatch.clear();
                     }
 
-                    this.sendPacket(((BatchPacket) packet).payload);
+                    this.sendBatchPacket((BatchPacket) packet);
                 } else {
                     toBatch.add(packet);
                 }
@@ -518,6 +522,34 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         }
 
         return this.channel.writeAndFlush(finalPayload);
+    }
+
+    private void sendBatchPacket(BatchPacket batch) {
+        byte[] payload = batch.payload;
+        if (!(this.compressionOut instanceof NetEaseZlibStreamCompression)) {
+            this.sendPacket(payload);
+            return;
+        }
+        try {
+            byte[] plaintext = inflateStandaloneBatch(payload);
+            byte[] compressed = this.compressionOut.compress(new BinaryStream(plaintext),
+                    Server.getInstance().networkCompressionLevel);
+            this.sendPacket(compressed);
+        } catch (Exception e) {
+            log.error("Unable to send cached batch through zlibstream for {}", playerLabel(), e);
+        }
+    }
+
+    private static byte[] inflateStandaloneBatch(byte[] payload) throws IOException {
+        try {
+            return Zlib.inflateRaw(payload, 64 * 1024 * 1024);
+        } catch (IOException ignored) {
+        }
+        try {
+            return Zlib.inflate(payload, 64 * 1024 * 1024);
+        } catch (IOException ignored) {
+        }
+        return SnappyCompression.decompress(payload, 64 * 1024 * 1024);
     }
 
     @Override
@@ -676,7 +708,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         int protocol = this.getBedrockProtocol();
         return this.state.getSecurity().isCompressionInitialized()
                 && protocol != Integer.MAX_VALUE
-                && protocol >= ProtocolInfo.v1_20_60;
+                && protocol >= ProtocolInfo.v1_20_60
+                && !(this.compressionOut instanceof NetEaseZlibStreamCompression);
     }
 
     private boolean shouldUsePrefixedCompressionAfterNegotiation() {
