@@ -1559,6 +1559,37 @@ public class Server {
         return this.commandMap.dispatch(sender, commandLine);
     }
 
+    /**
+     * 同 dispatchCommand，但转投主线程时阻塞等待真实结果——fire-and-forget 会把以返回值计 success 的调用方（/execute、命令方块）抹平为恒成功。
+     * <p>
+     * Like dispatchCommand, but waits (bounded) for the real outcome when routed to the primary thread, for callers that count success from the return value.
+     */
+    public boolean dispatchCommandAndWait(CommandSender sender, String commandLine, long timeoutMillis) throws ServerException {
+        if (!this.parallelLevelTick || this.isPrimaryThread() || !isPrimaryThreadCommand(commandLine)) {
+            return dispatchCommand(sender, commandLine);
+        }
+        CompletableFuture<Boolean> result = new CompletableFuture<>();
+        this.scheduler.scheduleTask(InternalPlugin.INSTANCE, () -> {
+            try {
+                result.complete(this.commandMap.dispatch(sender, commandLine));
+            } catch (Exception e) {
+                log.error("Failed to dispatch primary-thread command: " + commandLine, e);
+                result.complete(false);
+            }
+        });
+        try {
+            return result.get(timeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (TimeoutException e) {
+            log.warn("Timed out waiting for the primary-thread dispatch of '" + commandLine + "'; reporting failure");
+            return false;
+        } catch (ExecutionException e) {
+            return false;
+        }
+    }
+
     private boolean isPrimaryThreadCommand(String commandLine) {
         String name = commandLine == null ? "" : commandLine.trim();
         if (name.startsWith("/")) {
@@ -2100,13 +2131,23 @@ public class Server {
         if (this.autoSave) {
             for (Player player : new ArrayList<>(this.players.values())) {
                 if (player.isOnline()) {
-                    // 快照须在世界线程上生成
+                    // 快照须在世界线程上生成；登录序列未收尾的玩家仍由主线程驱动（与包路由同守卫），在主线程内联存档
+                    // Snapshot on the level thread; a login-unfinished player is still primary-thread-driven (packet-routing guard), so save inline there
                     Level playerLevel = player.getLevel();
-                    if (playerLevel != null && playerLevel.isParallelTickEnabled()) {
+                    if (playerLevel != null && playerLevel.isParallelTickEnabled() && player.isSpawnInitCompleted()) {
                         playerLevel.scheduleSyncTask(() -> {
-                            // 投递后玩家可能已断线或已切世界
-                            if (player.isOnline() && player.getLevel() == playerLevel) {
+                            if (!player.isOnline()) {
+                                return;
+                            }
+                            Level current = player.getLevel();
+                            if (current == playerLevel) {
                                 player.save(true);
+                            } else if (current != null) {
+                                current.scheduleSyncTask(() -> {
+                                    if (player.isOnline()) {
+                                        player.save(true);
+                                    }
+                                });
                             }
                         });
                     } else {

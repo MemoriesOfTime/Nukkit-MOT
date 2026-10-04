@@ -73,7 +73,7 @@ public class ShapelessRecipe implements CraftingRecipe {
         }
 
         this.ingredientsAggregate.sort(CraftingManager.recipeComparator);
-        this.networkId = networkId != null ? networkId : ++CraftingManager.NEXT_NETWORK_ID;
+        this.networkId = networkId != null ? networkId : CraftingManager.NEXT_NETWORK_ID.incrementAndGet();
         this.requirement = requirement;
     }
 

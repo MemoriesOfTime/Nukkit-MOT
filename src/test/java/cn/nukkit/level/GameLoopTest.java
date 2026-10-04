@@ -70,4 +70,33 @@ class GameLoopTest {
         assertEquals(0f, loop.getTPS());
         assertEquals(0f, loop.getMSPT());
     }
+
+    @Test
+    void firstTickCallbackRunsBeforeTickIncrement() throws Exception {
+        // 时基域切换复位依赖的不变量：首帧回调内 getTick()==N（tick++ 在回调之后），
+        // 故 resetLastUpdate(N-1) 才令接管/重启后的首帧 tickDiff 恰为 1
+        // Invariant the domain reset relies on: getTick()==N inside the first callback (tick++ runs
+        // after it), so resetLastUpdate(N-1) is what yields the first-frame tickDiff of 1
+        long[] observed = new long[1];
+        CountDownLatch done = new CountDownLatch(1);
+        GameLoop loop = GameLoop.builder()
+                .loopCountPerSec(20)
+                .currentTick(1000L)
+                .onTick((gl, startNanos) -> {
+                    if (done.getCount() > 0) {
+                        observed[0] = gl.getTick();
+                        done.countDown();
+                        gl.stop();
+                    }
+                    return -1;
+                })
+                .build();
+        Thread thread = new Thread(loop::startLoop, "GameLoopFirstTickTest");
+        thread.setDaemon(true);
+        thread.start();
+        assertTrue(done.await(5, TimeUnit.SECONDS));
+        thread.join(30_000);
+        assertFalse(thread.isAlive());
+        assertEquals(1000L, observed[0]);
+    }
 }

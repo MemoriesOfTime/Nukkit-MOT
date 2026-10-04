@@ -29,7 +29,7 @@ public class FurnaceRecipe implements SmeltingRecipe {
         this.output = result.clone();
         this.ingredient = ingredient.clone();
         this.recipeId = recipeId;
-        this.networkId = ++CraftingManager.NEXT_NETWORK_ID;
+        this.networkId = CraftingManager.NEXT_NETWORK_ID.incrementAndGet();
     }
 
     public String getRecipeId() {

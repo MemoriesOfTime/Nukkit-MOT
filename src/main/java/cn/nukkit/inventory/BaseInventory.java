@@ -118,14 +118,23 @@ public abstract class BaseInventory implements Inventory {
         return title;
     }
 
+    // SAI netId 惰性分配双检：并发读者各发 id 互相覆盖，客户端会见到同槽两个 netId
+    // Double-checked lazy assignment: racing observers would hand out different ids for one slot
+    private static void ensureStackNetId(Item item) {
+        if (!item.isNull() && item.getStackNetId() == 0) {
+            synchronized (item) {
+                if (item.getStackNetId() == 0) {
+                    item.autoAssignStackNetworkId();
+                }
+            }
+        }
+    }
+
     @Override
     public Item getItem(int index) {
         Item original = this.slots.get(index);
         if (original != null) {
-            // Ensure every non-empty stack carries a valid stackNetworkId for SAI.
-            if (!original.isNull() && original.getStackNetId() == 0) {
-                original.autoAssignStackNetworkId();
-            }
+            ensureStackNetId(original);
             return original.clone();
         }
         return new ItemBlock(Block.get(BlockID.AIR), null, 0);
@@ -136,9 +145,7 @@ public abstract class BaseInventory implements Inventory {
     public Item getUnclonedItem(int index) {
         Item item = this.slots.get(index);
         if (item != null) {
-            if (!item.isNull() && item.getStackNetId() == 0) {
-                item.autoAssignStackNetworkId();
-            }
+            ensureStackNetId(item);
             return item;
         }
         return new ItemBlock(Block.get(BlockID.AIR), null, 0);
@@ -147,8 +154,8 @@ public abstract class BaseInventory implements Inventory {
     @Override
     public Item getItemFast(int index) {
         Item item = this.slots.getOrDefault(index, air);
-        if (item != air && !item.isNull() && item.getStackNetId() == 0) {
-            item.autoAssignStackNetworkId();
+        if (item != air) {
+            ensureStackNetId(item);
         }
         return item;
     }
@@ -162,91 +169,99 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public void setContents(Map<Integer, Item> items) {
-        if (items.size() > this.size) {
-            TreeMap<Integer, Item> newItems = new TreeMap<>(items);
-            items = newItems;
-            newItems = new TreeMap<>();
-            int i = 0;
-            for (Map.Entry<Integer, Item> entry : items.entrySet()) {
-                newItems.put(entry.getKey(), entry.getValue());
-                i++;
-                if (i >= this.size) {
-                    break;
+        synchronized (this.slots) {
+            if (items.size() > this.size) {
+                TreeMap<Integer, Item> newItems = new TreeMap<>(items);
+                items = newItems;
+                newItems = new TreeMap<>();
+                int i = 0;
+                for (Map.Entry<Integer, Item> entry : items.entrySet()) {
+                    newItems.put(entry.getKey(), entry.getValue());
+                    i++;
+                    if (i >= this.size) {
+                        break;
+                    }
                 }
+                items = newItems;
             }
-            items = newItems;
-        }
 
-        // 溢出必须等所有槽位定稿后再装：逐槽写入中途 addItem 的话，
-        // 溢出会被后续槽位的 setItem/clear 覆盖丢失
-        // Route overflow only after every slot is final; inserting it mid-loop
-        // would let later iterations overwrite or clear it.
-        List<Item> deferredOverflow = new ArrayList<>();
-        for (int i = 0; i < this.size; ++i) {
-            if (!items.containsKey(i)) {
-                if (this.slots.containsKey(i)) {
-                    this.clear(i);
-                }
-            } else {
-                Item[] parts = splitOverstack(items.get(i));
-                if (this.setItem(i, parts[0])) {
-                    if (parts[1] != null) {
-                        deferredOverflow.add(parts[1]);
+            // 溢出必须等所有槽位定稿后再装：逐槽写入中途 addItem 的话，
+            // 溢出会被后续槽位的 setItem/clear 覆盖丢失
+            // Route overflow only after every slot is final; inserting it mid-loop
+            // would let later iterations overwrite or clear it.
+            List<Item> deferredOverflow = new ArrayList<>();
+            for (int i = 0; i < this.size; ++i) {
+                if (!items.containsKey(i)) {
+                    if (this.slots.containsKey(i)) {
+                        this.clear(i);
                     }
                 } else {
-                    this.clear(i);
+                    Item[] parts = splitOverstack(items.get(i));
+                    if (this.setItem(i, parts[0])) {
+                        if (parts[1] != null) {
+                            deferredOverflow.add(parts[1]);
+                        }
+                    } else {
+                        this.clear(i);
+                    }
                 }
             }
-        }
-        for (Item overflow : deferredOverflow) {
-            this.routeOverflow(overflow);
+            for (Item overflow : deferredOverflow) {
+                this.routeOverflow(overflow);
+            }
         }
     }
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
-        //item = item.clone();
-        if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
-            return false;
-        } else if (item.getId() == 0 || item.getCount() <= 0) {
-            return this.clear(index, send);
-        }
-
-        InventoryHolder holder = this.getHolder();
-        if (holder instanceof Entity) {
-            EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent((Entity) holder, this.getItem(index), item, index);
-            Server.getInstance().getPluginManager().callEvent(ev);
-            if (ev.isCancelled()) {
-                this.sendSlot(index, this.getViewers());
+        // 读旧值→写入→溢出回填的复合段持 slots 监视器（synchronizedMap 只保单操作原子，交错写丢/复制物品）；
+        // 持锁期间可能触发插件事件与网络发送（并行模式已知取舍），内部调用同监视器可重入
+        // The read-put-overflow compound holds the slots monitor (synchronizedMap covers single ops only);
+        // plugin events/sends under the lock are an accepted trade-off
+        synchronized (this.slots) {
+            //item = item.clone();
+            if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
                 return false;
+            } else if (item.getId() == 0 || item.getCount() <= 0) {
+                return this.clear(index, send);
             }
 
-            item = ev.getNewItem();
-        }
+            InventoryHolder holder = this.getHolder();
+            if (holder instanceof Entity) {
+                EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent((Entity) holder, this.getItem(index), item, index);
+                Server.getInstance().getPluginManager().callEvent(ev);
+                if (ev.isCancelled()) {
+                    this.sendSlot(index, this.getViewers());
+                    return false;
+                }
 
-        if (holder instanceof BlockEntity) {
-            ((BlockEntity) holder).setDirty();
-        }
-        // Server-Authoritative Inventory requires every non-empty stack to carry a
-        // positive stackNetworkId. Items created before SAI (e.g. loaded from NBT or
-        // spawned by plugins) may still have id==0, which Bedrock clients interpret as
-        // "empty slot" in ItemStackResponse packets and causes cursor/inventory desync.
-        if (!item.isNull() && item.getStackNetId() == 0) {
-            item.autoAssignStackNetworkId();
-        }
+                item = ev.getNewItem();
+            }
 
-        if (item instanceof ItemBundle bundle) {
-            ensureUniqueBundleId(index, bundle);
+            if (holder instanceof BlockEntity) {
+                ((BlockEntity) holder).setDirty();
+            }
+            // Server-Authoritative Inventory requires every non-empty stack to carry a
+            // positive stackNetworkId. Items created before SAI (e.g. loaded from NBT or
+            // spawned by plugins) may still have id==0, which Bedrock clients interpret as
+            // "empty slot" in ItemStackResponse packets and causes cursor/inventory desync.
+            if (!item.isNull() && item.getStackNetId() == 0) {
+                item.autoAssignStackNetworkId();
+            }
+
+            if (item instanceof ItemBundle bundle) {
+                ensureUniqueBundleId(index, bundle);
+            }
+
+            Item[] parts = splitOverstack(item);
+            item = parts[0];
+
+            Item old = this.getItem(index);
+            this.slots.put(index, item.clone());
+            this.onSlotChange(index, old, send);
+            this.routeOverflow(parts[1]);
+            return true;
         }
-
-        Item[] parts = splitOverstack(item);
-        item = parts[0];
-
-        Item old = this.getItem(index);
-        this.slots.put(index, item.clone());
-        this.onSlotChange(index, old, send);
-        this.routeOverflow(parts[1]);
-        return true;
     }
 
     /**
@@ -312,31 +327,33 @@ public abstract class BaseInventory implements Inventory {
     @Override
     @ApiStatus.Internal
     public void setItemForce(int index, Item item) {
-        if (index < 0 || index >= this.size) {
-            return;
-        }
-        Item old = this.getItem(index);
-        Item overflow = null;
-        if (item == null || item.isNull() || item.getCount() <= 0) {
-            this.slots.remove(index);
-        } else {
-            Item[] parts = splitOverstack(item);
-            item = parts[0];
-            overflow = parts[1];
-            if (item.getStackNetId() == 0) {
-                item.autoAssignStackNetworkId();
+        synchronized (this.slots) {
+            if (index < 0 || index >= this.size) {
+                return;
             }
-            if (item instanceof ItemBundle bundle) {
-                ensureUniqueBundleId(index, bundle);
+            Item old = this.getItem(index);
+            Item overflow = null;
+            if (item == null || item.isNull() || item.getCount() <= 0) {
+                this.slots.remove(index);
+            } else {
+                Item[] parts = splitOverstack(item);
+                item = parts[0];
+                overflow = parts[1];
+                if (item.getStackNetId() == 0) {
+                    item.autoAssignStackNetworkId();
+                }
+                if (item instanceof ItemBundle bundle) {
+                    ensureUniqueBundleId(index, bundle);
+                }
+                this.slots.put(index, item.clone());
             }
-            this.slots.put(index, item.clone());
+            InventoryHolder holder = this.getHolder();
+            if (holder instanceof BlockEntity) {
+                ((BlockEntity) holder).setDirty();
+            }
+            this.onSlotChange(index, old, false);
+            this.routeOverflowForce(overflow);
         }
-        InventoryHolder holder = this.getHolder();
-        if (holder instanceof BlockEntity) {
-            ((BlockEntity) holder).setDirty();
-        }
-        this.onSlotChange(index, old, false);
-        this.routeOverflowForce(overflow);
     }
 
     /**
@@ -465,40 +482,46 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public void decreaseCount(int slot) {
-        Item item = this.getItem(slot);
+        synchronized (this.slots) {
+            Item item = this.getItem(slot);
 
-        if (item.getCount() > 0) {
-            item.count--;
-            this.setItem(slot, item);
+            if (item.getCount() > 0) {
+                item.count--;
+                this.setItem(slot, item);
+            }
         }
     }
 
     @Override
     public boolean canAddItem(Item item) {
-        int count = item.getCount();
-        boolean checkDamage = item.hasMeta();
-        boolean checkTag = item.getCompoundTag() != null;
-        // The stack limit of the item being added, not of whatever occupies the slot right now:
-        // an empty slot holds air, and air stacks to 64 even when the incoming item does not.
-        int maxStackSize = Math.min(item.getMaxStackSize(), this.getMaxStackSize());
-        int i1 = this.getSize();
-        for (int i = 0; i < i1; ++i) {
-            Item slot = this.getItemFast(i);
-            if (item.equals(slot, checkDamage, checkTag)) {
-                int diff;
-                if ((diff = maxStackSize - slot.getCount()) > 0) {
-                    count -= diff;
+        // 多槽读一致性：与 addItem 同监视器，避免读到写入中途的槽位快照
+        // Multi-slot read consistency: share the slots monitor with addItem
+        synchronized (this.slots) {
+            int count = item.getCount();
+            boolean checkDamage = item.hasMeta();
+            boolean checkTag = item.getCompoundTag() != null;
+            // The stack limit of the item being added, not of whatever occupies the slot right now:
+            // an empty slot holds air, and air stacks to 64 even when the incoming item does not.
+            int maxStackSize = Math.min(item.getMaxStackSize(), this.getMaxStackSize());
+            int i1 = this.getSize();
+            for (int i = 0; i < i1; ++i) {
+                Item slot = this.getItemFast(i);
+                if (item.equals(slot, checkDamage, checkTag)) {
+                    int diff;
+                    if ((diff = maxStackSize - slot.getCount()) > 0) {
+                        count -= diff;
+                    }
+                } else if (slot.getId() == Item.AIR) {
+                    count -= maxStackSize;
                 }
-            } else if (slot.getId() == Item.AIR) {
-                count -= maxStackSize;
+
+                if (count <= 0) {
+                    return true;
+                }
             }
 
-            if (count <= 0) {
-                return true;
-            }
+            return false;
         }
-
-        return false;
     }
 
     @Override
@@ -508,127 +531,132 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public Item[] addItem(Item... slots) {
-        List<Item> itemSlots = new ArrayList<>();
-        for (Item slot : slots) {
-            if (slot.getId() != 0 && slot.getCount() > 0) {
-                itemSlots.add(slot.clone());
-            }
-        }
-
-        IntList emptySlots = new IntArrayList();
-
-        for (int i = 0; i < this.getSize(); ++i) {
-            Item item = this.getItem(i);
-            if (item.getId() == Item.AIR || item.getCount() <= 0) {
-                emptySlots.add(i);
+        synchronized (this.slots) {
+            List<Item> itemSlots = new ArrayList<>();
+            for (Item slot : slots) {
+                if (slot.getId() != 0 && slot.getCount() > 0) {
+                    itemSlots.add(slot.clone());
+                }
             }
 
-            for (Iterator<Item> iterator = itemSlots.iterator(); iterator.hasNext();) {
-                Item slot = iterator.next();
-                if (slot.equals(item)) {
-                    int maxStackSize = Math.min(item.getMaxStackSize(), this.getMaxStackSize());
-                    if (item.getCount() < maxStackSize) {
-                        int amount = Math.min(maxStackSize - item.getCount(), slot.getCount());
-                        if (amount > 0) {
-                            slot.setCount(slot.getCount() - amount);
-                            item.setCount(item.getCount() + amount);
-                            this.setItem(i, item);
-                            if (slot.getCount() <= 0) {
-                                iterator.remove();
+            IntList emptySlots = new IntArrayList();
+
+            for (int i = 0; i < this.getSize(); ++i) {
+                Item item = this.getItem(i);
+                if (item.getId() == Item.AIR || item.getCount() <= 0) {
+                    emptySlots.add(i);
+                }
+
+                for (Iterator<Item> iterator = itemSlots.iterator(); iterator.hasNext();) {
+                    Item slot = iterator.next();
+                    if (slot.equals(item)) {
+                        int maxStackSize = Math.min(item.getMaxStackSize(), this.getMaxStackSize());
+                        if (item.getCount() < maxStackSize) {
+                            int amount = Math.min(maxStackSize - item.getCount(), slot.getCount());
+                            if (amount > 0) {
+                                slot.setCount(slot.getCount() - amount);
+                                item.setCount(item.getCount() + amount);
+                                this.setItem(i, item);
+                                if (slot.getCount() <= 0) {
+                                    iterator.remove();
+                                }
                             }
                         }
                     }
                 }
+                if (itemSlots.isEmpty()) {
+                    break;
+                }
             }
-            if (itemSlots.isEmpty()) {
-                break;
-            }
-        }
 
-        if (!itemSlots.isEmpty() && !emptySlots.isEmpty()) {
-            for (int slotIndex : emptySlots) {
-                if (!itemSlots.isEmpty()) {
-                    Item slot = itemSlots.get(0);
-                    int amount = Math.min(Math.min(slot.getMaxStackSize(), this.getMaxStackSize()), slot.getCount());
-                    slot.setCount(slot.getCount() - amount);
-                    Item item = slot.clone();
-                    item.setCount(amount);
-                    this.setItem(slotIndex, item);
-                    if (slot.getCount() <= 0) {
-                        itemSlots.remove(slot);
+            if (!itemSlots.isEmpty() && !emptySlots.isEmpty()) {
+                for (int slotIndex : emptySlots) {
+                    if (!itemSlots.isEmpty()) {
+                        Item slot = itemSlots.get(0);
+                        int amount = Math.min(Math.min(slot.getMaxStackSize(), this.getMaxStackSize()), slot.getCount());
+                        slot.setCount(slot.getCount() - amount);
+                        Item item = slot.clone();
+                        item.setCount(amount);
+                        this.setItem(slotIndex, item);
+                        if (slot.getCount() <= 0) {
+                            itemSlots.remove(slot);
+                        }
                     }
                 }
             }
-        }
 
-        return itemSlots.toArray(Item.EMPTY_ARRAY);
+            return itemSlots.toArray(Item.EMPTY_ARRAY);
+        }
     }
 
     @Override
     public Item[] removeItem(Item... slots) {
-        List<Item> itemSlots = new ArrayList<>();
-        for (Item slot : slots) {
-            if (slot.getId() != 0 && slot.getCount() > 0) {
-                itemSlots.add(slot.clone());
-            }
-        }
-
-        for (int i = 0; i < this.size; ++i) {
-            Item item = this.getItem(i);
-            if (item.getId() == Item.AIR || item.getCount() <= 0) {
-                continue;
-            }
-
-            for (Item slot : new ArrayList<>(itemSlots)) {
-                if (slot.equals(item, item.hasMeta(), item.getCompoundTag() != null)) {
-                    int amount = Math.min(item.getCount(), slot.getCount());
-                    slot.setCount(slot.getCount() - amount);
-                    item.setCount(item.getCount() - amount);
-                    this.setItem(i, item);
-                    if (slot.getCount() <= 0) {
-                        itemSlots.remove(slot);
-                    }
+        synchronized (this.slots) {
+            List<Item> itemSlots = new ArrayList<>();
+            for (Item slot : slots) {
+                if (slot.getId() != 0 && slot.getCount() > 0) {
+                    itemSlots.add(slot.clone());
                 }
             }
 
-            if (itemSlots.isEmpty()) {
-                break;
-            }
-        }
+            for (int i = 0; i < this.size; ++i) {
+                Item item = this.getItem(i);
+                if (item.getId() == Item.AIR || item.getCount() <= 0) {
+                    continue;
+                }
 
-        return itemSlots.toArray(Item.EMPTY_ARRAY);
+                for (Item slot : new ArrayList<>(itemSlots)) {
+                    if (slot.equals(item, item.hasMeta(), item.getCompoundTag() != null)) {
+                        int amount = Math.min(item.getCount(), slot.getCount());
+                        slot.setCount(slot.getCount() - amount);
+                        item.setCount(item.getCount() - amount);
+                        this.setItem(i, item);
+                        if (slot.getCount() <= 0) {
+                            itemSlots.remove(slot);
+                        }
+                    }
+                }
+
+                if (itemSlots.isEmpty()) {
+                    break;
+                }
+            }
+
+            return itemSlots.toArray(Item.EMPTY_ARRAY);
+        }
     }
 
     @Override
     public boolean clear(int index, boolean send) {
-        Item old = this.slots.get(index);
-        if (old != null) {
-            Item item = new ItemBlock(Block.get(BlockID.AIR), null, 0);
-            InventoryHolder holder = this.getHolder();
-            if (holder instanceof Entity) {
-                EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent((Entity) holder, old, item, index);
-                Server.getInstance().getPluginManager().callEvent(ev);
-                if (ev.isCancelled()) {
-                    this.sendSlot(index, this.getViewers());
-                    return false;
+        synchronized (this.slots) {
+            Item old = this.slots.get(index);
+            if (old != null) {
+                Item item = new ItemBlock(Block.get(BlockID.AIR), null, 0);
+                InventoryHolder holder = this.getHolder();
+                if (holder instanceof Entity) {
+                    EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent((Entity) holder, old, item, index);
+                    Server.getInstance().getPluginManager().callEvent(ev);
+                    if (ev.isCancelled()) {
+                        this.sendSlot(index, this.getViewers());
+                        return false;
+                    }
+                    item = ev.getNewItem();
                 }
-                item = ev.getNewItem();
+
+                if (holder instanceof BlockEntity) {
+                    ((BlockEntity) holder).setDirty();
+                }
+
+                if (item.getId() != Item.AIR) {
+                    this.slots.put(index, item.clone());
+                } else {
+                    this.slots.remove(index);
+                }
+                this.onSlotChange(index, old, send);
             }
 
-            if (holder instanceof BlockEntity) {
-                ((BlockEntity) holder).setDirty();
-            }
-
-            if (item.getId() != Item.AIR) {
-                this.slots.put(index, item.clone());
-            } else {
-                this.slots.remove(index);
-            }
-
-            this.onSlotChange(index, old, send);
+            return true;
         }
-
-        return true;
     }
 
     @Override

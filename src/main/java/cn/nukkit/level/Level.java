@@ -541,15 +541,27 @@ public class Level implements ChunkManager, Metadatable {
     private volatile long mainThreadTakeoverTick;
     private final Queue<Runnable> syncTaskQueue = new ConcurrentLinkedQueue<>();
     private final Queue<SyncPacketEntry> syncPacketQueue = new ConcurrentLinkedQueue<>();
+    // CLQ.size() 是 O(n) 且入队热路径每次调用：改用原子计数维护长度（瞬态偏差只令上限偏保守）
+    // CLQ.size() is O(n) on the offer hot path; the counter's transient skew only makes the cap conservative
+    private final AtomicInteger syncTaskQueueSize = new AtomicInteger();
+    private final AtomicInteger syncPacketQueueSize = new AtomicInteger();
     // 世界线程卡死（isAlive 但不消费）时防止无界累积 OOM 的队列上限，超限回落主线程处理
     // Cap that prevents unbounded growth (and OOM) when the level thread is wedged; overflow falls back to the primary thread
     private static final int MAX_SYNC_PACKET_QUEUE_SIZE = 8192;
+    // 任务队列同理；告警只会跑在（可能已卡死的）世界线程 tick 里，故上限判定放进入队点直接回落
+    // Same rationale: the size warning runs inside the (possibly wedged) level thread, so cap at the offer point
+    private static final int MAX_SYNC_TASK_QUEUE_SIZE = 1024;
     private long lastQueueCapLogMillis;
     // 生命周期锁：串化 start/stop 与接纳判定+入队；锁内绝不 join
     private final Object lifecycleLock = new Object();
     private volatile boolean acceptingWork;
     // 读锁内触发的延迟关闭标记，供 unload() 区分"延迟中"与"卡死中止"
     private volatile boolean closeDeferred;
+    // close() 中止后的有界重试：直接放弃会留"已广播卸载但世界仍注册"的半卸载状态
+    // Bounded retry after a close() abort; giving up would strand a half-unloaded level
+    private static final int MAX_CLOSE_RETRIES = 5;
+    private final AtomicInteger closeRetries = new AtomicInteger();
+    private volatile boolean closeCompletionPending;
     // 全量存档进行中（世界线程），Watchdog 据此不把合法长存档误报为卡死
     // A full save is running on the level thread; the Watchdog uses this to skip
     // false "stopped responding" alarms for legitimately long saves
@@ -788,13 +800,12 @@ public class Level implements ChunkManager, Metadatable {
             }
             this.parallelTickEnabled = true;
             // 首次启动对齐服务器 tick；正常重启从自身上次 tick 续跑（不取 max，避免滞后差值一次性前跳）；
-            // 但线程停止期间主线程以服务器 tick 接管过的世界必须重新对齐——实体 lastUpdate 已在服务器
-            // 时基，从旧 loop tick 续跑会令 tickDiff 恒负（实体被移出 updateEntities/玩家冻结）
-            // First start aligns to the server tick; a normal restart resumes the loop's own tick;
-            // but after a primary-thread takeover the entities' lastUpdate live in the server-tick
-            // domain, so resuming the stale loop tick would freeze them with negative tickDiff
+            // 主线程接管过的世界必须重新对齐，判定用"发生过接管"标记而非数值比较（超载时服务器
+            // tick 可落后 loop tick，数值比较会漏判，重启后实体 tickDiff 巨正）
+            // First start aligns to the server tick, a restart resumes its own; realignment is decided by the
+            // takeover marker, not a numeric compare (an overloaded server tick can trail the loop tick)
             long initialTick;
-            boolean alignToServerTick = this.mainThreadTakeoverTick > this.nextLevelThreadTick;
+            boolean alignToServerTick = this.mainThreadTakeoverTick != 0L;
             if (this.nextLevelThreadTick <= 0 || alignToServerTick) {
                 initialTick = (long) server.getTick();
             } else {
@@ -803,10 +814,12 @@ public class Level implements ChunkManager, Metadatable {
             this.nextLevelThreadTick = initialTick;
             this.mainThreadTakeoverTick = 0L;
             if (alignToServerTick) {
-                // 域切回 loop 时基：统一重置实体 lastUpdate，首帧 tickDiff 恰为 1 而非停机时长
-                // Domain switch back to the loop base: reset lastUpdate so the first tickDiff is 1
+                // 域切回 loop 时基：重置值须比首帧 tick 小 1——首帧回调先于 tick++，重置为
+                // initialTick 则首帧 tickDiff==0，实体会被 onUpdate 判 false 逐出 updateEntities
+                // Domain switch back to the loop base: reset to one below the first frame's tick (the callback
+                // runs before tick++), or tickDiff==0 evicts every entity on the first frame
                 for (Entity entity : this.getEntities()) {
-                    entity.resetLastUpdate(initialTick);
+                    entity.resetLastUpdate(initialTick - 1);
                 }
             }
             AtomicBoolean intentionalStop = new AtomicBoolean(false);
@@ -928,6 +941,7 @@ public class Level implements ChunkManager, Metadatable {
         // 须在 lifecycleLock 内调用（无并发 offer 循环终止）；经调度器转投，避免持锁内联处理包
         SyncPacketEntry entry;
         while ((entry = this.syncPacketQueue.poll()) != null) {
+            this.syncPacketQueueSize.decrementAndGet();
             Player player = entry.player();
             DataPacket packet = entry.packet();
             server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
@@ -953,6 +967,7 @@ public class Level implements ChunkManager, Metadatable {
         // primary thread (startLevelThread) and running a heavy task inline under the lock
         Runnable task;
         while ((task = this.syncTaskQueue.poll()) != null) {
+            this.syncTaskQueueSize.decrementAndGet();
             server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, task);
         }
     }
@@ -974,8 +989,10 @@ public class Level implements ChunkManager, Metadatable {
         boolean firstTakeover = this.mainThreadTakeoverTick == 0L;
         this.mainThreadTakeoverTick = serverTick;
         if (firstTakeover) {
+            // 重置值比接管首拍 tick 小 1：本拍 doTick 紧随其后，重置为 serverTick 会令首拍 tickDiff==0 逐出实体
+            // Reset one below the takeover tick: doTick runs right after, and serverTick itself would make the first tickDiff 0
             for (Entity entity : this.getEntities()) {
-                entity.resetLastUpdate(serverTick);
+                entity.resetLastUpdate(serverTick - 1);
             }
         }
     }
@@ -1100,6 +1117,7 @@ public class Level implements ChunkManager, Metadatable {
     private void processScheduledTasks() {
         Runnable task;
         while ((task = syncTaskQueue.poll()) != null) {
+            this.syncTaskQueueSize.decrementAndGet();
             try {
                 task.run();
             } catch (Exception e) {
@@ -1111,7 +1129,7 @@ public class Level implements ChunkManager, Metadatable {
     public void addSyncPacketToQueue(Player player, DataPacket packet) {
         synchronized (lifecycleLock) {
             if (levelThreadAcceptingWork()) {
-                if (this.syncPacketQueue.size() >= MAX_SYNC_PACKET_QUEUE_SIZE) {
+                if (this.syncPacketQueueSize.get() >= MAX_SYNC_PACKET_QUEUE_SIZE) {
                     // 世界线程卡死（isAlive 但不消费）时防无界累积 OOM：回落主线程（等价 master 行为）
                     // 限流告警，避免每包刷屏
                     // Cap reached: the level thread is likely wedged (alive but not consuming).
@@ -1125,6 +1143,7 @@ public class Level implements ChunkManager, Metadatable {
                                 + "falling back to primary-thread processing for player " + player.getName());
                     }
                 } else {
+                    this.syncPacketQueueSize.incrementAndGet();
                     this.syncPacketQueue.offer(new SyncPacketEntry(player, packet));
                     if (this.gameLoop != null) this.gameLoop.wakeUp();
                     return;
@@ -1144,6 +1163,7 @@ public class Level implements ChunkManager, Metadatable {
     protected void handleSyncPackets() {
         SyncPacketEntry entry;
         while ((entry = this.syncPacketQueue.poll()) != null) {
+            this.syncPacketQueueSize.decrementAndGet();
             Player player = entry.player();
             if (!player.isConnected()) {
                 continue;
@@ -1192,9 +1212,20 @@ public class Level implements ChunkManager, Metadatable {
     public void scheduleSyncTask(Runnable task) {
         synchronized (lifecycleLock) {
             if (levelThreadAcceptingWork()) {
-                syncTaskQueue.offer(task);
-                if (gameLoop != null) gameLoop.wakeUp();
-                return;
+                if (this.syncTaskQueueSize.get() >= MAX_SYNC_TASK_QUEUE_SIZE) {
+                    long now = System.currentTimeMillis();
+                    if (now - this.lastQueueCapLogMillis > 10_000L) {
+                        this.lastQueueCapLogMillis = now;
+                        server.getLogger().warning("Sync task queue for world '" + this.getName()
+                                + "' is full (" + MAX_SYNC_TASK_QUEUE_SIZE + "); level thread appears stuck, "
+                                + "running queued tasks on the primary thread");
+                    }
+                } else {
+                    this.syncTaskQueueSize.incrementAndGet();
+                    this.syncTaskQueue.offer(task);
+                    if (gameLoop != null) gameLoop.wakeUp();
+                    return;
+                }
             }
         }
         runOrScheduleOnPrimary(task);
@@ -1222,7 +1253,8 @@ public class Level implements ChunkManager, Metadatable {
             }
         };
         synchronized (lifecycleLock) {
-            if (levelThreadAcceptingWork()) {
+            if (levelThreadAcceptingWork() && this.syncTaskQueueSize.get() < MAX_SYNC_TASK_QUEUE_SIZE) {
+                this.syncTaskQueueSize.incrementAndGet();
                 syncTaskQueue.offer(wrapped);
                 if (gameLoop != null) gameLoop.wakeUp();
                 return future;
@@ -1296,8 +1328,8 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void checkQueueSizes() {
-        int taskSize = syncTaskQueue.size();
-        int packetSize = syncPacketQueue.size();
+        int taskSize = syncTaskQueueSize.get();
+        int packetSize = syncPacketQueueSize.get();
         if (taskSize > QUEUE_WARN_THRESHOLD) {
             server.getLogger().warning("Sync task queue for world '" + this.getName()
                     + "' is large (" + taskSize + "), server may be overloaded");
@@ -1319,11 +1351,10 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
         stopLevelThread();
-        // 线程未确认停止时中止拆除，保留世界待线程退出后重试；自身线程调用不算卡死
+        // 线程未确认停止时先重试再放弃；自身线程调用不算卡死
         Thread levelThread = this.levelThread;
         if (levelThread != null && levelThread.isAlive() && levelThread != Thread.currentThread()) {
-            server.getLogger().error("Level thread for '" + this.getName()
-                    + "' is stuck; aborting close() so its provider is not torn down underneath it. Retry after the thread exits.");
+            scheduleCloseRetry("level thread stuck; not tearing the provider down underneath it");
             return;
         }
         boolean interrupted = false;
@@ -1334,12 +1365,14 @@ public class Level implements ChunkManager, Metadatable {
             interrupted = true;
         }
         if (!locked) {
-            server.getLogger().error("Timed out acquiring provider write lock while closing level '" + this.getName() + "'; aborting close()");
+            scheduleCloseRetry("timed out acquiring provider write lock");
             if (interrupted) {
                 Thread.currentThread().interrupt();
             }
             return;
         }
+        closeRetries.set(0);
+        closeCompletionPending = false;
         try {
             // 先失效异步读取：残活 worker 跳过读取，不碰已关闭的 provider
             for (PendingChunkLoad pending : this.pendingChunkLoads.values()) {
@@ -1395,6 +1428,26 @@ public class Level implements ChunkManager, Metadatable {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    /**
+     * close() 中止后 1 秒在主线程重试，超次数才真正放弃。
+     * <p>
+     * Retries an aborted close() on the primary thread one second later, up to the attempt budget.
+     */
+    private void scheduleCloseRetry(String reason) {
+        int attempt = closeRetries.incrementAndGet();
+        if (attempt > MAX_CLOSE_RETRIES) {
+            closeCompletionPending = false;
+            server.getLogger().error("Level '" + this.getName() + "' close() giving up after " + MAX_CLOSE_RETRIES
+                    + " retries (" + reason + "); the level remains registered in a half-unloaded state."
+                    + " Resolve the cause and unload it manually.");
+            return;
+        }
+        closeCompletionPending = true;
+        server.getLogger().error("Level '" + this.getName() + "' close() aborted (" + reason + "); retrying "
+                + attempt + "/" + MAX_CLOSE_RETRIES + " in 1s");
+        this.server.getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, this::close, 20);
     }
 
     public void addSound(Vector3 pos, String sound) {
@@ -1696,9 +1749,14 @@ public class Level implements ChunkManager, Metadatable {
                         + "' unload deferred (close was called under its provider read lock); completing on the next primary tick");
                 return true;
             }
-            // close 因线程卡死中止：如实返回失败（世界处于已广播卸载事件但仍注册的半卸载状态）
+            if (this.closeCompletionPending) {
+                this.server.getLogger().info("Level '" + this.getName()
+                        + "' unload in progress: close aborted (stuck thread / lock timeout) and bounded retries are scheduled");
+                return true;
+            }
+            // 重试耗尽仍未完成：如实返回失败（世界处于已广播卸载事件但仍注册的半卸载状态）
             this.server.getLogger().error("Level '" + this.getName()
-                    + "' unload incomplete: level thread stuck, the level remains registered. Retry after the thread exits.");
+                    + "' unload incomplete: close retries exhausted, the level remains registered.");
             return false;
         }
 

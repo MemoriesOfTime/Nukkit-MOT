@@ -15,9 +15,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import io.netty.util.collection.CharObjectHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
@@ -25,6 +23,10 @@ import java.io.*;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Deflater;
 
 /**
@@ -70,82 +72,85 @@ public class CraftingManager {
         }
     }
 
-    // 裸 ArrayDeque 的迭代/变更须持本对象监视器（并行 tick 下世界线程迭代与主线程插件
-    // registerRecipe/unregisterRecipe 并发会损坏队列结构）；getRecipes() 返回活引用，外部迭代同理
-    // Iteration and mutation of this bare ArrayDeque must hold its monitor (world-thread
-    // iteration races main-thread plugin register/unregister under parallel tick);
-    // getRecipes() hands out the live collection - external iteration follows the same rule
-    public final Collection<Recipe> recipes = new ArrayDeque<>();
+    // getRecipes() 交出活引用（master 语义）：CLD 弱一致迭代在并发 register/unregister 下安全（ArrayDeque 会 CME/损坏）；
+    // 写侧 synchronized 串化"登记+索引+rebuildPacket"复合序
+    // Live reference out (master semantics): the CLD iterates safely under concurrent mutation where an ArrayDeque
+    // would CME; the write-side synchronized serializes the register+index+rebuild compound
+    public final Collection<Recipe> recipes = new ConcurrentLinkedDeque<>();
 
-    private static BatchPacket packet313;
-    private static BatchPacket packet340;
-    private static BatchPacket packet361;
-    private static BatchPacket packet354;
-    private static BatchPacket packet388;
-    private static BatchPacket packet407;
-    private static BatchPacket packet419;
-    private static BatchPacket packet431;
-    private static BatchPacket packet440;
-    private static BatchPacket packet448;
-    private static BatchPacket packet465;
-    private static BatchPacket packet471;
-    private static BatchPacket packet486;
-    private static BatchPacket packet503;
-    private static BatchPacket packet527;
-    private static BatchPacket packet544;
-    private static BatchPacket packet554;
-    private static BatchPacket packet560;
-    private static BatchPacket packet567;
-    private static BatchPacket packet575;
-    private static BatchPacket packet582;
-    private static BatchPacket packet589;
-    private static BatchPacket packet594;
-    private static BatchPacket packet618;
-    private static BatchPacket packet622;
-    private static BatchPacket packet630;
-    private static BatchPacket packet649;
-    private static BatchPacket packet662;
-    private static BatchPacket packet671;
-    private static BatchPacket packet685;
-    private static BatchPacket packet712;
-    private static BatchPacket packet729;
-    private static BatchPacket packet748;
-    private static BatchPacket packet766;
-    private static BatchPacket packet776;
-    private static BatchPacket packet800;
-    private static BatchPacket packet818;
-    private static BatchPacket packet827;
-    private static BatchPacket packet844;
-    private static BatchPacket packet859;
-    private static BatchPacket packet898;
-    private static BatchPacket packet924;
-    private static BatchPacket packet944;
-    private static BatchPacket packet975;
-    private static BatchPacket packet1001;
-    private static BatchPacket packet2168;
-    private static BatchPacket packet2193;
+    private static volatile BatchPacket packet313;
+    private static volatile BatchPacket packet340;
+    private static volatile BatchPacket packet361;
+    private static volatile BatchPacket packet354;
+    private static volatile BatchPacket packet388;
+    private static volatile BatchPacket packet407;
+    private static volatile BatchPacket packet419;
+    private static volatile BatchPacket packet431;
+    private static volatile BatchPacket packet440;
+    private static volatile BatchPacket packet448;
+    private static volatile BatchPacket packet465;
+    private static volatile BatchPacket packet471;
+    private static volatile BatchPacket packet486;
+    private static volatile BatchPacket packet503;
+    private static volatile BatchPacket packet527;
+    private static volatile BatchPacket packet544;
+    private static volatile BatchPacket packet554;
+    private static volatile BatchPacket packet560;
+    private static volatile BatchPacket packet567;
+    private static volatile BatchPacket packet575;
+    private static volatile BatchPacket packet582;
+    private static volatile BatchPacket packet589;
+    private static volatile BatchPacket packet594;
+    private static volatile BatchPacket packet618;
+    private static volatile BatchPacket packet622;
+    private static volatile BatchPacket packet630;
+    private static volatile BatchPacket packet649;
+    private static volatile BatchPacket packet662;
+    private static volatile BatchPacket packet671;
+    private static volatile BatchPacket packet685;
+    private static volatile BatchPacket packet712;
+    private static volatile BatchPacket packet729;
+    private static volatile BatchPacket packet748;
+    private static volatile BatchPacket packet766;
+    private static volatile BatchPacket packet776;
+    private static volatile BatchPacket packet800;
+    private static volatile BatchPacket packet818;
+    private static volatile BatchPacket packet827;
+    private static volatile BatchPacket packet844;
+    private static volatile BatchPacket packet859;
+    private static volatile BatchPacket packet898;
+    private static volatile BatchPacket packet924;
+    private static volatile BatchPacket packet944;
+    private static volatile BatchPacket packet975;
+    private static volatile BatchPacket packet1001;
+    private static volatile BatchPacket packet2168;
+    private static volatile BatchPacket packet2193;
 
-    private static BatchPacket packet_netease_630;
-    private static BatchPacket packet_netease_686;
-    private static BatchPacket packet_netease_766;
-    private static BatchPacket packet_netease_819;
-    private static BatchPacket packet_netease_860;
-    private static BatchPacket packet_netease_898;
+    private static volatile BatchPacket packet_netease_630;
+    private static volatile BatchPacket packet_netease_686;
+    private static volatile BatchPacket packet_netease_766;
+    private static volatile BatchPacket packet_netease_819;
+    private static volatile BatchPacket packet_netease_860;
+    private static volatile BatchPacket packet_netease_898;
 
-    private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes = new Int2ObjectOpenHashMap<>();
+    // 索引容器换并发实现：世界线程每 tick 读与插件运行时 register/unregister 写并发，fastutil/bare 集合 rehash 期会错配/死循环；
+    // recipeXpMap 保留 fastutil 类型（公开 getter 签名），访问改持自身监视器
+    // Concurrent containers: per-tick reads race runtime plugin writes, which corrupt bare fastutil maps;
+    // recipeXpMap keeps its fastutil type (public getter) under synchronized access
+    private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes = new ConcurrentHashMap<>();
 
-    private final Map<Integer, Map<UUID, ShapelessRecipe>> shapelessRecipes = new Int2ObjectOpenHashMap<>();
+    private final Map<Integer, Map<UUID, ShapelessRecipe>> shapelessRecipes = new ConcurrentHashMap<>();
 
-    public final Map<UUID, MultiRecipe> multiRecipes = new HashMap<>();
+    public final Map<UUID, MultiRecipe> multiRecipes = new ConcurrentHashMap<>();
 
-    public final Map<Integer, FurnaceRecipe> furnaceRecipes = new Int2ObjectOpenHashMap<>();
-    private final Map<Integer, BlastFurnaceRecipe> blastFurnaceRecipes = new Int2ObjectOpenHashMap<>();
-    private final Map<Integer, SmokerRecipe> smokerRecipes = new Int2ObjectOpenHashMap<>();
-    public final Map<Integer, BrewingRecipe> brewingRecipes = new Int2ObjectOpenHashMap<>();
-    public final Map<Integer, ContainerRecipe> containerRecipes = new Int2ObjectOpenHashMap<>();
-    public final Map<Integer, CampfireRecipe> campfireRecipes = new Int2ObjectOpenHashMap<>();
-    private final Map<UUID, SmithingRecipe> smithingRecipes = new Object2ObjectOpenHashMap<>();
-    private final List<StonecutterRecipe> stonecutterRecipes = new ArrayList<>();
+    public final Map<Integer, FurnaceRecipe> furnaceRecipes = new ConcurrentHashMap<>();
+    private final Map<Integer, BlastFurnaceRecipe> blastFurnaceRecipes = new ConcurrentHashMap<>();
+    private final Map<Integer, SmokerRecipe> smokerRecipes = new ConcurrentHashMap<>();
+    public final Map<Integer, BrewingRecipe> brewingRecipes = new ConcurrentHashMap<>();
+    public final Map<Integer, ContainerRecipe> containerRecipes = new ConcurrentHashMap<>();
+    public final Map<Integer, CampfireRecipe> campfireRecipes = new ConcurrentHashMap<>();
+    private final Map<UUID, SmithingRecipe> smithingRecipes = new ConcurrentHashMap<>();
+    private final List<StonecutterRecipe> stonecutterRecipes = new CopyOnWriteArrayList<>();
 
     /**
      * Lookup table for recipes by their assigned network ID. Populated for recipes
@@ -153,12 +158,14 @@ public class CraftingManager {
      * the Server Authoritative ItemStackRequest flow to resolve a CraftRecipeAction
      * back to its Recipe instance without iterating the full recipe catalog.
      */
-    private final Map<Integer, Recipe> networkIdRecipes = new Int2ObjectOpenHashMap<>();
+    private final Map<Integer, Recipe> networkIdRecipes = new ConcurrentHashMap<>();
 
     private final Object2DoubleOpenHashMap<Recipe> recipeXpMap = new Object2DoubleOpenHashMap<>();
 
-    private static int RECIPE_COUNT = 0;
-    static int NEXT_NETWORK_ID = 1; // Reserve 1 for smithing_armor_trim
+    private static final AtomicInteger RECIPE_COUNT = new AtomicInteger();
+    // 并发注册下自增必须原子：撞号会让 SAI networkId 反查到错配方
+    // Atomic increment: duplicate ids would make SAI lookups resolve to the wrong recipe
+    static final AtomicInteger NEXT_NETWORK_ID = new AtomicInteger(1); // Reserve 1 for smithing_armor_trim
 
     public static final Comparator<Item> recipeComparator = (i1, i2) -> {
         if (i1.getId() > i2.getId()) {
@@ -1381,12 +1388,12 @@ public class CraftingManager {
     }
 
     /**
-     * 返回内部配方表的活引用（master 语义）。迭代须持 {@code synchronized (recipes)} 监视器：
-     * 并行 tick 下世界线程迭代与插件 register/unregister 并发会损坏 ArrayDeque。
+     * 返回内部配方表的活引用（master 语义）。集合为 CLD，无锁迭代弱一致安全；
+     * 需要跨多次操作的一致快照时仍建议持 {@code synchronized (recipes)}。
      * <p>
-     * Returns the live recipe collection (master semantics). Iteration must hold the
-     * {@code synchronized (recipes)} monitor: under parallel tick, world-thread iteration
-     * racing plugin register/unregister corrupts the ArrayDeque.
+     * Returns the live recipe collection (master semantics). It is a CLD whose
+     * lock-free iteration is weakly consistent; hold {@code synchronized (recipes)}
+     * only when a consistent snapshot across several operations is required.
      */
     public Collection<Recipe> getRecipes() {
         return this.recipes;
@@ -1550,7 +1557,7 @@ public class CraftingManager {
 
     public void registerShapedRecipe(ShapedRecipe recipe) {
         int resultHash = getItemHash(recipe.getResult());
-        Map<UUID, ShapedRecipe> map = this.shapedRecipes.computeIfAbsent(resultHash, k -> new HashMap<>());
+        Map<UUID, ShapedRecipe> map = this.shapedRecipes.computeIfAbsent(resultHash, k -> new ConcurrentHashMap<>());
         map.put(getMultiItemHash(new LinkedList<>(recipe.getIngredientsAggregate())), recipe);
         this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
@@ -1566,7 +1573,7 @@ public class CraftingManager {
         } else if (recipe instanceof SmithingRecipe smithingRecipe) {
             this.registerSmithingRecipe(smithingRecipe);
         } else if (recipe instanceof CraftingRecipe) {
-            UUID id = Utils.dataToUUID(String.valueOf(++RECIPE_COUNT), String.valueOf(recipe.getResult().getId()), String.valueOf(recipe.getResult().getDamage()), String.valueOf(recipe.getResult().getCount()), Arrays.toString(recipe.getResult().getCompoundTag()));
+            UUID id = Utils.dataToUUID(String.valueOf(RECIPE_COUNT.incrementAndGet()), String.valueOf(recipe.getResult().getId()), String.valueOf(recipe.getResult().getDamage()), String.valueOf(recipe.getResult().getCount()), Arrays.toString(recipe.getResult().getCompoundTag()));
             ((CraftingRecipe) recipe).setId(id);
             synchronized (this.recipes) {
                 this.recipes.add(recipe);
@@ -1599,7 +1606,7 @@ public class CraftingManager {
         List<Item> list = recipe.getIngredientsAggregate();
         UUID hash = getMultiItemHash(list);
         int resultHash = getItemHash(recipe.getResult());
-        Map<UUID, ShapelessRecipe> map = this.shapelessRecipes.computeIfAbsent(resultHash, k -> new HashMap<>());
+        Map<UUID, ShapelessRecipe> map = this.shapelessRecipes.computeIfAbsent(resultHash, k -> new ConcurrentHashMap<>());
         map.put(hash, recipe);
         this.networkIdRecipes.put(recipe.getNetworkId(), recipe);
     }
@@ -1679,7 +1686,9 @@ public class CraftingManager {
         }
 
         if (removed) {
-            this.recipeXpMap.removeDouble(recipe);
+            synchronized (recipeXpMap) {
+                this.recipeXpMap.removeDouble(recipe);
+            }
             this.rebuildPacket();
         }
 
@@ -1879,7 +1888,9 @@ public class CraftingManager {
     }
 
     public double getRecipeXp(Recipe recipe) {
-        return recipeXpMap.getOrDefault(recipe, 0.0);
+        synchronized (recipeXpMap) {
+            return recipeXpMap.getOrDefault(recipe, 0.0);
+        }
     }
 
     public Object2DoubleOpenHashMap<Recipe> getRecipeXpMap() {
@@ -1887,6 +1898,8 @@ public class CraftingManager {
     }
 
     public void setRecipeXp(Recipe recipe, double xp) {
-        recipeXpMap.put(recipe, xp);
+        synchronized (recipeXpMap) {
+            recipeXpMap.put(recipe, xp);
+        }
     }
 }

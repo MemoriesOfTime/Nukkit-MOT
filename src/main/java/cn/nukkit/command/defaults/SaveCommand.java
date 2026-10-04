@@ -7,6 +7,7 @@ import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Level;
+import cn.nukkit.plugin.InternalPlugin;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,15 +62,22 @@ public class SaveCommand extends VanillaCommand {
 
         broadcastCommandMessage(sender, new TranslationContainer("commands.save.start"));
 
-        // 并行世界的保存投递其世界线程，并等待全部完成后再广播成功（master 语义：全部写盘完成
-        // 才广播，依赖该消息的备份脚本不会拷贝到写一半的世界文件）；玩家自己世界的任务内联执行
-        // Parallel-world saves are hopped to their level threads and awaited before the
-        // success broadcast (master semantics: broadcast only after everything is written);
-        // the sender's own level runs its task inline via scheduleSyncTaskAndWait
+        // 统一经 scheduleSyncTaskAndWait（自有线程/主线程内联，其余排队）：绝不在别的世界线程内联目标世界（与主线程接管并发）；
+        // 世界线程调用者不阻塞等待其他 future（互等死锁），完成后在主线程异步广播
+        // All through scheduleSyncTaskAndWait: never inline a foreign level (races the primary takeover); a level-thread
+        // caller never blocks on other futures (deadlock) - the completion broadcast is asynchronous
         List<CompletableFuture<Void>> saves = new ArrayList<>();
         for (Player player : sender.getServer().getOnlinePlayers().values()) {
             Level playerLevel = player.getLevel();
-            if (playerLevel != null && playerLevel.isParallelTickEnabled()) {
+            if (playerLevel != null && playerLevel.isParallelTickEnabled() && !player.isSpawnInitCompleted()) {
+                // 登录序列未收尾：与包路由同守卫，存档转主线程与登录串行（不计入完成广播）
+                // Login not finalized: same guard as packet routing - save on the primary thread instead
+                sender.getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                    if (player.isOnline()) {
+                        player.save();
+                    }
+                });
+            } else if (playerLevel != null) {
                 saves.add(playerLevel.scheduleSyncTaskAndWait(() -> {
                     if (player.isOnline() && player.getLevel() == playerLevel) {
                         player.save();
@@ -81,22 +89,35 @@ public class SaveCommand extends VanillaCommand {
         }
 
         for (Level level : sender.getServer().getLevels().values()) {
-            if (level.isParallelTickEnabled()) {
-                saves.add(level.scheduleSyncTaskAndWait(() -> level.save(true)));
-            } else {
-                level.save(true);
-            }
+            saves.add(level.scheduleSyncTaskAndWait(() -> level.save(true)));
+        }
+
+        Runnable broadcastSuccess = () ->
+                broadcastCommandMessage(sender, new TranslationContainer("commands.save.success"));
+        Runnable broadcastPartial = () -> {
+            sender.getServer().getLogger().error("Timed out or failed waiting for parallel-world saves during /save-all; some worlds may still be writing");
+            broadcastCommandMessage(sender, "Save incomplete: some worlds may still be writing (timed out or failed)");
+        };
+
+        if (sender.getServer().isLevelThread()) {
+            // orTimeout 兜底：世界线程卡死时 allOf 永不完成，广播会被静默吞掉
+            // orTimeout backstop: a wedged level thread would leave allOf (and the broadcast) pending forever
+            CompletableFuture.allOf(saves.toArray(new CompletableFuture[0]))
+                    .orTimeout(60, TimeUnit.SECONDS)
+                    .whenComplete((result, error) -> sender.getServer().getScheduler()
+                            .scheduleTask(InternalPlugin.INSTANCE, error == null ? broadcastSuccess : broadcastPartial));
+            return true;
         }
 
         try {
             CompletableFuture.allOf(saves.toArray(new CompletableFuture[0])).get(60, TimeUnit.SECONDS);
+            broadcastSuccess.run();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            broadcastPartial.run();
         } catch (Exception e) {
-            sender.getServer().getLogger().error("Timed out or failed waiting for parallel-world saves during /save-all; some worlds may still be writing", e);
+            broadcastPartial.run();
         }
-
-        broadcastCommandMessage(sender, new TranslationContainer("commands.save.success"));
         return true;
     }
 }

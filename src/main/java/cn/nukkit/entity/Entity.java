@@ -2830,9 +2830,11 @@ public abstract class Entity extends Location implements Metadatable {
         }
 
         this.setLevel(targetLevel);
-        // 跨世界后 lastUpdate 须换到目标世界时基（并行=GameLoop tick，否则服务器 tick），
-        // 否则源/目标两域计数漂移会令 tickDiff 恒负（实体停 tick）或巨正（age 跳变）
-        this.resetLastUpdate(targetLevel.getTickForEntityInit());
+        // 跨世界后 lastUpdate 换到目标时基且取时基减 1（非并行时与 master 等价，下一拍 tickDiff=1）；
+        // 不切换则两域计数漂移会令 tickDiff 恒负（停 tick）或巨正（age 跳变）
+        // After crossing worlds lastUpdate moves to the target base minus one (master-equivalent, tickDiff==1
+        // next tick); without the switch the domain drift freezes or fast-forwards entities
+        this.resetLastUpdate(targetLevel.getTickForEntityInit() - 1);
         this.level.addEntity(this);
         this.chunk = null;
 
@@ -3601,45 +3603,49 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setDataFlagSelfOnly(int propertyId, int id, boolean value) {
-        if (this.getDataFlag(propertyId, id) != value) {
-            if (propertyId == EntityHuman.DATA_PLAYER_FLAGS) {
-                byte flags = (byte) this.getDataPropertyByte(propertyId);
-                flags ^= 1 << id;
-                this.setDataPropertyAndSendOnlyToSelf(new ByteEntityData(propertyId, flags));
-            } else {
-                LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
-                long flags = longEntityData.getData() ^ 1L << id;
-                LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
-                if (propertyId == DATA_FLAGS) {
-                    long data291;
-                    long data223;
-                    long data137;
+        // 与 setDataFlag 同锁：读-异或-写复合不持监视器会丢并发翻转
+        // Same lock as setDataFlag: an unlocked read-xor-write can lose a concurrent flip
+        synchronized (this.dataProperties) {
+            if (this.getDataFlag(propertyId, id) != value) {
+                if (propertyId == EntityHuman.DATA_PLAYER_FLAGS) {
+                    byte flags = (byte) this.getDataPropertyByte(propertyId);
+                    flags ^= 1 << id;
+                    this.setDataPropertyAndSendOnlyToSelf(new ByteEntityData(propertyId, flags));
+                } else {
+                    LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
+                    long flags = longEntityData.getData() ^ 1L << id;
+                    LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
+                    if (propertyId == DATA_FLAGS) {
+                        long data291;
+                        long data223;
+                        long data137;
 
-                    int id291 = id > 46 ? id - 1 : id;
-                    int id223 = id291 > 30 ? id291 - 1 : id291;
-                    int id137 = id223 >= 23 && id223 < 43 || id223 >= 46 ? id223 - 1 : id223;
+                        int id291 = id > 46 ? id - 1 : id;
+                        int id223 = id291 > 30 ? id291 - 1 : id291;
+                        int id137 = id223 >= 23 && id223 < 43 || id223 >= 46 ? id223 - 1 : id223;
 
-                    if (longEntityData.dataVersions != null && longEntityData.dataVersions.length == 3) {
-                        data291 = longEntityData.dataVersions[2];
-                        data223 = longEntityData.dataVersions[1];
-                        data137 = longEntityData.dataVersions[0];
-                    } else {
-                        data291 = 0L;
-                        data223 = 0L;
-                        data137 = 0L;
+                        if (longEntityData.dataVersions != null && longEntityData.dataVersions.length == 3) {
+                            data291 = longEntityData.dataVersions[2];
+                            data223 = longEntityData.dataVersions[1];
+                            data137 = longEntityData.dataVersions[0];
+                        } else {
+                            data291 = 0L;
+                            data223 = 0L;
+                            data137 = 0L;
+                        }
+
+                        newLongEntityData.dataVersions = new long[] {
+                                data137 ^ 1L << id137,
+                                data223 ^ 1L << id223,
+                                data291 ^ 1L << id291
+                        };
+                    } else if (propertyId == DATA_FLAGS_EXTENDED) {
+                        int id2 = id > 46 ? id - 1 : id;
+                        flags = longEntityData.dataVersions != null && longEntityData.dataVersions.length == 1 ? longEntityData.dataVersions[0] : 0L;
+                        newLongEntityData.dataVersions = new long[]{flags ^ 1L << id2};
                     }
-
-                    newLongEntityData.dataVersions = new long[] {
-                            data137 ^ 1L << id137,
-                            data223 ^ 1L << id223,
-                            data291 ^ 1L << id291
-                    };
-                } else if (propertyId == DATA_FLAGS_EXTENDED) {
-                    int id2 = id > 46 ? id - 1 : id;
-                    flags = longEntityData.dataVersions != null && longEntityData.dataVersions.length == 1 ? longEntityData.dataVersions[0] : 0L;
-                    newLongEntityData.dataVersions = new long[]{flags ^ 1L << id2};
+                    this.setDataPropertyAndSendOnlyToSelf(newLongEntityData);
                 }
-                this.setDataPropertyAndSendOnlyToSelf(newLongEntityData);
             }
         }
     }

@@ -18,10 +18,10 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
+import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.permission.Permission;
 import cn.nukkit.permission.PermissionAttachment;
 import cn.nukkit.permission.PermissionAttachmentInfo;
-import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
@@ -282,7 +282,7 @@ public class BlockEntityCommandBlock extends BlockEntitySpawnable
                         // dispatchCommand for ParamTree commands) may capture the
                         // precise number of affected targets.
                         this.receivedOutputSuccessCount = false;
-                        boolean result = this.server.dispatchCommand(this, event.getCommand());
+                        boolean result = this.server.dispatchCommandAndWait(this, event.getCommand(), 10_000);
                         if (!this.receivedOutputSuccessCount) {
                             // Legacy command or one that didn't report output:
                             // fall back to the boolean dispatch result (0/1).

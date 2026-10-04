@@ -457,8 +457,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private double lastRightClickTime = 0.0;
     private long lastClickAirTime = 0;
     private BlockVector3 lastRightClickPos = null;
-    private final IntOpenHashSet processedItemStackRequestIds = new IntOpenHashSet();
-    private int processedItemStackRequestTick = Integer.MIN_VALUE;
+    // ItemStackRequest 去重用墙钟窗而非 tick 基准：包处理线程回落时 tick 会被另一线程推进，同 id 两包跨边界即被重复执行（物品复制）
+    // Dedup on a wall-clock window, not a tick base: a fallback processing thread lets the base advance mid-batch, re-executing same-id requests (dupes)
+    private final Map<Integer, Long> processedItemStackRequestExpiry = new ConcurrentHashMap<>();
+    private static final long ITEM_STACK_REQUEST_DEDUP_WINDOW_MS = 3_000L;
+    private int itemStackDedupPurgeCounter;
     public EntityFishingHook fishing = null;
     public boolean formOpen;
     public boolean locallyInitialized;
@@ -1281,27 +1284,57 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    private static final long LONG_TICK_GRACE_MILLIS = 60_000L;
+    private static final long LONG_TICK_GRACE_MILLIS_PRIMARY = 25_000L;
+    // 主线程等待总预算硬封顶：宽限+轮次上界加 stop join/teardown 会逼近 Watchdog 60s 阈值；非主线程不受监控，不设预算
+    // Hard cap so the grace+rounds bound plus stop-join/teardown stays under the 60s Watchdog threshold; non-primary waiters are unmonitored
+    private static final long LEVEL_THREAD_WAIT_BUDGET_MILLIS_PRIMARY = 35_000L;
+
     private boolean levelThreadUnresponsive(CompletableFuture<Void> future, Level level) {
-        // 进度感知：等待期间世界线程仍在推进（合法长 tick/大存档/GC 停顿/慢插件）时延长等待，
-        // 而不是一律按卡死停掉线程；连续无推进或持续忙而不完成才判定卡死
-        // Progress-aware: extend the wait while the level thread keeps ticking (legit long
-        // tick / big save / GC pause / slow plugin) instead of always stopping it as stuck;
-        // declare stuck only after sustained no-progress or never-completing busyness
+        // tick 开始时间戳在单次 tick 内不推进，执行中的长 tick 会被误判成无进展，故辅以 tick 年龄宽限
+        // The tick-start timestamp freezes mid-tick, so a running long tick looks like no-progress; the age grace covers that
+        boolean primaryWaiter = this.server.isPrimaryThread();
+        long graceMillis = primaryWaiter ? LONG_TICK_GRACE_MILLIS_PRIMARY : LONG_TICK_GRACE_MILLIS;
+        int rounds = primaryWaiter ? 2 : 5;
+        long deadlineMillis = primaryWaiter
+                ? System.currentTimeMillis() + LEVEL_THREAD_WAIT_BUDGET_MILLIS_PRIMARY
+                : Long.MAX_VALUE;
         long lastProgressMillis = level.getLevelThreadLastTickMillis();
-        for (int round = 0; round < 5; round++) {
+        for (int round = 0; round < rounds; round++) {
+            long waitMillis = 10_000L;
+            if (deadlineMillis != Long.MAX_VALUE) {
+                waitMillis = Math.min(waitMillis, deadlineMillis - System.currentTimeMillis());
+                if (waitMillis <= 0) {
+                    this.server.getLogger().warning("Level thread for '" + level.getName()
+                            + "' still busy at the end of the primary-thread wait budget; treating as stuck");
+                    return true;
+                }
+            }
             try {
-                future.get(10, TimeUnit.SECONDS);
+                future.get(waitMillis, TimeUnit.MILLISECONDS);
                 return false;
             } catch (TimeoutException e) {
                 long nowProgress = level.getLevelThreadLastTickMillis();
+                if (deadlineMillis != Long.MAX_VALUE && System.currentTimeMillis() >= deadlineMillis) {
+                    this.server.getLogger().warning("Level thread for '" + level.getName()
+                            + "' still busy at the end of the primary-thread wait budget; treating as stuck");
+                    return true;
+                }
                 if (nowProgress > lastProgressMillis) {
                     lastProgressMillis = nowProgress;
                     this.server.getLogger().warning("Level thread for '" + level.getName()
                             + "' is still busy (ticks are progressing); extending the wait");
                     continue;
                 }
+                long tickAgeMillis = lastProgressMillis > 0 ? System.currentTimeMillis() - lastProgressMillis : -1L;
+                if (tickAgeMillis >= 0 && tickAgeMillis < graceMillis) {
+                    this.server.getLogger().warning("Level thread for '" + level.getName()
+                            + "' is mid-tick (" + (tickAgeMillis / 1000) + "s so far); extending the wait");
+                    round--; // 宽限不消耗轮次 / the grace does not consume a round
+                    continue;
+                }
                 this.server.getLogger().warning("Level thread for '" + level.getName()
-                        + "' still unresponsive after 15s with no tick progress; treating as stuck");
+                        + "' is unresponsive with no tick progress beyond the grace; treating as stuck");
                 return true;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -1316,13 +1349,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return true;
     }
 
+    /**
+     * 停止世界线程后执行兜底动作；线程拒不退出时改在调用线程直接执行，action 必须幂等（CAS 守卫）。
+     * <p>
+     * Runs the fallback after stopping the level thread; a wedged thread means the action runs on the caller, so it must be idempotent (CAS-guarded).
+     */
     private void runAfterLevelThreadStops(Level level, String action, Runnable queuedAction) {
         level.stopLevelThread();
         if (!level.isLevelThreadAlive()) {
             queuedAction.run();
         } else {
             this.server.getLogger().error("Level thread for '" + level.getName()
-                    + "' remains stuck; giving up: " + action);
+                    + "' remains stuck; running '" + action + "' on the calling thread as a last resort");
+            queuedAction.run();
         }
     }
 
@@ -5424,22 +5463,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        // 去重窗口 tick 取所属世界时基：世界线程的 drain 批次内该值恒定；此前读服务器 tick
-        // 会被主线程并发推进，同批次两次读取跨 tick 边界即清空去重集、重复执行同 id 请求
-        // Dedup-window tick uses the owning level's time base, which stays constant for a
-        // world-thread drain batch; the server tick can advance mid-batch (primary thread)
-        // and would clear the dedup set between two packets of the same batch
-        int currentTick = this.level != null ? (int) this.level.getTickForEntityInit() : this.server.getTick();
-        if (this.processedItemStackRequestTick != currentTick) {
-            this.processedItemStackRequestTick = currentTick;
-            this.processedItemStackRequestIds.clear();
+        long now = System.currentTimeMillis();
+        // 每 64 次调用顺带清理过期条目：条目量以请求速率为上界，通常只有个位数
+        // Opportunistic purge every 64 calls; the map is bounded by the request rate anyway
+        if ((++this.itemStackDedupPurgeCounter & 0x3F) == 0) {
+            this.processedItemStackRequestExpiry.values().removeIf(expiry -> expiry < now);
         }
 
         List<ItemStackRequest> pendingRequests = new ArrayList<>(requests.size());
         for (ItemStackRequest request : requests) {
-            if (this.processedItemStackRequestIds.add(request.getRequestId())) {
+            long expiry = now + ITEM_STACK_REQUEST_DEDUP_WINDOW_MS;
+            int requestId = request.getRequestId();
+            Long existing = this.processedItemStackRequestExpiry.putIfAbsent(requestId, expiry);
+            if (existing == null) {
                 pendingRequests.add(request);
+            } else if (existing < now) {
+                // replace 失败=另一线程已抢先重新登记且正在处理，视为已见
+                // a lost replace means another thread re-registered it and is processing it
+                if (this.processedItemStackRequestExpiry.replace(requestId, existing, expiry)) {
+                    pendingRequests.add(request);
+                }
             }
+            // 窗口内重复不刷新 expiry：续窗会拖长有效去重窗 / in-window duplicates must not
+            // refresh the expiry (replay would extend the window)
         }
 
         if (!pendingRequests.isEmpty()) {
