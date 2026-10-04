@@ -3,6 +3,7 @@ package cn.nukkit.level.format.leveldb;
 import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.level.ColdChunkLoadCounters;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
@@ -1289,7 +1290,9 @@ public class LevelDBProvider implements LevelProvider {
         long index = Level.chunkHash(chunkX, chunkZ);
         BaseFullChunk chunk = this.chunks.get(index);
         if (chunk == null) {
-            chunk = this.readOrCreateChunk(chunkX, chunkZ, create);
+            try (var ignored = ColdChunkLoadCounters.begin(this.getName(), ColdChunkLoadCounters.Kind.SYNCHRONOUS)) {
+                chunk = this.readOrCreateChunk(chunkX, chunkZ, create);
+            }
         }
         return chunk;
     }
@@ -1301,24 +1304,26 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public BaseFullChunk readChunkOffThread(int chunkX, int chunkZ) {
-        // 读锁允许并发读，并与 DB 关闭互斥。/ Read lock permits concurrent reads and excludes DB close.
-        this.dbReadCloseLock.readLock().lock();
-        try {
-            // 持锁后复检关闭状态。/ Recheck closed state under the lock.
-            if (this.closed) {
-                return null;
+        try (var ignored = ColdChunkLoadCounters.begin(this.getName(), ColdChunkLoadCounters.Kind.ASYNCHRONOUS)) {
+            // 读锁允许并发读，并与 DB 关闭互斥。/ Read lock permits concurrent reads and excludes DB close.
+            this.dbReadCloseLock.readLock().lock();
+            try {
+                // 持锁后复检关闭状态。/ Recheck closed state under the lock.
+                if (this.closed) {
+                    return null;
+                }
+                // 固定本次解码的 level 引用。/ Snapshot level for this decode.
+                Level levelSnapshot = this.level;
+                if (levelSnapshot == null) {
+                    return null;
+                }
+                // 读取前提交挂起写。/ Commit pending data before reading.
+                this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
+                // 仅解码；缓存挂载与 ticking 留给主线程。/ Decode only; mount and ticking stay on the main thread.
+                return this.readChunkDeferred(chunkX, chunkZ, levelSnapshot);
+            } finally {
+                this.dbReadCloseLock.readLock().unlock();
             }
-            // 固定本次解码的 level 引用。/ Snapshot level for this decode.
-            Level levelSnapshot = this.level;
-            if (levelSnapshot == null) {
-                return null;
-            }
-            // 读取前提交挂起写。/ Commit pending data before reading.
-            this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
-            // 仅解码；缓存挂载与 ticking 留给主线程。/ Decode only; mount and ticking stay on the main thread.
-            return this.readChunkDeferred(chunkX, chunkZ, levelSnapshot);
-        } finally {
-            this.dbReadCloseLock.readLock().unlock();
         }
     }
 
