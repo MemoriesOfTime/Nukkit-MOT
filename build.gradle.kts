@@ -22,11 +22,21 @@ group = "cn.nukkit"
 version = "MOT-SNAPSHOT"
 
 java {
+    // 用 JDK 21 构建，但字节码经下方 release=17 钉在 Java 17（与 pom.xml release=17 一致），
+    // 产物仍可跑在 JRE 17+；缺了 release，字节码会直接跟 toolchain 变成 class file 65
+    // Build with JDK 21 while release=17 below pins bytecode to Java 17 (matching pom.xml);
+    // without release, the output would follow the toolchain as class file 65
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
     withSourcesJar()
     withJavadocJar()
+}
+
+// 覆盖 main/test/buildTools 全部编译任务，产物统一 Java 17 兼容
+// Covers every compile task (main/test/buildTools); output stays Java 17 compatible
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(17)
 }
 
 repositories {
