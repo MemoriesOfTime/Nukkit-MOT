@@ -6,6 +6,7 @@ import cn.nukkit.event.block.LiquidFlowEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.ColdChunkLoadCounters;
 import cn.nukkit.level.particle.SmokeParticle;
 import cn.nukkit.level.sound.FizzSound;
 import cn.nukkit.math.AxisAlignedBB;
@@ -231,6 +232,14 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
             this.level.scheduleUpdate(this, this.tickRate());
             return 0;
         } else if (type == Level.BLOCK_UPDATE_SCHEDULED) {
+            if (this.level.getServer().liquidLoadedBoundary && !this.areFlowChunksLoaded()) {
+                // Retry the whole operation before decay, events, downward flow or hardening.
+                // The scheduler deduplicates entries and rechecks the current block on dispatch.
+                try (var ignored = ColdChunkLoadCounters.begin(this.level.getFolderName(), ColdChunkLoadCounters.Kind.DEFERRED)) {
+                    this.level.scheduleUpdate(this, this.tickRate());
+                }
+                return 0;
+            }
             int decay = this.getFlowDecay(this);
             int multiplier = this.getFlowDecayPerBlock();
             if (decay > 0) {
@@ -313,6 +322,28 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
             }
         }
         return 0;
+    }
+
+    private boolean areFlowChunksLoaded() {
+        // calculateFlowCost reads the next neighbour before checking its recursion limit.
+        // Its maximum Manhattan reach is therefore 1 + 4 / decay, not 4 / decay.
+        // Three also covers the direct setBlock/updateAround/anti-xray neighbourhood.
+        // Arbitrary plugin callbacks and block-breaking cascades have their own footprints.
+        int radius = Math.max(3, 1 + 4 / this.getFlowDecayPerBlock());
+        int x = this.getFloorX();
+        int z = this.getFloorZ();
+        for (int chunkX = (x - radius) >> 4; chunkX <= (x + radius) >> 4; ++chunkX) {
+            int minX = chunkX << 4;
+            int dx = Math.max(0, Math.max(minX - x, x - (minX + 15)));
+            for (int chunkZ = (z - radius) >> 4; chunkZ <= (z + radius) >> 4; ++chunkZ) {
+                int minZ = chunkZ << 4;
+                int dz = Math.max(0, Math.max(minZ - z, z - (minZ + 15)));
+                if (dx + dz <= radius) {
+                    if (this.level.getChunkIfLoaded(chunkX, chunkZ) == null) return false;
+                }
+            }
+        }
+        return true;
     }
 
     protected void flowIntoBlock(Block block, int newFlowDecay) {
