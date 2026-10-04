@@ -664,7 +664,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean getAllowFlight() {
-        return this.adventureSettings.get(Type.ALLOW_FLIGHT);
+        return this.adventureSettings != null && this.adventureSettings.get(Type.ALLOW_FLIGHT);
     }
 
     /**

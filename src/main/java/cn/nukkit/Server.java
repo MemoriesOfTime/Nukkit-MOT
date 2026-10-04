@@ -92,6 +92,7 @@ import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.MapMaker;
 import com.google.gson.JsonParser;
 import eu.okaeri.configs.ConfigManager;
 import eu.okaeri.configs.yaml.snakeyaml.YamlSnakeYamlConfigurer;
@@ -379,7 +380,7 @@ public class Server {
      * Per-identity locks for player data IO, keyed by the data path identity (UUID string or
      * lowercased name).
      */
-    private final ConcurrentHashMap<String, ReentrantLock> playerDataLocks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ReentrantLock> playerDataLocks = createPlayerDataLocks();
     /**
      * 已调度未执行的异步保存任务，按身份索引；迁移前同步冲刷。
      * <p>
@@ -1795,6 +1796,7 @@ public class Server {
             }
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
+            Nukkit.shutdownLogging();
             System.exit(1);
         }
     }
@@ -2837,6 +2839,15 @@ public class Server {
         }
     }
 
+    /**
+     * A lock remains strongly reachable in every holder/waiter's local variable until unlock.
+     * Weak values therefore release retired identities without replacing any live lock.
+     * Never use weak keys or size/age eviction: equal identities must share a live lock.
+     */
+    static ConcurrentMap<String, ReentrantLock> createPlayerDataLocks() {
+        return new MapMaker().weakValues().makeMap();
+    }
+
     private ReentrantLock playerDataLock(String key) {
         return playerDataLocks.computeIfAbsent(key, k -> new ReentrantLock());
     }
@@ -3584,6 +3595,7 @@ public class Server {
             logConfigError(e);
             if (firstLoad) {
                 log.error("Server cannot start with an invalid configuration. Please fix nukkit-mot.yml and restart.");
+                Nukkit.shutdownLogging();
                 System.exit(1);
             } else {
                 log.error("Failed to reload nukkit-mot.yml. Keeping previous configuration.");

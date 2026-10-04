@@ -5455,7 +5455,8 @@ public class Level implements ChunkManager, Metadatable {
      */
     synchronized void mountChunk(PendingChunkLoad pending) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || levelProvider != pending.provider || pending.invalidated
+        if (levelProvider == null || levelProvider.getLevel() == null
+            || levelProvider != pending.provider || pending.invalidated
                 || levelProvider.isChunkLoaded(pending.hash)) {
             return;
         }

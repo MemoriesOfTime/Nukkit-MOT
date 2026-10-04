@@ -3,6 +3,7 @@ package cn.nukkit.level.format.leveldb;
 import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
@@ -1496,6 +1497,9 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private synchronized LevelDBChunk readOrCreateChunk(int chunkX, int chunkZ, boolean create) {
+        if (this.closed) {
+            return null;
+        }
         // 读取前提交挂起写。/ Commit pending data before reading.
         this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
         // 锁内复查：loadChunk 的 containsKey 预检在锁外，并发加载同坐标时这里返回既有实例，
@@ -1807,12 +1811,14 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public int getMinBlockY() {
-        return this.level.getDimensionData().getMinHeight();
+        Level levelTemp = this.level;
+        return (levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData()).getMinHeight();
     }
 
     @Override
     public int getMaxBlockY() {
-        return this.level.getDimensionData().getMaxHeight();
+        Level levelTemp = this.level;
+        return (levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData()).getMaxHeight();
     }
 
     protected static BlockVector3 deserializeExtraDataKey(int chunkVersion, int key) {

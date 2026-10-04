@@ -24,6 +24,8 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
 import cn.nukkit.event.player.PlayerTeleportEvent;
+import cn.nukkit.inventory.PlayerInventory;
+import cn.nukkit.inventory.PlayerOffhandInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.*;
@@ -1898,13 +1900,15 @@ public abstract class Entity extends Location implements Metadatable {
         setLastDamageCause(source);
         float newHealth = health - source.getFinalDamage();
         if (newHealth < 1 && this instanceof Player p) {
+            PlayerInventory inv = p.getInventory();
+            PlayerOffhandInventory offhand = p.getOffhandInventory();
             if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.SUICIDE) {
                 boolean totem = false;
                 boolean isOffhand = false;
                 // A deliberately held totem takes precedence over the offhand.
-                if (isTotem(p.getInventory().getItemInHandFast())) {
+                if (inv != null && isTotem(inv.getItemInHandFast())) {
                     totem = true;
-                } else if (isTotem(p.getOffhandInventory().getItemFast(0))) {
+                } else if (offhand != null && isTotem(offhand.getItemFast(0))) {
                     totem = true;
                     isOffhand = true;
                 }
@@ -1926,19 +1930,19 @@ public abstract class Entity extends Location implements Metadatable {
                     p.dataPacket(pk);
 
                     if (isOffhand) {
-                        p.getOffhandInventory().decreaseCount(0);
+                        offhand.decreaseCount(0);
                     } else {
-                        p.getInventory().decreaseCount(p.getInventory().getHeldItemIndex());
+                        inv.decreaseCount(inv.getHeldItemIndex());
                     }
 
                     source.setCancelled(true);
                     return false;
                 }
-            } else if (isTotem(p.getOffhandInventory().getItemFast(0))) {
+            } else if (offhand != null && isTotem(offhand.getItemFast(0))) {
                 // This damage bypasses the totem (SUICIDE/VOID) and will kill the player. Hide the
                 // offhand totem before the death/damage signal reaches the client to prevent its
                 // local auto-revival creating a "ghost" state; the real item is left untouched.
-                p.getOffhandInventory().sendEmptyContentsToHolder();
+                offhand.sendEmptyContentsToHolder();
             }
         }
         this.setHealth(newHealth);
@@ -2683,9 +2687,12 @@ public abstract class Entity extends Location implements Metadatable {
                     }
 
                     if (this instanceof Player player) {
-                        final int level = player.getInventory().getBootsFast().getEnchantmentLevel(Enchantment.ID_PROTECTION_FALL);
-                        if (level != 0) {
-                            damage -= damage / 100 * (level * 12);
+                        PlayerInventory inv = player.getInventory();
+                        if (inv != null) {
+                            final int level = inv.getBootsFast().getEnchantmentLevel(Enchantment.ID_PROTECTION_FALL);
+                            if (level != 0) {
+                                damage -= damage / 100 * (level * 12);
+                            }
                         }
                     }
 

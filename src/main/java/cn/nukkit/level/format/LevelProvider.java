@@ -2,6 +2,7 @@ package cn.nukkit.level.format;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
+import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.generic.BaseFullChunk;
@@ -183,10 +184,12 @@ public interface LevelProvider {
     }
 
     default int getMinBlockY() {
-        return Math.max(this.getLevel().getDimensionData().getMinHeight(), 0);
+        Level level = this.getLevel();
+        return Math.max((level == null ? DimensionData.LEGACY_DIMENSION : level.getDimensionData()).getMinHeight(), 0);
     }
 
     default int getMaxBlockY() {
-        return Math.min(this.getLevel().getDimensionData().getMaxHeight(), 255);
+        Level level = this.getLevel();
+        return Math.min((level == null ? DimensionData.LEGACY_DIMENSION : level.getDimensionData()).getMaxHeight(), 255);
     }
 }
