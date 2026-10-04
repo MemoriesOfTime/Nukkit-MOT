@@ -1911,6 +1911,12 @@ public abstract class Entity extends Location implements Metadatable {
                         inv.decreaseCount(inv.getHeldItemIndex());
                     }
 
+                    // A totem consumes the lethal hit but returns false below, so EntityLiving
+                    // cannot arm its usual attackTime. Retain that same hurt window, including
+                    // its stronger-hit rule, without granting absolute noDamageTicks immunity.
+                    EntityLiving living = p;
+                    living.attackTime = Math.max(living.attackTime, source.getAttackCooldown());
+                    this.scheduleUpdate();
                     source.setCancelled(true);
                     return false;
                 }
@@ -2554,10 +2560,21 @@ public abstract class Entity extends Location implements Metadatable {
         return absorption;
     }
 
+    static Attribute clientAbsorptionAttribute(float absorption, int protocol) {
+        Attribute attribute = Attribute.getAttribute(Attribute.ABSORPTION);
+        if (protocol >= ProtocolInfo.v1_26_0) {
+            // Bedrock 1.26 builds one HUD heart slot per advertised capacity point. Sending the
+            // server-side Float.MAX_VALUE range therefore freezes mobile clients. Preserve
+            // custom values above vanilla's 16 absorption points instead of clipping them.
+            attribute.setMaxValue(Math.max(16.0f, absorption));
+        }
+        return attribute.setValue(absorption);
+    }
+
     public void setAbsorption(float absorption) {
         if (absorption != this.absorption || (this instanceof Player player && player.protocol >= ProtocolInfo.v1_21_60)) {
             this.absorption = absorption;
-            if (this instanceof Player player) player.setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
+            if (this instanceof Player player) player.setAttribute(clientAbsorptionAttribute(absorption, player.protocol));
         }
     }
 
@@ -3091,8 +3108,7 @@ public abstract class Entity extends Location implements Metadatable {
             }
 
             if (block.getId() == Block.POWDER_SNOW) {
-                portal = true;
-                continue;
+                powderSnow = true;
             }
 
             block.onEntityCollide(this);
@@ -3104,6 +3120,18 @@ public abstract class Entity extends Location implements Metadatable {
             inPortalTicks++;
         } else {
             this.inPortalTicks = 0;
+        }
+
+        if (powderSnow) {
+            if (this.getFreezingTicks() < 140) {
+                this.addFreezingTicks(1);
+            }
+        } else if (this.getFreezingTicks() > 0) {
+            this.addFreezingTicks(-1);
+        }
+
+        if (this.getFreezingTicks() == 140 && this.getServer().getTick() % 40 == 0) {
+            this.attack(new EntityDamageEvent(this, EntityDamageEvent.DamageCause.FREEZING, getFrostbiteInjury()));
         }
 
         if (vector.lengthSquared() > 0) {
