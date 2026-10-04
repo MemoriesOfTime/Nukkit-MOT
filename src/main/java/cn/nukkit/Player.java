@@ -2797,10 +2797,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int radius = 2 + Math.min(frostWalkerLevel, EnchantmentFrostWalker.MAX_FREEZE_RADIUS - 2);
             for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
                 for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
-                    Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
                     Block block = level.getBlock(coordX, this.getFloorY() - 1, coordZ);
-                    if (block instanceof BlockWater water && up.isAir()) {
-                        if (water.getFluidHeightPercent() < 0.15) {
+                    if (block instanceof BlockWater water && water.getFluidHeightPercent() < 0.15) {
+                        if (level.getBlock(coordX, this.getFloorY(), coordZ).isAir()) {
                             WaterFrostEvent ev = new WaterFrostEvent(block);
                             server.getPluginManager().callEvent(ev);
                             if (!ev.isCancelled()) {
