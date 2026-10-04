@@ -28,6 +28,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.vibration.VibrationEvent;
 import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
@@ -477,6 +478,13 @@ public abstract class Entity extends Location implements Metadatable {
     public Entity riding = null;
 
     public FullChunk chunk;
+
+    // Network movement watermarks (lastX/Y/Z) are not necessarily in the owned chunk.
+    private FullChunk lastValidPositionChunk;
+    private double lastValidChunkX;
+    private double lastValidChunkY;
+    private double lastValidChunkZ;
+    private float lastValidChunkYSize;
 
     protected EntityDamageEvent lastDamageCause = null;
 
@@ -3148,11 +3156,30 @@ public abstract class Entity extends Location implements Metadatable {
     protected void checkChunks() {
         int cx = (int) this.x >> 4;
         int cz = (int) this.z >> 4;
+        boolean guarded = this.isChunkTransitionGuarded(this.level, cx, cz);
         if (this.chunk == null || (this.chunk.getX() != cx) || this.chunk.getZ() != cz) {
+            FullChunk destination = null;
+            if (guarded) {
+                try {
+                    destination = this.level.getChunk(cx, cz, true);
+                } catch (RuntimeException failure) {
+                    this.restoreChunkPosition();
+                    this.level.reportChunkLoadFailure(cx, cz, failure);
+                    return;
+                }
+                if (destination == null || destination instanceof BaseFullChunk fullChunk
+                        && fullChunk.isReadFailurePlaceholder()) {
+                    this.restoreChunkPosition();
+                    return;
+                }
+            }
             if (this.chunk != null) {
                 this.chunk.removeEntity(this);
             }
-            this.chunk = this.level.getChunk(cx, cz, true);
+            this.chunk = guarded ? destination : this.level.getChunk(cx, cz, true);
+            if (guarded) {
+                this.chunk.addEntity(this);
+            }
 
             if (!this.justCreated) {
                 Map<Integer, Player> newChunk = this.level.getChunkPlayers(cx, cz);
@@ -3169,12 +3196,47 @@ public abstract class Entity extends Location implements Metadatable {
                 }
             }
 
-            if (this.chunk == null) {
-                return;
+            if (!guarded && this.chunk != null) {
+                this.chunk.addEntity(this);
             }
-
-            this.chunk.addEntity(this);
         }
+        this.rememberChunkPosition();
+    }
+
+    protected final boolean isChunkTransitionGuarded(Level target, int chunkX, int chunkZ) {
+        if (this.server.asyncChunkLoadCompletion) return true;
+        // A live switch-off must not admit entities to an existing, still unsavable stand-in.
+        BaseFullChunk cached = target == null ? null : target.getChunkIfLoaded(chunkX, chunkZ);
+        return cached != null && cached.isReadFailurePlaceholder();
+    }
+
+    protected final void rememberChunkPosition() {
+        this.lastValidPositionChunk = this.chunk;
+        this.lastValidChunkX = this.x;
+        this.lastValidChunkY = this.y;
+        this.lastValidChunkZ = this.z;
+        this.lastValidChunkYSize = this.ySize;
+    }
+
+    protected final void restoreChunkPosition() {
+        if (this.chunk == null) {
+            return;
+        }
+        if (this.lastValidPositionChunk == this.chunk) {
+            this.x = this.lastValidChunkX;
+            this.y = this.lastValidChunkY;
+            this.z = this.lastValidChunkZ;
+            this.ySize = this.lastValidChunkYSize;
+        } else {
+            // A plugin may assign chunk directly, without a prior successful position check.
+            double minX = this.chunk.getX() * 16d + 0.5;
+            double minZ = this.chunk.getZ() * 16d + 0.5;
+            this.x = Math.max(minX, Math.min(this.x, minX + 15));
+            this.z = Math.max(minZ, Math.min(this.z, minZ + 15));
+        }
+        this.recalculateBoundingBox(false);
+        this.blocksAround = null;
+        this.collisionBlocks = null;
     }
 
     public boolean setPosition(Vector3 pos) {
@@ -3192,11 +3254,31 @@ public abstract class Entity extends Location implements Metadatable {
             return false;
         }
 
+        Level targetLevel = pos instanceof Position position && position.level != null ? position.level : this.level;
+        int targetChunkX = this instanceof Player ? pos.getChunkX() : (int) pos.x >> 4;
+        int targetChunkZ = this instanceof Player ? pos.getChunkZ() : (int) pos.z >> 4;
+        boolean guarded = this.isChunkTransitionGuarded(targetLevel, targetChunkX, targetChunkZ);
+
         if (pos instanceof Position) {
             Level oldLevel = this.level;
             Level newLevel = ((Position) pos).level;
 
             if (newLevel != null && newLevel != oldLevel) {
+                if (guarded) {
+                    // Player.checkChunks uses floor coordinates; preserve each path's indexing.
+                    int cx = this instanceof Player ? pos.getChunkX() : (int) pos.x >> 4;
+                    int cz = this instanceof Player ? pos.getChunkZ() : (int) pos.z >> 4;
+                    BaseFullChunk destination;
+                    try {
+                        destination = newLevel.getChunk(cx, cz, true);
+                    } catch (RuntimeException failure) {
+                        newLevel.reportChunkLoadFailure(cx, cz, failure);
+                        return false;
+                    }
+                    if (destination == null || destination.isReadFailurePlaceholder()) {
+                        return false;
+                    }
+                }
                 if (!this.switchLevel(newLevel)) {
                     return false;
                 }
@@ -3230,9 +3312,15 @@ public abstract class Entity extends Location implements Metadatable {
             this.blocksAround = null;
         }
 
+        double requestedX = pos.x;
+        double requestedY = pos.y;
+        double requestedZ = pos.z;
         this.checkChunks();
 
-        return true;
+        return !guarded || this.chunk != null
+                && this.x == requestedX && this.y == requestedY && this.z == requestedZ
+                && this.chunk.getX() == (this instanceof Player ? this.getChunkX() : (int) this.x >> 4)
+                && this.chunk.getZ() == (this instanceof Player ? this.getChunkZ() : (int) this.z >> 4);
     }
 
     public Vector3 getMotion() {
