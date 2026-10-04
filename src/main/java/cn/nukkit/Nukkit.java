@@ -112,6 +112,7 @@ public class Nukkit {
             System.out.print("\u001B]0;Server Stopped\u0007");
         }
 
+        shutdownLogging();
         System.exit(0);
     }
 
@@ -151,6 +152,10 @@ public class Nukkit {
 
     public static Level getLogLevel() {
         return ((LoggerContext) LogManager.getContext(false)).getConfiguration().getLoggerConfig(org.apache.logging.log4j.LogManager.ROOT_LOGGER_NAME).getLevel();
+    }
+
+    public static void shutdownLogging() {
+        ((LoggerContext) LogManager.getContext(false)).stop();
     }
 
     public static String getBranch() {

@@ -122,11 +122,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -1558,6 +1554,7 @@ public class Server {
             }
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
+            Nukkit.shutdownLogging();
             System.exit(1);
         }
     }
@@ -3281,6 +3278,7 @@ public class Server {
             logConfigError(e);
             if (firstLoad) {
                 log.error("Server cannot start with an invalid configuration. Please fix nukkit-mot.yml and restart.");
+                Nukkit.shutdownLogging();
                 System.exit(1);
             } else {
                 log.error("Failed to reload nukkit-mot.yml. Keeping previous configuration.");
