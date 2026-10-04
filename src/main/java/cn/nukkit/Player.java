@@ -313,6 +313,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int chunksSent = 0;
     private boolean hasSpawnChunks;
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
+    private long chunkSendScanCursor;
+    private boolean chunkSendScanCursorSet;
+    private LongOpenHashSet chunkSendHeadVisited;
     protected int nextChunkOrderRun = 1;
     // 供 checkNetwork 检测跨区块/转向即时重排 / For checkNetwork cross-chunk/turn instant reorder
     private int lastOrderChunkX = Integer.MIN_VALUE;
@@ -1298,6 +1301,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+        BaseFullChunk currentChunk = this.level.getChunkIfLoaded(x, z);
+        if (currentChunk != null && currentChunk.isReadFailurePlaceholder()) {
+            this.loadQueue.add(Level.chunkHash(x, z));
+            return;
+        }
         this.usedChunks.put(Level.chunkHash(x, z), Boolean.TRUE);
 
         this.dataPacket(packet);
@@ -1358,32 +1366,87 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!loadQueue.isEmpty()) {
             int count = 0;
+            int loadRequests = 0;
+            boolean completionLoad = this.server.asyncChunkLoadCompletion;
             boolean asyncLoad = this.level.isAsyncChunkLoadEnabled();
+            // Bound MAIN work independently of pending queue length. Every tick starts at the
+            // head (nearest chunks first): headLimit entries that still need work, while reads
+            // already in flight are skipped for free up to tailLimit. The tail then resumes after
+            // the last deferred tail entry with its own tailLimit, so a corrupt/pending prefix
+            // cannot starve the healthy tail.
+            int headLimit = completionLoad ? (int) Math.max(16L, (long) server.chunksPerTick * 2) : 0;
+            int tailLimit = completionLoad ? (int) Math.max(32L, (long) server.chunksPerTick * 4) : 0;
+            int scanLimit = completionLoad
+                    ? (int) Math.min(loadQueue.size(), (long) headLimit + 2L * tailLimit)
+                    : loadQueue.size();
+            int headVisits = 0;
+            int tailVisits = 0;
+            int inFlightSkips = 0;
+            LongOpenHashSet headVisited = null;
+            if (completionLoad) {
+                headVisited = this.chunkSendHeadVisited;
+                if (headVisited == null) this.chunkSendHeadVisited = headVisited = new LongOpenHashSet();
+                headVisited.clear();
+            }
+            boolean tailPhase = false;
             LongIterator iter = loadQueue.longIterator();
-            while (iter.hasNext()) {
+            for (int visited = 0; visited < scanLimit && !loadQueue.isEmpty(); visited++) {
                 if (count >= server.chunksPerTick) {
                     break;
                 }
+                if (completionLoad && !tailPhase && headVisits >= headLimit) {
+                    tailPhase = true;
+                    if (this.chunkSendScanCursorSet && loadQueue.contains(this.chunkSendScanCursor)
+                            && !headVisited.contains(this.chunkSendScanCursor)) {
+                        iter = loadQueue.iterator(this.chunkSendScanCursor);
+                    }
+                }
+                if (tailPhase && tailVisits++ >= tailLimit) {
+                    break;
+                }
+                if (!iter.hasNext()) {
+                    // Head pass reached the end: the whole queue was visited this tick.
+                    if (!completionLoad || !tailPhase) break;
+                    iter = loadQueue.longIterator();
+                }
 
                 long index = iter.nextLong();
+                if (completionLoad) {
+                    if (tailPhase) {
+                        if (headVisited.contains(index)) continue;
+                    } else {
+                        headVisited.add(index);
+                        headVisits++;
+                    }
+                }
                 int chunkX = Level.getHashX(index);
                 int chunkZ = Level.getHashZ(index);
 
-                ++count;
+                if (!completionLoad) ++count;
 
                 try {
+                    BaseFullChunk loadedChunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
+                    if (loadedChunk != null && loadedChunk.isReadFailurePlaceholder()) continue;
                     this.usedChunks.put(index, false);
                     this.level.registerChunkLoader(this, chunkX, chunkZ, false);
 
                     // 异步区块加载:读取+解码在异步线程完成,区块由主线程 doTick 挂载后下一 tick 再发送,避免主线程同步读取磁盘
                     // Async chunk loading: read+decode off-thread; the chunk is mounted in doTick and sent next tick, avoiding a sync disk read on the main thread
                     if (asyncLoad) {
-                        BaseFullChunk loadedChunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
                         if (loadedChunk == null) {
-                            if (this.level.requestChunkLoadAsync(chunkX, chunkZ)) {
+                            // Admission has its own budget; failed/pending reads never spend send slots.
+                            // A read already in flight costs nothing: the head is revisited every tick.
+                            if (completionLoad && this.level.isChunkLoadPending(chunkX, chunkZ)) {
+                                if (!tailPhase && inFlightSkips++ < tailLimit) headVisits--;
                                 continue;
                             }
-                            // 受理失败(executor 关闭等)→ 落到下方原同步路径 / rejected → fall through to the sync path below
+                            if (!completionLoad || loadRequests < server.chunksPerTick && !this.level.isChunkLoadBackedOff(chunkX, chunkZ)) {
+                                this.level.requestChunkLoadAsync(chunkX, chunkZ);
+                                ++loadRequests;
+                            }
+                            // A full disk-reader queue is backpressure, not permission to read
+                            // synchronously. Keep the request in loadQueue and retry next tick.
+                            continue;
                         } else if (!loadedChunk.isPopulated()) {
                             boolean neighboursCached = true;
                             boolean queueRejected = false;
@@ -1392,9 +1455,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     if ((dx | dz) == 0) {
                                         continue;
                                     }
-                                    if (this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz) == null) {
-                                        // 受理失败(队列已满/executor 关)→ 放弃异步预载,落到下方同步 populateChunk 保证推进,避免队列持续满时该区块永久悬挂
-                                        // Rejected (queue full / executor down) → abandon async preload and fall through to sync populateChunk to guarantee progress, so a saturated queue can't leave this chunk hanging forever
+                                    BaseFullChunk neighbour = this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz);
+                                    if (neighbour != null && neighbour.isReadFailurePlaceholder()) {
+                                        queueRejected = true;
+                                        break;
+                                    }
+                                    if (neighbour == null) {
+                                        // Population may read all eight neighbours. Defer it
+                                        // when any preload is rejected, just as for the centre.
                                         if (!this.level.requestChunkLoadAsync(chunkX + dx, chunkZ + dz)) {
                                             queueRejected = true;
                                             break;
@@ -1406,22 +1474,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     break;
                                 }
                             }
-                            if (!queueRejected && !neighboursCached) {
+                            if (queueRejected || !neighboursCached) {
                                 continue;
                             }
                         }
                     }
 
                     if (!this.level.populateChunk(chunkX, chunkZ)) {
+                        boolean quarantined = false;
+                        for (int dx = -1; dx <= 1; dx++) {
+                            for (int dz = -1; dz <= 1; dz++) {
+                                BaseFullChunk current = this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz);
+                                if (current != null && current.isReadFailurePlaceholder()) quarantined = true;
+                            }
+                        }
+                        if (quarantined) continue;
                         // 保中心向外顺序,避免外圈幽灵区块(等价 Allay enqueueFirst+break)
                         // Preserve center-out order, avoiding ghost chunks (cf. Allay enqueueFirst+break)
                         break;
                     }
 
+                    if (completionLoad) ++count;
                     iter.remove();
                 } catch (Exception ex) {
                     server.getLogger().logException(ex);
                     return;
+                } finally {
+                    if (completionLoad && tailPhase && loadQueue.contains(index)) {
+                        this.chunkSendScanCursor = index;
+                        this.chunkSendScanCursorSet = true;
+                    }
                 }
 
                 PlayerChunkRequestEvent ev = new PlayerChunkRequestEvent(this, chunkX, chunkZ);
@@ -7687,11 +7769,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     protected void checkChunks() {
+        boolean guarded = this.isChunkTransitionGuarded(this.level, this.getChunkX(), this.getChunkZ());
         if (this.chunk == null || (this.chunk.getX() != this.getChunkX() || this.chunk.getZ() != this.getChunkZ())) {
-            if (this.chunk != null) {
-                this.chunk.removeEntity(this);
+            if (guarded) {
+                BaseFullChunk destination;
+                int cx = this.getChunkX();
+                int cz = this.getChunkZ();
+                try {
+                    destination = this.level.getChunk(cx, cz, true);
+                } catch (RuntimeException failure) {
+                    this.level.reportChunkLoadFailure(cx, cz, failure);
+                    this.restoreChunkPosition();
+                    return;
+                }
+                if (destination == null || destination.isReadFailurePlaceholder()) {
+                    this.restoreChunkPosition();
+                    return;
+                }
+                if (this.chunk != null) this.chunk.removeEntity(this);
+                this.chunk = destination;
+            } else {
+                if (this.chunk != null) this.chunk.removeEntity(this);
+                this.chunk = this.level.getChunk(this.getChunkX(), this.getChunkZ(), true);
             }
-            this.chunk = this.level.getChunk(this.getChunkX(), this.getChunkZ(), true);
 
             if (!this.justCreated) {
                 Map<Integer, Player> newChunk = this.level.getChunkPlayers(this.getChunkX(), this.getChunkZ());
@@ -7716,6 +7816,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.chunk.addEntity(this);
         }
+        this.rememberChunkPosition();
     }
 
     protected boolean checkTeleportPosition() {

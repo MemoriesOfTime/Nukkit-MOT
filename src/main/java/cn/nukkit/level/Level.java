@@ -32,6 +32,7 @@ import cn.nukkit.item.ItemID;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.Chunk;
+import cn.nukkit.level.format.ChunkReadTicket;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
@@ -373,6 +374,7 @@ public class Level implements ChunkManager, Metadatable {
     private long blockUpdateFuseTrips;
     private long lastBlockUpdateReport;
     private final Map<Long, Set<Integer>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
+    private BlockLightBoundary blockLightBoundary;
 
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
@@ -467,6 +469,7 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private ExecutorService asyncChunkLoadExecutor;
+    private volatile boolean chunkLoadsClosing;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
     // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
@@ -488,6 +491,144 @@ public class Level implements ChunkManager, Metadatable {
     // 包内可见以便单元测试 / package-private for unit tests
     final ConcurrentHashMap<Long, PendingChunkLoad> pendingChunkLoads = new ConcurrentHashMap<>();
     final Queue<PendingChunkLoad> completedChunkLoads = new ConcurrentLinkedQueue<>();
+    // Keep failure state until recovery/level close: eviction would reset backoff under corruption.
+    final Cache<Long, PendingChunkLoad> chunkLoadFailures = Caffeine.newBuilder().build();
+    private volatile ConcurrentHashMap<Long, ChunkFailureLog> chunkLoadFailureCounts;
+    private volatile java.util.concurrent.PriorityBlockingQueue<FailedChunkRetry> failedChunkRetries;
+
+    private record FailedChunkRetry(PendingChunkLoad failed, long dueAtNanos)
+            implements Comparable<FailedChunkRetry> {
+        @Override
+        public int compareTo(FailedChunkRetry other) {
+            return Long.compare(this.dueAtNanos, other.dueAtNanos);
+        }
+    }
+
+    private void queueFailedChunkRetry(PendingChunkLoad failed, long dueAtNanos) {
+        if (this.failedChunkRetries == null) {
+            synchronized (this.chunkMountFence()) {
+                if (this.failedChunkRetries == null) this.failedChunkRetries = new java.util.concurrent.PriorityBlockingQueue<>();
+            }
+        }
+        this.failedChunkRetries.add(new FailedChunkRetry(failed, dueAtNanos));
+    }
+
+    /** Bounded tick work; player-held stand-ins recover even without another accessor call. */
+    void retryFailedChunkReads() {
+        var retries = this.failedChunkRetries;
+        if (retries == null || !this.server.asyncChunkLoadCompletion || this.chunkLoadsClosing) return;
+        for (int count = 0; count < 32; count++) {
+            FailedChunkRetry next = retries.peek();
+            if (next == null || this.chunkLoadRetryClock() - next.dueAtNanos < 0) return;
+            // A concurrent producer can only put an earlier (also due) entry ahead of peek.
+            next = retries.poll();
+            if (next == null) return;
+            PendingChunkLoad failed = next.failed;
+            if (this.getProvider() != failed.provider || this.chunkLoadFailures.getIfPresent(failed.hash) != failed) continue;
+            BaseFullChunk loaded = failed.provider.getLoadedChunk(failed.hash);
+            if (loaded == null || !loaded.isReadFailurePlaceholder() || !this.isChunkInUse(failed.hash)) continue;
+            this.retryFailedChunkRead(failed.x, failed.z);
+            if (!this.pendingChunkLoads.containsKey(failed.hash) && this.chunkLoadFailures.getIfPresent(failed.hash) == failed) {
+                // A full/stopped reader is backpressure, not another disk failure or inline IO.
+                this.queueFailedChunkRetry(failed, this.chunkLoadRetryClock() + TimeUnit.SECONDS.toNanos(1));
+            }
+        }
+    }
+
+    private static final class ChunkFailureLog {
+        long count;
+        long lastLoggedCount;
+        long lastLoggedNanos;
+    }
+
+    /** One stack per coordinate; later failures get a count/summary at most once per second. */
+    public void reportChunkLoadFailure(int x, int z, Throwable failure) {
+        var counts = this.chunkLoadFailureCounts;
+        if (counts == null) {
+            synchronized (this.chunkMountFence()) {
+                if (this.chunkLoadFailureCounts == null) this.chunkLoadFailureCounts = new ConcurrentHashMap<>();
+                counts = this.chunkLoadFailureCounts;
+            }
+        }
+        ChunkFailureLog state = counts.computeIfAbsent(chunkHash(x, z), ignored -> new ChunkFailureLog());
+        synchronized (state) {
+            long count = ++state.count;
+            long now = this.chunkLoadRetryClock();
+            String message = "Failed to load chunk " + x + ", " + z + " in level " + getFolderName();
+            if (count == 1) {
+                this.server.getLogger().error(message, failure);
+            } else if (now - state.lastLoggedNanos >= TimeUnit.SECONDS.toNanos(1)) {
+                this.server.getLogger().error(message + " (failures=" + count + ", since last log="
+                        + (count - state.lastLoggedCount) + "): " + failure);
+            } else {
+                return;
+            }
+            state.lastLoggedNanos = now;
+            state.lastLoggedCount = count;
+        }
+    }
+
+    public long getChunkLoadFailureCount(int x, int z) {
+        var counts = this.chunkLoadFailureCounts;
+        ChunkFailureLog state = counts == null ? null : counts.get(chunkHash(x, z));
+        if (state == null) return 0;
+        synchronized (state) {
+            return state.count;
+        }
+    }
+
+    /** Synchronous read failures use the same retry deadline as failed worker reads. */
+    public void recordChunkReadFailure(int x, int z, LevelProvider provider, Throwable failure) {
+        PendingChunkLoad failed = new PendingChunkLoad(x, z, chunkHash(x, z), provider);
+        failed.failure = failure;
+        this.backOffChunkRead(failed);
+        this.reportChunkLoadFailure(x, z, failure);
+    }
+
+    private void backOffChunkRead(PendingChunkLoad failed) {
+        this.chunkLoadFailures.asMap().compute(failed.hash, (hash, previous) -> {
+            int attempts = previous != null && previous.provider == failed.provider ? previous.failedAttempts : 0;
+            failed.failedAttempts = Math.min(7, Math.max(failed.failedAttempts, attempts) + 1);
+            long seconds = Math.min(60, 1L << (failed.failedAttempts - 1));
+            failed.retryAfterNanos = this.chunkLoadRetryClock() + TimeUnit.SECONDS.toNanos(seconds);
+            failed.completion.complete(new ChunkLoadResult(ChunkLoadResult.Status.FAILED, null, failed.failure));
+            return failed;
+        });
+        this.queueFailedChunkRetry(failed, failed.retryAfterNanos);
+    }
+
+    long chunkLoadRetryClock() {
+        return System.nanoTime();
+    }
+
+    /** True while an off-thread read for this chunk is admitted and not yet mounted. */
+    public boolean isChunkLoadPending(int x, int z) {
+        return this.pendingChunkLoads.containsKey(chunkHash(x, z));
+    }
+
+    public boolean isChunkLoadBackedOff(int x, int z) {
+        PendingChunkLoad failed = this.chunkLoadFailures.getIfPresent(chunkHash(x, z));
+        return failed != null && failed.provider == this.getProvider()
+                && this.chunkLoadRetryClock() - failed.retryAfterNanos < 0;
+    }
+
+    // Only admission/publication holds this monitor; native IO and lifecycle callbacks do not.
+    private volatile ChunkMountFence chunkMountFence;
+
+    private static final class ChunkMountFence {
+        final Map<Long, Integer> synchronousReads = new HashMap<>();
+    }
+
+    private ChunkMountFence chunkMountFence() {
+        ChunkMountFence fence = this.chunkMountFence;
+        if (fence == null) {
+            synchronized (ChunkMountFence.class) {
+                if (this.chunkMountFence == null) this.chunkMountFence = new ChunkMountFence();
+                fence = this.chunkMountFence;
+            }
+        }
+        return fence;
+    }
 
     static final class PendingChunkLoad {
         final int x;
@@ -497,8 +638,19 @@ public class Level implements ChunkManager, Metadatable {
         volatile BaseFullChunk chunk;
         volatile Throwable failure;
         volatile boolean invalidated;
+        BaseFullChunk retryPlaceholder;
+        int failedAttempts;
+        long retryAfterNanos;
+        final ChunkReadTicket ticket;
+        final CompletableFuture<ChunkLoadResult> completion = new CompletableFuture<>();
+        final CompletionStage<ChunkLoadResult> result = this.completion.minimalCompletionStage();
 
         PendingChunkLoad(int x, int z, long hash, LevelProvider provider) {
+            this(x, z, hash, provider, null);
+        }
+
+        PendingChunkLoad(int x, int z, long hash, LevelProvider provider, ChunkReadTicket ticket) {
+            this.ticket = ticket;
             this.x = x;
             this.z = z;
             this.hash = hash;
@@ -593,6 +745,8 @@ public class Level implements ChunkManager, Metadatable {
 
         if (this.server.asyncChunkSending) {
             this.asyncChuckExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("AsyncChunkThread for " + name).build());
+        }
+        if (this.server.asyncChunkSending || this.server.asyncChunkLoadCompletion) {
             this.asyncChunkLoadExecutor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
                     new ArrayBlockingQueue<>(Math.max(16, this.chunkGenerationQueueSize)),
                     new ThreadFactoryBuilder().setNameFormat("AsyncChunkLoadThread for " + name).build());
@@ -737,6 +891,17 @@ public class Level implements ChunkManager, Metadatable {
 
     public void close() {
         boolean interrupted = false;
+        this.chunkLoadsClosing = true;
+        // These read-only results can no longer be mounted. Skip queued disk reads,
+        // but retain the existing drain for reads which already entered the provider.
+        for (PendingChunkLoad pending : this.pendingChunkLoads.values()) {
+            pending.invalidated = true;
+            if (pending.ticket != null) {
+                pending.ticket.close();
+                pending.completion.complete(new ChunkLoadResult(ChunkLoadResult.Status.CANCELLED, null, null));
+                this.pendingChunkLoads.remove(pending.hash, pending);
+            }
+        }
         this.providerLock.writeLock().lock();
         try {
             for (ExecutorService executor : new ExecutorService[]{this.asyncChunkLoadExecutor, this.asyncChuckExecutor}) {
@@ -1258,6 +1423,7 @@ public class Level implements ChunkManager, Metadatable {
     @SuppressWarnings("unchecked")
     public void doTick(int currentTick) {
         updateBlockLight(lightQueue);
+        if (this.blockLightBoundary != null) this.blockLightBoundary.tick();
         this.checkTime();
 
         if (/*stopTime || !this.gameRules.getBoolean(GameRule.DO_DAYLIGHT_CYCLE) ||*/ currentTick % 6000 == 0) { // Keep the time in sync
@@ -1427,13 +1593,15 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
+        this.retryFailedChunkReads();
+
         // 挂载异步加载完成的区块;不以配置为 gate,保证配置热切换后残留 pending 也能排空
         // Mount async-loaded chunks; not gated by config so leftover pending drains after a hot config toggle
         if (!this.completedChunkLoads.isEmpty()) {
             PendingChunkLoad pending;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (pending = this.completedChunkLoads.poll()) != null; ++i) {
-                this.pendingChunkLoads.remove(pending.hash);
+                if (pending.ticket == null) this.pendingChunkLoads.remove(pending.hash, pending);
                 this.mountChunk(pending);
             }
         }
@@ -2450,22 +2618,36 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void updateBlockLight(Map<Long, Set<Integer>> map) {
-        int size = map.size();
-        if (size == 0) {
-            return;
+        // Snapshot only the work list. Detach each set under the producer's monitor,
+        // then release it before touching chunks. On failure, later chunks stay queued.
+        List<Long> pendingChunks;
+        synchronized (map) {
+            if (map.isEmpty()) {
+                return;
+            }
+            pendingChunks = new ArrayList<>(map.keySet());
         }
-        Queue<Long> lightPropagationQueue = new ConcurrentLinkedQueue<>();
-        Queue<Object[]> lightRemovalQueue = new ConcurrentLinkedQueue<>();
+        // These queues never escape this invocation; neither CAS nor boxed nodes are needed.
+        LongArrayFIFOQueue lightPropagationQueue = new LongArrayFIFOQueue();
+        LongArrayFIFOQueue lightRemovalQueue = new LongArrayFIFOQueue();
+        IntArrayFIFOQueue lightRemovalLevels = new IntArrayFIFOQueue();
         LongOpenHashSet visited = new LongOpenHashSet();
         LongOpenHashSet removalVisited = new LongOpenHashSet();
 
-        Iterator<Map.Entry<Long, Set<Integer>>> iter = map.entrySet().iterator();
-        while (iter.hasNext() && size-- > 0) {
-            Map.Entry<Long, Set<Integer>> entry = iter.next();
-            iter.remove();
-            long index = entry.getKey();
-            BaseFullChunk chunk = getChunk(getHashX(index), getHashZ(index), false);
-            Set<Integer> blocks = entry.getValue();
+        for (long index : pendingChunks) {
+            // generate=false still reads disk. Cold roots retain their bucket until mount.
+            BaseFullChunk chunk = getChunkIfLoaded(getHashX(index), getHashZ(index));
+            if (!BlockLightBoundary.healthy(chunk)) {
+                this.lightBoundary().request(index);
+                continue;
+            }
+            Set<Integer> blocks;
+            synchronized (map) {
+                blocks = map.remove(index);
+            }
+            if (blocks == null) {
+                continue;
+            }
 
             for (int blockHash : blocks) {
                 Vector3 pos = getBlockXYZ(index, blockHash, this.getDimensionData());
@@ -2480,10 +2662,11 @@ public class Level implements ChunkManager, Metadatable {
                         long hash = Hash.hashBlock(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ());
                         if (newLevel < oldLevel) {
                             removalVisited.add(hash);
-                            lightRemovalQueue.add(new Object[]{hash, oldLevel});
+                            lightRemovalQueue.enqueue(hash);
+                            lightRemovalLevels.enqueue(oldLevel);
                         } else {
                             visited.add(hash);
-                            lightPropagationQueue.add(hash);
+                            lightPropagationQueue.enqueue(hash);
                         }
                     }
                 }
@@ -2491,84 +2674,110 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         while (!lightRemovalQueue.isEmpty()) {
-            Object[] val = lightRemovalQueue.poll();
-            long node = (long) val[0];
+            long node = lightRemovalQueue.dequeueLong();
             int x = Hash.hashBlockX(node);
             int y = Hash.hashBlockY(node);
             int z = Hash.hashBlockZ(node);
 
-            int lightLevel = (int) val[1];
+            int lightLevel = lightRemovalLevels.dequeueInt();
 
-            this.computeRemoveBlockLight(x - 1, y, z, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x + 1, y, z, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y - 1, z, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y + 1, z, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y, z - 1, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y, z + 1, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
+            this.computeRemoveBlockLight(x - 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x + 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x, y - 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x, y + 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x, y, z - 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x, y, z + 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
         }
 
         while (!lightPropagationQueue.isEmpty()) {
-            long node = lightPropagationQueue.poll();
+            long node = lightPropagationQueue.dequeueLong();
 
             int x = Hash.hashBlockX(node);
             int y = Hash.hashBlockY(node);
             int z = Hash.hashBlockZ(node);
 
-            int id = this.getBlockIdAt(x, y, z);
+            BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
+            if (!BlockLightBoundary.healthy(chunk) || !isYInRange(y)) continue;
+            int id = chunk.getBlockId(x & 15, y, z & 15);
             int lightFilter = id >= Block.MAX_BLOCK_ID ? 15 : Block.lightFilter[id];
-            int lightLevel = this.getBlockLightAt(x, y, z) - lightFilter;
+            int lightLevel = chunk.getBlockLight(x & 15, y, z & 15) - lightFilter;
 
             if (lightLevel >= 1) {
-                this.computeSpreadBlockLight(x - 1, y, z, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x + 1, y, z, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x, y - 1, z, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x, y + 1, z, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x, y, z - 1, lightLevel, lightPropagationQueue, visited);
-                this.computeSpreadBlockLight(x, y, z + 1, lightLevel, lightPropagationQueue, visited);
+                this.computeSpreadBlockLight(x - 1, y, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x + 1, y, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x, y - 1, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x, y + 1, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x, y, z - 1, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x, y, z + 1, lightLevel, lightPropagationQueue, visited, pendingChunks);
             }
         }
     }
 
-    private void computeRemoveBlockLight(int x, int y, int z, int currentLight, Queue<Object[]> queue,
-                                         Queue<Long> spreadQueue, Set<Long> visited, Set<Long> spreadVisited) {
-        int current = this.getBlockLightAt(x, y, z);
+    private void computeRemoveBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue,
+                                         IntArrayFIFOQueue removalLevels, LongArrayFIFOQueue spreadQueue, Set<Long> visited, Set<Long> spreadVisited, List<Long> roots) {
+        if (!isYInRange(y)) return;
+        BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
+        if (!BlockLightBoundary.healthy(chunk)) {
+            this.lightBoundary().defer(x, y, z, roots);
+            return;
+        }
+        int current = chunk.getBlockLight(x & 15, y, z & 15);
         if (current != 0 && current < currentLight) {
-            this.setBlockLightAt(x, y, z, 0);
+            chunk.setBlockLight(x & 15, y, z & 15, 0);
             if (current > 1) {
                 long index = Hash.hashBlock(x, y, z);
                 if (!visited.contains(index)) {
                     visited.add(index);
-                    queue.add(new Object[]{index, current});
+                    queue.enqueue(index);
+                    removalLevels.enqueue(current);
                 }
             }
         } else if (current >= currentLight) {
             long index = Hash.hashBlock(x, y, z);
             if (!spreadVisited.contains(index)) {
                 spreadVisited.add(index);
-                spreadQueue.add(index);
+                spreadQueue.enqueue(index);
             }
         }
     }
 
-    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, Queue<Long> queue, Set<Long> visited) {
-        int current = this.getBlockLightAt(x, y, z);
+    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue, Set<Long> visited, List<Long> roots) {
+        if (!isYInRange(y)) return;
+        BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
+        if (!BlockLightBoundary.healthy(chunk)) {
+            this.lightBoundary().defer(x, y, z, roots);
+            return;
+        }
+        int current = chunk.getBlockLight(x & 15, y, z & 15);
         if (current < currentLight - 1) {
-            this.setBlockLightAt(x, y, z, currentLight);
+            chunk.setBlockLight(x & 15, y, z & 15, currentLight);
 
             long index = Hash.hashBlock(x, y, z);
             if (!visited.contains(index)) {
                 visited.add(index);
                 if (currentLight > 1) {
-                    queue.add(index);
+                    queue.enqueue(index);
                 }
             }
         }
     }
 
+    private BlockLightBoundary lightBoundary() {
+        if (this.blockLightBoundary == null) this.blockLightBoundary = new BlockLightBoundary(this);
+        return this.blockLightBoundary;
+    }
+
+    /** Main-thread mount/population hook; every mount reconstructs restart-lost boundaries. */
+    public void resumeBlockLightAtChunkBoundary(BaseFullChunk chunk) {
+        if (this.server.lightUpdates) this.lightBoundary().mounted(chunk, false);
+    }
+
     public void addLightUpdate(int x, int y, int z) {
         long index = chunkHash(x >> 4, z >> 4);
-        Set<Integer> currentMap = this.lightQueue.computeIfAbsent(index, k -> ConcurrentHashMap.newKeySet(8));
-        currentMap.add(Level.localBlockHash(x, y, z, this.getDimensionData()));
+        synchronized (this.lightQueue) {
+            Set<Integer> currentMap = this.lightQueue.computeIfAbsent(index, k -> ConcurrentHashMap.newKeySet(8));
+            currentMap.add(Level.localBlockHash(x, y, z, this.getDimensionData()));
+        }
     }
 
     @Override
@@ -3777,12 +3986,13 @@ public class Level implements ChunkManager, Metadatable {
         BaseFullChunk chunk = this.requireProvider().getLoadedChunk(index);
         if (chunk == null) {
             chunk = this.forceLoadChunk(index, chunkX, chunkZ, create);
-        } else if (this.server.isPrimaryThread()) {
+        } else if (chunk.getChunkLoadFailure() == null && this.server.isPrimaryThread()) {
             // Provider-direct loads bypass Level mounting; replay only their deferred ticks here
             // without changing entity initialization or ChunkLoadEvent lifecycle semantics.
             // provider 直载绕过 Level 挂载;这里只回放延迟方块刻,不改变实体初始化与事件生命周期
             chunk.replayDeferredBlockUpdates();
         }
+        if (chunk != null && chunk.isReadFailurePlaceholder()) this.retryFailedChunkRead(chunkX, chunkZ);
         return chunk;
     }
 
@@ -3803,6 +4013,16 @@ public class Level implements ChunkManager, Metadatable {
                 return;
             }
             long index = Level.chunkHash(x, z);
+            BaseFullChunk current = levelProvider.getLoadedChunk(index);
+            if (chunk.isReadFailurePlaceholder() || current != null && current.isReadFailurePlaceholder()) {
+                if (this.chunkPopulationQueue.remove(index) != null) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        for (int dz = -1; dz <= 1; dz++) this.chunkPopulationLock.remove(Level.chunkHash(x + dx, z + dz));
+                    }
+                }
+                this.chunkGenerationQueue.remove(index);
+                return;
+            }
             // 生成/population 经 chunk.setBlock 与 level.setBlockAt 直写，不触发方块更新，
             // 连接/角落位从未计算；挂上迁移标志，交给挂载/发送路径按邻居补算
             // Generation/population writes via chunk.setBlock and level.setBlockAt, bypassing
@@ -3907,6 +4127,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         chunk.setChanged();
+        this.resumeBlockLightAtChunkBoundary(chunk);
 
         if (!this.isChunkInUse(index)) {
             this.unloadChunkRequest(chunkX, chunkZ);
@@ -4476,6 +4697,13 @@ public class Level implements ChunkManager, Metadatable {
 
             for (GameVersion protocol : chunkRequests.get(index)) {
                 BaseFullChunk chunk = this.getChunk(x, z);
+                if (chunk != null && chunk.isReadFailurePlaceholder()) {
+                    this.getChunkSendTasks(protocol).remove(index);
+                    this.getPendingChunkRequests(protocol).add(index);
+                    this.chunkSendTaskStartTick.remove(index);
+                    protocols.remove(protocol);
+                    continue;
+                }
                 if (chunk != null) {
                     // 兜底：挂载尾段邻居未齐而保留标志的区块，发送前最后重试一次 / Fallback:
                     // last retry before sending for chunks still flagged after the mount tail
@@ -4522,7 +4750,7 @@ public class Level implements ChunkManager, Metadatable {
         if (server.cacheChunks) {
             BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunkIfLoaded(x, z);
-            if (chunk != null && chunk.getChanges() <= timestamp) {
+            if (chunk != null && chunk.getChanges() <= timestamp && !chunk.isReadFailurePlaceholder()) {
                 chunk.setChunkPacket(protocol, data);
             }
             //this.sendChunk(x, z, index, data);
@@ -4622,15 +4850,36 @@ public class Level implements ChunkManager, Metadatable {
         LevelProvider levelProvider = this.requireProvider();
         if (levelProvider.isChunkLoaded(index)) {
             BaseFullChunk chunk = levelProvider.getLoadedChunk(index);
-            if (chunk != null && this.server.isPrimaryThread()) {
+            if (chunk != null && chunk.getChunkLoadFailure() == null && this.server.isPrimaryThread()) {
                 chunk.replayDeferredBlockUpdates();
             }
+            if (chunk != null && chunk.isReadFailurePlaceholder()) this.retryFailedChunkRead(x, z);
             return chunk != null;
         }
         return forceLoadChunk(index, x, z, generate) != null;
     }
 
-    private synchronized BaseFullChunk forceLoadChunk(long index, int x, int z, boolean generate) {
+    private BaseFullChunk forceLoadChunk(long index, int x, int z, boolean generate) {
+        ChunkMountFence fence = this.chunkMountFence();
+        synchronized (fence) {
+            fence.synchronousReads.merge(index, 1, Integer::sum);
+        }
+        try {
+            return this.forceLoadChunkSynchronously(index, x, z, generate);
+        } finally {
+            synchronized (fence) {
+                int remaining = fence.synchronousReads.get(index) - 1;
+                if (remaining == 0) fence.synchronousReads.remove(index);
+                else fence.synchronousReads.put(index, remaining);
+            }
+        }
+    }
+
+    private synchronized BaseFullChunk forceLoadChunkSynchronously(long index, int x, int z, boolean generate) {
+        if (this.server.asyncChunkLoadCompletion) {
+            BaseFullChunk existing = this.requireProvider().getLoadedChunk(index);
+            if (existing != null) return existing;
+        }
         BaseFullChunk chunk = this.requireProvider().getChunk(x, z, generate);
 
         if (chunk == null) {
@@ -4640,7 +4889,23 @@ public class Level implements ChunkManager, Metadatable {
             return null;
         }
 
-        return this.finishChunkLoad(index, x, z, chunk);
+        if (chunk.getChunkLoadFailure() != null) {
+            this.queueUnloadChunk(x, z);
+            return chunk;
+        }
+        try {
+            BaseFullChunk loaded = this.finishChunkLoad(index, x, z, chunk);
+            if (this.server.asyncChunkLoadCompletion) this.chunkLoadFailures.invalidate(index);
+            return loaded;
+        } catch (RuntimeException failure) {
+            if (!this.server.asyncChunkLoadCompletion) throw failure;
+            chunk.markChunkLoadFailure(failure);
+            this.reportChunkLoadFailure(x, z, failure);
+            throw failure;
+        } catch (Error failure) {
+            if (this.server.asyncChunkLoadCompletion) chunk.markChunkLoadFailure(failure);
+            throw failure;
+        }
     }
 
     /**
@@ -4649,27 +4914,42 @@ public class Level implements ChunkManager, Metadatable {
      * Shared mount tail after a chunk enters the cache: events, entity init, light task, loader callbacks; used by both sync and async load paths
      */
     private BaseFullChunk finishChunkLoad(long index, int x, int z, BaseFullChunk chunk) {
+        return this.finishChunkLoad(index, x, z, chunk, null);
+    }
+
+    private boolean isCurrentChunkMount(PendingChunkLoad pending, BaseFullChunk chunk) {
+        return !this.chunkLoadsClosing && !pending.invalidated && this.getProvider() == pending.provider
+                && this.pendingChunkLoads.get(pending.hash) == pending
+                && pending.provider.getLoadedChunk(pending.hash) == chunk && chunk.getProvider() == pending.provider;
+    }
+
+    private BaseFullChunk finishChunkLoad(long index, int x, int z, BaseFullChunk chunk, PendingChunkLoad pending) {
+        if (chunk.getChunkLoadFailure() != null) return chunk;
         if (chunk.getProvider() != null) {
             // Persisted ticks historically enter the Level scheduler before ChunkLoadEvent, while
             // entities and block entities remain initialized afterwards by initChunk().
             // 持久化方块刻应在 ChunkLoadEvent 前进入调度器;实体与方块实体仍由事件后的 initChunk 初始化
             chunk.replayDeferredBlockUpdates();
             this.server.getPluginManager().callEvent(new ChunkLoadEvent(chunk, !chunk.isGenerated()));
+            // Events can unload/replace a chunk or its provider. Never initialize that stale copy.
+            if (pending != null && !this.isCurrentChunkMount(pending, chunk)) return chunk;
         } else {
             this.unloadChunk(x, z, false);
             return chunk;
         }
 
         chunk.initChunk();
+        if (pending != null && !this.isCurrentChunkMount(pending, chunk)) return chunk;
 
         // 旧世界连接/角落位迁移：挂载即重算（光照 population 同款挂载尾段模式），并唤醒邻居重试
         // Legacy connection/corner-bit migration: fix on mount (same tail pattern as light
         // population) and wake neighbours so their four-neighbour gating may now pass
         this.fixLegacyBlockConnections(x, z, chunk);
         this.retryLegacyConnectionFixForNeighbours(x, z);
+        if (this.server.lightUpdates) this.lightBoundary().mounted(chunk, true);
 
         if (!chunk.isLightPopulated() && chunk.isPopulated() && this.server.lightUpdates) {
-            this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new LightPopulationTask(this, chunk));
+            LightPopulationTask.schedule(this, chunk);
         }
 
         if (this.isChunkInUse(index)) {
@@ -4715,39 +4995,143 @@ public class Level implements ChunkManager, Metadatable {
      */
     public boolean requestChunkLoadAsync(int x, int z) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
+        if (this.chunkLoadsClosing || levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
             return false;
         }
 
         long index = Level.chunkHash(x, z);
-        if (levelProvider.isChunkLoaded(index)) {
-            return true;
+        if (!this.server.asyncChunkLoadCompletion) {
+            if (levelProvider.isChunkLoaded(index)) return true;
+        } else {
+            BaseFullChunk loaded = levelProvider.getLoadedChunk(index);
+            if (loaded != null && !loaded.isReadFailurePlaceholder()) return true;
         }
 
+        try {
+            return this.submitChunkRead(x, z, levelProvider, this.server.asyncChunkLoadCompletion) != null;
+        } catch (CancellationException closing) {
+            return false;
+        }
+    }
+
+    private void retryFailedChunkRead(int x, int z) {
+        if (!this.server.asyncChunkLoadCompletion || !this.server.isPrimaryThread()
+                || this.chunkLoadsClosing || this.asyncChunkLoadExecutor == null) return;
+        LevelProvider provider = this.getProvider();
+        if (provider == null || !provider.isOffThreadChunkReadSupported()) return;
+        try {
+            this.submitChunkRead(x, z, provider, true);
+        } catch (CancellationException closing) {
+            // Provider close won admission; never fall back to inline IO.
+        }
+    }
+
+    /**
+     * Request a fresh chunk without waiting for disk. Call from the server thread. Requests
+     * for the same coordinates share one read-only stage through mount/init and callbacks.
+     * A missing chunk is mounted empty, as in requestChunkLoadAsync; an IO failure is FAILED.
+     * DISABLED/REJECTED are terminal outcomes, never permission to run IO inline. Cancellation
+     * of a stage's toCompletableFuture() does not cancel other subscribers to the shared read.
+     * Existing synchronous loadChunk/getChunk contracts are unchanged.
+     */
+    public CompletionStage<ChunkLoadResult> requestChunkLoadAsyncResult(int x, int z) {
+        if (!this.server.isPrimaryThread()) throw new IllegalStateException("Chunk requests require the server thread");
+        if (!this.server.asyncChunkLoadCompletion) return chunkLoadResult(ChunkLoadResult.Status.DISABLED, null, null);
+        LevelProvider levelProvider = this.getProvider();
+        if (this.chunkLoadsClosing || levelProvider == null) return chunkLoadResult(ChunkLoadResult.Status.CANCELLED, null, null);
+        long hash = Level.chunkHash(x, z);
+        // Check pending before cache: ChunkLoadEvent can reenter before initChunk has run.
+        PendingChunkLoad pending = this.pendingChunkLoads.get(hash);
+        if (pending != null) {
+            if (pending.ticket == null) return chunkLoadResult(ChunkLoadResult.Status.DISABLED, null, null);
+            return pending.result;
+        }
+        BaseFullChunk loaded = levelProvider.getLoadedChunk(hash);
+        if (loaded != null) {
+            if (loaded.isReadFailurePlaceholder()) {
+                this.retryFailedChunkRead(x, z);
+                PendingChunkLoad retry = this.pendingChunkLoads.get(hash);
+                if (retry != null) return retry.result;
+                PendingChunkLoad failed = this.chunkLoadFailures.getIfPresent(hash);
+                return failed != null ? failed.result
+                        : chunkLoadResult(ChunkLoadResult.Status.FAILED, null, loaded.getChunkLoadFailure());
+            }
+            if (loaded.getChunkLoadFailure() != null) return chunkLoadResult(ChunkLoadResult.Status.FAILED, null, loaded.getChunkLoadFailure());
+            ChunkMountFence fence = this.chunkMountFence();
+            synchronized (fence) {
+                if (loaded.isInitialized() && !fence.synchronousReads.containsKey(hash)) {
+                    return chunkLoadResult(ChunkLoadResult.Status.LOADED, loaded, null);
+                }
+            }
+            // A provider-direct cache entry may never have run the Level lifecycle.
+            ChunkReadTicket cached = new ChunkReadTicket() {
+                public BaseFullChunk read() { throw new IllegalStateException("Already cached"); }
+                public BaseFullChunk tryMount(BaseFullChunk candidate) {
+                    return levelProvider.getLoadedChunk(hash) == loaded ? loaded : null;
+                }
+                public void close() { }
+            };
+            PendingChunkLoad cachedLoad = new PendingChunkLoad(x, z, hash, levelProvider, cached);
+            cachedLoad.chunk = loaded;
+            PendingChunkLoad winner = this.pendingChunkLoads.putIfAbsent(hash, cachedLoad);
+            if (winner != null) return winner.result;
+            this.mountChunk(cachedLoad);
+            return cachedLoad.result;
+        }
+        if (!this.isAsyncChunkLoadEnabled()) return chunkLoadResult(ChunkLoadResult.Status.DISABLED, null, null);
+        try {
+            pending = this.submitChunkRead(x, z, levelProvider, true);
+            if (pending == null) return chunkLoadResult(ChunkLoadResult.Status.REJECTED, null, null);
+            // A ticketless provider keeps its legacy read path; it cannot promise freshness.
+            return pending.ticket == null && this.chunkLoadFailures.getIfPresent(hash) != pending
+                    ? chunkLoadResult(ChunkLoadResult.Status.DISABLED, null, null) : pending.result;
+        } catch (CancellationException closing) {
+            return chunkLoadResult(ChunkLoadResult.Status.CANCELLED, null, closing);
+        } catch (Exception failure) {
+            return chunkLoadResult(ChunkLoadResult.Status.FAILED, null, failure);
+        }
+    }
+
+    private static CompletionStage<ChunkLoadResult> chunkLoadResult(ChunkLoadResult.Status status, BaseFullChunk chunk, Throwable failure) {
+        return CompletableFuture.completedStage(new ChunkLoadResult(status, chunk, failure));
+    }
+
+    private PendingChunkLoad submitChunkRead(int x, int z, LevelProvider levelProvider, boolean strict) {
+        long index = Level.chunkHash(x, z);
+        PendingChunkLoad failed = strict ? this.chunkLoadFailures.getIfPresent(index) : null;
+        if (failed != null && failed.provider == levelProvider && this.chunkLoadRetryClock() - failed.retryAfterNanos < 0) return failed;
         return this.pendingChunkLoads.computeIfAbsent(index, hash -> {
-            PendingChunkLoad pending = new PendingChunkLoad(x, z, hash, levelProvider);
+            ChunkReadTicket ticket = strict ? levelProvider.openChunkRead(x, z) : null;
+            if (ticket == null && strict) {
+                BaseFullChunk loaded = levelProvider.getLoadedChunk(hash);
+                if (loaded != null && loaded.isReadFailurePlaceholder()) return null;
+            }
+            PendingChunkLoad pending = new PendingChunkLoad(x, z, hash, levelProvider, ticket);
+            BaseFullChunk loaded = levelProvider.getLoadedChunk(hash);
+            if (loaded != null && loaded.isReadFailurePlaceholder()) pending.retryPlaceholder = loaded;
+            if (failed != null && failed.provider == levelProvider) pending.failedAttempts = failed.failedAttempts;
             try {
                 this.asyncChunkLoadExecutor.execute(() -> {
                     try {
-                        if (pending.invalidated) {
-                            return;
-                        }
-                        pending.chunk = levelProvider.readChunkOffThread(x, z);
+                        if (this.chunkLoadsClosing || pending.invalidated) return;
+                        pending.chunk = ticket == null ? levelProvider.readChunkOffThread(x, z) : ticket.read();
                     } catch (Throwable t) {
                         pending.failure = t;
-                        this.server.getLogger().error("Failed to read chunk " + x + ", " + z + " asynchronously in level " + getFolderName(), t);
-                        if (t instanceof Error error) {
-                            throw error;
+                        if (!(t instanceof CancellationException)) {
+                            if (ticket != null) this.reportChunkLoadFailure(x, z, t);
+                            else this.server.getLogger().error("Failed to read chunk " + x + ", " + z + " asynchronously in level " + getFolderName(), t);
                         }
+                        if (t instanceof Error error) throw error;
                     } finally {
                         this.completedChunkLoads.add(pending);
                     }
                 });
             } catch (RejectedExecutionException e) {
+                if (ticket != null) ticket.close();
                 return null;
             }
             return pending;
-        }) != null;
+        });
     }
 
     void invalidatePendingChunkLoad(long hash) {
@@ -4765,9 +5149,88 @@ public class Level implements ChunkManager, Metadatable {
      * Mount an async read result on the main thread; drops the decoded copy if the slot identity changed (unload/replace/sync load won/level reload).
      * On read failure or absent-on-disk, mounts an empty chunk (matching the sync path readOrCreateChunk(create=true)) so a broken chunk isn't re-read every tick by the player's loadQueue, avoiding a disk/log storm
      */
-    synchronized void mountChunk(PendingChunkLoad pending) {
+    void mountChunk(PendingChunkLoad pending) {
+        if (pending.ticket == null) {
+            this.mountChunkLegacy(pending);
+            return;
+        }
+        if (!this.server.isPrimaryThread()) throw new IllegalStateException("Chunk mounting requires the server thread");
+        BaseFullChunk mounting = null;
+        boolean deferred = false;
+        try {
+            LevelProvider levelProvider = this.getProvider();
+            if (this.chunkLoadsClosing || levelProvider != pending.provider || pending.invalidated
+                    || this.pendingChunkLoads.get(pending.hash) != pending) {
+                pending.completion.complete(new ChunkLoadResult(ChunkLoadResult.Status.CANCELLED, null, null));
+                return;
+            }
+            if (pending.failure != null) {
+                if (pending.failure instanceof CancellationException) {
+                    pending.completion.complete(new ChunkLoadResult(ChunkLoadResult.Status.CANCELLED, null, pending.failure));
+                } else {
+                    this.backOffChunkRead(pending);
+                }
+                return;
+            }
+            boolean absent = pending.chunk == null;
+            BaseFullChunk decoded = absent ? levelProvider.getEmptyChunk(pending.x, pending.z) : pending.chunk;
+            BaseFullChunk canonical;
+            ChunkMountFence fence = this.chunkMountFence();
+            synchronized (fence) {
+                if (fence.synchronousReads.containsKey(pending.hash)) {
+                    // A legacy synchronous reader may hold Level/provider monitors through IO.
+                    // Retry next tick instead of acquiring those monitors on the server thread.
+                    deferred = true;
+                    this.completedChunkLoads.add(pending);
+                    return;
+                }
+                canonical = pending.ticket.tryMount(decoded);
+            }
+            if (canonical == null) {
+                pending.completion.complete(new ChunkLoadResult(ChunkLoadResult.Status.CANCELLED, null, null));
+                return;
+            }
+            if (canonical.getChunkLoadFailure() != null) {
+                pending.completion.complete(new ChunkLoadResult(ChunkLoadResult.Status.FAILED, null, canonical.getChunkLoadFailure()));
+                return;
+            }
+            if (!canonical.isInitialized()) {
+                mounting = canonical;
+                this.finishChunkLoad(pending.hash, pending.x, pending.z, canonical, pending);
+            }
+            if (!this.isCurrentChunkMount(pending, canonical)) {
+                pending.completion.complete(new ChunkLoadResult(ChunkLoadResult.Status.CANCELLED, null, null));
+                return;
+            }
+            this.chunkLoadFailures.invalidate(pending.hash);
+            pending.completion.complete(new ChunkLoadResult(absent && canonical == decoded
+                    ? ChunkLoadResult.Status.CREATED : ChunkLoadResult.Status.LOADED, canonical, null));
+        } catch (Throwable failure) {
+            if (mounting != null) mounting.markChunkLoadFailure(failure);
+            pending.completion.complete(new ChunkLoadResult(ChunkLoadResult.Status.FAILED, null, failure));
+            this.reportChunkLoadFailure(pending.x, pending.z, failure);
+            if (failure instanceof Error error) throw error;
+        } finally {
+            if (!deferred) {
+                pending.ticket.close();
+                this.pendingChunkLoads.remove(pending.hash, pending);
+                // An invalidation (including a cancelled unload) or refused replacement must
+                // not strand a player-held placeholder after consuming its scheduled retry.
+                if (!this.chunkLoadsClosing && this.getProvider() == pending.provider
+                        && pending.retryPlaceholder != null
+                        && pending.provider.getLoadedChunk(pending.hash) == pending.retryPlaceholder) {
+                    PendingChunkLoad failed = this.chunkLoadFailures.getIfPresent(pending.hash);
+                    if (failed != null && failed != pending && failed.provider == pending.provider) {
+                        this.queueFailedChunkRetry(failed, this.chunkLoadRetryClock() + TimeUnit.SECONDS.toNanos(1));
+                    }
+                }
+            }
+        }
+    }
+
+    private synchronized void mountChunkLegacy(PendingChunkLoad pending) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || levelProvider != pending.provider || pending.invalidated
+        if (this.chunkLoadsClosing || levelProvider == null || levelProvider != pending.provider || pending.invalidated
                 || levelProvider.isChunkLoaded(pending.hash)) {
             return;
         }
@@ -4857,6 +5320,7 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
             levelProvider.unloadChunk(x, z, safe);
+            if (this.blockLightBoundary != null) this.blockLightBoundary.unloaded(x, z);
         } catch (Exception e) {
             MainLogger logger = this.server.getLogger();
             logger.error(this.server.getLanguage().translateString("nukkit.level.chunkUnloadError", e.toString()));
@@ -5018,6 +5482,25 @@ public class Level implements ChunkManager, Metadatable {
         return this.populateChunk(x, z, false);
     }
 
+    /** Main-thread query: population also owns the eight neighbouring live chunks. */
+    public boolean isChunkGenerationPending(int x, int z) {
+        long index = chunkHash(x, z);
+        if (chunkPopulationLock.containsKey(index)) {
+            return true;
+        }
+        // Shared completion bookkeeping can clear population flags while a generation
+        // entry for its centre remains. Conservatively check both queues in the 3x3 area.
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                long centre = chunkHash(x + dx, z + dz);
+                if (chunkPopulationQueue.containsKey(centre) || chunkGenerationQueue.containsKey(centre)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public boolean populateChunk(int x, int z, boolean force) {
         long index = Level.chunkHash(x, z);
         if (this.chunkPopulationQueue.containsKey(index) || this.chunkPopulationQueue.size() >= this.chunkPopulationQueueSize && !force) {
@@ -5025,8 +5508,18 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         BaseFullChunk chunk = this.getChunk(x, z, true);
+        if (chunk == null || chunk.isReadFailurePlaceholder()) return false;
         boolean populate;
         if (!chunk.isPopulated()) {
+            // Population mutates the full 3x3 area. No task may acquire a quarantine neighbour.
+            if (this.server.asyncChunkLoadCompletion) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        BaseFullChunk neighbour = this.getChunk(x + dx, z + dz, true);
+                        if (neighbour == null || neighbour.isReadFailurePlaceholder()) return false;
+                    }
+                }
+            }
             populate = true;
             for (int xx = -1; xx <= 1; ++xx) {
                 for (int zz = -1; zz <= 1; ++zz) {
@@ -5066,8 +5559,10 @@ public class Level implements ChunkManager, Metadatable {
 
         long index = Level.chunkHash(x, z);
         if (!this.chunkGenerationQueue.containsKey(index)) {
+            BaseFullChunk chunk = this.getChunk(x, z, true);
+            if (chunk == null || chunk.isReadFailurePlaceholder()) return;
             this.chunkGenerationQueue.put(index, Boolean.TRUE);
-            GenerationTask task = new GenerationTask(this, this.getChunk(x, z, true));
+            GenerationTask task = new GenerationTask(this, chunk);
             this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, task);
         }
     }
