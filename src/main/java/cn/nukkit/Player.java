@@ -158,6 +158,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int SPECTATOR = 3;
     public static final int VIEW = SPECTATOR;
 
+    private static final double CREATIVE_BREAK_POSITION_EPSILON = 1.0E-4;
+    // Bedrock resting contact can sit 0.005 blocks below the collision top. This
+    // controls packets only; the authoritative position still stays on the floor.
+    private static final double CREATIVE_BREAK_CORRECTION_TOLERANCE = 0.01;
+    private static final int CREATIVE_BREAK_CORRECTION_TICKS = 5;
+
     public static final int CRAFTING_SMALL = 0;
     public static final int CRAFTING_BIG = 1;
     public static final int ANVIL_WINDOW_ID = 2;
@@ -259,6 +265,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected long randomClientId;
 
     protected Location forceMovement = null;
+
+    private Level deniedCreativeBreakLevel;
+    private BlockVector3 deniedCreativeBreakBlock;
+    private int deniedCreativeBreakExpiresAtTick;
 
     protected Location teleportPosition = null;
 
@@ -645,7 +655,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean getAllowFlight() {
-        return this.adventureSettings.get(Type.ALLOW_FLIGHT);
+        return this.adventureSettings != null && this.adventureSettings.get(Type.ALLOW_FLIGHT);
     }
 
     /**
@@ -667,6 +677,90 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         double speedRatio = (double) configuredFlySpeed / DEFAULT_FLY_SPEED;
         return vanillaLimitSquared * speedRatio * speedRatio;
+    }
+
+    void armDeniedCreativeBreakCorrection(BlockVector3 blockPos) {
+        if (!this.isCreative() || this.noClip || this.riding != null
+                || blockPos.distanceSquared(this) > 4
+                || blockPos.getY() + CREATIVE_BREAK_POSITION_EPSILON >= this.y) {
+            return;
+        }
+
+        Block block = this.level.getBlock(blockPos.asVector3(), false);
+        AxisAlignedBB feet = this.boundingBox.clone().shrink(0.05, 0, 0.05);
+        feet.setMinY(this.y - 0.05);
+        feet.setMaxY(this.y + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(feet)) {
+            return;
+        }
+
+        this.deniedCreativeBreakLevel = this.level;
+        this.deniedCreativeBreakBlock = new BlockVector3(
+                blockPos.getX(), blockPos.getY(), blockPos.getZ());
+        this.deniedCreativeBreakExpiresAtTick = this.server.getTick()
+                + CREATIVE_BREAK_CORRECTION_TICKS;
+    }
+
+    private Vector3 correctDeniedCreativeBreakMovement(Vector3 clientPos) {
+        if (this.deniedCreativeBreakBlock == null) {
+            return clientPos;
+        }
+        if (!this.isCreative() || this.noClip || this.riding != null
+                || this.level != this.deniedCreativeBreakLevel
+                || this.server.getTick() > this.deniedCreativeBreakExpiresAtTick) {
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+        if (clientPos.y >= this.y) {
+            return clientPos;
+        }
+
+        Block block = this.level.getBlock(this.deniedCreativeBreakBlock.asVector3(), false);
+        AxisAlignedBB targetFeet = this.boundingBox
+                .getOffsetBoundingBox(clientPos.x - this.x, 0, clientPos.z - this.z)
+                .shrink(0.05, 0, 0.05);
+        targetFeet.setMinY(clientPos.y);
+        targetFeet.setMaxY(this.y + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(targetFeet)) {
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+
+        // Locate the highest crossed surface using the block's actual collision
+        // predicate. getBoundingBox() alone omits the upper half of stairs.
+        // Testing the interval above each midpoint makes the search monotonic,
+        // including blocks whose collision consists of disconnected pieces.
+        double lowerY = clientPos.y;
+        double upperY = this.y + CREATIVE_BREAK_POSITION_EPSILON;
+        for (int probe = 0; probe < 40 && upperY - lowerY > 1.0E-7; probe++) {
+            double middleY = (lowerY + upperY) * 0.5;
+            targetFeet.setMinY(middleY);
+            if (block.collidesWithBB(targetFeet)) {
+                lowerY = middleY;
+            } else {
+                upperY = middleY;
+            }
+        }
+        // A replacement block may enclose the current feet. Preserve the existing
+        // denial guard without pushing the player above their accepted height.
+        double floorY = Math.min(this.y, upperY);
+        double crossedAt = (this.y - floorY) / (this.y - clientPos.y);
+        targetFeet.offset(-(clientPos.x - this.x) * (1 - crossedAt), 0,
+                -(clientPos.z - this.z) * (1 - crossedAt));
+        targetFeet.setMinY(floorY - CREATIVE_BREAK_POSITION_EPSILON);
+        targetFeet.setMaxY(floorY + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(targetFeet)) {
+            // Diagonal motion may enter this column after passing below its top.
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+
+        return new Vector3(clientPos.x, floorY, clientPos.z);
+    }
+
+    private void clearDeniedCreativeBreakCorrection() {
+        this.deniedCreativeBreakLevel = null;
+        this.deniedCreativeBreakBlock = null;
     }
 
     public void setAllowModifyWorld(boolean value) {
@@ -1009,7 +1103,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         Player[] playerListViewers = this.server.playerList.values().stream()
                 .filter(viewer -> viewer.sentSkins.contains(this.getUniqueId()))
-                .filter(viewer -> viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE)
+                .filter(viewer -> !PlayerEntitySkinSender.requiresRetainedEntry(viewer))
                 .toArray(Player[]::new);
         if (playerListViewers.length > 0) {
             this.server.updatePlayerListData(
@@ -1018,7 +1112,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         for (Player viewer : this.server.playerList.values()) {
-            if (viewer.getGameVersion() != GameVersion.V1_21_124_NETEASE
+            if (!PlayerEntitySkinSender.requiresRetainedEntry(viewer)
                     || !viewer.sentSkins.contains(this.getUniqueId())) {
                 continue;
             }
@@ -1164,7 +1258,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         level = level == null ? this.level : level;
         long index = Level.chunkHash(x, z);
         if (this.usedChunks.containsKey(index)) {
-            for (Entity entity : level.getChunkEntities(x, z).values()) {
+            // Only live entities have viewers; abandoning a chunk must not reload it from storage.
+            for (Entity entity : level.getChunkEntities(x, z, false).values()) {
                 if (entity != this) {
                     entity.despawnFrom(this);
                 }
@@ -1182,7 +1277,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkZ = Level.getHashZ(index);
             this.level.unregisterChunkLoader(this, chunkX, chunkZ);
 
-            for (Entity entity : level.getChunkEntities(chunkX, chunkZ).values()) {
+            for (Entity entity : level.getChunkEntities(chunkX, chunkZ, false).values()) {
                 if (entity != this) {
                     if (online) {
                         entity.despawnFrom(this);
@@ -1990,6 +2085,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
+        // Resolve transient items under the accepted transition's old mode: recover finite
+        // items and discard creative items before a delayed close can use the new mode.
+        // Cancelled transitions must leave the inventory available to its current owner.
+        this.resetCraftingGridType();
+        this.resolveOpenTradeInputs();
+
         this.gamemode = gamemode;
 
         if (this.server.useClientSpectator) {
@@ -2070,6 +2171,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.inventory.sendCreativeContents();
         return true;
+    }
+
+    /**
+     * 模式切换边界上按旧模式结算已打开交易界面的输入槽：创造物品丢弃、
+     * 有限物品收回背包；交易会话保持打开，与工作站窗口的结算方式一致。
+     * Resolve open trade inputs at a mode-switch boundary under the old mode, so a
+     * delayed close under the new mode cannot resurrect or destroy them; the trade
+     * session itself stays open, mirroring how station windows are resolved.
+     */
+    private void resolveOpenTradeInputs() {
+        TradeInventory tradeInventory = this.getTradeInventory();
+        if (tradeInventory == null) {
+            return;
+        }
+        this.returnUiItems(tradeInventory.getItem(0), tradeInventory.getItem(1));
+        tradeInventory.clear(0);
+        tradeInventory.clear(1);
     }
 
     /**
@@ -2332,19 +2450,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (server.vanillaPortals) {
+                    final Position portalTarget = this.portalPos;
+                    if (portalTarget == null) {
+                        return;
+                    }
                     this.inPortalTicks = 81;
+                    final Level portalOrigin = this.level;
                     this.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
                         @Override
                         public void onRun() {
-                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalPos);
+                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalTarget);
                             getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                                // 目标对象同时标识本次请求，旧回调不能传送玩家或清理新请求。
+                                // The target identifies this attempt; stale callbacks must not teleport or clear a newer attempt.
+                                if (portalPos != portalTarget) {
+                                    return;
+                                }
+                                portalPos = null;
+                                if (!isOnline() || !isAlive() || level != portalOrigin) {
+                                    inPortalTicks = 0;
+                                    return;
+                                }
                                 if (foundPortal == null) {
-                                    BlockNetherPortal.spawnPortal(portalPos);
-                                    teleport(portalPos.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
+                                    BlockNetherPortal.spawnPortal(portalTarget);
+                                    teleport(portalTarget.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
                                 } else {
                                     teleport(BlockNetherPortal.getSafePortal(foundPortal), TeleportCause.NETHER_PORTAL);
                                 }
-                                portalPos = null;
                             });
                         }
                     });
@@ -2474,6 +2606,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
         }
+
+        Vector3 correctedClientPos = this.correctDeniedCreativeBreakMovement(clientPos);
+        boolean correctedDeniedCreativeBreak = correctedClientPos.y - clientPos.y
+                > CREATIVE_BREAK_CORRECTION_TOLERANCE;
+        clientPos = correctedClientPos;
 
         double dx = clientPos.x - this.x;
         double dy = clientPos.y - this.y;
@@ -2632,7 +2769,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.speed.setComponents(0, 0, 0);
             }
         } else {
-            this.forceMovement = null;
+            if (correctedDeniedCreativeBreak) {
+                Location correction = this.getLocation().add(0, 0.00001, 0);
+                this.sendPosition(correction, MovePlayerPacket.MODE_NORMAL);
+                this.forceMovement = correction;
+            } else {
+                this.forceMovement = null;
+            }
 
             if (this.speed == null) {
                 speed = new Vector3(from.x - to.x, from.y - to.y, from.z - to.z);
@@ -3347,10 +3490,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         for (Player p : new ArrayList<>(this.server.playerList.values())) {
             if (p != this && p.username != null) {
                 if (p.username.equalsIgnoreCase(this.username)) {
+                    if (this.server.isDuplicateLoginKeepingExistingSession()) {
+                        // The session that is already in the world stays and the newcomer is the one
+                        // that is refused: closing the older session hands the world to whoever knocks
+                        // last, so a player carrying loot loses it to a stranger reusing the nickname.
+                        // A stale session still times out by itself.
+                        this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        return;
+                    }
                     p.close("", "disconnectionScreen.loggedinOtherLocation");
                     break;
                 }
                 if (this.getUniqueId().equals(p.getUniqueId())) {
+                    if (this.server.isDuplicateLoginKeepingExistingSession()) {
+                        this.server.getLogger().warning("Refused the login of " + this.username + ": "
+                                + p.getName() + " is already playing under identity " + this.getUniqueId());
+                        this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        return;
+                    }
                     this.server.getLogger().warning("Evicting " + p.getName() + " as a duplicate login of "
                             + this.username + ": both resolved to identity " + this.getUniqueId());
                     p.close("", "disconnectionScreen.loggedinOtherLocation");
@@ -3889,7 +4046,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (DataPacketManager.canProcess(packet.protocol, packet.getClass())) {
+        if (DataPacketManager.canProcess(packet.gameVersion, packet.getClass())) {
             DataPacketManager.processPacket(this.playerHandle, packet);
             return;
         }
@@ -4044,7 +4201,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                 double dis = newPos.distanceSquared(this);
 
-                if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
+                if (this.forceMovement == null && dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
                     break;
                 }
 
@@ -4218,7 +4375,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 boolean authStartUsingItem = UsingItemReceive.authInputStartsUsingItem(authPacket);
-                Item authHeldItem = this.inventory.getItemInHand();
+                // The inventory is built by initEntity, which runs at login. An auth input that
+                // reaches the session before that (a client that keeps moving while its profile
+                // is still loading) used to throw here and drop the connection.
+                Item authHeldItem = this.inventory == null ? null : this.inventory.getItemInHand();
                 boolean authHoldToUse = UsingItemReceive.isHoldToUseItem(authHeldItem);
                 if (UsingItemReceive.shouldStartUsingFromAuthInput(
                         this.spawned && this.isAlive(),
@@ -4481,7 +4641,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 double distSqrt = clientPosition.distanceSquared(this);
-                if (distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
+                if (this.forceMovement == null && distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
                     break;
                 }
 
@@ -5637,6 +5797,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 break;
                             }
 
+                            this.armDeniedCreativeBreakCorrection(blockVector);
                             inventory.sendContents(this);
                             inventory.sendHeldItem(this);
 
@@ -6197,6 +6358,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (canInteract) {
             handItem = this.level.useBreakOn(blockPos.asVector3(), face, handItem, this, true);
             if (handItem == null) {
+                this.armDeniedCreativeBreakCorrection(blockPos);
                 this.level.sendBlocks(new Player[]{this}, new Vector3[]{blockPos.asVector3()}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
 
                 BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
@@ -6221,6 +6383,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         inventory.sendContents(this);
         inventory.sendHeldItem(this);
+
+        this.armDeniedCreativeBreakCorrection(blockPos);
 
         if (blockPos.distanceSquared(this) < 10000) {
             Vector3 pos = blockPos.asVector3();
@@ -7728,6 +7892,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
@@ -7767,6 +7932,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return false;
     }
 
+    private void cancelPendingPortalTransfer() {
+        // 已完成的传送已清空目标，保留其计时以避免在出口立即回传。
+        // Completed transfers have no target; preserve their timer to prevent an immediate return trip.
+        if (this.portalPos != null) {
+            this.portalPos = null;
+            this.inPortalTicks = 0;
+        }
+    }
+
     public void checkSwimmingState() {
         if (this.isSwimming() && !this.isInsideOfWater()) {
             this.setSwimming(false);
@@ -7795,6 +7969,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void teleportImmediate(Location location, TeleportCause cause) {
         Location from = this.getLocation();
         if (super.teleport(location.add(0, 0.00001, 0), cause)) {
+            this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
 
@@ -8137,7 +8312,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             Item[] drops;
 
             if (this.craftingGrid != null) {
-                drops = this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
+                // Creative UI contents are free items: never return or drop them on reset.
+                // Closing a full inventory must not publish them to survival players.
+                drops = this.isCreative() ? Item.EMPTY_ARRAY
+                        : this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
                 this.craftingGrid.clearAll();
 
                 for (Item drop : drops) {
@@ -8145,7 +8323,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            drops = this.inventory.addItem(this.getCursorInventory().getItem(0));
+            drops = this.isCreative() ? Item.EMPTY_ARRAY
+                    : this.inventory.addItem(this.getCursorInventory().getItem(0));
             this.playerUIInventory.getCursorInventory().clear(0);
 
             for (Item drop : drops) {
@@ -8179,7 +8358,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private void moveBlockUIContents(int window) {
         Inventory inventory = this.getWindowById(window);
         if (inventory instanceof FakeBlockUIComponent) {
-            Item[] drops = this.inventory.addItem(inventory.getContents().values().toArray(Item.EMPTY_ARRAY));
+            Item[] drops = this.isCreative() ? Item.EMPTY_ARRAY
+                    : this.inventory.addItem(inventory.getContents().values().toArray(Item.EMPTY_ARRAY));
             inventory.clearAll();
             for (Item drop : drops) {
                 this.level.dropItem(this, drop);
@@ -8982,6 +9162,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    /**
+     * The name a verified login is known by: format codes removed and whitespace at either end
+     * trimmed.
+     * <p>
+     * Clients can report {@code "Name "} or {@code " Name"} for the account that otherwise logs
+     * in as {@code "Name"}. Left untrimmed, the padded form derived its own offline identity and
+     * its own player data file, so one account owned two inventories and a relog between the two
+     * spellings loaded whatever the other file still held. Trimming also stops the padded form
+     * from slipping past a name ban, the whitelist and the duplicate login check. Spaces inside
+     * the name are part of it and stay.
+     *
+     * @param chainUsername name from the verified login chain
+     * @return the trimmed name, or {@code null} when the chain carries none
+     */
+    static String verifiedLoginName(String chainUsername) {
+        String cleaned = TextFormat.clean(chainUsername);
+        return cleaned == null ? null : cleaned.strip();
+    }
+
     // Called only by the main-thread AsyncTask completion after successful verification.
     void continueVerifiedLogin(Skin loginSkin, ClientChainData validated) {
         this.loginChainData = validated;
@@ -9001,7 +9200,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.version = loginChainData.getGameVersion();
 
         // Use verified identity data from ClientChainData (signature-validated) as the source of truth
-        String verifiedName = TextFormat.clean(loginChainData.getUsername());
+        // The name is trimmed before anything keys on it: whitelist, bans, the duplicate login
+        // check, the name lookup table and the offline identity all see the same string.
+        // Replace mode keeps its historical form ("Name " -> "Name_") and is not trimmed.
+        String verifiedName = this.server.spaceMode == 2
+                ? TextFormat.clean(loginChainData.getUsername())
+                : verifiedLoginName(loginChainData.getUsername());
         if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
             verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
         }
@@ -9021,6 +9225,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.minecraftId = loginChainData.getMinecraftId();
 
         boolean valid = true;
+        // Length and characters are still checked on the raw name, exactly as before trimming
+        // existed: a short name padded with a space ("gg ") keeps logging in.
         String rawVerifiedName = loginChainData.getUsername();
         int len = rawVerifiedName == null ? 0 : rawVerifiedName.length();
         if (((len > 16 || len < 3) && !gameVersion.isNetEase())
@@ -9047,6 +9253,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!valid || Objects.equals(this.iusername, "rcon") || Objects.equals(this.iusername, "console")) {
             this.close("", "disconnectionScreen.invalidName");
+            return;
+        }
+
+        // An Xbox login has its own profile and is not affected by an unfolded offline name.
+        String foldBlock = loginChainData.isXboxAuthed() ? null : this.server.profileFoldBlockReason(this.iusername);
+        if (foldBlock != null) {
+            this.server.getLogger().warning("Refused the offline login of " + this.username + ": the player data "
+                    + "saved under a padded spelling of this name was not folded at startup (" + foldBlock + ")");
+            this.close("", "Your player data is unavailable, please contact the server administrators");
             return;
         }
 
@@ -9291,6 +9506,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void giveItem(Item... items) {
         for (Item failed : getInventory().addItem(items)) {
             getLevel().dropItem(this, failed);
+        }
+    }
+
+    /**
+     * 回收界面（工作站/交易）输入物品：有限模式收回背包、溢出掉落在玩家处；
+     * 创造模式物品是免费内容，直接丢弃，绝不让其进入有限世界。
+     * Resolve transient UI input items under the current mode: finite modes recover
+     * them into the backpack and drop the overflow at the player, creative discards
+     * these free items so they never reach finite modes.
+     *
+     * @param items input items held by a transient UI (workstation or trade slots)
+     */
+    public void returnUiItems(Item... items) {
+        // Creative UI contents are free items: never return or drop them on close.
+        if (this.isCreative()) {
+            return;
+        }
+        for (Item item : items) {
+            if (item.isNull()) {
+                continue;
+            }
+            Item[] drops = this.inventory.addItem(item);
+            for (Item drop : drops) {
+                if (!this.dropItem(drop)) {
+                    this.level.dropItem(this, drop);
+                }
+            }
         }
     }
 

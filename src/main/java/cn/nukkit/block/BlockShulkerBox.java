@@ -64,7 +64,10 @@ public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntity
 
     @Override
     public double getResistance() {
-        return 30;
+        // Bedrock blast resistance of a shulker box is 2, the same as its hardness.
+        // Nukkit stores five times that value, so 30 made the box three times tougher
+        // than vanilla and let it survive TNT blasts that flattened the stone around it.
+        return 10;
     }
 
     @Override

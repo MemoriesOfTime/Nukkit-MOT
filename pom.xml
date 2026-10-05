@@ -40,7 +40,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
         <argLine></argLine>
-        <jline.version>3.30.6</jline.version>
+        <jline.version>3.30.15</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.11</leveldb-mcpe-jni.version>
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
@@ -121,7 +121,7 @@
         <dependency>
             <groupId>org.cloudburstmc.netty</groupId>
             <artifactId>netty-transport-nethernet</artifactId>
-            <version>2.0.0.CR3-20260918.234329-18</version>
+            <version>2.0.0.CR4-20260928.175532-10</version>
             <scope>compile</scope>
             <exclusions>
                 <!-- 统一使用服务器自带的 Netty 4.2.x；Use the Netty version this server ships with (4.2.x) -->
@@ -139,13 +139,13 @@
         <dependency>
             <groupId>dev.opencollab</groupId>
             <artifactId>libdatachannel-java</artifactId>
-            <version>0.24.5.0-20260918.234655-9</version>
+            <version>0.24.6.0-20260928.143903-1</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>dev.opencollab</groupId>
             <artifactId>libdatachannel-java-arch-detect</artifactId>
-            <version>0.24.5.0-20260918.234655-9</version>
+            <version>0.24.6.0-20260928.143903-1</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -606,10 +606,15 @@
                         <exclude>cn/nukkit/buildtools/**</exclude>
                     </excludes>
                     <archive>
-                        <manifestEntries>
+                        <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <Main-Class>cn.nukkit.Nukkit</Main-Class>
+                            <mainClass>cn.nukkit.Bootstrap</mainClass>
+                        </manifest>
+                        <!-- MR-JAR：允许 META-INF/versions/21 的虚拟线程覆盖类在 JVM 21+ 生效
+                             MR-JAR: activates META-INF/versions/21 overrides on JVM 21+ -->
+                        <manifestEntries>
+                            <Multi-Release>true</Multi-Release>
                         </manifestEntries>
                     </archive>
                 </configuration>
@@ -632,6 +637,28 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+                <executions>
+                    <!-- MR-JAR：src/main/java21 以 release 21 单独编译进 META-INF/versions/21，
+                         仅允许 Java 21+ API（虚拟线程）；JVM 21+ 类加载器自动选中，17 自动忽略。
+                         须跑在 default-compile 之后（依赖已编译的主类作 classpath）。
+                         MR-JAR: compiles src/main/java21 at release 21 into META-INF/versions/21;
+                         JVM 21+ picks these classes automatically, 17 ignores them. Must run
+                         after default-compile (needs main classes on the classpath). -->
+                    <execution>
+                        <id>compile-java21</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <release>21</release>
+                            <compileSourceRoots>
+                                <compileSourceRoot>${project.basedir}/src/main/java21</compileSourceRoot>
+                            </compileSourceRoots>
+                            <outputDirectory>${project.build.outputDirectory}/META-INF/versions/21</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -663,6 +690,13 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>3.7.0</version>
+                <!-- 快照按实际解析的时间戳文件名复制，与 DEPENDENCIES.txt / Class-Path 的精确 pin 对齐；
+                     仅作用于手动执行 dependency:copy-dependencies 预置的 lib/，使其可被引导直接判定就绪
+                     Copies snapshots under resolved timestamped names matching the exact pins; applies to
+                     manually invoked dependency:copy-dependencies so a pre-populated lib/ verifies as ready -->
+                <configuration>
+                    <useBaseVersion>false</useBaseVersion>
+                </configuration>
                 <executions>
                     <execution>
                         <id>test-dependency-properties</id>
@@ -670,6 +704,19 @@
                         <goals>
                             <goal>properties</goal>
                         </goals>
+                    </execution>
+                    <!-- 运行时依赖清单输入，供 GenerateDependencyManifest 生成 DEPENDENCIES.txt
+                         Feeds GenerateDependencyManifest with the runtime dependency list -->
+                    <execution>
+                        <id>runtime-dependency-list</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>list</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <outputFile>${project.build.directory}/dependency-list.txt</outputFile>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -693,6 +740,22 @@
                             <mainClass>cn.nukkit.buildtools.MinifyJsonResources</mainClass>
                             <arguments>
                                 <argument>${project.build.outputDirectory}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <!-- 生成 target/classes/DEPENDENCIES.txt，随 package 进 jar 供 Bootstrap 使用
+                         Emits target/classes/DEPENDENCIES.txt, packaged for Bootstrap -->
+                    <execution>
+                        <id>generate-dependency-manifest</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>cn.nukkit.buildtools.GenerateDependencyManifest</mainClass>
+                            <arguments>
+                                <argument>${project.build.directory}/dependency-list.txt</argument>
+                                <argument>${project.build.outputDirectory}/DEPENDENCIES.txt</argument>
                             </arguments>
                         </configuration>
                     </execution>
@@ -740,8 +803,17 @@
                     <filters>
                         <filter>
                             <artifact>*:*</artifact>
+                            <!-- META-INF/versions 不再整体排除：本项目 versions/21 的虚拟线程覆盖类
+                                 需进入 shaded jar。放开后 bouncycastle(9/11/15/17/25)与 jackson-core(21)
+                                 的版本化类同时激活——与 Gradle 构建（本就保留）及 Lite jar 路径（依赖
+                                 自带 MR 标志）对齐，消除 Maven fat jar 此前的静默降级。
+                                 META-INF/versions is intentionally kept: our versions/21
+                                 virtual-thread overrides must reach the shaded jar. This also
+                                 activates versioned classes from bouncycastle (9/11/15/17/25) and
+                                 jackson-core (21), aligning the Maven fat jar with the Gradle build
+                                 (which always kept them) and the Lite path (deps are MR-flagged
+                                 themselves). -->
                             <excludes>
-                                <exclude>META-INF/versions/</exclude>
                                 <exclude>META-INF/*.SF</exclude>
                                 <exclude>META-INF/*.DSA</exclude>
                                 <exclude>META-INF/*.RSA</exclude>
@@ -761,9 +833,44 @@
                         <transformer
                                 implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer">
                         </transformer>
+                        <!-- shaded jar 保持自包含：显式固定 Main-Class，避免继承 jar 插件清单的 Bootstrap 入口
+                             Pin Main-Class so the shaded jar stays self-contained -->
+                        <transformer
+                                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                            <mainClass>cn.nukkit.Nukkit</mainClass>
+                            <manifestEntries>
+                                <Multi-Release>true</Multi-Release>
+                            </manifestEntries>
+                        </transformer>
                     </transformers>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
                 </configuration>
+            </plugin>
+            <plugin>
+                <!-- shade 把 thin jar 留成 original-<finalName>.jar，改名 <finalName>-Lite.jar 作为引导
+                     自动下载发行版（original- 前缀匹配不到 CI 的 Nukkit-*.jar 归档通配）；
+                     shade 被跳过（central-release）时无此文件，failonerror=false 容忍
+                     Rename the shade leftover to the Lite flavor; failonerror=false tolerates
+                     its absence when shading is skipped -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>rename-thin-jar-to-lite</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                    <move file="${project.build.directory}/original-${project.build.finalName}.jar"
+                                          tofile="${project.build.directory}/${project.build.finalName}-Lite.jar"
+                                          failonerror="false"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>pl.project13.maven</groupId>

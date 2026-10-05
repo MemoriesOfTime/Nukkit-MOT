@@ -23,8 +23,19 @@ public class ItemBreakParticle extends Particle {
     @Override
     public DataPacket[] mvEncode(GameVersion protocol) {
         int runtimeId = this.item.getId();
+        int damage = this.item.getDamage();
         if (protocol.getProtocol() >= ProtocolInfo.v1_16_100) {
-            runtimeId = item.getNetworkId(protocol);
+            try {
+                if (!item.isSupportedOn(protocol)) {
+                    throw new IllegalArgumentException("Item is unavailable in the recipient palette");
+                }
+                runtimeId = item.getNetworkId(protocol);
+            } catch (IllegalArgumentException unsupportedItem) {
+                // Match the inventory placeholder for this recipient only. Particles carry
+                // no item NBT; never replace or mutate the server's actual item/mapping.
+                runtimeId = Item.get(Item.INFO_UPDATE).getNetworkId(protocol);
+                damage = 0;
+            }
         }
 
         LevelEventPacket packet = new LevelEventPacket();
@@ -32,7 +43,7 @@ public class ItemBreakParticle extends Particle {
         packet.x = (float) this.x;
         packet.y = (float) this.y;
         packet.z = (float) this.z;
-        packet.data = (runtimeId << 16 | item.getDamage());
+        packet.data = (runtimeId << 16 | damage);
         packet.protocol = protocol.getProtocol();
         packet.gameVersion = protocol;
         packet.tryEncode();

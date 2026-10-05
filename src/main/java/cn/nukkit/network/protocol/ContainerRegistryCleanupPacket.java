@@ -33,6 +33,7 @@ public class ContainerRegistryCleanupPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putArray(this.getRemovedContainers(), container -> this.writeFullContainerName(container));
     }
 }
