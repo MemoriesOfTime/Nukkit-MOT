@@ -704,6 +704,7 @@ public class Server {
 
         // Load server.properties (standard MC settings)
         log.info("Loading server properties...");
+        NukkitConsole.takeOverTerminalClose();
         this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
         this.properties.setHeader("Nukkit-MOT Server Properties\n"
                 + "For advanced settings, see nukkit-mot.yml\n"

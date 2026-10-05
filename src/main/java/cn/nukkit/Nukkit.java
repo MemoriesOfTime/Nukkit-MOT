@@ -6,6 +6,7 @@ import com.google.common.base.Preconditions;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.netty.util.internal.logging.Log4J2LoggerFactory;
 import lombok.extern.log4j.Log4j2;
+import net.minecrell.terminalconsole.TerminalConsoleAppender;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
@@ -156,6 +157,10 @@ public class Nukkit {
 
     public static void shutdownLogging() {
         ((LoggerContext) LogManager.getContext(false)).stop();
+        try {
+            TerminalConsoleAppender.close();
+        } catch (IOException ignored) {
+        }
     }
 
     public static String getBranch() {
