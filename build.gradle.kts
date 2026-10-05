@@ -34,9 +34,34 @@ java {
 }
 
 // 覆盖 main/test/buildTools 全部编译任务，产物统一 Java 17 兼容
-// Covers every compile task (main/test/buildTools); output stays Java 17 compatible
+// （下方 compileJava21 是唯一例外：MR-JAR 版本化类，编译为 21 字节码落在 META-INF/versions/21）
+// Covers every compile task (main/test/buildTools); output stays Java 17 compatible.
+// Sole exception: compileJava21 below — MR-JAR versioned classes compiled at release 21
+// into META-INF/versions/21.
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(17)
+}
+
+// MR-JAR：src/main/java21 的虚拟线程实现类以 release 21 单独编译，产物经 sourceSet output
+// 进入 jar/liteJar/shadowJar 的 META-INF/versions/21；JVM 21+ 自动选中、17 自动忽略。
+// 与 pom.xml 的 compile-java21 execution 对应，JavaReleaseConsistencyTest 守卫两侧一致。
+// MR-JAR: virtual-thread impl under src/main/java21 compiles at release 21 into
+// META-INF/versions/21 (reaches jar/liteJar/shadowJar via the sourceSet output).
+// JVM 21+ picks these classes automatically, 17 ignores them. Mirrors the pom's
+// compile-java21 execution; JavaReleaseConsistencyTest guards both sides.
+val compileJava21 by tasks.registering(JavaCompile::class) {
+    source = fileTree("src/main/java21")
+    // 直接引用 compileJava 的输出目录而非 sourceSet output，避免与 output.dir(builtBy) 成环
+    // Points at compileJava's output dir instead of the sourceSet output to avoid a
+    // builtBy cycle with the output.dir registration below
+    classpath = sourceSets.main.get().compileClasspath + files(tasks.compileJava.flatMap { it.destinationDirectory })
+    destinationDirectory.set(layout.buildDirectory.dir("classes/java21/META-INF/versions/21"))
+    options.release.set(21)
+    options.encoding = "UTF-8"
+}
+
+sourceSets.main {
+    output.dir(layout.buildDirectory.dir("classes/java21"), "builtBy" to compileJava21)
 }
 
 repositories {
@@ -311,7 +336,8 @@ val liteJar by tasks.registering(Jar::class) {
         manifest.attributes(
             mapOf(
                 "Main-Class" to "cn.nukkit.Bootstrap",
-                "Class-Path" to libs.joinToString(" ")
+                "Class-Path" to libs.joinToString(" "),
+                "Multi-Release" to "true"
             )
         )
     }
@@ -372,6 +398,15 @@ tasks {
 
     jar {
         archiveClassifier.set("dev")
+        manifest.attributes["Multi-Release"] = "true"
+    }
+
+    named<Jar>("sourcesJar") {
+        // 版本化路径：避免与主源码集的同名文件成重复条目（无策略时 sourcesJar/assemble/build 直接失败），
+        // 并与二进制 jar 的 META-INF/versions/21 结构对应
+        // Versioned path: avoids duplicate entries against the main source set (which fails
+        // sourcesJar/assemble/build without a strategy) and mirrors the binary jar layout
+        from("src/main/java21") { into("META-INF/versions/21") }
     }
 
     assemble {

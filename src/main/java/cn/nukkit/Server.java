@@ -771,7 +771,8 @@ public class Server {
 
         Zlib.setProvider(this.serverConfig.networkSettings().zlibProvider());
 
-        this.scheduler = new ServerScheduler();
+        this.scheduler = new ServerScheduler(this.serverConfig.performanceSettings().virtualThreads());
+        log.info("Virtual threads for async tasks: {}", this.scheduler.isVirtualThreadsEnabled() ? "enabled" : "disabled");
 
         if (this.getPropertyBoolean("enable-rcon", false)) {
             try {
