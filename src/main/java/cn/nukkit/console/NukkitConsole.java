@@ -15,11 +15,13 @@ import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Terminal;
+import org.jline.utils.ShutdownHooks;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -103,6 +105,7 @@ public class NukkitConsole extends SimpleTerminalConsole {
     public void start() {
         try {
             Terminal terminal = TerminalConsoleAppender.getTerminal();
+            takeOverTerminalClose();
             if (terminal != null) {
                 readCommands(terminal);
             } else {
@@ -110,6 +113,54 @@ public class NukkitConsole extends SimpleTerminalConsole {
             }
         } catch (IOException e) {
             LOGGER.error("Failed to read console input", e);
+        }
+    }
+
+    private static final AtomicBoolean terminalCloseTakenOver = new AtomicBoolean();
+
+    public static void takeOverTerminalClose() {
+        Terminal terminal = TerminalConsoleAppender.getTerminal();
+        // terminal 由首条日志在 dispatcher 线程惰性创建（此处首条日志刚入队，毫秒级就绪）
+        // terminal is lazily created by the first log event on the dispatcher thread (ready in ms)
+        for (int i = 0; terminal == null && i < 50; i++) {
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            terminal = TerminalConsoleAppender.getTerminal();
+        }
+        if (terminal == null || !terminalCloseTakenOver.compareAndSet(false, true)) {
+            return;
+        }
+        removeJlineShutdownHook(terminal);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                TerminalConsoleAppender.close();
+            } catch (IOException ignored) {
+                // 进程即将退出，清理失败无需处理 / the process exits right after anyway
+            }
+        }, "Terminal-Cleanup"));
+    }
+
+    private static void removeJlineShutdownHook(Terminal terminal) {
+        try {
+            for (Class<?> c = terminal.getClass(); c != null; c = c.getSuperclass()) {
+                try {
+                    Field closer = c.getDeclaredField("closer");
+                    closer.setAccessible(true);
+                    Object task = closer.get(terminal);
+                    if (task instanceof ShutdownHooks.Task) {
+                        ShutdownHooks.remove((ShutdownHooks.Task) task);
+                    }
+                    return;
+                } catch (NoSuchFieldException ignored) {
+                    // 沿继承链继续找 closer（不存在则以 no-op 结束）/ keep walking
+                }
+            }
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
+            LOGGER.debug("Failed to remove jline terminal shutdown hook", e);
         }
     }
 

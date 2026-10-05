@@ -50,8 +50,11 @@ public abstract class AsyncTask implements Runnable {
     }
 
     /**
-     * Whether this task should run on a virtual thread.
-     * Override and return true for I/O-bound tasks (e.g., file writes, network requests).
+     * 此任务是否应在虚拟线程上运行。I/O 密集型任务（文件写入、网络请求）应覆写返回 true。
+     * 仅在 JVM 21+ 上生效；不支持时自动回退平台线程池。
+     * <p>
+     * Whether this task should run on a virtual thread. Override to return true for
+     * I/O-bound tasks. Only effective on JVM 21+; falls back to the platform pool otherwise.
      */
     protected boolean isVirtual() {
         return false;

@@ -60,7 +60,8 @@ public class LevelDBChunk extends BaseChunk {
         this.storageSaveX = chunkX;
         this.storageSaveZ = chunkZ;
 
-        this.dimensionData = provider == null ? DimensionData.LEGACY_DIMENSION : provider.getLevel().getDimensionData();
+        Level levelTemp = provider == null ? null : provider.getLevel();
+        this.dimensionData = levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData();
         int minSectionY = this.dimensionData.getMinSectionY();
         int maxSectionY = this.dimensionData.getMaxSectionY();
         this.sections = new ChunkSection[this.dimensionData.getHeight() >> 4];
