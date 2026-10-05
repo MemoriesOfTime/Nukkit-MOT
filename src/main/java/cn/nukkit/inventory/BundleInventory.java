@@ -34,23 +34,27 @@ public class BundleInventory extends BaseInventory {
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
-        if (!canStore(item)) {
-            return false;
-        }
-        if (wouldCreateBundleCycle(item)) {
-            return false;
-        }
+        // MAX_FILL 重量检查与写入须在同一监视器下原子完成，否则并发写绕过重量上限
+        // The MAX_FILL weight check and the write must be atomic under one monitor
+        synchronized (this.slots) {
+            if (!canStore(item)) {
+                return false;
+            }
+            if (wouldCreateBundleCycle(item)) {
+                return false;
+            }
 
-        int newWeight = getWeight() - getWeight(this.getItemFast(index)) + getWeight(item);
-        if (newWeight > MAX_FILL) {
-            return false;
-        }
+            int newWeight = getWeight() - getWeight(this.getItemFast(index)) + getWeight(item);
+            if (newWeight > MAX_FILL) {
+                return false;
+            }
 
-        boolean changed = super.setItem(index, item, send);
-        if (changed) {
-            getHolder().saveNBT();
+            boolean changed = super.setItem(index, item, send);
+            if (changed) {
+                getHolder().saveNBT();
+            }
+            return changed;
         }
-        return changed;
     }
 
     // Force-set still rejects shulker boxes and bundle cycles to keep the
@@ -126,19 +130,20 @@ public class BundleInventory extends BaseInventory {
         if (tag == null || !tag.containsList(ItemBundle.TAG_STORAGE_ITEM_COMPONENT_CONTENT)) {
             return;
         }
+        synchronized (this.slots) {
+            ListTag<CompoundTag> items = tag.getList(ItemBundle.TAG_STORAGE_ITEM_COMPONENT_CONTENT, CompoundTag.class);
+            for (CompoundTag itemTag : items.getAll()) {
+                int slot = itemTag.getByte("Slot") & 0xFF;
+                if (slot < 0 || slot >= this.getSize()) {
+                    continue;
+                }
 
-        ListTag<CompoundTag> items = tag.getList(ItemBundle.TAG_STORAGE_ITEM_COMPONENT_CONTENT, CompoundTag.class);
-        for (CompoundTag itemTag : items.getAll()) {
-            int slot = itemTag.getByte("Slot") & 0xFF;
-            if (slot < 0 || slot >= this.getSize()) {
-                continue;
-            }
-
-            Item item = NBTIO.getItemHelper(itemTag);
-            if (!item.isNull() && canStore(item) && !wouldCreateBundleCycle(item)) {
-                int newWeight = getWeight() + getWeight(item);
-                if (newWeight <= MAX_FILL) {
-                    this.slots.put(slot, item);
+                Item item = NBTIO.getItemHelper(itemTag);
+                if (!item.isNull() && canStore(item) && !wouldCreateBundleCycle(item)) {
+                    int newWeight = getWeight() + getWeight(item);
+                    if (newWeight <= MAX_FILL) {
+                        this.slots.put(slot, item);
+                    }
                 }
             }
         }
@@ -153,8 +158,12 @@ public class BundleInventory extends BaseInventory {
 
     private int getWeight(Set<Integer> visitedBundleIds) {
         int weight = 0;
-        for (Item item : this.slots.values()) {
-            weight += getWeight(item, visitedBundleIds);
+        // synchronizedMap 惯例：迭代须持其监视器（见 BaseInventory.slots）
+        // synchronizedMap idiom: iteration must hold the map's monitor (see BaseInventory.slots)
+        synchronized (this.slots) {
+            for (Item item : this.slots.values()) {
+                weight += getWeight(item, visitedBundleIds);
+            }
         }
         return weight;
     }

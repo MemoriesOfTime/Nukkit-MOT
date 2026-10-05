@@ -14,7 +14,7 @@ public abstract class MetadataStore {
 
     private final Map<String, Map<Plugin, MetadataValue>> metadataMap = new HashMap<>();
 
-    public void setMetadata(Object subject, String metadataKey, MetadataValue newMetadataValue) {
+    public synchronized void setMetadata(Object subject, String metadataKey, MetadataValue newMetadataValue) {
         if (newMetadataValue == null) {
             throw new ServerException("Value cannot be null");
         }
@@ -27,7 +27,7 @@ public abstract class MetadataStore {
         entry.put(owningPlugin, newMetadataValue);
     }
 
-    public List<MetadataValue> getMetadata(Object subject, String metadataKey) {
+    public synchronized List<MetadataValue> getMetadata(Object subject, String metadataKey) {
         String key = this.disambiguate((Metadatable) subject, metadataKey);
         if (this.metadataMap.containsKey(key)) {
             Collection values = ((Map) this.metadataMap.get(key)).values();
@@ -36,11 +36,11 @@ public abstract class MetadataStore {
         return Collections.emptyList();
     }
 
-    public boolean hasMetadata(Object subject, String metadataKey) {
+    public synchronized boolean hasMetadata(Object subject, String metadataKey) {
         return this.metadataMap.containsKey(this.disambiguate((Metadatable) subject, metadataKey));
     }
 
-    public void removeMetadata(Object subject, String metadataKey, Plugin owningPlugin) {
+    public synchronized void removeMetadata(Object subject, String metadataKey, Plugin owningPlugin) {
         if (owningPlugin == null) {
             throw new PluginException("Plugin cannot be null");
         }
@@ -59,10 +59,20 @@ public abstract class MetadataStore {
         if (owningPlugin == null) {
             throw new PluginException("Plugin cannot be null");
         }
-        for (Map value : this.metadataMap.values()) {
-            if (value.containsKey(owningPlugin)) {
-                ((MetadataValue) value.get(owningPlugin)).invalidate();
+        // 快照持锁、invalidate() 在锁外执行：它是插件可覆写的外来代码，持监视器调用存在死锁面
+        // Snapshot under the monitor, invoke invalidate() outside it: it is foreign,
+        // plugin-overridable code and must not run while holding this store's monitor
+        List<MetadataValue> toInvalidate = new ArrayList<>();
+        synchronized (this) {
+            for (Map value : this.metadataMap.values()) {
+                MetadataValue metadataValue = (MetadataValue) value.get(owningPlugin);
+                if (metadataValue != null) {
+                    toInvalidate.add(metadataValue);
+                }
             }
+        }
+        for (MetadataValue metadataValue : toInvalidate) {
+            metadataValue.invalidate();
         }
     }
 

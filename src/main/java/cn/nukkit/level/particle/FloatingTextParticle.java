@@ -128,7 +128,7 @@ public class FloatingTextParticle extends Particle {
     public DataPacket[] mvEncode(GameVersion protocol) {
         ArrayList<DataPacket> packets = new ArrayList<>();
         if (this.entityId == -1) {
-            this.entityId = Entity.entityCount++;
+            this.entityId = Entity.nextEntityId();
         } else {
             packets.add(getRemovePacket(protocol));
         }

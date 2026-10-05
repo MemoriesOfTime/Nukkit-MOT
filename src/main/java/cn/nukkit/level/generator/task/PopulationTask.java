@@ -150,13 +150,20 @@ public class PopulationTask extends AsyncTask {
                 return;
             }
 
-            for (BaseFullChunk chunk : this.chunks) {
-                if (chunk != null) {
-                    level.generateChunkCallback(chunk.getX(), chunk.getZ(), chunk);
+            // 9 个回调捆绑为单任务投递：逐个投递时世界线程可在邻居与中心回调之间插入完整
+            // tick，丢失 master 同线程连续执行的序列原子性
+            // Bundle all callbacks into one task: offered one by one, the level thread can
+            // run a full tick between neighbour and center callbacks, losing the sequence
+            // atomicity master had on a single thread
+            level.runGenerationCallbacks(() -> {
+                for (BaseFullChunk chunk : this.chunks) {
+                    if (chunk != null) {
+                        level.generateChunkCallback(chunk.getX(), chunk.getZ(), chunk, true);
+                    }
                 }
-            }
 
-            level.generateChunkCallback(centerChunk.getX(), centerChunk.getZ(), centerChunk, isPopulated);
+                level.generateChunkCallback(centerChunk.getX(), centerChunk.getZ(), centerChunk, isPopulated);
+            });
         }
     }
 }

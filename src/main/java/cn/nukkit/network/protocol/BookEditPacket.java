@@ -69,4 +69,9 @@ public class BookEditPacket extends DataPacket {
         SWAP_PAGES,
         SIGN_BOOK
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

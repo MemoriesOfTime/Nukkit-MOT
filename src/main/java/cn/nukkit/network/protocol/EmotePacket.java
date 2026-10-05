@@ -1737,4 +1737,9 @@ public class EmotePacket extends DataPacket {
         }
 
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

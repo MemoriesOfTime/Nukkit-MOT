@@ -22,7 +22,7 @@ public class BanList {
 
     private final String file;
 
-    private boolean enable = true;
+    private volatile boolean enable = true;
 
     public BanList(String file) {
         this.file = file;
@@ -36,12 +36,20 @@ public class BanList {
         this.enable = enable;
     }
 
-    public LinkedHashMap<String, BanEntry> getEntires() {
+    /**
+     * 返回内部封禁表活引用（master 语义，插件惯用法 {@code getEntires().remove(name)} 依赖此行为）。
+     * 并行 tick 开启时跨线程迭代/修改须调用方自行同步；结构化操作请走 {@link #add}/{@link #remove}。
+     * <p>
+     * Returns the live internal map (master semantics; the common plugin idiom
+     * {@code getEntires().remove(name)} relies on it). Under parallel tick, cross-thread
+     * iteration/mutation is the caller's responsibility; prefer {@link #add}/{@link #remove}.
+     */
+    public synchronized LinkedHashMap<String, BanEntry> getEntires() {
         removeExpired();
         return this.list;
     }
 
-    public boolean isBanned(String name) {
+    public synchronized boolean isBanned(String name) {
         if (!this.enable || name == null) {
             return false;
         } else {
@@ -51,7 +59,7 @@ public class BanList {
         }
     }
 
-    public void add(BanEntry entry) {
+    public synchronized void add(BanEntry entry) {
         this.list.put(entry.getName(), entry);
         this.save();
     }
@@ -79,7 +87,7 @@ public class BanList {
         return entry;
     }
 
-    public void remove(String name) {
+    public synchronized void remove(String name) {
         name = name.toLowerCase(Locale.ROOT);
         if (this.list.containsKey(name)) {
             this.list.remove(name);
@@ -88,7 +96,7 @@ public class BanList {
     }
 
 
-    public void removeExpired() {
+    public synchronized void removeExpired() {
         for (String name : new ArrayList<>(this.list.keySet())) {
             BanEntry entry = this.list.get(name);
             if (entry.hasExpired()) {
@@ -97,7 +105,7 @@ public class BanList {
         }
     }
 
-    public void load() {
+    public synchronized void load() {
         this.list = new LinkedHashMap<>();
         File file = new File(this.file);
         try {
@@ -117,7 +125,7 @@ public class BanList {
         }
     }
 
-    public void save() {
+    public synchronized void save() {
         this.removeExpired();
 
         try {

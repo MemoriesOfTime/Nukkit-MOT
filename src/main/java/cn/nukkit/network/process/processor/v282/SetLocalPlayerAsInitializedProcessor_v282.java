@@ -25,6 +25,11 @@ public class SetLocalPlayerAsInitializedProcessor_v282 extends DataPacketProcess
         playerHandle.doFirstSpawn();
 
         playerHandle.player.getServer().getPluginManager().callEvent(new PlayerLocallyInitializedEvent(playerHandle.player));
+
+        // 收尾（本处理器的事件）完成后才发布接管，世界线程不与主线程并发操作该玩家
+        // Publish the handover only after this finalization event so the level thread
+        // cannot race the primary thread's remaining work on the player
+        playerHandle.player.publishSpawnInitCompleted();
     }
 
     @Override

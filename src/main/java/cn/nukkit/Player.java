@@ -102,14 +102,15 @@ import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
 import cn.nukkit.scoreboard.scorer.PlayerScorer;
 import cn.nukkit.utils.*;
+import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Maps;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -132,10 +133,8 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -213,13 +212,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected final NetworkPlayerSession networkSession;
 
     public boolean playedBefore;
-    public boolean spawned = false;
-    public boolean loggedIn = false;
+    public volatile boolean spawned = false;
+    // 主线程出生收尾完成后由 publishSpawnInitCompleted 置位（晚于 spawned），世界线程据此接管 tick 与包路由
+    private volatile boolean spawnInitCompleted = false;
+    private final AtomicBoolean closeTeardownExecuted = new AtomicBoolean(false);
+    // 登录期同步包延迟队列：入队与 doFirstSpawn 的排空/置位共用此锁，保持与出生后直达包的全序
+    private final Object preSpawnPacketLock = new Object();
+    private final ArrayDeque<DataPacket> preSpawnDeferredPackets = new ArrayDeque<>();
+    private final AtomicBoolean preSpawnDrainScheduled = new AtomicBoolean(false);
+    public volatile boolean loggedIn = false;
     protected boolean loginVerified = false;
     private int unverifiedPackets;
     protected boolean loginPacketReceived;
     protected boolean awaitingEncryptionHandshake;
-    public int gamemode;
+    public volatile int gamemode;
     public long lastBreak = -1;
     private BlockVector3 lastBreakPosition = new BlockVector3();
 
@@ -236,7 +242,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected int windowCnt = MINIMUM_OTHER_WINDOW_ID;
 
-    protected final BiMap<Inventory, Integer> windows = HashBiMap.create();
+    // 窗口/表单 ID 分配锁：包处理（世界线程）与插件 API（主线程）并发分配时保证唯一
+    // Lock for window/form id allocation across the world-thread packet path and main-thread plugin APIs
+    private final Object windowIdLock = new Object();
+
+    protected final BiMap<Inventory, Integer> windows = Maps.synchronizedBiMap(HashBiMap.create());
     protected final BiMap<Integer, Inventory> windowIndex = windows.inverse();
     protected final Set<Integer> permanentWindows = new IntOpenHashSet();
     // Most recently opened non-permanent window; getTopWindow() is deterministic
@@ -274,7 +284,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected int lastTeleportTick = -1;
 
-    protected boolean connected = true;
+    protected volatile boolean connected = true;
     protected final InetSocketAddress rawSocketAddress;
     protected InetSocketAddress socketAddress;
     protected boolean removeFormat = true;
@@ -308,7 +318,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private final int loaderId;
 
-    public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
+    public final Map<Long, Boolean> usedChunks = new Long2ObjectNonBlockingMap<>();
 
     private int chunksSent = 0;
     private boolean hasSpawnChunks;
@@ -321,7 +331,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     // 借鉴 PNX,默认 100° / Adapted from PNX, default 100°
     private static final double FOV_DEGREES = 100.0;
 
-    protected final Map<UUID, Player> hiddenPlayers = new HashMap<>();
+    protected final Map<UUID, Player> hiddenPlayers = new ConcurrentHashMap<>();
     /** Server tick at which the cool down of an item category ends. */
     protected final Map<String, Integer> itemCoolDownEnds = new ConcurrentHashMap<>(2);
 
@@ -355,7 +365,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int startAirTicks = 5;
     protected int lastInAirTick = 0;
 
-    protected AdventureSettings adventureSettings;
+    protected volatile AdventureSettings adventureSettings;
     protected Color locatorBarColor;
 
     protected boolean checkMovement = true;
@@ -420,10 +430,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private boolean canPickupXP = true;
 
     protected int formWindowCount = 0;
-    public Map<Integer, FormWindow> formWindows = new Int2ObjectOpenHashMap<>();
-    protected Map<Integer, FormWindow> serverSettings = new Int2ObjectOpenHashMap<>();
+    public Map<Integer, FormWindow> formWindows = new ConcurrentHashMap<>();
+    protected Map<Integer, FormWindow> serverSettings = new ConcurrentHashMap<>();
 
-    protected Map<Long, DummyBossBar> dummyBossBars = new Long2ObjectLinkedOpenHashMap<>();
+    protected Map<Long, DummyBossBar> dummyBossBars = new ConcurrentHashMap<>();
 
     protected Cache<String, FormWindowDialog> dialogWindows = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
@@ -443,12 +453,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int lastEmote;
     private int lastEnderPearl = 20;
     private int lastChorusFruitTeleport = 20;
-    public long lastSkinChange = -1;
+    public volatile long lastSkinChange = -1;
     private double lastRightClickTime = 0.0;
     private long lastClickAirTime = 0;
     private BlockVector3 lastRightClickPos = null;
-    private final IntOpenHashSet processedItemStackRequestIds = new IntOpenHashSet();
-    private int processedItemStackRequestTick = Integer.MIN_VALUE;
+    // ItemStackRequest 去重用墙钟窗而非 tick 基准：包处理线程回落时 tick 会被另一线程推进，同 id 两包跨边界即被重复执行（物品复制）
+    // Dedup on a wall-clock window, not a tick base: a fallback processing thread lets the base advance mid-batch, re-executing same-id requests (dupes)
+    private final Map<Integer, Long> processedItemStackRequestExpiry = new ConcurrentHashMap<>();
+    private static final long ITEM_STACK_REQUEST_DEDUP_WINDOW_MS = 3_000L;
+    private int itemStackDedupPurgeCounter;
     public EntityFishingHook fishing = null;
     public boolean formOpen;
     public boolean locallyInitialized;
@@ -463,15 +476,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int riptideTicks;
 
     @Setter
-    private boolean needSendData;
-    private boolean needSendAdventureSettings;
-    private boolean needSendFoodLevel;
+    private volatile boolean needSendData;
+    private volatile boolean needSendAdventureSettings;
+    private volatile boolean needSendFoodLevel;
     @Setter
-    private boolean needSendInventory;
-    private boolean needSendHeldItem;
-    private boolean needSendRotation;
-    private boolean dimensionFix560;
-    private boolean needSendUpdateClientInputLocksPacket;
+    private volatile boolean needSendInventory;
+    private volatile boolean needSendHeldItem;
+    private volatile boolean needSendRotation;
+    private volatile boolean dimensionFix560;
+    private volatile boolean needSendUpdateClientInputLocksPacket;
 
     /**
      * 用于修复1.20.0连续执行despawnFromAll和spawnToAll导致玩家移动不显示问题
@@ -1240,6 +1253,119 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.loadQueue.remove(index);
     }
 
+    /**
+     * 断线/跨世界传送时的区块卸载，串行到其世界线程执行；超时后停止线程再回落调用线程。
+     * Chunk teardown on disconnect/transfer, serialized onto the level's thread with a stop-then-inline timeout fallback.
+     */
+    private void unloadChunksOnLevelThread(boolean online) {
+        Level level = this.getLevel();
+        if (level == null || !level.isParallelTickEnabled()) {
+            this.unloadChunks(online);
+            return;
+        }
+        AtomicBoolean unloaded = new AtomicBoolean(false);
+        Runnable unload = () -> {
+            if (unloaded.compareAndSet(false, true)) {
+                this.unloadChunks(online);
+            }
+        };
+        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(unload);
+        try {
+            future.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException | InterruptedException e) {
+            // 中断（通常为关服）也须完成卸载，否则 usedChunks/加载器注册泄漏
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+                runAfterLevelThreadStops(level, "unload chunks for player " + this.getName(), unload);
+            } else if (levelThreadUnresponsive(future, level)) {
+                runAfterLevelThreadStops(level, "unload chunks for player " + this.getName(), unload);
+            }
+        } catch (ExecutionException e) {
+            this.server.getLogger().logException(e.getCause());
+        }
+    }
+
+    private static final long LONG_TICK_GRACE_MILLIS = 60_000L;
+    private static final long LONG_TICK_GRACE_MILLIS_PRIMARY = 25_000L;
+    // 主线程等待总预算硬封顶：宽限+轮次上界加 stop join/teardown 会逼近 Watchdog 60s 阈值；非主线程不受监控，不设预算
+    // Hard cap so the grace+rounds bound plus stop-join/teardown stays under the 60s Watchdog threshold; non-primary waiters are unmonitored
+    private static final long LEVEL_THREAD_WAIT_BUDGET_MILLIS_PRIMARY = 35_000L;
+
+    private boolean levelThreadUnresponsive(CompletableFuture<Void> future, Level level) {
+        // tick 开始时间戳在单次 tick 内不推进，执行中的长 tick 会被误判成无进展，故辅以 tick 年龄宽限
+        // The tick-start timestamp freezes mid-tick, so a running long tick looks like no-progress; the age grace covers that
+        boolean primaryWaiter = this.server.isPrimaryThread();
+        long graceMillis = primaryWaiter ? LONG_TICK_GRACE_MILLIS_PRIMARY : LONG_TICK_GRACE_MILLIS;
+        int rounds = primaryWaiter ? 2 : 5;
+        long deadlineMillis = primaryWaiter
+                ? System.currentTimeMillis() + LEVEL_THREAD_WAIT_BUDGET_MILLIS_PRIMARY
+                : Long.MAX_VALUE;
+        long lastProgressMillis = level.getLevelThreadLastTickMillis();
+        for (int round = 0; round < rounds; round++) {
+            long waitMillis = 10_000L;
+            if (deadlineMillis != Long.MAX_VALUE) {
+                waitMillis = Math.min(waitMillis, deadlineMillis - System.currentTimeMillis());
+                if (waitMillis <= 0) {
+                    this.server.getLogger().warning("Level thread for '" + level.getName()
+                            + "' still busy at the end of the primary-thread wait budget; treating as stuck");
+                    return true;
+                }
+            }
+            try {
+                future.get(waitMillis, TimeUnit.MILLISECONDS);
+                return false;
+            } catch (TimeoutException e) {
+                long nowProgress = level.getLevelThreadLastTickMillis();
+                if (deadlineMillis != Long.MAX_VALUE && System.currentTimeMillis() >= deadlineMillis) {
+                    this.server.getLogger().warning("Level thread for '" + level.getName()
+                            + "' still busy at the end of the primary-thread wait budget; treating as stuck");
+                    return true;
+                }
+                if (nowProgress > lastProgressMillis) {
+                    lastProgressMillis = nowProgress;
+                    this.server.getLogger().warning("Level thread for '" + level.getName()
+                            + "' is still busy (ticks are progressing); extending the wait");
+                    continue;
+                }
+                long tickAgeMillis = lastProgressMillis > 0 ? System.currentTimeMillis() - lastProgressMillis : -1L;
+                if (tickAgeMillis >= 0 && tickAgeMillis < graceMillis) {
+                    this.server.getLogger().warning("Level thread for '" + level.getName()
+                            + "' is mid-tick (" + (tickAgeMillis / 1000) + "s so far); extending the wait");
+                    round--; // 宽限不消耗轮次 / the grace does not consume a round
+                    continue;
+                }
+                this.server.getLogger().warning("Level thread for '" + level.getName()
+                        + "' is unresponsive with no tick progress beyond the grace; treating as stuck");
+                return true;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return true;
+            } catch (ExecutionException e) {
+                this.server.getLogger().logException(e.getCause());
+                return false;
+            }
+        }
+        this.server.getLogger().warning("Level thread for '" + level.getName()
+                + "' keeps ticking but never completes the task; treating as stuck");
+        return true;
+    }
+
+    /**
+     * 停止世界线程后执行兜底动作；线程拒不退出时改在调用线程直接执行，action 必须幂等（CAS 守卫）。
+     * <p>
+     * Runs the fallback after stopping the level thread; a wedged thread means the action runs on the caller, so it must be idempotent (CAS-guarded).
+     */
+    private void runAfterLevelThreadStops(Level level, String action, Runnable queuedAction) {
+        level.stopLevelThread();
+        if (!level.isLevelThreadAlive()) {
+            queuedAction.run();
+        } else {
+            this.server.getLogger().error("Level thread for '" + level.getName()
+                    + "' remains stuck; running '" + action + "' on the calling thread as a last resort");
+            queuedAction.run();
+        }
+    }
+
     private void unloadChunks(boolean online) {
         for (long index : this.usedChunks.keySet()) {
             int chunkX = Level.getHashX(index);
@@ -1444,16 +1570,67 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             if (protocol <= ProtocolInfo.v1_5_0) {
                 this.server.getPluginManager().callEvent(new PlayerLocallyInitializedEvent(this));
+                // 收尾（sendPlayStatus+事件）完成后才发布接管，世界线程不与主线程并发操作该玩家
+                // Publish the handover only after finalization so the level thread cannot
+                // race the primary thread's remaining work on this player
+                this.publishSpawnInitCompleted();
+            }
+        }
+    }
+
+    /**
+     * 世界线程入队登录期延迟包；锁内复查出生收尾，刚完成则返回 false（调用方按出生后语义路由）。
+     */
+    public boolean deferPreSpawnPacket(DataPacket packet) {
+        synchronized (this.preSpawnPacketLock) {
+            if (this.spawnInitCompleted) {
+                return false;
+            }
+            this.preSpawnDeferredPackets.add(packet);
+        }
+        if (this.preSpawnDrainScheduled.compareAndSet(false, true)) {
+            this.server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                // 先复位再排空：排空期间的新入队能安排下一轮任务
+                this.preSpawnDrainScheduled.set(false);
+                this.drainPreSpawnPackets();
+            });
+        }
+        return true;
+    }
+
+    /**
+     * 仅主线程调用：按登录期单线程语义排空延迟包；doFirstSpawn 置 spawned 前亦调用。
+     * Primary-thread only; private 防止插件并发排空破坏登录语义。
+     */
+    private void drainPreSpawnPackets() {
+        while (true) {
+            DataPacket packet;
+            synchronized (this.preSpawnPacketLock) {
+                packet = this.preSpawnDeferredPackets.pollFirst();
+                if (packet == null) {
+                    return;
+                }
+            }
+            if (!this.isConnected()) {
+                synchronized (this.preSpawnPacketLock) {
+                    this.preSpawnDeferredPackets.clear();
+                }
+                return;
+            }
+            try {
+                this.handleDataPacket(packet);
+            } catch (Throwable t) {
+                this.server.getLogger().error("Error while handling deferred login packet for " + this.getName(), t);
             }
         }
     }
 
     protected void doFirstSpawn() {
-        this.locallyInitialized = true;
-
         if (this.spawned) {
             return;
         }
+
+        this.locallyInitialized = true;
 
         if (this.protocol < ProtocolInfo.v1_2_0) {
             this.adventureSettings.update();
@@ -1520,7 +1697,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.getLevel().sendWeather(this);
         }
 
-        this.spawned = true;
+        // 锁外排空、仅"空检查+置位"持锁并循环到空，保证与入队的全序且包处理不持锁
+        while (true) {
+            this.drainPreSpawnPackets();
+            synchronized (this.preSpawnPacketLock) {
+                if (this.preSpawnDeferredPackets.isEmpty()) {
+                    this.spawned = true;
+                    break;
+                }
+            }
+        }
+
+        // 排空中处理的包可能触发 kick/close（拆除后 inventory 已置 null），后续收尾不得再执行
+        // A packet drained above may have kicked/closed this player (teardown nulls the
+        // inventory); none of the finalization below may run afterwards
+        if (this.closed) {
+            return;
+        }
 
         this.sendMovementSpeed();
 
@@ -1581,6 +1774,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             });
         }
+
+        // 同上方 spawned 发布协议：排空出生体期间延迟到达的包；接管发布（spawnInitCompleted）
+        // 延迟到调用方（现代协议=v282 处理器发完事件后、老协议=checkNetwork 收尾后），
+        // 避免主线程收尾工作与世界线程接管并发操作同一玩家
+        // Drain login-phase packets; the handover flag itself is published by the caller
+        // (modern: the v282 processor after its event; legacy: after checkNetwork finishes)
+        // so primary-thread finalization cannot race the level thread's takeover
+        this.drainPreSpawnPackets();
+    }
+
+    /**
+     * 发布出生接管：主线程对玩家的出生收尾（sendPlayStatus、PlayerLocallyInitializedEvent 等）
+     * 全部完成后再调用，此后世界线程才接管该玩家的 checkNetwork/包路由。自带排空-置位循环，
+     * 与延迟包队列保持全序。
+     * <p>
+     * Publish the spawn handover: call this only after the primary thread has finished all
+     * spawn finalization for the player (sendPlayStatus, PlayerLocallyInitializedEvent, ...);
+     * the level thread takes over checkNetwork/packet routing afterwards. Drains deferred
+     * packets before setting the flag to keep total ordering with the deferral queue.
+     * <p>
+     * 插件不应调用（内部时序协议的一部分）。Plugins must not call this.
+     */
+    public void publishSpawnInitCompleted() {
+        while (true) {
+            this.drainPreSpawnPackets();
+            synchronized (this.preSpawnPacketLock) {
+                if (this.preSpawnDeferredPackets.isEmpty()) {
+                    this.spawnInitCompleted = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    public boolean isSpawnInitCompleted() {
+        return this.spawnInitCompleted;
     }
 
     protected boolean orderChunks() {
@@ -2980,6 +3209,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
+        // Parallel mode only: spawn finalization runs on the primary thread, so the level thread
+        // must not tick the player until handover; advance lastUpdate to avoid a huge first tickDiff
+        if (this.level != null && this.level.isParallelTickEnabled() && !this.spawnInitCompleted) {
+            this.lastUpdate = currentTick;
+            return true;
+        }
+
         int tickDiff = currentTick - this.lastUpdate;
 
         if (tickDiff <= 0) {
@@ -4015,8 +4251,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (DataPacketManager.canProcess(packet.gameVersion, packet.getClass())) {
-            DataPacketManager.processPacket(this.playerHandle, packet);
+        if (DataPacketManager.tryProcessPacket(this.playerHandle, packet)) {
             return;
         }
 
@@ -5136,7 +5371,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.inventoryOpen = false;
 
                         if (this.craftingType == CRAFTING_SMALL) {
-                            for (Entry<Inventory, Integer> open : new ArrayList<>(this.windows.entrySet())) {
+                            for (Entry<Inventory, Integer> open : this.snapshotWindows()) {
                                 if (open.getKey() instanceof ContainerInventory || open.getKey() instanceof PlayerEnderChestInventory) {
                                     this.server.getPluginManager().callEvent(new InventoryCloseEvent(open.getKey(), this));
                                     this.closingWindowId = Integer.MAX_VALUE;
@@ -5229,17 +5464,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        int currentTick = this.server.getTick();
-        if (this.processedItemStackRequestTick != currentTick) {
-            this.processedItemStackRequestTick = currentTick;
-            this.processedItemStackRequestIds.clear();
+        long now = System.currentTimeMillis();
+        // 每 64 次调用顺带清理过期条目：条目量以请求速率为上界，通常只有个位数
+        // Opportunistic purge every 64 calls; the map is bounded by the request rate anyway
+        if ((++this.itemStackDedupPurgeCounter & 0x3F) == 0) {
+            this.processedItemStackRequestExpiry.values().removeIf(expiry -> expiry < now);
         }
 
         List<ItemStackRequest> pendingRequests = new ArrayList<>(requests.size());
         for (ItemStackRequest request : requests) {
-            if (this.processedItemStackRequestIds.add(request.getRequestId())) {
+            long expiry = now + ITEM_STACK_REQUEST_DEDUP_WINDOW_MS;
+            int requestId = request.getRequestId();
+            Long existing = this.processedItemStackRequestExpiry.putIfAbsent(requestId, expiry);
+            if (existing == null) {
                 pendingRequests.add(request);
+            } else if (existing < now) {
+                // replace 失败=另一线程已抢先重新登记且正在处理，视为已见
+                // a lost replace means another thread re-registered it and is processing it
+                if (this.processedItemStackRequestExpiry.replace(requestId, existing, expiry)) {
+                    pendingRequests.add(request);
+                }
             }
+            // 窗口内重复不刷新 expiry：续窗会拖长有效去重窗 / in-window duplicates must not
+            // refresh the expiry (replay would extend the window)
         }
 
         if (!pendingRequests.isEmpty()) {
@@ -6830,7 +7077,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             this.connected = false;
+            // QuitEvent 处理器可能重入 close 提前执行 teardown 置 spawned=false，须先捕获
+            final boolean wasSpawned = this.spawned;
             PlayerQuitEvent ev = null;
+            boolean broadcastQuit;
             try {
                 if (this.username != null && !this.username.isEmpty()) {
                     try {
@@ -6840,43 +7090,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     if (this.loggedIn && (ev == null || ev.getAutoSave())) {
                         try {
-                            this.save();
-                        } catch (Throwable t) {
-                            this.server.getLogger().logException(t);
-                        }
-                    }
-                    if (this.fishing != null) {
-                        try {
-                            this.stopFishing(false);
+                            this.saveSerializedWithLevelThread();
                         } catch (Throwable t) {
                             this.server.getLogger().logException(t);
                         }
                     }
                 }
 
-                for (Player player : new ArrayList<>(this.server.playerList.values())) {
-                    if (!player.canSee(this)) {
-                        player.showPlayer(this);
+                if (this.uuid != null) {
+                    for (Player player : new ArrayList<>(this.server.playerList.values())) {
+                        if (!player.canSee(this)) {
+                            player.showPlayer(this);
+                        }
                     }
+
+                    this.hiddenPlayers.clear();
                 }
 
-                this.hiddenPlayers.clear();
+                broadcastQuit = ev != null && wasSpawned && !Objects.equals(this.username, "")
+                        && !Objects.equals(ev.getQuitMessage().toString(), "");
 
-                try {
-                    this.removeAllWindows(true);
-                } catch (Throwable t) {
-                    this.server.getLogger().logException(t);
-                }
-
-                DataDrivenScreen.removeActiveScreen(this);
-
-                this.unloadChunks(false);
-
-                try {
-                    super.close();
-                } catch (Throwable t) {
-                    this.server.getLogger().logException(t);
-                }
+                this.teardownOnLevelThread();
             } finally {
                 this.interfaz.close(this, notify ? reason : "");
 
@@ -6895,27 +7129,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            if (broadcastQuit) {
                 this.server.broadcastMessage(ev.getQuitMessage());
             }
 
             this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
-            this.spawned = false;
             this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logOut",
                     TextFormat.AQUA + (this.getName() == null ? this.unverifiedUsername : this.getName()) + TextFormat.WHITE,
                     this.getAddress(),
                     String.valueOf(this.getPort()),
                     this.getServer().getLanguage().translateString(reason)));
-            this.windows.clear();
-            this.topWindow = null;
-            this.hasSpawned.clear();
-            this.spawnPosition = null;
-
-            if (this.riding instanceof EntityRideable) {
-                this.riding.passengers.remove(this);
-            }
-
-            this.riding = null;
+        } else {
+            // 重复 close：teardown 幂等（CAS 只执行一次）
+            this.teardownOnLevelThread();
         }
 
         if (this.perm != null) {
@@ -6923,18 +7149,145 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.perm = null;
         }
 
-        this.inventory = null;
-        this.chunk = null;
-
-        this.server.removePlayer(this);
-
         if (this.loggedIn) {
             this.server.getLogger().warning("(BUG) Player still logged in");
             this.interfaz.close(this, notify ? reason : "");
             this.server.removeOnlinePlayer(this);
             this.loggedIn = false;
         }
+    }
+
+    /**
+     * 断线状态拆除投递到所属世界线程（与 onUpdate 串行）；超时回落策略同存档。
+     * <p>
+     * Disconnect teardown hopped to the owning level's thread; same fallback policy as save.
+     */
+    private void teardownOnLevelThread() {
+        if (this.closeTeardownExecuted.get()) {
+            return;
+        }
+        Level level = this.getLevel();
+        if (level == null || !level.isParallelTickEnabled()) {
+            this.performCloseTeardown();
+            return;
+        }
+        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(this::performCloseTeardown);
+        try {
+            future.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+                runAfterLevelThreadStops(level, "teardown player " + this.getName(), this::performCloseTeardown);
+            } else if (levelThreadUnresponsive(future, level)) {
+                runAfterLevelThreadStops(level, "teardown player " + this.getName(), this::performCloseTeardown);
+            }
+        } catch (ExecutionException e) {
+            this.server.getLogger().logException(e.getCause());
+        }
+    }
+
+    /**
+     * close() 的状态拆除段，须与所属世界线程串行执行。
+     * <p>
+     * State-teardown of close(); must be serialized with the owning level thread.
+     */
+    private void performCloseTeardown() {
+        if (!this.closeTeardownExecuted.compareAndSet(false, true)) {
+            return;
+        }
+
+        if (this.fishing != null) {
+            try {
+                this.stopFishing(false);
+            } catch (Throwable t) {
+                this.server.getLogger().logException(t);
+            }
+        }
+
+        try {
+            this.removeAllWindows(true);
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        // 各步异常隔离，保证末尾注销必然执行（否则玩家泄漏在 Server.players）
+        try {
+            DataDrivenScreen.removeActiveScreen(this);
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        try {
+            this.unloadChunks(false);
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        try {
+            super.close();
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        this.spawned = false;
+        this.spawnInitCompleted = false;
+        this.windows.clear();
+        this.topWindow = null;
+        this.hasSpawned.clear();
+        this.spawnPosition = null;
+
+        if (this.riding instanceof EntityRideable) {
+            this.riding.passengers.remove(this);
+        }
+
+        this.riding = null;
+
+        this.inventory = null;
+        this.chunk = null;
+
+        this.server.removePlayer(this);
         this.newPosition = null;
+    }
+
+    /**
+     * 断线保存，并行世界时投递到其世界线程执行；超时后停止线程再回落调用线程。
+     * Disconnect save, hopped to the level's thread with a stop-then-inline timeout fallback.
+     */
+    private void saveSerializedWithLevelThread() {
+        Level level = this.getLevel();
+        if (level == null || !level.isParallelTickEnabled()) {
+            this.save();
+            return;
+        }
+        AtomicBoolean saved = new AtomicBoolean(false);
+        Runnable saveOnce = () -> {
+            if (this.closed) {
+                // master 在此路径会抛异常并留日志；静默跳过会让断线存档丢失无从排查
+                // master surfaced this as a logged exception; skipping silently would make
+                // the lost disconnect save invisible
+                this.server.getLogger().warning("Skipping disconnect save for " + this.getName()
+                        + ": player already closed (progress since the last save is lost)");
+                return;
+            }
+            if (saved.compareAndSet(false, true)) {
+                this.save();
+            }
+        };
+        CompletableFuture<Void> future = level.scheduleSyncTaskAndWait(saveOnce);
+        try {
+            future.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            this.server.getLogger().warning("Level thread for '" + level.getName()
+                    + "' did not save player " + this.getName() + " within 5s; waiting once more");
+            if (levelThreadUnresponsive(future, level)) {
+                runAfterLevelThreadStops(level, "save player " + this.getName(), saveOnce);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            runAfterLevelThreadStops(level, "save player " + this.getName(), saveOnce);
+        } catch (ExecutionException e) {
+            this.server.getLogger().logException(e.getCause());
+        }
     }
 
     /**
@@ -7902,7 +8255,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return form id to use in {@link PlayerFormRespondedEvent}
      */
     public int showFormWindow(FormWindow window) {
-        return showFormWindow(window, this.formWindowCount++);
+        return showFormWindow(window, nextFormWindowId());
+    }
+
+    /**
+     * 表单 ID 自增须与窗口 ID 同锁：主线程插件 API 与世界线程包处理并发自增会重号。
+     * <p>
+     * Form-id increment shares the window-id lock: concurrent increments from main-thread
+     * plugin APIs and world-thread packet handling would mint duplicate ids.
+     */
+    private int nextFormWindowId() {
+        synchronized (this.windowIdLock) {
+            return this.formWindowCount++;
+        }
     }
 
     /**
@@ -7975,7 +8340,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return form id to use in {@link PlayerFormRespondedEvent}
      */
     public int addServerSettings(FormWindow window) {
-        int id = this.formWindowCount++;
+        int id = nextFormWindowId();
 
         this.serverSettings.put(id, window);
         return id;
@@ -8080,16 +8445,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public int addWindow(Inventory inventory, Integer forceId, boolean isPermanent, boolean alwaysOpen) {
-        if (this.windows.containsKey(inventory)) {
-            return this.windows.get(inventory);
-        }
         int cnt;
-        if (forceId == null) {
-            this.windowCnt = cnt = Math.max(MINIMUM_OTHER_WINDOW_ID, ++this.windowCnt % 99);
-        } else {
-            cnt = forceId;
+        // 窗口 ID 分配为"检查-自增-写入"复合操作：包处理在世界线程、插件 API 在主线程，
+        // 并发进入会分配重复 ID 且 forcePut 静默驱逐同 ID 旧映射
+        // Window-id allocation is a check-then-increment-then-put compound: world-thread
+        // packet handling races main-thread plugin APIs and would mint duplicate ids
+        synchronized (this.windowIdLock) {
+            if (this.windows.containsKey(inventory)) {
+                return this.windows.get(inventory);
+            }
+            if (forceId == null) {
+                this.windowCnt = cnt = Math.max(MINIMUM_OTHER_WINDOW_ID, ++this.windowCnt % 99);
+            } else {
+                cnt = forceId;
+            }
+            this.windows.forcePut(inventory, cnt);
         }
-        this.windows.forcePut(inventory, cnt);
 
         if (isPermanent) {
             this.permanentWindows.add(cnt);
@@ -8122,7 +8493,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         // Re-scan if the tracked reference is stale (e.g. removed outside removeWindow).
         Inventory fallback = null;
-        for (Entry<Inventory, Integer> entry : this.windows.entrySet()) {
+        for (Entry<Inventory, Integer> entry : this.snapshotWindows()) {
             if (!this.permanentWindows.contains(entry.getValue())) {
                 fallback = entry.getKey();
                 break;
@@ -8149,7 +8520,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void sendAllInventories() {
-        for (Inventory inv : this.windows.keySet()) {
+        for (Inventory inv : this.snapshotWindowKeys()) {
             inv.sendContents(this);
 
             if (inv instanceof PlayerInventory) {
@@ -8182,7 +8553,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public TradeInventory getTradeInventory() {
-        for (Inventory inv : this.windows.keySet()) {
+        for (Inventory inv : this.snapshotWindowKeys()) {
             if (inv instanceof TradeInventory) {
                 return (TradeInventory) inv;
             }
@@ -8255,6 +8626,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    private List<Entry<Inventory, Integer>> snapshotWindows() {
+        synchronized (this.windows) {
+            return new ArrayList<>(this.windows.entrySet());
+        }
+    }
+
+    private List<Inventory> snapshotWindowKeys() {
+        synchronized (this.windows) {
+            return new ArrayList<>(this.windows.keySet());
+        }
+    }
+
+    private List<Entry<Integer, Inventory>> snapshotWindowIndex() {
+        synchronized (this.windows) {
+            return new ArrayList<>(this.windowIndex.entrySet());
+        }
+    }
+
     /**
      * Remove all windows
      */
@@ -8268,7 +8657,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param permanent remove permanent windows
      */
     public void removeAllWindows(boolean permanent) {
-        for (Entry<Integer, Inventory> entry : new ArrayList<>(this.windowIndex.entrySet())) {
+        for (Entry<Integer, Inventory> entry : this.snapshotWindowIndex()) {
             if (!permanent && this.permanentWindows.contains(entry.getKey())) {
                 continue;
             }
@@ -8443,8 +8832,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     protected void preSwitchLevel() {
-        // Remove old chunks
-        this.unloadChunks(true);
+        // Remove old chunks；须串行到源世界线程执行（usedChunks/loadQueue 非并发）
+        this.unloadChunksOnLevelThread(true);
     }
 
     @Override
@@ -9618,8 +10007,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     /**
      * Run every tick to send updated data if needed
+     * 并行世界下由所属世界线程在 checkNetwork 后调用，主线程仅处理未出生玩家（与写入方同线程）
      */
-    void resetPacketCounters() {
+    public void resetPacketCounters() {
         if (this.needSendAdventureSettings) {
             this.needSendAdventureSettings = false;
             this.adventureSettings.update(false);

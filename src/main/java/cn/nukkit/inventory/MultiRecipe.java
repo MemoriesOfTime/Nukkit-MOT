@@ -43,7 +43,7 @@ public class MultiRecipe implements Recipe {
 
     public MultiRecipe(UUID id) {
         this.id = id;
-        this.networkId = ++CraftingManager.NEXT_NETWORK_ID;
+        this.networkId = CraftingManager.NEXT_NETWORK_ID.incrementAndGet();
     }
 
     @Override

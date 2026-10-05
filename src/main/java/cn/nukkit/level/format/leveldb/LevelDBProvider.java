@@ -57,6 +57,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.function.ObjLongConsumer;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.*;
 import static cn.nukkit.level.format.leveldb.LevelDBKey.*;
@@ -600,9 +601,25 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        return ImmutableMap.copyOf(chunks);
+        synchronized (this) {
+            return ImmutableMap.copyOf(chunks);
+        }
     }
 
+    @Override
+    public void forEachLoadedChunk(ObjLongConsumer<? super FullChunk> action) {
+        synchronized (this) {
+            for (Long2ObjectMap.Entry<BaseFullChunk> entry : this.chunks.long2ObjectEntrySet()) {
+                action.accept(entry.getValue(), entry.getLongKey());
+            }
+        }
+    }
+
+    /**
+     * 返回内部区块表的原始引用（非并发），仅限持有 chunks 监视器的调用方使用。
+     * Prefer {@link #getLoadedChunks()} (snapshot).
+     */
+    @Deprecated
     public Long2ObjectMap<? extends FullChunk> getLoadedChunksUnsafe() {
         return chunks;
     }
@@ -724,38 +741,54 @@ public class LevelDBProvider implements LevelProvider {
             return false;
         }
         if (chunk instanceof LevelDBChunk levelDBChunk) {
-            // async-chunks 同时控制保存。/ async-chunks also controls saving.
-            if (Server.getInstance().asyncChunkSending) {
-                // 仅复用匹配 changes 的 batch；卸载时释放 chunkRef。
-                // Reuse only a batch matching changes; release chunkRef on unload.
-                boolean staged = false;
-                PendingWrite pw = this.pendingWrites.get(index);
-                if (pw != null) {
-                    pw.lock.lock();
-                    try {
-                        staged = pw.batch != null && pw.changeSnapshot == levelDBChunk.getChanges();
-                        pw.chunkRef = null;
-                    } finally {
-                        pw.lock.unlock();
-                    }
-                }
-                if (!staged && levelDBChunk.hasChanged() && levelDBChunk.isGenerated()) {
-                    this.stagePendingWrite(index, chunkX, chunkZ, levelDBChunk, false);
-                    this.enqueueCommit(index);
-                }
-            } else {
-                // 回退到同步保存前先排空。/ Drain before synchronous fallback.
-                this.commitPendingWrite(index);
-                if (levelDBChunk.hasChanged()) {
-                    this.saveChunkSync(chunkX, chunkZ, levelDBChunk);
-                }
-            }
+            this.saveDetachedChunk(chunkX, chunkZ, index, levelDBChunk);
         }
         if (!chunk.unload(false, safe)) {
             return false;
         }
-        this.chunks.remove(index, chunk);
+        synchronized (this) {
+            this.chunks.remove(index, chunk);
+        }
         return true;
+    }
+
+    /**
+     * 区块摘除前后的持久化路径，独立成方法供 setChunk 在 provider 监视器外复用：
+     * 监视器内做序列化/同步落盘会卡住同世界任意坐标的同步区块加载。
+     * <p>
+     * Persistence path for a detached chunk, extracted so setChunk can run it outside the
+     * provider monitor (inside it, sync loads of any coordinate queue behind the write).
+     */
+    private void saveDetachedChunk(int chunkX, int chunkZ, long index, LevelDBChunk levelDBChunk) {
+        // async-chunks 同时控制保存。/ async-chunks also controls saving.
+        if (Server.getInstance().asyncChunkSending) {
+            // 只复用"同一 chunk 对象"暂存的 batch：changes 计数器跨对象可碰撞，仅比对数值会把
+            // 别的 chunk 的 batch 误认成本块已暂存，未保存变更被静默丢弃；chunkRef 即身份凭据
+            // Reuse a batch staged from the SAME object only: the changes counter collides across
+            // generations; chunkRef is the identity token
+            boolean staged = false;
+            PendingWrite pw = this.pendingWrites.get(index);
+            if (pw != null) {
+                pw.lock.lock();
+                try {
+                    staged = pw.batch != null && pw.chunkRef == levelDBChunk
+                            && pw.changeSnapshot == levelDBChunk.getChanges();
+                    pw.chunkRef = null;
+                } finally {
+                    pw.lock.unlock();
+                }
+            }
+            if (!staged && levelDBChunk.hasChanged() && levelDBChunk.isGenerated()) {
+                this.stagePendingWrite(index, chunkX, chunkZ, levelDBChunk, false);
+                this.enqueueCommit(index);
+            }
+        } else {
+            // 回退到同步保存前先排空。/ Drain before synchronous fallback.
+            this.commitPendingWrite(index);
+            if (levelDBChunk.hasChanged()) {
+                this.saveChunkSync(chunkX, chunkZ, levelDBChunk);
+            }
+        }
     }
 
     @Override
@@ -1246,10 +1279,16 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public void saveChunks() {
-        for (BaseFullChunk chunk : this.chunks.values()) {
-            if (chunk.hasChanged()) {
-                this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
+        List<BaseFullChunk> toSave = new ArrayList<>();
+        synchronized (this) {
+            for (BaseFullChunk chunk : this.chunks.values()) {
+                if (chunk.hasChanged()) {
+                    toSave.add(chunk);
+                }
             }
+        }
+        for (BaseFullChunk chunk : toSave) {
+            this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
         }
     }
 
@@ -1259,9 +1298,14 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private void unloadChunksUnsafe(boolean wait) {
-        Iterator<BaseFullChunk> iterator = this.chunks.values().iterator();
-        while (iterator.hasNext()) {
-            LevelDBChunk chunk = (LevelDBChunk) iterator.next();
+        List<BaseFullChunk> toUnload = new ArrayList<>();
+        synchronized (this) {
+            for (BaseFullChunk chunk : this.chunks.values()) {
+                toUnload.add(chunk);
+            }
+        }
+        for (BaseFullChunk base : toUnload) {
+            LevelDBChunk chunk = (LevelDBChunk) base;
             if (wait) {
                 // 单个区块失败不得中断其余区块的保存。/ One failing chunk must not abort the remaining saves.
                 try {
@@ -1276,7 +1320,9 @@ public class LevelDBProvider implements LevelProvider {
                 }
             }
             chunk.unload(level.isSaveOnUnloadEnabled(), false);
-            iterator.remove();
+            synchronized (this) {
+                this.chunks.remove(Level.chunkHash(chunk.getX(), chunk.getZ()), chunk);
+            }
         }
     }
 
@@ -1423,11 +1469,48 @@ public class LevelDBProvider implements LevelProvider {
         chunk.setPosition(chunkX, chunkZ);
         long index = Level.chunkHash(chunkX, chunkZ);
 
-        FullChunk oldChunk = this.chunks.get(index);
-        if (oldChunk != null && !oldChunk.equals(chunk)) {
-            this.unloadChunk(chunkX, chunkZ, false);
+        // 先持久化前驱终态、再发布替换块：先发布会让旧块后到的 stage 把旧数据落在新数据之后
+        // （写槽回退一代）。摘除+put 仍在监视器内原子，序列化/落盘在外；前驱在锁间隙被并发
+        // 替换者接手时携新前驱重试（重复 stage 同源无害）
+        // Persist the predecessor BEFORE publishing the replacement, or a late-landing old stage
+        // writes old data after new (the write slot regresses a generation). The detach+put stays
+        // atomic under the monitor; if a concurrent replacer takes the predecessor, retry with the new one
+        for (;;) {
+            BaseFullChunk predecessor = this.chunks.get(index);
+            if (predecessor != null && predecessor.equals(chunk)) {
+                // 等价块直接覆盖：不保存不卸载（与既有语义一致）
+                // Equal chunk: overwrite in place, no save/unload (existing semantics)
+                synchronized (this) {
+                    if (this.chunks.get(index) == predecessor) {
+                        this.chunks.put(index, (LevelDBChunk) chunk);
+                        return;
+                    }
+                }
+                continue;
+            }
+            if (predecessor instanceof LevelDBChunk levelDBChunk) {
+                this.saveDetachedChunk(chunkX, chunkZ, index, levelDBChunk);
+            }
+            boolean installed = false;
+            synchronized (this) {
+                BaseFullChunk current = this.chunks.get(index);
+                if (current == predecessor) {
+                    if (predecessor != null) {
+                        // 两参 remove：并发新块已入 map 时不误删
+                        // Two-arg remove: never removes a concurrently inserted newer chunk
+                        this.chunks.remove(index, predecessor);
+                    }
+                    this.chunks.put(index, (LevelDBChunk) chunk);
+                    installed = true;
+                }
+            }
+            if (installed) {
+                if (predecessor != null) {
+                    predecessor.unload(false, false);
+                }
+                return;
+            }
         }
-        this.chunks.put(index, (LevelDBChunk) chunk);
     }
 
     @SuppressWarnings("unused")
@@ -1463,6 +1546,15 @@ public class LevelDBProvider implements LevelProvider {
         }
         // 读取前提交挂起写。/ Commit pending data before reading.
         this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
+        // 锁内复查：loadChunk 的 containsKey 预检在锁外，并发加载同坐标时这里返回既有实例，
+        // 避免产生双实例后 put 覆盖先装载者的修改
+        // Re-check under the lock: loadChunk's containsKey pre-check is outside it, so a
+        // concurrent load of the same coordinate returns the existing instance instead of
+        // creating a second one whose put overwrites the first loader's changes
+        LevelDBChunk existing = (LevelDBChunk) this.chunks.get(Level.chunkHash(chunkX, chunkZ));
+        if (existing != null) {
+            return existing;
+        }
         LevelDBChunk chunk = null;
         try {
             chunk = this.readChunk(chunkX, chunkZ);
