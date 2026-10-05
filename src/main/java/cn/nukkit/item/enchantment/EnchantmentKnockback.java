@@ -1,5 +1,7 @@
 package cn.nukkit.item.enchantment;
 
+import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityLiving;
 import cn.nukkit.item.Item;
 
 /**
@@ -30,5 +32,15 @@ public class EnchantmentKnockback extends Enchantment {
     @Override
     public boolean canEnchant(Item item) {
         return item.isSpear() || super.canEnchant(item);
+    }
+
+    @Override
+    public void doPostAttack(Entity attacker, Entity entity) {
+        if (this.level < 1 || !(entity instanceof EntityLiving victim)) {
+            return;
+        }
+
+        victim.knockBack(attacker, 0, entity.x - attacker.x, entity.z - attacker.z,
+                this.level * 0.5, EntityLiving.DEFAULT_KNOCKBACK_VERTICAL_LIMIT);
     }
 }
