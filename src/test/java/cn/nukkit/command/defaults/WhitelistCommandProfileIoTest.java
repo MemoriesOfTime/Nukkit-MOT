@@ -1,6 +1,5 @@
 package cn.nukkit.command.defaults;
 
-import cn.nukkit.IPlayer;
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
@@ -26,7 +25,7 @@ class WhitelistCommandProfileIoTest {
     @ParameterizedTest
     @ValueSource(strings = {"add", "remove"})
     void nameMembershipDoesNotLoadProfile(String action) {
-        Fixture f = new Fixture(action, true, true);
+        Fixture f = new Fixture(action, true);
         // Reaching this path would also wait for pending saves of an offline player.
         when(f.server.getOfflinePlayer(anyString())).thenThrow(new AssertionError("profile IO on command thread"));
 
@@ -41,28 +40,12 @@ class WhitelistCommandProfileIoTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"add", "remove"})
-    void disabledFlagKeepsLegacyPlayerPath(String action) {
-        Fixture f = new Fixture(action, false, true);
-        IPlayer player = mock(IPlayer.class);
-        when(f.server.getOfflinePlayer("MiXeD Name")).thenReturn(player);
-
-        assertEquals(1, f.execute());
-
-        verify(player).setWhitelisted(action.equals("add"));
-        verify(f.server, never()).addWhitelist(anyString());
-        verify(f.server, never()).removeWhitelist(anyString());
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"add", "remove"})
     void permissionDenialStillPrecedesEveryMutation(String action) {
-        for (boolean enabled : new boolean[]{true, false}) {
-            Fixture f = new Fixture(action, enabled, false);
+        Fixture f = new Fixture(action, false);
 
-            assertEquals(0, f.execute());
+        assertEquals(0, f.execute());
 
-            verifyNoInteractions(f.server);
-        }
+        verifyNoInteractions(f.server);
     }
 
     private static final class Fixture {
@@ -71,8 +54,7 @@ class WhitelistCommandProfileIoTest {
         final CommandLogger log = mock(CommandLogger.class, RETURNS_SELF);
         final ParamList arguments = mock(ParamList.class);
 
-        Fixture(String action, boolean enabled, boolean allowed) {
-            server.asyncProfileIo = enabled;
+        Fixture(String action, boolean allowed) {
             when(sender.getServer()).thenReturn(server);
             when(sender.hasPermission("nukkit.command.allowlist." + action)).thenReturn(allowed);
             when(arguments.getResult(0)).thenReturn(action);

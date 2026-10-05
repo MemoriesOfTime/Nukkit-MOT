@@ -31,12 +31,8 @@ public class NameOnlyPlayerTargetsNode extends ParamNode<List<NameOnlyPlayerTarg
                     .map(entity -> new Target(server, null, (IPlayer) entity)).toList();
             if (!targets.isEmpty()) value = targets;
             else error("commands.generic.noTargetMatch");
-        } else if (server.asyncProfileIo) {
-            value = List.of(new Target(server, arg, server.getPlayerExact(arg.toLowerCase(Locale.ROOT))));
         } else {
-            IPlayer player = server.getOfflinePlayer(arg);
-            if (player != null) value = List.of(new Target(server, null, player));
-            else error("commands.generic.player.notFound");
+            value = List.of(new Target(server, arg, server.getPlayerExact(arg.toLowerCase(Locale.ROOT))));
         }
     }
 

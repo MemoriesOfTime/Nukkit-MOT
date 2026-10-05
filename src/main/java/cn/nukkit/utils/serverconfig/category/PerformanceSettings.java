@@ -12,10 +12,6 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 public class PerformanceSettings extends OkaeriConfig {
 
-    @Comment("Avoid synchronous player profile reads where a nickname suffices (false restores legacy callers)")
-    @CustomKey("async-profile-io")
-    private boolean asyncProfileIo = true;
-
     @Comment("Number of async worker threads (auto = CPU cores + 1)")
     @CustomKey("async-workers")
     private String asyncWorkers = "auto";

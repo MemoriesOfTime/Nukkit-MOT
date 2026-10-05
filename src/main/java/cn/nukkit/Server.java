@@ -197,8 +197,6 @@ public class Server {
 
     private int autoSaveTicker;
     private int autoSaveTicks;
-    /** Name-based administrative commands avoid synchronous profile reads when enabled. */
-    public boolean asyncProfileIo = true;
 
     private final BaseLang baseLang;
     private boolean forceLanguage;
@@ -4006,7 +4004,6 @@ public class Server {
         this.forceResources = this.getPropertyBoolean("force-resources", false);
         this.forceResourcesAllowOwnPacks = this.getPropertyBoolean("force-resources-allow-client-packs", false);
         this.autoSaveTicks = this.serverConfig.performanceSettings().ticksPerAutosave();
-        this.asyncProfileIo = this.serverConfig.performanceSettings().asyncProfileIo();
         switch (this.getPropertyString("server-authoritative-movement", "server-auth")) {
             case "client-auth" -> this.serverAuthoritativeMovementMode = 0;
             case "server-auth-with-rewind" -> this.serverAuthoritativeMovementMode = 2;

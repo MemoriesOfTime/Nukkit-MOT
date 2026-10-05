@@ -1,6 +1,5 @@
 package cn.nukkit.command.tree.node;
 
-import cn.nukkit.IPlayer;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
@@ -29,7 +28,7 @@ class NameOnlyPlayerTargetsNodeTest {
     @BeforeAll static void initialize() { MockServer.init(); }
 
     @Test void literalRetainsExactNameWithoutResolvingOfflineProfile() {
-        Fixture f = new Fixture(true);
+        Fixture f = new Fixture();
         try (var global = mockStatic(Server.class)) {
             global.when(Server::getInstance).thenReturn(f.server);
             f.fill("MiXeD Name");
@@ -42,28 +41,8 @@ class NameOnlyPlayerTargetsNodeTest {
         }
     }
 
-    @Test void disabledFlagResolvesAndDelegatesToLegacyPlayer() {
-        Fixture f = new Fixture(false);
-        IPlayer legacy = mock(IPlayer.class);
-        when(legacy.getName()).thenReturn("Legacy Name");
-        when(legacy.isOp()).thenReturn(true);
-        when(f.server.getOfflinePlayer("Alias")).thenReturn(legacy);
-        try (var global = mockStatic(Server.class)) {
-            global.when(Server::getInstance).thenReturn(f.server);
-            f.fill("Alias");
-            f.server.asyncProfileIo = true;
-            var target = f.targets().get(0);
-            assertEquals("Legacy Name", target.getName());
-            assertTrue(target.isOp());
-            target.setOp(false);
-            verify(legacy).setOp(false);
-            verify(f.server).getOfflinePlayer("Alias");
-            verify(f.server, never()).removeOp(anyString());
-        }
-    }
-
     @Test void onlineLiteralKeepsPlayerPermissionAndPacketEffects() {
-        Fixture f = new Fixture(true);
+        Fixture f = new Fixture();
         Player player = mock(Player.class);
         when(player.getName()).thenReturn("Canonical Name");
         when(player.isOnline()).thenReturn(true);
@@ -86,7 +65,7 @@ class NameOnlyPlayerTargetsNodeTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void unicodeCaseExpansionCannotChangeTheOnlineOperatorTarget(boolean grant) {
-        Fixture f = new Fixture(true);
+        Fixture f = new Fixture();
         String literal = "İİİ";
         String normalized = literal.toLowerCase(Locale.ROOT);
         assertTrue("iii".equalsIgnoreCase(literal), "raw lookup would incorrectly match the ASCII player");
@@ -112,10 +91,8 @@ class NameOnlyPlayerTargetsNodeTest {
         }
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void selectorsRetainPlayerObjectsAndFilterNonPlayers(boolean enabled) throws Exception {
-        Fixture f = new Fixture(enabled);
+    @Test void selectorsRetainPlayerObjectsAndFilterNonPlayers() throws Exception {
+        Fixture f = new Fixture();
         Player player = mock(Player.class);
         Entity nonPlayer = mock(Entity.class);
         EntitySelectorAPI selectors = mock(EntitySelectorAPI.class);
@@ -133,7 +110,7 @@ class NameOnlyPlayerTargetsNodeTest {
     }
 
     @Test void selectorFailureKeepsItsOriginalErrorAndDoesNotFallBackToName() throws Exception {
-        Fixture f = new Fixture(true);
+        Fixture f = new Fixture();
         EntitySelectorAPI selectors = mock(EntitySelectorAPI.class);
         when(selectors.checkValid("@a[bad]")).thenReturn(true);
         when(selectors.matchEntities(f.sender, "@a[bad]")).thenThrow(new SelectorSyntaxException("selector failed"));
@@ -149,7 +126,7 @@ class NameOnlyPlayerTargetsNodeTest {
     }
 
     @Test void resetDoesNotReusePreviousNameAfterBlankInput() {
-        Fixture f = new Fixture(true);
+        Fixture f = new Fixture();
         try (var global = mockStatic(Server.class)) {
             global.when(Server::getInstance).thenReturn(f.server);
             f.fill("Earlier");
@@ -167,8 +144,7 @@ class NameOnlyPlayerTargetsNodeTest {
         final ParamList list;
         final NameOnlyPlayerTargetsNode node = new NameOnlyPlayerTargetsNode();
 
-        Fixture(boolean enabled) {
-            server.asyncProfileIo = enabled;
+        Fixture() {
             ParamTree tree = mock(ParamTree.class);
             when(tree.getSender()).thenReturn(sender);
             list = new ParamList(tree);
