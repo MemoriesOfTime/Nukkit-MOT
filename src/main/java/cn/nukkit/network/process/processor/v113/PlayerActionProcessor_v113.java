@@ -52,6 +52,8 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
             return;
         }
 
+        player.resetCraftingGridType();
+
         pk.entityId = player.getId();
         Vector3 pos = new Vector3(pk.x, pk.y, pk.z);
         BlockFace face = BlockFace.fromIndex(pk.face);
