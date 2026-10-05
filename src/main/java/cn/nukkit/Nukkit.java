@@ -6,6 +6,7 @@ import com.google.common.base.Preconditions;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.netty.util.internal.logging.Log4J2LoggerFactory;
 import lombok.extern.log4j.Log4j2;
+import net.minecrell.terminalconsole.TerminalConsoleAppender;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
@@ -112,6 +113,7 @@ public class Nukkit {
             System.out.print("\u001B]0;Server Stopped\u0007");
         }
 
+        shutdownLogging();
         System.exit(0);
     }
 
@@ -151,6 +153,14 @@ public class Nukkit {
 
     public static Level getLogLevel() {
         return ((LoggerContext) LogManager.getContext(false)).getConfiguration().getLoggerConfig(org.apache.logging.log4j.LogManager.ROOT_LOGGER_NAME).getLevel();
+    }
+
+    public static void shutdownLogging() {
+        ((LoggerContext) LogManager.getContext(false)).stop();
+        try {
+            TerminalConsoleAppender.close();
+        } catch (IOException ignored) {
+        }
     }
 
     public static String getBranch() {

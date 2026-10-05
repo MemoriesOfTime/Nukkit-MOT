@@ -52,6 +52,9 @@ public class UnknownTilePreservationTest {
 
         LevelProvider provider = mock(LevelProvider.class);
         lenient().when(provider.getMinBlockY()).thenReturn(0);
+        // initChunk 守卫要求 provider 的 level 存活（getLevel() 非 null 表示未关闭）
+        // The initChunk guard requires a live provider level (non-null getLevel() means not closed)
+        lenient().when(provider.getLevel()).thenReturn(mock(cn.nukkit.level.Level.class));
         chunk.setProvider(provider);
     }
 
