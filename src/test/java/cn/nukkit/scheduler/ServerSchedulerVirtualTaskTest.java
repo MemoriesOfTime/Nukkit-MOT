@@ -8,6 +8,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -73,10 +74,17 @@ public class ServerSchedulerVirtualTaskTest {
                     "JVM 不支持时应回退平台线程池, 实际线程: " + threadName.get());
         }
 
-        // 完成任务经 FINISHED_LIST 由主线程心跳回收
-        // Finished tasks are collected back on the main-thread heartbeat
-        scheduler.mainThreadHeartbeat(2);
-        assertTrue(completionRan.get(), "onCompletion 未被回收执行");
+        // 完成任务经 FINISHED_LIST 由主线程心跳回收。countDown 唤醒本线程时 offer 可能尚未发生
+        // （onRun 返回前后存在窗口），须像真实主循环一样持续心跳直到回收，单次心跳会漏收
+        // Finished tasks are collected via FINISHED_LIST on the main-thread heartbeat. The offer
+        // may lag the countDown wakeup (window around onRun's return), so keep ticking until
+        // collected like the real tick loop; a single heartbeat can miss it
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!completionRan.get()) {
+            assertTrue(System.nanoTime() < deadline, "onCompletion 未在 5s 内被回收执行");
+            scheduler.mainThreadHeartbeat(2);
+            LockSupport.parkNanos(1_000_000);
+        }
         assertTrue(task.isFinished());
     }
 
