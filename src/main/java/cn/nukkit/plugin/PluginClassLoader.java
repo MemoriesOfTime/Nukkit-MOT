@@ -4,8 +4,8 @@ import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author MagicDroidX
@@ -15,7 +15,7 @@ public class PluginClassLoader extends URLClassLoader {
 
     private final JavaPluginLoader loader;
 
-    private final Map<String, Class<?>> classes = new HashMap<>();
+    private final Map<String, Class<?>> classes = new ConcurrentHashMap<>();
 
     public PluginClassLoader(JavaPluginLoader loader, ClassLoader parent, File file) throws MalformedURLException {
         this(loader, parent, file, new URL[0]);
@@ -71,6 +71,16 @@ public class PluginClassLoader extends URLClassLoader {
             try {
                 result = super.findClass(name);
             } catch (ClassNotFoundException ignored) {
+            } catch (LinkageError le) {
+                // 并发 define 竞态或缓存条目丢失时，该类其实已由本 loader 定义过，从 JVM 取回并补写缓存；
+                // findLoadedClass 为 null 则是真正的坏类（VerifyError 等），原样抛出
+                // Concurrent define race or a lost cache entry: the class was already defined by this loader.
+                // A null findLoadedClass means a genuinely broken class (VerifyError etc.) — rethrow as-is.
+                Class<?> already = findLoadedClass(name);
+                if (already == null) {
+                    throw le;
+                }
+                result = already;
             }
 
             // 自己没有再查全局其他插件，保留 depend/softdepend 依赖机制
