@@ -1205,14 +1205,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
-     * Whether a consumable is being used right now: food, a potion, milk or the ominous bottle.
-     *
-     * <p>Only these items carry a use duration and are finished by the server timer in
-     * {@link #processAutoCompletion()}. A bow, a crossbow or a shield keeps {@code useDuration == 0}
-     * and is finished by the client releasing the button, so they keep the old behaviour wherever
-     * this check guards a reset.
-     */
-    /**
      * Whether a use transaction is only a repeat of a consumable that is still being used.
      *
      * <p>The client keeps sending {@code USE_ITEM_ACTION_CLICK_AIR} while the button is held down,
@@ -1226,6 +1218,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return useDuration > 0 && ticksUsed < useDuration;
     }
 
+    /**
+     * Whether a consumable is being used right now: food, a potion, milk or the ominous bottle.
+     *
+     * <p>Only these items carry a use duration and are finished by the server timer in
+     * {@link #processAutoCompletion()}. A bow, a crossbow or a shield keeps {@code useDuration == 0}
+     * and is finished by the client releasing the button, so they keep the old behaviour wherever
+     * this check guards a reset.
+     */
     public boolean isConsumingItem() {
         if (!this.isUsingItem() || this.inventory == null) {
             return false;
@@ -4401,12 +4401,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
-                        // Bedrock lets a player eat while sprinting, and sprint is toggled all the
-                        // time in a fight (knock-back, a released stick). Dropping the use state
-                        // here made the food silently never finish.
                         if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
-                                this.isJavaClient(), authHoldToUse, authStartUsingItem)
-                                && !this.isConsumingItem()) {
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem, this.isConsumingItem())) {
                             this.setUsingItem(false);
                         }
                     }

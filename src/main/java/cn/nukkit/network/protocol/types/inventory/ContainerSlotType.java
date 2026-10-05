@@ -104,7 +104,7 @@ public enum ContainerSlotType {
             return this.id + 1;
         }
         int protocol = gameVersion.getProtocol();
-        if (this.id > DYNAMIC_CONTAINER.id && protocol < ProtocolInfo.v1_21_20) {
+        if (this.id > DYNAMIC_CONTAINER.id && protocol < ProtocolInfo.v1_26_10) {
             throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
         }
         if (protocol >= ProtocolInfo.v1_21_20) {
@@ -149,11 +149,14 @@ public enum ContainerSlotType {
             return fromId(id > RECIPE_ITEMS.id ? id - 1 : id);
         }
         int protocol = gameVersion.getProtocol();
-        if (protocol >= ProtocolInfo.v1_21_20) {
+        if (protocol >= ProtocolInfo.v1_26_10) {
             return fromId(id);
         }
+        if (protocol >= ProtocolInfo.v1_21_20) {
+            return id > DYNAMIC_CONTAINER.id ? null : fromId(id);
+        }
         if (protocol >= ProtocolInfo.v1_20_50) {
-            return id == DYNAMIC_CONTAINER.id ? null : fromId(id);
+            return id >= DYNAMIC_CONTAINER.id ? null : fromId(id);
         }
         if (protocol >= ProtocolInfo.v1_19_80) {
             return id >= CRAFTER_BLOCK_CONTAINER.id ? null : fromId(id);

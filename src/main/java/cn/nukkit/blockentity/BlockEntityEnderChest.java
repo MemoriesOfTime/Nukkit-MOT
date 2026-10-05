@@ -1,13 +1,13 @@
 package cn.nukkit.blockentity;
 
 import cn.nukkit.Player;
-import cn.nukkit.inventory.Inventory;
-import java.util.HashSet;
-import java.util.Set;
-
 import cn.nukkit.block.Block;
+import cn.nukkit.inventory.Inventory;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public class BlockEntityEnderChest extends BlockEntitySpawnable {
 
@@ -42,6 +42,7 @@ public class BlockEntityEnderChest extends BlockEntitySpawnable {
                 }
                 this.getViewers().remove(player);
                 if (player.getViewingEnderChest() != null
+                        && player.getViewingEnderChest().getLevel() == this.getLevel()
                         && player.getViewingEnderChest().getFloorX() == this.getFloorX()
                         && player.getViewingEnderChest().getFloorY() == this.getFloorY()
                         && player.getViewingEnderChest().getFloorZ() == this.getFloorZ()) {
