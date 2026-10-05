@@ -20,6 +20,10 @@ public class PerformanceSettings extends OkaeriConfig {
     @CustomKey("async-workers")
     private String asyncWorkers = "auto";
 
+    @Comment("Use virtual threads for opt-in async tasks (requires JVM 21+; cannot be enabled otherwise)")
+    @CustomKey("virtual-threads")
+    private boolean virtualThreads = true;
+
     @Comment("Automatically adjust tick rate based on server load")
     @CustomKey("auto-tick-rate")
     private boolean autoTickRate = true;
