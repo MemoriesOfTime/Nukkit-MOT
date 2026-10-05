@@ -112,7 +112,8 @@ public class InventoryTransaction {
                         invalid = true;
                         return;
                     }
-                    if (!existingSlotChangeAction.getInventory().equals(slotChangeAction.getInventory())) {
+                    if (!existingSlotChangeAction.getInventory().equals(slotChangeAction.getInventory())
+                            || existingSlotChangeAction.getSlot() != slotChangeAction.getSlot()) {
                         continue;
                     }
                     Item existingSource = existingSlotChangeAction.getSourceItem();
@@ -171,7 +172,9 @@ public class InventoryTransaction {
         return authoritativeOutput;
     }
 
-    protected final Pattern TRIM_PATTERN = Pattern.compile("^minecraft:[a-z_]+_smithing_template$");
+    private static final Pattern SHARED_TRIM_PATTERN = Pattern.compile("^minecraft:[a-z_]+_smithing_template$");
+    // Preserve the protected instance field for already compiled plugin subclasses.
+    protected final Pattern TRIM_PATTERN = SHARED_TRIM_PATTERN;
 
     protected boolean matchItems(boolean clientAuthTrim, boolean clientAuthLapis) {
         List<Item> haveItems = new ArrayList<>();
