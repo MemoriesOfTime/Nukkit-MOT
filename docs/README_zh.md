@@ -26,7 +26,7 @@ Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支�
 6. 支持网易客户端
 
 ## 如何安装？
-1. 安装 Java 17 或更高版本
+1. 安装 Java 21 或更高版本
 2. 从下方链接下载 `.jar` 文件
 3. 运行命令：`java -jar Nukkit-MOT-SNAPSHOT.jar`（将 `Nukkit-MOT-SNAPSHOT.jar` 替换为你下载的文件名）
 
@@ -71,7 +71,7 @@ docker run -d --name nukkit-mot \
     <dependency>
         <groupId>com.nukkit-mot</groupId>
         <artifactId>nukkit-mot</artifactId>
-        <version>1.26.40-R1</version>
+        <version>1.26.50-R1</version>
         <scope>provided</scope>
     </dependency>
 </dependencies>
@@ -101,7 +101,7 @@ repositories {
 ```kts
 // 发布版
 dependencies {
-    compileOnly("com.nukkit-mot:nukkit-mot:1.26.40-R1")
+    compileOnly("com.nukkit-mot:nukkit-mot:1.26.50-R1")
 }
 
 // 开发版 (SNAPSHOT)
