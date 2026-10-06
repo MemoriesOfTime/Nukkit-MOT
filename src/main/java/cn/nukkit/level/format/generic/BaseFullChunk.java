@@ -217,7 +217,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void initChunk() {
-        if (this.getProvider() != null && !this.isInit) {
+        LevelProvider initProviderTemp = this.getProvider();
+        if (initProviderTemp != null && initProviderTemp.getLevel() != null && !this.isInit) {
             boolean changed = this.hasChanged();
             if (this.NBTentities != null) {
                 for (CompoundTag nbt : NBTentities) {
@@ -464,7 +465,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public int getHeightMap(int x, int z) {
-        return this.heightMap[(z << 4) | x] + this.getProvider().getMinBlockY();
+        LevelProvider providerTemp = this.getProvider();
+        return this.heightMap[(z << 4) | x] + (providerTemp == null ? 0 : providerTemp.getMinBlockY());
     }
 
     @Override
@@ -472,7 +474,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         //基岩版3d-data保存heightMap是以0为索引保存的，所以这里需要减去世界最小值，详情查看
         //Bedrock Edition 3d-data saves the height map start from index of 0, so need to subtract the world minimum height here, see for details:
         //https://github.com/bedrock-dev/bedrock-level/blob/main/src/include/data_3d.h#L115
-        this.heightMap[(z << 4) | x] = (short) (value - this.getProvider().getMinBlockY());
+        LevelProvider providerTemp = this.getProvider();
+        this.heightMap[(z << 4) | x] = (short) (value - (providerTemp == null ? 0 : providerTemp.getMinBlockY()));
         this.setChanged();
     }
 
@@ -535,6 +538,9 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void populateSkyLight() {
+        LevelProvider providerTemp = this.getProvider();
+        int minY = providerTemp == null ? 0 : providerTemp.getMinBlockY();
+        int maxY = providerTemp == null ? 255 : providerTemp.getMaxBlockY();
         // basic light calculation
         for (int z = 0; z < 16; ++z) {
             for (int x = 0; x < 16; ++x) { // iterating over all columns in chunk
@@ -543,7 +549,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
                 int y;
 
-                for (y = this.getProvider().getMaxBlockY(); y > top; --y) {
+                for (y = maxY; y > top; --y) {
                     // all the blocks above the top-most block are exposed to sun and
                     // thus have a skylight value of 15
                     this.setBlockSkyLight(x, y, z, 15);
@@ -553,7 +559,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 int nextDecrease = 0; // decrease that that will be applied starting with the next block
 
                 // Process from top-most block downward
-                for (y = top; y >= this.getProvider().getMinBlockY(); --y) {
+                for (y = top; y >= minY; --y) {
                     nextLight -= nextDecrease;
                     int light = nextLight; // this light value will be applied for this block. The following checks are all about the next blocks
 
@@ -590,8 +596,9 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void populateBlockLight() {
-        int minY = this.getProvider().getMinBlockY();
-        int maxY = this.getProvider().getMaxBlockY();
+        LevelProvider providerTemp = this.getProvider();
+        int minY = providerTemp == null ? 0 : providerTemp.getMinBlockY();
+        int maxY = providerTemp == null ? 255 : providerTemp.getMaxBlockY();
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {

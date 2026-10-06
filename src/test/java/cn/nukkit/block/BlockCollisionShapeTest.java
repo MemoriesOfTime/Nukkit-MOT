@@ -50,6 +50,17 @@ class BlockCollisionShapeTest {
     }
 
     @Test
+    void mudIsFourteenPixelsHigh() {
+        Block mud = Block.get(BlockID.MUD);
+        mud.setComponents(10d, 20d, 30d);
+
+        assertInstanceOf(BlockMud.class, mud);
+        assertEquals(20d + 14d / 16d, mud.getBoundingBox().getMaxY(), 1e-12);
+        assertEquals(20d + 14d / 16d, mud.getCollisionBoundingBox().getMaxY(), 1e-12);
+        assertEquals(20d, mud.getBoundingBox().getMinY(), 1e-12);
+    }
+
+    @Test
     void loneGlassPaneStaysACentrePost() {
         Block pane = Block.get(BlockID.GLASS_PANE);
         pane.setComponents(0d, 0d, 0d);
