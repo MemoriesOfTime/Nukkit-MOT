@@ -33,7 +33,7 @@ public class BlockDoubleSlabStone4 extends BlockDoubleSlabStone {
 
     @Override
     public double getHardness() {
-        return 2;
+        return (this.getDamage() & 0x07) == MOSSY_STONE_BRICKS ? 1.5 : 2;
     }
 
     @Override

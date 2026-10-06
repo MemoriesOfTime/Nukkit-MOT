@@ -22,13 +22,9 @@ import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPSignaling;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPSignaling.JoinRefusal;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling.PongData;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetSignaling.IceServerInfo;
+import org.cloudburstmc.netty.channel.nethernet.signaling.*;
 import org.cloudburstmc.netty.util.nethernet.NetherNetLogging;
-import org.cloudburstmc.netty.util.nethernet.ServerIdentity;
+import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
 import org.cloudburstmc.netty.util.nethernet.TokenTrust;
 import org.cloudburstmc.netty.util.nethernet.TransportIdentityBinding;
 import tel.schich.libdatachannel.LibDataChannelArchDetect;
@@ -78,7 +74,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
 
     private final Channel channel;
     private final EventLoopGroup eventLoopGroup;
-    private final NetherNetHTTPSignaling signaling;
+    private final NetherNetHTTPServerSignaling signaling;
     private final NetherNetTransportStats stats = new NetherNetTransportStats();
     /**
      * 与 RakNet 共用某个监听端口时的进程内中继（server-udp-ports 把媒体发布在 server-port 或 IPv6 监听上），否则为 null。
@@ -115,11 +111,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         try {
             LibDataChannelArchDetect.initialize();
         } catch (Throwable t) {
+            log.fatal(server.getLanguage().translateString("nukkit.nethernet.nativeInit.failed"));
             throw new IllegalStateException("Unable to initialize NetherNet: the native libdatachannel library may be missing for this platform", t);
         }
         NetherNetLogging.setNativeLogLevel("WARN");
 
-        ServerIdentity identity = NetherNetIdentity.load(server, settings);
+        OperatorIdentity identity = NetherNetIdentity.load(server, settings);
         NetherNetUdpPorts mediaPorts;
         try {
             mediaPorts = resolveMediaPorts(server);
@@ -151,7 +148,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             this.relay = null;
         }
 
-        this.signaling = new NetherNetHTTPSignaling.Builder()
+        this.signaling = new NetherNetHTTPServerSignaling.Builder()
                 .setIdentity(identity)
                 .setServeHttp(true)
                 // RakNet 已占用 server-port 的 UDP 侧，信令端口不可复用；媒体端口经 server-udp-ports

@@ -125,10 +125,10 @@ public class Long2ObjectNonBlockingMap<TypeV>
     }
 
     // --- The Hash Table --------------------
-    private transient CHM _chm;
+    private transient volatile CHM _chm;
     // This next field holds the value for Key 0 - the special key value which
     // is the initial array value, and also means: no-key-inserted-yet.
-    private transient Object _val_1; // Value for Key: NO_KEY
+    private transient volatile Object _val_1; // Value for Key: NO_KEY
 
     // Time since last resize
     private transient long _last_resize_milli;
@@ -352,12 +352,14 @@ public class Long2ObjectNonBlockingMap<TypeV>
         if (oldVal == null || newVal == null) throw new NullPointerException();
         if (key == NO_KEY) {
             Object curVal = _val_1;
-            if (oldVal == NO_MATCH_OLD || // Do we care about expected-Value at all?
+            while (oldVal == NO_MATCH_OLD || // Do we care about expected-Value at all?
                     curVal == oldVal ||       // No instant match already?
                     (oldVal == MATCH_ANY && curVal != TOMBSTONE) ||
                     oldVal.equals(curVal)) { // Expensive equals check
-                if (!CAS(_val_1_handler, curVal, newVal)) // One shot CAS update attempt
-                    curVal = _val_1;                      // Failed; get failing witness
+                Object witness = _val_1_handler.compareAndExchange(this, curVal, newVal);
+                if (witness == curVal) break;
+                // Retry against the actual failed-CAS witness; a failed update is not success.
+                curVal = witness;
             }
             return curVal == TOMBSTONE ? null : (TypeV) curVal; // Return the last value present
         }

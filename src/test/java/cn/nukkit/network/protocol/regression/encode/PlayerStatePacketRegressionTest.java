@@ -144,6 +144,7 @@ public class PlayerStatePacketRegressionTest extends AbstractPacketRegressionTes
         ));
         abilityLayer.setFlySpeed(0.05f);
         abilityLayer.setWalkSpeed(0.1f);
+        abilityLayer.setVerticalFlySpeed(0.5f);
         nukkitPacket.getAbilityLayers().add(abilityLayer);
         nukkitPacket.encode();
 
@@ -153,6 +154,16 @@ public class PlayerStatePacketRegressionTest extends AbstractPacketRegressionTes
         assertEquals(12345L, cbPacket.getUniqueEntityId());
         assertNotNull(cbPacket.getAbilityLayers());
         assertFalse(cbPacket.getAbilityLayers().isEmpty());
+
+        // Semantic float assertions: fly -> vertical (776+) -> walk must survive the round trip
+        var layer = cbPacket.getAbilityLayers().get(0);
+        assertEquals(0.05f, layer.getFlySpeed(), 0.0f);
+        assertEquals(0.1f, layer.getWalkSpeed(), 0.0f);
+        if (protocolVersion >= ProtocolInfo.v1_21_60) {
+            assertEquals(0.5f, layer.getVerticalFlySpeed(), 0.0f);
+        } else {
+            assertEquals(0.0f, layer.getVerticalFlySpeed(), 0.0f);
+        }
     }
 
     // ==================== UpdateClientInputLocksPacket ====================
