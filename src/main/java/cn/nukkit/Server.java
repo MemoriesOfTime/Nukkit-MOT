@@ -92,6 +92,7 @@ import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.MapMaker;
 import com.google.gson.JsonParser;
 import eu.okaeri.configs.ConfigManager;
 import eu.okaeri.configs.yaml.snakeyaml.YamlSnakeYamlConfigurer;
@@ -121,10 +122,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -287,7 +285,7 @@ public class Server {
      * Per-identity locks for player data IO, keyed by the data path identity (UUID string or
      * lowercased name).
      */
-    private final ConcurrentHashMap<String, ReentrantLock> playerDataLocks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ReentrantLock> playerDataLocks = createPlayerDataLocks();
     /**
      * 已调度未执行的异步保存任务，按身份索引；迁移前同步冲刷。
      * <p>
@@ -702,11 +700,11 @@ public class Server {
 
         this.console = new NukkitConsole();
         this.consoleThread = new ConsoleThread();
-        this.consoleThread.start();
         this.console.setExecutingCommands(true);
 
         // Load server.properties (standard MC settings)
         log.info("Loading server properties...");
+        NukkitConsole.takeOverTerminalClose();
         this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
         this.properties.setHeader("Nukkit-MOT Server Properties\n"
                 + "For advanced settings, see nukkit-mot.yml\n"
@@ -773,7 +771,8 @@ public class Server {
 
         Zlib.setProvider(this.serverConfig.networkSettings().zlibProvider());
 
-        this.scheduler = new ServerScheduler();
+        this.scheduler = new ServerScheduler(this.serverConfig.performanceSettings().virtualThreads());
+        log.info("Virtual threads for async tasks: {}", this.scheduler.isVirtualThreadsEnabled() ? "enabled" : "disabled");
 
         if (this.getPropertyBoolean("enable-rcon", false)) {
             try {
@@ -918,7 +917,24 @@ public class Server {
         NetherNetSettings netherNetSettings = this.serverConfig != null
                 ? this.serverConfig.networkSettings().netherNetSettings() : null;
         if (netherNetSettings != null && netherNetSettings.enabled()) {
-            this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
+            try {
+                this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
+            } catch (Throwable t) {
+                // NetherNet 启动失败（原生库缺失、端口配置错误等）按致命错误处理：提示根因与关闭方式后中止启动，
+                // 不带残缺的网络栈继续运行（与下方 defaultLevel 加载失败同路）
+                // A NetherNet startup failure (missing native lib, bad port config, ...) is fatal:
+                // report the root cause and the disable hint, then abort like a defaultLevel load failure
+                Throwable cause = t;
+                while (cause.getCause() != null) {
+                    cause = cause.getCause();
+                }
+                this.getLogger().emergency(this.baseLang.translateString("nukkit.nethernet.startFailed",
+                        cause.getMessage() != null ? cause.getMessage() : cause.toString()));
+                this.getLogger().emergency(this.baseLang.translateString("nukkit.nethernet.startFailed.hint"));
+                log.debug("NetherNet startup aborted", t);
+                this.forceShutdown();
+                return;
+            }
         }
 
         EntityProperty.init();
@@ -1517,7 +1533,9 @@ public class Server {
             this.consoleThread.interrupt();
 
             this.getLogger().debug("Stopping network interfaces...");
-            for (SourceInterface interfaz : this.network.getInterfaces()) {
+            // unregisterInterface 会边迭代边从 getInterfaces() 的活集合删除，拷贝防 CME
+            // unregisterInterface mutates the live set mid-iteration; copy to avoid CME
+            for (SourceInterface interfaz : new ArrayList<>(this.network.getInterfaces())) {
                 interfaz.shutdown();
                 this.network.unregisterInterface(interfaz);
             }
@@ -1538,6 +1556,7 @@ public class Server {
             }
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
+            Nukkit.shutdownLogging();
             System.exit(1);
         }
     }
@@ -1556,6 +1575,12 @@ public class Server {
         this.tickCounter = 0;
 
         log.info(this.baseLang.translateString("nukkit.server.startFinished", String.valueOf((double) (System.currentTimeMillis() - Nukkit.START_TIME) / 1000)));
+
+        // 控制台线程推迟到服务器就绪后启动：此前读到的命令依赖尚未创建的对象会被静默丢弃
+        // （如引导下载期间管道送达的 stop），留在 stdin 等就绪后读取
+        // Console thread starts after the server is ready; earlier commands would be silently dropped
+        this.consoleThread.start();
+
         this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, System::gc, 20);
 
         this.tickProcessor();
@@ -2524,6 +2549,15 @@ public class Server {
         }
     }
 
+    /**
+     * A lock remains strongly reachable in every holder/waiter's local variable until unlock.
+     * Weak values therefore release retired identities without replacing any live lock.
+     * Never use weak keys or size/age eviction: equal identities must share a live lock.
+     */
+    static ConcurrentMap<String, ReentrantLock> createPlayerDataLocks() {
+        return new MapMaker().weakValues().makeMap();
+    }
+
     private ReentrantLock playerDataLock(String key) {
         return playerDataLocks.computeIfAbsent(key, k -> new ReentrantLock());
     }
@@ -3246,6 +3280,7 @@ public class Server {
             logConfigError(e);
             if (firstLoad) {
                 log.error("Server cannot start with an invalid configuration. Please fix nukkit-mot.yml and restart.");
+                Nukkit.shutdownLogging();
                 System.exit(1);
             } else {
                 log.error("Failed to reload nukkit-mot.yml. Keeping previous configuration.");

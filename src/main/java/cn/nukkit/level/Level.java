@@ -38,6 +38,8 @@ import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.anvil.Anvil;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.level.generator.PopChunkManager;
@@ -2418,7 +2420,8 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Block getBlock(FullChunk chunk, int x, int y, int z, int layer, boolean load) {
-        int[] fullState;
+        int id = 0;
+        int meta = 0;
         if (isYInRange(y)) {
             int cx = x >> 4;
             int cz = z >> 4;
@@ -2430,15 +2433,28 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
             if (chunk != null) {
-                fullState = chunk.getBlockState(x & 0xF, y, z & 0xF, layer);
-            } else {
-                fullState = new int[]{0, 0};
+                // Only exact built-in classes may bypass the virtual legacy state-array API.
+                // The pair retains all 32 bits of both legacy fields under the original read lock.
+                if (chunk.getClass() == LevelDBChunk.class) {
+                    ChunkSection section = ((LevelDBChunk) chunk).getSection(y >> 4);
+                    if (section.getClass() == LevelDBChunkSection.class) {
+                        long pair = ((LevelDBChunkSection) section).getBlockStatePair(x & 0xF, y & 0xF, z & 0xF, layer);
+                        id = (int) (pair >>> 32);
+                        meta = (int) pair;
+                    } else if (section.getClass() != EmptyChunkSection.class) {
+                        int[] state = section.getBlockState(x & 0xF, y & 0xF, z & 0xF, layer);
+                        id = state[0];
+                        meta = state[1];
+                    }
+                } else {
+                    int[] state = chunk.getBlockState(x & 0xF, y, z & 0xF, layer);
+                    id = state[0];
+                    meta = state[1];
+                }
             }
-        } else {
-            fullState = new int[]{0, 0};
         }
 
-        return Block.get(fullState[0], fullState[1], this, x, y, z, layer);
+        return Block.get(id, meta, this, x, y, z, layer);
     }
 
     public synchronized void updateAllLight(Vector3 pos) {
@@ -4767,7 +4783,8 @@ public class Level implements ChunkManager, Metadatable {
      */
     synchronized void mountChunk(PendingChunkLoad pending) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || levelProvider != pending.provider || pending.invalidated
+        if (levelProvider == null || levelProvider.getLevel() == null
+            || levelProvider != pending.provider || pending.invalidated
                 || levelProvider.isChunkLoaded(pending.hash)) {
             return;
         }
