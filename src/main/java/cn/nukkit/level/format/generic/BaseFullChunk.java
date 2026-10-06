@@ -39,6 +39,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected Long2ObjectNonBlockingMap<Entity> entities;
 
+    private volatile PickupEntityIndex pickupEntityIndex;
+
     protected Long2ObjectNonBlockingMap<BlockEntity> tiles;
 
     protected Long2ObjectNonBlockingMap<BlockEntity> tileList;
@@ -123,6 +125,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public BaseFullChunk clone() {
+        if (this.entities != null) this.entityIndex();
         BaseFullChunk chunk;
         try {
             chunk = (BaseFullChunk) super.clone();
@@ -171,6 +174,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         }
 
         chunk.entities = null;
+        chunk.pickupEntityIndex = null;
         chunk.tileList = null;
         chunk.NBTentities = null;
         chunk.NBTtiles = null;
@@ -693,7 +697,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (this.entities == null) {
             this.entities = new Long2ObjectNonBlockingMap<>();
         }
-        this.entities.put(entity.getId(), entity);
+        this.entityIndex().put(entity.getId(), entity);
         if (!(entity instanceof Player) && this.isInit) {
             this.setChanged();
         }
@@ -702,7 +706,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void removeEntity(Entity entity) {
         if (this.entities != null) {
-            this.entities.remove(entity.getId());
+            this.entityIndex().remove(entity.getId());
             if (!(entity instanceof Player) && this.isInit) {
                 this.setChanged();
             }
@@ -758,7 +762,24 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public Map<Long, Entity> getEntities() {
-        return entities == null ? Collections.emptyMap() : entities;
+        return entities == null ? Collections.emptyMap() : entityIndex();
+    }
+
+    private PickupEntityIndex entityIndex() {
+        PickupEntityIndex index = this.pickupEntityIndex;
+        if (index != null && index.backing() == this.entities) return index;
+        synchronized (this) {
+            // Conversion and chunk sending can replace the backing map. A live clone shares both.
+            if (this.pickupEntityIndex == null || this.pickupEntityIndex.backing() != this.entities) {
+                this.pickupEntityIndex = new PickupEntityIndex(this.entities);
+            }
+            return this.pickupEntityIndex;
+        }
+    }
+
+    @Override
+    public boolean hasPickupEntities(boolean itemsOnly) {
+        return this.entities != null && this.entityIndex().hasPickupEntities(itemsOnly);
     }
 
     @Override

@@ -2491,8 +2491,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Internal: Check nearby entities and try to pick them up
      */
     protected void checkNearEntities() {
-        Entity[] e = this.level.getNearbyEntities(this.boundingBox.grow(1, 0.5, 1), this);
-        for (Entity entity : e) {
+        for (Entity entity : CollisionHelper.getPickupEntities(this.level, this.boundingBox.grow(1, 0.5, 1), false)) {
             //entity.scheduleUpdate();
 
             if (!entity.isAlive()) {
