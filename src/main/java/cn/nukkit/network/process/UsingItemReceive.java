@@ -71,14 +71,21 @@ public final class UsingItemReceive {
     }
 
     /**
-     * START_SPRINTING used to always {@code setUsingItem(false)}. Java eat/draw can
-     * cancel sprint on the same tick Via emits StartUsingItem; if MOT still sees
-     * both bits, keep using. A later START_SPRINTING while already eating still
-     * cancels the hold, matching vanilla sprint-cancel-eat.
+     * START_SPRINTING 是否打断持续使用。
+     * <p>
+     * Java（Via）遵循 JE 原版：之后的疾跑打断进食，仅同 tick 的 StartUsingItem 起始（Via 在
+     * 同一输入里同时上报两个 bit）保留；原生 Bedrock 允许边疾跑边进食，consumable 不受影响。
+     * <p>
+     * Whether START_SPRINTING keeps a hold-to-use alive: Java (Via) matches vanilla JE — a later
+     * sprint cancels the eat, only the same-tick StartUsingItem start is kept; native Bedrock may
+     * eat while sprinting.
      */
     public static boolean shouldKeepUsingDespiteStartSprinting(boolean javaClient, boolean holdToUse,
-                                                               boolean startUsingItemFlag) {
-        return javaClient && startUsingItemFlag && holdToUse;
+                                                               boolean startUsingItemFlag, boolean consumingItem) {
+        if (javaClient) {
+            return startUsingItemFlag && holdToUse;
+        }
+        return consumingItem;
     }
 
     public static boolean isStartUsingPlayerAction(int action) {

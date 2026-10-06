@@ -4292,31 +4292,30 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
     @ParameterizedTest(name = "ItemStackRequestPacket v{0} v2168 AutoCraft ingredients")
     @MethodSource("versionsAt2168")
     void itemStackRequestV2168AutoCraftIngredients(int protocol) {
-        var stickDef = new org.cloudburstmc.protocol.bedrock.data.definitions.SimpleItemDefinition("minecraft:stick", 320, false);
-        var cb = new org.cloudburstmc.protocol.bedrock.packet.ItemStackRequestPacket();
-        cb.getRequests().add(new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequest(
-                200,
-                new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.ItemStackRequestAction[]{
-                        new org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.AutoCraftRecipeAction(
-                                100, // recipeNetworkId
-                                2,   // numberOfRequestedCrafts
-                                java.util.List.of(
-                                        new org.cloudburstmc.protocol.bedrock.data.inventory.descriptor.ItemDescriptorWithCount(
-                                                new org.cloudburstmc.protocol.bedrock.data.inventory.descriptor.DefaultDescriptor(stickDef, 0),
-                                                5 // count
-                                        ),
-                                        new org.cloudburstmc.protocol.bedrock.data.inventory.descriptor.ItemDescriptorWithCount(
-                                                org.cloudburstmc.protocol.bedrock.data.inventory.descriptor.InvalidDescriptor.INSTANCE,
-                                                0
-                                        )
-                                ),
-                                2    // timesCrafted
-                        )
-                },
-                new String[0]
-        ));
-
-        ItemStackRequestPacket nk = crossEncode(cb, ItemStackRequestPacket::new, protocol);
+        // Written by hand in the layout real 1.26.4x clients send: the repetitions byte of
+        // CRAFT_RECIPE_AUTO appears once, and the ingredient list carries one VarUInt count.
+        // The Cloudburst v2168 writer emits an extra size byte that no client sends, so it
+        // cannot serve as the reference for this action.
+        ItemStackRequestPacket nk = decodeRawItemStackRequestPacket(protocol, stream -> {
+            stream.putUnsignedVarInt(1);   // requests
+            stream.putVarInt(200);         // requestId
+            stream.putUnsignedVarInt(1);   // actions
+            stream.putUnsignedVarInt(11);  // CRAFT_RECIPE_AUTO, v2168 primary id
+            stream.putByte((byte) 13);     // duplicate type byte
+            stream.putUnsignedVarInt(100); // recipeNetworkId
+            stream.putByte((byte) 2);      // repetitions, sent once
+            stream.putUnsignedVarInt(2);   // ingredients
+            stream.putUnsignedVarInt(1);   // DEFAULT
+            stream.putByte((byte) 1);
+            stream.putString("minecraft:stick");
+            stream.putVarInt(0);           // aux
+            stream.putLShort(5);           // count
+            stream.putUnsignedVarInt(0);   // INVALID
+            stream.putByte((byte) 0);
+            stream.putLShort(0);
+            stream.putUnsignedVarInt(0);   // filter strings
+            stream.putLInt(-1);            // no text processing origin
+        });
 
         assertEquals(1, nk.getRequests().size());
         var request = nk.getRequests().get(0);
@@ -4326,6 +4325,7 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
                 request.getActions()[0]);
         assertEquals(100, auto.getRecipeNetworkId());
         assertEquals(2, auto.getNumberOfRequestedCrafts());
+        assertEquals(2, auto.getTimesCrafted());
         assertEquals(2, auto.getIngredients().size());
 
         // DEFAULT ingredient: 解析为 minecraft:stick, aux=0, count=5

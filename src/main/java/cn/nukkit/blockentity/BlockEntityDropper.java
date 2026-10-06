@@ -1,5 +1,6 @@
 package cn.nukkit.blockentity;
 
+import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.inventory.DropperInventory;
@@ -10,6 +11,8 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+
+import java.util.HashSet;
 
 /**
  * Created by PetteriM1
@@ -129,6 +132,17 @@ public class BlockEntityDropper extends BlockEntitySpawnable implements Inventor
         }
 
         return c;
+    }
+
+    /** Breaking the block closes the window of every player looking into it, like a chest. */
+    @Override
+    public void close() {
+        if (!this.closed) {
+            for (Player player : new HashSet<>(this.inventory.getViewers())) {
+                player.removeWindow(this.inventory);
+            }
+            super.close();
+        }
     }
 
     @Override

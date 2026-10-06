@@ -75,7 +75,10 @@ public enum ContainerSlotType {
     /**
      * @since v712
      */
-    DYNAMIC_CONTAINER(63);
+    DYNAMIC_CONTAINER(63),
+    RECIPE_FOOD_CONTAINER(64),
+    RECIPE_BLOCKS_CONTAINER(65),
+    RECIPE_FURNACE_ITEMS_CONTAINER(66);
 
     private final int id;
     private static final Int2ObjectArrayMap<ContainerSlotType> VALUES = new Int2ObjectArrayMap<>();
@@ -101,6 +104,9 @@ public enum ContainerSlotType {
             return this.id + 1;
         }
         int protocol = gameVersion.getProtocol();
+        if (this.id > DYNAMIC_CONTAINER.id && protocol < ProtocolInfo.v1_26_10) {
+            throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+        }
         if (protocol >= ProtocolInfo.v1_21_20) {
             return this.id;
         }
@@ -143,11 +149,14 @@ public enum ContainerSlotType {
             return fromId(id > RECIPE_ITEMS.id ? id - 1 : id);
         }
         int protocol = gameVersion.getProtocol();
-        if (protocol >= ProtocolInfo.v1_21_20) {
+        if (protocol >= ProtocolInfo.v1_26_10) {
             return fromId(id);
         }
+        if (protocol >= ProtocolInfo.v1_21_20) {
+            return id > DYNAMIC_CONTAINER.id ? null : fromId(id);
+        }
         if (protocol >= ProtocolInfo.v1_20_50) {
-            return id == DYNAMIC_CONTAINER.id ? null : fromId(id);
+            return id >= DYNAMIC_CONTAINER.id ? null : fromId(id);
         }
         if (protocol >= ProtocolInfo.v1_19_80) {
             return id >= CRAFTER_BLOCK_CONTAINER.id ? null : fromId(id);
