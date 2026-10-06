@@ -3443,9 +3443,9 @@ public class Level implements ChunkManager, Metadatable {
         if (!isAiMob) {
             int index = 0;
             int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
-            int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) * 0.0625);
+            int maxX = NukkitMath.floorDouble((bb.getMaxX() + 2) * 0.0625);
             int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
-            int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) * 0.0625);
+            int maxZ = NukkitMath.floorDouble((bb.getMaxZ() + 2) * 0.0625);
             ArrayList<Entity> overflow = null;
             for (int x = minX; x <= maxX; ++x) {
                 for (int z = minZ; z <= maxZ; ++z) {
