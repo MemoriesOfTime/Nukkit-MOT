@@ -80,6 +80,10 @@ public class DimensionDataPacket extends DataPacket {
                         // v2192 新增默认生物群系 / default biome added in v2192
                         this.putString(dimensionDefinition.getDefaultBiome() != null ? dimensionDefinition.getDefaultBiome() : "");
                     }
+                    if (this.protocol >= ProtocolInfo.v1_26_60) {
+                        this.putVarInt(dimensionDefinition.getCloudHeight());
+                        this.putBoolean(dimensionDefinition.isRenderClouds());
+                    }
                 }
             }
         });

@@ -207,11 +207,14 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
     @ParameterizedTest(name = "ClientboundUpdateSoundDataPacket v{0} update slots")
     @MethodSource("versionsFrom2168")
     void testClientboundUpdateSoundDataPacketV2168Updates(int protocolVersion) {
-        // 按 protocol-docs（BDS 导出）的字段布局独立校验 wire：LLong handle + 7 个 tagged 更新槽。
-        // 值更新必须重复 7 槽（客户端只消费最后一槽），槽 0 不得为 STOP，否则解码侧 stop 被误置 true
-        // Verify the wire independently per protocol-docs (BDS-exported) layouts: LLong handle + 7 tagged
-        // update slots. A value update must repeat into all 7 slots (the client consumes the last one) and
-        // slot 0 must not be STOP, or decode would map stop=true
+        // 按 protocol-docs（BDS 导出）的字段布局独立校验 wire：LLong handle + tagged 更新槽。
+        // v1_26_60 起仅携带单个事件槽；之前值更新必须重复 7 槽（客户端只消费最后一槽），
+        // 槽 0 不得为 STOP，否则解码侧 stop 被误置 true
+        // Verify the wire independently per protocol-docs (BDS-exported) layouts: LLong handle +
+        // tagged update slots. Since v1_26_60 exactly one event slot; before that a value update
+        // must repeat into all 7 slots (the client consumes the last one) and slot 0 must not be
+        // STOP, or decode would map stop=true
+        int slots = protocolVersion >= cn.nukkit.network.protocol.ProtocolInfo.v1_26_60 ? 1 : 7;
         var volume = new cn.nukkit.network.protocol.ClientboundUpdateSoundDataPacket();
         volume.protocol = protocolVersion;
         volume.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
@@ -222,12 +225,12 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         ByteBuf volumeBuf = PacketBridgeUtil.nukkitPacketToByteBuf(volume);
         try {
             assertEquals(42L, volumeBuf.readLongLE());
-            for (int i = 0; i < 7; i++) {
+            for (int i = 0; i < slots; i++) {
                 assertEquals(1, org.cloudburstmc.protocol.common.util.VarInts.readUnsignedInt(volumeBuf),
                         "slot " + i + " should be SET_VOLUME");
                 assertEquals(0.5f, volumeBuf.readFloatLE());
             }
-            assertEquals(0, volumeBuf.readableBytes(), "expected exactly 7 slots");
+            assertEquals(0, volumeBuf.readableBytes(), "expected exactly " + slots + " slots");
         } finally {
             volumeBuf.release();
         }
@@ -242,11 +245,11 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         ByteBuf stopBuf = PacketBridgeUtil.nukkitPacketToByteBuf(stopPk);
         try {
             assertEquals(42L, stopBuf.readLongLE());
-            for (int i = 0; i < 7; i++) {
+            for (int i = 0; i < slots; i++) {
                 assertEquals(0, org.cloudburstmc.protocol.common.util.VarInts.readUnsignedInt(stopBuf),
                         "slot " + i + " should be STOP");
             }
-            assertEquals(0, stopBuf.readableBytes(), "expected exactly 7 slots");
+            assertEquals(0, stopBuf.readableBytes(), "expected exactly " + slots + " slots");
         } finally {
             stopBuf.release();
         }
@@ -263,13 +266,13 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         ByteBuf fadeBuf = PacketBridgeUtil.nukkitPacketToByteBuf(fade);
         try {
             assertEquals(42L, fadeBuf.readLongLE());
-            for (int i = 0; i < 7; i++) {
+            for (int i = 0; i < slots; i++) {
                 assertEquals(3, org.cloudburstmc.protocol.common.util.VarInts.readUnsignedInt(fadeBuf),
                         "slot " + i + " should be FADE");
                 assertEquals(0.5f, fadeBuf.readFloatLE());
                 assertEquals(2.0f, fadeBuf.readFloatLE());
             }
-            assertEquals(0, fadeBuf.readableBytes(), "expected exactly 7 slots");
+            assertEquals(0, fadeBuf.readableBytes(), "expected exactly " + slots + " slots");
         } finally {
             fadeBuf.release();
         }

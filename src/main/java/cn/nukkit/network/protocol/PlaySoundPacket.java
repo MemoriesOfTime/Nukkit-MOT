@@ -48,7 +48,7 @@ public class PlaySoundPacket extends DataPacket {
         this.putLFloat(this.volume);
         this.putLFloat(this.pitch);
         if (protocol >= ProtocolInfo.v1_26_50_27) {
-            this.putUnsignedVarInt(this.loopCount);
+            this.putVarInt((int) this.loopCount);
             this.putBoolean(this.bypassListenerRangeCheck);
             this.putOptionalNull(this.serverSoundHandle, this::putLLong);
             this.putOptionalNull(this.playbackPositionSeconds, this::putLFloat);

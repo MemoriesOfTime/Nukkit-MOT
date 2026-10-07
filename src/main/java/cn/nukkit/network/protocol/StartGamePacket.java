@@ -291,6 +291,9 @@ public class StartGamePacket extends DataPacket {
                 this.putBoolean(this.createdInEditor);
                 this.putBoolean(this.exportedFromEditor);
             }
+            if (protocol >= ProtocolInfo.v1_26_60) {
+                this.putByte((byte) 0); // EditorLevelMigrationVersion.LEGACY
+            }
         }
         this.putVarInt(this.dayCycleStopTime);
         if (protocol >= 388) {

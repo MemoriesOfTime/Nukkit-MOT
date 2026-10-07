@@ -367,7 +367,7 @@ public class BinaryStream {
                 this.putString(skin.getGeometryData());
             }
         } else {
-            if (protocol >= ProtocolInfo.v1_16_210) {
+            if (protocol >= ProtocolInfo.v1_16_210 && protocol < ProtocolInfo.v1_26_60) {
                 this.putString(skin.getPlayFabId());
             }
             this.putString(skin.getSkinResourcePatch());
@@ -531,7 +531,7 @@ public class BinaryStream {
     public Skin getSkin(int protocol) { // Can be used only with protocol >= 388
         Skin skin = new Skin();
         skin.setSkinId(this.getString());
-        if (protocol >= ProtocolInfo.v1_16_210) {
+        if (protocol >= ProtocolInfo.v1_16_210 && protocol < ProtocolInfo.v1_26_60) {
             skin.setPlayFabId(this.getString());
         }
         skin.setSkinResourcePatch(this.getString());
@@ -2481,6 +2481,9 @@ public class BinaryStream {
                 String patternId = getString();
                 int timesCrafted = hasNumberOfCrafts ? (getByte() & 0xFF) : 0;
                 yield new CraftLoomAction(patternId, timesCrafted);
+            }
+            case CRAFT_RESERVED -> {
+                yield new CraftReservedAction(getString(256), getByte() & 0xFF);
             }
             case CRAFT_RECIPE_AUTO -> {
                 int recipeId = (int) getUnsignedVarInt();

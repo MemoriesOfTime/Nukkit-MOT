@@ -105,7 +105,8 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
         cb.setBlockPosition(org.cloudburstmc.math.vector.Vector3i.from(10, 64, -20));
         cb.setBlockFace(1);
         cb.setHotbarSlot(3);
-        cb.setHand(1); // 副手 / off-hand
+        // Beta14 起 CB 的 hand 字段为 HandSlot 枚举 / CB's hand field is a HandSlot enum since Beta14
+        cb.setHand(org.cloudburstmc.protocol.bedrock.data.inventory.HandSlot.OFFHAND);
         cb.setItemInHand(org.cloudburstmc.protocol.bedrock.data.inventory.ItemData.AIR);
         cb.setPlayerPosition(org.cloudburstmc.math.vector.Vector3f.from(10.5f, 65f, -19.5f));
         cb.setClickPosition(org.cloudburstmc.math.vector.Vector3f.from(0.25f, 0.5f, 0.75f));
@@ -336,10 +337,11 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
         var def = cb.getDefinitions().get(0);
         assertEquals("minecraft:test_dim", def.getId());
         assertEquals("minecraft:plains", def.getDefaultBiome());
-        // v2192 前导对 =（下限, 跨度 320-(-64)=384）；CB 将跨度读入其 maximumHeight 字段
-        // Leading pair since v2192 = (min, span 384); CB reads the span into its maximumHeight field
+        // v2192 前导对 =（下限, 跨度 320-(-64)=384）；CB #360 修复后按 min+跨度 还原 maximumHeight=320
+        // Leading pair since v2192 = (min, span 320-(-64)=384); since CB #360 the maximum is
+        // reconstructed as min+span = 320
         assertEquals(-64, def.getMinimumHeight());
-        assertEquals(384, def.getMaximumHeight());
+        assertEquals(320, def.getMaximumHeight());
     }
 
     @Test

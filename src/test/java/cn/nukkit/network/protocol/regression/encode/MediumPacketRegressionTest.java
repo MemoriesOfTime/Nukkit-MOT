@@ -1162,10 +1162,11 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
         var definition = cbPacket.getDefinitions().get(0);
         assertEquals("minecraft:overworld", definition.getId());
         if (protocolVersion >= ProtocolInfo.v1_26_50_27) {
-            // v2192+ 前导对 =（下限, 跨度 320-(-64)=384）；CB 将跨度读入其 maximumHeight 字段
-            // Leading pair since v2192 = (min, span 384); CB reads the span into its maximumHeight field
+            // v2192+ 前导对 =（下限, 跨度 320-(-64)=384）；CB #360 修复后按 min+跨度 还原 maximumHeight=320
+            // Leading pair since v2192 = (min, span 320-(-64)=384); since CB #360 the maximum is
+            // reconstructed as min+span = 320
             assertEquals(-64, definition.getMinimumHeight());
-            assertEquals(384, definition.getMaximumHeight());
+            assertEquals(320, definition.getMaximumHeight());
         } else {
             assertEquals(320, definition.getMaximumHeight());
             assertEquals(-64, definition.getMinimumHeight());
