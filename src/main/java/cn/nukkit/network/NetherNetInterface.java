@@ -162,7 +162,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 .setIceServers(iceServers(settings))
                 .setAdvertisedAddresses(mediaPorts == null ? Set.of() : mediaPorts.advertisedAddresses())
                 .setTokenTrust(TokenTrust.ANY)
-                .setMotdProvider((host, remoteAddress) -> this.buildPong())
+                .setMotdProvider((host, remoteAddress, client) -> this.buildPong())
                 .setPlayerFilter((host, player) -> this.refusePlayer(player))
                 .build();
 
