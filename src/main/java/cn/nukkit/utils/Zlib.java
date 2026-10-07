@@ -3,12 +3,15 @@ package cn.nukkit.utils;
 import cn.nukkit.Server;
 
 import java.io.IOException;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 import java.util.zip.Deflater;
 
 public abstract class Zlib {
 
     private static ZlibProvider[] providers;
-    private static ZlibProvider provider;
+    private static volatile ZlibProvider provider;
+    private static final ReentrantReadWriteLock providerLock = new ReentrantReadWriteLock();
 
     static {
         providers = new ZlibProvider[3];
@@ -24,27 +27,45 @@ public abstract class Zlib {
      * 2 = ZlibThreadLocal (default)
      */
     public static void setProvider(int providerIndex) {
-        switch (providerIndex) {
-            case 0:
-                if (providers[providerIndex] == null)
-                    providers[providerIndex] = new ZlibOriginal();
-                break;
-            case 1:
-                if (providers[providerIndex] == null)
-                    providers[providerIndex] = new ZlibSingleThreadLowMem();
-                break;
-            case 2:
-                if (providers[providerIndex] == null)
-                    providers[providerIndex] = new ZlibThreadLocal();
-                break;
-            default:
-                throw new UnsupportedOperationException("Invalid provider: " + providerIndex);
+        providerLock.writeLock().lock();
+        try {
+            switch (providerIndex) {
+                case 0:
+                    if (providers[providerIndex] == null)
+                        providers[providerIndex] = new ZlibOriginal();
+                    break;
+                case 1:
+                    if (providers[providerIndex] == null)
+                        providers[providerIndex] = new ZlibSingleThreadLowMem();
+                    break;
+                case 2:
+                    if (providers[providerIndex] == null)
+                        providers[providerIndex] = new ZlibThreadLocal();
+                    break;
+                default:
+                    throw new UnsupportedOperationException("Invalid provider: " + providerIndex);
+            }
+            provider = providers[providerIndex];
+        } finally {
+            providerLock.writeLock().unlock();
         }
-        provider = providers[providerIndex];
     }
 
     public static byte[] deflate(byte[] data) throws Exception {
         return deflate(data, Deflater.DEFAULT_COMPRESSION);
+    }
+
+    /**
+     * Run with a stable concurrent compressor, or return null for the main-thread fallback.
+     * The action must not change the provider. Concurrent actions share the read lock.
+     */
+    public static <T> T withConcurrentCompression(Supplier<T> action) {
+        providerLock.readLock().lock();
+        try {
+            return provider instanceof ZlibSingleThreadLowMem ? null : action.get();
+        } finally {
+            providerLock.readLock().unlock();
+        }
     }
 
     public static byte[] deflate(byte[] data, int level) throws Exception {

@@ -469,7 +469,10 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private ExecutorService asyncChunkLoadExecutor;
-    private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
+    private final Queue<PreparedChunkRequest> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
+
+    private record PreparedChunkRequest(NetworkChunkSerializer.NetworkChunkSerializerCallbackData data,
+                                        BatchPacket packet) { }
 
     // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
     // Posted to main thread to clear tasks (tasks isn't thread-safe; async worker can't touch it)
@@ -1412,10 +1415,12 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         if (this.server.asyncChunkSending) {
-            NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
+            PreparedChunkRequest prepared;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
-            for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
-                this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
+            for (int i = 0; i < count && (prepared = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
+                var data = prepared.data();
+                this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(),
+                        data.getSubChunkCount(), data.getPayload(), prepared.packet());
             }
         }
 
@@ -4515,7 +4520,15 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
-        this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp, x, z, subChunkCount, payload));
+        // Called by the serializer worker. Only owned bytes and immutable world/version
+        // metadata are used here; cache publication and player access stay on the main thread.
+        BatchPacket packet = server.cacheChunks
+                ? Zlib.withConcurrentCompression(() -> Player.getChunkCacheFromData(
+                        gameVersion, x, z, subChunkCount, payload, this.getDimension()))
+                : null;
+        this.asyncChunkRequestCallbackQueue.add(new PreparedChunkRequest(
+                new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp,
+                        x, z, subChunkCount, packet == null ? payload : null), packet));
     }
 
     /**
@@ -4533,12 +4546,18 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
+        this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload, null);
+    }
+
+    private void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z,
+                                      int subChunkCount, byte[] payload, BatchPacket preparedPacket) {
         long index = Level.chunkHash(x, z);
 
-        if (server.cacheChunks) {
-            BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
+        if (preparedPacket != null || server.cacheChunks) {
+            BatchPacket data = preparedPacket != null ? preparedPacket
+                    : Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunkIfLoaded(x, z);
-            if (chunk != null && chunk.getChanges() <= timestamp) {
+            if (server.cacheChunks && chunk != null && chunk.getChanges() <= timestamp) {
                 chunk.setChunkPacket(protocol, data);
             }
             //this.sendChunk(x, z, index, data);
