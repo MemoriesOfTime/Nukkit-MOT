@@ -5097,6 +5097,29 @@ public class Level implements ChunkManager, Metadatable {
         this.generateChunk(x, z, true);
     }
 
+    /**
+     * Ticks between two chunk garbage collections of the same level.
+     */
+    public static final int CHUNK_GC_PERIOD = 100;
+
+    /**
+     * Whether this level collects chunk garbage on the given server tick. Each level collects once per
+     * {@link #CHUNK_GC_PERIOD} ticks at its own phase, so the levels no longer collect all in one tick -
+     * the tick that also runs the spawner, the autosave and every other 100/200/1200-tick task.
+     */
+    public boolean isChunkGarbageCollectionTick(int tick) {
+        return Math.floorMod(tick, CHUNK_GC_PERIOD) == chunkGarbageCollectionPhase(this.levelId);
+    }
+
+    /**
+     * Phase 1..99 of a level's chunk garbage collection, never 0: 0 is the phase every period of the server
+     * divisible by 100 shares. Level ids walk the golden-ratio sequence, so consecutive ids land far apart.
+     */
+    static int chunkGarbageCollectionPhase(int levelId) {
+        double spread = (levelId * 0.6180339887498949) % 1.0;
+        return 1 + (int) (spread * (CHUNK_GC_PERIOD - 1));
+    }
+
     public void doChunkGarbageCollection() {
         // Remove all invalid block entities
         if (!blockEntities.isEmpty()) {

@@ -1053,9 +1053,10 @@ public class Server {
         nonAutoSaveWorlds.addAll(this.serverConfig.worldSettings().autoSaveDisabledWorlds());
 
         if (this.serverConfig.entitySettings().autoSpawnTask()) {
-            this.spawnerTask = new SpawnerTask();
             int spawnerTicks = Math.max(this.serverConfig.entitySettings().ticksPerSpawns(), 2) >> 1; // Run the spawner on 2x speed but spawn only either monsters or animals
-            this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask, spawnerTicks, spawnerTicks);
+            this.spawnerTask = new SpawnerTask(spawnerTicks);
+            // Every tick, one spawner at a time: see SpawnerTask#tick
+            this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask::tick, 1, 1);
         }
 
         if (this.serverConfig.debugSettings().bstatsMetrics()) {
@@ -1924,11 +1925,9 @@ public class Server {
                 this.doAutoSave();
             }
 
-            if (this.tickCounter % 100 == 0) {
-                for (Level level : this.levelArray) {
-                    if (!level.isBeingConverted) {
-                        level.doChunkGarbageCollection();
-                    }
+            for (Level level : this.levelArray) {
+                if (!level.isBeingConverted && level.isChunkGarbageCollectionTick(this.tickCounter)) {
+                    level.doChunkGarbageCollection();
                 }
             }
 
