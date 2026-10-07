@@ -52,6 +52,14 @@ public class PerformanceSettings extends OkaeriConfig {
     @CustomKey("ticks-per-autosave")
     private int ticksPerAutosave = 6000;
 
+    @Comment("Most player and chunk saves an auto-save does per tick; it continues on the next ticks (0 = the whole auto-save in one tick)")
+    @CustomKey("autosave-saves-per-tick")
+    private int autosaveSavesPerTick = 32;
+
+    @Comment("Main-thread time an auto-save may take per tick, in microseconds (at least one step per tick)")
+    @CustomKey("autosave-tick-budget-micros")
+    private int autosaveTickBudgetMicros = 2000;
+
     @Comment("Enable automatic level compaction")
     @CustomKey("level-auto-compaction")
     private boolean levelAutoCompaction = true;
