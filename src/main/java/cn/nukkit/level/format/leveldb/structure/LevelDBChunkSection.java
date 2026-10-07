@@ -16,6 +16,7 @@ import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
 import cn.nukkit.utils.Zlib;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
@@ -940,6 +941,19 @@ public class LevelDBChunkSection implements ChunkSection {
             } finally {
                 writeLock.unlock();
             }
+        }
+    }
+
+    @Override
+    public boolean mayContainBlockIds(IntSet blockIds) {
+        this.readLock.lock();
+        try {
+            // Migration has always read layer 0; waterlogged/extra-layer blocks do not widen it.
+            return this.hasLayerUnsafe(0)
+                    ? this.storages[0].mayContainBlockIds(blockIds)
+                    : blockIds.contains(Block.AIR);
+        } finally {
+            this.readLock.unlock();
         }
     }
 

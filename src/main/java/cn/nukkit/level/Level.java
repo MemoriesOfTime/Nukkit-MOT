@@ -4376,31 +4376,44 @@ public class Level implements ChunkManager, Metadatable {
             int maxY = this.getMaxBlockY();
             int baseX = x << 4;
             int baseZ = z << 4;
-            for (int blockY = minY; blockY <= maxY; blockY++) {
-                for (int bx = 0; bx < 16; bx++) {
-                    for (int bz = 0; bz < 16; bz++) {
-                        // getBlockIdAt 需要世界坐标；此处 bx/bz 是局部坐标，须走 getBlockId
-                        // getBlockIdAt expects world coords while bx/bz are chunk-local; use getBlockId
-                        int id = chunk.getBlockId(bx, blockY, bz);
-                        if (id == 0 || !targetIds.contains(id)) {
-                            continue;
-                        }
-                        Block block = this.getBlock(baseX + bx, blockY, baseZ + bz, 0);
-                        if (block == null) {
-                            continue;
-                        }
-                        boolean changed = false;
-                        if (block instanceof BlockThin thin) {
-                            changed = thin.updateConnections();
-                        } else if (block instanceof BlockFence fence) {
-                            changed = fence.updateConnections();
-                        } else if (block instanceof BlockStairs stairs) {
-                            changed = stairs.updateCorner();
-                        } else if (block instanceof BlockTripWire wire) {
-                            changed = wire.updateConnections();
-                        }
-                        if (changed) {
-                            this.setBlock(block, 0, block, true, false);
+            Chunk sectionedChunk = chunk instanceof Chunk ? (Chunk) chunk : null;
+            ChunkSection[] sections = sectionedChunk == null ? null : sectionedChunk.getSections();
+            int sectionOffset = sectionedChunk == null ? 0 : sectionedChunk.getSectionOffset();
+            for (int sectionY = minY >> 4; sectionY <= (maxY >> 4); sectionY++) {
+                int sectionIndex = sectionY + sectionOffset;
+                ChunkSection section = sections != null && sectionIndex >= 0 && sectionIndex < sections.length
+                        ? sections[sectionIndex] : null;
+                if (section != null && !section.mayContainBlockIds(targetIds)) {
+                    continue;
+                }
+                int firstY = Math.max(minY, sectionY << 4);
+                int lastY = Math.min(maxY, (sectionY << 4) + 15);
+                for (int blockY = firstY; blockY <= lastY; blockY++) {
+                    for (int bx = 0; bx < 16; bx++) {
+                        for (int bz = 0; bz < 16; bz++) {
+                            // getBlockIdAt 需要世界坐标；此处 bx/bz 是局部坐标，须走 getBlockId
+                            // getBlockIdAt expects world coords while bx/bz are chunk-local; use getBlockId
+                            int id = chunk.getBlockId(bx, blockY, bz);
+                            if (id == 0 || !targetIds.contains(id)) {
+                                continue;
+                            }
+                            Block block = this.getBlock(baseX + bx, blockY, baseZ + bz, 0);
+                            if (block == null) {
+                                continue;
+                            }
+                            boolean changed = false;
+                            if (block instanceof BlockThin thin) {
+                                changed = thin.updateConnections();
+                            } else if (block instanceof BlockFence fence) {
+                                changed = fence.updateConnections();
+                            } else if (block instanceof BlockStairs stairs) {
+                                changed = stairs.updateCorner();
+                            } else if (block instanceof BlockTripWire wire) {
+                                changed = wire.updateConnections();
+                            }
+                            if (changed) {
+                                this.setBlock(block, 0, block, true, false);
+                            }
                         }
                     }
                 }
