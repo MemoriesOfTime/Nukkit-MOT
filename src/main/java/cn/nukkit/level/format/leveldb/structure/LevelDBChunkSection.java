@@ -4,6 +4,8 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.custom.container.BlockStorageContainer;
+import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
@@ -21,11 +23,11 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.function.Consumer;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_DATA_ARRAY;
 import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_ID_ARRAY;
@@ -138,8 +140,11 @@ public class LevelDBChunkSection implements ChunkSection {
             this.parent = new WeakReference<>(parent);
             this.wasAttached |= parent != null;
             // Set hasSkyLight based on dimension (Overworld = 0 has sky light).
+            // 异步解码挂载时 level 可能已被 close 置空，回退 legacy（主世界，含天光）
+            // The level may be nulled by close during async decode attach; fall back to legacy (overworld, with skylight)
             if (parent != null && parent.getProvider() != null) {
-                this.hasSkyLight = parent.getProvider().getLevel().getDimensionData().getDimensionId() == 0;
+                Level levelTemp = parent.getProvider().getLevel();
+                this.hasSkyLight = (levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData()).getDimensionId() == 0;
             }
         } finally {
             this.writeLock.unlock();

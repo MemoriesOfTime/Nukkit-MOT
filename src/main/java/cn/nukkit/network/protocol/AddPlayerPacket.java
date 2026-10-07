@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.data.EntityMetadata;
 import cn.nukkit.item.Item;
@@ -108,11 +109,11 @@ public class AddPlayerPacket extends DataPacket {
                 this.putLShort(1); // BASE layer type
                 this.putLInt(262143); // abilitiesSet - all abilities
                 this.putLInt(63); // abilityValues - survival abilities
-                this.putLFloat(0.1f); // flySpeed
-                this.putLFloat(0.05f); // walkSpeed
+                this.putLFloat(Player.DEFAULT_FLY_SPEED); // flySpeed
                 if (this.protocol >= ProtocolInfo.v1_21_60) {
-                    this.putLFloat(1.0f); // getVerticalFlySpeed()
+                    this.putLFloat(Player.DEFAULT_VERTICAL_FLY_SPEED); // verticalFlySpeed
                 }
+                this.putLFloat(Player.DEFAULT_SPEED); // walkSpeed
             }
             this.putUnsignedVarInt(0);
             this.putString(deviceId);

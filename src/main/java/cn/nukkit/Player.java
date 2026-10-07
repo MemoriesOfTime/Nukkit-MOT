@@ -665,7 +665,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean getAllowFlight() {
-        return this.adventureSettings.get(Type.ALLOW_FLIGHT);
+        return this.adventureSettings != null && this.adventureSettings.get(Type.ALLOW_FLIGHT);
     }
 
     /**
@@ -1238,7 +1238,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         level = level == null ? this.level : level;
         long index = Level.chunkHash(x, z);
         if (this.usedChunks.containsKey(index)) {
-            for (Entity entity : level.getChunkEntities(x, z).values()) {
+            // Only live entities have viewers; abandoning a chunk must not reload it from storage.
+            for (Entity entity : level.getChunkEntities(x, z, false).values()) {
                 if (entity != this) {
                     entity.despawnFrom(this);
                 }
@@ -1256,7 +1257,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkZ = Level.getHashZ(index);
             this.level.unregisterChunkLoader(this, chunkX, chunkZ);
 
-            for (Entity entity : level.getChunkEntities(chunkX, chunkZ).values()) {
+            for (Entity entity : level.getChunkEntities(chunkX, chunkZ, false).values()) {
                 if (entity != this) {
                     if (online) {
                         entity.despawnFrom(this);
@@ -2264,9 +2265,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int minX = NukkitMath.floorDouble(bb.getMinX());
             int minY = NukkitMath.floorDouble(bb.getMinY());
             int minZ = NukkitMath.floorDouble(bb.getMinZ());
-            int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-            int maxY = NukkitMath.ceilDouble(bb.getMaxY());
-            int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
+            int maxX = NukkitMath.floorDouble(bb.getMaxX());
+            int maxY = NukkitMath.floorDouble(bb.getMaxY());
+            int maxZ = NukkitMath.floorDouble(bb.getMaxZ());
 
             for (int z = minZ; z <= maxZ; ++z) {
                 for (int x = minX; x <= maxX; ++x) {
@@ -2501,8 +2502,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Internal: Check nearby entities and try to pick them up
      */
     protected void checkNearEntities() {
-        Entity[] e = this.level.getNearbyEntities(this.boundingBox.grow(1, 0.5, 1), this);
-        for (Entity entity : e) {
+        for (Entity entity : CollisionHelper.getPickupEntities(this.level, this.boundingBox.grow(1, 0.5, 1), false)) {
             //entity.scheduleUpdate();
 
             if (!entity.isAlive()) {
