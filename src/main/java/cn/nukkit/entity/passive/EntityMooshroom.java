@@ -1,12 +1,16 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.BlockFlower;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
+import cn.nukkit.level.particle.SmokeParticle;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
@@ -18,6 +22,10 @@ import java.util.List;
 public class EntityMooshroom extends EntityWalkingAnimal {
 
     public static final int NETWORK_ID = 16;
+
+    private static final int NO_STEW_EFFECT = -1;
+    private static final int MAX_STEW_EFFECT = 12;
+    private boolean interacting;
 
     public EntityMooshroom(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -53,6 +61,9 @@ public class EntityMooshroom extends EntityWalkingAnimal {
         if (this.namedTag.contains("Variant")) {
             this.setBrown(this.namedTag.getInt("Variant") == 1);
         }
+        int savedEffect = this.namedTag.contains("MarkVariant") ? this.namedTag.getInt("MarkVariant") : NO_STEW_EFFECT;
+        this.setStewEffect(this.isBrown() && savedEffect >= 0 && savedEffect <= MAX_STEW_EFFECT
+                ? savedEffect : NO_STEW_EFFECT);
     }
 
     @Override
@@ -84,30 +95,40 @@ public class EntityMooshroom extends EntityWalkingAnimal {
     
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.BOWL) {
-            if (!player.isCreative()) {
-                player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-            }
-            player.getInventory().addItem(Item.get(Item.MUSHROOM_STEW, 0, 1));
-            this.level.addSoundToViewers(this, Sound.MOB_MOOSHROOM_SUSPICIOUS_MILK);
+        if (this.interacting || player.isSpectator()) {
             return false;
-        } else if (item.getId() == Item.BUCKET) {
-            if (!player.isCreative()) {
-                player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
+        }
+        if ((item.getId() == Item.BOWL || item.getId() == Item.BUCKET) && item.getDamage() == 0) {
+            if (this.isBaby()) {
+                return false;
             }
-            Item newBucket = Item.get(Item.BUCKET, 1, 1);
-            if (player.getInventory().getItemFast(player.getInventory().getHeldItemIndex()).count > 0) {
-                if (player.getInventory().canAddItem(newBucket)) {
-                    player.getInventory().addItem(newBucket);
+            boolean bowl = item.getId() == Item.BOWL;
+            int effect = this.getStewEffect();
+            Item result = bowl
+                    ? Item.get(this.isBrown() && effect >= 0 ? Item.SUSPICIOUS_STEW : Item.MUSHROOM_STEW,
+                    this.isBrown() && effect >= 0 ? effect : 0, 1)
+                    : Item.get(Item.BUCKET, 1, 1);
+            if (this.exchange(player, item, result)) {
+                if (bowl) {
+                    this.setStewEffect(NO_STEW_EFFECT);
+                    this.level.addSoundToViewers(this, Sound.MOB_MOOSHROOM_SUSPICIOUS_MILK);
                 } else {
-                    player.dropItem(newBucket);
+                    this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_MILK);
                 }
-            } else {
-                player.getInventory().setItemInHand(newBucket);
             }
-            this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_MILK);
+            // exchangeItemInHand already consumed the input; Player must not do so again.
             return false;
-        } else if (this.isBreedingItem(item) && !this.isBaby() && !this.isInLoveCooldown()) {
+        }
+        int flowerEffect = flowerStewEffect(item);
+        if (flowerEffect >= 0 && this.isBrown() && !this.isBaby()) {
+            if (flowerEffect != this.getStewEffect() && this.exchange(player, item, null)) {
+                this.setStewEffect(flowerEffect);
+                this.level.addSoundToViewers(this, Sound.MOB_MOOSHROOM_EAT);
+                this.level.addParticle(new SmokeParticle(this.add(0, 0.25, 0)));
+            }
+            return false;
+        }
+        if (this.isBreedingItem(item) && !this.isBaby() && !this.isInLoveCooldown()) {
             if (!player.isCreative()) {
                 player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             }
@@ -123,6 +144,7 @@ public class EntityMooshroom extends EntityWalkingAnimal {
     public void saveNBT() {
         super.saveNBT();
         this.namedTag.putInt("Variant", this.isBrown() ? 1 : 0);
+        this.namedTag.putInt("MarkVariant", this.isBrown() ? this.getStewEffect() : NO_STEW_EFFECT);
     }
 
     @Override
@@ -136,6 +158,67 @@ public class EntityMooshroom extends EntityWalkingAnimal {
     }
 
     public void setBrown(boolean brown) {
+        boolean changed = this.isBrown() != brown;
         this.setDataProperty(new IntEntityData(DATA_VARIANT, brown ? 1 : 0));
+        if (changed || !brown) {
+            this.setStewEffect(NO_STEW_EFFECT);
+        }
+    }
+
+    private int getStewEffect() {
+        int effect = this.getDataPropertyInt(DATA_MARK_VARIANT);
+        return effect >= 0 && effect <= MAX_STEW_EFFECT ? effect : NO_STEW_EFFECT;
+    }
+
+    private void setStewEffect(int effect) {
+        this.setDataProperty(new IntEntityData(DATA_MARK_VARIANT, effect));
+    }
+
+    private boolean exchange(Player player, Item item, Item result) {
+        if (this.closed || !this.isAlive() || player.getLevel() != this.level) {
+            return false;
+        }
+        boolean brown = this.isBrown();
+        int effect = this.getStewEffect();
+        var originalLevel = this.level;
+        this.interacting = true;
+        try {
+            return player.getInventory().exchangeItemInHand(item, result,
+                    player.isSurvival() || player.isAdventure(),
+                    () -> !this.closed && this.isAlive() && !this.isBaby()
+                            && this.level == originalLevel && player.getLevel() == originalLevel
+                            && this.isBrown() == brown && this.getStewEffect() == effect);
+        } finally {
+            this.interacting = false;
+        }
+    }
+
+    private static int flowerStewEffect(Item item) {
+        int blockId = item instanceof ItemBlock ? item.getBlock().getId() : item.getId();
+        if (blockId == BlockID.FLOWER) {
+            return switch (item.getDamage()) {
+                case BlockFlower.TYPE_POPPY -> 0;
+                case BlockFlower.TYPE_CORNFLOWER -> 1;
+                case BlockFlower.TYPE_RED_TULIP, BlockFlower.TYPE_ORANGE_TULIP,
+                        BlockFlower.TYPE_WHITE_TULIP, BlockFlower.TYPE_PINK_TULIP -> 2;
+                case BlockFlower.TYPE_AZURE_BLUET -> 3;
+                case BlockFlower.TYPE_LILY_OF_THE_VALLEY -> 4;
+                case BlockFlower.TYPE_BLUE_ORCHID -> 6;
+                case BlockFlower.TYPE_ALLIUM -> 7;
+                case BlockFlower.TYPE_OXEYE_DAISY -> 8;
+                default -> NO_STEW_EFFECT;
+            };
+        }
+        if (item.getDamage() != 0) {
+            return NO_STEW_EFFECT;
+        }
+        return switch (blockId) {
+            case BlockID.DANDELION -> 5;
+            case BlockID.WITHER_ROSE -> 9;
+            case BlockID.TORCHFLOWER -> 10;
+            case BlockID.OPEN_EYEBLOSSOM -> 11;
+            case BlockID.CLOSED_EYEBLOSSOM -> 12;
+            default -> NO_STEW_EFFECT;
+        };
     }
 }
