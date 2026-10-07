@@ -246,6 +246,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int closingWindowId = Integer.MIN_VALUE;
 
     public Vector3 speed = null;
+    /**
+     * Server tick at which {@link #speed} last took a real movement, and how many ticks that
+     * movement spanned. {@code speed} is only refreshed when a new position arrives, so without the
+     * tick a player who stopped would keep the speed of his last step.
+     */
+    private int speedSampleTick = -1;
+    private int speedSampleTicks = 1;
 
     public final HashSet<String> achievements = new HashSet<>();
 
@@ -446,6 +453,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public long lastSkinChange = -1;
     private double lastRightClickTime = 0.0;
     private long lastClickAirTime = 0;
+    /**
+     * Server tick of the last accepted spear jab ({@link InventoryTransactionPacket#USE_ITEM_ACTION_USE_AS_ATTACK}).
+     */
+    private int lastSpearJabTick = Integer.MIN_VALUE;
     private BlockVector3 lastRightClickPos = null;
     private final IntOpenHashSet processedItemStackRequestIds = new IntOpenHashSet();
     private int processedItemStackRequestTick = Integer.MIN_VALUE;
@@ -2750,6 +2761,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             } else {
                 this.speed.setComponents(from.x - to.x, from.y - to.y, from.z - to.z);
             }
+            this.speedSampleTick = this.server.getTick();
+            this.speedSampleTicks = Math.max(1, tickDiff);
 
             if (this.riding == null && this.inventory != null) {
                 if (this.isFoodEnabled() && distanceSquared >= 0.05 && this.getServer().getDifficulty() > 0) {
@@ -4369,8 +4382,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
+                        // A spear charge (minecraft:kinetic_weapon) is meant to be run with: it only
+                        // strikes above a closing speed, and the spear does not slow the player down.
                         if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
-                                this.isJavaClient(), authHoldToUse, authStartUsingItem)) {
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem)
+                                && !(this.inventory != null && this.inventory.getItemInHandFast().isSpear())) {
                             this.setUsingItem(false);
                         }
                     }
@@ -5833,6 +5849,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 }
                             }
                             break;
+                        case InventoryTransactionPacket.USE_ITEM_ACTION_USE_AS_ATTACK:
+                            // 1.21.110+ clients jab with a spear through the attack button: they send this
+                            // action and no USE_ITEM_ON_ENTITY attack, so without it the jab neither hit
+                            // anything nor wore the spear down.
+                            if (this.isSpectator() || !this.spawned || !this.isAlive()) {
+                                break;
+                            }
+                            item = this.inventory.getItemInHand();
+                            if (!(item instanceof ItemSpear spear)) {
+                                break;
+                            }
+                            if (useItemData.itemInHand == null || !item.equalsFast(useItemData.itemInHand)) {
+                                this.needSendHeldItem = true;
+                                break;
+                            }
+                            int jabTick = this.server.getTick();
+                            if (!isSpearJabReady(this.lastSpearJabTick, jabTick, spear.getJabCooldownTicks())) {
+                                break;
+                            }
+                            this.lastSpearJabTick = jabTick;
+                            spear.onJab(this);
+                            break;
                         default:
                             break;
                     }
@@ -6720,6 +6758,39 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         return end;
     }
+
+    /**
+     * Whether a spear jab arriving at {@code nowTick} may act. The client already waits for the
+     * spear's swing cool down before it sends the jab; the server only refuses jabs that come
+     * clearly faster than that, allowing a few ticks of network jitter.
+     */
+    static boolean isSpearJabReady(int lastJabTick, int nowTick, int coolDownTicks) {
+        if (lastJabTick == Integer.MIN_VALUE) {
+            return true;
+        }
+        return nowTick - lastJabTick >= Math.max(1, coolDownTicks - SPEAR_JAB_JITTER_TICKS);
+    }
+
+    private static final int SPEAR_JAB_JITTER_TICKS = 3;
+
+    /**
+     * Velocity of this player in blocks per tick from the last accepted movement, or zero when no
+     * movement came in the last {@value #RECENT_VELOCITY_TICKS} ticks (the player stands still).
+     */
+    public Vector3 getRecentVelocity() {
+        return recentVelocity(this.speed, this.speedSampleTick, this.speedSampleTicks, this.server.getTick());
+    }
+
+    static Vector3 recentVelocity(Vector3 speed, int sampleTick, int sampleTicks, int nowTick) {
+        if (speed == null || sampleTick < 0 || nowTick - sampleTick > RECENT_VELOCITY_TICKS) {
+            return new Vector3(0, 0, 0);
+        }
+        double ticks = Math.max(1, sampleTicks);
+        // speed holds from - to: the step backwards.
+        return new Vector3(-speed.x / ticks, -speed.y / ticks, -speed.z / ticks);
+    }
+
+    private static final int RECENT_VELOCITY_TICKS = 2;
 
     /**
      * 判断指定itemCategory的冷却是否已经结束
