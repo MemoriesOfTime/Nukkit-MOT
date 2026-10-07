@@ -11,6 +11,7 @@ import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
+import cn.nukkit.level.format.generic.serializer.ChunkRequestToken;
 import cn.nukkit.level.format.leveldb.serializer.*;
 import cn.nukkit.level.format.leveldb.structure.*;
 import cn.nukkit.level.generator.Generator;
@@ -539,6 +540,7 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         long timestamp = chunk.getChanges();
+        ChunkRequestToken token = new ChunkRequestToken(chunk);
 
         if (this.getServer().asyncChunkSending) {
             final BaseChunk chunkClone = chunk.cloneForChunkSending();
@@ -550,7 +552,7 @@ public class LevelDBProvider implements LevelProvider {
                                 chunkX,
                                 chunkZ,
                                 networkChunkSerializerCallback.getSubchunks(),
-                                networkChunkSerializerCallback.getStream().getBuffer()
+                                networkChunkSerializerCallback.getStream().getBuffer(), token
                         );
                     }, level.antiXrayEnabled(), getLevel().getDimensionData());
                 } catch (Throwable t) {
@@ -568,7 +570,7 @@ public class LevelDBProvider implements LevelProvider {
                             chunkX,
                             chunkZ,
                             networkChunkSerializerCallback.getSubchunks(),
-                            networkChunkSerializerCallback.getStream().getBuffer()
+                            networkChunkSerializerCallback.getStream().getBuffer(), token
                     );
                 }, level.antiXrayEnabled(), this.level.getDimensionData());
             } catch (Throwable t) {

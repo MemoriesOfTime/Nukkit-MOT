@@ -7,6 +7,7 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.BaseLevelProvider;
 import cn.nukkit.level.format.generic.BaseRegionLoader;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
+import cn.nukkit.level.format.generic.serializer.ChunkRequestToken;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -115,6 +116,7 @@ public class Anvil extends BaseLevelProvider {
         }
 
         long timestamp = chunk.getChanges();
+        ChunkRequestToken token = new ChunkRequestToken(chunk);
 
         if (this.getServer().asyncChunkSending) {
             final Chunk chunkClone = chunk.cloneForChunkSending();
@@ -126,7 +128,7 @@ public class Anvil extends BaseLevelProvider {
                                 x,
                                 z,
                                 networkChunkSerializerCallback.getSubchunks(),
-                                networkChunkSerializerCallback.getStream().getBuffer()
+                                networkChunkSerializerCallback.getStream().getBuffer(), token
                         );
                     }, level.antiXrayEnabled(), getLevel().getDimensionData());
                 } catch (Throwable t) {
@@ -144,7 +146,7 @@ public class Anvil extends BaseLevelProvider {
                             x,
                             z,
                             networkChunkSerializerCallback.getSubchunks(),
-                            networkChunkSerializerCallback.getStream().getBuffer()
+                            networkChunkSerializerCallback.getStream().getBuffer(), token
                     );
                 }, level.antiXrayEnabled(), this.level.getDimensionData());
             } catch (Throwable t) {

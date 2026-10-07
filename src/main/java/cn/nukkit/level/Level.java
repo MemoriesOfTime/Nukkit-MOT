@@ -41,6 +41,7 @@ import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
+import cn.nukkit.level.format.generic.serializer.ChunkRequestToken;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.level.generator.PopChunkManager;
 import cn.nukkit.level.generator.task.GenerationTask;
@@ -469,7 +470,10 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private ExecutorService asyncChunkLoadExecutor;
-    private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
+    private final Queue<ChunkRequestResult> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
+
+    private record ChunkRequestResult(NetworkChunkSerializer.NetworkChunkSerializerCallbackData data,
+                                      ChunkRequestToken token) { }
 
     // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
     // Posted to main thread to clear tasks (tasks isn't thread-safe; async worker can't touch it)
@@ -1412,10 +1416,12 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         if (this.server.asyncChunkSending) {
-            NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
+            ChunkRequestResult result;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
-            for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
-                this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
+            for (int i = 0; i < count && (result = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
+                var data = result.data();
+                this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(),
+                        data.getSubChunkCount(), data.getPayload(), result.token());
             }
         }
 
@@ -4515,7 +4521,14 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
-        this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp, x, z, subChunkCount, payload));
+        this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload, null);
+    }
+
+    public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z,
+                                          int subChunkCount, byte[] payload, ChunkRequestToken token) {
+        this.asyncChunkRequestCallbackQueue.add(new ChunkRequestResult(
+                new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp,
+                        x, z, subChunkCount, payload), token));
     }
 
     /**
@@ -4533,12 +4546,19 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
+        // The legacy dirty counter cannot validate source identity or survive save resets.
+        // Keep delivering legacy provider payloads, without publishing an unverifiable cache.
+        this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload, null);
+    }
+
+    public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z,
+                                     int subChunkCount, byte[] payload, ChunkRequestToken token) {
         long index = Level.chunkHash(x, z);
 
         if (server.cacheChunks) {
             BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunkIfLoaded(x, z);
-            if (chunk != null && chunk.getChanges() <= timestamp) {
+            if (token != null && token.matches(chunk)) {
                 chunk.setChunkPacket(protocol, data);
             }
             //this.sendChunk(x, z, index, data);
