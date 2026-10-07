@@ -79,6 +79,8 @@ public class FormWindowSimple extends FormWindow {
 
     @Override
     public void setResponse(int protocol, String data) {
+        this.response = null;
+        this.closed = false;
         if (data.equals("null")) {
             this.closed = true;
             return;
@@ -87,6 +89,9 @@ public class FormWindowSimple extends FormWindow {
         try {
             buttonID = Integer.parseInt(data);
         } catch (Exception e) {
+            return;
+        }
+        if (buttonID < 0) {
             return;
         }
         if (buttonID >= this.buttons.size()) {
