@@ -13,13 +13,10 @@ import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.event.vehicle.VehicleMoveEvent;
-import cn.nukkit.event.vehicle.VehicleUpdateEvent;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMinecart;
 import cn.nukkit.level.GameRule;
-import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -177,14 +174,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
 
         setRotation(yawToChange, pitch);
 
-        Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
-        Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
-
-        this.getServer().getPluginManager().callEvent(new VehicleUpdateEvent(this));
-
-        if (!from.equals(to)) {
-            this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
-        }
+        dispatchVehicleMovementEvents();
 
         // Collisions
         if (this instanceof InventoryHolder) {

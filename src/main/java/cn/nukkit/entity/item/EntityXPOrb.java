@@ -25,6 +25,8 @@ public class EntityXPOrb extends Entity {
     public Player closestPlayer = null;
     private int pickupDelay;
     private int exp;
+    private boolean targetSearchStarted;
+    private int nextTargetSearchTick;
 
     public EntityXPOrb(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -177,19 +179,7 @@ public class EntityXPOrb extends Entity {
                 hasUpdate = true;
             }*/
 
-            if (this.closestPlayer == null || this.closestPlayer.distanceSquared(this) > 64.0D) {
-                for (Player p : this.getViewers().values()) {
-                    if (p == this.closestPlayer) continue; // Current closestPlayer is null or too far away
-                    if (!p.isSpectator() && p.distanceSquared(this) <= 64) {
-                        this.closestPlayer = p;
-                        break;
-                    }
-                }
-            }
-
-            if (this.closestPlayer != null && (this.closestPlayer.isSpectator() || !this.closestPlayer.canPickupXP())) {
-                this.closestPlayer = null;
-            }
+            this.updateClosestPlayer(currentTick);
 
             if (this.closestPlayer != null) {
                 double dX = (this.closestPlayer.x - this.x) / 8.0D;
@@ -226,6 +216,34 @@ public class EntityXPOrb extends Entity {
         }
 
         return hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
+    }
+
+    /** Only target acquisition is staggered; invalidation and attraction remain per-tick. */
+    void updateClosestPlayer(int currentTick) {
+        if (this.closestPlayer != null && !this.canAttractPlayer(this.closestPlayer)) {
+            this.closestPlayer = null;
+        }
+        if (this.closestPlayer != null
+                || (this.targetSearchStarted && currentTick - this.nextTargetSearchTick < 0)) {
+            return;
+        }
+
+        this.targetSearchStarted = true;
+        // First search is immediate. Later searches align to this entity's two-tick phase;
+        // a deadline, rather than a modulo-only gate, also catches up after skipped ticks.
+        this.nextTargetSearchTick = currentTick + 2 - ((currentTick ^ (int) this.getId()) & 1);
+        for (Player player : this.getViewers().values()) {
+            if (this.canAttractPlayer(player)) {
+                this.closestPlayer = player;
+                break;
+            }
+        }
+    }
+
+    private boolean canAttractPlayer(Player player) {
+        return !player.closed && player.level == this.level && player.isAlive()
+                && !player.isSpectator() && player.canPickupXP()
+                && player.distanceSquared(this) <= 64.0D;
     }
 
     @Override
