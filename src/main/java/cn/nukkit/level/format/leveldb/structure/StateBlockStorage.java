@@ -560,6 +560,21 @@ public class StateBlockStorage {
         return false;
     }
 
+    /** Unused palette entries are harmless false positives; do not scan all 4096 cells. */
+    public boolean mayHaveRandomTickBlocks() {
+        // Large or long-lived palettes cost more to inspect than the usual three samples.
+        // Keep those on the existing path rather than trading three reads for a full scan.
+        if (this.palette.size() > 16) {
+            return true;
+        }
+        for (int i = 0; i < this.palette.size(); i++) {
+            if (Level.isRandomTickBlock(this.palette.get(i).getLegacyId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static int elementIndex(int x, int y, int z) {
         int index = (x << 8) | (z << 4) | y;
         if (index < 0 || index >= SUB_CHUNK_SIZE) {

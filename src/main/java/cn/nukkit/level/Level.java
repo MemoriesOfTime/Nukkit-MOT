@@ -1735,6 +1735,10 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    public static boolean isRandomTickBlock(int blockId) {
+        return blockId >= 0 && blockId < randomTickBlocks.length && randomTickBlocks[blockId];
+    }
+
     private void tickChunks() {
         if (this.chunksPerTicks <= 0 || this.loaders.isEmpty()) {
             this.chunkTickList.clear();
@@ -1798,7 +1802,7 @@ public class Level implements ChunkManager, Metadatable {
                 if (doRandomTick && randomTickSpeed > 0) {
                     if (this.useSections) {
                         for (ChunkSection section : ((Chunk) chunk).getSections()) {
-                            if (!(section instanceof EmptyChunkSection)) {
+                            if (!(section instanceof EmptyChunkSection) && section.mayHaveRandomTickBlocks()) {
                                 int Y = section.getY();
                                 for (int i = 0; i < randomTickSpeed; ++i) {
                                     int n = ThreadLocalRandom.current().nextInt();
@@ -1808,7 +1812,7 @@ public class Level implements ChunkManager, Metadatable {
 
                                     int fullBlock = section.getFullBlock(x, y, z);
                                     int blockId = fullBlock >> Block.DATA_BITS;
-                                    if (blockId >= 0 && blockId <= Block.MAX_BLOCK_ID && randomTickBlocks[blockId]) {
+                                    if (isRandomTickBlock(blockId)) {
                                         Block block = Block.get(fullBlock, this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
                                         block.onUpdate(BLOCK_UPDATE_RANDOM);
                                     }

@@ -96,6 +96,11 @@ public interface ChunkSection {
 
     boolean isEmpty();
 
+    /** False only when layer zero cannot contain a block selected by Level's random ticks. */
+    default boolean mayHaveRandomTickBlocks() {
+        return true;
+    }
+
     boolean hasLayer(int layer);
 
     @Deprecated
