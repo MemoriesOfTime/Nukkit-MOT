@@ -4019,6 +4019,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+        // The remaining switch only accepts unsigned-byte legacy packet IDs.
+        // Modern packets without a processor intentionally have no legacy pid().
+        if (pid > 0xff) {
+            return;
+        }
+
         byte pidOld;
         try {
             pidOld = packet.pid();
