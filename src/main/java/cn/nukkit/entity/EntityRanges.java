@@ -61,8 +61,17 @@ public class EntityRanges {
      * @return AxisAlignedBB
      */
     public static AxisAlignedBB createTargetSearchBox(Entity entity) {
-        int radius = getFollowRange(entity);
+        int radius = getTargetSearchRange(entity);
         return entity.boundingBox.clone().grow(radius, radius, radius);
+    }
+
+    /**
+     * Local candidate search is separate from retaining a known owner/target.
+     * Allay's vanilla 1024-block follow_range belongs to following its owner;
+     * its local pickup_items search has max_dist 32, not that navigation range.
+     */
+    public static int getTargetSearchRange(Entity entity) {
+        return entity instanceof EntityAllay ? 32 : getFollowRange(entity);
     }
 
     private static int getAttribute(Entity entity) {
