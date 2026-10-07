@@ -43,7 +43,7 @@ public class ClientboundTextureShiftPacket extends DataPacket {
         this.collectionName = this.getString();
         this.fromStep = this.getString();
         this.toStep = this.getString();
-        int count = (int) this.getUnsignedVarInt();
+        int count = this.getUnsignedVarIntCount("texture shift step count");
         this.allSteps = new String[count];
         for (int i = 0; i < count; i++) {
             this.allSteps[i] = this.getString();
