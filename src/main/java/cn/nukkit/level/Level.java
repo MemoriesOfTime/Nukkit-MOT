@@ -3447,34 +3447,39 @@ public class Level implements ChunkManager, Metadatable {
             int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
             int maxZ = NukkitMath.floorDouble((bb.getMaxZ() + 2) * 0.0625);
             ArrayList<Entity> overflow = null;
-            for (int x = minX; x <= maxX; ++x) {
-                for (int z = minZ; z <= maxZ; ++z) {
-                    for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
-                        if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
-                            if (index < ENTITY_BUFFER.length) {
-                                ENTITY_BUFFER[index] = ent;
-                            } else {
-                                if (overflow == null) overflow = new ArrayList<>(1024);
-                                overflow.add(ent);
+            try {
+                for (int x = minX; x <= maxX; ++x) {
+                    for (int z = minZ; z <= maxZ; ++z) {
+                        for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
+                            if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
+                                if (index < ENTITY_BUFFER.length) {
+                                    ENTITY_BUFFER[index] = ent;
+                                } else {
+                                    if (overflow == null) overflow = new ArrayList<>(1024);
+                                    overflow.add(ent);
+                                }
+                                index++;
                             }
-                            index++;
                         }
                     }
                 }
-            }
-            if (index == 0) return EMPTY_ENTITY_ARR;
-            Entity[] copy;
-            if (overflow == null) {
-                copy = Arrays.copyOfRange(ENTITY_BUFFER, 0, index);
-                Arrays.fill(ENTITY_BUFFER, 0, index, null);
-            } else {
-                copy = new Entity[ENTITY_BUFFER.length + overflow.size()];
-                System.arraycopy(ENTITY_BUFFER, 0, copy, 0, ENTITY_BUFFER.length);
-                for (int i = 0; i < overflow.size(); i++) {
-                    copy[ENTITY_BUFFER.length + i] = overflow.get(i);
+                if (index == 0) return EMPTY_ENTITY_ARR;
+                Entity[] copy;
+                if (overflow == null) {
+                    copy = Arrays.copyOfRange(ENTITY_BUFFER, 0, index);
+                } else {
+                    copy = new Entity[ENTITY_BUFFER.length + overflow.size()];
+                    System.arraycopy(ENTITY_BUFFER, 0, copy, 0, ENTITY_BUFFER.length);
+                    for (int i = 0; i < overflow.size(); i++) {
+                        copy[ENTITY_BUFFER.length + i] = overflow.get(i);
+                    }
                 }
+                return copy;
+            } finally {
+                // Clear the used prefix on overflow and on exceptional traversal too.
+                // Otherwise the static scratch array keeps Entity -> Level graphs alive.
+                Arrays.fill(ENTITY_BUFFER, 0, Math.min(index, ENTITY_BUFFER.length), null);
             }
-            return copy;
         } else {
             if (entity == null || entity.getLevel() != this) {
                 return new Entity[]{};
