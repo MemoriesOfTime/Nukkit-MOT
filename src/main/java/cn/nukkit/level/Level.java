@@ -4685,7 +4685,7 @@ public class Level implements ChunkManager, Metadatable {
         this.retryLegacyConnectionFixForNeighbours(x, z);
 
         if (!chunk.isLightPopulated() && chunk.isPopulated() && this.server.lightUpdates) {
-            this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new LightPopulationTask(this, chunk));
+            LightPopulationTask.schedule(this, chunk);
         }
 
         if (this.isChunkInUse(index)) {
@@ -5033,6 +5033,25 @@ public class Level implements ChunkManager, Metadatable {
 
     public boolean populateChunk(int x, int z) {
         return this.populateChunk(x, z, false);
+    }
+
+    /** Main-thread query: population also owns the eight neighbouring live chunks. */
+    public boolean isChunkGenerationPending(int x, int z) {
+        long index = chunkHash(x, z);
+        if (chunkPopulationLock.containsKey(index)) {
+            return true;
+        }
+        // Shared completion bookkeeping can clear population flags while a generation
+        // entry for its centre remains. Conservatively check both queues in the 3x3 area.
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                long centre = chunkHash(x + dx, z + dz);
+                if (chunkPopulationQueue.containsKey(centre) || chunkGenerationQueue.containsKey(centre)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public boolean populateChunk(int x, int z, boolean force) {
