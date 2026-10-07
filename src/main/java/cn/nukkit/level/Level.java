@@ -2466,22 +2466,31 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void updateBlockLight(Map<Long, Set<Integer>> map) {
-        int size = map.size();
-        if (size == 0) {
-            return;
+        // Snapshot only the work list. Detach each set under the producer's monitor,
+        // then release it before touching chunks. On failure, later chunks stay queued.
+        List<Long> pendingChunks;
+        synchronized (map) {
+            if (map.isEmpty()) {
+                return;
+            }
+            pendingChunks = new ArrayList<>(map.keySet());
         }
-        Queue<Long> lightPropagationQueue = new ConcurrentLinkedQueue<>();
-        Queue<Object[]> lightRemovalQueue = new ConcurrentLinkedQueue<>();
+        // These queues never escape this invocation; neither CAS nor boxed nodes are needed.
+        LongArrayFIFOQueue lightPropagationQueue = new LongArrayFIFOQueue();
+        LongArrayFIFOQueue lightRemovalQueue = new LongArrayFIFOQueue();
+        IntArrayFIFOQueue lightRemovalLevels = new IntArrayFIFOQueue();
         LongOpenHashSet visited = new LongOpenHashSet();
         LongOpenHashSet removalVisited = new LongOpenHashSet();
 
-        Iterator<Map.Entry<Long, Set<Integer>>> iter = map.entrySet().iterator();
-        while (iter.hasNext() && size-- > 0) {
-            Map.Entry<Long, Set<Integer>> entry = iter.next();
-            iter.remove();
-            long index = entry.getKey();
+        for (long index : pendingChunks) {
+            Set<Integer> blocks;
+            synchronized (map) {
+                blocks = map.remove(index);
+            }
+            if (blocks == null) {
+                continue;
+            }
             BaseFullChunk chunk = getChunk(getHashX(index), getHashZ(index), false);
-            Set<Integer> blocks = entry.getValue();
 
             for (int blockHash : blocks) {
                 Vector3 pos = getBlockXYZ(index, blockHash, this.getDimensionData());
@@ -2496,10 +2505,11 @@ public class Level implements ChunkManager, Metadatable {
                         long hash = Hash.hashBlock(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ());
                         if (newLevel < oldLevel) {
                             removalVisited.add(hash);
-                            lightRemovalQueue.add(new Object[]{hash, oldLevel});
+                            lightRemovalQueue.enqueue(hash);
+                            lightRemovalLevels.enqueue(oldLevel);
                         } else {
                             visited.add(hash);
-                            lightPropagationQueue.add(hash);
+                            lightPropagationQueue.enqueue(hash);
                         }
                     }
                 }
@@ -2507,24 +2517,23 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         while (!lightRemovalQueue.isEmpty()) {
-            Object[] val = lightRemovalQueue.poll();
-            long node = (long) val[0];
+            long node = lightRemovalQueue.dequeueLong();
             int x = Hash.hashBlockX(node);
             int y = Hash.hashBlockY(node);
             int z = Hash.hashBlockZ(node);
 
-            int lightLevel = (int) val[1];
+            int lightLevel = lightRemovalLevels.dequeueInt();
 
-            this.computeRemoveBlockLight(x - 1, y, z, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x + 1, y, z, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y - 1, z, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y + 1, z, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y, z - 1, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
-            this.computeRemoveBlockLight(x, y, z + 1, lightLevel, lightRemovalQueue, lightPropagationQueue, removalVisited, visited);
+            this.computeRemoveBlockLight(x - 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
+            this.computeRemoveBlockLight(x + 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
+            this.computeRemoveBlockLight(x, y - 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
+            this.computeRemoveBlockLight(x, y + 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
+            this.computeRemoveBlockLight(x, y, z - 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
+            this.computeRemoveBlockLight(x, y, z + 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited);
         }
 
         while (!lightPropagationQueue.isEmpty()) {
-            long node = lightPropagationQueue.poll();
+            long node = lightPropagationQueue.dequeueLong();
 
             int x = Hash.hashBlockX(node);
             int y = Hash.hashBlockY(node);
@@ -2545,8 +2554,8 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
-    private void computeRemoveBlockLight(int x, int y, int z, int currentLight, Queue<Object[]> queue,
-                                         Queue<Long> spreadQueue, Set<Long> visited, Set<Long> spreadVisited) {
+    private void computeRemoveBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue,
+                                         IntArrayFIFOQueue removalLevels, LongArrayFIFOQueue spreadQueue, Set<Long> visited, Set<Long> spreadVisited) {
         int current = this.getBlockLightAt(x, y, z);
         if (current != 0 && current < currentLight) {
             this.setBlockLightAt(x, y, z, 0);
@@ -2554,19 +2563,20 @@ public class Level implements ChunkManager, Metadatable {
                 long index = Hash.hashBlock(x, y, z);
                 if (!visited.contains(index)) {
                     visited.add(index);
-                    queue.add(new Object[]{index, current});
+                    queue.enqueue(index);
+                    removalLevels.enqueue(current);
                 }
             }
         } else if (current >= currentLight) {
             long index = Hash.hashBlock(x, y, z);
             if (!spreadVisited.contains(index)) {
                 spreadVisited.add(index);
-                spreadQueue.add(index);
+                spreadQueue.enqueue(index);
             }
         }
     }
 
-    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, Queue<Long> queue, Set<Long> visited) {
+    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue, Set<Long> visited) {
         int current = this.getBlockLightAt(x, y, z);
         if (current < currentLight - 1) {
             this.setBlockLightAt(x, y, z, currentLight);
@@ -2575,7 +2585,7 @@ public class Level implements ChunkManager, Metadatable {
             if (!visited.contains(index)) {
                 visited.add(index);
                 if (currentLight > 1) {
-                    queue.add(index);
+                    queue.enqueue(index);
                 }
             }
         }
@@ -2583,8 +2593,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public void addLightUpdate(int x, int y, int z) {
         long index = chunkHash(x >> 4, z >> 4);
-        Set<Integer> currentMap = this.lightQueue.computeIfAbsent(index, k -> ConcurrentHashMap.newKeySet(8));
-        currentMap.add(Level.localBlockHash(x, y, z, this.getDimensionData()));
+        synchronized (this.lightQueue) {
+            Set<Integer> currentMap = this.lightQueue.computeIfAbsent(index, k -> ConcurrentHashMap.newKeySet(8));
+            currentMap.add(Level.localBlockHash(x, y, z, this.getDimensionData()));
+        }
     }
 
     @Override
