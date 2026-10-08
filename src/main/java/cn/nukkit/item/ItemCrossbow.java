@@ -26,7 +26,12 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class ItemCrossbow extends ItemBow {
 
-    private static final float ARROW_POWER = 3.15f;
+    /**
+     * Launch speed of a crossbow arrow in blocks per tick, vanilla {@code minecraft:player_crossbow_arrow}
+     * ({@code power 3.15}). It is the only multiplier of the unit direction: applied twice, it
+     * launched arrows at 11 blocks per tick and tripled their damage.
+     */
+    static final double ARROW_POWER = 3.15;
     private static final float MULTISHOT_ANGLE_DELTA = 10;
 
     private int loadTick = 0; //TODO Improve this
@@ -171,12 +176,14 @@ public class ItemCrossbow extends ItemBow {
                     float angleOffset = launchCount == 1 ? 0 : i * MULTISHOT_ANGLE_DELTA - MULTISHOT_ANGLE_DELTA;
                     Vector3 dir = aimDir.yRot(angleOffset * NukkitMath.DEG_TO_RAD)
                             .add(0.0075 * random.nextGaussian(), 0.0075 * random.nextGaussian(), 0.0075 * random.nextGaussian());
-                    CompoundTag nbt = Entity.getDefaultNBT(pos, dir.multiply(ARROW_POWER), (float) dir.yRotFromDirection(), (float) dir.xRotFromDirection())
+                    CompoundTag nbt = Entity.getDefaultNBT(pos, dir, (float) dir.yRotFromDirection(), (float) dir.xRotFromDirection())
                             .putByte("PierceLevel", penetrationLevel)
                             .putByte("auxValue", chargedItem.getDamage())
                             .putCompound("item", itemTag);
 
-                    EntityArrow arrow = new EntityArrow(player.chunk, nbt, player, false);
+                    // Crossbow arrows are always critical, as in vanilla (Java CrossbowItem) and on
+                    // EaseCation, PowerNukkitX and Allay.
+                    EntityArrow arrow = new EntityArrow(player.chunk, nbt, player, true);
                     arrow.piercing = penetrationLevel;
                     if (launchCount > 1 && i != 1) {
                         arrow.setPickupMode(EntityArrow.PICKUP_NONE);
@@ -190,7 +197,7 @@ public class ItemCrossbow extends ItemBow {
                         }
                     }
 
-                    EntityShootBowEvent entityShootBowEvent = new EntityShootBowEvent(player, this, arrow, 3.5);
+                    EntityShootBowEvent entityShootBowEvent = new EntityShootBowEvent(player, this, arrow, ARROW_POWER);
                     Server.getInstance().getPluginManager().callEvent(entityShootBowEvent);
                     if (entityShootBowEvent.isCancelled()) {
                         entityShootBowEvent.getProjectile().close();
