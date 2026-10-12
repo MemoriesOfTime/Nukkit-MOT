@@ -251,10 +251,18 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
     @Override
     public void setBlockSkyLight(int x, int y, int z, int level) {
         int Y = y >> 4;
+        boolean emptyFallbackEntered = false;
         try {
-            this.getSection(Y).setBlockSkyLight(x, y & 0x0f, z, level);
+            ChunkSection section = this.getSection(Y);
+            if (section != null && section.getClass() == EmptyChunkSection.class && level != 15) {
+                emptyFallbackEntered = true;
+                this.materializeSectionIfEmpty(Y);
+                section = this.getSection(Y);
+            }
+            section.setBlockSkyLight(x, y & 0x0f, z, level);
             setChanged();
         } catch (ChunkException e) {
+            if (emptyFallbackEntered) throw e;
             this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockSkyLight(x, y & 0x0f, z, level);
             setChanged();
@@ -269,10 +277,18 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
     @Override
     public void setBlockLight(int x, int y, int z, int level) {
         int Y = y >> 4;
+        boolean emptyFallbackEntered = false;
         try {
-            this.getSection(Y).setBlockLight(x, y & 0x0f, z, level);
+            ChunkSection section = this.getSection(Y);
+            if (section != null && section.getClass() == EmptyChunkSection.class && level != 0) {
+                emptyFallbackEntered = true;
+                this.materializeSectionIfEmpty(Y);
+                section = this.getSection(Y);
+            }
+            section.setBlockLight(x, y & 0x0f, z, level);
             setChanged();
         } catch (ChunkException e) {
+            if (emptyFallbackEntered) throw e;
             this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockLight(x, y & 0x0f, z, level);
             setChanged();
