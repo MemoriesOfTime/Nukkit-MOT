@@ -59,7 +59,7 @@ public class ItemFirework extends Item {
     @Override
     public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
         if (block.canPassThrough()) {
-            this.spawnFirework(level, block);
+            this.spawnFirework(level, block, null, player);
 
             if (!player.isCreative()) {
                 player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
