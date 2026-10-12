@@ -573,6 +573,18 @@ public class LevelDBProvider implements LevelProvider {
         }
     }
 
+    @Override
+    public long[] getLoadedChunkHashes() {
+        synchronized (this.chunks) {
+            return this.chunks.keySet().toLongArray();
+        }
+    }
+
+    @Override
+    public int getLoadedChunkCount() {
+        return this.chunks.size();
+    }
+
     public Long2ObjectMap<? extends FullChunk> getLoadedChunksUnsafe() {
         return chunks;
     }
