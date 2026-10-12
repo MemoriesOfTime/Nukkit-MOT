@@ -120,7 +120,9 @@ public class BlockCoralBlock extends BlockSolidMeta {
             if (item.getEnchantment(Enchantment.ID_SILK_TOUCH) != null) {
                 return new Item[]{this.toItem() };
             } else {
-                return new Item[]{ new ItemBlock(this.clone(), this.getDamage() | 0x8) };
+                BlockCoralBlock dead = (BlockCoralBlock) this.clone();
+                dead.setDead(true);
+                return new Item[]{dead.toItem()};
             }
         } else {
             return Item.EMPTY_ARRAY;
