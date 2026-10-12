@@ -37,7 +37,6 @@ import org.cloudburstmc.netty.handler.codec.raknet.common.RakSessionCodec;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
@@ -229,16 +228,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                 return;
             }
 
-            InetAddress malformedAddress = this.channel.remoteAddress().getAddress();
-            boolean blockMalformedAddress = shouldBlockAddressAfterMalformed(
-                    this.state.getLogin().getPhase(), malformedAddress);
+            // A decoder failure is evidence about this session, not other users at its address.
             this.disconnect("Sent malformed packet");
             Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
                 try {
                     this.channel.close();
-                    if (blockMalformedAddress) {
-                        this.server.blockAddress(malformedAddress, 60);
-                    }
                 } catch (Throwable throwable) {
                     if (Nukkit.DEBUG > 1) {
                         log.info("Error while closing channel", throwable);
@@ -1006,13 +1000,6 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         Object[] withCause = Arrays.copyOf(arguments, arguments.length + 1);
         withCause[arguments.length] = failure == null ? "unknown" : failure.toString();
         log.warn(message + ", cause={}", withCause);
-    }
-
-    static boolean shouldBlockAddressAfterMalformed(SessionLoginPhase phase, InetAddress address) {
-        return address != null
-                && !address.isSiteLocalAddress()
-                && phase.ordinal() >= SessionLoginPhase.LOGIN_RECEIVED.ordinal()
-                && phase.ordinal() < SessionLoginPhase.LOGGED_IN.ordinal();
     }
 
     record InboundBatchDecodeResult(boolean success, CompressionProvider compression, boolean prefixed,

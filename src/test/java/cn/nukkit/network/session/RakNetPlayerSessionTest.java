@@ -314,17 +314,6 @@ class RakNetPlayerSessionTest {
     }
 
     @Test
-    void malformedPreLoginPacketsDoNotTriggerIpBlock() throws Exception {
-        InetAddress address = InetAddress.getByName("1.2.3.4");
-        assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.CONNECTED, address));
-        assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED, address));
-        assertTrue(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.LOGIN_RECEIVED, address));
-        assertTrue(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.RESOURCE_PACK, address));
-        assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.LOGGED_IN, address));
-        assertFalse(RakNetPlayerSession.shouldBlockAddressAfterMalformed(SessionLoginPhase.DISCONNECTED, address));
-    }
-
-    @Test
     void serverTickDefersInboundTailWithoutDroppingPackets() {
         SessionFixture fixture = createSession(false);
         int burst = RakNetPlayerSession.MAX_INBOUND_PACKETS_PER_SERVER_TICK + 44;
@@ -500,16 +489,16 @@ class RakNetPlayerSessionTest {
     }
 
     @Test
-    void delayedMalformedLoginCloseUsesOriginalPhaseAndAddress() throws Exception {
-        assertMalformedLoginPolicy(SessionLoginPhase.RESOURCE_PACK, true);
+    void delayedMalformedLoginClosesOnlyTheSession() throws Exception {
+        assertMalformedLoginPolicy(SessionLoginPhase.RESOURCE_PACK);
     }
 
     @Test
     void delayedMalformedNegotiationCloseDoesNotBlockAnAddress() throws Exception {
-        assertMalformedLoginPolicy(SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED, false);
+        assertMalformedLoginPolicy(SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED);
     }
 
-    private static void assertMalformedLoginPolicy(SessionLoginPhase phase, boolean expectedBlock) throws Exception {
+    private static void assertMalformedLoginPolicy(SessionLoginPhase phase) throws Exception {
         RakNetInterface networkInterface = mock(RakNetInterface.class, RETURNS_DEEP_STUBS);
         when(networkInterface.getNetwork()).thenReturn(network);
         SessionFixture fixture = createSession(networkInterface, false, true, true);
@@ -530,7 +519,7 @@ class RakNetPlayerSessionTest {
         callback.getValue().run();
 
         verify(fixture.channel).close();
-        verify(networkInterface, times(expectedBlock ? 1 : 0)).blockAddress(originalAddress, 60);
+        verify(networkInterface, never()).blockAddress(any(InetAddress.class), anyInt());
         verify(fixture.channel, never()).unsafe();
     }
 
