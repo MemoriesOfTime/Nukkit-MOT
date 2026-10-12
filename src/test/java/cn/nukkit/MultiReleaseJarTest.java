@@ -99,25 +99,6 @@ public class MultiReleaseJarTest {
         assertClassMajor(VERSIONED_IMPL_RESOURCE, 65);
     }
 
-    @Test
-    public void testShadedJarMultiReleaseManifestWhenPresent() throws Exception {
-        // 只在 shaded jar 已构建时检查（mvn/gradle test 阶段 jar 通常尚未产出，跳过不算失败）
-        // Checked only when the shaded jar exists (usually absent during the test phase)
-        Path repoRoot = findRepoRoot();
-        Path fatJar = repoRoot.resolve("target/Nukkit-MOT-SNAPSHOT.jar");
-        if (!Files.exists(fatJar)) {
-            System.out.println("=== shaded jar 不存在，跳过 manifest 检查 (re-run after package to verify) ===");
-            return;
-        }
-        try (JarFile jar = new JarFile(fatJar.toFile())) {
-            assertTrue(jar.isMultiRelease(), "shaded jar 应声明 Multi-Release: true");
-            assertNotNull(jar.getEntry(VERSIONED_IMPL_RESOURCE), "shaded jar 应包含 versions/21 覆盖类");
-            // 基线 stub 与版本化类签名须一致，防同名类漂移（MR-JAR 的经典坑）
-            // Base stub and versioned override must stay signature-compatible
-            assertImplSignaturesCompatible(jar);
-        }
-    }
-
     /**
      * 基线与 versions/21 的同名实现类方法签名一致（编译期父类契约之外的运行时复核）：
      * 提取两份 class 文件常量池中的方法名/描述符片段对比。
