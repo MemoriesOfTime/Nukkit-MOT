@@ -34,6 +34,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 import lombok.SneakyThrows;
 import org.cloudburstmc.nbt.NBTOutputStream;
@@ -1397,7 +1398,8 @@ public class BinaryStream {
 
         this.putVarInt(getBlockRuntimeId(gameVersion, item));
 
-        ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+        // Invocation-owned heap scratch; only its bytes are copied into the packet.
+        ByteBuf userDataBuf = Unpooled.buffer(64);
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable) {
                 byte[] nbt = item.getCompoundTag();
@@ -1554,7 +1556,8 @@ public class BinaryStream {
             return;
         }
 
-        ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+        // Keep the same little-endian writer without per-item native allocations.
+        ByteBuf userDataBuf = Unpooled.buffer(64);
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable && runtimeEntry != null && !runtimeEntry.isHasDamage()) {
                 byte[] nbt = item.getCompoundTag();
