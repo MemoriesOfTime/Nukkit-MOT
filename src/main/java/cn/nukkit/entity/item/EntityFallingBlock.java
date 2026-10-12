@@ -247,8 +247,17 @@ public class EntityFallingBlock extends Entity {
                     EntityBlockChangeEvent event = new EntityBlockChangeEvent(this, landingBlock, Block.get(blockId, damage));
                     this.server.getPluginManager().callEvent(event);
                     if (!event.isCancelled()) {
-                        this.level.setBlock(landingBlock, event.getTo(), true, true);
-                        this.level.scheduleUpdate(this.level.getBlock(landingBlock), 1);
+                        // Choose one output from the final landing target: a shattered
+                        // stalactite item or one placed block (Cloudburst/Petteri's split).
+                        Block settledBlock = event.getTo();
+                        if (settledBlock.getId() == BlockID.POINTED_DRIPSTONE) {
+                            if (this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
+                                this.level.dropItem(this, settledBlock.toItem());
+                            }
+                        } else {
+                            this.level.setBlock(landingBlock, settledBlock, true, true);
+                            this.level.scheduleUpdate(this.level.getBlock(landingBlock), 1);
+                        }
 
                         // Relocate overlapping falling blocks upward to avoid repeated landing in the same position
                         AxisAlignedBB bb = this.getBoundingBox();
@@ -258,8 +267,6 @@ public class EntityFallingBlock extends Entity {
                         if (event.getTo().getId() == Item.ANVIL || blockId == Item.POINTED_DRIPSTONE) {
                             if (blockId == Item.ANVIL) {
                                 this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_ANVIL_FALL);
-                            } else {
-                                this.getLevel().dropItem(this, Block.get(blockId, event.getTo().getDamage()).toItem());
                             }
 
                             List<Entity> e = CollisionHelper.getCollidingEntities(this.level, this.getBoundingBox(), this);
