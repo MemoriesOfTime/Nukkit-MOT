@@ -85,10 +85,17 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         // server-validated below. Never expose a null primary output to listeners.
         Item recipeResult = recipe instanceof MultiRecipe ? null : recipe.getResult();
         if (recipeResult != null) {
-            if (recipe instanceof UserDataShapelessRecipe) {
-                applyInputNbt(recipeResult, collectCraftingInputList(player));
+            List<Item> consumedItems = CraftRecipeAutoProcessor.collectConsumedItems(player,
+                    CraftRecipeAutoProcessor.findAllConsumeActions(context.getItemStackRequest().getActions(),
+                            context.getCurrentActionIndex() + 1));
+            if (consumedItems == null) {
+                return context.error();
             }
-            recipeResult = fireCraftItemEvent(player, recipe, recipeResult);
+            if (recipe instanceof UserDataShapelessRecipe) {
+                applyInputNbt(recipeResult, consumedItems);
+            }
+            recipeResult = fireCraftItemEvent(player, recipe, recipeResult, consumedItems,
+                    Math.max(1, action.getNumberOfRequestedCrafts()));
             if (recipeResult == null) {
                 return context.error();
             }
@@ -287,6 +294,31 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         }
         Item eventOutput = snapshot.getPrimaryOutput();
         return eventOutput == null || eventOutput.isNull() ? null : eventOutput.clone();
+    }
+
+    /** Actual consumed stacks and the batch result form one event snapshot; callers scale only once. */
+    static Item fireCraftItemEvent(Player player, Recipe recipe, Item output, List<Item> consumedItems, int times) {
+        if (output == null || output.isNull()) {
+            return null;
+        }
+        Item batchOutput = output.clone();
+        batchOutput.setCount(output.getCount() * times);
+        CraftingTransaction snapshot = new ItemStackRequestCraftingTransaction(
+                player, consumedItems, batchOutput, recipe);
+        CraftItemEvent craftEvent = new CraftItemEvent(snapshot);
+        Server.getInstance().getPluginManager().callEvent(craftEvent);
+        if (craftEvent.isCancelled()) {
+            return null;
+        }
+        Item eventOutput = snapshot.getPrimaryOutput();
+        if (eventOutput == null || eventOutput.isNull()
+                || eventOutput.getCount() != batchOutput.getCount()
+                || !eventOutput.equals(output, true, false)) {
+            return null;
+        }
+        Item result = eventOutput.clone();
+        result.setCount(output.getCount());
+        return result;
     }
 
     private ActionResponse handleTrade(CraftRecipeAction action, Player player, ItemStackRequestContext context) {

@@ -1,9 +1,7 @@
 package cn.nukkit.inventory.request;
 
 import cn.nukkit.Player;
-import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
-import cn.nukkit.inventory.transaction.ItemStackRequestCraftingTransaction;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
@@ -46,20 +44,7 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         if (ingredients == null) {
             ingredients = List.of();
         }
-        List<Item> eventItems = ingredients.stream()
-                .map(CraftRecipeAutoProcessor::toEventItem)
-                .filter(item -> item != null && !item.isNull())
-                .toList();
-
-        // 只读快照使 getTransaction() 与旧版路径一致
-        // Read-only snapshot so getTransaction() matches the legacy path
         Item recipeResult = recipe instanceof MultiRecipe ? null : recipe.getResult();
-        CraftItemEvent craftItemEvent = new CraftItemEvent(new ItemStackRequestCraftingTransaction(
-                player, eventItems, recipeResult, recipe));
-        player.getServer().getPluginManager().callEvent(craftItemEvent);
-        if (craftItemEvent.isCancelled()) {
-            return context.error();
-        }
 
         context.put(CraftRecipeActionProcessor.RECIPE_NET_ID_KEY, action.getRecipeNetworkId());
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
@@ -97,6 +82,12 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
                     || !validateAutoCraftingRecipe(player, multiRecipe, output, 1, consumedItems)) {
                 return context.error();
             }
+            Item authoritativeOutput = CraftRecipeActionProcessor.fireCraftItemEvent(
+                    player, recipe, output, consumedItems, 1);
+            if (authoritativeOutput == null) {
+                return context.error();
+            }
+            context.put(CraftRecipeActionProcessor.EVENT_AUTHORED_MULTI_OUTPUT_KEY, authoritativeOutput);
             context.put(CraftResultDeprecatedActionProcessor.MULTI_RESULTS_KEY, List.of(resultsAction.getResultItems()));
             return context.success();
         }
@@ -109,6 +100,14 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         if (!validateAutoCraftingRecipe(player, recipe, recipeResult, times, consumedItems)) {
             return context.error();
         }
+        if (recipe instanceof UserDataShapelessRecipe) {
+            CraftRecipeActionProcessor.applyInputNbt(recipeResult, consumedItems);
+        }
+        recipeResult = CraftRecipeActionProcessor.fireCraftItemEvent(
+                player, recipe, recipeResult, consumedItems, times);
+        if (recipeResult == null) {
+            return context.error();
+        }
 
         if (recipe instanceof CraftingRecipe multiOutput && !multiOutput.getExtraResults().isEmpty()) {
             if (times != 1) {
@@ -116,17 +115,17 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
                         player.getName(), times);
                 return context.error();
             }
-            context.put(CreateActionProcessor.RECIPE_OUTPUTS_KEY,
-                    CraftRecipeActionProcessor.scaleItems(multiOutput.getAllResults(), times));
+            List<Item> outputs = CraftRecipeActionProcessor.scaleItems(multiOutput.getAllResults(), times);
+            Item authoritativePrimary = recipeResult.clone();
+            authoritativePrimary.setCount(authoritativePrimary.getCount() * times);
+            outputs.set(0, authoritativePrimary);
+            context.put(CreateActionProcessor.RECIPE_OUTPUTS_KEY, outputs);
             context.put(CreateActionProcessor.CREATED_SLOTS_KEY, new HashSet<>());
             return context.success();
         }
 
         Item output = recipeResult.clone();
         output.setCount(output.getCount() * times);
-        if (recipe instanceof UserDataShapelessRecipe) {
-            CraftRecipeActionProcessor.applyInputNbt(output, consumedItems);
-        }
         output.autoAssignStackNetworkId();
         player.getUIInventory().setItem(PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT, output, false);
 
@@ -163,18 +162,7 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         return null;
     }
 
-    private static Item toEventItem(ItemDescriptorWithCount ingredient) {
-        if (ingredient == null || ingredient.getDescriptor() == null) {
-            return Item.get(Item.AIR);
-        }
-        Item item = ingredient.getDescriptor().toItem();
-        if (item != null && !item.isNull() && ingredient.getCount() > 0) {
-            item.setCount(ingredient.getCount());
-        }
-        return item;
-    }
-
-    private static List<Item> collectConsumedItems(Player player, List<ConsumeAction> consumeActions) {
+    static List<Item> collectConsumedItems(Player player, List<ConsumeAction> consumeActions) {
         List<Item> actual = new ArrayList<>();
         for (ConsumeAction consume : consumeActions) {
             if (consume.getCount() <= 0) {
