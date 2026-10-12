@@ -2,22 +2,25 @@ package cn.nukkit.entity;
 
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
-import cn.nukkit.entity.mob.EntityEnderman;
-import cn.nukkit.entity.mob.EntityZombie;
-import cn.nukkit.entity.passive.EntityAllay;
-import cn.nukkit.entity.passive.EntityCow;
-import cn.nukkit.entity.passive.EntityVillager;
+import cn.nukkit.entity.mob.*;
+import cn.nukkit.entity.passive.*;
+import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -36,26 +39,89 @@ class LocalTargetSearchRangeTest {
         AxisAlignedBB box = EntityRanges.createTargetSearchBox(allay);
         assertEquals(-32, box.getMinX());
         assertEquals(32.6, box.getMaxX());
-        assertEquals(32, EntityRanges.getTargetSearchRange(mock(EntityZombie.class)));
-        assertEquals(64, EntityRanges.getTargetSearchRange(mock(EntityEnderman.class)));
+        assertEquals(10, EntityRanges.getTargetSearchRange(mock(EntityZombie.class)));
+        assertEquals(32, EntityRanges.getTargetSearchRange(mock(EntityEnderman.class)));
         assertEquals(10, EntityRanges.getTargetSearchRange(mock(EntityCow.class)));
-        assertEquals(128, EntityRanges.getTargetSearchRange(mock(EntityVillager.class)));
+        assertEquals(10, EntityRanges.getTargetSearchRange(mock(EntityVillager.class)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("nativeWalkingRanges")
+    void nativeLocalRangesCoverTheirEntireKnownPredicate(Class<? extends EntityWalking> type, int range) {
+        assertEquals(range, EntityRanges.getTargetSearchRange(mock(type)));
+    }
+
+    static Stream<Arguments> nativeWalkingRanges() {
+        return Stream.of(
+                Arguments.of(EntityZombie.class, 10), Arguments.of(EntityCreeper.class, 10),
+                Arguments.of(EntityEnderman.class, 32), Arguments.of(EntityWitch.class, 16),
+                Arguments.of(EntityWolf.class, 16), Arguments.of(EntityCow.class, 10),
+                Arguments.of(EntityVillager.class, 10), Arguments.of(EntityVillagerV2.class, 10),
+                Arguments.of(EntityPig.class, 10), Arguments.of(EntitySheep.class, 10),
+                Arguments.of(EntityMooshroom.class, 10), Arguments.of(EntityPolarBear.class, 10),
+                Arguments.of(EntityIronGolem.class, 10), Arguments.of(EntityLlama.class, 10),
+                Arguments.of(EntityHorse.class, 10), Arguments.of(EntityDonkey.class, 10),
+                Arguments.of(EntityMule.class, 7), Arguments.of(EntitySkeletonHorse.class, 0),
+                Arguments.of(EntityZombieHorse.class, 0), Arguments.of(EntitySpider.class, 10),
+                Arguments.of(EntityZombiePigman.class, 10), Arguments.of(EntitySkeleton.class, 16),
+                Arguments.of(EntityStray.class, 16), Arguments.of(EntityBogged.class, 16),
+                Arguments.of(EntityPillager.class, 64), Arguments.of(EntityPiglin.class, 16),
+                Arguments.of(EntityRabbit.class, 10));
+    }
+
+    @ParameterizedTest
+    @MethodSource("rejectedCandidateStateRanges")
+    void rejectedCandidateStillPerformsLegacyMetadataAndStayTimeReset(Class<? extends EntityWalking> type, int range) throws Exception {
+        Fixture f = new Fixture(0, 0, type);
+        Class<?> declaration = type.getMethod("targetOption", EntityCreature.class, double.class).getDeclaringClass();
+        field(f.walker, declaration, "angryFlagSet", true);
+        if (f.walker instanceof EntityPiglin piglin) { when(piglin.isAngry()).thenReturn(true); }
+        Player rejected = mock(Player.class);
+        rejected.x = 15;
+        rejected.y = 64;
+        rejected.spawned = true;
+        when(rejected.isAlive()).thenReturn(true);
+        when(rejected.isSurvival()).thenReturn(true);
+        when(f.level.getNearbyEntities(any(), same(f.walker), eq(false), eq(true))).thenReturn(new Entity[]{rejected});
+        doCallRealMethod().when(f.walker).targetOption(any(), anyDouble());
+        assertEquals(range, EntityRanges.getTargetSearchRange(f.walker), "rejection effects need the legacy candidate set");
+        f.scan();
+        assertNull(f.walker.followTarget);
+        assertEquals(100, f.walker.stayTime);
+        verify(f.walker).targetOption(rejected, 225);
+        Field flag = declaration.getDeclaredField("angryFlagSet");
+        flag.setAccessible(true);
+        assertFalse(flag.getBoolean(f.walker));
+    }
+
+    static Stream<Arguments> rejectedCandidateStateRanges() {
+        return Stream.of(Arguments.of(EntitySkeleton.class, 16), Arguments.of(EntityStray.class, 16),
+                Arguments.of(EntityBogged.class, 16), Arguments.of(EntityPillager.class, 64), Arguments.of(EntityPiglin.class, 16));
     }
 
     @Test
-    void cachedCandidatesOutsideRangeNeverReachTargetOption() throws Exception {
-        Fixture f = new Fixture(0, 0);
-        EntityCreature edge = creature(16, 0);
-        EntityCreature outside = creature(16.01, 0);
-        EntityCreature diagonal = creature(12, 12);
-        when(f.level.getNearbyEntities(any(), same(f.walker), eq(false), eq(true)))
-                .thenReturn(new Entity[]{edge, outside, diagonal});
-        when(f.walker.targetOption(edge, 256)).thenReturn(true);
+    void unknownOverrideKeepsItsExistingFiniteCuboid() {
+        EntityVillager custom = mock(CustomVillager.class);
+        custom.boundingBox = new SimpleAxisAlignedBB(0, 64, 0, 0.6, 65.8, 0.6);
+        assertEquals(128, EntityRanges.getFollowRange(custom));
+        assertEquals(128, EntityRanges.getTargetSearchRange(custom));
+        assertEquals(-128, EntityRanges.createTargetSearchBox(custom).getMinX());
+    }
+
+    @Test
+    void rawHorseBaseKeepsLegacyCuboidAndDiagonalCandidateAcceptance() throws Exception {
+        Fixture f = new Fixture(0, 0, EntityHorseBase.class);
+        Player player = mock(Player.class);
+        player.x = 15;
+        player.y = 64;
+        player.z = 15;
+        when(player.canBeFollowed()).thenReturn(true);
+        doCallRealMethod().when(f.walker).canTarget(any());
+        doCallRealMethod().when(f.walker).targetOption(any(), anyDouble());
+        when(f.level.getNearbyEntities(any(), same(f.walker), eq(false), eq(true))).thenReturn(new Entity[]{player});
+        assertEquals(16, EntityRanges.getTargetSearchRange(f.walker));
         f.scan();
-        assertSame(edge, f.walker.followTarget);
-        verify(f.walker).targetOption(edge, 256);
-        verify(f.walker, never()).targetOption(same(outside), anyDouble());
-        verify(f.walker, never()).targetOption(same(diagonal), anyDouble());
+        assertSame(player, f.walker.followTarget, "no new sphere guard cuts an unknown/unbounded predicate");
     }
 
     @Test
@@ -67,7 +133,7 @@ class LocalTargetSearchRangeTest {
         when(player.isSurvival()).thenReturn(true);
         assertTrue(zombie.targetOption(player, 100));
         assertFalse(zombie.targetOption(player, 100.01));
-        assertEquals(32, EntityRanges.getTargetSearchRange(zombie), "broad phase does not narrow existing aggro");
+        assertEquals(10, EntityRanges.getTargetSearchRange(zombie), "broad phase covers existing aggro");
     }
 
     @Test
@@ -80,7 +146,7 @@ class LocalTargetSearchRangeTest {
         when(player.isAdventure()).thenReturn(true);
         assertTrue(enderman.targetOption(player, 1024));
         assertFalse(enderman.targetOption(player, 1024.01));
-        assertEquals(64, EntityRanges.getTargetSearchRange(enderman));
+        assertEquals(32, EntityRanges.getTargetSearchRange(enderman));
     }
 
     @Test
@@ -203,11 +269,26 @@ class LocalTargetSearchRangeTest {
         field.set(owner, value);
     }
 
+    private abstract static class CustomWalking extends EntityWalking {
+        CustomWalking(FullChunk chunk, CompoundTag nbt) { super(chunk, nbt); }
+        @Override
+        public boolean targetOption(EntityCreature creature, double distance) { return true; }
+    }
+
+    private static class CustomVillager extends EntityVillager {
+        CustomVillager(FullChunk chunk, CompoundTag nbt) { super(chunk, nbt); }
+        @Override
+        public boolean targetOption(EntityCreature creature, double distance) { return true; }
+    }
+
     private static final class Fixture {
         final Level level = mock(Level.class);
-        final EntityWalking walker = mock(EntityWalking.class);
+        final EntityWalking walker;
 
-        Fixture(double x, double z) throws Exception {
+        Fixture(double x, double z) throws Exception { this(x, z, CustomWalking.class); }
+
+        Fixture(double x, double z, Class<? extends EntityWalking> type) throws Exception {
+            walker = mock(type);
             walker.x = x;
             walker.y = 64;
             walker.z = z;

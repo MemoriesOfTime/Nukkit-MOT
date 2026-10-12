@@ -46,8 +46,6 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
-        int searchRange = EntityRanges.getTargetSearchRange(this);
-        double searchRangeSquared = (double) searchRange * searchRange;
         for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
@@ -58,7 +56,7 @@ public abstract class EntityWalking extends BaseEntity {
             }
 
             double distance = this.distanceSquared(creature);
-            if (distance > searchRangeSquared || !this.targetOption(creature, distance)) {
+            if (!this.targetOption(creature, distance)) {
                 continue;
             }
 
