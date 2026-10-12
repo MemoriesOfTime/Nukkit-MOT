@@ -52,6 +52,7 @@ public class StrongExplosion extends Explosion {
 
     @Override
     public boolean explodeA() {
+        if (!hasSafeExplosionNumbers(1300d, 1000d, 0.22499999999999998)) return false;
         if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
             Entity entity = entitySource.entity();
             if (entity instanceof EntityExplosive && entity.isInsideOfWater()) {
@@ -79,6 +80,7 @@ public class StrongExplosion extends Explosion {
                         double pointerZ = this.source.z;
 
                         for (double blastForce = this.size * (Utils.random.nextInt(700, 1301)) / 1000d; blastForce > 0; blastForce -= 0.22499999999999998) {
+                            double previousBlastForce = blastForce;
                             int x = (int) pointerX;
                             int y = (int) pointerY;
                             int z = (int) pointerZ;
@@ -86,20 +88,25 @@ public class StrongExplosion extends Explosion {
                             vBlock.y = pointerY >= y ? y : y - 1;
                             vBlock.z = pointerZ >= z ? z : z - 1;
                             if (!level.isYInRange(vBlock.y)) {
-                                break;
-                            }
-                            Block block = this.level.getBlock(vBlock);
-
-                            if (block.getId() != Block.AIR && block.getId() != Block.BEDROCK) {
-                                if (block.getId() != Block.OBSIDIAN) {
-                                    blastForce -= (block.getResistance() / 5 + 0.3d) * 0.3d;
+                                if (vBlock.y < level.getMinBlockY() && vector.y <= 0
+                                        || vBlock.y > level.getMaxBlockY() && vector.y >= 0) {
+                                    break;
                                 }
-                                if (blastForce > 0) {
-                                    if (!this.affectedBlocks.contains(block)) {
-                                        this.affectedBlocks.add(block);
+                            } else {
+                                Block block = this.level.getBlock(vBlock);
+
+                                if (block.getId() != Block.AIR && block.getId() != Block.BEDROCK) {
+                                    if (block.getId() != Block.OBSIDIAN) {
+                                        blastForce -= (block.getResistance() / 5 + 0.3d) * 0.3d;
+                                    }
+                                    if (blastForce > 0) {
+                                        if (!this.affectedBlocks.contains(block)) {
+                                            this.affectedBlocks.add(block);
+                                        }
                                     }
                                 }
                             }
+                            if (!hasSafeRayForce(previousBlastForce, blastForce, 0.22499999999999998)) return false;
                             pointerX += vector.x;
                             pointerY += vector.y;
                             pointerZ += vector.z;
@@ -114,6 +121,7 @@ public class StrongExplosion extends Explosion {
 
     @Override
     public boolean explodeB() {
+        if (!hasSafeExplosionNumbers(1300d, 1000d, 0.22499999999999998)) return false;
         LongArraySet updateBlocks = new LongArraySet();
         double yield = (1d / this.size) * 100d;
 
@@ -128,6 +136,8 @@ public class StrongExplosion extends Explosion {
                 this.affectedBlocks = ev.getBlockList();
             }
         }
+
+        if (!hasSafeExplosionNumbers(1300d, 1000d, 0.22499999999999998)) return false;
 
         double explosionSize = this.size * 2d;
         double minX = NukkitMath.floorDouble(this.source.x - explosionSize - 1);
