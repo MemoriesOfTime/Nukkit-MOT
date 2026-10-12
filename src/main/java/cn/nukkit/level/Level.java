@@ -657,6 +657,38 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    /** One owned task replaces the capturing read lambda; rejection adds no wrapper. */
+    static final class ChunkReadTask implements Runnable {
+        final Level level;
+        final PendingChunkLoad pending;
+        boolean rejected;
+
+        ChunkReadTask(Level level, PendingChunkLoad pending) {
+            this.level = level;
+            this.pending = pending;
+        }
+
+        @Override
+        public void run() {
+            ChunkReadTicket ticket = pending.ticket;
+            try {
+                if (level.chunkLoadsClosing || pending.invalidated) return;
+                pending.chunk = ticket == null
+                        ? pending.provider.readChunkOffThread(pending.x, pending.z) : ticket.read();
+            } catch (Throwable failure) {
+                pending.failure = failure;
+                if (!(failure instanceof CancellationException)) {
+                    if (ticket != null) level.reportChunkLoadFailure(pending.x, pending.z, failure);
+                    else level.server.getLogger().error("Failed to read chunk " + pending.x + ", " + pending.z
+                            + " asynchronously in level " + level.getFolderName(), failure);
+                }
+                if (failure instanceof Error error) throw error;
+            } finally {
+                level.completedChunkLoads.add(pending);
+            }
+        }
+    }
+
     static final class FailedChunkRequest {
         final GameVersion protocol;
         final int x;
@@ -746,8 +778,7 @@ public class Level implements ChunkManager, Metadatable {
             this.asyncChuckExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("AsyncChunkThread for " + name).build());
         }
         if (this.server.asyncChunkSending || this.server.asyncChunkLoadCompletion) {
-            this.asyncChunkLoadExecutor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-                    new ArrayBlockingQueue<>(Math.max(16, this.chunkGenerationQueueSize)),
+            this.asyncChunkLoadExecutor = new ChunkReadExecutor(Math.max(16, this.chunkGenerationQueueSize),
                     new ThreadFactoryBuilder().setNameFormat("AsyncChunkLoadThread for " + name).build());
         }
 
@@ -5066,21 +5097,15 @@ public class Level implements ChunkManager, Metadatable {
             if (loaded != null && loaded.isReadFailurePlaceholder()) pending.retryPlaceholder = loaded;
             if (failed != null && failed.provider == levelProvider) pending.failedAttempts = failed.failedAttempts;
             try {
-                this.asyncChunkLoadExecutor.execute(() -> {
-                    try {
-                        if (this.chunkLoadsClosing || pending.invalidated) return;
-                        pending.chunk = ticket == null ? levelProvider.readChunkOffThread(x, z) : ticket.read();
-                    } catch (Throwable t) {
-                        pending.failure = t;
-                        if (!(t instanceof CancellationException)) {
-                            if (ticket != null) this.reportChunkLoadFailure(x, z, t);
-                            else this.server.getLogger().error("Failed to read chunk " + x + ", " + z + " asynchronously in level " + getFolderName(), t);
-                        }
-                        if (t instanceof Error error) throw error;
-                    } finally {
-                        this.completedChunkLoads.add(pending);
+                ChunkReadTask task = new ChunkReadTask(this, pending);
+                if (this.asyncChunkLoadExecutor instanceof ChunkReadExecutor reads) {
+                    if (!reads.tryExecute(task)) {
+                        if (ticket != null) ticket.close();
+                        return null;
                     }
-                });
+                } else {
+                    this.asyncChunkLoadExecutor.execute(task);
+                }
             } catch (RejectedExecutionException e) {
                 if (ticket != null) ticket.close();
                 return null;
