@@ -73,7 +73,11 @@ class PlayerNetherPortalTransferTest {
         collisions = mock(CollisionHelper.class);
         when(player.getCollisionHelper()).thenReturn(collisions);
         doCallRealMethod().when(player).checkBlockCollision();
-        portals = mockStatic(BlockNetherPortal.class);
+        portals = mockStatic(BlockNetherPortal.class, call -> {
+            String name = call.getMethod().getName();
+            if (name.equals("isPortalDestinationReady") || name.equals("isPortalLoaded")) return call.callRealMethod();
+            return RETURNS_DEFAULTS.answer(call);
+        });
     }
 
     @AfterEach
@@ -288,6 +292,8 @@ class PlayerNetherPortalTransferTest {
         BaseFullChunk chunk = mock(BaseFullChunk.class);
         when(chunk.isGenerated()).thenReturn(true);
         when(target.level.getChunk(anyInt(), anyInt(), eq(false))).thenReturn(chunk);
+        when(target.level.getChunkIfLoaded(anyInt(), anyInt())).thenReturn(chunk);
+        when(chunk.getBlockId(anyInt(), anyInt(), anyInt())).thenReturn(Block.NETHER_PORTAL);
         when(player.level.calculatePortalMirror(player)).thenReturn(target);
         when(collisions.getCollisionBlocks()).thenReturn(new Block[]{Block.get(Block.NETHER_PORTAL)});
         player.inPortalTicks = 39;
