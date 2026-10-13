@@ -3,6 +3,7 @@ package cn.nukkit.level;
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
 import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
@@ -53,7 +54,7 @@ public class LevelChunkSaveBackpressureTest {
         setField(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
         setField(level, "unloadQueue", new Long2LongLinkedOpenHashMap());
         setField(level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
-        setField(level, "playerLoaders", new ConcurrentHashMap<>());
+        setField(level, "playerLoaders", new Long2ObjectNonBlockingMap<>());
         setField(level, "loaders", new Int2ObjectOpenHashMap<>());
         setField(level, "loaderCounter", new Int2IntOpenHashMap());
         return level;
@@ -173,6 +174,36 @@ public class LevelChunkSaveBackpressureTest {
         level.unloadChunks(50, true);
         Assertions.assertEquals(130, writes.get());
         Assertions.assertTrue(unloadQueue(level).isEmpty(), "shutdown must not leave chunks waiting for another tick");
+    }
+
+    @Test
+    public void overloadAfterPrimarySaveDoesNotSplitChangedNeighbours() throws Exception {
+        Level level = newLevel();
+        setField(level, "autoSave", true);
+        AtomicInteger writes = new AtomicInteger(127);
+        Mockito.when(this.provider.isChunkSaveBacklogged()).thenAnswer(ignored -> writes.get() >= 128);
+        // A border save and all eight dirty neighbours form the existing indivisible unload pass.
+        for (int x = 9; x <= 11; x++) {
+            for (int z = 9; z <= 11; z++) {
+                BaseFullChunk chunk = Mockito.mock(BaseFullChunk.class);
+                Mockito.when(chunk.hasChanged()).thenReturn(true);
+                Mockito.when(this.provider.isChunkLoaded(x, z)).thenReturn(true);
+                Mockito.doReturn(chunk).when(level).getChunk(x, z);
+                Mockito.doReturn(chunk).when(level).getChunk(x, z, false);
+            }
+        }
+        Mockito.doAnswer(ignored -> {
+            writes.incrementAndGet();
+            return null;
+        }).when(this.provider).saveChunk(Mockito.anyInt(), Mockito.anyInt());
+        unloadQueue(level).put(Level.chunkHash(10, 10), due());
+
+        level.unloadChunks(50, false);
+
+        Assertions.assertEquals(136, writes.get(), "backpressure gates the next unload, never half of a border save");
+        Assertions.assertTrue(unloadQueue(level).isEmpty());
+        Mockito.verify(this.provider, Mockito.times(9)).saveChunk(Mockito.anyInt(), Mockito.anyInt());
+        Mockito.verify(this.provider).unloadChunk(10, 10, true);
     }
 
 }

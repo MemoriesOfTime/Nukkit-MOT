@@ -1,8 +1,10 @@
 package cn.nukkit.network;
 
 import io.netty.channel.EventLoop;
+import org.cloudburstmc.netty.channel.nethernet.signaling.IceServerInfo;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
-import org.cloudburstmc.netty.util.nethernet.ServerIdentity;
+import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
+import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
 
 import java.net.ConnectException;
 import java.net.SocketAddress;
@@ -22,8 +24,8 @@ abstract class NetherNetDelegatingSignaling implements NetherNetServerSignaling 
     }
 
     @Override
-    public void sendFullSdp(String targetNetworkId, String sdp) {
-        this.delegate.sendFullSdp(targetNetworkId, sdp);
+    public void sendDescription(String targetNetworkId, String sdp) {
+        this.delegate.sendDescription(targetNetworkId, sdp);
     }
 
     @Override
@@ -47,7 +49,7 @@ abstract class NetherNetDelegatingSignaling implements NetherNetServerSignaling 
     }
 
     @Override
-    public ServerIdentity serverIdentity() {
+    public OperatorIdentity serverIdentity() {
         return this.delegate.serverIdentity();
     }
 
@@ -67,12 +69,12 @@ abstract class NetherNetDelegatingSignaling implements NetherNetServerSignaling 
     }
 
     @Override
-    public void setSignalHandler(long connectionId, SignalHandler handler) {
+    public void setSignalHandler(String connectionId, SignalHandler handler) {
         this.delegate.setSignalHandler(connectionId, handler);
     }
 
     @Override
-    public void removeSignalHandler(long connectionId) {
+    public void removeSignalHandler(String connectionId) {
         this.delegate.removeSignalHandler(connectionId);
     }
 

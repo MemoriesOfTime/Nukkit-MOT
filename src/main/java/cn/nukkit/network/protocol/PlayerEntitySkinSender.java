@@ -45,7 +45,8 @@ public final class PlayerEntitySkinSender {
      * Whether the viewer uses the NetEase V860 skin handshake for player-like entities.
      */
     public static boolean requiresRetainedEntry(Player viewer) {
-        return viewer.getGameVersion() == GameVersion.V1_21_124_NETEASE;
+        return viewer.getGameVersion().isNetEase()
+                && viewer.getGameVersion().getProtocol() >= GameVersion.V1_21_124_NETEASE.getProtocol();
     }
 
     /**

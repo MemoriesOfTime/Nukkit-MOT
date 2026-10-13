@@ -10,6 +10,7 @@ public class TaskHandler {
 
     private final int taskId;
     private final boolean asynchronous;
+    private final boolean virtual;
 
     private final Plugin plugin;
     private final Runnable task;
@@ -23,7 +24,12 @@ public class TaskHandler {
     private boolean cancelled;
 
     public TaskHandler(Plugin plugin, Runnable task, int taskId, boolean asynchronous) {
+        this(plugin, task, taskId, asynchronous, false);
+    }
+
+    public TaskHandler(Plugin plugin, Runnable task, int taskId, boolean asynchronous, boolean virtual) {
         this.asynchronous = asynchronous;
+        this.virtual = virtual;
         this.plugin = plugin;
         this.task = task;
         this.taskId = taskId;
@@ -99,6 +105,10 @@ public class TaskHandler {
 
     public boolean isAsynchronous() {
         return asynchronous;
+    }
+
+    public boolean isVirtual() {
+        return virtual;
     }
 
     public void setDelay(int delay) {

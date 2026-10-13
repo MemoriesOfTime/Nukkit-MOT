@@ -1,6 +1,7 @@
 package cn.nukkit.network.process.processor.v527;
 
 import cn.nukkit.AdventureSettings;
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.event.player.PlayerKickEvent;
@@ -62,7 +63,7 @@ public class RequestAbilityProcessor_v527 extends DataPacketProcessor<RequestAbi
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_19_0_29;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_19_0_29;
     }
 }

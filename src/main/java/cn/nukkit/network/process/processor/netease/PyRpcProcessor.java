@@ -83,7 +83,7 @@ public class PyRpcProcessor extends DataPacketProcessor<PyRpcPacket> {
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= GameVersion.V1_20_50_NETEASE.getProtocol();
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.isNetEase() && gameVersion.getProtocol() >= GameVersion.V1_20_50_NETEASE.getProtocol();
     }
 }
