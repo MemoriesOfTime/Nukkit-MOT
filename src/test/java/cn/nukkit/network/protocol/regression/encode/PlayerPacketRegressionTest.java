@@ -283,9 +283,29 @@ public class PlayerPacketRegressionTest extends AbstractPacketRegressionTest {
 
         assertEquals("TestPlayer", cbPacket.getUsername());
         assertEquals(1, cbPacket.getRuntimeEntityId());
+        assertEquals(1, cbPacket.getUniqueEntityId());
         assertEquals(100.5f, cbPacket.getPosition().getX(), 0.001f);
         assertEquals(64.0f, cbPacket.getPosition().getY(), 0.001f);
         assertEquals(200.5f, cbPacket.getPosition().getZ(), 0.001f);
+        assertEquals("", cbPacket.getDeviceId());
+        if (protocolVersion >= ProtocolInfo.v1_13_0) {
+            assertEquals(org.cloudburstmc.protocol.bedrock.data.BuildPlatform.UNKNOWN, cbPacket.getBuildPlatform());
+        }
+
+        // Abilities floats: wire order is flySpeed -> verticalFlySpeed (776+) -> walkSpeed with
+        // vanilla values. Guards against field-order/value swaps: equal-width floats never break
+        // framing, so only semantic assertions catch them.
+        if (protocolVersion >= ProtocolInfo.v1_19_10) {
+            assertEquals(1, cbPacket.getAbilityLayers().size());
+            var layer = cbPacket.getAbilityLayers().get(0);
+            assertEquals(0.05f, layer.getFlySpeed(), 0.0f);
+            assertEquals(0.1f, layer.getWalkSpeed(), 0.0f);
+            if (protocolVersion >= ProtocolInfo.v1_21_60) {
+                assertEquals(1.0f, layer.getVerticalFlySpeed(), 0.0f);
+            } else {
+                assertEquals(0.0f, layer.getVerticalFlySpeed(), 0.0f);
+            }
+        }
     }
 
     // ==================== PlayerSkinPacket ====================

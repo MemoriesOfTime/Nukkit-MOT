@@ -2,6 +2,7 @@ package cn.nukkit.level.format;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
+import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.generic.BaseFullChunk;
@@ -51,6 +52,15 @@ public interface LevelProvider {
      */
     default boolean isOffThreadChunkReadSupported() {
         return false;
+    }
+
+    /**
+     * Register a read whose freshness can be checked without IO at publication time.
+     * Providers without this contract return null; callers must not fall back to sync IO.
+     */
+    @Nullable
+    default ChunkReadTicket openChunkRead(int chunkX, int chunkZ) {
+        return null;
     }
 
     /**
@@ -169,10 +179,12 @@ public interface LevelProvider {
     }
 
     default int getMinBlockY() {
-        return Math.max(this.getLevel().getDimensionData().getMinHeight(), 0);
+        Level level = this.getLevel();
+        return Math.max((level == null ? DimensionData.LEGACY_DIMENSION : level.getDimensionData()).getMinHeight(), 0);
     }
 
     default int getMaxBlockY() {
-        return Math.min(this.getLevel().getDimensionData().getMaxHeight(), 255);
+        Level level = this.getLevel();
+        return Math.min((level == null ? DimensionData.LEGACY_DIMENSION : level.getDimensionData()).getMaxHeight(), 255);
     }
 }

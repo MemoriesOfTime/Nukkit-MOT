@@ -222,9 +222,10 @@ public record CollisionHelper(Entity entity) {
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
         int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
-        int maxX = NukkitMath.ceilDouble(boundingBox.getMaxX());
-        int maxY = NukkitMath.ceilDouble(boundingBox.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
+        // Loops include the upper cell; floor avoids visiting a cell beyond a fractional maximum.
+        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
+        int maxY = NukkitMath.floorDouble(boundingBox.getMaxY());
+        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
 
         if (minX > maxX || minY > maxY || minZ > maxZ) return Block.EMPTY_ARRAY;
 
@@ -316,9 +317,9 @@ public record CollisionHelper(Entity entity) {
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
         int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
-        int maxX = NukkitMath.ceilDouble(boundingBox.getMaxX());
-        int maxY = NukkitMath.ceilDouble(boundingBox.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
+        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
+        int maxY = NukkitMath.floorDouble(boundingBox.getMaxY());
+        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
 
         if (minX > maxX || minY > maxY || minZ > maxZ) return false;
 
@@ -379,9 +380,9 @@ public record CollisionHelper(Entity entity) {
 
         if ((entity == null || entity.canCollide()) && isFinite(boundingBox)) {
             int minX = NukkitMath.floorDouble((boundingBox.getMinX() - 2) / 16);
-            int maxX = NukkitMath.ceilDouble((boundingBox.getMaxX() + 2) / 16);
+            int maxX = NukkitMath.floorDouble((boundingBox.getMaxX() + 2) / 16);
             int minZ = NukkitMath.floorDouble((boundingBox.getMinZ() - 2) / 16);
-            int maxZ = NukkitMath.ceilDouble((boundingBox.getMaxZ() + 2) / 16);
+            int maxZ = NukkitMath.floorDouble((boundingBox.getMaxZ() + 2) / 16);
 
             // Guard against oversized chunk ranges (e.g. from corrupted positions): a 1M-block sweep is already unreasonable.
             long chunkRange = (long) (maxX - minX + 1) * (maxZ - minZ + 1);
@@ -406,6 +407,40 @@ public record CollisionHelper(Entity entity) {
         }
 
         return nearby;
+    }
+
+    /**
+     * Typed pickup snapshot, using PNX's loaded-only item query and MOT's chunk/iteration order.
+     * Empty indexed chunks never traverse their entity map. A lazy linked snapshot avoids the
+     * intermediate Entity array while preserving the old pre-event spatial snapshot: a plugin
+     * moving or spawning an entity during pickup must not change this query's remaining results.
+     */
+    public static List<Entity> getPickupEntities(Level level, AxisAlignedBB boundingBox, boolean itemsOnly) {
+        if (!isFinite(boundingBox)) return Collections.emptyList();
+        int minX = NukkitMath.floorDouble((boundingBox.getMinX() - 2) / 16);
+        int maxX = NukkitMath.floorDouble((boundingBox.getMaxX() + 2) / 16);
+        int minZ = NukkitMath.floorDouble((boundingBox.getMinZ() - 2) / 16);
+        int maxZ = NukkitMath.floorDouble((boundingBox.getMaxZ() + 2) / 16);
+        long chunkRange = ((long) maxX - minX + 1) * ((long) maxZ - minZ + 1);
+        if (chunkRange <= 0 || chunkRange > MAX_BOUNDING_BOX_ITERATIONS) {
+            logRunawayAABBStatic(boundingBox, "getPickupEntities");
+            return Collections.emptyList();
+        }
+        List<Entity> nearby = null;
+        for (int x = minX; x <= maxX; ++x) {
+            for (int z = minZ; z <= maxZ; ++z) {
+                FullChunk chunk = level.getChunkIfLoaded(x, z);
+                if (chunk == null || !chunk.hasPickupEntities(itemsOnly)) continue;
+                for (Entity entity : chunk.getEntities().values()) {
+                    if (FullChunk.isPickupEntity(entity, itemsOnly)
+                            && (itemsOnly ? entity.getBoundingBox() : entity.boundingBox).intersectsWith(boundingBox)) {
+                        if (nearby == null) nearby = new LinkedList<>();
+                        nearby.add(entity);
+                    }
+                }
+            }
+        }
+        return nearby == null ? Collections.emptyList() : nearby;
     }
 
     /**
@@ -504,9 +539,9 @@ public record CollisionHelper(Entity entity) {
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
         int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
-        int maxX = NukkitMath.ceilDouble(boundingBox.getMaxX());
-        int maxY = NukkitMath.ceilDouble(boundingBox.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
+        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
+        int maxY = NukkitMath.floorDouble(boundingBox.getMaxY());
+        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
 
         if (minX > maxX || minY > maxY || minZ > maxZ) return Collections.emptyList();
 
@@ -584,9 +619,9 @@ public record CollisionHelper(Entity entity) {
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
         int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
-        int maxX = NukkitMath.ceilDouble(boundingBox.getMaxX());
-        int maxY = NukkitMath.ceilDouble(boundingBox.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
+        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
+        int maxY = NukkitMath.floorDouble(boundingBox.getMaxY());
+        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
 
         if (minX > maxX || minY > maxY || minZ > maxZ) return false;
 
@@ -668,9 +703,9 @@ public record CollisionHelper(Entity entity) {
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
         int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
-        int maxX = NukkitMath.ceilDouble(boundingBox.getMaxX());
-        int maxY = NukkitMath.ceilDouble(boundingBox.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
+        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
+        int maxY = NukkitMath.floorDouble(boundingBox.getMaxY());
+        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
 
         if (minX > maxX || minY > maxY || minZ > maxZ) {
             return collides;

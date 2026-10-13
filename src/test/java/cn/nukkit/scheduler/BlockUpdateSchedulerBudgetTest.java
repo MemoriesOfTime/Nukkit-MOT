@@ -284,6 +284,78 @@ class BlockUpdateSchedulerBudgetTest {
         assertTrue(Files.readString(file).contains("scheduled-block-update-budget: false"));
     }
 
+    @Test
+    void deferredTickMetadataNeverDirtiesAReadFailurePlaceholder() {
+        Fixture f = new Fixture(true, 1);
+        BaseFullChunk placeholder = failedChunk(true);
+        when(f.level.getChunkIfLoaded(0, 0)).thenReturn(placeholder);
+        for (int x = 0; x < 4; x++) f.add(x, 1);
+        assertEquals(1, f.scheduler.tick(1));
+        assertEquals(3, f.scheduler.getPendingBlockUpdates(SAVE_AREA).size());
+        verify(placeholder, never()).setChanged();
+        BlockUpdateEntry cancelled = f.scheduler.getPendingBlockUpdates(SAVE_AREA).iterator().next();
+        assertTrue(f.scheduler.remove(cancelled));
+        verify(placeholder, never()).setChanged();
+        assertEquals(1, f.scheduler.tick(2));
+        verify(placeholder, never()).setChanged();
+        verify(f.level, never()).getChunk(anyInt(), anyInt(), anyBoolean());
+    }
+
+    @Test
+    void decodedChunkWithLifecycleFailureStillPersistsDeferredTickMetadata() {
+        Fixture f = new Fixture(true, 1);
+        BaseFullChunk decoded = failedChunk(false);
+        assertNotNull(decoded.getChunkLoadFailure());
+        assertFalse(decoded.isReadFailurePlaceholder());
+        when(f.level.getChunkIfLoaded(0, 0)).thenReturn(decoded);
+        for (int x = 0; x < 4; x++) f.add(x, 1);
+        assertEquals(1, f.scheduler.tick(1));
+        verify(decoded, atLeastOnce()).setChanged();
+        clearInvocations(decoded);
+        BlockUpdateEntry cancelled = f.scheduler.getPendingBlockUpdates(SAVE_AREA).iterator().next();
+        assertTrue(f.scheduler.remove(cancelled));
+        verify(decoded).setChanged();
+        clearInvocations(decoded);
+        assertEquals(1, f.scheduler.tick(2));
+        verify(decoded).setChanged();
+        verify(f.level, never()).getChunk(anyInt(), anyInt(), anyBoolean());
+    }
+
+    @Test
+    void deferredBorderTickDirtiesHealthySnapshotOwnersButNotThePlaceholder() {
+        for (int origin : new int[]{0, -16}) {
+            Fixture f = new Fixture(true, 1);
+            int chunk = origin >> 4;
+            BaseFullChunk placeholder = failedChunk(true);
+            List<BaseFullChunk> healthy = new ArrayList<>();
+            for (int x = chunk; x <= chunk + 1; x++) {
+                for (int z = chunk; z <= chunk + 1; z++) {
+                    BaseFullChunk owner = x == chunk && z == chunk ? placeholder : mock(BaseFullChunk.class);
+                    if (owner != placeholder) healthy.add(owner);
+                    when(f.level.getChunkIfLoaded(x, z)).thenReturn(owner);
+                }
+            }
+            for (int x = origin + 14; x <= origin + 15; x++) {
+                for (int z = origin + 14; z <= origin + 15; z++) f.add(x, z, 1);
+            }
+            assertEquals(1, f.scheduler.tick(1));
+            verify(placeholder, never()).setChanged();
+            for (BaseFullChunk owner : healthy) verify(owner, atLeastOnce()).setChanged();
+            verify(f.level, never()).getChunk(anyInt(), anyInt(), anyBoolean());
+        }
+    }
+
+    private static BaseFullChunk failedChunk(boolean readFailure) {
+        BaseFullChunk chunk = mock(BaseFullChunk.class);
+        when(chunk.getChunkLoadFailure()).thenCallRealMethod();
+        when(chunk.isReadFailurePlaceholder()).thenCallRealMethod();
+        doCallRealMethod().when(chunk).markChunkLoadFailure(any());
+        doCallRealMethod().when(chunk).markChunkReadFailure(any());
+        if (readFailure) chunk.markChunkReadFailure(new IllegalStateException("unreadable chunk"));
+        else chunk.markChunkLoadFailure(new IllegalStateException("lifecycle failure after decode"));
+        return chunk;
+    }
+
     private static final class Fixture {
         final Server server = mock(Server.class);
         final Level level = mock(Level.class);

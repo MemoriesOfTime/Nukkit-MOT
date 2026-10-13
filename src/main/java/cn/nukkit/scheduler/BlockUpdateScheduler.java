@@ -204,7 +204,7 @@ public class BlockUpdateScheduler {
         // Scheduled-only work need not change a block. Dirty the loaded snapshot owner so both
         // its remaining tick list and removal of an executed/cancelled tick are saved.
         BaseFullChunk chunk = level.getChunkIfLoaded(Level.getHashX(hash), Level.getHashZ(hash));
-        if (chunk != null) chunk.setChanged();
+        if (chunk != null && !chunk.isReadFailurePlaceholder()) chunk.setChanged();
     }
 
     private void execute(BlockUpdateEntry entry) {
