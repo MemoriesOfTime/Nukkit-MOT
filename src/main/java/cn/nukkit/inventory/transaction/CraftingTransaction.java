@@ -36,6 +36,8 @@ public class CraftingTransaction extends InventoryTransaction {
 
     protected int craftingType;
 
+    private boolean executionInProgress;
+
     public CraftingTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions, false);
 
@@ -179,24 +181,50 @@ public class CraftingTransaction extends InventoryTransaction {
 
     @Override
     public boolean execute() {
-        if (super.execute()) {
-            switch (this.primaryOutput.getId()) {
-                case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
-                case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
-                case Item.FURNACE -> source.awardAchievement("buildFurnace");
-                case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
-                case Item.BREAD -> source.awardAchievement("makeBread");
-                case Item.CAKE -> source.awardAchievement("bakeCake");
-                case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
-                    Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
-                case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
-                case Item.DIAMOND -> source.awardAchievement("diamond");
+        if (executionInProgress || this.hasExecuted() || !NativeRecipeTransaction.supports(this)) return false;
+        executionInProgress = true;
+        try {
+            if (!this.canExecute()) {
+                this.sendInventories();
+                return false;
             }
-
-            return true;
+            List<Item> frozenInputs = this.inputs.stream().map(Item::clone).toList();
+            List<Item> frozenSecondary = this.secondaryOutputs.stream().map(Item::clone).toList();
+            Recipe frozenRecipe = this.transactionRecipe;
+            int frozenGridSize = this.gridSize;
+            int frozenType = this.craftingType;
+            Item originalOutput = this.primaryOutput.clone();
+            boolean committed = NativeRecipeTransaction.execute(this, originalOutput, this::getPrimaryOutput,
+                    this::callExecuteEvent, () -> sameItems(this.inputs, frozenInputs)
+                            && sameItems(this.secondaryOutputs, frozenSecondary) && this.transactionRecipe == frozenRecipe
+                            && this.gridSize == frozenGridSize && this.craftingType == frozenType,
+                    this::awardCraftingAchievement);
+            if (!committed) this.sendInventories();
+            return committed;
+        } finally {
+            executionInProgress = false;
         }
+    }
 
-        return false;
+    private static boolean sameItems(List<Item> actual, List<Item> expected) {
+        if (actual.size() != expected.size()) return false;
+        for (int i = 0; i < actual.size(); i++) if (!actual.get(i).equalsExact(expected.get(i))) return false;
+        return true;
+    }
+
+    private void awardCraftingAchievement() {
+        switch (this.primaryOutput.getId()) {
+            case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
+            case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
+            case Item.FURNACE -> source.awardAchievement("buildFurnace");
+            case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
+            case Item.BREAD -> source.awardAchievement("makeBread");
+            case Item.CAKE -> source.awardAchievement("bakeCake");
+            case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
+                Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
+            case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
+            case Item.DIAMOND -> source.awardAchievement("diamond");
+        }
     }
 
     @Override

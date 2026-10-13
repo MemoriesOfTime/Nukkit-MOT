@@ -175,7 +175,7 @@ public class BlockGrindstone extends BlockTransparentMeta implements Faceable {
                 return false;
             }
         }
-        player.addWindow(new GrindstoneInventory(player.getUIInventory(), this), Player.GRINDSTONE_WINDOW_ID);
+        player.requestWindowOpen(new GrindstoneInventory(player.getUIInventory(), this), Player.GRINDSTONE_WINDOW_ID);
         return true;
     }
 }

@@ -130,13 +130,21 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable, Bloc
         Item currentBook = lectern.getBook();
         if (!currentBook.isNull()) {
             if (player != null && player.protocol >= ProtocolInfo.v1_20_60) {
-                ContainerOpenPacket pk = new ContainerOpenPacket();
-                pk.windowId = Player.LECTERN_WINDOW_ID;
-                pk.type = ContainerOpenPacket.TYPE_LECTERN;
-                pk.x = this.getFloorX();
-                pk.y = this.getFloorY();
-                pk.z = this.getFloorZ();
-                player.dataPacket(pk);
+                player.requestInventoryScreenOpen(
+                        () -> !lectern.closed && player.getLevel() == this.getLevel()
+                                && player.distanceSquared(this) <= 100
+                                && this.getLevel().getBlockEntityIfLoaded(this) == lectern
+                                && !lectern.getBook().isNull(),
+                        () -> {
+                            ContainerOpenPacket pk = new ContainerOpenPacket();
+                            pk.windowId = Player.LECTERN_WINDOW_ID;
+                            pk.type = ContainerOpenPacket.TYPE_LECTERN;
+                            pk.x = this.getFloorX();
+                            pk.y = this.getFloorY();
+                            pk.z = this.getFloorZ();
+                            player.dataPacket(pk);
+                        }, () -> { });
+
             }
             return true;
         }

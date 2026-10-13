@@ -13,6 +13,10 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class GrindstoneInventory extends FakeBlockUIComponent {
 
+    private final Object deferredCloseIdentity = new Object();
+    private final Object deferredCleanupIdentity = new Object();
+    private boolean cleanupCompleted;
+
     private static final int EQUIPMENT = 0;
     private static final int INGREDIENT = 1;
 
@@ -195,13 +199,37 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
 
     @Override
     public void onOpen(Player who) {
+        this.cleanupCompleted = false;
         super.onOpen(who);
         who.craftingType = Player.GRINDSTONE_WINDOW_ID;
     }
 
     @Override
+    public void close(Player who) {
+        if (InventoryMutationGuard.deferUntilReleased(
+                java.util.Arrays.asList(this, who.getInventory(), who.getUIInventory()),
+                this.deferredCloseIdentity, () -> this.close(who))) return;
+        super.close(who);
+    }
+
+    @Override
     public void onClose(Player who) {
-        super.onClose(who);
+        if (this.cleanupCompleted) return;
+        if (InventoryMutationGuard.deferUntilReleased(
+                java.util.Arrays.asList(this, who.getInventory(), who.getUIInventory()),
+                this.deferredCleanupIdentity, () -> this.onClose(who))) return;
+        // Keep ownership through cleanup and the close packet's mapped window identity.
+        try (InventoryMutationGuard.Lease close = InventoryMutationGuard.tryClaim(
+                java.util.Arrays.asList(this, who.getInventory(), who.getUIInventory()))) {
+            if (close == null) return;
+            this.completeClose(who);
+            super.onClose(who);
+        }
+    }
+
+    private void completeClose(Player who) {
+        if (this.cleanupCompleted) return;
+        this.cleanupCompleted = true;
         who.craftingType = Player.CRAFTING_SMALL;
 
         who.returnUiItems(this.getItem(EQUIPMENT), this.getItem(INGREDIENT));

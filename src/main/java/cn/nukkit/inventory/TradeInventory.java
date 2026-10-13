@@ -61,7 +61,11 @@ public class TradeInventory extends BaseInventory {
         pk.newTradingUi = true;
         pk.usingEconomyTrade = true;
 
-        who.dataPacket(pk);
+        if (!who.dataPacket(pk)) {
+            releaseAssignedRecipeIds();
+            this.getViewers().remove(who);
+            return;
+        }
 
         this.sendContents(who);
     }

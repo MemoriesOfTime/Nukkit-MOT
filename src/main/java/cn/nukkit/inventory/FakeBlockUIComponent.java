@@ -56,7 +56,7 @@ public class FakeBlockUIComponent extends PlayerUIComponent {
             pk.x = pk.y = pk.z = 0;
         }
 
-        who.dataPacket(pk);
+        if (!who.dataPacket(pk)) return;
 
         this.sendContents(who);
     }

@@ -165,7 +165,7 @@ public class BlockCommandBlock extends BlockSolidMeta implements Faceable, Block
         if (player.getWindowId(inventory) != -1) {
             player.removeWindow(inventory);
         }
-        player.addWindow(inventory);
+        player.requestWindowOpen(inventory);
         return true;
     }
 
