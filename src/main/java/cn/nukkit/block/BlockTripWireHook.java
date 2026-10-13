@@ -174,12 +174,10 @@ public class BlockTripWireHook extends BlockFlowable {
                 Vector3 vc = v.getSide(facing, i);
                 block = blocks[i];
 
-                if (block != null && this.level.getBlockIdAt(vc.getFloorX(), vc.getFloorY(), vc.getFloorZ()) != Block.AIR) {
-                    if (canConnect ^ ((block.getDamage() & 0x04) > 0)) {
-                        block.setDamage(block.getDamage() ^ 0x04);
-                    }
-
-                    this.level.setBlock(vc, block, true, true);
+                // Redstone callbacks may replace the wire or change its other state bits.
+                if (block instanceof BlockTripWire && this.level.getBlock(vc) instanceof BlockTripWire wire) {
+                    wire.setAttached(canConnect);
+                    this.level.setBlock(vc, wire, true, true);
                 }
             }
         }
