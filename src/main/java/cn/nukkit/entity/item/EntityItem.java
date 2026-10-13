@@ -4,6 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockLiquid;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityPickupClaim;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.ItemBurnEvent;
@@ -246,18 +247,23 @@ public class EntityItem extends Entity {
                             if (!entity.isOnGround()) {
                                 continue;
                             }
-                            int newAmount = this.item.getCount() + closeItem.getCount();
-                            if (newAmount > this.item.getMaxStackSize()) {
-                                continue;
+                            // Native despawn and merge-packet callbacks must not consume either participant.
+                            try (EntityPickupClaim.Lease receiver = EntityPickupClaim.tryClaim(this);
+                                 EntityPickupClaim.Lease donor = EntityPickupClaim.tryClaim(entity)) {
+                                if (receiver == null || donor == null) continue;
+                                int newAmount = this.item.getCount() + closeItem.getCount();
+                                if (newAmount > this.item.getMaxStackSize()) {
+                                    continue;
+                                }
+                                closeItem.setCount(0);
+                                this.item.setCount(newAmount);
+                                entity.close();
+                                EntityEventPacket packet = new EntityEventPacket();
+                                packet.eid = getId();
+                                packet.data = newAmount;
+                                packet.event = EntityEventPacket.MERGE_ITEMS;
+                                Server.broadcastPacket(this.getViewers().values(), packet);
                             }
-                            closeItem.setCount(0);
-                            entity.close();
-                            this.item.setCount(newAmount);
-                            EntityEventPacket packet = new EntityEventPacket();
-                            packet.eid = getId();
-                            packet.data = newAmount;
-                            packet.event = EntityEventPacket.MERGE_ITEMS;
-                            Server.broadcastPacket(this.getViewers().values(), packet);
                         }
                     }
                 }
@@ -366,7 +372,8 @@ public class EntityItem extends Entity {
 
     /** Both entities must allow merging; the item equality check stays with the caller. */
     protected boolean mergeableWith(EntityItem other) {
-        return this.mergeItems && other != null && other.mergeItems;
+        return this.mergeItems && other != null && other.mergeItems
+                && !EntityPickupClaim.isClaimed(this) && !EntityPickupClaim.isClaimed(other);
     }
 
     static boolean mergeableFromNbt(CompoundTag tag) {

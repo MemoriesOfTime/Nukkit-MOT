@@ -127,9 +127,8 @@ class InventoryExactBulkWriteTest {
   assertTrue(f.inventory.getItem(0).isNull());assertTrue(f.inventory.getContents().values().stream().allMatch(item->item.getCount()<=1));
  }
  @Test void nestedPublicPickupLeavesItsSourceUntilTheBulkCallbackCompletes() throws Exception {
-  Fixture f=new Fixture(false);EntityItem source=mock(EntityItem.class);AtomicBoolean closed=new AtomicBoolean(),entered=new AtomicBoolean(),accepted=new AtomicBoolean(true);
-  when(source.getItem()).thenReturn(stack(1));when(source.getViewers()).thenReturn(Collections.emptyMap());
-  when(source.isClosed()).thenAnswer(c->closed.get());doAnswer(c->{closed.set(true);return null;}).when(source).close();
+  Fixture f=new Fixture(false);EntityItem source=NativePublishedPickupSourceFixture.create(f.player,stack(1));
+  java.util.function.Supplier<Boolean> closed=source::isClosed;AtomicBoolean entered=new AtomicBoolean(),accepted=new AtomicBoolean(true);
   var plugins=Server.getInstance().getPluginManager();
   doAnswer(c->{if(entered.compareAndSet(false,true))accepted.set(f.player.pickupEntity(source,true));return null;}).when(plugins).callEvent(any(EntityInventoryChangeEvent.class));
   assertEquals(0,f.inventory.addItem(stack(4)).length);assertFalse(accepted.get());assertFalse(closed.get());assertEquals(5,total(f.inventory)+source.getItem().getCount());

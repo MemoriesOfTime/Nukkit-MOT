@@ -12,6 +12,7 @@ import cn.nukkit.event.entity.EntityInventoryChangeEvent;
 import cn.nukkit.event.inventory.InventoryTransactionEvent;
 import cn.nukkit.event.inventory.InventoryPickupItemEvent;
 import cn.nukkit.inventory.PlayerInventory;
+import cn.nukkit.inventory.NativePublishedPickupSourceFixture;
 import cn.nukkit.inventory.FurnaceInventory;
 import cn.nukkit.inventory.ChestInventory;
 import cn.nukkit.inventory.DoubleChestInventory;
@@ -305,7 +306,7 @@ class InventoryTransactionConservationTest {
     @Test void nestedPhysicalPickupCannotBeLostByTransactionRollback() throws Exception {
         Fixture f = new Fixture();
         InventoryTransaction transaction = f.move(1, true);
-        Source source = new Source();
+        Source source = new Source(f.player);
         AtomicBoolean attempted = new AtomicBoolean();
         AtomicBoolean accepted = new AtomicBoolean(true);
         var plugins = Server.getInstance().getPluginManager();
@@ -329,7 +330,7 @@ class InventoryTransactionConservationTest {
     @Test void nestedTransactionCannotReenterThePhysicalPickupInventory() throws Exception {
         Fixture f = new Fixture();
         InventoryTransaction transaction = f.move(1, false);
-        Source source = new Source();
+        Source source = new Source(f.player);
         AtomicBoolean accepted = new AtomicBoolean(true);
         var plugins = Server.getInstance().getPluginManager();
         doAnswer(call -> {
@@ -416,14 +417,11 @@ class InventoryTransactionConservationTest {
     }
 
     private static final class Source {
-        final EntityItem entity = mock(EntityItem.class);
-        final AtomicBoolean closed = new AtomicBoolean();
-        Source() {
-            when(entity.getItem()).thenReturn(Item.get(Item.EMERALD, 0, 1));
-            when(entity.getPickupDelay()).thenReturn(0);
-            when(entity.isClosed()).thenAnswer(call -> closed.get());
-            when(entity.getViewers()).thenReturn(Collections.emptyMap());
-            doAnswer(call -> { closed.set(true); return null; }).when(entity).close();
+        final EntityItem entity;
+        final java.util.function.Supplier<Boolean> closed;
+        Source(Player player) {
+            entity = NativePublishedPickupSourceFixture.create(player, Item.get(Item.EMERALD, 0, 1));
+            closed = entity::isClosed;
         }
     }
 

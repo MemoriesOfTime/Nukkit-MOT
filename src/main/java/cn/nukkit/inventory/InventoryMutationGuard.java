@@ -76,6 +76,38 @@ public final class InventoryMutationGuard {
         return new Lease(owned);
     }
 
+    /** Profiles cannot capture provisional slots owned by an atomic claim or an exact bulk write. */
+    public static boolean canCaptureProfile(Collection<? extends Inventory> inventories) {
+        synchronized (CLAIMED) {
+            // Ordinary autosave must not initialize lazy bundle containers or allocate a backing traversal.
+            if (CLAIMED.isEmpty() && EXPECTED_WRITE.get() == null) return true;
+        }
+        Set<Inventory> backings = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Inventory inventory : inventories) collectProfileBackings(inventory, backings);
+        if (overlapsWrite(backings)) return false;
+        synchronized (CLAIMED) {
+            for (Inventory inventory : backings) {
+                if (CLAIMED.contains(inventory)) return false;
+            }
+        }
+        return true;
+    }
+
+    private static void collectProfileBackings(Inventory inventory, Set<Inventory> backings) {
+        if (inventory == null || !backings.add(inventory)) return;
+        if (inventory instanceof DoubleChestInventory chest) {
+            collectProfileBackings(chest.getLeftSide(), backings);
+            collectProfileBackings(chest.getRightSide(), backings);
+        } else if (inventory instanceof PlayerUIComponent component) {
+            collectProfileBackings(component.getBackingInventory(), backings);
+        }
+        // Contents hold the actual item instances; a bundle's live container mutates its carrier NBT.
+        // Identity traversal rejects only containers reachable from this profile, not another player's bundle.
+        for (Item item : inventory.getContents().values()) {
+            if (item instanceof ItemBundle bundle) collectProfileBackings(bundle.getInventory(), backings);
+        }
+    }
+
     private static boolean overlapsWrite(Set<Inventory> inventories) {
         for (WriteScope scope = EXPECTED_WRITE.get(); scope != null; scope = scope.previous) {
             for (Inventory inventory : inventories) {
@@ -107,7 +139,7 @@ public final class InventoryMutationGuard {
     }
 
     private static void collectBackings(Inventory inventory, Set<Inventory> owned) {
-        if (!owned.add(inventory)) return;
+        if (inventory == null || !owned.add(inventory)) return;
         if (inventory instanceof DoubleChestInventory chest) {
             collectBackings(chest.getLeftSide(), owned);
             collectBackings(chest.getRightSide(), owned);
@@ -121,7 +153,7 @@ public final class InventoryMutationGuard {
         WriteScope active = EXPECTED_WRITE.get();
         for (WriteScope expected = active; expected != null; expected = expected.previous) {
             if (expected.owned.contains(inventory)) {
-                return expected == active && expected.inventory == inventory
+                return expected == active && expected.inventory != null && expected.inventory == inventory
                         && expected.slot == slot && matchesTarget(target, expected.target)
                         && fitsCurrentLimit(inventory, expected.requestedInventory, target);
             }
@@ -167,7 +199,7 @@ public final class InventoryMutationGuard {
             this.inventory = inventory;
             this.requestedInventory = requestedInventory;
             this.slot = slot;
-            this.target = target.clone();
+            this.target = target == null ? null : target.clone();
             this.exactBulk = exactBulk;
             Item stored = exactBulk && inventory instanceof BaseInventory nativeInventory
                     ? nativeInventory.slots.get(slot) : null;
@@ -194,6 +226,34 @@ public final class InventoryMutationGuard {
         }
     }
 
+    /** An inventory rollback restores native dimensions without invoking resizing callbacks. */
+    public static final class NativeMetadataSnapshot {
+        private final java.util.Map<BaseInventory, int[]> metadata = new IdentityHashMap<>();
+
+        private NativeMetadataSnapshot(Set<Inventory> owned) {
+            for (Inventory inventory : owned) {
+                if (inventory instanceof BaseInventory nativeInventory) {
+                    metadata.put(nativeInventory, new int[] {nativeInventory.size, nativeInventory.maxStackSize});
+                }
+            }
+        }
+
+        public boolean matches() {
+            for (var entry : metadata.entrySet()) {
+                if (entry.getKey().size != entry.getValue()[0]
+                        || entry.getKey().maxStackSize != entry.getValue()[1]) return false;
+            }
+            return true;
+        }
+
+        public void restore() {
+            metadata.forEach((inventory, values) -> {
+                inventory.size = values[0];
+                inventory.maxStackSize = values[1];
+            });
+        }
+    }
+
     public static final class Lease implements AutoCloseable {
         private final Set<Inventory> owned;
         private boolean closed;
@@ -201,6 +261,17 @@ public final class InventoryMutationGuard {
         private Lease(Set<Inventory> owned) { this.owned = owned; }
 
         public boolean contains(Inventory inventory) { return owned.contains(inventory); }
+
+        public NativeMetadataSnapshot captureNativeMetadata() {
+            if (closed) throw new IllegalStateException("Inventory claim is closed");
+            return new NativeMetadataSnapshot(owned);
+        }
+
+        /** Native transaction callbacks cannot alter a backing owned by this transaction. */
+        public WriteScope blockWrites() {
+            if (closed) throw new IllegalStateException("Inventory claim is closed");
+            return new WriteScope(owned, null, null, -1, null, false);
+        }
 
         public WriteScope expectWrite(Inventory inventory, int slot, Item target) {
             if (closed || !contains(inventory)) throw new IllegalStateException("Inventory is not claimed");
