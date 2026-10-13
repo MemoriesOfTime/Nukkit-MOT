@@ -19,7 +19,11 @@ class LevelLightQueueDrainLocksAuditTest {
         queue.put(Level.chunkHash(0, 0), new HashSet<>(Set.of(Level.localBlockHash(1, 64, 1, dimension))));
         queue.put(Level.chunkHash(1, 0), new HashSet<>(Set.of(Level.localBlockHash(17, 64, 1, dimension))));
         when(level.getDimensionData()).thenReturn(dimension);
-        when(level.getChunk(0, 0, false)).thenThrow(new IllegalStateException("chunk read failed"));
+        cn.nukkit.level.format.generic.BaseFullChunk chunk = mock(cn.nukkit.level.format.generic.BaseFullChunk.class);
+        when(level.getChunk(0, 0, false)).thenReturn(chunk);
+        when(level.getChunkIfLoaded(0, 0)).thenReturn(chunk);
+        // The bucket is already owned when its loaded chunk light data fails to read.
+        when(chunk.getBlockLight(anyInt(), anyInt(), anyInt())).thenThrow(new IllegalStateException("chunk read failed"));
         doCallRealMethod().when(level).updateBlockLight(anyMap());
         assertThrows(IllegalStateException.class, () -> level.updateBlockLight(queue));
         assertFalse(queue.containsKey(Level.chunkHash(0, 0)));
