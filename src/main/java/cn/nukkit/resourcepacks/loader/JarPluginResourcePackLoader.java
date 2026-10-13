@@ -23,7 +23,7 @@ public class JarPluginResourcePackLoader implements ResourcePackLoader {
     public List<ResourcePack> loadPacks() {
         var baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
-        for (File jar : jarPath.listFiles()) {
+        for (File jar : ResourcePackLoader.listFilesInNameOrder(jarPath)) {
             try {
                 ResourcePack resourcePack = null;
                 String fileExt = Files.getFileExtension(jar.getName());

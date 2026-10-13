@@ -25,6 +25,11 @@ public class InventoryTransactionPacket extends DataPacket {
     public static final int USE_ITEM_ACTION_CLICK_BLOCK = 0;
     public static final int USE_ITEM_ACTION_CLICK_AIR = 1;
     public static final int USE_ITEM_ACTION_BREAK_BLOCK = 2;
+    /**
+     * Left-click that uses the held item instead of a plain attack, without a target block or
+     * entity. Sent by 1.21.110+ clients for the spear jab ({@code minecraft:piercing_weapon}).
+     */
+    public static final int USE_ITEM_ACTION_USE_AS_ATTACK = 3;
 
     public static final int RELEASE_ITEM_ACTION_RELEASE = 0; //bow shoot
     public static final int RELEASE_ITEM_ACTION_CONSUME = 1; //eat food, drink potion

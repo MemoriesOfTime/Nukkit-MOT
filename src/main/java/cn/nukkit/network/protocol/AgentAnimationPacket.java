@@ -34,6 +34,7 @@ public class AgentAnimationPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putByte(this.animation);
         this.putEntityRuntimeId(this.runtimeEntityId);
     }

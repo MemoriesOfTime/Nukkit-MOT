@@ -74,7 +74,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         cleanSnapshotCache();
         var baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
-        for (File pack : path.listFiles()) {
+        for (File pack : ResourcePackLoader.listFilesInNameOrder(path)) {
             if (shouldIgnoreFile(pack.getName())) {
                 continue;
             }
