@@ -261,7 +261,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             return;
         }
         super.kill();
-        EntityDeathEvent ev = new EntityDeathEvent(this, this.getDrops());
+        EntityDeathEvent ev = new EntityDeathEvent(this, this.getDrops(this.getDeathLootingWeapon()));
         this.server.getPluginManager().callEvent(ev);
 
         this.checkTameableEntityDeath();
@@ -448,6 +448,36 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     public Item[] getDrops() {
         return Item.EMPTY_ARRAY;
+    }
+
+    /**
+     * Weapon-aware loot, retaining the legacy override for custom entities.
+     * Vanilla bonus rules apply only to exact built-in entity classes.
+     */
+    public Item[] getDrops(Item weapon) {
+        return VanillaLooting.apply(this, weapon, this.getDrops());
+    }
+
+    /** Melee uses the accepted hit's enchantments; projectiles use the killer's held item. */
+    protected Item getDeathLootingWeapon() {
+        if (!(this.lastDamageCause instanceof EntityDamageByEntityEvent event)
+                || event.isCancelled() || !(event.getDamager() instanceof Player player)) {
+            return Item.get(Item.AIR);
+        }
+        boolean projectile = event instanceof EntityDamageByChildEntityEvent;
+        if (projectile ? event.getCause() != DamageCause.PROJECTILE
+                : event.getCause() != DamageCause.ENTITY_ATTACK) {
+            return Item.get(Item.AIR);
+        }
+        Item weapon = player.getInventory().getItemInHand().clone();
+        Enchantment[] hitEnchantments = event.getWeaponEnchantments();
+        if (!projectile && hitEnchantments != null) {
+            CompoundTag tag = weapon.getOrCreateNamedTag();
+            tag.remove("ench");
+            weapon.setNamedTag(tag);
+            weapon.addEnchantment(hitEnchantments);
+        }
+        return weapon;
     }
 
     public Block[] getLineOfSight(int maxDistance) {
