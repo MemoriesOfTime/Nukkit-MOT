@@ -467,7 +467,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean worldClockSynced;
     private boolean foodEnabled = true;
     private int failedTransactions;
-    protected int failedMobEquipmentPacket;
     private int timeSinceRest;
     private boolean inSoulSand;
     private boolean dimensionChangeInProgress;
@@ -3001,9 +3000,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastUpdate = currentTick;
 
         this.failedTransactions = 0;
-        if (currentTick%20 == 0) {
-            this.failedMobEquipmentPacket = 0;
-        }
 
         if (this.riptideTicks > 0) {
             this.riptideTicks -= tickDiff;

@@ -10,7 +10,6 @@ import cn.nukkit.network.protocol.MobEquipmentPacket;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -37,7 +36,6 @@ class MobEquipmentStaleWindowTest {
         MobEquipmentProcessor.INSTANCE.handle(handle, equipment(0, 3, held));
 
         verify(player, never()).kick(any(PlayerKickEvent.Reason.class), anyString(), anyBoolean(), anyString());
-        assertEquals(0, handle.getFailedMobEquipmentPacket());
         verify(inventory).equipItem(3);
         verify(inventory, never()).sendContents(player);
         verify(inventory, never()).setItem(anyInt(), any(Item.class));
