@@ -95,9 +95,11 @@ public class CameraInstructionPacket extends DataPacket {
 
             if (this.protocol >= ProtocolInfo.v1_21_100) {
                 this.setFovInstruction(this.getOptional(null, buf -> {
-                    float fov = buf.getFloat();
-                    float easeTime = buf.getFloat();
-                    CameraEase easeType = CameraEase.values()[buf.getByte()];
+                    float fov = buf.getLFloat();
+                    float easeTime = buf.getLFloat();
+                    // v944+: ease type is the serialize name string, not an ordinal byte
+                    CameraEase easeType = this.protocol >= ProtocolInfo.v1_26_10
+                            ? cameraEaseFromName(buf.getString()) : CameraEase.values()[buf.getByte()];
                     boolean clear = buf.getBoolean();
                     return new CameraFovInstruction(fov, easeTime, easeType, clear);
                 }));
@@ -105,17 +107,19 @@ public class CameraInstructionPacket extends DataPacket {
 
             if (this.protocol >= ProtocolInfo.v1_21_120) {
                 this.setSplineInstruction(this.getOptional(null, buf -> {
-                    float totalTime = buf.getFloat();
+                    float totalTime = buf.getLFloat();
                     CameraSplineType type = CameraSplineType.values()[buf.getByte()];
                     List<Vector3f> curve = new ArrayList<>();
                     buf.getArray(curve, BinaryStream::getVector3f);
+                    boolean easeByName = this.protocol >= ProtocolInfo.v1_26_10;
                     List<CameraSplineInstruction.SplineProgressOption> progressKeyFrames = new ArrayList<>();
                     if (this.protocol >= ProtocolInfo.v1_26_0) {
-                        // v924+: includes easing function
+                        // v924+: progress keyframes carry an easing function
                         buf.getArray(progressKeyFrames, buf2 -> {
                             float value = buf2.getLFloat();
                             float time = buf2.getLFloat();
-                            CameraEase easingFunc = CameraEase.values()[buf2.getLInt()];
+                            CameraEase easingFunc = easeByName
+                                    ? cameraEaseFromName(buf2.getString()) : CameraEase.values()[buf2.getByte()];
                             return new CameraSplineInstruction.SplineProgressOption(value, time, easingFunc);
                         });
                     } else {
@@ -126,12 +130,28 @@ public class CameraInstructionPacket extends DataPacket {
                         });
                     }
                     List<CameraSplineInstruction.SplineRotationOption> rotationOption = new ArrayList<>();
-                    buf.getArray(rotationOption, buf2 -> {
-                        Vector3f keyFrameValues = buf2.getVector3f();
-                        float keyFrameTimes = buf2.getFloat();
-                        return new CameraSplineInstruction.SplineRotationOption(keyFrameValues, keyFrameTimes);
-                    });
-                    return new CameraSplineInstruction(totalTime, type, curve, progressKeyFrames, rotationOption);
+                    if (this.protocol >= ProtocolInfo.v1_26_0) {
+                        // v924+: rotation keyframes carry an easing function
+                        buf.getArray(rotationOption, buf2 -> {
+                            Vector3f keyFrameValues = buf2.getVector3f();
+                            float keyFrameTimes = buf2.getLFloat();
+                            CameraEase ease = easeByName
+                                    ? cameraEaseFromName(buf2.getString()) : CameraEase.values()[buf2.getByte()];
+                            return new CameraSplineInstruction.SplineRotationOption(keyFrameValues, keyFrameTimes, ease);
+                        });
+                    } else {
+                        buf.getArray(rotationOption, buf2 -> {
+                            Vector3f keyFrameValues = buf2.getVector3f();
+                            float keyFrameTimes = buf2.getLFloat();
+                            return new CameraSplineInstruction.SplineRotationOption(keyFrameValues, keyFrameTimes, CameraEase.LINEAR);
+                        });
+                    }
+                    if (this.protocol >= ProtocolInfo.v1_26_0) {
+                        String splineIdentifier = buf.getString();
+                        boolean loadFromJson = buf.getBoolean();
+                        return new CameraSplineInstruction(totalTime, type, curve, progressKeyFrames, rotationOption, splineIdentifier, loadFromJson);
+                    }
+                    return new CameraSplineInstruction(totalTime, type, curve, progressKeyFrames, rotationOption, "", false);
                 }));
                 this.setAttachInstruction(this.getOptional(null, buf -> new CameraAttachToEntityInstruction(buf.getLLong())));
                 this.setDetachFromEntity(this.getOptional(OptionalBoolean.empty(), buf -> OptionalBoolean.of(buf.getBoolean())));
@@ -234,7 +254,12 @@ public class CameraInstructionPacket extends DataPacket {
                 this.putOptionalNull(this.getFovInstruction(), (b, fovInstruction) -> {
                     b.putLFloat(fovInstruction.getFov());
                     b.putLFloat(fovInstruction.getEaseTime());
-                    b.putByte((byte) fovInstruction.getEaseType().ordinal());
+                    // v944+: ease type is the serialize name string, not an ordinal byte
+                    if (this.protocol >= ProtocolInfo.v1_26_10) {
+                        b.putString(easeOrLinear(fovInstruction.getEaseType()).getSerializeName());
+                    } else {
+                        b.putByte((byte) easeOrLinear(fovInstruction.getEaseType()).ordinal());
+                    }
                     b.putBoolean(fovInstruction.isClear());
                 });
             }
@@ -244,12 +269,17 @@ public class CameraInstructionPacket extends DataPacket {
                     buf.putLFloat(splineInstruction.getTotalTime());
                     buf.putByte((byte) splineInstruction.getType().ordinal());
                     buf.putArray(splineInstruction.getCurve(), BinaryStream::putVector3f);
+                    boolean easeByName = this.protocol >= ProtocolInfo.v1_26_10;
                     if (this.protocol >= ProtocolInfo.v1_26_0) {
-                        // v924+: includes easing function
+                        // v924+: progress keyframes carry an easing function
                         buf.putArray(splineInstruction.getProgressKeyFrames(), (buf2, progress) -> {
                             buf2.putLFloat(progress.getValue());
                             buf2.putLFloat(progress.getTime());
-                            buf2.putLInt(progress.getEasingFunc().ordinal());
+                            if (easeByName) {
+                                buf2.putString(easeOrLinear(progress.getEasingFunc()).getSerializeName());
+                            } else {
+                                buf2.putByte((byte) easeOrLinear(progress.getEasingFunc()).ordinal());
+                            }
                         });
                     } else {
                         // Pre-v924: only value and time as Vector2f
@@ -260,7 +290,19 @@ public class CameraInstructionPacket extends DataPacket {
                     buf.putArray(splineInstruction.getRotationOption(), (buf2, rotationOption) -> {
                         buf2.putVector3f(rotationOption.getKeyFrameValues());
                         buf2.putLFloat(rotationOption.getKeyFrameTimes());
+                        if (this.protocol >= ProtocolInfo.v1_26_0) {
+                            // v924+: rotation keyframes carry an easing function
+                            if (easeByName) {
+                                buf2.putString(easeOrLinear(rotationOption.getEase()).getSerializeName());
+                            } else {
+                                buf2.putByte((byte) easeOrLinear(rotationOption.getEase()).ordinal());
+                            }
+                        }
                     });
+                    if (this.protocol >= ProtocolInfo.v1_26_0) {
+                        buf.putString(splineInstruction.getSplineIdentifier() != null ? splineInstruction.getSplineIdentifier() : "");
+                        buf.putBoolean(splineInstruction.isLoadFromJson());
+                    }
                 });
                 this.putOptionalNull(this.getAttachInstruction(), (b, attachInstruction) -> b.putLLong(attachInstruction.getUniqueEntityId()));
                 this.putOptional(OptionalBoolean::isPresent,this.getDetachFromEntity(), (b, detachFromEntity) -> b.putBoolean(detachFromEntity.getAsBoolean()));
@@ -419,6 +461,16 @@ public class CameraInstructionPacket extends DataPacket {
                 (int) (this.getLFloat() * 255),
                 (int) (this.getLFloat() * 255)
         );
+    }
+
+    private static CameraEase cameraEaseFromName(String name) {
+        CameraEase ease = CameraEase.fromName(name);
+        // unknown names from newer clients fall back to LINEAR instead of leaving a null field
+        return ease != null ? ease : CameraEase.LINEAR;
+    }
+
+    private static CameraEase easeOrLinear(CameraEase ease) {
+        return ease != null ? ease : CameraEase.LINEAR;
     }
 
 }

@@ -12,6 +12,7 @@ import java.util.List;
 public class MapInfoRequestPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.MAP_INFO_REQUEST_PACKET;
+    private static final int MAX_MAP_PIXELS = 128 * 128;
 
     public long mapId;
 
@@ -20,7 +21,7 @@ public class MapInfoRequestPacket extends DataPacket {
      *
      * @since 1.19.20
      */
-    private final List<MapPixel> pixels = new ObjectArrayList<>();
+    public final List<MapPixel> pixels = new ObjectArrayList<>();
 
     @Override
     public byte pid() {
@@ -32,10 +33,14 @@ public class MapInfoRequestPacket extends DataPacket {
         mapId = this.getVarLong();
 
         if (this.protocol >= ProtocolInfo.v1_19_20) {
-            int count = (int) this.getUnsignedVarInt();
+            // since v544: uint32 length + N x (uint32 pixel + uint16 index), all little-endian, no compression
+            int count = this.getLInt();
+            if (count < 0 || count > MAX_MAP_PIXELS) {
+                throw new IllegalArgumentException("Invalid map pixel count: " + count);
+            }
             for (int i = 0; i < count; i++) {
                 MapPixel pixel = new MapPixel();
-                pixel.pixel = this.getInt();
+                pixel.pixel = this.getLInt();
                 pixel.index = this.getLShort();
                 this.pixels.add(pixel);
             }
@@ -51,10 +56,10 @@ public class MapInfoRequestPacket extends DataPacket {
         /**
          * Colour value of pixel
          */
-        int pixel;
+        public int pixel;
         /**
          * Pixel index in map.
          */
-        int index;
+        public int index;
     }
 }

@@ -73,8 +73,9 @@ public class MoveEntityAbsolutePacket extends DataPacket {
         this.y = v.y;
         this.z = v.z;
         this.pitch = this.getRotationByte();
-        this.headYaw = this.getRotationByte();
+        // wire order is X(pitch), Y(yaw), YHead(headYaw); bytes 2 and 3 must not swap
         this.yaw = this.getRotationByte();
+        this.headYaw = this.getRotationByte();
     }
 
     @Override
@@ -119,8 +120,8 @@ public class MoveEntityAbsolutePacket extends DataPacket {
         }
         this.putVector3f((float) this.x, (float) this.y, (float) this.z);
         this.putRotationByte(this.pitch);
-        this.putRotationByte(this.headYaw);
         this.putRotationByte(this.yaw);
+        this.putRotationByte(this.headYaw);
         if (protocol <= 261) {
             this.putBoolean(this.onGround);
             this.putBoolean(this.teleport);

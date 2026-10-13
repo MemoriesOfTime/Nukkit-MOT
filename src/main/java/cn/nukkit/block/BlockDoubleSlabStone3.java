@@ -41,7 +41,11 @@ public class BlockDoubleSlabStone3 extends BlockDoubleSlabStone {
 
     @Override
     public double getHardness() {
-        return 2;
+        return switch (this.getDamage() & 0x07) {
+            case END_STONE_BRICKS -> 3;
+            case SMOOTH_RED_SANDSTONE -> 2;
+            default -> 1.5;
+        };
     }
 
     @Override

@@ -407,7 +407,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             // Check collisions with blocks
-            if ((this instanceof Player || this instanceof BaseEntity) && this.riding == null && this.age % (this instanceof Player ? 2 : 10) == 0) {
+            int floorProbePeriod = this instanceof Player ? 2 : 10;
+            boolean floorProbeDue = tickDiff <= 1 || this instanceof Player
+                    ? this.age % floorProbePeriod == 0
+                    // A caught-up mob tick covers the ages [age - tickDiff + 1, age] (age was already advanced).
+                    : hitsResidue((long) this.age - tickDiff + 1, tickDiff, floorProbePeriod, 0);
+            if ((this instanceof Player || this instanceof BaseEntity) && this.riding == null && floorProbeDue) {
                 int floorY = NukkitMath.floorDouble(this.y - 0.25);
                 if (floorY != getFloorY()) {
                     Block block = this.level.getBlock(this.chunk, getFloorX(), floorY, getFloorZ(), false);

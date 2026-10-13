@@ -155,7 +155,8 @@ public class ClientboundMapItemDataPacket extends DataPacket {
                 this.putBoolean(this.isLocked);
             }
             if (protocol >= ProtocolInfo.v1_19_20) {
-                this.putBlockVector3(this.origin);
+                // since v544 origin is 3x zigzag varint (CB writeVector3i); y is not unsigned
+                this.putSignedBlockPosition(this.origin);
             }
 
             if ((update & ENTITIES_UPDATE) != 0) {
@@ -198,17 +199,18 @@ public class ClientboundMapItemDataPacket extends DataPacket {
                 this.putVarInt(offsetX);
                 this.putVarInt(offsetZ);
 
-                this.putUnsignedVarInt((long) width * height);
-
                 if (image != null) {
-                    for (int y = 0; y < width; y++) {
-                        for (int x = 0; x < height; x++) {
+                    this.putUnsignedVarInt((long) width * height);
+                    // row-major: outer y<height, inner x<width; not swappable for non-square images
+                    for (int y = 0; y < this.height; y++) {
+                        for (int x = 0; x < this.width; x++) {
                             this.putUnsignedVarInt(Utils.toABGR(this.image.getRGB(x, y)));
                         }
                     }
 
                     image.flush();
                 } else if (colors.length > 0) {
+                    // colors-only path carries a single array-length prefix (CB v354 writeTextureUpdate)
                     this.putUnsignedVarInt(colors.length);
                     for (int color : colors) {
                         this.putUnsignedVarInt(color);

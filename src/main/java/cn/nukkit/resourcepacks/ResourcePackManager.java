@@ -9,7 +9,6 @@ import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.ConfigSection;
 import cn.nukkit.utils.Utils;
-import com.google.common.collect.Sets;
 import com.google.gson.JsonArray;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import lombok.extern.log4j.Log4j2;
@@ -34,7 +33,7 @@ public class ResourcePackManager {
     private File packConfigFile;
 
     public ResourcePackManager(ResourcePackLoader... loaders) {
-        this(Sets.newHashSet(loaders));
+        this(new LinkedHashSet<>(Arrays.asList(loaders)));
     }
 
     public ResourcePackManager(Set<ResourcePackLoader> loaders) {
@@ -155,9 +154,9 @@ public class ResourcePackManager {
     }
 
     /**
-     * 读取并应用 packs.yml 配置（如 CDN URL）
+     * 读取并应用 packs.yml 配置（CDN URL、加密密钥、栈优先级）
      * <p>
-     * Load and apply packs.yml configuration (e.g. CDN URLs)
+     * Load and apply packs.yml configuration (CDN URLs, encryption keys, stack priority)
      */
     private void applyPackConfig() {
         if (this.packConfigFile == null) {
@@ -188,6 +187,7 @@ public class ResourcePackManager {
             log.warn("Invalid packs.yml structure: every top-level entry must be a pack section");
             return;
         }
+        Map<UUID, Integer> priorities = new HashMap<>();
         for (String packId : config.getSections("").keySet()) {
             ResourcePack pack;
             try {
@@ -208,7 +208,38 @@ public class ResourcePackManager {
             if (config.exists(keyPath)) {
                 pack.setEncryptionKey(config.getString(keyPath));
             }
+            String priorityPath = packId + ".priority";
+            if (config.exists(priorityPath)) {
+                Object priority = config.get(priorityPath);
+                if (priority instanceof Integer || priority instanceof Long || priority instanceof Short
+                        || priority instanceof Byte) {
+                    priorities.put(pack.getPackId(), ((Number) priority).intValue());
+                } else {
+                    log.warn("Invalid priority in packs.yml for pack {}: {} (expected a whole number)", packId, priority);
+                }
+            }
         }
+        if (!priorities.isEmpty()) {
+            orderByPriority(this.resourcePacks, priorities);
+            orderByPriority(this.behaviorPacks, priorities);
+        }
+    }
+
+    /**
+     * 按 packs.yml 中的 priority 排列资源包栈：优先级高的位于栈的上层，其内容覆盖下层资源包。
+     * <p>
+     * Orders a stack by the {@code priority} set in packs.yml. The first pack of the stack is the top
+     * one, whose textures and definitions override those of the packs below it, so a higher priority
+     * is placed earlier. Packs without a priority count as 0; packs of equal priority keep their load
+     * order (loader registration order, then file name), so the result never depends on the
+     * filesystem.
+     */
+    private static void orderByPriority(Set<ResourcePack> stack, Map<UUID, Integer> priorities) {
+        List<ResourcePack> ordered = new ArrayList<>(stack);
+        ordered.sort(Comparator.comparingInt((ResourcePack pack) -> priorities.getOrDefault(pack.getPackId(), 0))
+                .reversed());
+        stack.clear();
+        stack.addAll(ordered);
     }
 
     private static boolean hasValidPackConfigStructure(Config config) {

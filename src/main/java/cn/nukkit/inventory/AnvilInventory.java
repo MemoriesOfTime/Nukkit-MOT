@@ -19,6 +19,8 @@ public class AnvilInventory extends FakeBlockUIComponent {
     public static final int RESULT = ANVIL_OUTPUT_UI_SLOT - 1; //1: offset
 
     private int cost;
+    private final Object deferredCleanupIdentity = new Object();
+    private boolean cleanupCompleted;
 
     public AnvilInventory(PlayerUIInventory playerUI, Position position) {
         super(playerUI, InventoryType.ANVIL, 1, position);
@@ -27,6 +29,16 @@ public class AnvilInventory extends FakeBlockUIComponent {
     @Override
     public void onClose(Player who) {
         super.onClose(who);
+        if (this.cleanupCompleted) return;
+        if (InventoryMutationGuard.deferUntilReleased(
+                java.util.Arrays.asList(this, who.getInventory(), who.getUIInventory()),
+                this.deferredCleanupIdentity, () -> this.completeClose(who))) return;
+        this.completeClose(who);
+    }
+
+    private void completeClose(Player who) {
+        if (this.cleanupCompleted) return;
+        this.cleanupCompleted = true;
         who.craftingType = Player.CRAFTING_SMALL;
         who.resetCraftingGridType();
 
@@ -38,6 +50,7 @@ public class AnvilInventory extends FakeBlockUIComponent {
 
     @Override
     public void onOpen(Player who) {
+        this.cleanupCompleted = false;
         super.onOpen(who);
         who.craftingType = Player.ANVIL_WINDOW_ID;
     }

@@ -23,6 +23,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
+import cn.nukkit.utils.CollisionHelper;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -231,14 +232,25 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
             if (powered == this.isEnabled()) {
                 this.setEnabled(!powered);
                 this.level.setBlock(this, this, true, false);
+            }
 
-                // Wake up the hopper block entity when unpowered
-                if (!powered) {
-                    BlockEntity be = this.level.getBlockEntity(this);
-                    if (be instanceof BlockEntityHopper hopper) {
-                        hopper.scheduleUpdate();
-                    }
-                }
+            // The block entity keeps this answer instead of reading the neighbours on every transfer,
+            // and wakes itself when the lock is gone.
+            BlockEntity be = this.level.getBlockEntity(this);
+            if (be instanceof BlockEntityHopper hopper) {
+                hopper.setRedstonePowered(powered);
+            }
+
+            return type;
+        }
+
+        if (type == Level.BLOCK_UPDATE_REDSTONE) {
+            // Power arriving through a neighbouring block (lever, button, torch, repeater on it) reaches
+            // the hopper only as a redstone update. It used to be ignored, so a hopper that slept locked
+            // stayed asleep after the power was gone.
+            BlockEntity be = this.level.getBlockEntity(this);
+            if (be instanceof BlockEntityHopper hopper) {
+                hopper.invalidateRedstonePower();
             }
 
             return type;
@@ -396,7 +408,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
 
             boolean pickedUpItem = false;
 
-            for (Entity entity : this.getPosition().getLevel().getCollidingEntities(pickupArea)) {
+            for (Entity entity : CollisionHelper.getPickupEntities(this.getPosition().getLevel(), pickupArea, true)) {
                 if (entity.isClosed() || !(entity instanceof EntityItem)) {
                     continue;
                 }
@@ -414,7 +426,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                     continue;
                 }
 
-                InventoryMoveItemEvent ev = new InventoryMoveItemEvent(null, inventory, this, item, InventoryMoveItemEvent.Action.PICKUP);
+                InventoryMoveItemEvent ev = new InventoryMoveItemEvent(null, inventory, this, item, InventoryMoveItemEvent.Action.PICKUP, itemEntity);
                 ev.call();
 
                 if (ev.isCancelled()) {
