@@ -21,6 +21,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.vibration.VibrationEvent;
 import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.MinecartType;
@@ -84,9 +85,15 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
             if (fuse <= 0) {
                 if (this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
                     this.explode(ThreadLocalRandom.current().nextInt(5));
+                    if (!this.closed) {
+                        // A cancelled prime retains the cart; accepted explosions close it.
+                        this.fuse = -1;
+                        setDataProperty(new IntEntityData(DATA_FUSE_LENGTH, -1));
+                    }
+                } else {
+                    this.close();
                 }
-                this.close();
-                return false;
+                return hasUpdate;
             }
         }
 
@@ -95,6 +102,7 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
 
     @Override
     public void activate(int x, int y, int z, boolean flag) {
+        this.namedTag.remove("TntIgniter");
         level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_IGNITE);
         this.fuse = 80;
     }
@@ -121,6 +129,7 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
             return false;
         }
 
+        rememberIgniter(ignitingProjectile.shootingEntity);
         double speedSqr = ignitingProjectile.motionX * ignitingProjectile.motionX
                 + ignitingProjectile.motionY * ignitingProjectile.motionY
                 + ignitingProjectile.motionZ * ignitingProjectile.motionZ;
@@ -216,7 +225,33 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
                 return;
             }
         }
-        level.dropItem(this, new ItemMinecartTNT());
+        level.dropItem(this, storedMinecartItem());
+    }
+
+    /** Preserve the placed item's full NBT, but never trust its saved type or count. */
+    private Item storedMinecartItem() {
+        if (namedTag.containsCompound("MinecartItem")) {
+            try {
+                // Decoding/count clamps must not borrow the entity's retained item record.
+                Item item = NBTIO.getItemHelper(namedTag.getCompound("MinecartItem").copy());
+                if (item.getId() == Item.MINECART_WITH_TNT && !item.isNull()) {
+                    item.setCount(1);
+                    return item;
+                }
+            } catch (RuntimeException malformedItem) {
+                // Old or edited data must not prevent the ordinary single-cart drop.
+            }
+        }
+        return new ItemMinecartTNT();
+    }
+
+    /** The igniter owns the action; the player who originally placed the cart does not. */
+    private void rememberIgniter(Entity source) {
+        if (source instanceof Player player) {
+            namedTag.putString("TntIgniter", player.getUniqueId().toString());
+        } else {
+            namedTag.remove("TntIgniter");
+        }
     }
 
     @Override
@@ -239,6 +274,7 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
         if (item.getId() == Item.FLINT_AND_STEEL || item.getId() == Item.FIRE_CHARGE) {
+            rememberIgniter(player);
             level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_IGNITE);
             this.fuse = 80;
             return true;
