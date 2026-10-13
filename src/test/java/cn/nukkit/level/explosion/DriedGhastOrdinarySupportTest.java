@@ -9,6 +9,7 @@ import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BinaryStream;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.BeforeAll;
@@ -16,10 +17,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Isolated;
 
 import java.io.ByteArrayInputStream;
+import java.io.BufferedInputStream;
+import java.io.FilterInputStream;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 
@@ -53,8 +58,9 @@ public final class DriedGhastOrdinarySupportTest {
 
     private static CompoundTag nativeState(int protocol, int id, int meta, String expectedSha) throws Exception {
         byte[] bytes = resource("runtime_block_states_" + protocol + ".dat");
-        assertEquals(expectedSha, java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
-        var root = NBTIO.readTag(new GZIPInputStream(new ByteArrayInputStream(bytes)), ByteOrder.BIG_ENDIAN, false);
+        if (protocol != 589) assertEquals(expectedSha, java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+        var root = palette(bytes);
+        if (protocol == 589) assertKnown589Projection(root);
         assertInstanceOf(ListTag.class, root);
         CompoundTag selected = null;
         for (var value : ((ListTag<?>) root).getAll()) {
@@ -69,6 +75,87 @@ public final class DriedGhastOrdinarySupportTest {
         assertNotNull(selected, "Exact native state " + id + ":" + meta);
         assertTrue(selected.containsInt("runtimeId") && selected.containsString("name") && selected.containsCompound("states"));
         return selected;
+    }
+
+    private static Tag palette(byte[] bytes) throws Exception {
+        try (var buffered = new BufferedInputStream(new GZIPInputStream(new ByteArrayInputStream(bytes)))) {
+            Tag root = NBTIO.readTag(new FilterInputStream(buffered) {
+                @Override public void close() { }
+            }, ByteOrder.BIG_ENDIAN, false);
+            assertEquals(-1, buffered.read(), "No trailing decoded palette payload");
+            return root;
+        }
+    }
+
+    // Derived independently from the OLD public589 resource, before the typed-property repair.
+    // Normalize only the four published anchor ByteTag->IntTag variants; every other typed value/order is pinned.
+    private static void assertKnown589Projection(Tag source) throws Exception {
+        ListTag<?> root = assertInstanceOf(ListTag.class, source.copy());
+        assertEquals("", root.getName()); assertEquals(15827, root.size());
+        Set<Integer> variants = new HashSet<>(); int changed = 0;
+        for (int ordinal = 0; ordinal < root.size(); ordinal++) {
+            CompoundTag row = assertInstanceOf(CompoundTag.class, root.get(ordinal));
+            if (!"minecraft:respawn_anchor".equals(row.getString("name"))) continue;
+            CompoundTag states = row.getCompound("states"); int charge = states.getInt("respawn_anchor_charge");
+            if (charge < 1 || charge > 4) continue;
+            assertEquals(12792 + charge, ordinal); assertEquals(527, row.getInt("id"));
+            assertEquals(charge, row.getShort("data")); assertEquals(1776 + charge, row.getInt("runtimeId"));
+            Tag value = states.get("respawn_anchor_charge");
+            assertTrue(value.getId() == 1 || value.getId() == 3, "Only the known ByteTag/IntTag variant is compatible");
+            variants.add((int) value.getId()); states.putInt("respawn_anchor_charge", charge); changed++;
+        }
+        assertEquals(4, changed); assertEquals(1, variants.size(), "The four known properties use one complete variant");
+        StringBuilder semantic = new StringBuilder(); appendSemantic(root, semantic);
+        assertEquals("c2ba1a75cdf87b1d9e659c46b129a0362e9a5135e823d14aad546480728306dd",
+                java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                        .digest(semantic.toString().getBytes(StandardCharsets.UTF_8))),
+                "All unchanged589 row order, fields, values and other tag types match the independent old public projection");
+    }
+
+    private static void appendSemantic(Tag tag, StringBuilder out) {
+        out.append(tag.getId()).append(':');
+        if (tag instanceof CompoundTag compound) {
+            out.append('{');
+            new TreeMap<>(compound.getTags()).forEach((key, value) -> {
+                out.append(key.getBytes(StandardCharsets.UTF_8).length).append(':').append(key);
+                appendSemantic(value, out);
+            });
+            out.append('}');
+        } else if (tag instanceof ListTag<?> list) {
+            out.append('[').append(list.size()).append(':');
+            for (Tag child : list.getAll()) appendSemantic(child, out);
+            out.append(']');
+        } else {
+            assertTrue(Set.of(1, 2, 3, 8).contains((int) tag.getId()), "Declared589 scalar schema");
+            String value = String.valueOf(tag.parseValue());
+            out.append(value.getBytes(StandardCharsets.UTF_8).length).append(':').append(value);
+        }
+    }
+
+    @Test void public589ProjectionAcceptsExactlyTheCompleteKnownTypedPropertyVariants() throws Exception {
+        ListTag<?> stockOrRepaired = assertInstanceOf(ListTag.class, palette(resource("runtime_block_states_589.dat")));
+        assertDoesNotThrow(() -> assertKnown589Projection(stockOrRepaired));
+        ListTag<?> bytes = assertInstanceOf(ListTag.class, stockOrRepaired.copy());
+        ListTag<?> ints = assertInstanceOf(ListTag.class, stockOrRepaired.copy());
+        for (int charge = 1; charge <= 4; charge++) {
+            ((CompoundTag) bytes.get(12792 + charge)).getCompound("states").putByte("respawn_anchor_charge", charge);
+            ((CompoundTag) ints.get(12792 + charge)).getCompound("states").putInt("respawn_anchor_charge", charge);
+        }
+        assertDoesNotThrow(() -> assertKnown589Projection(bytes));
+        assertDoesNotThrow(() -> assertKnown589Projection(ints));
+    }
+
+    @Test void public589ProjectionRejectsUnrelatedStateOrderAndTagChanges() throws Exception {
+        ListTag<?> source = assertInstanceOf(ListTag.class, palette(resource("runtime_block_states_589.dat")));
+        ListTag<?> wrongState = assertInstanceOf(ListTag.class, source.copy());
+        ((CompoundTag) wrongState.get(14092)).getCompound("states").putString("stone_type", "granite");
+        assertThrows(AssertionError.class, () -> assertKnown589Projection(wrongState));
+        ListTag<Tag> wrongOrder = new ListTag<>(source.getName());
+        for (int i = 0; i < source.size(); i++) wrongOrder.add(source.get(i == 14092 ? 0 : i == 0 ? 14092 : i).copy());
+        assertThrows(AssertionError.class, () -> assertKnown589Projection(wrongOrder));
+        ListTag<?> wrongType = assertInstanceOf(ListTag.class, source.copy());
+        ((CompoundTag) wrongType.get(12793)).getCompound("states").putShort("respawn_anchor_charge", 1);
+        assertThrows(AssertionError.class, () -> assertKnown589Projection(wrongType));
     }
 
     private static int independentHash(String name, CompoundTag states) throws Exception {
