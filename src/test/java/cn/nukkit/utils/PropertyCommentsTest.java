@@ -99,8 +99,9 @@ public class PropertyCommentsTest {
         Assertions.assertTrue(eng.containsKey("rcon.password"));
         Assertions.assertTrue(eng.containsKey("server-authoritative-movement"));
         Assertions.assertTrue(eng.containsKey("server-udp-ports"), "NetherNet port pinning key must be documented");
+        Assertions.assertTrue(eng.containsKey("keep-existing-session-on-duplicate-login"), "duplicate-login policy key must be documented");
         // Every documented key of ServerProperties must have an English entry (fallback source)
-        Assertions.assertTrue(eng.size() >= 39, "eng must document all ServerProperties keys, got " + eng.size());
+        Assertions.assertTrue(eng.size() >= 40, "eng must document all ServerProperties keys, got " + eng.size());
         Assertions.assertTrue(eng.get("motd").startsWith("Server name"));
     }
 
