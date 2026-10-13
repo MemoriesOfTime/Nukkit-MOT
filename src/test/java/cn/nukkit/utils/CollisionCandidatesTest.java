@@ -298,8 +298,9 @@ class CollisionCandidatesTest {
         final LevelDBChunk[][] chunks = new LevelDBChunk[6][6];
 
         private World() {
-            level = mock(Level.class);
-            provider = mock(LevelDBProvider.class);
+            // This world supplies values; retaining millions of call records is not part of its contract.
+            level = mock(Level.class, withSettings().stubOnly());
+            provider = mock(LevelDBProvider.class, withSettings().stubOnly());
             when(level.getMinBlockY()).thenReturn(0);
             when(level.getMaxBlockY()).thenReturn(255);
             when(level.isYInRange(anyInt())).thenCallRealMethod();
@@ -370,7 +371,7 @@ class CollisionCandidatesTest {
 
         /** A level where every cell holds the same block; neighbours for the shape probe. */
         static Level uniform(int id) {
-            Level level = mock(Level.class);
+            Level level = mock(Level.class, withSettings().stubOnly());
             when(level.getMinBlockY()).thenReturn(0);
             when(level.getMaxBlockY()).thenReturn(255);
             org.mockito.stubbing.Answer<Block> answer = inv -> {
