@@ -43,7 +43,10 @@ class EndCrystalPrimeContractTest {
   }).when(plugins).callEvent(any(Event.class));
   try {assertFalse(crystal.attack(new cn.nukkit.event.entity.EntityDamageEvent(crystal,cn.nukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_ATTACK,1)));
    assertEquals(0,primes[0]);assertFalse(crystal.closed,"Refused accepted-damage path retains the crystal");}
-  finally {crystal.close();}
+  finally {
+   try {crystal.close();}
+   finally {MockServer.reset();}
+  }
  }
  @Test void changedForceAndBlockBreakingVetoAreHonored() throws Exception{explode(false,false,true);}
  @Test void acceptedBlockBreakingRetainsMobGriefingGate() throws Exception{explode(false,true,true);explode(false,true,false);}
