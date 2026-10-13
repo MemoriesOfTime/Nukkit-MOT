@@ -78,6 +78,7 @@ class PlayerEnderChestLidTest {
         Mockito.when(viewer.getX()).thenReturn(x);
         Mockito.when(viewer.getZ()).thenReturn(z);
         Mockito.when(viewer.getWindowId(any())).thenReturn(5);
+        Mockito.when(viewer.dataPacket(any(DataPacket.class))).thenReturn(true);
         viewer.spawned = true;
         return viewer;
     }

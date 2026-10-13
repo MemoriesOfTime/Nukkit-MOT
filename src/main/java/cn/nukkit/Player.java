@@ -81,6 +81,7 @@ import cn.nukkit.network.protocol.netease.PyRpcPacket;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.debugshape.DebugShape;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
@@ -137,6 +138,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -244,6 +247,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected Inventory topWindow;
     private boolean inventoryOpen;
     protected int closingWindowId = Integer.MIN_VALUE;
+    // A screen is distinct from the permanent inventory/UI/armor/crafting slot mappings.
+    private Integer inventoryScreenId;
+    private ContainerType inventoryScreenType = ContainerType.NONE;
+    private int pendingCloseWindowId = Integer.MIN_VALUE;
+    private ContainerType pendingCloseWindowType = ContainerType.NONE;
+    private Inventory inventoryCloseInProgress;
+    private boolean inventoryScreenOpening;
+    private int inventoryScreenChangeDepth;
+    private long windowOpenRequestSequence;
+    private WindowOpenRequest pendingWindowOpen;
+    private WindowOpenRequest activeWindowOpenRequest;
+    private static final long WINDOW_OPEN_REQUEST_MAX_NANOS = 5_000_000_000L;
 
     public Vector3 speed = null;
 
@@ -1762,7 +1777,26 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             log.trace("Outbound {}: {}", this.getName(), packet);
         }
 
+        // Raw workbench and player-inventory packets also share the close handshake.
+        Integer openingWindowId = packet instanceof ContainerOpenPacket open ? open.windowId
+                : packet instanceof UpdateTradePacket trade ? this.tradeScreenWindowId(trade) : null;
+        if (openingWindowId != null && this.spawned && this.protocol >= 407) {
+            if (this.activeWindowOpenRequest != null && (this.activeWindowOpenRequest.finished
+                    || !this.connected || this.closed || !this.spawned
+                    || !this.activeWindowOpenRequest.stillValid.getAsBoolean())) return false;
+            if (this.pendingCloseWindowId != Integer.MIN_VALUE || this.inventoryCloseInProgress != null
+                    || this.inventoryScreenId != null && !this.inventoryScreenId.equals(openingWindowId)) {
+                return false;
+            }
+        }
+        if (packet instanceof ContainerClosePacket close && close.wasServerInitiated && this.spawned && this.protocol >= 407
+                && !Objects.equals(this.inventoryScreenId, close.windowId) && this.pendingCloseWindowId != close.windowId) {
+            return false; // stale inventory callbacks cannot close a fresh screen
+        }
         this.networkSession.sendPacket(packet);
+        if (this.spawned && this.protocol >= 407) {
+            this.trackInventoryScreenPacket(packet);
+        }
         return true;
     }
 
@@ -3009,6 +3043,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean onUpdate(int currentTick) {
         if (!this.loggedIn) {
             return false;
+        }
+        if (this.pendingWindowOpen != null && (this.closed || !this.spawned || !this.isAlive()
+                || System.nanoTime() - this.pendingWindowOpen.createdNanos > WINDOW_OPEN_REQUEST_MAX_NANOS)) {
+            this.pendingWindowOpen.cancel();
         }
 
         int tickDiff = currentTick - this.lastUpdate;
@@ -4945,13 +4983,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (!this.inventoryOpen) {
                             if (this.riding instanceof EntityChestBoat && this.riding == targetEntity) {
                                 if (this.protocol >= ProtocolInfo.v1_19_0) {
-                                    this.addWindow(((InventoryHolder) targetEntity).getInventory());
+                                    this.requestWindowOpen(((InventoryHolder) targetEntity).getInventory());
                                 }
                             } else if (this.protocol >= 407) {
-                                if (this.inventory.open(this)) {
-                                    this.inventoryOpen = true;
-                                    this.awardAchievement("openInventory");
-                                }
+                                this.requestWindowOpen(this.inventory, ContainerIds.INVENTORY,
+                                        () -> this.spawned && !this.closed, id -> {
+                                            if (id >= 0) this.awardAchievement("openInventory");
+                                        });
                             }
                         } else if (Nukkit.DEBUG > 1) {
                             server.getLogger().debug(this.username + " tried to open inventory but one is already open");
@@ -5159,74 +5197,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 break;
             case ProtocolInfo.CONTAINER_CLOSE_PACKET:
                 ContainerClosePacket containerClosePacket = (ContainerClosePacket) packet;
-
-                if (!this.spawned) {
-                    return;
-                }
-
-                if (containerClosePacket.windowId == -1) {
-                    // At least 1.21 does sometimes send windowId -1 when opening and closing containers quickly
-                    if (this.inventoryOpen) {
-                        this.inventoryOpen = false;
-
-                        if (this.craftingType == CRAFTING_SMALL) {
-                            for (Entry<Inventory, Integer> open : new ArrayList<>(this.windows.entrySet())) {
-                                if (open.getKey() instanceof ContainerInventory || open.getKey() instanceof PlayerEnderChestInventory) {
-                                    this.server.getPluginManager().callEvent(new InventoryCloseEvent(open.getKey(), this));
-                                    this.closingWindowId = Integer.MAX_VALUE;
-                                    this.removeWindow(open.getKey(), true);
-                                    this.closingWindowId = Integer.MIN_VALUE;
-                                }
-                            }
-                            return;
-                        }
-                    }
-
-                    // 1.21 clients also close an ender chest with -1 while their own inventory is not
-                    // open. Without this the window stayed open on the server: the lid hung open for
-                    // everyone and the chest did not open again for this player until a teleport.
-                    closeEnderChestWindowForUnknownId();
-                    // The same happens to a chest, barrel, shulker box, hopper or furnace of the world:
-                    // the lid hung open and the block did not open again for this player. Only windows
-                    // of real block entities are closed here. A plugin window drawn on a fake block has
-                    // no block entity, and a late -1 must not shut a fresh window of that kind.
-                    closeWorldContainerWindowsForUnknownId();
-
-                    this.craftingType = CRAFTING_SMALL;
-                    this.resetCraftingGridType();
-                    this.addWindow(this.craftingGrid, ContainerIds.NONE);
-                    if (this.protocol >= 407) {
-                        ContainerClosePacket pk = new ContainerClosePacket();
-                        pk.windowId = -1;
-                        pk.wasServerInitiated = false;
-                        pk.type = containerClosePacket.type;
-                        this.dataPacket(pk);
-                    }
-                    //TODO Find out why the correct id is not returned
-                    TradeInventory tradeInventory = this.getTradeInventory();
-                    if (tradeInventory != null) {
-                        this.removeWindow(tradeInventory, true);
-                    }
-                } else if (this.windowIndex.containsKey(containerClosePacket.windowId)) {
-                    this.inventoryOpen = false;
-                    Inventory inn = this.windowIndex.get(containerClosePacket.windowId);
-                    this.server.getPluginManager().callEvent(new InventoryCloseEvent(inn, this));
-                    this.closingWindowId = containerClosePacket.windowId;
-                    this.removeWindow(inn, true);
-                    this.closingWindowId = Integer.MIN_VALUE;
-                } else {  // Close the bugged inventory client refused with id -1 above
-                    ContainerClosePacket pk = new ContainerClosePacket();
-                    pk.windowId = containerClosePacket.windowId;
-                    pk.wasServerInitiated = false;
-                    pk.type = containerClosePacket.type;
-                    this.dataPacket(pk);
-
-//                    for (Inventory open : new ArrayList<>(this.windows.keySet())) {
-//                        if (open instanceof ContainerInventory) {
-//                            this.removeWindow(open);
-//                        }
-//                    }
-                }
+                if (!this.spawned) return;
+                if (this.protocol < 407) this.handleLegacyInventoryScreenClose(containerClosePacket);
+                else this.handleInventoryScreenClose(containerClosePacket);
                 break;
             case ProtocolInfo.BLOCK_ENTITY_DATA_PACKET:
                 if (!this.spawned || !this.isAlive()) {
@@ -7125,6 +7098,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (!(inventory instanceof ContainerInventory)) {
             return false;
         }
+        if (inventory instanceof DoubleChestInventory doubleChest) {
+            return isWorldBlockContainer(doubleChest.getLeftSide()) && isWorldBlockContainer(doubleChest.getRightSide());
+        }
         InventoryHolder holder = inventory.getHolder();
         if (!(holder instanceof BlockEntity blockEntity) || blockEntity.closed) {
             return false;
@@ -8172,7 +8148,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public Inventory getWindowById(int id) {
-        return this.windowIndex.get(id);
+        Inventory inventory = this.windowIndex.get(id);
+        if (inventory == null && id == (byte) TRADE_WINDOW_ID && Objects.equals(this.inventoryScreenId, TRADE_WINDOW_ID)
+                && this.windowIndex.get(TRADE_WINDOW_ID) instanceof TradeInventory) {
+            return this.windowIndex.get(TRADE_WINDOW_ID);
+        }
+        return inventory;
     }
 
     public int addWindow(Inventory inventory) {
@@ -8188,6 +8169,563 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public int addWindow(Inventory inventory, Integer forceId, boolean isPermanent, boolean alwaysOpen) {
+        if (this.protocol < 407) return this.addWindowLegacy(inventory, forceId, isPermanent, alwaysOpen);
+
+        Integer existing = this.windows.get(inventory);
+        if (existing != null) {
+            return existing;
+        }
+        boolean screen = !isPermanent && !(inventory instanceof CraftingGrid)
+                && (forceId == null || forceId >= 0);
+        if (screen) {
+            if (this.inventoryScreenOpening || this.inventoryCloseInProgress != null
+                    || this.inventoryScreenChangeDepth != 0 || this.pendingCloseWindowId != Integer.MIN_VALUE) {
+                return -1;
+            }
+            if (this.currentInventoryScreenId() != null) {
+                this.closeCurrentInventoryScreen();
+                return -1; // synchronous callers must not mistake a queued request for an open
+            }
+        }
+        if (inventory instanceof CraftingGrid && forceId != null && forceId == ContainerIds.NONE) {
+            Inventory previousGrid = this.windowIndex.get(forceId);
+            if (previousGrid instanceof CraftingGrid) {
+                this.windows.remove(previousGrid);
+            }
+        }
+        int cnt = this.allocateWindowId(forceId, screen);
+        if (cnt == Integer.MIN_VALUE) return -1;
+        this.windows.put(inventory, cnt);
+        // CraftingGrid.open() intentionally returns false: this is a slot mapping, not a screen.
+        // Its viewers belong to the permanent UI inventory and must never be added/removed here.
+        if (inventory instanceof CraftingGrid) return cnt;
+        if (isPermanent) {
+            this.permanentWindows.add(cnt);
+            inventory.getViewers().add(this);
+            return cnt;
+        }
+        if (screen) this.topWindow = inventory;
+        boolean previousOpening = this.inventoryScreenOpening;
+        int previousCraftingType = this.craftingType;
+        if (screen) this.inventoryScreenOpening = true;
+        boolean accepted = false;
+        try {
+            accepted = this.spawned && (!this.inventoryOpen || !screen) && inventory.open(this);
+            if (!accepted && alwaysOpen) {
+                inventory.getViewers().add(this);
+                accepted = true;
+            }
+            if (screen && !Objects.equals(this.inventoryScreenId, cnt)) accepted = false;
+            // An open callback may remove the very mapping it was given.
+            if (accepted && this.windows.get(inventory) != null && this.windows.get(inventory) == cnt) {
+                if (screen && this.inventoryScreenId == null) {
+                    this.inventoryScreenId = cnt;
+                    this.inventoryScreenType = this.inventoryNetworkType(inventory);
+                }
+                return cnt;
+            }
+            accepted = false;
+            return -1;
+        } finally {
+            try {
+                if (!accepted) {
+                    if (screen && inventory.getViewers().contains(this)) {
+                        int previousClosing = this.closingWindowId;
+                        this.closingWindowId = Integer.MAX_VALUE;
+                        try { inventory.close(this); }
+                        catch (RuntimeException | Error cleanupFailure) { this.server.getLogger().logException(cleanupFailure); }
+                        finally { this.closingWindowId = previousClosing; }
+                    }
+                    this.craftingType = previousCraftingType;
+                    if (!(inventory instanceof PlayerUIComponent)) inventory.getViewers().remove(this);
+                    if (this.windows.get(inventory) != null && this.windows.get(inventory) == cnt) this.windows.remove(inventory);
+                    if (isPermanent) this.permanentWindows.remove(cnt);
+                    if (this.topWindow == inventory) this.topWindow = null;
+                    if (Objects.equals(this.inventoryScreenId, cnt)) {
+                        // onOpen may already have sent the open packet before another callback failed.
+                        try { this.sendInventoryScreenClose(cnt, this.inventoryScreenType, true); }
+                        catch (RuntimeException | Error closeFailure) { this.server.getLogger().logException(closeFailure); }
+                    }
+                }
+            } finally {
+                this.inventoryScreenOpening = previousOpening;
+            }
+        }
+    }
+
+    private int allocateWindowId(Integer forceId, boolean screen) {
+        if (forceId != null) {
+            return this.windowIndex.containsKey(forceId) || screen && this.pendingCloseWindowId == forceId
+                    ? Integer.MIN_VALUE : forceId;
+        }
+        for (int attempts = 0; attempts < 99; attempts++) {
+            this.windowCnt = Math.max(MINIMUM_OTHER_WINDOW_ID, ++this.windowCnt % 99);
+            if (!this.windowIndex.containsKey(this.windowCnt) && this.pendingCloseWindowId != this.windowCnt) return this.windowCnt;
+        }
+        return Integer.MIN_VALUE;
+    }
+
+    public Optional<Inventory> getTopWindow() {
+        if (this.protocol < 407) return this.getTopWindowLegacy();
+
+        if (this.topWindow != null && this.isScreenWindow(this.topWindow)) return Optional.of(this.topWindow);
+        this.topWindow = null;
+        for (Inventory inventory : this.windows.keySet()) {
+            if (this.isScreenWindow(inventory)) {
+                this.topWindow = inventory;
+                break;
+            }
+        }
+        return Optional.ofNullable(this.topWindow);
+    }
+
+    private boolean isScreenWindow(Inventory inventory) {
+        Integer id = this.windows.get(inventory);
+        return id != null && id >= 0 && !this.permanentWindows.contains(id) && !(inventory instanceof CraftingGrid);
+    }
+
+    private Integer currentInventoryScreenId() {
+        if (this.inventoryScreenId != null) return this.inventoryScreenId;
+        if (this.inventoryOpen) return ContainerIds.INVENTORY;
+        return this.getTopWindow().map(this.windows::get).orElse(null);
+    }
+
+    private ContainerType inventoryNetworkType(Inventory inventory) {
+        return ContainerType.from(inventory instanceof FakeBlockUIComponent component
+                ? component.getFakeBlockType().getNetworkType() : inventory.getType().getNetworkType());
+    }
+
+    private int tradeScreenWindowId(UpdateTradePacket packet) {
+        return this.windowIndex.get(TRADE_WINDOW_ID) instanceof TradeInventory
+                && (byte) TRADE_WINDOW_ID == packet.windowId ? TRADE_WINDOW_ID : packet.windowId;
+    }
+
+    private void trackInventoryScreenPacket(DataPacket packet) {
+        if (packet instanceof UpdateTradePacket trade) {
+            this.inventoryScreenId = this.tradeScreenWindowId(trade);
+            this.inventoryScreenType = ContainerType.from(trade.windowType);
+        } else if (packet instanceof ContainerOpenPacket open) {
+            this.inventoryScreenId = open.windowId;
+            this.inventoryScreenType = ContainerType.from(open.type);
+        } else if (packet instanceof ContainerClosePacket close && close.wasServerInitiated
+                && (Objects.equals(this.inventoryScreenId, close.windowId) || this.pendingCloseWindowId == close.windowId)) {
+            // A client-close response must never create another server-close barrier.
+            if (this.pendingCloseWindowId == Integer.MIN_VALUE || this.pendingCloseWindowId == close.windowId) {
+                this.pendingCloseWindowId = close.windowId;
+                this.pendingCloseWindowType = close.type;
+            }
+            if (Objects.equals(this.inventoryScreenId, close.windowId)) this.inventoryScreenId = null;
+            Inventory inventory = this.windowIndex.get(close.windowId);
+            if (inventory != null && this.isScreenWindow(inventory)) {
+                this.windows.remove(inventory); // also covers callers using inventory.close(player) directly
+                if (this.topWindow == inventory) this.topWindow = null;
+            }
+            if (close.windowId == ContainerIds.INVENTORY) this.inventoryOpen = false;
+        }
+    }
+
+    private boolean sendInventoryScreenClose(int id, ContainerType type, boolean serverInitiated) {
+        if (this.protocol < 407) return true;
+        ContainerClosePacket response = new ContainerClosePacket();
+        response.windowId = id;
+        response.type = type;
+        response.wasServerInitiated = serverInitiated;
+        return this.dataPacket(response);
+    }
+
+    /** True only for the one verified server close awaiting the client's response. */
+    public boolean isAwaitingContainerClose(int windowId) {
+        return this.pendingCloseWindowId != Integer.MIN_VALUE
+                && ((byte) this.pendingCloseWindowId == (byte) windowId
+                    || windowId == ContainerIds.NONE && this.currentInventoryScreenId() == null);
+    }
+
+    /** Close exactly this screen; a stale callback cannot close a newer screen. */
+    public boolean closeInventoryScreen(int expectedId, ContainerType expectedType) {
+        Integer current = this.currentInventoryScreenId();
+        if (current == null || current != expectedId) return false;
+        Inventory inventory = this.windowIndex.get(current);
+        ContainerType currentType = this.inventoryScreenId != null ? this.inventoryScreenType
+                : inventory != null ? this.inventoryNetworkType(inventory) : ContainerType.NONE;
+        if (currentType != expectedType) return false;
+        this.closeCurrentInventoryScreen();
+        return true;
+    }
+
+    private void closeCurrentInventoryScreen() {
+        Integer id = this.currentInventoryScreenId();
+        if (id == null || this.inventoryCloseInProgress != null) return;
+        Inventory inventory = this.windowIndex.get(id);
+        if (inventory != null && !(inventory instanceof CraftingGrid)) {
+            this.closeAndRemoveInventoryWindow(inventory, false, true);
+            if (this.getWindowId(inventory) == -1 || inventory == this.inventory && !this.inventoryOpen)
+                this.resetCraftingGridType();
+        } else {
+            this.inventoryScreenChangeDepth++;
+            try {
+                if (this.sendInventoryScreenClose(id, this.inventoryScreenType, true)) {
+                    this.inventoryScreenId = null;
+                    this.pendingCloseWindowId = id;
+                    this.pendingCloseWindowType = this.inventoryScreenType;
+                    this.inventoryOpen = false;
+                    this.resetCraftingGridType();
+                }
+            } finally {
+                this.inventoryScreenChangeDepth--;
+            }
+        }
+    }
+
+    public void removeWindow(Inventory inventory) { this.removeWindow(inventory, false); }
+
+    protected void removeWindow(Inventory inventory, boolean isResponse) {
+        if (this.protocol < 407) { this.removeWindowLegacy(inventory, isResponse); return; }
+
+        if (this.pendingWindowOpen != null && this.pendingWindowOpen.inventory == inventory) this.pendingWindowOpen.cancel();
+        if (this.activeWindowOpenRequest != null && this.activeWindowOpenRequest.inventory == inventory) this.activeWindowOpenRequest.cancel();
+        if (inventory == this.inventoryCloseInProgress) return;
+        this.closeAndRemoveInventoryWindow(inventory, isResponse, false);
+    }
+
+    private void closeAndRemoveInventoryWindow(Inventory inventory, boolean isResponse, boolean fireEvent) {
+        Integer id = this.windows.get(inventory);
+        if (id == null) return;
+        int previousClosingId = this.closingWindowId;
+        Inventory previousClosingInventory = this.inventoryCloseInProgress;
+        this.inventoryCloseInProgress = inventory;
+        this.inventoryScreenChangeDepth++;
+        if (isResponse || this.inventoryScreenOpening && this.inventoryScreenId == null)
+            this.closingWindowId = Integer.MAX_VALUE;
+        boolean ownScreen = Objects.equals(this.currentInventoryScreenId(), id);
+        boolean retainAnvilInputs = false;
+        try {
+            if (fireEvent && !(inventory instanceof FakeBlockUIComponent)) {
+                try { this.server.getPluginManager().callEvent(new InventoryCloseEvent(inventory, this)); }
+                catch (RuntimeException | Error notificationFailure) { this.server.getLogger().logException(notificationFailure); }
+            }
+            try {
+                inventory.close(this);
+                if (!isResponse && ownScreen && inventory instanceof TradeInventory)
+                    this.sendInventoryScreenClose(id, this.inventoryNetworkType(inventory), true);
+            }
+            finally {
+                retainAnvilInputs = inventory instanceof AnvilInventory anvil && inventory.getViewers().contains(this)
+                        && (!anvil.getInputSlot().isNull() || !anvil.getMaterialSlot().isNull());
+            }
+        } finally {
+            try {
+                // A throwing/canceling/reentrant plugin must not retain the old id or viewer.
+                if (!retainAnvilInputs) {
+                    if (!this.permanentWindows.contains(id) && Objects.equals(this.windows.get(inventory), id)) this.windows.remove(inventory);
+                    if (inventory != this.inventory && !(inventory instanceof PlayerUIComponent)) inventory.getViewers().remove(this);
+                    if (this.topWindow == inventory) this.topWindow = null;
+                }
+                if (ownScreen && !retainAnvilInputs) {
+                    if (isResponse) this.inventoryScreenId = null;
+                    this.inventoryOpen = false;
+                }
+            } finally {
+                this.inventoryCloseInProgress = previousClosingInventory;
+                this.closingWindowId = previousClosingId;
+                this.inventoryScreenChangeDepth--;
+            }
+        }
+    }
+
+    private void handleInventoryScreenClose(ContainerClosePacket packet) {
+        int id = packet.windowId;
+        if (this.isAwaitingContainerClose(id)) {
+            // Ack first; only then clear the barrier and invoke an opener/callback.
+            // NONE is the Bedrock rejection alias; serialize the last window id as PMMP does.
+            if (!this.sendInventoryScreenClose(this.pendingCloseWindowId, this.pendingCloseWindowType, false)) return;
+            this.pendingCloseWindowId = Integer.MIN_VALUE;
+            this.pendingCloseWindowType = ContainerType.NONE;
+            this.flushPendingWindowOpen();
+            return;
+        }
+        Integer activeId = this.currentInventoryScreenId();
+        Inventory inventory = activeId == null ? null : this.windowIndex.get(activeId);
+        boolean noneClosesActive = id == ContainerIds.NONE && activeId != null
+                && (this.inventoryOpen || activeId == ContainerIds.NONE || inventory instanceof PlayerEnderChestInventory
+                    || isWorldBlockContainer(inventory));
+        if (activeId != null && (id == (byte) activeId.intValue() || noneClosesActive)) {
+            ContainerType type = inventory != null && !(inventory instanceof CraftingGrid)
+                    ? this.inventoryNetworkType(inventory) : this.inventoryScreenType;
+            this.inventoryScreenChangeDepth++;
+            int previousClosingId = this.closingWindowId;
+            this.closingWindowId = Integer.MAX_VALUE;
+            boolean acknowledged = false;
+            try {
+                if (!this.sendInventoryScreenClose(id, type, false)) return;
+                acknowledged = true;
+                this.inventoryScreenId = null;
+                this.inventoryOpen = false;
+                if (inventory != null && !(inventory instanceof CraftingGrid))
+                    this.closeAndRemoveInventoryWindow(inventory, true, true);
+            } finally {
+                try {
+                    if (acknowledged && (!(inventory instanceof AnvilInventory) || this.getWindowId(inventory) == -1))
+                        this.resetCraftingGridType();
+                } finally {
+                    this.closingWindowId = previousClosingId;
+                    this.inventoryScreenChangeDepth--;
+                    this.flushPendingWindowOpen();
+                }
+            }
+        } else if (activeId == null && id != ContainerIds.NONE) {
+            // Positive unknown closes can be handshake retries. Never echo them over a fresh screen.
+            this.sendInventoryScreenClose(id, packet.type, false);
+        }
+    }
+
+    /** A cancelable open request. Cancellation belongs to this request, never a newer one. */
+    public final class WindowOpenRequest {
+        private final Inventory inventory;
+        private final BooleanSupplier stillValid;
+        private final Runnable opener;
+        private final Runnable refused;
+        private final long createdNanos = System.nanoTime();
+        private boolean finished;
+        private WindowOpenRequest(Inventory inventory, BooleanSupplier valid, Runnable opener, Runnable refused) {
+            this.inventory = inventory;
+            this.stillValid = valid;
+            this.opener = opener;
+            this.refused = refused;
+        }
+        public void cancel() {
+            if (this.finished) return;
+            this.finished = true;
+            if (Player.this.pendingWindowOpen == this) Player.this.pendingWindowOpen = null;
+            try { this.refused.run(); }
+            catch (RuntimeException | Error callbackFailure) { Player.this.server.getLogger().logException(callbackFailure); }
+        }
+    }
+
+    /** Open a native world inventory after any prior close ACK; stale holders never reopen. */
+    public WindowOpenRequest requestWindowOpen(Inventory inventory) { return this.requestWindowOpen(inventory, null); }
+
+    public WindowOpenRequest requestWindowOpen(Inventory inventory, Integer forceId) {
+        Level origin = this.level;
+        InventoryHolder holder = inventory instanceof DoubleChestInventory doubleChest
+                ? doubleChest.getLeftSide().getHolder() : inventory.getHolder();
+        Position anchor = holder instanceof Position position ? position.clone() : null;
+        Block anchorBlock = anchor != null && !(holder instanceof Entity) && origin != null ? origin.getBlock(anchor) : null;
+        return this.requestWindowOpen(inventory, forceId, () -> {
+            if (this.level != origin) return false;
+            if (inventory instanceof DoubleChestInventory doubleChest && (!isWorldBlockContainer(inventory)
+                    || doubleChest.getLeftSide().getDoubleInventory() != inventory
+                    || doubleChest.getRightSide().getDoubleInventory() != inventory)) return false;
+            if (holder instanceof Entity entity && (entity.closed || entity.getLevel() != origin || !entity.isAlive())) return false;
+            if (holder instanceof BlockEntity entity && (entity.closed || entity.getLevel() != origin
+                    || origin.getBlockEntityIfLoaded(entity) != entity)) return false;
+            if (anchor != null && this.distanceSquared(anchor) > 100) return false;
+            return anchorBlock == null || holder instanceof BlockEntity || origin.getBlock(anchor).equals(anchorBlock);
+        }, ignored -> { });
+    }
+
+    /** The ender chest has a player-owned inventory but a separately owned world lid. */
+    public WindowOpenRequest requestEnderChestWindow(BlockEnderChest chest) {
+        Level origin = chest.getLevel();
+        BlockEntity holder = origin.getBlockEntityIfLoaded(chest);
+        Inventory inventory = this.getEnderChestInventory();
+        return this.requestInventoryScreenOpen(inventory,
+                () -> this.level == origin && this.distanceSquared(chest) <= 100
+                        && origin.getBlock(chest).getId() == chest.getId()
+                        && origin.getBlockEntityIfLoaded(chest) == holder,
+                () -> {
+                    this.setViewingEnderChest(chest);
+                    boolean opened = false;
+                    try { opened = this.addWindow(inventory) != -1; }
+                    finally { if (!opened) this.setViewingEnderChest(null); }
+                }, () -> { });
+    }
+
+    /** Callback runs once with the real opened id, or -1 if canceled/refused. No optimistic success. */
+    public WindowOpenRequest requestWindowOpen(Inventory inventory, Integer forceId,
+                                               BooleanSupplier stillValid, IntConsumer completion) {
+        Objects.requireNonNull(inventory);
+        Objects.requireNonNull(completion);
+        boolean[] completed = {false};
+        IntConsumer deliver = result -> {
+            if (completed[0]) return;
+            completed[0] = true;
+            completion.accept(result);
+        };
+        return this.requestInventoryScreenOpen(inventory, stillValid, () -> {
+            int result;
+            if (inventory == this.inventory) {
+                if (this.inventoryOpen) result = ContainerIds.INVENTORY;
+                else {
+                    this.inventoryScreenOpening = true;
+                    try {
+                        boolean accepted = inventory.open(this) && (this.protocol < 407 || Objects.equals(this.inventoryScreenId, ContainerIds.INVENTORY));
+                        this.inventoryOpen = accepted;
+                        result = accepted ? ContainerIds.INVENTORY : -1;
+                    } finally {
+                        this.inventoryScreenOpening = false;
+                    }
+                }
+            } else result = this.addWindow(inventory, forceId);
+            deliver.accept(result);
+        }, () -> deliver.accept(-1));
+    }
+
+    /** Barrier for a plugin screen sent as raw ContainerOpen (e.g. a workbench with id -1). */
+    public WindowOpenRequest requestInventoryScreenOpen(BooleanSupplier stillValid, Runnable opener, Runnable refused) {
+        return this.requestInventoryScreenOpen(null, stillValid, opener, refused);
+    }
+
+    private WindowOpenRequest requestInventoryScreenOpen(Inventory inventory, BooleanSupplier stillValid,
+                                                         Runnable opener, Runnable refused) {
+        WindowOpenRequest request = new WindowOpenRequest(inventory, Objects.requireNonNull(stillValid),
+                Objects.requireNonNull(opener), Objects.requireNonNull(refused));
+        try {
+            if (!this.connected || this.closed || !this.spawned || !this.isAlive() || !stillValid.getAsBoolean()) {
+                request.cancel();
+                return request;
+            }
+        } catch (RuntimeException | Error validityFailure) {
+            this.server.getLogger().logException(validityFailure);
+            request.cancel();
+            return request;
+        }
+        if (this.protocol < 407) {
+            try {
+                request.opener.run();
+                request.finished = true;
+            } catch (RuntimeException | Error failure) {
+                this.server.getLogger().logException(failure);
+                request.cancel();
+            }
+            return request;
+        }
+        long sequence = ++this.windowOpenRequestSequence;
+        WindowOpenRequest previous = this.pendingWindowOpen;
+        this.pendingWindowOpen = null;
+        if (this.activeWindowOpenRequest != null) this.activeWindowOpenRequest.cancel();
+        if (previous != null) previous.cancel();
+        // A cancellation callback can create a newer request; preserve it.
+        if (sequence != this.windowOpenRequestSequence) { request.cancel(); return request; }
+        this.pendingWindowOpen = request;
+        if (this.inventoryCloseInProgress == null && !this.inventoryScreenOpening && this.inventoryScreenChangeDepth == 0) {
+            boolean alreadyWaiting = this.pendingCloseWindowId != Integer.MIN_VALUE;
+            Integer current = this.currentInventoryScreenId();
+            if (current != null && (inventory == null || this.windowIndex.get(current) != inventory)) this.closeCurrentInventoryScreen();
+            if (alreadyWaiting && this.pendingCloseWindowId != Integer.MIN_VALUE) {
+                // A new user action retries the instruction; a timer never opens over an unacked close.
+                this.sendInventoryScreenClose(this.pendingCloseWindowId, this.pendingCloseWindowType, true);
+            }
+            this.flushPendingWindowOpen();
+        }
+        return request;
+    }
+
+    private void flushPendingWindowOpen() {
+        if (this.pendingCloseWindowId != Integer.MIN_VALUE || this.inventoryCloseInProgress != null
+                || this.inventoryScreenOpening || this.inventoryScreenChangeDepth != 0) return;
+        WindowOpenRequest request = this.pendingWindowOpen;
+        if (request == null) return;
+        Integer active = this.currentInventoryScreenId();
+        if (active != null && (request.inventory == null || this.windowIndex.get(active) != request.inventory)) {
+            this.closeCurrentInventoryScreen();
+            if (this.currentInventoryScreenId() != null || this.pendingCloseWindowId != Integer.MIN_VALUE) return;
+        }
+        this.pendingWindowOpen = null;
+        boolean previousOpening = this.inventoryScreenOpening;
+        if (request.inventory == null) this.inventoryScreenOpening = true;
+        try {
+            if (!this.connected || this.closed || !this.spawned || !this.isAlive()
+                    || System.nanoTime() - request.createdNanos > WINDOW_OPEN_REQUEST_MAX_NANOS
+                    || !request.stillValid.getAsBoolean()) {
+                request.cancel();
+                return;
+            }
+            this.activeWindowOpenRequest = request;
+            request.opener.run();
+            request.finished = true;
+        } catch (RuntimeException | Error failure) {
+            this.server.getLogger().logException(failure);
+            if (!request.finished) request.cancel();
+            else request.refused.run();
+        } finally {
+            if (this.activeWindowOpenRequest == request) this.activeWindowOpenRequest = null;
+            this.inventoryScreenOpening = previousOpening;
+            this.flushPendingWindowOpen();
+        }
+    }
+
+    private void handleLegacyInventoryScreenClose(ContainerClosePacket containerClosePacket) {
+
+                if (!this.spawned) {
+                    return;
+                }
+
+                if (containerClosePacket.windowId == -1) {
+                    // At least 1.21 does sometimes send windowId -1 when opening and closing containers quickly
+                    if (this.inventoryOpen) {
+                        this.inventoryOpen = false;
+
+                        if (this.craftingType == CRAFTING_SMALL) {
+                            for (Entry<Inventory, Integer> open : new ArrayList<>(this.windows.entrySet())) {
+                                if (open.getKey() instanceof ContainerInventory || open.getKey() instanceof PlayerEnderChestInventory) {
+                                    this.server.getPluginManager().callEvent(new InventoryCloseEvent(open.getKey(), this));
+                                    this.closingWindowId = Integer.MAX_VALUE;
+                                    this.removeWindow(open.getKey(), true);
+                                    this.closingWindowId = Integer.MIN_VALUE;
+                                }
+                            }
+                            return;
+                        }
+                    }
+
+                    // 1.21 clients also close an ender chest with -1 while their own inventory is not
+                    // open. Without this the window stayed open on the server: the lid hung open for
+                    // everyone and the chest did not open again for this player until a teleport.
+                    closeEnderChestWindowForUnknownId();
+                    // The same happens to a chest, barrel, shulker box, hopper or furnace of the world:
+                    // the lid hung open and the block did not open again for this player. Only windows
+                    // of real block entities are closed here. A plugin window drawn on a fake block has
+                    // no block entity, and a late -1 must not shut a fresh window of that kind.
+                    closeWorldContainerWindowsForUnknownId();
+
+                    this.craftingType = CRAFTING_SMALL;
+                    this.resetCraftingGridType();
+                    this.addWindow(this.craftingGrid, ContainerIds.NONE);
+                    if (this.protocol >= 407) {
+                        ContainerClosePacket pk = new ContainerClosePacket();
+                        pk.windowId = -1;
+                        pk.wasServerInitiated = false;
+                        pk.type = containerClosePacket.type;
+                        this.dataPacket(pk);
+                    }
+                    //TODO Find out why the correct id is not returned
+                    TradeInventory tradeInventory = this.getTradeInventory();
+                    if (tradeInventory != null) {
+                        this.removeWindow(tradeInventory, true);
+                    }
+                } else if (this.windowIndex.containsKey(containerClosePacket.windowId)) {
+                    this.inventoryOpen = false;
+                    Inventory inn = this.windowIndex.get(containerClosePacket.windowId);
+                    this.server.getPluginManager().callEvent(new InventoryCloseEvent(inn, this));
+                    this.closingWindowId = containerClosePacket.windowId;
+                    this.removeWindow(inn, true);
+                    this.closingWindowId = Integer.MIN_VALUE;
+                } else {  // Close the bugged inventory client refused with id -1 above
+                    ContainerClosePacket pk = new ContainerClosePacket();
+                    pk.windowId = containerClosePacket.windowId;
+                    pk.wasServerInitiated = false;
+                    pk.type = containerClosePacket.type;
+                    this.dataPacket(pk);
+
+//                    for (Inventory open : new ArrayList<>(this.windows.keySet())) {
+//                        if (open instanceof ContainerInventory) {
+//                            this.removeWindow(open);
+//                        }
+//                    }
+                }
+    }
+
+    private int addWindowLegacy(Inventory inventory, Integer forceId, boolean isPermanent, boolean alwaysOpen) {
         if (this.windows.containsKey(inventory)) {
             return this.windows.get(inventory);
         }
@@ -8223,7 +8761,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return cnt;
     }
 
-    public Optional<Inventory> getTopWindow() {
+    private Optional<Inventory> getTopWindowLegacy() {
         if (this.topWindow != null && this.windows.containsKey(this.topWindow)
                 && !this.permanentWindows.contains(this.windows.get(this.topWindow))) {
             return Optional.of(this.topWindow);
@@ -8240,11 +8778,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return Optional.ofNullable(fallback);
     }
 
-    public void removeWindow(Inventory inventory) {
-        this.removeWindow(inventory, false);
-    }
-
-    protected void removeWindow(Inventory inventory, boolean isResponse) {
+    private void removeWindowLegacy(Inventory inventory, boolean isResponse) {
         inventory.close(this);
         // TODO: This needs a proper fix
         // Requiring isResponse here causes issues with inventory events and an item duplication glitch
@@ -8253,6 +8787,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (inventory == this.topWindow) {
                 this.topWindow = null;
             }
+        }
+    }
+
+    private void removeAllWindowsLegacy(boolean permanent) {
+        for (Entry<Integer, Inventory> entry : new ArrayList<>(this.windowIndex.entrySet())) {
+            if (!permanent && this.permanentWindows.contains(entry.getKey())) {
+                continue;
+            }
+
+            this.removeWindow(entry.getValue());
         }
     }
 
@@ -8376,8 +8920,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param permanent remove permanent windows
      */
     public void removeAllWindows(boolean permanent) {
+        if (this.protocol < 407) { this.removeAllWindowsLegacy(permanent); return; }
+
+        if (this.pendingWindowOpen != null) this.pendingWindowOpen.cancel();
+        if (this.activeWindowOpenRequest != null) this.activeWindowOpenRequest.cancel();
+        this.closeCurrentInventoryScreen();
         for (Entry<Integer, Inventory> entry : new ArrayList<>(this.windowIndex.entrySet())) {
-            if (!permanent && this.permanentWindows.contains(entry.getKey())) {
+            if (!permanent && (this.permanentWindows.contains(entry.getKey()) || entry.getValue() instanceof CraftingGrid)) {
                 continue;
             }
 

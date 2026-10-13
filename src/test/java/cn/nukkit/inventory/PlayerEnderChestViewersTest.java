@@ -99,6 +99,7 @@ class PlayerEnderChestViewersTest {
         Mockito.when(viewer.getLevel()).thenReturn(level);
         Mockito.when(viewer.getViewingEnderChest()).thenReturn(chest);
         Mockito.when(viewer.getWindowId(any())).thenReturn(5);
+        Mockito.when(viewer.dataPacket(any(DataPacket.class))).thenReturn(true);
         Mockito.when(viewer.getClosingWindowId()).thenReturn(Integer.MAX_VALUE);
         viewer.spawned = true;
         return viewer;

@@ -159,12 +159,7 @@ public class BlockEnderChest extends BlockTransparentMeta implements Faceable, B
                 }
             }
 
-            player.setViewingEnderChest(this);
-            if (player.addWindow(player.getEnderChestInventory()) == -1) {
-                // The window did not open (cancelled open event, another screen): do not stay a viewer,
-                // or the lid of this chest would never open or close for anybody again.
-                player.setViewingEnderChest(null);
-            }
+            player.requestEnderChestWindow(this);
 
             for (Entity e : this.getChunk().getEntities().values()) {
                 if (e instanceof EntityPiglin) {

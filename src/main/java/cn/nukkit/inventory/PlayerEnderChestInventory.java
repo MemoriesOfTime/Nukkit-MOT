@@ -40,7 +40,11 @@ public class PlayerEnderChestInventory extends BaseInventory {
             containerOpenPacket.x = containerOpenPacket.y = containerOpenPacket.z = 0;
         }
 
-        who.dataPacket(containerOpenPacket);
+        if (!who.dataPacket(containerOpenPacket)) {
+            this.getViewers().remove(who);
+            who.setViewingEnderChest(null);
+            return;
+        }
 
         this.sendContents(who);
 

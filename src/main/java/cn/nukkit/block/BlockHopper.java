@@ -182,7 +182,8 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
         BlockEntity blockEntity = this.level.getBlockEntity(this);
 
         if (blockEntity instanceof BlockEntityHopper) {
-            return player.addWindow(((BlockEntityHopper) blockEntity).getInventory()) != -1;
+            player.requestWindowOpen(((BlockEntityHopper) blockEntity).getInventory());
+            return true;
         }
 
         return false;

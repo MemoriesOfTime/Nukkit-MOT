@@ -209,7 +209,7 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
                 }
             }
 
-            player.addWindow(chest.getInventory());
+            player.requestWindowOpen(chest.getInventory());
 
             for (Entity e : this.getChunk().getEntities().values()) {
                 if (e instanceof EntityPiglin) {

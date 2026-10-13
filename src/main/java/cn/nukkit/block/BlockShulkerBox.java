@@ -245,7 +245,7 @@ public class BlockShulkerBox extends BlockTransparentMeta implements BlockEntity
                 return true;
             }
 
-            player.addWindow(box.getInventory());
+            player.requestWindowOpen(box.getInventory());
         }
 
         return true;
