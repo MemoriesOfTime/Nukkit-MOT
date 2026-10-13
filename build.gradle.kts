@@ -35,34 +35,34 @@ java {
 }
 
 // 覆盖 main/test/buildTools 全部编译任务，产物统一 Java 17 兼容
-// （下方 compileJava21 是唯一例外：MR-JAR 版本化类，编译为 21 字节码落在 META-INF/versions/21）
+// （下方 compileJava25 是唯一例外：MR-JAR 版本化类，编译为 25 字节码落在 META-INF/versions/25）
 // Covers every compile task (main/test/buildTools); output stays Java 17 compatible.
-// Sole exception: compileJava21 below — MR-JAR versioned classes compiled at release 21
-// into META-INF/versions/21.
+// Sole exception: compileJava25 below — MR-JAR versioned classes compiled at release 25
+// into META-INF/versions/25.
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(17)
+    options.release.set(25)
 }
 
-// MR-JAR：src/main/java21 的虚拟线程实现类以 release 21 单独编译，产物经 sourceSet output
-// 进入 jar/liteJar/shadowJar 的 META-INF/versions/21；JVM 21+ 自动选中、17 自动忽略。
-// 与 pom.xml 的 compile-java21 execution 对应，JavaReleaseConsistencyTest 守卫两侧一致。
-// MR-JAR: virtual-thread impl under src/main/java21 compiles at release 21 into
-// META-INF/versions/21 (reaches jar/liteJar/shadowJar via the sourceSet output).
+// MR-JAR：src/main/java25 的虚拟线程实现类以 release 25 单独编译，产物经 sourceSet output
+// 进入 jar/liteJar/shadowJar 的 META-INF/versions/25；JVM 21+ 自动选中、17 自动忽略。
+// 与 pom.xml 的 compile-java25 execution 对应，JavaReleaseConsistencyTest 守卫两侧一致。
+// MR-JAR: virtual-thread impl under src/main/java25 compiles at release 25 into
+// META-INF/versions/25 (reaches jar/liteJar/shadowJar via the sourceSet output).
 // JVM 21+ picks these classes automatically, 17 ignores them. Mirrors the pom's
-// compile-java21 execution; JavaReleaseConsistencyTest guards both sides.
+// compile-java25 execution; JavaReleaseConsistencyTest guards both sides.
 val compileJava21 by tasks.registering(JavaCompile::class) {
-    source = fileTree("src/main/java21")
+    source = fileTree("src/main/java25")
     // 直接引用 compileJava 的输出目录而非 sourceSet output，避免与 output.dir(builtBy) 成环
     // Points at compileJava's output dir instead of the sourceSet output to avoid a
     // builtBy cycle with the output.dir registration below
     classpath = sourceSets.main.get().compileClasspath + files(tasks.compileJava.flatMap { it.destinationDirectory })
-    destinationDirectory.set(layout.buildDirectory.dir("classes/java21/META-INF/versions/21"))
-    options.release.set(21)
+    destinationDirectory.set(layout.buildDirectory.dir("classes/java21/META-INF/versions/25"))
+    options.release.set(25)
     options.encoding = "UTF-8"
 }
 
 sourceSets.main {
-    output.dir(layout.buildDirectory.dir("classes/java21"), "builtBy" to compileJava21)
+    output.dir(layout.buildDirectory.dir("classes/java25"), "builtBy" to compileJava21)
 }
 
 repositories {

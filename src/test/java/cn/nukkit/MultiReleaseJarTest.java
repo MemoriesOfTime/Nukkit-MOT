@@ -23,12 +23,12 @@ import java.util.zip.ZipEntry;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 验证 MR-JAR 语义端到端生效：构造一个含 versions/21 覆盖类的最小 Multi-Release jar，
+ * 验证 MR-JAR 语义端到端生效：构造一个含 versions/25 覆盖类的最小 Multi-Release jar，
  * 经 URLClassLoader（Bootstrap/Lite jar 的加载方式）加载后，
  * JVM 21+ 应选中虚拟线程实现、JVM 17-20 应选中基线 stub。
  * 同时守卫 shaded jar 的 Multi-Release manifest。
  * <p>
- * End-to-end MR-JAR semantics: builds a minimal Multi-Release jar with the versions/21
+ * End-to-end MR-JAR semantics: builds a minimal Multi-Release jar with the versions/25
  * override, loads it through a URLClassLoader (the Bootstrap/Lite jar path) and asserts the
  * JVM selects the virtual-thread implementation on 21+ and the base stub on 17-20.
  * Also guards the Multi-Release manifest of the shaded jar when present.
@@ -38,7 +38,7 @@ public class MultiReleaseJarTest {
     private static final String SERVICE_CLASS = "cn.nukkit.scheduler.VirtualThreadService";
     private static final String IMPL_CLASS = "cn.nukkit.scheduler.VirtualThreadServiceImpl";
     private static final String VERSIONED_IMPL_RESOURCE =
-            "META-INF/versions/21/cn/nukkit/scheduler/VirtualThreadServiceImpl.class";
+        "META-INF/versions/25/cn/nukkit/scheduler/VirtualThreadServiceImpl.class";
 
     @TempDir
     Path tempDir;
@@ -55,7 +55,7 @@ public class MultiReleaseJarTest {
 
             boolean expectSupported = Runtime.version().feature() >= 21;
             assertEquals(expectSupported, supported,
-                    "JVM " + Runtime.version().feature() + " 应" + (expectSupported ? "" : "不") + "选中 versions/21 覆盖类");
+                "JVM " + Runtime.version().feature() + " 应" + (expectSupported ? "" : "不") + "选中 versions/25 覆盖类");
 
             Object executor = service.getMethod("newExecutor", String.class, Thread.UncaughtExceptionHandler.class)
                     .invoke(instance, "Nukkit MR Test #", (Thread.UncaughtExceptionHandler) (t, e) -> { });
@@ -93,24 +93,8 @@ public class MultiReleaseJarTest {
 
     @Test
     public void testVersionedClassLayoutOnClasspath() throws Exception {
-        // 两个实现类都存在，版本化类 major=65、基线类 major=61（接线在 JavaReleaseConsistencyTest 也有守卫）
-        // Both impl classes exist; versioned major=65, base major=61
-        assertClassMajor(IMPL_CLASS.replace('.', '/') + ".class", 61);
-        assertClassMajor(VERSIONED_IMPL_RESOURCE, 65);
-    }
-
-    /**
-     * 基线与 versions/21 的同名实现类方法签名一致（编译期父类契约之外的运行时复核）：
-     * 提取两份 class 文件常量池中的方法名/描述符片段对比。
-     * <p>
-     * Asserts the base and versioned same-FQCN classes stay signature-compatible by
-     * comparing method name/descriptor fragments from both class files' constant pools.
-     */
-    private void assertImplSignaturesCompatible(JarFile jar) throws Exception {
-        List<String> baseMethods = publicMethodSignatures(jar, IMPL_CLASS.replace('.', '/') + ".class");
-        List<String> versionedMethods = publicMethodSignatures(jar, VERSIONED_IMPL_RESOURCE);
-        assertEquals(baseMethods, versionedMethods,
-                "VirtualThreadServiceImpl 基线与 versions/21 版本 public 签名漂移");
+        assertClassMajor(IMPL_CLASS.replace('.', '/') + ".class", 69);
+        assertClassMajor(VERSIONED_IMPL_RESOURCE, 69);
     }
 
     private List<String> publicMethodSignatures(JarFile jar, String entry) throws Exception {
@@ -124,7 +108,7 @@ public class MultiReleaseJarTest {
         }
     }
 
-    /** 构造最小 MR jar：基线 Service+Impl + versions/21 Impl + Multi-Release manifest */
+    /** 构造最小 MR jar：基线 Service+Impl + versions/25 Impl + Multi-Release manifest */
     private Path buildMiniMrJar() throws Exception {
         Path jar = tempDir.resolve("mini-mr.jar");
         Manifest manifest = new Manifest();

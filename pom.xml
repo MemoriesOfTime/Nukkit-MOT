@@ -689,24 +689,24 @@
                     </annotationProcessorPaths>
                 </configuration>
                 <executions>
-                    <!-- MR-JAR：src/main/java21 以 release 21 单独编译进 META-INF/versions/21，
+                    <!-- MR-JAR：src/main/java21 以 release 25 单独编译进 META-INF/versions/25，
                          仅允许 Java 21+ API（虚拟线程）；JVM 21+ 类加载器自动选中，17 自动忽略。
                          须跑在 default-compile 之后（依赖已编译的主类作 classpath）。
-                         MR-JAR: compiles src/main/java21 at release 21 into META-INF/versions/21;
+                         MR-JAR: compiles src/main/java25 at release 25 into META-INF/versions/21;
                          JVM 21+ picks these classes automatically, 17 ignores them. Must run
                          after default-compile (needs main classes on the classpath). -->
                     <execution>
-                        <id>compile-java21</id>
+                        <id>compile-java25</id>
                         <phase>compile</phase>
                         <goals>
                             <goal>compile</goal>
                         </goals>
                         <configuration>
-                            <release>21</release>
+                            <release>25</release>
                             <compileSourceRoots>
-                                <compileSourceRoot>${project.basedir}/src/main/java21</compileSourceRoot>
+                                <compileSourceRoot>${project.basedir}/src/main/java25</compileSourceRoot>
                             </compileSourceRoots>
-                            <outputDirectory>${project.build.outputDirectory}/META-INF/versions/21</outputDirectory>
+                            <outputDirectory>${project.build.outputDirectory}/META-INF/versions/25</outputDirectory>
                         </configuration>
                     </execution>
                 </executions>

@@ -108,7 +108,7 @@ public class VirtualThreadServiceConcurrentInitTest {
         }
     }
 
-    /** 最小 MR jar：Service + Impl（基线）+ versions/21 Impl + Multi-Release manifest */
+    /** 最小 MR jar：Service + Impl（基线）+ versions/25 Impl + Multi-Release manifest */
     private Path buildMiniJar() throws Exception {
         Path jar = tempDir.resolve("mini-init-race.jar");
         Manifest manifest = new Manifest();
@@ -118,7 +118,7 @@ public class VirtualThreadServiceConcurrentInitTest {
             copyFromClasspath(out, "cn/nukkit/scheduler/VirtualThreadService.class");
             copyFromClasspath(out, "cn/nukkit/scheduler/VirtualThreadService$DefaultHolder.class");
             copyFromClasspath(out, "cn/nukkit/scheduler/VirtualThreadServiceImpl.class");
-            copyFromClasspath(out, "META-INF/versions/21/cn/nukkit/scheduler/VirtualThreadServiceImpl.class");
+            copyFromClasspath(out, "META-INF/versions/25/cn/nukkit/scheduler/VirtualThreadServiceImpl.class");
         }
         return jar;
     }
