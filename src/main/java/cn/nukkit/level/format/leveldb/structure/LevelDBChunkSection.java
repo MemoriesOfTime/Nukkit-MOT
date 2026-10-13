@@ -850,7 +850,11 @@ public class LevelDBChunkSection implements ChunkSection {
                 }
                 storages[i] = storage.copy();
             }
-            return new LevelDBChunkSection(null, this.y, storages, this.blockLight, this.skyLight, this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+            return new LevelDBChunkSection(null, this.y, storages,
+                    this.blockLight == null ? null : this.blockLight.clone(),
+                    this.skyLight == null ? null : this.skyLight.clone(),
+                    this.compressedLight == null ? null : this.compressedLight.clone(),
+                    this.hasBlockLight, this.hasSkyLight);
         } finally {
             this.readLock.unlock();
         }
