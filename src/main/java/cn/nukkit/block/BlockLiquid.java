@@ -7,6 +7,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.ColdChunkLoadCounters;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.particle.SmokeParticle;
 import cn.nukkit.level.sound.FizzSound;
 import cn.nukkit.math.AxisAlignedBB;
@@ -339,7 +340,8 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                 int minZ = chunkZ << 4;
                 int dz = Math.max(0, Math.max(minZ - z, z - (minZ + 15)));
                 if (dx + dz <= radius) {
-                    if (this.level.getChunkIfLoaded(chunkX, chunkZ) == null) return false;
+                    BaseFullChunk chunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
+                    if (chunk == null || chunk.isReadFailurePlaceholder()) return false;
                 }
             }
         }

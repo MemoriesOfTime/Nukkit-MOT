@@ -2093,6 +2093,57 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
+    @Test
+    void serverboundDataStoreRejectsEmptyKeys() {
+        // schema declares MinLength = 1 for Data Store Name and Property
+        assertThrows(IllegalArgumentException.class, () -> decodeDataStoreFrame("", "prop", "path"),
+                "empty Data Store Name must be rejected");
+        assertThrows(IllegalArgumentException.class, () -> decodeDataStoreFrame("store", "", "path"),
+                "empty Property must be rejected");
+    }
+
+    @Test
+    void serverboundDataStoreAcceptsEmptyPath() {
+        // Path has no MinLength in the schema
+        ServerboundDataStorePacket nk = assertDoesNotThrow(() -> decodeDataStoreFrame("store", "prop", ""));
+        assertEquals("", nk.getUpdate().getPath());
+    }
+
+    @Test
+    void serverboundDataStoreRejectsOverLengthStrings() {
+        assertThrows(IllegalArgumentException.class,
+                () -> decodeDataStoreFrame("s".repeat(1001), "prop", "path"),
+                "Data Store Name MaxLength is 1000");
+        assertThrows(IllegalArgumentException.class,
+                () -> decodeDataStoreFrame("store", "p".repeat(1001), "path"),
+                "Property MaxLength is 1000");
+        assertThrows(IllegalArgumentException.class,
+                () -> decodeDataStoreFrame("store", "prop", "p".repeat(1001)),
+                "Path MaxLength is 1000");
+        assertThrows(IllegalArgumentException.class, () -> decodeDataStoreFrame("store", "prop", "path", "v".repeat(5001)),
+                "string value MaxLength is 5000");
+    }
+
+    private static ServerboundDataStorePacket decodeDataStoreFrame(String name, String property, String path) {
+        return decodeDataStoreFrame(name, property, path, "value");
+    }
+
+    private static ServerboundDataStorePacket decodeDataStoreFrame(String name, String property, String path, String stringValue) {
+        BinaryStream s = new BinaryStream();
+        s.putString(name);
+        s.putString(property);
+        s.putString(path);
+        s.putUnsignedVarInt(2); // string variant
+        s.putString(stringValue);
+        s.putLInt(1); // property update count
+        ServerboundDataStorePacket nk = new ServerboundDataStorePacket();
+        nk.protocol = ProtocolInfo.v1_21_130;
+        nk.gameVersion = GameVersion.V1_21_130;
+        nk.setBuffer(s.getBuffer());
+        nk.decode();
+        return nk;
+    }
+
     // ==================== ClientboundDataDrivenUIShowScreenPacket ====================
 
     @ParameterizedTest(name = "ClientboundDataDrivenUICloseScreenPacket decode v{0}")

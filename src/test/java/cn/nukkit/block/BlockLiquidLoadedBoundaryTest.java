@@ -169,6 +169,62 @@ class BlockLiquidLoadedBoundaryTest {
         assertEquals(disabled.trace, enabled.trace);
     }
 
+    @Test
+    void readFailurePlaceholderDefersTheWholeScheduledLiquidUpdate() {
+        for (boolean lava : new boolean[]{false, true}) {
+            Fixture f = new Fixture(lava ? new BlockLava() : new BlockWater(),
+                    15, 8, Level.DIMENSION_OVERWORLD, true);
+            f.loadSurroundings();
+            BaseFullChunk placeholder = failedChunk(true);
+            when(f.level.getChunkIfLoaded(1, 0)).thenReturn(placeholder);
+            f.liquid.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
+            f.assertOnlyRetry(lava ? 30 : 5);
+        }
+    }
+
+    @Test
+    void decodedChunkWithLifecycleFailureRetainsTheLoadedLiquidTrace() {
+        Fixture expected = loadedScenario(0, true);
+        Fixture actual = loadedScenario(0, true);
+        BaseFullChunk decoded = failedChunk(false);
+        assertNotNull(decoded.getChunkLoadFailure());
+        assertFalse(decoded.isReadFailurePlaceholder());
+        when(actual.level.getChunkIfLoaded(1, 0)).thenReturn(decoded);
+        expected.liquid.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
+        actual.liquid.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
+        assertTrue(actual.writes > 0);
+        assertEquals(expected.trace, actual.trace);
+        assertEquals(expected.state(), actual.state());
+    }
+
+    @Test
+    void placeholderReplacementResumesOneCurrentLiquidUpdate() {
+        Fixture f = new Fixture(new BlockWater(), 15, 8, Level.DIMENSION_OVERWORLD, true);
+        f.loadSurroundings();
+        BaseFullChunk placeholder = failedChunk(true);
+        when(f.level.getChunkIfLoaded(1, 0)).thenReturn(placeholder);
+        f.liquid.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
+        f.assertOnlyRetry(5);
+        BaseFullChunk replacement = mock(BaseFullChunk.class);
+        when(f.level.getChunkIfLoaded(1, 0)).thenReturn(replacement);
+        f.tick(5);
+        assertTrue(f.writes > 0);
+        int effects = f.writes;
+        f.tick(5);
+        assertEquals(effects, f.writes);
+    }
+
+    private static BaseFullChunk failedChunk(boolean readFailure) {
+        BaseFullChunk chunk = mock(BaseFullChunk.class);
+        when(chunk.getChunkLoadFailure()).thenCallRealMethod();
+        when(chunk.isReadFailurePlaceholder()).thenCallRealMethod();
+        doCallRealMethod().when(chunk).markChunkLoadFailure(any());
+        doCallRealMethod().when(chunk).markChunkReadFailure(any());
+        if (readFailure) chunk.markChunkReadFailure(new IllegalStateException("unreadable chunk"));
+        else chunk.markChunkLoadFailure(new IllegalStateException("lifecycle failure after decode"));
+        return chunk;
+    }
+
     private static Fixture loadedScenario(int scenario, boolean enabled) {
         BlockLiquid liquid = scenario >= 4 ? new BlockLava()
                 : new BlockWater(scenario == 1 ? 3 : 0);

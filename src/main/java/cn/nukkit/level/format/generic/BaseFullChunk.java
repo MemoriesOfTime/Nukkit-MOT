@@ -39,6 +39,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected Long2ObjectNonBlockingMap<Entity> entities;
 
+    private volatile PickupEntityIndex pickupEntityIndex;
+
     protected Long2ObjectNonBlockingMap<BlockEntity> tiles;
 
     protected Long2ObjectNonBlockingMap<BlockEntity> tileList;
@@ -98,7 +100,35 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected AtomicLong changes = new AtomicLong();
 
-    protected boolean isInit;
+    protected volatile boolean isInit;
+    private volatile Throwable chunkLoadFailure;
+    private volatile boolean readFailurePlaceholder;
+
+    /** Whether entity and block-entity initialization has completed for this live object. */
+    public boolean isInitialized() {
+        return this.isInit;
+    }
+
+    /** A failed mount must not later be reported as a successful cached load. */
+    public Throwable getChunkLoadFailure() {
+        return this.chunkLoadFailure;
+    }
+
+    /** Lifecycle errors are diagnostic only: decoded terrain and live entities remain writable. */
+    public void markChunkLoadFailure(Throwable failure) {
+        if (this.chunkLoadFailure == null) this.chunkLoadFailure = failure;
+    }
+
+    /** Only an empty stand-in for an unreadable chunk may discard changes on unload. */
+    public void markChunkReadFailure(Throwable failure) {
+        this.markChunkLoadFailure(failure);
+        this.readFailurePlaceholder = true;
+        this.setGenerated(false);
+    }
+
+    public boolean isReadFailurePlaceholder() {
+        return this.readFailurePlaceholder;
+    }
 
     protected boolean lightPopulated;
 
@@ -123,6 +153,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public BaseFullChunk clone() {
+        if (this.entities != null) this.entityIndex();
         BaseFullChunk chunk;
         try {
             chunk = (BaseFullChunk) super.clone();
@@ -171,6 +202,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         }
 
         chunk.entities = null;
+        chunk.pickupEntityIndex = null;
         chunk.tileList = null;
         chunk.NBTentities = null;
         chunk.NBTtiles = null;
@@ -213,7 +245,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void initChunk() {
-        if (this.getProvider() != null && !this.isInit) {
+        LevelProvider initProviderTemp = this.getProvider();
+        if (initProviderTemp != null && initProviderTemp.getLevel() != null && !this.isInit) {
             boolean changed = this.hasChanged();
             if (this.NBTentities != null) {
                 for (CompoundTag nbt : NBTentities) {
@@ -460,7 +493,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public int getHeightMap(int x, int z) {
-        return this.heightMap[(z << 4) | x] + this.getProvider().getMinBlockY();
+        LevelProvider providerTemp = this.getProvider();
+        return this.heightMap[(z << 4) | x] + (providerTemp == null ? 0 : providerTemp.getMinBlockY());
     }
 
     @Override
@@ -468,7 +502,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         //基岩版3d-data保存heightMap是以0为索引保存的，所以这里需要减去世界最小值，详情查看
         //Bedrock Edition 3d-data saves the height map start from index of 0, so need to subtract the world minimum height here, see for details:
         //https://github.com/bedrock-dev/bedrock-level/blob/main/src/include/data_3d.h#L115
-        this.heightMap[(z << 4) | x] = (short) (value - this.getProvider().getMinBlockY());
+        LevelProvider providerTemp = this.getProvider();
+        this.heightMap[(z << 4) | x] = (short) (value - (providerTemp == null ? 0 : providerTemp.getMinBlockY()));
         this.setChanged();
     }
 
@@ -531,6 +566,9 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void populateSkyLight() {
+        LevelProvider providerTemp = this.getProvider();
+        int minY = providerTemp == null ? 0 : providerTemp.getMinBlockY();
+        int maxY = providerTemp == null ? 255 : providerTemp.getMaxBlockY();
         // basic light calculation
         for (int z = 0; z < 16; ++z) {
             for (int x = 0; x < 16; ++x) { // iterating over all columns in chunk
@@ -539,7 +577,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
                 int y;
 
-                for (y = this.getProvider().getMaxBlockY(); y > top; --y) {
+                for (y = maxY; y > top; --y) {
                     // all the blocks above the top-most block are exposed to sun and
                     // thus have a skylight value of 15
                     this.setBlockSkyLight(x, y, z, 15);
@@ -549,7 +587,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 int nextDecrease = 0; // decrease that that will be applied starting with the next block
 
                 // Process from top-most block downward
-                for (y = top; y >= this.getProvider().getMinBlockY(); --y) {
+                for (y = top; y >= minY; --y) {
                     nextLight -= nextDecrease;
                     int light = nextLight; // this light value will be applied for this block. The following checks are all about the next blocks
 
@@ -586,8 +624,9 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void populateBlockLight() {
-        int minY = this.getProvider().getMinBlockY();
-        int maxY = this.getProvider().getMaxBlockY();
+        LevelProvider providerTemp = this.getProvider();
+        int minY = providerTemp == null ? 0 : providerTemp.getMinBlockY();
+        int maxY = providerTemp == null ? 255 : providerTemp.getMaxBlockY();
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -686,7 +725,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (this.entities == null) {
             this.entities = new Long2ObjectNonBlockingMap<>();
         }
-        this.entities.put(entity.getId(), entity);
+        this.entityIndex().put(entity.getId(), entity);
         if (!(entity instanceof Player) && this.isInit) {
             this.setChanged();
         }
@@ -695,7 +734,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void removeEntity(Entity entity) {
         if (this.entities != null) {
-            this.entities.remove(entity.getId());
+            this.entityIndex().remove(entity.getId());
             if (!(entity instanceof Player) && this.isInit) {
                 this.setChanged();
             }
@@ -751,7 +790,24 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public Map<Long, Entity> getEntities() {
-        return entities == null ? Collections.emptyMap() : entities;
+        return entities == null ? Collections.emptyMap() : entityIndex();
+    }
+
+    private PickupEntityIndex entityIndex() {
+        PickupEntityIndex index = this.pickupEntityIndex;
+        if (index != null && index.backing() == this.entities) return index;
+        synchronized (this) {
+            // Conversion and chunk sending can replace the backing map. A live clone shares both.
+            if (this.pickupEntityIndex == null || this.pickupEntityIndex.backing() != this.entities) {
+                this.pickupEntityIndex = new PickupEntityIndex(this.entities);
+            }
+            return this.pickupEntityIndex;
+        }
+    }
+
+    @Override
+    public boolean hasPickupEntities(boolean itemsOnly) {
+        return this.entities != null && this.entityIndex().hasPickupEntities(itemsOnly);
     }
 
     @Override
