@@ -280,85 +280,89 @@ public class PlayerInventory extends BaseInventory {
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
-        if (index < 0 || index >= this.size) {
-            return false;
-        } else if (item.getId() == 0 || item.getCount() <= 0) {
-            return this.clear(index, send);
-        }
-
-        if (index >= this.getSize()) { // Armor change
-            EntityArmorChangeEvent ev = new EntityArmorChangeEvent(this.getHolder(), this.getItem(index), item, index);
-            Server.getInstance().getPluginManager().callEvent(ev);
-            if (ev.isCancelled() && this.getHolder() != null) {
-                this.sendArmorSlot(index, this.getViewers());
+        synchronized (this.slots) {
+            if (index < 0 || index >= this.size) {
                 return false;
+            } else if (item.getId() == 0 || item.getCount() <= 0) {
+                return this.clear(index, send);
             }
-            item = ev.getNewItem();
-        } else {
-            EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(this.getHolder(), this.getItem(index), item, index);
-            Server.getInstance().getPluginManager().callEvent(ev);
-            if (ev.isCancelled()) {
-                this.sendSlot(index, this.getViewers());
-                return false;
+
+            if (index >= this.getSize()) { // Armor change
+                EntityArmorChangeEvent ev = new EntityArmorChangeEvent(this.getHolder(), this.getItem(index), item, index);
+                Server.getInstance().getPluginManager().callEvent(ev);
+                if (ev.isCancelled() && this.getHolder() != null) {
+                    this.sendArmorSlot(index, this.getViewers());
+                    return false;
+                }
+                item = ev.getNewItem();
+            } else {
+                EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(this.getHolder(), this.getItem(index), item, index);
+                Server.getInstance().getPluginManager().callEvent(ev);
+                if (ev.isCancelled()) {
+                    this.sendSlot(index, this.getViewers());
+                    return false;
+                }
+                item = ev.getNewItem();
             }
-            item = ev.getNewItem();
+
+            if (item instanceof cn.nukkit.item.ItemBundle bundle) {
+                ensureUniqueBundleId(index, bundle);
+            }
+
+            Item[] parts = splitOverstack(item);
+            item = parts[0];
+
+            Item old = this.getItem(index);
+            this.slots.put(index, item.clone());
+            this.onSlotChange(index, old, send);
+            this.routeOverflow(parts[1]);
+            return true;
         }
-
-        if (item instanceof cn.nukkit.item.ItemBundle bundle) {
-            ensureUniqueBundleId(index, bundle);
-        }
-
-        Item[] parts = splitOverstack(item);
-        item = parts[0];
-
-        Item old = this.getItem(index);
-        this.slots.put(index, item.clone());
-        this.onSlotChange(index, old, send);
-        this.routeOverflow(parts[1]);
-        return true;
     }
 
     @Override
     public boolean clear(int index, boolean send) {
-        Item old = this.slots.get(index);
-        if (old != null) {
-            Item item = new ItemBlock(Block.get(BlockID.AIR), null, 0);
-            if (index >= this.getSize() && index < this.size) {
-                EntityArmorChangeEvent ev = new EntityArmorChangeEvent(this.getHolder(), old, item, index);
-                Server.getInstance().getPluginManager().callEvent(ev);
-                if (ev.isCancelled()) {
-                    if (index >= this.size) {
-                        this.sendArmorSlot(index, this.getViewers());
-                    } else {
-                        this.sendSlot(index, this.getViewers());
+        synchronized (this.slots) {
+            Item old = this.slots.get(index);
+            if (old != null) {
+                Item item = new ItemBlock(Block.get(BlockID.AIR), null, 0);
+                if (index >= this.getSize() && index < this.size) {
+                    EntityArmorChangeEvent ev = new EntityArmorChangeEvent(this.getHolder(), old, item, index);
+                    Server.getInstance().getPluginManager().callEvent(ev);
+                    if (ev.isCancelled()) {
+                        if (index >= this.size) {
+                            this.sendArmorSlot(index, this.getViewers());
+                        } else {
+                            this.sendSlot(index, this.getViewers());
+                        }
+                        return false;
                     }
-                    return false;
-                }
-                item = ev.getNewItem();
-            } else {
-                EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(this.getHolder(), old, item, index);
-                Server.getInstance().getPluginManager().callEvent(ev);
-                if (ev.isCancelled()) {
-                    if (index >= this.size) {
-                        this.sendArmorSlot(index, this.getViewers());
-                    } else {
-                        this.sendSlot(index, this.getViewers());
+                    item = ev.getNewItem();
+                } else {
+                    EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(this.getHolder(), old, item, index);
+                    Server.getInstance().getPluginManager().callEvent(ev);
+                    if (ev.isCancelled()) {
+                        if (index >= this.size) {
+                            this.sendArmorSlot(index, this.getViewers());
+                        } else {
+                            this.sendSlot(index, this.getViewers());
+                        }
+                        return false;
                     }
-                    return false;
+                    item = ev.getNewItem();
                 }
-                item = ev.getNewItem();
+
+                if (item.getId() != Item.AIR) {
+                    this.slots.put(index, item.clone());
+                } else {
+                    this.slots.remove(index);
+                }
+
+                this.onSlotChange(index, old, send);
             }
 
-            if (item.getId() != Item.AIR) {
-                this.slots.put(index, item.clone());
-            } else {
-                this.slots.remove(index);
-            }
-
-            this.onSlotChange(index, old, send);
+            return true;
         }
-
-        return true;
     }
 
     public Item[] getArmorContents() {

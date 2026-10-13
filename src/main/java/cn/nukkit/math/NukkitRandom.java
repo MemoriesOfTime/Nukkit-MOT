@@ -9,7 +9,7 @@ import java.util.zip.CRC32;
  * Nukkit Project
  */
 public class NukkitRandom {
-    protected long seed;
+    protected volatile long seed;
 
     public NukkitRandom() {
         this(-1);
@@ -22,7 +22,7 @@ public class NukkitRandom {
         this.setSeed(seeds);
     }
 
-    public void setSeed(long seeds) {
+    public synchronized void setSeed(long seeds) {
         CRC32 crc32 = new CRC32();
         ByteBuffer buffer = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN);
         buffer.putInt((int) seeds);
@@ -34,7 +34,7 @@ public class NukkitRandom {
         return seed;
     }
 
-    public int nextSignedInt() {
+    public synchronized int nextSignedInt() {
         int t = (((int) ((this.seed * 65535) + 31337) >> 8) + 1337);
         this.seed ^= t;
         return t;

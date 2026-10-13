@@ -50,4 +50,9 @@ public class NPCRequestPacket extends DataPacket {
             this.putString(this.sceneName);
         }
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

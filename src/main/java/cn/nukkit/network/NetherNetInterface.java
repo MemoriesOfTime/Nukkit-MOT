@@ -86,7 +86,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     private final String mediaDescription;
     private long nextMediaAlertMinute = -1;
     private boolean mediaAlarmRaised;
-    private final Map<InetSocketAddress, NetherNetPlayerSession> sessions = new HashMap<>();
+    private final Map<InetSocketAddress, NetherNetPlayerSession> sessions = new ConcurrentHashMap<>();
     private final Queue<NetherNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<NetherNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<InetAddress, Long> blockedAddresses = new ConcurrentHashMap<>();

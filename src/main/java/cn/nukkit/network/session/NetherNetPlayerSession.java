@@ -3,6 +3,7 @@ package cn.nukkit.network.session;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.level.Level;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.NetherNetInterface;
 import cn.nukkit.network.Network;
@@ -315,7 +316,16 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
             handled++;
             handledBytes += packetBytes;
             try {
-                this.player.handleDataPacket(packet);
+                // 与 RakNetPlayerSession.serverTick 相同的白名单路由：并行 tick 开启时，
+                // level-sync 包须投递到所属世界线程串行处理，否则主线程与世界线程无锁竞争
+                // Same whitelist routing as RakNetPlayerSession.serverTick: level-sync packets must
+                // be serialized with the owning level's tick thread when parallel tick is enabled
+                Level level = this.player.getLevel();
+                if (level != null && level.isParallelTickEnabled() && packet.isLevelSyncPacket()) {
+                    level.addSyncPacketToQueue(this.player, packet);
+                } else {
+                    this.player.handleDataPacket(packet);
+                }
             } catch (Throwable e) {
                 log.error(new FormattedMessage("An error occurred whilst handling {} for {}",
                         new Object[]{packet.getClass().getSimpleName(), this.player.getName()}, e));

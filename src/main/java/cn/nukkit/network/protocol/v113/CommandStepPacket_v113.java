@@ -47,4 +47,9 @@ public class CommandStepPacket_v113 extends DataPacket_v113 {
         this.encodeUnsupported();
     }
 
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
+
 }

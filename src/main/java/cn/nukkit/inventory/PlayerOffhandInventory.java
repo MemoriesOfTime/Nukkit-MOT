@@ -124,57 +124,16 @@ public class PlayerOffhandInventory extends BaseInventory {
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
-        if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
-            return false;
-        } else if (item.getId() == 0 || item.getCount() <= 0) {
-            return this.clear(index, send);
-        }
-
-        EntityHuman holder = this.getHolder();
-        Item oldItem = this.getItem(index);
-        EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(holder, oldItem, item, index);
-        Server.getInstance().getPluginManager().callEvent(ev);
-        if (ev.isCancelled()) {
-            this.sendSlot(index, this.getViewers());
-            if (holder instanceof Player) {
-                this.sendSlot(index, (Player) holder);
-            }
-            return false;
-        }
-        item = ev.getNewItem();
-
-        if (holder instanceof Player) {
-            PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, oldItem, item);
-            Server.getInstance().getPluginManager().callEvent(ev2);
-            if (ev2.isCancelled()) {
-                this.sendSlot(index, this.getViewers());
-                this.sendSlot(index, (Player) holder);
+        synchronized (this.slots) {
+            if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
                 return false;
+            } else if (item.getId() == 0 || item.getCount() <= 0) {
+                return this.clear(index, send);
             }
-            item = ev2.getNewItem();
-        }
-
-        if (item instanceof cn.nukkit.item.ItemBundle bundle) {
-            ensureUniqueBundleId(index, bundle);
-        }
-
-        Item[] parts = splitOverstack(item);
-        item = parts[0];
-
-        this.slots.put(index, item.clone());
-        this.onSlotChange(index, oldItem, send);
-        this.routeOverflow(parts[1]);
-        return true;
-    }
-
-    @Override
-    public boolean clear(int index, boolean send) {
-        Item old = this.slots.get(index);
-        if (old != null && old.getId() != Item.AIR) {
-            Item item = new ItemBlock(cn.nukkit.block.Block.get(cn.nukkit.block.BlockID.AIR), null, 0);
 
             EntityHuman holder = this.getHolder();
-            EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(holder, old, item, index);
+            Item oldItem = this.getItem(index);
+            EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(holder, oldItem, item, index);
             Server.getInstance().getPluginManager().callEvent(ev);
             if (ev.isCancelled()) {
                 this.sendSlot(index, this.getViewers());
@@ -186,7 +145,7 @@ public class PlayerOffhandInventory extends BaseInventory {
             item = ev.getNewItem();
 
             if (holder instanceof Player) {
-                PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, old, item);
+                PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, oldItem, item);
                 Server.getInstance().getPluginManager().callEvent(ev2);
                 if (ev2.isCancelled()) {
                     this.sendSlot(index, this.getViewers());
@@ -196,13 +155,58 @@ public class PlayerOffhandInventory extends BaseInventory {
                 item = ev2.getNewItem();
             }
 
-            if (item.getId() != Item.AIR) {
-                this.slots.put(index, item.clone());
-            } else {
-                this.slots.remove(index);
+            if (item instanceof cn.nukkit.item.ItemBundle bundle) {
+                ensureUniqueBundleId(index, bundle);
             }
-            this.onSlotChange(index, old, send);
+
+            Item[] parts = splitOverstack(item);
+            item = parts[0];
+
+            this.slots.put(index, item.clone());
+            this.onSlotChange(index, oldItem, send);
+            this.routeOverflow(parts[1]);
+            return true;
         }
-        return true;
+    }
+
+    @Override
+    public boolean clear(int index, boolean send) {
+        synchronized (this.slots) {
+            Item old = this.slots.get(index);
+            if (old != null && old.getId() != Item.AIR) {
+                Item item = new ItemBlock(cn.nukkit.block.Block.get(cn.nukkit.block.BlockID.AIR), null, 0);
+
+                EntityHuman holder = this.getHolder();
+                EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(holder, old, item, index);
+                Server.getInstance().getPluginManager().callEvent(ev);
+                if (ev.isCancelled()) {
+                    this.sendSlot(index, this.getViewers());
+                    if (holder instanceof Player) {
+                        this.sendSlot(index, (Player) holder);
+                    }
+                    return false;
+                }
+                item = ev.getNewItem();
+
+                if (holder instanceof Player) {
+                    PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, old, item);
+                    Server.getInstance().getPluginManager().callEvent(ev2);
+                    if (ev2.isCancelled()) {
+                        this.sendSlot(index, this.getViewers());
+                        this.sendSlot(index, (Player) holder);
+                        return false;
+                    }
+                    item = ev2.getNewItem();
+                }
+
+                if (item.getId() != Item.AIR) {
+                    this.slots.put(index, item.clone());
+                } else {
+                    this.slots.remove(index);
+                }
+                this.onSlotChange(index, old, send);
+            }
+            return true;
+        }
     }
 }

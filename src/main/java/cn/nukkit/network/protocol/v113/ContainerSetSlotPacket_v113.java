@@ -38,4 +38,9 @@ public class ContainerSetSlotPacket_v113 extends DataPacket_v113 {
         this.putSlot(gameVersion, this.item);
         this.putByte((byte) this.selectedSlot);
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

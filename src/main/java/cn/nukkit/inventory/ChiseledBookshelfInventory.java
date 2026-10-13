@@ -25,46 +25,52 @@ public class ChiseledBookshelfInventory extends BaseInventory {
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
-        if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
-            return false;
-        }
+        synchronized (this.slots) {
+            if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
+                return false;
+            }
 
-        Item old = this.getItem(index);
-        Item stored = normalizeBook(item);
-        if (stored.isNull()) {
-            this.slots.remove(index);
-        } else {
-            this.slots.put(index, stored);
-        }
+            Item old = this.getItem(index);
+            Item stored = normalizeBook(item);
+            if (stored.isNull()) {
+                this.slots.remove(index);
+            } else {
+                this.slots.put(index, stored);
+            }
 
-        this.onSlotChange(index, old, send);
-        return true;
+            this.onSlotChange(index, old, send);
+            return true;
+        }
     }
 
     public void loadItem(int index, Item item) {
-        if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
-            return;
-        }
+        synchronized (this.slots) {
+            if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
+                return;
+            }
 
-        Item stored = normalizeBook(item);
-        if (stored.isNull()) {
-            this.slots.remove(index);
-        } else {
-            this.slots.put(index, stored);
+            Item stored = normalizeBook(item);
+            if (stored.isNull()) {
+                this.slots.remove(index);
+            } else {
+                this.slots.put(index, stored);
+            }
         }
     }
 
     @Override
     public boolean clear(int index, boolean send) {
-        if (index < 0 || index >= this.size) {
-            return false;
-        }
+        synchronized (this.slots) {
+            if (index < 0 || index >= this.size) {
+                return false;
+            }
 
-        Item old = this.slots.remove(index);
-        if (old != null) {
-            this.onSlotChange(index, old, send);
+            Item old = this.slots.remove(index);
+            if (old != null) {
+                this.onSlotChange(index, old, send);
+            }
+            return true;
         }
-        return true;
     }
 
     @Override

@@ -130,4 +130,41 @@ class CraftingManagerUnregisterRecipeTest {
         assertTrue(manager.unregisterRecipe(recipe));
         assertTrue(manager.getRecipeXp(recipe) == 0.0, "recipe xp entry should have been removed");
     }
+
+    @Test
+    void concurrentIterationWhileRegisteringAndUnregisteringIsSafe() throws Exception {
+        // getRecipes() 交出活引用：无锁迭代须在并发 register/unregister 下不 CME；latch 保证迭代始于首次变更之后（零重叠假绿）
+        // Live reference out: lock-free iteration must not CME under concurrent mutation; the latch
+        // starts iteration after the first mutation (zero overlap would fake-green)
+        java.util.concurrent.CountDownLatch firstAdd = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicBoolean done = new java.util.concurrent.atomic.AtomicBoolean(false);
+        Thread mutator = new Thread(() -> {
+            for (int i = 0; i < 500; i++) {
+                ShapedRecipe recipe = new ShapedRecipe(
+                        Item.get(Item.GOLD_INGOT),
+                        new String[]{"A"},
+                        Map.of('A', Item.get(Item.IRON_INGOT)),
+                        new ArrayList<>()
+                );
+                manager.registerRecipe(recipe);
+                if (i == 0) {
+                    firstAdd.countDown();
+                }
+                manager.unregisterRecipe(recipe);
+            }
+            done.set(true);
+        }, "CraftingManagerConcurrentMutationTest");
+        mutator.start();
+        assertTrue(firstAdd.await(5, java.util.concurrent.TimeUnit.SECONDS), "mutator should make its first add");
+        try {
+            while (!done.get()) {
+                for (Recipe ignored : manager.getRecipes()) {
+                    // 空循环体即断言：底层抛并发异常则失败 / iterating is the assertion
+                }
+            }
+        } finally {
+            mutator.join(30_000);
+        }
+        assertFalse(mutator.isAlive(), "mutator thread should finish");
+    }
 }

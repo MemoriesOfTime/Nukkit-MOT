@@ -370,6 +370,11 @@ public class TextPacket extends DataPacket {
         }
     }
 
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
+
     @OnlyNetEase
     private void readNetEaseParameters() {
         int count = (int) this.getUnsignedVarInt();

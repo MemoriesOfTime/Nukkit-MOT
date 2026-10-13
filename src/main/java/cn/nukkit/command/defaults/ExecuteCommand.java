@@ -171,7 +171,7 @@ public class ExecuteCommand extends VanillaCommand {
             case "run" -> {
                 String command = list.getResult(1);
                 if (command.isBlank()) return 0;
-                return sender.getServer().dispatchCommand(sender, command) ? 1 : 0;
+                return sender.getServer().dispatchCommandAndWait(sender, command, 10_000) ? 1 : 0;
             }
             case "as" -> {
                 List<Entity> executors = list.getResult(1);
@@ -182,7 +182,7 @@ public class ExecuteCommand extends VanillaCommand {
                 String chainCommand = list.getResult(2);
                 for (Entity executor : executors) {
                     ExecutorCommandSender executorCommandSender = new ExecutorCommandSender(sender, executor, executor.getLocation());
-                    int n = executorCommandSender.getServer().dispatchCommand(executorCommandSender, chainCommand) ? 1 : 0;
+                    int n = executorCommandSender.getServer().dispatchCommandAndWait(executorCommandSender, chainCommand, 10_000) ? 1 : 0;
                     if (n == 0) {
                         var names = new ArrayList<String>();
                         Matcher match = ERROR_COMMAND_NAME.matcher(chainCommand);

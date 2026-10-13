@@ -24,31 +24,35 @@ public class ShelfInventory extends BaseInventory {
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
-        if (index < 0 || index >= this.size) {
-            return false;
+        synchronized (this.slots) {
+            if (index < 0 || index >= this.size) {
+                return false;
+            }
+            Item old = this.getItem(index);
+            if (item == null || item.isNull()) {
+                this.slots.remove(index);
+            } else {
+                Item stored = item.clone();
+                stored.setCount(1);
+                this.slots.put(index, stored);
+            }
+            this.onSlotChange(index, old, send);
+            return true;
         }
-        Item old = this.getItem(index);
-        if (item == null || item.isNull()) {
-            this.slots.remove(index);
-        } else {
-            Item stored = item.clone();
-            stored.setCount(1);
-            this.slots.put(index, stored);
-        }
-        this.onSlotChange(index, old, send);
-        return true;
     }
 
     @Override
     public boolean clear(int index, boolean send) {
-        if (index < 0 || index >= this.size) {
-            return false;
+        synchronized (this.slots) {
+            if (index < 0 || index >= this.size) {
+                return false;
+            }
+            Item old = this.slots.remove(index);
+            if (old != null) {
+                this.onSlotChange(index, old, send);
+            }
+            return true;
         }
-        Item old = this.slots.remove(index);
-        if (old != null) {
-            this.onSlotChange(index, old, send);
-        }
-        return true;
     }
 
     @Override

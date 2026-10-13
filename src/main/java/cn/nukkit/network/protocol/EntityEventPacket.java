@@ -151,4 +151,9 @@ public class EntityEventPacket extends DataPacket {
             this.putOptionalNull(this.fireAtPosition, this::putVector3f);
         }
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }

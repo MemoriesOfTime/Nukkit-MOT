@@ -69,6 +69,11 @@ public class ServerboundDataStorePacket extends DataPacket {
         return NETWORK_ID;
     }
 
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
+
     public DataStoreUpdate getUpdate() {
         return update;
     }

@@ -16,6 +16,7 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
 import java.util.UUID;
 
 /**
@@ -105,11 +106,17 @@ public class CraftingEventProcessor_v113 extends DataPacketProcessor<CraftingEve
     }
 
     private CraftingRecipe getRecipe(Player player, UUID id) {
-        for (Recipe recipe : player.getServer().getCraftingManager().getRecipes()) {
-            if (recipe instanceof CraftingRecipe) {
-                CraftingRecipe craftRecipe = (CraftingRecipe) recipe;
-                if (craftRecipe.getId() != null && craftRecipe.getId().equals(id)) {
-                    return craftRecipe;
+        // 迭代须持 recipes 监视器：世界线程迭代与主线程插件 register/unregister 并发会损坏 ArrayDeque
+        // Iteration must hold the recipes monitor: world-thread iteration racing
+        // main-thread plugin register/unregister corrupts the ArrayDeque
+        Collection<Recipe> recipes = player.getServer().getCraftingManager().getRecipes();
+        synchronized (recipes) {
+            for (Recipe recipe : recipes) {
+                if (recipe instanceof CraftingRecipe) {
+                    CraftingRecipe craftRecipe = (CraftingRecipe) recipe;
+                    if (craftRecipe.getId() != null && craftRecipe.getId().equals(id)) {
+                        return craftRecipe;
+                    }
                 }
             }
         }

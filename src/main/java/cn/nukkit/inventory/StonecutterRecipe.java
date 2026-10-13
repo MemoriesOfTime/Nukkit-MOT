@@ -26,7 +26,7 @@ public class StonecutterRecipe implements Recipe {
         this.priority = priority;
         this.result = result.clone();
         this.ingredient = ingredient.clone();
-        this.networkId = networkId != null ? networkId : ++CraftingManager.NEXT_NETWORK_ID;
+        this.networkId = networkId != null ? networkId : CraftingManager.NEXT_NETWORK_ID.incrementAndGet();
     }
 
     @Override

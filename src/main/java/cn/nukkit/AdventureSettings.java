@@ -24,7 +24,7 @@ public class AdventureSettings implements Cloneable {
     public static final int PERMISSION_AUTOMATION = 3;
     public static final int PERMISSION_ADMIN = 4;
 
-    private final Map<Type, Boolean> values = new EnumMap<>(Type.class);
+    private Map<Type, Boolean> values = new EnumMap<>(Type.class);
 
     private Player player;
 
@@ -32,10 +32,11 @@ public class AdventureSettings implements Cloneable {
         this.player = player;
     }
 
-    public AdventureSettings clone(Player newPlayer) {
+    public synchronized AdventureSettings clone(Player newPlayer) {
         try {
             AdventureSettings settings = (AdventureSettings) super.clone();
             settings.player = newPlayer;
+            settings.values = new EnumMap<>(this.values);
             return settings;
         } catch (CloneNotSupportedException e) {
             return null;
@@ -49,7 +50,7 @@ public class AdventureSettings implements Cloneable {
      * @param value new value
      * @return AdventureSettings
      */
-    public AdventureSettings set(Type type, boolean value) {
+    public synchronized AdventureSettings set(Type type, boolean value) {
         this.values.put(type, value);
         return this;
     }
@@ -60,7 +61,7 @@ public class AdventureSettings implements Cloneable {
      * @param type adventure setting
      * @return value
      */
-    public boolean get(Type type) {
+    public synchronized boolean get(Type type) {
         Boolean value = this.values.get(type);
         return value == null ? type.getDefaultValue() : value;
     }

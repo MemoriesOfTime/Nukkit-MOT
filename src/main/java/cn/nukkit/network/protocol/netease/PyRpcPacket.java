@@ -136,4 +136,13 @@ public class PyRpcPacket extends DataPacket {
     public static PyRpcMessage decodeMessage(byte[] data) {
         return PyRpcProtocol.DEFAULT.decode(data);
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        // 其处理器触发的网易 Mod 插件事件（PlayerNetEasePyRpcReceivedEvent/ModEventC2S 等）常被
+        // 用于修改玩家/世界状态，与已白名单的 ModalFormResponse/NPCRequest/ServerboundDataStore 同形态
+        // Its processor fires NetEase mod plugin events commonly used to mutate player/world
+        // state; same shape as the whitelisted ModalFormResponse/NPCRequest/ServerboundDataStore
+        return true;
+    }
 }

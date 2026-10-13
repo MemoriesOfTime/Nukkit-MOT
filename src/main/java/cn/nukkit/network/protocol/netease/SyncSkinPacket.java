@@ -139,4 +139,9 @@ public class SyncSkinPacket extends DataPacket {
         /** 旧格式遗留槽位，已不再上线。 */
         public String string4 = "";
     }
+
+    @Override
+    public boolean isLevelSyncPacket() {
+        return true;
+    }
 }
