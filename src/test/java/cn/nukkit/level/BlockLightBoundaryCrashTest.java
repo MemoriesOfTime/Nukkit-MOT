@@ -77,7 +77,9 @@ class BlockLightBoundaryCrashTest {
             Server server = Server.getInstance();
             server.useNativeLevelDB = false; server.levelDbCache = 8;
             server.asyncChunkSending = true; server.asyncChunkLoadCompletion = true;
-            Level level = mock(Level.class);
+            // This child asserts durable world/light state rather than Mockito invocation counts.
+            // Retaining millions of recorded cell checks would exhaust its fixed 256 MiB heap.
+            Level level = mock(Level.class, withSettings().stubOnly());
             when(level.getDimensionData()).thenReturn(DimensionEnum.OVERWORLD.getDimensionData());
             when(level.getDimension()).thenReturn(Level.DIMENSION_OVERWORLD);
             when(level.getMinBlockY()).thenReturn(-64); when(level.getMaxBlockY()).thenReturn(319);

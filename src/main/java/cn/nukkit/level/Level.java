@@ -2638,7 +2638,7 @@ public class Level implements ChunkManager, Metadatable {
             // generate=false still reads disk. Cold roots retain their bucket until mount.
             BaseFullChunk chunk = getChunkIfLoaded(getHashX(index), getHashZ(index));
             if (!BlockLightBoundary.healthy(chunk)) {
-                this.lightBoundary().request(index);
+                this.lightBoundary().request(index, map);
                 continue;
             }
             Set<Integer> blocks;
@@ -2681,12 +2681,12 @@ public class Level implements ChunkManager, Metadatable {
 
             int lightLevel = lightRemovalLevels.dequeueInt();
 
-            this.computeRemoveBlockLight(x - 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
-            this.computeRemoveBlockLight(x + 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
-            this.computeRemoveBlockLight(x, y - 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
-            this.computeRemoveBlockLight(x, y + 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
-            this.computeRemoveBlockLight(x, y, z - 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
-            this.computeRemoveBlockLight(x, y, z + 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks);
+            this.computeRemoveBlockLight(x - 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks, node);
+            this.computeRemoveBlockLight(x + 1, y, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks, node);
+            this.computeRemoveBlockLight(x, y - 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks, node);
+            this.computeRemoveBlockLight(x, y + 1, z, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks, node);
+            this.computeRemoveBlockLight(x, y, z - 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks, node);
+            this.computeRemoveBlockLight(x, y, z + 1, lightLevel, lightRemovalQueue, lightRemovalLevels, lightPropagationQueue, removalVisited, visited, pendingChunks, node);
         }
 
         while (!lightPropagationQueue.isEmpty()) {
@@ -2703,22 +2703,22 @@ public class Level implements ChunkManager, Metadatable {
             int lightLevel = chunk.getBlockLight(x & 15, y, z & 15) - lightFilter;
 
             if (lightLevel >= 1) {
-                this.computeSpreadBlockLight(x - 1, y, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
-                this.computeSpreadBlockLight(x + 1, y, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
-                this.computeSpreadBlockLight(x, y - 1, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
-                this.computeSpreadBlockLight(x, y + 1, z, lightLevel, lightPropagationQueue, visited, pendingChunks);
-                this.computeSpreadBlockLight(x, y, z - 1, lightLevel, lightPropagationQueue, visited, pendingChunks);
-                this.computeSpreadBlockLight(x, y, z + 1, lightLevel, lightPropagationQueue, visited, pendingChunks);
+                this.computeSpreadBlockLight(x - 1, y, z, lightLevel, lightPropagationQueue, visited, pendingChunks, chunk);
+                this.computeSpreadBlockLight(x + 1, y, z, lightLevel, lightPropagationQueue, visited, pendingChunks, chunk);
+                this.computeSpreadBlockLight(x, y - 1, z, lightLevel, lightPropagationQueue, visited, pendingChunks, chunk);
+                this.computeSpreadBlockLight(x, y + 1, z, lightLevel, lightPropagationQueue, visited, pendingChunks, chunk);
+                this.computeSpreadBlockLight(x, y, z - 1, lightLevel, lightPropagationQueue, visited, pendingChunks, chunk);
+                this.computeSpreadBlockLight(x, y, z + 1, lightLevel, lightPropagationQueue, visited, pendingChunks, chunk);
             }
         }
     }
 
     private void computeRemoveBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue,
-                                         IntArrayFIFOQueue removalLevels, LongArrayFIFOQueue spreadQueue, Set<Long> visited, Set<Long> spreadVisited, List<Long> roots) {
+                                         IntArrayFIFOQueue removalLevels, LongArrayFIFOQueue spreadQueue, Set<Long> visited, Set<Long> spreadVisited, List<Long> roots, long sourceNode) {
         if (!isYInRange(y)) return;
         BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
         if (!BlockLightBoundary.healthy(chunk)) {
-            this.lightBoundary().defer(x, y, z, roots);
+            this.lightBoundary().defer(x, y, z, roots, getChunkIfLoaded(Hash.hashBlockX(sourceNode) >> 4, Hash.hashBlockZ(sourceNode) >> 4));
             return;
         }
         int current = chunk.getBlockLight(x & 15, y, z & 15);
@@ -2741,11 +2741,11 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
-    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue, Set<Long> visited, List<Long> roots) {
+    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue, Set<Long> visited, List<Long> roots, BaseFullChunk source) {
         if (!isYInRange(y)) return;
         BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
         if (!BlockLightBoundary.healthy(chunk)) {
-            this.lightBoundary().defer(x, y, z, roots);
+            this.lightBoundary().defer(x, y, z, roots, source);
             return;
         }
         int current = chunk.getBlockLight(x & 15, y, z & 15);
@@ -5081,7 +5081,10 @@ public class Level implements ChunkManager, Metadatable {
         if (!this.isAsyncChunkLoadEnabled()) return chunkLoadResult(ChunkLoadResult.Status.DISABLED, null, null);
         try {
             pending = this.submitChunkRead(x, z, levelProvider, true);
-            if (pending == null) return chunkLoadResult(ChunkLoadResult.Status.REJECTED, null, null);
+            if (pending == null) {
+                if (this.blockLightBoundary != null) this.blockLightBoundary.readRejected(hash);
+                return chunkLoadResult(ChunkLoadResult.Status.REJECTED, null, null);
+            }
             // A ticketless provider keeps its legacy read path; it cannot promise freshness.
             return pending.ticket == null && this.chunkLoadFailures.getIfPresent(hash) != pending
                     ? chunkLoadResult(ChunkLoadResult.Status.DISABLED, null, null) : pending.result;

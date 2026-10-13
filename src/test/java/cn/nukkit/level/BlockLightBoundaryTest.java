@@ -27,6 +27,12 @@ class BlockLightBoundaryTest {
         final Map<Long, CompletableFuture<ChunkLoadResult>> reads = new HashMap<>();
         final BlockLightBoundary boundary = new BlockLightBoundary(level);
         World() {
+            // Long relaxation proofs clear the Mockito history between bounded ticks.
+            // Fail immediately on forbidden synchronous IO so clearing cannot erase evidence.
+            doThrow(new AssertionError("light repair requested a synchronous chunk read"))
+                    .when(level).getChunk(anyInt(), anyInt(), anyBoolean());
+            doThrow(new AssertionError("light repair requested a synchronous block lookup"))
+                    .when(level).getBlockIdAt(anyInt(), anyInt(), anyInt());
             when(level.isYInRange(anyInt())).thenCallRealMethod();
             when(level.getMinBlockY()).thenReturn(-64);
             when(level.getMaxBlockY()).thenReturn(319);
@@ -48,7 +54,10 @@ class BlockLightBoundaryTest {
                 if (!chunks.containsKey(Level.chunkHash(x + dx, z + dz))) chunk(x + dx, z + dz);
         }
         void drain() {
-            for (int i = 0; i < 1500 && boundary.hasWork(); i++) boundary.tick();
+            for (int i = 0; i < 1500 && boundary.hasWork(); i++) {
+                boundary.tick();
+                clearInvocations(level); // Bound test call-log memory; preserve every light operation.
+            }
             assertFalse(boundary.hasWork(), "bounded relaxation did not converge");
         }
         int light(int x, int y, int z) {
@@ -233,7 +242,10 @@ class BlockLightBoundaryTest {
                 world.stale(halo, 14, 64, 14);
                 actual.mounted(halo, true);
             }
-            for (int tick = 0; tick < 1500 && actual.hasWork(); tick++) actual.tick();
+            for (int tick = 0; tick < 1500 && actual.hasWork(); tick++) {
+                actual.tick();
+                clearInvocations(world.level);
+            }
             assertFalse(actual.hasWork());
             assertEquals(0, world.light(15, 64, 15));
             assertEquals(8, world.reads.size(), "ordinary wave halo expanded recursively");
