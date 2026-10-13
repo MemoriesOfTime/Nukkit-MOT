@@ -5,6 +5,7 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
@@ -270,6 +271,7 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
     }
 
     public static Position getSafePortal(Position portal) {
+        clearPortalExit(portal);
         Level level = portal.getLevel();
         Vector3 down = portal.down();
         while (level.getBlockIdAt(down.getFloorX(), down.getFloorY(), down.getFloorZ()) == NETHER_PORTAL) {
@@ -323,33 +325,70 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         if (found == null) {
             return null;
         }
-        Vector3 up = found.up();
+        // Only the server thread may touch live block state. Player searches run on a
+        // worker; their exit is cleared by getSafePortal after the attempt is revalidated.
+        if (level.getServer().isPrimaryThread()) {
+            clearPortalExit(found);
+        }
+        return found;
+    }
+
+    /** Revalidate a worker result without loading a chunk or trusting an old frame. */
+    public static boolean isPortalLoaded(Position portal) {
+        BaseFullChunk chunk = portal.level.getChunkIfLoaded(portal.getFloorX() >> 4, portal.getFloorZ() >> 4);
+        return usablePortalChunk(chunk)
+                && chunk.getBlockId(portal.getFloorX() & 15, portal.getFloorY(), portal.getFloorZ() & 15) == NETHER_PORTAL;
+    }
+
+    /** The warmed destination must still be mounted and healthy before creating a frame. */
+    public static boolean isPortalDestinationReady(Position portal) {
+        int cx = portal.getFloorX() >> 4, cz = portal.getFloorZ() >> 4;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (!usablePortalChunk(portal.level.getChunkIfLoaded(cx + dx, cz + dz))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean usablePortalChunk(BaseFullChunk chunk) {
+        return chunk != null && chunk.isGenerated();
+    }
+
+    private static void clearPortalExit(Position portal) {
+        Level level = portal.level;
+        if (!level.getServer().isPrimaryThread()) {
+            throw new IllegalStateException("Portal exits require the server thread");
+        }
+        Vector3 up = portal.up();
         int x = up.getFloorX(), y = up.getFloorY(), z = up.getFloorZ();
         int id = level.getBlockIdAt(x, y, z);
         if (id != AIR && id != OBSIDIAN && id != NETHER_PORTAL) {
             for (int xx = -1; xx < 4; xx++) {
-                for (int yy = 1; yy < 4; yy++)  {
+                for (int yy = 1; yy < 4; yy++) {
                     for (int zz = -1; zz < 3; zz++) {
                         level.setBlockAt(x + xx, y + yy, z + zz, AIR);
                     }
                 }
             }
         }
-        return found;
     }
 
     private static Position findPortalInChunk(
             Level level, int chunkX, int chunkZ, boolean mayLoadFromDisk) {
-        FullChunk chunk = level.getChunk(chunkX, chunkZ, false);
+        // getChunk(..., false) still loads from disk. The player already warms the
+        // nearby 3x3 on the server thread; workers must never mount a cold chunk.
+        BaseFullChunk chunk = level.getChunkIfLoaded(chunkX, chunkZ);
         if (chunk == null) {
-            // A cold far chunk is not worth blocking the transfer for. The mirror will get a new
-            // frame if no nearby portal exists; already loaded chunks still use the full radius.
-            if (!mayLoadFromDisk || !level.loadChunk(chunkX, chunkZ, false)) {
+            if (!mayLoadFromDisk || !level.getServer().isPrimaryThread()
+                    || !level.loadChunk(chunkX, chunkZ, false)) {
                 return null;
             }
-            chunk = level.getChunk(chunkX, chunkZ, false);
+            chunk = level.getChunkIfLoaded(chunkX, chunkZ);
         }
-        if (chunk == null || !chunk.isGenerated()) {
+        if (!usablePortalChunk(chunk)) {
             return null;
         }
 

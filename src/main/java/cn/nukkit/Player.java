@@ -2355,6 +2355,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     inPortalTicks = 0;
                                     return;
                                 }
+                                if (!BlockNetherPortal.isPortalDestinationReady(portalTarget)
+                                        || foundPortal != null && !BlockNetherPortal.isPortalLoaded(foundPortal)) {
+                                    // An unhealthy destination or vanished frame cannot be trusted after
+                                    // the worker returns. Retry by stepping into the portal again.
+                                    inPortalTicks = 0;
+                                    return;
+                                }
                                 if (foundPortal == null) {
                                     // The frame may end up at another height than asked for, so the
                                     // player follows the frame instead of the mirrored position.
