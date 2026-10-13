@@ -51,15 +51,26 @@ class BlockPaletteNetEaseFallbackTest {
     }
 
     @Test
-    void netEase130ItemMappingReusesStandard898() {
+    void netEase130ItemMappingLoadsRealTable() {
         RuntimeItemMapping mapping = RuntimeItems.getMapping(GameVersion.V1_21_130_NETEASE);
 
-        Assertions.assertEquals(GameVersion.V1_21_130.getProtocol(), mapping.getProtocolId(),
-                "898 NetEase must ride the standard 898 mapping until netease_898 data lands");
+        Assertions.assertEquals(GameVersion.V1_21_130_NETEASE.getProtocol(), mapping.getProtocolId(),
+                "898 NetEase serves its own netease_898 table");
         OptionalInt rawCopper = mapping.getNetworkIdByNamespaceId("minecraft:raw_copper");
         Assertions.assertTrue(rawCopper.isPresent());
-        Assertions.assertEquals(547, rawCopper.getAsInt(), "standard 898 item id");
+        Assertions.assertEquals(547, rawCopper.getAsInt(), "raw_copper matches the standard 898 id");
+        // real NetEase 898 dump rotates the 600-602 range relative to the standard table
+        Assertions.assertEquals(600, mapping.getNetworkIdByNamespaceId("minecraft:command_block_minecart").getAsInt(),
+                "NetEase 898 command_block_minecart id");
+        Assertions.assertEquals(601, mapping.getNetworkIdByNamespaceId("minecraft:splash_potion").getAsInt(),
+                "NetEase 898 splash_potion id");
+        Assertions.assertEquals(602, mapping.getNetworkIdByNamespaceId("minecraft:lingering_potion").getAsInt(),
+                "NetEase 898 lingering_potion id");
         Assertions.assertTrue(mapping.getNetworkIdByNamespaceId("minecraft:diamond_spear").isPresent(),
-                "1.21.130 spears must resolve for NetEase clients via the standard table");
+                "1.21.130 spears must resolve for NetEase clients");
+        Assertions.assertTrue(mapping.getNetworkIdByNamespaceId("minecraft:board").isEmpty(),
+                "education items absent from the NetEase table");
+        Assertions.assertTrue(mapping.getNetworkIdByNamespaceId("minecraft:chalkboard").isEmpty(),
+                "education items absent from the NetEase table");
     }
 }
