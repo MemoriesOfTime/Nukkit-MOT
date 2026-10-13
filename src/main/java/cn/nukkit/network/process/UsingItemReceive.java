@@ -81,6 +81,11 @@ public final class UsingItemReceive {
      * eat while sprinting.
      */
     public static boolean shouldKeepUsingDespiteStartSprinting(boolean javaClient, boolean holdToUse,
+                                                               boolean startUsingItemFlag) {
+        return javaClient && startUsingItemFlag && holdToUse;
+    }
+
+    public static boolean shouldKeepUsingDespiteStartSprinting(boolean javaClient, boolean holdToUse,
                                                                boolean startUsingItemFlag, boolean consumingItem) {
         if (javaClient) {
             return startUsingItemFlag && holdToUse;

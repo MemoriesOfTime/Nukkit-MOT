@@ -216,6 +216,8 @@ public abstract class BaseInventory implements Inventory {
             item = ev.getNewItem();
         }
 
+        if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
+
         if (holder instanceof BlockEntity) {
             ((BlockEntity) holder).setDirty();
         }
@@ -407,6 +409,29 @@ public abstract class BaseInventory implements Inventory {
         }
     }
 
+    /**
+     * Observe one native rescue decrement. Unknown inventory subclasses retain their public
+     * virtual mutation path and cannot claim a receipt without a commit-point contract.
+     */
+    public final Item decreaseTotemCount(int slot, int selectedSlot, Item selected) {
+        if (getClass() != PlayerInventory.class && getClass() != PlayerOffhandInventory.class) {
+            this.decreaseCount(slot);
+            return null;
+        }
+        Item item = this.getItem(slot);
+        if (item.getCount() <= 0) return null;
+        TotemConsumption receipt = slot == selectedSlot && selected == this.slots.get(slot)
+                && item.getId() == Item.TOTEM && InventoryMutationGuard.canConfirmSlotMutation(this)
+                ? new TotemConsumption(this, selected, item) : null;
+        item.count--;
+        this.setItemObserved(slot, item, true, receipt);
+        return receipt == null ? null : receipt.consumed();
+    }
+
+    protected boolean setItemObserved(int slot, Item item, boolean send, TotemConsumption receipt) {
+        return this.setItem(slot, item, send);
+    }
+
     @Override
     public boolean canAddItem(Item item) {
         int count = item.getCount();
@@ -464,11 +489,14 @@ public abstract class BaseInventory implements Inventory {
                     if (item.getCount() < maxStackSize) {
                         int amount = Math.min(maxStackSize - item.getCount(), slot.getCount());
                         if (amount > 0) {
-                            slot.setCount(slot.getCount() - amount);
-                            item.setCount(item.getCount() + amount);
-                            this.setItem(i, item);
-                            if (slot.getCount() <= 0) {
-                                iterator.remove();
+                            Item candidate = item.clone();
+                            candidate.setCount(item.getCount() + amount);
+                            if (this.setItemExactBulk(i, candidate)) {
+                                slot.setCount(slot.getCount() - amount);
+                                item = this.getItem(i);
+                                if (slot.getCount() <= 0) {
+                                    iterator.remove();
+                                }
                             }
                         }
                     }
@@ -484,12 +512,14 @@ public abstract class BaseInventory implements Inventory {
                 if (!itemSlots.isEmpty()) {
                     Item slot = itemSlots.get(0);
                     int amount = Math.min(Math.min(slot.getMaxStackSize(), this.getMaxStackSize()), slot.getCount());
-                    slot.setCount(slot.getCount() - amount);
+                    if (amount <= 0) continue;
                     Item item = slot.clone();
                     item.setCount(amount);
-                    this.setItem(slotIndex, item);
-                    if (slot.getCount() <= 0) {
-                        itemSlots.remove(slot);
+                    if (this.setItemExactBulk(slotIndex, item)) {
+                        slot.setCount(slot.getCount() - amount);
+                        if (slot.getCount() <= 0) {
+                            itemSlots.remove(slot);
+                        }
                     }
                 }
             }
@@ -516,11 +546,14 @@ public abstract class BaseInventory implements Inventory {
             for (Item slot : new ArrayList<>(itemSlots)) {
                 if (slot.equals(item, item.hasMeta(), item.getCompoundTag() != null)) {
                     int amount = Math.min(item.getCount(), slot.getCount());
-                    slot.setCount(slot.getCount() - amount);
-                    item.setCount(item.getCount() - amount);
-                    this.setItem(i, item);
-                    if (slot.getCount() <= 0) {
-                        itemSlots.remove(slot);
+                    Item candidate = item.clone();
+                    candidate.setCount(item.getCount() - amount);
+                    if (this.setItemExactBulk(i, candidate)) {
+                        slot.setCount(slot.getCount() - amount);
+                        item = this.getItem(i);
+                        if (slot.getCount() <= 0) {
+                            itemSlots.remove(slot);
+                        }
                     }
                 }
             }
@@ -531,6 +564,23 @@ public abstract class BaseInventory implements Inventory {
         }
 
         return itemSlots.toArray(Item.EMPTY_ARRAY);
+    }
+
+    private boolean setItemExactBulk(int slot, Item target) {
+        try (InventoryMutationGuard.WriteScope write = InventoryMutationGuard.tryExactBulkWrite(this, slot, target)) {
+            if (write == null) return false;
+            try {
+                if (this.setItem(slot, target.clone())
+                        && InventoryMutationGuard.matchesTarget(this.getItem(slot), target)) {
+                    return true;
+                }
+            } catch (RuntimeException | Error failure) {
+                write.restorePreviousSlot();
+                throw failure;
+            }
+            write.restorePreviousSlot();
+            return false;
+        }
     }
 
     @Override
@@ -548,6 +598,8 @@ public abstract class BaseInventory implements Inventory {
                 }
                 item = ev.getNewItem();
             }
+
+            if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
 
             if (holder instanceof BlockEntity) {
                 ((BlockEntity) holder).setDirty();

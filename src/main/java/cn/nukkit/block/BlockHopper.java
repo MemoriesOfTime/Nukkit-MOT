@@ -5,17 +5,21 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityPickupClaim;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.ContainerInventory;
-import cn.nukkit.inventory.FurnaceInventory;
+import cn.nukkit.inventory.BaseInventory;
+import cn.nukkit.inventory.InventoryMutationGuard;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.NativeContainerTransaction;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemHopper;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
@@ -23,9 +27,15 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
+import cn.nukkit.utils.CollisionHelper;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author CreeperFace
@@ -293,6 +303,153 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
         return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
     }
 
+    /** The source stays claimed through accepted retirement and destination lease release. */
+    private static boolean pickupPublishedItem(IHopper hopper, BaseInventory inventory, EntityItem entity) {
+        try (EntityPickupClaim.Lease source = EntityPickupClaim.tryClaim(entity)) {
+            if (source == null) return false;
+            try (InventoryMutationGuard.Lease destination = InventoryMutationGuard.tryClaim(Collections.singleton(inventory))) {
+                if (destination == null) return false;
+                Position actor = hopper.getPosition();
+                Object actorChunk = hopper instanceof BlockEntity block ? block.chunk
+                        : hopper instanceof Entity value ? value.chunk : null;
+                HopperPickupContext context = new HopperPickupContext(hopper, inventory, actor.getLevel(),
+                        actor.x, actor.y, actor.z, actorChunk, entity.getLevel(), entity.chunk,
+                        entity.getId(), inventory.getSize(), inventory.getMaxStackSize());
+                Item item = entity.getItem();
+                if (!context.matches(entity) || item == null || item.isNull() || !inventory.canAddItem(item)) return false;
+                InventoryMoveItemEvent event = new InventoryMoveItemEvent(null, inventory, hopper, item,
+                        InventoryMoveItemEvent.Action.PICKUP, entity);
+                event.call();
+                if (event.isCancelled() || !context.matches(entity)) return false;
+                // Callback-authored source or inventory edits precede this transfer's rollback boundary.
+                item = entity.getItem();
+                if (item == null || item.isNull() || item.getCount() <= 0) return false;
+                Item offered = item.clone();
+                Map<Integer, Item> before = new HashMap<>();
+                inventory.slots.forEach((slot, stack) -> before.put(slot, stack.clone()));
+                InventoryMutationGuard.NativeMetadataSnapshot metadata = destination.captureNativeMetadata();
+                Item[] remainder;
+                int accepted;
+                boolean refused;
+                try {
+                    remainder = inventory.addItem(offered.clone());
+                    int left = remainder.length == 0 ? 0 : remainder.length == 1 ? remainder[0].getCount() : -1;
+                    accepted = offered.getCount() - left;
+                    refused = left < 0 || accepted <= 0 || !context.matches(entity) || !metadata.matches()
+                            || !entity.getItem().equalsExact(offered)
+                            || !matchesPickupSlots(inventory, before, offered, accepted);
+                    if (refused) {
+                        restorePickupSlots(inventory, before, metadata);
+                        restorePickupCount(context, entity, offered);
+                    }
+                } catch (RuntimeException | Error failure) {
+                    try { restorePickupSlots(inventory, before, metadata); restorePickupCount(context, entity, offered); }
+                    catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+                    try { inventory.sendContents(inventory.getViewers()); }
+                    catch (RuntimeException | Error update) { if (update != failure) failure.addSuppressed(update); }
+                    throw failure;
+                }
+                if (refused) {
+                    // This resync is outside the provisional-write catch: a viewer callback must not
+                    // replay the old snapshot over a separate change made after this rollback.
+                    inventory.sendContents(inventory.getViewers());
+                    return false;
+                }
+                // No rollback after accepted source retirement. Match the native accepted cooldown
+                // before the destination lease drains deferred close callbacks.
+                Throwable failure = null;
+                try { hopper.setTransferCooldown(8); }
+                catch (RuntimeException | Error effect) { failure = effect; }
+                try {
+                    if (remainder.length == 0) entity.close();
+                    else entity.getItem().setCount(remainder[0].getCount());
+                } catch (RuntimeException | Error retirement) {
+                    if (failure == null) failure = retirement;
+                    else if (failure != retirement) failure.addSuppressed(retirement);
+                }
+                if (failure instanceof RuntimeException exception) throw exception;
+                if (failure instanceof Error error) throw error;
+                return true;
+            }
+        }
+    }
+
+    /** Opaque public Inventory extensions keep their native insertion/remainder contract. */
+    private static boolean pickupLegacyItem(IHopper hopper, Inventory inventory, EntityItem entity) {
+        try (EntityPickupClaim.Lease source = EntityPickupClaim.tryClaim(entity)) {
+            if (source == null) return false;
+            Item item = entity.getItem();
+            if (item.isNull()) return false;
+            int originalCount = item.getCount();
+            if (!inventory.canAddItem(item)) return false;
+            InventoryMoveItemEvent event = new InventoryMoveItemEvent(null, inventory, hopper, item,
+                    InventoryMoveItemEvent.Action.PICKUP, entity);
+            event.call();
+            if (event.isCancelled()) return false;
+            Item[] items = inventory.addItem(item);
+            if (items.length == 0) {
+                entity.close();
+                return true;
+            }
+            if (items[0].getCount() != originalCount) {
+                item.setCount(items[0].getCount());
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /** Count custody only: no NBT/world rewind, no replay of a closed or replaced actor. */
+    private static void restorePickupCount(HopperPickupContext context, EntityItem source, Item offered) {
+        if (context.sourceMatches(source)) source.getItem().setCount(offered.getCount());
+    }
+
+    private static boolean matchesPickupSlots(BaseInventory inventory, Map<Integer, Item> before, Item offered, int accepted) {
+        Set<Integer> slots = new HashSet<>(before.keySet());
+        slots.addAll(inventory.slots.keySet());
+        int granted = 0;
+        for (int slot : slots) {
+            Item previous = before.get(slot), current = inventory.slots.get(slot);
+            if (previous == null && current == null || previous != null && current != null && previous.equalsExact(current)) continue;
+            if (slot < 0 || slot >= inventory.getSize() || current == null || current.isNull()) return false;
+            Item expected = offered.clone();
+            expected.setCount(current.getCount());
+            int oldCount = previous == null || previous.isNull() ? 0 : previous.getCount();
+            if (!InventoryMutationGuard.matchesTarget(current, expected)
+                    || oldCount != 0 && !previous.equals(offered, true, true)
+                    || current.getCount() <= oldCount
+                    || current.getCount() > Math.min(current.getMaxStackSize(), inventory.getMaxStackSize())) return false;
+            granted += current.getCount() - oldCount;
+        }
+        return granted == accepted;
+    }
+
+    private static void restorePickupSlots(BaseInventory inventory, Map<Integer, Item> before,
+                                            InventoryMutationGuard.NativeMetadataSnapshot metadata) {
+        metadata.restore();
+        inventory.slots.clear();
+        inventory.slots.putAll(before);
+    }
+
+    private record HopperPickupContext(IHopper hopper, BaseInventory inventory, Level level,
+                                      double x, double y, double z, Object actorChunk,
+                                      Level sourceLevel, FullChunk sourceChunk, long sourceId, int size, int limit) {
+        boolean matches(EntityItem source) {
+            Position actor = hopper.getPosition();
+            if (inventory.destroyed || hopper.getInventory() != inventory || inventory.getHolder() != hopper
+                    || inventory.getSize() != size || inventory.getMaxStackSize() != limit
+                    || level == null || actor.getLevel() != level || actor.x != x || actor.y != y || actor.z != z
+                    || sourceLevel != level || !sourceMatches(source)) return false;
+            if (hopper instanceof BlockEntity block && (block.closed || block.chunk != actorChunk)) return false;
+            return !(hopper instanceof Entity entity) || !entity.closed && entity.isAlive() && entity.chunk == actorChunk;
+        }
+        boolean sourceMatches(EntityItem source) {
+            return !source.isClosed() && source.getLevel() == sourceLevel && sourceLevel != null
+                    && source.chunk == sourceChunk && source.getId() == sourceId
+                    && sourceLevel.getEntity(sourceId) == source;
+        }
+    }
+
     public interface IHopper extends InventoryHolder {
 
         Position getPosition();
@@ -314,65 +471,14 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                 return false;
             }
 
-            if (blockEntity instanceof BlockEntityFurnace) {
-                FurnaceInventory inv = ((BlockEntityFurnace) blockEntity).getInventory();
-                Item item = inv.getResult();
-
-                if (!item.isNull()) {
-                    Item itemToAdd = item.clone();
-                    itemToAdd.count = 1;
-
-                    if (!inventory.canAddItem(itemToAdd)) {
-                        return false;
-                    }
-
-                    InventoryMoveItemEvent ev = new InventoryMoveItemEvent(inv, inventory, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
-                    ev.call();
-
-                    if (ev.isCancelled()) {
-                        return false;
-                    }
-
-                    Item[] items = inventory.addItem(itemToAdd);
-
-                    if (items.length <= 0) {
-                        item.count--;
-                        inv.setResult(item);
-                        return true;
-                    }
-                }
-            } else if (blockEntity instanceof InventoryHolder) {
-                Inventory inv = ((InventoryHolder) blockEntity).getInventory();
-
-                for (int i = 0; i < inv.getSize(); i++) {
-                    Item item = inv.getItem(i);
-
-                    if (!item.isNull()) {
-                        Item itemToAdd = item.clone();
-                        itemToAdd.count = 1;
-
-                        if (!inventory.canAddItem(itemToAdd)) {
-                            continue;
-                        }
-
-                        InventoryMoveItemEvent ev = new InventoryMoveItemEvent(inv, inventory, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
-                        ev.call();
-
-                        if (ev.isCancelled()) {
-                            continue;
-                        }
-
-                        Item[] items = inventory.addItem(itemToAdd);
-
-                        if (items.length >= 1) {
-                            continue;
-                        }
-
-                        item.count--;
-
-                        inv.setItem(i, item);
-                        return true;
-                    }
+            if (blockEntity instanceof InventoryHolder holder) {
+                Inventory source = holder.getInventory();
+                int start = blockEntity instanceof BlockEntityFurnace ? 2 : 0;
+                int end = blockEntity instanceof BlockEntityFurnace ? 3 : source.getSize();
+                for (int i = start; i < end; i++) {
+                    if (NativeContainerTransaction.move(this, source, i, inventory, -1,
+                            () -> holder.getInventory() == source && this.getInventory() == inventory,
+                            () -> this.setTransferCooldown(8))) return true;
                 }
             } else {
                 if (block instanceof BlockComposter composter) {
@@ -408,42 +514,15 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
 
             boolean pickedUpItem = false;
 
-            for (Entity entity : this.getPosition().getLevel().getCollidingEntities(pickupArea)) {
+            for (Entity entity : CollisionHelper.getPickupEntities(this.getPosition().getLevel(), pickupArea, true)) {
                 if (entity.isClosed() || !(entity instanceof EntityItem)) {
                     continue;
                 }
 
-                EntityItem itemEntity = (EntityItem) entity;
-                Item item = itemEntity.getItem();
-
-                if (item.isNull()) {
-                    continue;
-                }
-
-                int originalCount = item.getCount();
-
-                if (!inventory.canAddItem(item)) {
-                    continue;
-                }
-
-                InventoryMoveItemEvent ev = new InventoryMoveItemEvent(null, inventory, this, item, InventoryMoveItemEvent.Action.PICKUP, itemEntity);
-                ev.call();
-
-                if (ev.isCancelled()) {
-                    continue;
-                }
-
-                Item[] items = inventory.addItem(item);
-
-                if (items.length == 0) {
-                    entity.close();
+                if (inventory instanceof BaseInventory nativeInventory
+                        ? pickupPublishedItem(this, nativeInventory, (EntityItem) entity)
+                        : pickupLegacyItem(this, inventory, (EntityItem) entity)) {
                     pickedUpItem = true;
-                    continue;
-                }
-
-                if (items[0].getCount() != originalCount) {
-                    pickedUpItem = true;
-                    item.setCount(items[0].getCount());
                 }
             }
 

@@ -4,12 +4,12 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.event.Event;
 import cn.nukkit.event.inventory.InventoryMoveItemEvent;
-import cn.nukkit.inventory.ChestInventory;
-import cn.nukkit.inventory.FurnaceInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.StringItemUnknown;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.math.Vector3;
@@ -77,10 +77,10 @@ public class BlockEntityHopperTest {
         // The hopper sits at a chunk corner; its neighbourhood is in memory unless a test says otherwise.
         lenient().when(level.isChunkLoaded(anyInt(), anyInt())).thenReturn(true);
 
-        FullChunk chunk = mock(FullChunk.class);
         LevelProvider provider = mock(LevelProvider.class);
-        lenient().when(chunk.getProvider()).thenReturn(provider);
         lenient().when(provider.getLevel()).thenReturn(level);
+        lenient().when(level.getDimensionData()).thenReturn(DimensionData.LEGACY_DIMENSION);
+        FullChunk chunk = new LevelDBChunk(provider, 0, 0);
 
         CompoundTag nbt = new CompoundTag()
                 .putString("id", BlockEntity.HOPPER)
@@ -96,24 +96,18 @@ public class BlockEntityHopperTest {
         return new HopperTestContext(hopper, level, chunk);
     }
 
-    /**
-     * Creates a mock BlockEntityFurnace with a real FurnaceInventory.
-     */
-    private static BlockEntityFurnace createMockFurnace() {
-        BlockEntityFurnace furnace = mock(BlockEntityFurnace.class);
-        FurnaceInventory furnaceInv = new FurnaceInventory(furnace);
-        when(furnace.getInventory()).thenReturn(furnaceInv);
-        return furnace;
+    /** Native holders retain their constructor-created metadata, owner and physical backing. */
+    private static BlockEntityFurnace createNativeFurnace(HopperTestContext ctx) {
+        return new BlockEntityFurnace(ctx.chunk, containerNbt(BlockEntity.FURNACE));
     }
 
-    /**
-     * Creates a mock BlockEntityChest with a real ChestInventory.
-     */
-    private static BlockEntityChest createMockChest() {
-        BlockEntityChest chest = mock(BlockEntityChest.class);
-        ChestInventory chestInv = new ChestInventory(chest);
-        when(chest.getInventory()).thenReturn(chestInv);
-        return chest;
+    private static BlockEntityChest createNativeChest(HopperTestContext ctx) {
+        return new BlockEntityChest(ctx.chunk, containerNbt(BlockEntity.CHEST));
+    }
+
+    private static CompoundTag containerNbt(String type) {
+        return new CompoundTag().putString("id", type).putInt("x", 0).putInt("y", 65).putInt("z", 0)
+                .putList(new ListTag<CompoundTag>("Items"));
     }
 
     /**
@@ -144,7 +138,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A1: facing down -> empty smelting slot")
         void pushToEmptySmeltingSlot() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 0, furnace, Block.get(Block.FURNACE));
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.IRON_INGOT, 0, 5));
@@ -162,7 +156,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A2: facing down -> stack with same item in smelting slot")
         void pushToSmeltingSlotWithSameItem() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 0, furnace, Block.get(Block.FURNACE));
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.IRON_INGOT, 0, 5));
@@ -179,7 +173,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A3: facing down -> reject different item in smelting slot")
         void pushToSmeltingSlotWithDifferentItem() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 0, furnace, Block.get(Block.FURNACE));
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.IRON_INGOT, 0, 5));
@@ -196,7 +190,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A4: facing down -> reject different StringItem merge (bugfix verification)")
         void pushDifferentStringItemToSmeltingSlotRejected() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 0, furnace, Block.get(Block.FURNACE));
 
             ctx.hopper.getInventory().setItem(0, new StringItemUnknown("minecraft:item_b"));
@@ -215,7 +209,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A5: facing down -> allow same StringItem merge (bugfix verification)")
         void pushSameStringItemToSmeltingSlotAccepted() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 0, furnace, Block.get(Block.FURNACE));
 
             Item hopperItem = new StringItemUnknown("minecraft:test_item");
@@ -237,7 +231,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A6: facing side -> fuel into empty fuel slot")
         void pushFuelToEmptyFuelSlot() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 2, furnace, Block.get(Block.FURNACE)); // 2 = NORTH
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.COAL, 0, 5));
@@ -255,7 +249,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A7: facing side -> stack same fuel")
         void pushFuelToFuelSlotWithSameItem() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 2, furnace, Block.get(Block.FURNACE));
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.COAL, 0, 5));
@@ -272,7 +266,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A8: facing side -> reject different fuel item")
         void pushDifferentStringItemFuelRejected() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 2, furnace, Block.get(Block.FURNACE));
 
             // Create a StringItem that hypothetically has fuel time
@@ -296,7 +290,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A9: facing side -> non-fuel item rejected from fuel slot")
         void pushNonFuelToFuelSlotRejected() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 2, furnace, Block.get(Block.FURNACE));
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.DIAMOND, 0, 5));
@@ -311,7 +305,7 @@ public class BlockEntityHopperTest {
         @DisplayName("A10: facing side -> empty bucket is not fuel")
         void pushEmptyBucketToFuelSlotRejected() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
             setupPushTarget(ctx, 2, furnace, Block.get(Block.FURNACE));
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.BUCKET, 0, 1));
@@ -333,7 +327,7 @@ public class BlockEntityHopperTest {
         @DisplayName("B1: push to container with space")
         void pushToContainerWithSpace() {
             HopperTestContext ctx = createHopper();
-            BlockEntityChest chest = createMockChest();
+            BlockEntityChest chest = createNativeChest(ctx);
             setupPushTarget(ctx, 0, chest, Block.get(Block.CHEST));
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.DIAMOND, 0, 5));
@@ -351,7 +345,7 @@ public class BlockEntityHopperTest {
         @DisplayName("B2: push to full container rejected")
         void pushToFullContainer() {
             HopperTestContext ctx = createHopper();
-            BlockEntityChest chest = createMockChest();
+            BlockEntityChest chest = createNativeChest(ctx);
             setupPushTarget(ctx, 0, chest, Block.get(Block.CHEST));
 
             // Fill every slot of the chest
@@ -379,7 +373,7 @@ public class BlockEntityHopperTest {
         @DisplayName("C1: pull from furnace result slot")
         void pullFromFurnaceResultSlot() {
             HopperTestContext ctx = createHopper();
-            BlockEntityFurnace furnace = createMockFurnace();
+            BlockEntityFurnace furnace = createNativeFurnace(ctx);
 
             furnace.getInventory().setResult(Item.get(ItemID.IRON_INGOT, 0, 5));
 
@@ -396,7 +390,7 @@ public class BlockEntityHopperTest {
         @DisplayName("C2: pull from generic container")
         void pullFromContainer() {
             HopperTestContext ctx = createHopper();
-            BlockEntityChest chest = createMockChest();
+            BlockEntityChest chest = createNativeChest(ctx);
 
             chest.getInventory().setItem(0, Item.get(ItemID.DIAMOND, 0, 3));
 
@@ -413,7 +407,7 @@ public class BlockEntityHopperTest {
         @DisplayName("C3: pull rejected when hopper is full")
         void pullWhenHopperIsFull() {
             HopperTestContext ctx = createHopper();
-            BlockEntityChest chest = createMockChest();
+            BlockEntityChest chest = createNativeChest(ctx);
 
             // Fill hopper with max stacks
             for (int i = 0; i < ctx.hopper.getInventory().getSize(); i++) {
@@ -438,7 +432,7 @@ public class BlockEntityHopperTest {
         @DisplayName("D1: pushItems cancelled by InventoryMoveItemEvent")
         void pushItemsEventCancelled() {
             HopperTestContext ctx = createHopper();
-            BlockEntityChest chest = createMockChest();
+            BlockEntityChest chest = createNativeChest(ctx);
             setupPushTarget(ctx, 0, chest, Block.get(Block.CHEST));
 
             ctx.hopper.getInventory().setItem(0, Item.get(ItemID.DIAMOND, 0, 5));
@@ -464,7 +458,7 @@ public class BlockEntityHopperTest {
         @DisplayName("D2: pullItems cancelled by InventoryMoveItemEvent")
         void pullItemsEventCancelled() {
             HopperTestContext ctx = createHopper();
-            BlockEntityChest chest = createMockChest();
+            BlockEntityChest chest = createNativeChest(ctx);
 
             chest.getInventory().setItem(0, Item.get(ItemID.DIAMOND, 0, 3));
 
@@ -544,7 +538,7 @@ public class BlockEntityHopperTest {
             ctx.hopper.transferCooldown = 0;
 
             // Empty hopper, empty chest above
-            BlockEntityChest chest = createMockChest();
+            BlockEntityChest chest = createNativeChest(ctx);
             when(ctx.level.getBlockEntity(any(Vector3.class))).thenReturn(chest);
 
             boolean result = ctx.hopper.onUpdate();
@@ -566,7 +560,6 @@ public class BlockEntityHopperTest {
             when(ctx.level.getBlockEntity(any(Vector3.class))).thenReturn(null);
             lenient().when(ctx.level.getBlock(any(FullChunk.class), anyInt(), anyInt(), anyInt(), anyBoolean()))
                     .thenReturn(Block.get(Block.AIR));
-            when(ctx.level.getCollidingEntities(any())).thenReturn(new cn.nukkit.entity.Entity[0]);
 
             boolean result = ctx.hopper.onUpdate();
 

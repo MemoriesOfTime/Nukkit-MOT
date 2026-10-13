@@ -6,8 +6,14 @@ import cn.nukkit.block.BlockID;
 import cn.nukkit.event.inventory.InventoryClickEvent;
 import cn.nukkit.event.inventory.InventoryTransactionEvent;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.BaseInventory;
+import cn.nukkit.inventory.DoubleChestInventory;
+import cn.nukkit.inventory.BundleInventory;
+import cn.nukkit.inventory.InventoryMutationGuard;
+import cn.nukkit.inventory.PlayerUIComponent;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.ShulkerBoxInventory;
+import cn.nukkit.inventory.transaction.action.CreativeInventoryAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -94,7 +100,8 @@ public class InventoryTransaction {
 
             if (!source.isCreative()) {
                 int slot = slotChangeAction.getSlot();
-                if (slot == 36 || slot == 37 || slot == 38 || slot == 39) {
+                if (slotChangeAction.getInventory() == source.getInventory()
+                        && (slot == 36 || slot == 37 || slot == 38 || slot == 39)) {
                     if (sourceItem.hasEnchantment(Enchantment.ID_BINDING_CURSE)) {
                         invalid = true;
                         Server.getInstance().getLogger().debug("Failed to add SlotChangeAction for " + source.getName() + ": armor has binding curse");
@@ -174,10 +181,14 @@ public class InventoryTransaction {
     protected final Pattern TRIM_PATTERN = Pattern.compile("^minecraft:[a-z_]+_smithing_template$");
 
     protected boolean matchItems(boolean clientAuthTrim, boolean clientAuthLapis) {
+        return matchItems(clientAuthTrim, clientAuthLapis, this.actions);
+    }
+
+    private boolean matchItems(boolean clientAuthTrim, boolean clientAuthLapis, List<InventoryAction> matchedActions) {
         List<Item> haveItems = new ArrayList<>();
         List<Item> needItems = new ArrayList<>();
 
-        for (InventoryAction action : this.actions) {
+        for (InventoryAction action : matchedActions) {
             if (action.getTargetItem().getId() != Item.AIR) {
                 needItems.add(action.getTargetItem());
             }
@@ -230,15 +241,19 @@ public class InventoryTransaction {
     }
 
     protected void sendInventories() {
+        sendInventories(this.actions, this.inventories);
+    }
+
+    private void sendInventories(List<InventoryAction> sentActions, Set<Inventory> sentInventories) {
         if (this.getSource().protocol >= ProtocolInfo.v1_16_0) {
-            for (InventoryAction action : this.actions) {
+            for (InventoryAction action : sentActions) {
                 if (action instanceof SlotChangeAction) {
                     SlotChangeAction sca = (SlotChangeAction) action;
                     sca.getInventory().sendSlot(sca.getSlot(), this.source);
                 }
             }
         } else {
-            for (Inventory inventory : this.inventories) {
+            for (Inventory inventory : sentInventories) {
                 inventory.sendContents(this.source);
                 if (inventory instanceof PlayerInventory) {
                     ((PlayerInventory) inventory).sendArmorContents(this.source);
@@ -256,6 +271,10 @@ public class InventoryTransaction {
     }
 
     public static boolean callExecuteEvents(InventoryTransaction transaction) {
+        return callExecuteEvents(transaction, null);
+    }
+
+    private static boolean callExecuteEvents(InventoryTransaction transaction, List<InventoryAction> eventActions) {
         InventoryTransactionEvent ev = new InventoryTransactionEvent(transaction);
         transaction.source.getServer().getPluginManager().callEvent(ev);
 
@@ -263,7 +282,9 @@ public class InventoryTransaction {
         SlotChangeAction to = null;
         Player who = null;
 
-        for (InventoryAction action : transaction.actions) {
+        // Legacy events may author the list; detach it after the event before invoking inventory hooks.
+        if (eventActions == null) eventActions = List.copyOf(transaction.actions);
+        for (InventoryAction action : eventActions) {
             if (!(action instanceof SlotChangeAction)) {
                 continue;
             }
@@ -297,6 +318,14 @@ public class InventoryTransaction {
     }
 
     public boolean execute() {
+        // Exact creative actions are virtual credits/sinks; custom/workstation/world actions have separate effects.
+        if (this.getClass() == InventoryTransaction.class
+                && this.actions.stream().anyMatch(action -> action.getClass() == SlotChangeAction.class)
+                && this.actions.stream().allMatch(action -> action.getClass() == CreativeInventoryAction.class
+                || action.getClass() == SlotChangeAction.class
+                && ((SlotChangeAction) action).getInventory() instanceof BaseInventory)) {
+            return executeSlotTransfer();
+        }
         if (this.hasExecuted() || !this.canExecute()) {
             this.sendInventories();
             return false;
@@ -316,7 +345,8 @@ public class InventoryTransaction {
             if (action instanceof SlotChangeAction) {
                 if (!source.isCreative()) {
                     int slot = ((SlotChangeAction) action).getSlot();
-                    if (slot == 36 || slot == 37 || slot == 38 || slot == 39) {
+                    if (((SlotChangeAction) action).getInventory() == source.getInventory()
+                            && (slot == 36 || slot == 37 || slot == 38 || slot == 39)) {
                         if (action.getSourceItem().hasEnchantment(Enchantment.ID_BINDING_CURSE)) {
                             this.sendInventories();
                             return false;
@@ -336,6 +366,181 @@ public class InventoryTransaction {
 
         this.hasExecuted = true;
         return true;
+    }
+
+    @SuppressWarnings("try") // Expected-write scopes enforce setters through the thread-local guard.
+    private boolean executeSlotTransfer() {
+        List<InventoryAction> frozenActions = List.copyOf(this.actions);
+        Set<Inventory> frozenInventories = Collections.newSetFromMap(new IdentityHashMap<>());
+        frozenInventories.addAll(this.inventories);
+        try (InventoryMutationGuard.Lease claim = InventoryMutationGuard.tryClaim(frozenInventories)) {
+            if (claim == null) return false;
+            Map<CreativeInventoryAction, CreativeActionSnapshot> virtual = new IdentityHashMap<>();
+            for (InventoryAction action : frozenActions) {
+                if (action.getClass() == CreativeInventoryAction.class) {
+                    CreativeInventoryAction creative = (CreativeInventoryAction) action;
+                    if (!creative.isValid(this.source)) {
+                        this.sendInventories(frozenActions, frozenInventories);
+                        return false;
+                    }
+                    virtual.put(creative, new CreativeActionSnapshot(creative.getActionType(),
+                            creative.getSourceItem(), creative.getTargetItem()));
+                }
+            }
+            if (this.hasExecuted() || !matchItems(false, false, frozenActions) || this.invalid
+                    || !matchesCreativeTransfer(frozenActions, frozenInventories, virtual)) {
+                this.sendInventories(frozenActions, frozenInventories);
+                return false;
+            }
+            if (!(virtual.isEmpty() ? this.callExecuteEvent() : callExecuteEvents(this, frozenActions))) {
+                this.sendInventories(frozenActions, frozenInventories);
+                return true;
+            }
+            if (!matchesCreativeTransfer(frozenActions, frozenInventories, virtual)) {
+                this.sendInventories(frozenActions, frozenInventories);
+                return false;
+            }
+            List<InventoryAction> preparedActions = virtual.isEmpty() ? List.copyOf(this.actions) : frozenActions;
+            for (InventoryAction action : preparedActions) {
+                if ((action.getClass() != SlotChangeAction.class && action.getClass() != CreativeInventoryAction.class)
+                        || action.getClass() == CreativeInventoryAction.class && !virtual.containsKey(action)
+                        || action instanceof SlotChangeAction slot && !claim.contains(slot.getInventory())
+                        || !action.onPreExecute(this.source)) {
+                    this.sendInventories(frozenActions, frozenInventories);
+                    return false;
+                }
+            }
+            for (InventoryAction action : preparedActions) {
+                if (action instanceof SlotChangeAction change && !this.source.isCreative()
+                        && change.getInventory() == this.source.getInventory()
+                        && change.getSlot() >= 36 && change.getSlot() <= 39
+                        && action.getSourceItem().hasEnchantment(Enchantment.ID_BINDING_CURSE)) {
+                    this.sendInventories(frozenActions, frozenInventories);
+                    return false;
+                }
+            }
+            // A transaction callback may have changed either slot or its authored action.
+            if (this.actions.isEmpty() || !matchesCreativeTransfer(frozenActions, frozenInventories, virtual)
+                    || !matchItems(false, false, List.copyOf(this.actions)) || this.invalid
+                    || !matchesCreativeTransfer(frozenActions, frozenInventories, virtual)) {
+                this.sendInventories(frozenActions, frozenInventories);
+                return false;
+            }
+            List<SlotChangeAction> writes = this.actions.stream().filter(action -> action.getClass() == SlotChangeAction.class)
+                    .map(action -> (SlotChangeAction) action).toList();
+            // A valid item stack can still exceed a container's smaller configured limit.
+            // Reject before any setter can route excess into the world and defeat rollback.
+            for (SlotChangeAction action : writes) {
+                Item target = action.getTargetItem();
+                if (!target.isNull() && (target.getCount() <= 0 || target.getCount()
+                        > Math.min(action.getInventory().getMaxStackSize(), target.getMaxStackSize()))) {
+                    this.sendInventories(frozenActions, frozenInventories);
+                    return false;
+                }
+            }
+            Map<BaseInventory, Map<Integer, Item>> before = new IdentityHashMap<>();
+            Map<SlotChangeAction, Item> expected = new IdentityHashMap<>();
+            writes.forEach(action -> expected.put(action, action.getTargetItem()));
+            for (SlotChangeAction action : writes) {
+                captureSlotTransfer((BaseInventory) action.getInventory(), before);
+            }
+            try {
+                for (SlotChangeAction action : writes) {
+                    try (InventoryMutationGuard.WriteScope write = claim.expectWrite(action.getInventory(), action.getSlot(), expected.get(action))) {
+                        if (!action.executeInventoryWrite(this.source)
+                                || !acceptedSlotTarget(action, expected.get(action))) {
+                            restoreSlotTransfer(before);
+                            this.sendInventories(frozenActions, frozenInventories);
+                            return false;
+                        }
+                    }
+                }
+                // A later callback must not rewrite an earlier accepted half of the transfer.
+                for (SlotChangeAction action : writes) {
+                    if (!acceptedSlotTarget(action, expected.get(action))) {
+                        restoreSlotTransfer(before);
+                        this.sendInventories(frozenActions, frozenInventories);
+                        return false;
+                    }
+                }
+                // Recheck after the last native callback/read, before any irreversible committed effects.
+                if (!matchesCreativeTransfer(frozenActions, frozenInventories, virtual)) {
+                    restoreSlotTransfer(before);
+                    this.sendInventories(frozenActions, frozenInventories);
+                    return false;
+                }
+            } catch (RuntimeException | Error failure) {
+                restoreSlotTransfer(before);
+                try {
+                    this.sendInventories(frozenActions, frozenInventories);
+                } catch (RuntimeException | Error updateFailure) {
+                    if (updateFailure != failure) failure.addSuppressed(updateFailure);
+                }
+                throw failure;
+            }
+            this.hasExecuted = true;
+            for (SlotChangeAction action : writes) {
+                action.onInventoryWriteCommitted(this.source);
+                action.onExecuteSuccess(this.source);
+            }
+            return true;
+        }
+    }
+
+    private boolean matchesCreativeTransfer(List<InventoryAction> frozenActions, Set<Inventory> frozenInventories,
+                                            Map<CreativeInventoryAction, CreativeActionSnapshot> virtual) {
+        if (virtual.isEmpty()) return true;
+        if (!matchesCreativeMembership(frozenActions, frozenInventories)) return false;
+        for (var entry : virtual.entrySet()) {
+            CreativeInventoryAction action = entry.getKey();
+            CreativeActionSnapshot snapshot = entry.getValue();
+            if (!action.isValid(this.source) || action.getActionType() != snapshot.type()
+                    || !action.getSourceItem().equalsExact(snapshot.source())
+                    || !action.getTargetItem().equalsExact(snapshot.target())) return false;
+        }
+        return matchesCreativeMembership(frozenActions, frozenInventories);
+    }
+
+    private boolean matchesCreativeMembership(List<InventoryAction> frozenActions, Set<Inventory> frozenInventories) {
+        if (this.actions.size() != frozenActions.size() || this.inventories.size() != frozenInventories.size()
+                || !frozenInventories.containsAll(this.inventories)) return false;
+        for (int i = 0; i < frozenActions.size(); i++) {
+            if (this.actions.get(i) != frozenActions.get(i)) return false;
+        }
+        return true;
+    }
+
+    private record CreativeActionSnapshot(int type, Item source, Item target) { }
+
+    private static boolean acceptedSlotTarget(SlotChangeAction action, Item expected) {
+        return InventoryMutationGuard.matchesTarget(action.getInventory().getItem(action.getSlot()), expected);
+    }
+
+    private static void captureSlotTransfer(BaseInventory inventory, Map<BaseInventory, Map<Integer, Item>> before) {
+        if (inventory instanceof DoubleChestInventory chest) {
+            captureSlotTransfer(chest.getLeftSide(), before);
+            captureSlotTransfer(chest.getRightSide(), before);
+        } else if (inventory instanceof PlayerUIComponent component) {
+            captureSlotTransfer(component.getBackingInventory(), before);
+        } else {
+            before.computeIfAbsent(inventory, key -> {
+                Map<Integer, Item> snapshot = new HashMap<>();
+                key.slots.forEach((slot, stack) -> snapshot.put(slot, stack.clone()));
+                return snapshot;
+            });
+        }
+    }
+
+    private static void restoreSlotTransfer(Map<BaseInventory, Map<Integer, Item>> before) {
+        // Restoring a snapshot is not another grant: bypass cancellable setters and overflow routing.
+        before.forEach((inventory, snapshot) -> {
+            inventory.slots.clear();
+            inventory.slots.putAll(snapshot);
+        });
+        // Bundle slots are mirrored into their holder's serialized item NBT.
+        before.keySet().forEach(inventory -> {
+            if (inventory instanceof BundleInventory bundle) bundle.getHolder().saveNBT();
+        });
     }
 
     public boolean hasExecuted() {
