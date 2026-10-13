@@ -109,6 +109,7 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
      */
     @Override
     public boolean attack(EntityDamageEvent source) {
+        if (this.closed || !this.isAlive()) return false;
         EntityArrow ignitingProjectile = getIgnitingProjectile(source);
         boolean shouldExplode = ignitingProjectile != null
                 && this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES);
@@ -189,6 +190,7 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     }
 
     public void explode(double square) {
+        if (this.closed || !this.isAlive()) return;
         double root = Math.sqrt(square);
 
         if (root > 5.0D) {
@@ -197,15 +199,30 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
 
         EntityExplosionPrimeEvent event = new EntityExplosionPrimeEvent(this, (4.0D + Utils.random.nextDouble() * 1.5D * root));
         server.getPluginManager().callEvent(event);
+        if (this.closed || !this.isAlive()) return;
+        if (!this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
+            this.close();
+            return;
+        }
         if (event.isCancelled()) {
             return;
         }
         Explosion explosion = new Explosion(this, event.getForce(), this);
-        if (event.isBlockBreaking()) {
-            explosion.explodeA();
+        Throwable closeFailure = null;
+        try {
+            this.close();
+        } catch (RuntimeException | Error failure) {
+            closeFailure = failure;
         }
-        explosion.explodeB();
-        this.close();
+        try {
+            if (event.isBlockBreaking()) explosion.explodeA();
+            explosion.explodeB();
+        } catch (RuntimeException | Error blastFailure) {
+            if (closeFailure == null) throw blastFailure;
+            if (closeFailure != blastFailure) closeFailure.addSuppressed(blastFailure);
+        }
+        if (closeFailure instanceof RuntimeException failure) throw failure;
+        if (closeFailure instanceof Error failure) throw failure;
     }
 
     @Override
