@@ -88,7 +88,7 @@ class ReviewV3PlaceholderRecoveryTest {
         field("pendingChunkLoads", new ConcurrentHashMap<>());
         field("completedChunkLoads", new ConcurrentLinkedQueue<>());
         field("chunkLoadFailures", Caffeine.newBuilder().build());
-        field("unloadQueue", new Long2ObjectNonBlockingMap<Long>());
+        field("unloadQueue", Level.class.getDeclaredField("unloadQueue").getType().getDeclaredConstructor().newInstance());
         field("chunkLoaders", new Long2ObjectNonBlockingMap<>());
         field("playerLoaders", new Long2ObjectNonBlockingMap<>());
         field("loaders", new Int2ObjectOpenHashMap<>());

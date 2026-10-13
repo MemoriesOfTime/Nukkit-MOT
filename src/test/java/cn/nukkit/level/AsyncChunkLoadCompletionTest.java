@@ -77,7 +77,7 @@ class AsyncChunkLoadCompletionTest {
         field(this.level, "pendingChunkLoads", new ConcurrentHashMap<>());
         field(this.level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
         field(this.level, "chunkLoadFailures", Caffeine.newBuilder().maximumSize(1024).build());
-        field(this.level, "unloadQueue", new Long2ObjectNonBlockingMap<Long>());
+        field(this.level, "unloadQueue", Level.class.getDeclaredField("unloadQueue").getType().getDeclaredConstructor().newInstance());
         field(this.level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
         field(this.level, "playerLoaders", new Long2ObjectNonBlockingMap<>());
         field(this.level, "loaders", new Int2ObjectOpenHashMap<>());

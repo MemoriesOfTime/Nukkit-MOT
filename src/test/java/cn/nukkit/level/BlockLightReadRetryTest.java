@@ -343,7 +343,7 @@ class BlockLightReadRetryTest {
             field(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
             field(level, "chunkLoadFailures", Caffeine.newBuilder().maximumSize(1024).build());
             field(level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
-            field(level, "unloadQueue", new Long2ObjectNonBlockingMap<>());
+            field(level, "unloadQueue", Level.class.getDeclaredField("unloadQueue").getType().getDeclaredConstructor().newInstance());
             doReturn(DimensionEnum.OVERWORLD.getDimensionData()).when(level).getDimensionData();
             // Pure cache/range predicates are fixture state; update/queue/read/mount/tick stay native.
             doAnswer(call -> chunks.get(Level.chunkHash(call.getArgument(0), call.getArgument(1)))).when(level).getChunkIfLoaded(anyInt(), anyInt());
