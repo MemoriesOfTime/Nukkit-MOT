@@ -48,7 +48,7 @@ class LevelChunkGarbageCollectionTest {
         setField(level, "blockEntities", new Long2ObjectNonBlockingMap<>());
         setField(level, "pendingChunkLoads", new ConcurrentHashMap<>());
         setField(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
-        setField(level, "unloadQueue", new Long2ObjectNonBlockingMap<>());
+        setField(level, "unloadQueue", Level.class.getDeclaredField("unloadQueue").getType().getDeclaredConstructor().newInstance());
         setField(level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
         setField(level, "playerLoaders", new Long2ObjectNonBlockingMap<>());
         setField(level, "loaders", new Int2ObjectOpenHashMap<>());
@@ -66,7 +66,7 @@ class LevelChunkGarbageCollectionTest {
     private static boolean isQueued(Level level, long hash) throws Exception {
         Field field = Level.class.getDeclaredField("unloadQueue");
         field.setAccessible(true);
-        return ((Long2ObjectNonBlockingMap<?>) field.get(level)).containsKey(hash);
+        return ((java.util.Map<?, ?>) field.get(level)).containsKey(hash);
     }
 
     @Test
