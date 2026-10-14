@@ -2626,6 +2626,11 @@ public class Level implements ChunkManager, Metadatable {
         return this.setBlock(pos, 0, block, direct, update);
     }
 
+    /** Observe native acceptance before callbacks and notifications. */
+    public boolean setBlock(Vector3 pos, Block block, boolean direct, boolean update, Runnable accepted) {
+        return this.setBlock(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ(), 0, block, direct, update, accepted);
+    }
+
     public boolean setBlock(Vector3 pos, BlockLayer layer, Block block, boolean direct, boolean update) {
         return this.setBlock(pos, layer.ordinal(), block, direct, update);
     }
@@ -2643,6 +2648,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean setBlock(int x, int y, int z, int layer, Block block, boolean direct, boolean update) {
+        return this.setBlock(x, y, z, layer, block, direct, update, null);
+    }
+
+    private boolean setBlock(int x, int y, int z, int layer, Block block, boolean direct, boolean update, Runnable accepted) {
         if (!isYInRange(y) || layer < 0 || layer > this.requireProvider().getMaximumLayer()) {
             return false;
         }
@@ -2652,6 +2661,7 @@ public class Level implements ChunkManager, Metadatable {
         if (blockPrevious.getFullId() == block.getFullId()) {
             return false;
         }
+        if (accepted != null) accepted.run();
         block.x = x;
         block.y = y;
         block.z = z;
