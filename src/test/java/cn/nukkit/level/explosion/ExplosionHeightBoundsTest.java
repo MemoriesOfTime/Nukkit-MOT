@@ -161,4 +161,26 @@ class ExplosionHeightBoundsTest {
         assertFalse(explosion(Route.ORDINARY, center, 1).explodeB());
         verify(world.level, never()).getNearbyEntities(any(AxisAlignedBB.class), nullable(Entity.class));
     }
+    @ParameterizedTest
+    @EnumSource(Route.class)
+    void distantInwardRaysDoNotWalkEveryEmptyHeightSample(Route route) {
+        for (double centerY : new double[]{100_000_000d, -100_000_000d}) {
+            World world = new World(0, 0, 0, false);
+            AtomicInteger heightSamples = new AtomicInteger();
+            when(world.level.isYInRange(anyInt())).thenAnswer(call -> {
+                assertTrue(heightSamples.incrementAndGet() <= 10_000,
+                        "an inward ray must skip its empty height gap");
+                return (int) call.getArgument(0) == 0;
+            });
+            when(world.level.isYInRange(anyDouble())).thenAnswer(call -> {
+                assertTrue(heightSamples.incrementAndGet() <= 10_000,
+                        "an inward ray must skip its empty height gap");
+                return (double) call.getArgument(0) == 0;
+            });
+            Explosion blast = explosion(route, new Position(0, centerY, 0, world.level), 500_000_000d);
+            assertTrue(blast.explodeA());
+            assertTrue(world.reads.get() > 0, "inward rays retain terrain intersections");
+        }
+    }
+
 }

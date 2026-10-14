@@ -83,6 +83,19 @@ public class Explosion {
                 && center + radius + 1 < Integer.MAX_VALUE;
     }
 
+    /** Number of ordinary ray steps before this inward ray can first sample provider height. */
+    final long emptyHeightRaySteps(double y, double stepY) {
+        if (y < this.level.getMinBlockY() && stepY > 0) {
+            return Math.max(1L, (long) Math.ceil((this.level.getMinBlockY() - y) / stepY));
+        }
+        if (y >= (double) this.level.getMaxBlockY() + 1 && stepY < 0) {
+            // The upper boundary is exclusive: floor(y) must be at most maxBlockY.
+            return Math.max(1L, (long) Math.floor((y - ((double) this.level.getMaxBlockY() + 1))
+                    / -stepY) + 1L);
+        }
+        return 1L;
+    }
+
     /** A custom resistance must not make a ray nonfinite or increase its original force. */
     protected final boolean hasSafeRayForce(double previous, double current, double decay) {
         if (!Double.isFinite(current) || current > previous
@@ -184,6 +197,17 @@ public class Explosion {
                                         || vBlock.y > level.getMaxBlockY() && vector.y >= 0) {
                                     break;
                                 }
+                                // Preserve the ordinary final step and its loop decay, skipping only
+                                // empty samples that cannot read a block or invoke a callback.
+                                long skipped = emptyHeightRaySteps(pointerY, vector.y) - 1L;
+                                double emptyDecay = skipped * (STEP_LEN * 0.75d);
+                                if (emptyDecay >= blastForce) {
+                                    break;
+                                }
+                                blastForce -= emptyDecay;
+                                pointerX += vector.x * skipped;
+                                pointerY += vector.y * skipped;
+                                pointerZ += vector.z * skipped;
                             } else {
                                 Block block = this.level.getBlock(vBlock);
                                 if (!block.isAir()) {

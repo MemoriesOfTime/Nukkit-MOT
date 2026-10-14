@@ -92,6 +92,17 @@ public class StrongExplosion extends Explosion {
                                         || vBlock.y > level.getMaxBlockY() && vector.y >= 0) {
                                     break;
                                 }
+                                // Preserve the ordinary final step and its loop decay, skipping only
+                                // empty samples that cannot read a block or invoke a callback.
+                                long skipped = emptyHeightRaySteps(pointerY, vector.y) - 1L;
+                                double emptyDecay = skipped * (0.22499999999999998);
+                                if (emptyDecay >= blastForce) {
+                                    break;
+                                }
+                                blastForce -= emptyDecay;
+                                pointerX += vector.x * skipped;
+                                pointerY += vector.y * skipped;
+                                pointerZ += vector.z * skipped;
                             } else {
                                 Block block = this.level.getBlock(vBlock);
 
