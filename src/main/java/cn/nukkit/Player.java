@@ -5826,7 +5826,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             if (item.onClickAir(this, directionVector)) {
-                                if (this.isSurvival() || this.isAdventure()) {
+                                // Bundle output commits its canonical carrier inside the native coordinator.
+                                if ((this.isSurvival() || this.isAdventure()) && !(item instanceof cn.nukkit.item.ItemBundle)) {
                                     if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
                                         this.inventory.setItemInHand(item);
                                     } else {
@@ -8723,7 +8724,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private boolean canConsumePickupSource(Entity entity) {
-        return this.spawned && this.isAlive() && this.isOnline() && !this.isSpectator() && !entity.isClosed();
+        return this.spawned && this.isAlive() && this.isOnline() && !this.isSpectator() && !entity.isClosed()
+                && !entity.isPublicationDeferred();
     }
 
     private record ItemPickupContext(Player owner, PlayerInventory inventory, Level playerLevel,

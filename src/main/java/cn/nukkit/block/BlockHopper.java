@@ -514,7 +514,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
             boolean pickedUpItem = false;
 
             for (Entity entity : CollisionHelper.getPickupEntities(this.getPosition().getLevel(), pickupArea, true)) {
-                if (entity.isClosed() || !(entity instanceof EntityItem)) {
+                if (entity.isClosed() || entity.isPublicationDeferred() || !(entity instanceof EntityItem)) {
                     continue;
                 }
 

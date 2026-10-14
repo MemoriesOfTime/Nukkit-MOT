@@ -364,7 +364,7 @@ class InventoryTransactionConservationTest {
         Fixture f = new Fixture();
         ItemBundle bundle = new ItemBundle();
         bundle.getBundleId();
-        bundle.setNamedTag(bundle.getNamedTag().putString("km_serial", "original"));
+        bundle.setNamedTag(bundle.getNamedTag().putString("example:serial", "original"));
         bundle.getInventory().setItem(0, Item.get(Item.STONE, 0, 3), false);
         f.inventory.setItemForce(0, bundle);
         Item source = f.inventory.getItem(0);
@@ -378,7 +378,7 @@ class InventoryTransactionConservationTest {
                 EntityInventoryChangeEvent event = call.getArgument(0);
                 if (event.getSlot() == 1) {
                     Item changed = event.getNewItem().clone();
-                    changed.setNamedTag(changed.getNamedTag().putString("km_serial", "changed"));
+                    changed.setNamedTag(changed.getNamedTag().putString("example:serial", "changed"));
                     event.setNewItem(changed);
                 }
                 return null;
@@ -386,7 +386,7 @@ class InventoryTransactionConservationTest {
         }
         assertEquals(!rewriteSerial, transaction.execute());
         ItemBundle result = (ItemBundle) f.inventory.getItem(rewriteSerial ? 0 : 1);
-        assertEquals("original", result.getNamedTag().getString("km_serial"));
+        assertEquals("original", result.getNamedTag().getString("example:serial"));
         assertEquals(3, result.getInventory().getItem(0).getCount());
         assertTrue(f.inventory.getItem(rewriteSerial ? 1 : 0).isNull());
     }

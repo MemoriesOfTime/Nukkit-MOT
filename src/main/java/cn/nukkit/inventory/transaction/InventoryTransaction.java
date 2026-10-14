@@ -14,6 +14,8 @@ import cn.nukkit.inventory.PlayerUIComponent;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.ShulkerBoxInventory;
 import cn.nukkit.inventory.transaction.action.CreativeInventoryAction;
+import cn.nukkit.inventory.transaction.action.DropItemAction;
+import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -318,6 +320,21 @@ public class InventoryTransaction {
     }
 
     public boolean execute() {
+        List<InventoryAction> initialActions = List.copyOf(this.actions);
+        boolean containsDrop = initialActions.stream().anyMatch(action -> action instanceof DropItemAction);
+        boolean containsOther = initialActions.stream().anyMatch(action -> action.getClass() != DropItemAction.class);
+        if (containsDrop && containsOther) {
+            if (this.getClass() == InventoryTransaction.class
+                    && initialActions.stream().anyMatch(action -> action.getClass() == SlotChangeAction.class)
+                    && initialActions.stream().allMatch(action -> action.getClass() == DropItemAction.class
+                    || action.getClass() == SlotChangeAction.class
+                    && ((SlotChangeAction) action).getInventory() instanceof BaseInventory)) {
+                return executePreparedWorldDrop(initialActions);
+            }
+            // Custom/workstation/world combinations have no preparation contract and cannot publish during rollback.
+            this.sendInventories(initialActions, Set.copyOf(this.inventories));
+            return false;
+        }
         // Exact creative actions are virtual credits/sinks; custom/workstation/world actions have separate effects.
         if (this.getClass() == InventoryTransaction.class
                 && this.actions.stream().anyMatch(action -> action.getClass() == SlotChangeAction.class)
@@ -367,6 +384,244 @@ public class InventoryTransaction {
         this.hasExecuted = true;
         return true;
     }
+
+    @SuppressWarnings("try")
+    private boolean executePreparedWorldDrop(List<InventoryAction> frozenActions) {
+        Set<Inventory> frozenInventories = Collections.newSetFromMap(new IdentityHashMap<>());
+        frozenInventories.addAll(this.inventories);
+        Map<InventoryAction, WorldActionSnapshot> snapshots = new IdentityHashMap<>();
+        for (InventoryAction action : frozenActions) {
+            snapshots.put(action, new WorldActionSnapshot(action.getSourceItem(), action.getTargetItem()));
+        }
+        WorldActorSnapshot actorContext = new WorldActorSnapshot(this.source);
+        Player actor = actorContext.actor();
+        Set<Inventory> capturedInventories = Collections.newSetFromMap(new IdentityHashMap<>());
+        capturedInventories.addAll(frozenInventories);
+        for (Inventory inventory : Arrays.asList(actor.getInventory(), actor.getOffhandInventory(),
+                actor.getEnderChestInventory(), actor.getUIInventory())) {
+            if (inventory != null) capturedInventories.add(inventory);
+        }
+        List<SlotChangeAction> writes = frozenActions.stream().filter(action -> action.getClass() == SlotChangeAction.class)
+                .map(action -> (SlotChangeAction) action).toList();
+        List<EntityItem.PreparedDrop> tickets = new ArrayList<>();
+        Map<BaseInventory, Map<Integer, Item>> before = new IdentityHashMap<>();
+        boolean committed = false;
+        try (InventoryMutationGuard.Lease claim = InventoryMutationGuard.tryClaim(capturedInventories)) {
+            if (claim == null) return false;
+            for (SlotChangeAction action : writes) {
+                if (!claim.contains(action.getInventory())) return false;
+            }
+            for (Inventory inventory : capturedInventories) {
+                if (!(inventory instanceof BaseInventory nativeInventory)) return false;
+                captureSlotTransfer(nativeInventory, before);
+            }
+            InventoryMutationGuard.NativeMetadataSnapshot metadata = claim.captureNativeMetadata();
+            Map<BaseInventory, Map<Integer, Item>> expectedBackings = expectedWorldBackings(before, writes, snapshots);
+            try (InventoryMutationGuard.WriteScope blocked = claim.blockWrites()) {
+                try {
+                    if (this.hasExecuted() || !worldActorIntact(actorContext)
+                            || !matchItems(false, false, frozenActions) || this.invalid
+                            || !metadata.matches() || !worldActionsIntact(frozenActions, frozenInventories, snapshots)) {
+                        return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                    }
+                    if (!callExecuteEvents(this, frozenActions)
+                            || !metadata.matches() || !worldActionsIntact(frozenActions, frozenInventories, snapshots)) {
+                        return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                    }
+                    for (InventoryAction action : frozenActions) {
+                        if (!action.onPreExecute(actor) || !metadata.matches() || !worldActionsIntact(frozenActions, frozenInventories, snapshots)) {
+                            return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                        }
+                        if (action instanceof SlotChangeAction change) {
+                            Item target = snapshots.get(action).target();
+                            if (!target.isNull() && (target.getCount() <= 0 || target.getCount()
+                                    > Math.min(change.getInventory().getMaxStackSize(), target.getMaxStackSize()))
+                                    || !actor.isCreative() && change.getSlot() >= 36 && change.getSlot() <= 39
+                                    && snapshots.get(action).source().hasEnchantment(Enchantment.ID_BINDING_CURSE)) {
+                                return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                            }
+                        }
+                    }
+                    for (InventoryAction action : frozenActions) {
+                        if (!(action instanceof DropItemAction drop)) continue;
+                        Item target = snapshots.get(action).target();
+                        if (target.getId() == Item.AIR) continue; // Preserve a neutral virtual no-op.
+                        if (target.getCount() <= 0) {
+                            return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                        }
+                        EntityItem.PreparedDrop ticket = drop.prepare(actor);
+                        if (ticket == null) return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                        tickets.add(ticket);
+                    }
+                    if (!matchItems(false, false, frozenActions) || this.invalid
+                            || !matchesWorldBackings(before) || !metadata.matches() || !worldActionsIntact(frozenActions, frozenInventories, snapshots)
+                            || !worldActorIntact(actorContext)
+                            || !tickets.stream().allMatch(EntityItem.PreparedDrop::isValid)) {
+                        return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                    }
+                    for (SlotChangeAction action : writes) {
+                        Item target = snapshots.get(action).target();
+                        try (InventoryMutationGuard.WriteScope write = claim.expectWrite(action.getInventory(), action.getSlot(), target)) {
+                            if (!action.executeInventoryWrite(actor) || !acceptedSlotTarget(action, target)) {
+                                return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                            }
+                        }
+                    }
+                    for (SlotChangeAction action : writes) {
+                        if (!acceptedSlotTarget(action, snapshots.get(action).target())) {
+                            return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                        }
+                    }
+                    // Native callbacks and the last postcondition read precede the irreversible world publication.
+                    if (!metadata.matches() || !matchesWorldBackings(expectedBackings)
+                            || !worldActionsIntact(frozenActions, frozenInventories, snapshots)
+                            || !worldActorIntact(actorContext)
+                            || !tickets.stream().allMatch(EntityItem.PreparedDrop::isValid)) {
+                        return rejectPreparedWorldDrop(tickets, before, metadata, claim, frozenActions, capturedInventories);
+                    }
+                    this.hasExecuted = true;
+                    committed = true;
+                    for (EntityItem.PreparedDrop ticket : tickets) ticket.release();
+                } catch (RuntimeException | Error failure) {
+                    if (!committed) {
+                        try { discardPreparedWorldDrops(tickets); } catch (RuntimeException | Error cleanup) {
+                            if (cleanup != failure) failure.addSuppressed(cleanup);
+                        }
+                        metadata.restore();
+                        restoreSlotTransfer(before, claim);
+                        try { this.resyncWorldInventories(frozenActions, capturedInventories); } catch (RuntimeException | Error update) {
+                            if (update != failure) failure.addSuppressed(update);
+                        }
+                    }
+                    throw failure;
+                }
+            }
+            // Notification may transfer a released source to a recipient or fail after publication. Never refund here.
+            Throwable notificationFailure = null;
+            for (EntityItem.PreparedDrop ticket : tickets) {
+                try { ticket.notifyPublished(); } catch (RuntimeException | Error failure) {
+                    notificationFailure = collectWorldNotificationFailure(notificationFailure, failure);
+                }
+            }
+            for (SlotChangeAction action : writes) {
+                try { action.onInventoryWriteCommitted(actor); action.onExecuteSuccess(actor); } catch (RuntimeException | Error failure) {
+                    notificationFailure = collectWorldNotificationFailure(notificationFailure, failure);
+                }
+            }
+            try { actor.setUsingItem(false); } catch (RuntimeException | Error failure) {
+                notificationFailure = collectWorldNotificationFailure(notificationFailure, failure);
+            }
+            if (notificationFailure instanceof RuntimeException failure) throw failure;
+            if (notificationFailure instanceof Error failure) throw failure;
+            return true;
+        }
+    }
+
+    private static Throwable collectWorldNotificationFailure(Throwable previous, Throwable failure) {
+        if (previous == null) return failure;
+        if (previous != failure) previous.addSuppressed(failure);
+        return previous;
+    }
+
+    private static void discardPreparedWorldDrops(List<EntityItem.PreparedDrop> tickets) {
+        Throwable failure = null;
+        for (EntityItem.PreparedDrop ticket : tickets) {
+            try { ticket.discard(); } catch (RuntimeException | Error cleanup) {
+                failure = collectWorldNotificationFailure(failure, cleanup);
+            }
+        }
+        if (failure instanceof RuntimeException error) throw error;
+        if (failure instanceof Error error) throw error;
+    }
+
+    private boolean rejectPreparedWorldDrop(List<EntityItem.PreparedDrop> tickets, Map<BaseInventory, Map<Integer, Item>> before,
+                                            InventoryMutationGuard.NativeMetadataSnapshot metadata, InventoryMutationGuard.Lease claim,
+                                            List<InventoryAction> actions, Set<Inventory> inventories) {
+        try { discardPreparedWorldDrops(tickets); } finally { metadata.restore(); restoreSlotTransfer(before, claim); }
+        this.resyncWorldInventories(actions, inventories);
+        return false;
+    }
+
+    private void resyncWorldInventories(List<InventoryAction> actions, Set<Inventory> inventories) {
+        Throwable failure = null;
+        try { this.sendInventories(actions, inventories); } catch (RuntimeException | Error update) { failure = update; }
+        for (Inventory inventory : inventories) {
+            try { inventory.sendContents(this.source); } catch (RuntimeException | Error update) {
+                failure = collectWorldNotificationFailure(failure, update);
+            }
+        }
+        if (failure instanceof RuntimeException error) throw error;
+        if (failure instanceof Error error) throw error;
+    }
+
+    private static Map<BaseInventory, Map<Integer, Item>> expectedWorldBackings(
+            Map<BaseInventory, Map<Integer, Item>> before, List<SlotChangeAction> writes,
+            Map<InventoryAction, WorldActionSnapshot> snapshots) {
+        Map<BaseInventory, Map<Integer, Item>> expected = new IdentityHashMap<>();
+        before.forEach((inventory, slots) -> {
+            Map<Integer, Item> copy = new HashMap<>();
+            slots.forEach((slot, item) -> copy.put(slot, item.clone()));
+            expected.put(inventory, copy);
+        });
+        for (SlotChangeAction action : writes) {
+            BaseInventory backing = (BaseInventory) action.getInventory();
+            int slot = action.getSlot();
+            if (backing instanceof DoubleChestInventory chest) {
+                int leftSize = chest.getLeftSide().getSize();
+                backing = slot < leftSize ? chest.getLeftSide() : chest.getRightSide();
+                if (slot >= leftSize) slot -= leftSize;
+            } else if (backing instanceof PlayerUIComponent component) {
+                slot = component.getBackingSlot(slot);
+                backing = component.getBackingInventory();
+            }
+            Item target = snapshots.get(action).target();
+            if (target.isNull()) expected.get(backing).remove(slot);
+            else expected.get(backing).put(slot, target.clone());
+        }
+        return expected;
+    }
+
+    private static boolean matchesWorldBackings(Map<BaseInventory, Map<Integer, Item>> expected) {
+        for (var entry : expected.entrySet()) {
+            Map<Integer, Item> actual = entry.getKey().slots;
+            if (actual.size() != entry.getValue().size()) return false;
+            for (var slot : entry.getValue().entrySet()) {
+                Item current = actual.get(slot.getKey());
+                if (current == null || !InventoryMutationGuard.matchesTarget(current, slot.getValue())) return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean worldActionsIntact(List<InventoryAction> frozenActions, Set<Inventory> frozenInventories,
+                                       Map<InventoryAction, WorldActionSnapshot> snapshots) {
+        if (!matchesCreativeMembership(frozenActions, frozenInventories)) return false;
+        for (InventoryAction action : frozenActions) {
+            WorldActionSnapshot expected = snapshots.get(action);
+            if (!action.getSourceItem().equalsExact(expected.source())
+                    || !action.getTargetItem().equalsExact(expected.target())) return false;
+        }
+        return matchesCreativeMembership(frozenActions, frozenInventories);
+    }
+
+    private boolean worldActorIntact(WorldActorSnapshot context) {
+        Player actor = context.actor();
+        return this.source == actor && !actor.closed && actor.spawned && actor.isAlive() && actor.isOnline()
+                && !actor.isSpectator() && actor.getLevel() == context.level() && actor.getGameVersion() == context.version()
+                && actor.protocol == context.protocol() && actor.getGamemode() == context.mode()
+                && actor.x == context.x() && actor.y == context.y() && actor.z == context.z()
+                && actor.yaw == context.yaw() && actor.pitch == context.pitch();
+    }
+
+    private record WorldActorSnapshot(Player actor, cn.nukkit.level.Level level, cn.nukkit.GameVersion version,
+                                      int protocol, int mode, double x, double y, double z, double yaw, double pitch) {
+        private WorldActorSnapshot(Player actor) {
+            this(actor, actor.getLevel(), actor.getGameVersion(), actor.protocol, actor.getGamemode(),
+                    actor.x, actor.y, actor.z, actor.yaw, actor.pitch);
+        }
+    }
+
+    private record WorldActionSnapshot(Item source, Item target) { }
 
     @SuppressWarnings("try") // Expected-write scopes enforce setters through the thread-local guard.
     private boolean executeSlotTransfer() {
