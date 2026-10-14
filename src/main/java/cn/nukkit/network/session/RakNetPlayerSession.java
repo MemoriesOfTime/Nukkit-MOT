@@ -489,7 +489,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
 
-        ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
+        ByteBuf finalPayload = Unpooled.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);
 
         if (this.encryptionCipher != null) {
