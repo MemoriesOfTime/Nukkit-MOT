@@ -12,6 +12,14 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 public class WorldEntry extends OkaeriConfig {
 
+    @Comment("Maximum changed chunks per autosave DB write (1..64); snapshots remain in the same tick")
+    @CustomKey("save-batch-chunks")
+    private int saveBatchChunks = 16;
+
+    @Comment("Target bytes per autosave DB write (65536..16777216); one oversized chunk is written alone")
+    @CustomKey("save-batch-bytes")
+    private int saveBatchBytes = 4 * 1024 * 1024;
+
     @Comment("World generator type (normal, flat, nether, the_end, void)")
     private String generator = "normal";
 

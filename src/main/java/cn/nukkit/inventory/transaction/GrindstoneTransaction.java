@@ -25,6 +25,7 @@ public class GrindstoneTransaction extends InventoryTransaction {
     @Getter
     private int experienceDropped;
     private final List<Item> outputItemCheck = new ArrayList<>();
+    private boolean executionInProgress;
 
     public GrindstoneTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions);
@@ -95,40 +96,44 @@ public class GrindstoneTransaction extends InventoryTransaction {
 
     @Override
     public boolean execute() {
-        if (this.invalid || this.hasExecuted() || !this.canExecute()) {
-            this.source.removeAllWindows(false);
-            this.sendInventories();
-            return false;
-        }
-
-        GrindstoneInventory inventory = (GrindstoneInventory) getSource().getWindowById(Player.GRINDSTONE_WINDOW_ID);
-        int experience = inventory.calculateExperience();
-        Item originalOutput = this.outputItem.clone();
-        GrindItemEvent event = new GrindItemEvent(inventory, this.equipmentItem, this.outputItem, this.ingredientItem, experience, this.source);
-        this.source.getServer().getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
-            this.sendInventories();
-            source.setNeedSendInventory(true);
-            return true;
-        }
-        Item authoritativeOutput = applyEventOutputToActions(originalOutput, event.getNewItem());
-        if (authoritativeOutput == null) {
-            this.sendInventories();
-            source.setNeedSendInventory(true);
-            return true;
-        }
-        this.outputItem = authoritativeOutput;
-
-        for (InventoryAction action : this.actions) {
-            if (action.execute(this.source)) {
-                action.onExecuteSuccess(this.source);
-            } else {
-                action.onExecuteFail(this.source);
+        if (executionInProgress || this.hasExecuted() || !NativeRecipeTransaction.supports(this)) return false;
+        executionInProgress = true;
+        try {
+            if (!this.canExecute()) {
+                this.sendInventories();
+                return false;
             }
+            GrindstoneInventory inventory = (GrindstoneInventory) getSource().getWindowById(Player.GRINDSTONE_WINDOW_ID);
+            Item equipment = this.equipmentItem == null ? null : this.equipmentItem.clone();
+            Item ingredient = this.ingredientItem == null ? null : this.ingredientItem.clone();
+            Item originalOutput = this.outputItem.clone();
+            GrindItemEvent event = new GrindItemEvent(inventory, equipment == null ? null : equipment.clone(),
+                    originalOutput.clone(), ingredient == null ? null : ingredient.clone(),
+                    inventory.calculateExperience(), this.source);
+            int[] approvedExperience = {0};
+            boolean committed = NativeRecipeTransaction.execute(this, originalOutput, this::getOutputItem, () -> {
+                this.source.getServer().getPluginManager().callEvent(event);
+                if (event.isCancelled() || event.getExperienceDropped() < 0) return false;
+                Item approved = applyEventOutputToActions(originalOutput, event.getNewItem());
+                if (approved == null) return false;
+                this.outputItem = approved;
+                approvedExperience[0] = event.getExperienceDropped();
+                return true;
+            }, () -> sameNullableItem(this.equipmentItem, equipment) && sameNullableItem(this.ingredientItem, ingredient)
+                    && this.source.getWindowById(Player.GRINDSTONE_WINDOW_ID) == inventory,
+                    () -> this.experienceDropped = approvedExperience[0]);
+            if (!committed) {
+                this.sendInventories();
+                source.setNeedSendInventory(true);
+            }
+            return committed;
+        } finally {
+            executionInProgress = false;
         }
+    }
 
-        this.experienceDropped = event.getExperienceDropped();
-        return true;
+    private static boolean sameNullableItem(Item actual, Item expected) {
+        return actual == null ? expected == null : expected != null && actual.equalsExact(expected);
     }
 
     public static boolean isIn(List<InventoryAction> actions) {

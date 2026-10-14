@@ -139,6 +139,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -320,6 +321,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int chunksSent = 0;
     private boolean hasSpawnChunks;
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
+    private long chunkSendScanCursor;
+    private boolean chunkSendScanCursorSet;
+    private LongOpenHashSet chunkSendHeadVisited;
     protected int nextChunkOrderRun = 1;
     // 供 checkNetwork 检测跨区块/转向即时重排 / For checkNetwork cross-chunk/turn instant reorder
     private int lastOrderChunkX = Integer.MIN_VALUE;
@@ -1309,6 +1313,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+        BaseFullChunk currentChunk = this.level.getChunkIfLoaded(x, z);
+        if (currentChunk != null && currentChunk.isReadFailurePlaceholder()) {
+            this.loadQueue.add(Level.chunkHash(x, z));
+            return;
+        }
         this.usedChunks.put(Level.chunkHash(x, z), Boolean.TRUE);
 
         this.dataPacket(packet);
@@ -1369,32 +1378,87 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!loadQueue.isEmpty()) {
             int count = 0;
+            int loadRequests = 0;
+            boolean completionLoad = this.server.asyncChunkLoadCompletion;
             boolean asyncLoad = this.level.isAsyncChunkLoadEnabled();
+            // Bound MAIN work independently of pending queue length. Every tick starts at the
+            // head (nearest chunks first): headLimit entries that still need work, while reads
+            // already in flight are skipped for free up to tailLimit. The tail then resumes after
+            // the last deferred tail entry with its own tailLimit, so a corrupt/pending prefix
+            // cannot starve the healthy tail.
+            int headLimit = completionLoad ? (int) Math.max(16L, (long) server.chunksPerTick * 2) : 0;
+            int tailLimit = completionLoad ? (int) Math.max(32L, (long) server.chunksPerTick * 4) : 0;
+            int scanLimit = completionLoad
+                    ? (int) Math.min(loadQueue.size(), (long) headLimit + 2L * tailLimit)
+                    : loadQueue.size();
+            int headVisits = 0;
+            int tailVisits = 0;
+            int inFlightSkips = 0;
+            LongOpenHashSet headVisited = null;
+            if (completionLoad) {
+                headVisited = this.chunkSendHeadVisited;
+                if (headVisited == null) this.chunkSendHeadVisited = headVisited = new LongOpenHashSet();
+                headVisited.clear();
+            }
+            boolean tailPhase = false;
             LongIterator iter = loadQueue.longIterator();
-            while (iter.hasNext()) {
+            for (int visited = 0; visited < scanLimit && !loadQueue.isEmpty(); visited++) {
                 if (count >= server.chunksPerTick) {
                     break;
                 }
+                if (completionLoad && !tailPhase && headVisits >= headLimit) {
+                    tailPhase = true;
+                    if (this.chunkSendScanCursorSet && loadQueue.contains(this.chunkSendScanCursor)
+                            && !headVisited.contains(this.chunkSendScanCursor)) {
+                        iter = loadQueue.iterator(this.chunkSendScanCursor);
+                    }
+                }
+                if (tailPhase && tailVisits++ >= tailLimit) {
+                    break;
+                }
+                if (!iter.hasNext()) {
+                    // Head pass reached the end: the whole queue was visited this tick.
+                    if (!completionLoad || !tailPhase) break;
+                    iter = loadQueue.longIterator();
+                }
 
                 long index = iter.nextLong();
+                if (completionLoad) {
+                    if (tailPhase) {
+                        if (headVisited.contains(index)) continue;
+                    } else {
+                        headVisited.add(index);
+                        headVisits++;
+                    }
+                }
                 int chunkX = Level.getHashX(index);
                 int chunkZ = Level.getHashZ(index);
 
-                ++count;
+                if (!completionLoad) ++count;
 
                 try {
+                    BaseFullChunk loadedChunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
+                    if (loadedChunk != null && loadedChunk.isReadFailurePlaceholder()) continue;
                     this.usedChunks.put(index, false);
                     this.level.registerChunkLoader(this, chunkX, chunkZ, false);
 
                     // 异步区块加载:读取+解码在异步线程完成,区块由主线程 doTick 挂载后下一 tick 再发送,避免主线程同步读取磁盘
                     // Async chunk loading: read+decode off-thread; the chunk is mounted in doTick and sent next tick, avoiding a sync disk read on the main thread
                     if (asyncLoad) {
-                        BaseFullChunk loadedChunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
                         if (loadedChunk == null) {
-                            if (this.level.requestChunkLoadAsync(chunkX, chunkZ)) {
+                            // Admission has its own budget; failed/pending reads never spend send slots.
+                            // A read already in flight costs nothing: the head is revisited every tick.
+                            if (completionLoad && this.level.isChunkLoadPending(chunkX, chunkZ)) {
+                                if (!tailPhase && inFlightSkips++ < tailLimit) headVisits--;
                                 continue;
                             }
-                            // 受理失败(executor 关闭等)→ 落到下方原同步路径 / rejected → fall through to the sync path below
+                            if (!completionLoad || loadRequests < server.chunksPerTick && !this.level.isChunkLoadBackedOff(chunkX, chunkZ)) {
+                                this.level.requestChunkLoadAsync(chunkX, chunkZ);
+                                ++loadRequests;
+                            }
+                            // A full disk-reader queue is backpressure, not permission to read
+                            // synchronously. Keep the request in loadQueue and retry next tick.
+                            continue;
                         } else if (!loadedChunk.isPopulated()) {
                             boolean neighboursCached = true;
                             boolean queueRejected = false;
@@ -1403,9 +1467,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     if ((dx | dz) == 0) {
                                         continue;
                                     }
-                                    if (this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz) == null) {
-                                        // 受理失败(队列已满/executor 关)→ 放弃异步预载,落到下方同步 populateChunk 保证推进,避免队列持续满时该区块永久悬挂
-                                        // Rejected (queue full / executor down) → abandon async preload and fall through to sync populateChunk to guarantee progress, so a saturated queue can't leave this chunk hanging forever
+                                    BaseFullChunk neighbour = this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz);
+                                    if (neighbour != null && neighbour.isReadFailurePlaceholder()) {
+                                        queueRejected = true;
+                                        break;
+                                    }
+                                    if (neighbour == null) {
+                                        // Population may read all eight neighbours. Defer it
+                                        // when any preload is rejected, just as for the centre.
                                         if (!this.level.requestChunkLoadAsync(chunkX + dx, chunkZ + dz)) {
                                             queueRejected = true;
                                             break;
@@ -1417,22 +1486,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     break;
                                 }
                             }
-                            if (!queueRejected && !neighboursCached) {
+                            if (queueRejected || !neighboursCached) {
                                 continue;
                             }
                         }
                     }
 
                     if (!this.level.populateChunk(chunkX, chunkZ)) {
+                        boolean quarantined = false;
+                        for (int dx = -1; dx <= 1; dx++) {
+                            for (int dz = -1; dz <= 1; dz++) {
+                                BaseFullChunk current = this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz);
+                                if (current != null && current.isReadFailurePlaceholder()) quarantined = true;
+                            }
+                        }
+                        if (quarantined) continue;
                         // 保中心向外顺序,避免外圈幽灵区块(等价 Allay enqueueFirst+break)
                         // Preserve center-out order, avoiding ghost chunks (cf. Allay enqueueFirst+break)
                         break;
                     }
 
+                    if (completionLoad) ++count;
                     iter.remove();
                 } catch (Exception ex) {
                     server.getLogger().logException(ex);
                     return;
+                } finally {
+                    if (completionLoad && tailPhase && loadQueue.contains(index)) {
+                        this.chunkSendScanCursor = index;
+                        this.chunkSendScanCursorSet = true;
+                    }
                 }
 
                 PlayerChunkRequestEvent ev = new PlayerChunkRequestEvent(this, chunkX, chunkZ);
@@ -7754,11 +7837,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     protected void checkChunks() {
+        boolean guarded = this.isChunkTransitionGuarded(this.level, this.getChunkX(), this.getChunkZ());
         if (this.chunk == null || (this.chunk.getX() != this.getChunkX() || this.chunk.getZ() != this.getChunkZ())) {
-            if (this.chunk != null) {
-                this.chunk.removeEntity(this);
+            if (guarded) {
+                BaseFullChunk destination;
+                int cx = this.getChunkX();
+                int cz = this.getChunkZ();
+                try {
+                    destination = this.level.getChunk(cx, cz, true);
+                } catch (RuntimeException failure) {
+                    this.level.reportChunkLoadFailure(cx, cz, failure);
+                    this.restoreChunkPosition();
+                    return;
+                }
+                if (destination == null || destination.isReadFailurePlaceholder()) {
+                    this.restoreChunkPosition();
+                    return;
+                }
+                if (this.chunk != null) this.chunk.removeEntity(this);
+                this.chunk = destination;
+            } else {
+                if (this.chunk != null) this.chunk.removeEntity(this);
+                this.chunk = this.level.getChunk(this.getChunkX(), this.getChunkZ(), true);
             }
-            this.chunk = this.level.getChunk(this.getChunkX(), this.getChunkZ(), true);
 
             if (!this.justCreated) {
                 Map<Integer, Player> newChunk = this.level.getChunkPlayers(this.getChunkX(), this.getChunkZ());
@@ -7783,6 +7884,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.chunk.addEntity(this);
         }
+        this.rememberChunkPosition();
     }
 
     protected boolean checkTeleportPosition() {
@@ -8202,7 +8304,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.removeWindow(inventory, false);
     }
 
+    private Set<Inventory> removingAnvilWindows;
+
     protected void removeWindow(Inventory inventory, boolean isResponse) {
+        boolean anvil = inventory instanceof AnvilInventory || inventory instanceof GrindstoneInventory;
+        if (anvil) {
+            if (this.removingAnvilWindows != null && this.removingAnvilWindows.contains(inventory)) return;
+            if (InventoryMutationGuard.deferUntilReleased(
+                    java.util.Arrays.asList(inventory, this.getInventory(), this.getUIInventory()), inventory,
+                    () -> this.removeWindow(inventory, isResponse))) return;
+            if (this.getWindowId(inventory) < 0) return;
+            if (this.removingAnvilWindows == null) {
+                this.removingAnvilWindows = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            }
+            this.removingAnvilWindows.add(inventory);
+        }
+        try {
+            this.removeWindowNow(inventory, isResponse);
+        } finally {
+            if (anvil) this.removingAnvilWindows.remove(inventory);
+        }
+    }
+
+    private void removeWindowNow(Inventory inventory, boolean isResponse) {
         inventory.close(this);
         // TODO: This needs a proper fix
         // Requiring isResponse here causes issues with inventory events and an item duplication glitch
@@ -8683,22 +8807,130 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return success
      */
     public boolean pickupEntity(Entity entity, boolean near) {
+        if (!near || !(entity instanceof EntityItem || entity instanceof EntityArrow
+                || entity instanceof EntityThrownTrident)) {
+            return this.pickupEntityUnclaimed(entity, near, null, null);
+        }
+        try (EntityPickupClaim.Lease source = EntityPickupClaim.tryClaim(entity)) {
+            if (source == null) return false;
+            PlayerInventory inventory = this.inventory;
+            ItemPickupContext context = new ItemPickupContext(this, inventory, entity);
+            try (InventoryMutationGuard.Lease destination = InventoryMutationGuard.tryClaim(
+                    Collections.singleton(inventory))) {
+                return destination != null && context.matches(this, entity)
+                        && this.pickupEntityUnclaimed(entity, true, context, destination);
+            }
+        }
+    }
+
+    private boolean canConsumePickupSource(Entity entity) {
+        return this.spawned && this.isAlive() && this.isOnline() && !this.isSpectator() && !entity.isClosed();
+    }
+
+    private record ItemPickupContext(Player owner, PlayerInventory inventory, Level playerLevel,
+                                     Level sourceLevel, FullChunk sourceChunk, long sourceId, int gamemode) {
+        private ItemPickupContext(Player player, PlayerInventory inventory, Entity source) {
+            this(player, inventory, player.getLevel(), source.getLevel(), source.chunk, source.getId(), player.getGamemode());
+        }
+        private boolean matches(Player player, Entity source) {
+            return player == owner && player.canConsumePickupSource(source)
+                    && player.inventory == inventory && inventory.getHolder() == player
+                    && player.getLevel() == playerLevel && player.getGamemode() == gamemode
+                    && source.getLevel() == sourceLevel && source.chunk == sourceChunk
+                    && source.getId() == sourceId && sourceLevel != null && sourceLevel.getEntity(sourceId) == source;
+        }
+    }
+
+    private static Item arrowPickupItem(EntityArrow arrow) {
+        if (arrow.namedTag != null && arrow.namedTag.containsCompound("item")) {
+            CompoundTag tag = arrow.namedTag.getCompound("item");
+            Item item = Item.get(tag.getInt("id"), tag.getInt("Damage"), tag.getInt("Count"));
+            if (tag.containsCompound("tag")) item.setCompoundTag(tag.getCompound("tag").clone());
+            return item;
+        }
+        return new ItemArrow();
+    }
+
+    private void consumeItemPickup(Entity entity) {
+        try {
+            TakeItemEntityPacket pk = new TakeItemEntityPacket();
+            pk.entityId = this.getId();
+            pk.target = entity.getId();
+            Server.broadcastPacket(entity.getViewers().values(), pk);
+            this.dataPacket(pk);
+        } finally {
+            // A cosmetic packet failure cannot leave an accepted inventory grant beside its source.
+            entity.close();
+        }
+    }
+
+    private boolean retainPickupRemainder(Entity entity, Item offered, Item[] remainders) {
+        Item remainder = remainders[0]; // A single offered stack has at most one native remainder.
+        boolean acceptedAny = remainder.getCount() < offered.getCount();
+        if (entity instanceof EntityItem itemEntity) {
+            itemEntity.getItem().setCount(remainder.getCount());
+        } else if (entity instanceof EntityArrow arrow) {
+            if (arrow.namedTag == null) arrow.namedTag = new CompoundTag();
+            CompoundTag itemTag = arrow.namedTag.containsCompound("item")
+                    ? arrow.namedTag.getCompound("item").clone() : new CompoundTag();
+            itemTag.putInt("id", remainder.getId()).putInt("Damage", remainder.getDamage())
+                    .putInt("Count", remainder.getCount());
+            if (remainder.hasCompoundTag()) itemTag.putCompound("tag", remainder.getNamedTag().clone());
+            else itemTag.remove("tag");
+            arrow.namedTag.putCompound("item", itemTag);
+        } else if (entity instanceof EntityThrownTrident trident) {
+            trident.setItem(remainder);
+        }
+        return acceptedAny;
+    }
+
+    private void restorePickupInventory(ItemPickupContext context, Entity entity, Item sourceBefore,
+            Map<Integer, Item> before, InventoryMutationGuard.NativeMetadataSnapshot metadata) {
+        metadata.restore();
+        context.inventory().slots.clear();
+        context.inventory().slots.putAll(before);
+        // Restore the live source amount; an independent entity close is never replayed into the world.
+        if (!entity.isClosed()) this.retainPickupRemainder(entity, sourceBefore, new Item[]{sourceBefore});
+    }
+
+    private <T> T applyPickupInventory(ItemPickupContext context, InventoryMutationGuard.Lease claim,
+            Entity entity, Item offered, Supplier<T> apply, T refused) {
+        PlayerInventory destination = context.inventory();
+        Map<Integer, Item> before = new HashMap<>();
+        destination.slots.forEach((slot, stack) -> before.put(slot, stack.clone()));
+        InventoryMutationGuard.NativeMetadataSnapshot metadata = claim.captureNativeMetadata();
+        Item sourceBefore = offered.clone();
+        try {
+            T accepted = apply.get();
+            if (Boolean.FALSE.equals(accepted) || !context.matches(this, entity) || !metadata.matches()) {
+                this.restorePickupInventory(context, entity, sourceBefore, before, metadata);
+                return refused;
+            }
+            return accepted;
+        } catch (RuntimeException | Error failure) {
+            try {
+                this.restorePickupInventory(context, entity, sourceBefore, before, metadata);
+            } catch (RuntimeException | Error cleanup) {
+                if (cleanup != failure) failure.addSuppressed(cleanup);
+            }
+            try {
+                destination.sendContents(this);
+            } catch (RuntimeException | Error updateFailure) {
+                if (updateFailure != failure) failure.addSuppressed(updateFailure);
+            }
+            throw failure;
+        }
+    }
+
+    private boolean pickupEntityUnclaimed(Entity entity, boolean near, ItemPickupContext context,
+                                           InventoryMutationGuard.Lease destination) {
         if (!this.spawned || !this.isAlive() || !this.isOnline() || this.isSpectator() || entity.isClosed()) {
             return false;
         }
 
         if (near) {
             if (entity instanceof EntityArrow entityArrow && entityArrow.hadCollision) {
-                Item item;
-                if (entityArrow.namedTag != null && entityArrow.namedTag.containsCompound("item")) {
-                    CompoundTag tag = entityArrow.namedTag.getCompound("item");
-                    item = Item.get(tag.getInt("id"), tag.getInt("Damage"), tag.getInt("Count"));
-                    if (tag.containsCompound("tag")) {
-                        item.setCompoundTag(tag.getCompound("tag"));
-                    }
-                } else {
-                    item = new ItemArrow();
-                }
+                Item item = arrowPickupItem(entityArrow);
                 if (!this.isCreative() && !this.inventory.canAddItem(item)) {
                     return false;
                 }
@@ -8711,20 +8943,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 this.server.getPluginManager().callEvent(ev);
-                if (ev.isCancelled()) {
+                if (ev.isCancelled() || !context.matches(this, entity)) {
                     return false;
                 }
 
-                TakeItemEntityPacket pk = new TakeItemEntityPacket();
-                pk.entityId = this.getId();
-                pk.target = entity.getId();
-                Server.broadcastPacket(entity.getViewers().values(), pk);
-                this.dataPacket(pk);
-
                 if (!this.isCreative()) {
-                    this.inventory.addItem(item.clone());
+                    Item offered = arrowPickupItem(entityArrow);
+                    Item[] remainders = this.applyPickupInventory(context, destination, entity, offered,
+                            () -> context.inventory().addItem(offered.clone()), new Item[]{offered.clone()});
+                    if (remainders.length != 0) return this.retainPickupRemainder(entity, offered, remainders);
                 }
-                entity.close();
+                this.consumeItemPickup(entity);
                 return true;
             }
             if (entity instanceof EntityThrownTrident) {
@@ -8755,24 +8984,30 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 this.server.getPluginManager().callEvent(ev);
-                if (ev.isCancelled()) {
+                if (ev.isCancelled() || !context.matches(this, entity)) {
                     return false;
                 }
 
-                TakeItemEntityPacket pk = new TakeItemEntityPacket();
-                pk.entityId = this.getId();
-                pk.target = entity.getId();
-                Server.broadcastPacket(entity.getViewers().values(), pk);
-                this.dataPacket(pk);
-
                 if (!thrownTrident.isCreative()) {
-                    if (inventory.getItem(thrownTrident.getFavoredSlot()).getId() == Item.AIR) {
-                        inventory.setItem(thrownTrident.getFavoredSlot(), item.clone());
+                    Item offered = thrownTrident.getItem().clone();
+                    int favoredSlot = thrownTrident.getFavoredSlot();
+                    if (favoredSlot >= 0 && favoredSlot < context.inventory().getSize()
+                            && context.inventory().getItem(favoredSlot).getId() == Item.AIR) {
+                        if (!this.applyPickupInventory(context, destination, entity, offered, () -> {
+                            try (InventoryMutationGuard.WriteScope write = destination.expectWrite(
+                                    context.inventory(), favoredSlot, offered)) {
+                                return context.inventory().setItem(favoredSlot, offered.clone())
+                                        && InventoryMutationGuard.matchesTarget(
+                                        context.inventory().getItem(favoredSlot), offered);
+                            }
+                        }, false)) return false;
                     } else {
-                        inventory.addItem(item.clone());
+                        Item[] remainders = this.applyPickupInventory(context, destination, entity, offered,
+                                () -> context.inventory().addItem(offered.clone()), new Item[]{offered.clone()});
+                        if (remainders.length != 0) return this.retainPickupRemainder(entity, offered, remainders);
                     }
                 }
-                entity.close();
+                this.consumeItemPickup(entity);
                 return true;
             }
             if (entity instanceof EntityItem) {
@@ -8786,23 +9021,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                         InventoryPickupItemEvent ev;
                         this.server.getPluginManager().callEvent(ev = new InventoryPickupItemEvent(this.inventory, (EntityItem) entity));
-                        if (ev.isCancelled()) {
+                        if (ev.isCancelled() || !context.matches(this, entity)) {
                             return false;
                         }
 
-                        switch (item.getId()) {
+                        Item offered = ((EntityItem) entity).getItem().clone();
+                        Item[] remainders = this.applyPickupInventory(context, destination, entity, offered,
+                                () -> context.inventory().addItem(offered.clone()), new Item[]{offered.clone()});
+                        if (remainders.length != 0) return this.retainPickupRemainder(entity, offered, remainders);
+                        this.consumeItemPickup(entity);
+                        switch (offered.getId()) {
                             case Item.WOOD, Item.WOOD2 -> this.awardAchievement("mineWood");
                             case Item.DIAMOND -> this.awardAchievement("diamond");
                         }
-
-                        TakeItemEntityPacket pk = new TakeItemEntityPacket();
-                        pk.entityId = this.getId();
-                        pk.target = entity.getId();
-                        Server.broadcastPacket(entity.getViewers().values(), pk);
-                        this.dataPacket(pk);
-
-                        this.inventory.addItem(item.clone());
-                        entity.close();
                         return true;
                     }
                 }

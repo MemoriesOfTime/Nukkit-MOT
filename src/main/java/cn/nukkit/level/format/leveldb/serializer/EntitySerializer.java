@@ -54,7 +54,12 @@ public class EntitySerializer {
 
     /** Main-thread entity snapshot; stale actor DB reads are deferred to the commit worker. */
     public static Cleanup snapshotEntities(WriteBatch writeBatch, LevelDBChunk chunk) {
-        Cleanup cleanup = EntityStorageV1_18_30.INSTANCE.snapshotEntities(writeBatch, chunk);
+        return snapshotEntities(writeBatch, chunk, null);
+    }
+
+    /** Shared retained actors prevent one chunk cleanup deleting another member's actor put. */
+    public static Cleanup snapshotEntities(WriteBatch writeBatch, LevelDBChunk chunk, java.util.Set<Long> retainedActors) {
+        Cleanup cleanup = EntityStorageV1_18_30.INSTANCE.snapshotEntities(writeBatch, chunk, retainedActors);
         EntityStorageLegacy.INSTANCE.deleteEntities(null, writeBatch, chunk);
         return cleanup;
     }

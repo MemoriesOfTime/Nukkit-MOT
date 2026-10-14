@@ -60,6 +60,10 @@ final class EntityStorageV1_18_30 implements EntityStorage {
     }
 
     EntitySerializer.Cleanup snapshotEntities(WriteBatch writeBatch, LevelDBChunk chunk) {
+        return snapshotEntities(writeBatch, chunk, null);
+    }
+
+    EntitySerializer.Cleanup snapshotEntities(WriteBatch writeBatch, LevelDBChunk chunk, Set<Long> retainedActors) {
         int chunkX = chunk.getX();
         int chunkZ = chunk.getZ();
         int dimension = chunk.getProvider().getLevel().getDimension();
@@ -100,7 +104,8 @@ final class EntityStorageV1_18_30 implements EntityStorage {
             } else {
                 writeBatch.put(digpKey, value);
             }
-            Set<Long> retained = Set.copyOf(writtenStorageKeys);
+            if (retainedActors != null) retainedActors.addAll(writtenStorageKeys);
+            Set<Long> retained = retainedActors == null ? Set.copyOf(writtenStorageKeys) : retainedActors;
             // Capture only coordinates and immutable IDs; worker must never inspect live entities.
             return (database, batch) -> deleteStaleActors(database, batch, chunkX, chunkZ, dimension, retained);
         } catch (IOException e) {
