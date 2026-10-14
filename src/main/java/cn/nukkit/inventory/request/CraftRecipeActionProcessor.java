@@ -8,6 +8,7 @@ import cn.nukkit.event.inventory.EnchantItemEvent;
 import cn.nukkit.event.inventory.SmithingTableEvent;
 import cn.nukkit.event.inventory.StonecutterItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.inventory.transaction.CraftingTransaction;
 import cn.nukkit.inventory.transaction.ItemStackRequestCraftingTransaction;
 import cn.nukkit.item.Item;
@@ -107,6 +108,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
 
         if (recipe instanceof MultiRecipe multiRecipe) {
+            if (multiRecipe instanceof RepairItemRecipe && action.getNumberOfRequestedCrafts() != 1) {
+                return context.error();
+            }
             int times = Math.max(1, action.getNumberOfRequestedCrafts());
             context.put(TIMES_CRAFTED_KEY, times);
             CraftResultsDeprecatedAction resultsAction = findCraftResultsAction(
