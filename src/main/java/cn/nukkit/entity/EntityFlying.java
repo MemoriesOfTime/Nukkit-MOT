@@ -11,7 +11,11 @@ import org.apache.commons.math3.util.FastMath;
 public abstract class EntityFlying extends BaseEntity {
 
     public EntityFlying(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
+        this(chunk, nbt, false);
+    }
+
+    protected EntityFlying(FullChunk chunk, CompoundTag nbt, boolean prepared) {
+        super(chunk, nbt, prepared);
         this.noFallDamage = true;
     }
 

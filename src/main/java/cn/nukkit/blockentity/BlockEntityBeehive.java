@@ -295,6 +295,135 @@ public class BlockEntityBeehive extends BlockEntity {
         return entity;
     }
     
+    /** Pure exact witness; actor preparation and source acceptance are separate operations. */
+    public ExplosionOccupants captureExplosionOccupants() {
+        return new ExplosionOccupants(this);
+    }
+
+    public static final class ExplosionOccupants implements AutoCloseable {
+        private final BlockEntityBeehive hive;
+        private final cn.nukkit.level.Level level;
+        private final FullChunk chunk;
+        private final Occupant[] original;
+        private final CompoundTag[] authored;
+        private final CompoundTag tileState;
+        private final CompoundTag emptiedState;
+        private final double x, y, z;
+        private final long id;
+        private final java.util.List<EntityBee.PreparedBee> actors = new ArrayList<>();
+        private final java.util.List<Occupant> emptied = new ArrayList<>();
+        private final boolean angry;
+        private boolean prepared, consumed, closed;
+
+        private ExplosionOccupants(BlockEntityBeehive hive) {
+            this.hive = hive; this.level = hive.level; this.chunk = hive.chunk;
+            this.original = hive.getOccupants(); this.authored = new CompoundTag[original.length];
+            for (int i = 0; i < original.length; i++) authored[i] = original[i].saveNBT().copy();
+            this.tileState = hive.namedTag.copy();
+            this.emptiedState = tileState.copy().putList(new ListTag<CompoundTag>("Occupants"));
+            this.x=hive.x; this.y=hive.y; this.z=hive.z; this.id=hive.getId();
+            this.angry = level != null && level.getBlock(hive.down()).getId() != BlockID.CAMPFIRE_BLOCK;
+        }
+
+        public boolean matches() { return matches(false,false); }
+        public boolean matchesAfterNativeRemoval() {
+            return prepared && !closed && matches(true,true) && actors.stream().allMatch(EntityBee.PreparedBee::isValid);
+        }
+        /** Rollback retains exact occupants; validity of unfunded actors is not debit authority. */
+        public boolean matchesRetainedForNativeRollback() { return matches(true,false); }
+        private boolean matches(boolean afterNativeRemoval,boolean requireAir) {
+            if (consumed || level == null || hive.closed || hive.level != level || hive.chunk != chunk
+                    || hive.getId()!=id || hive.x!=x || hive.y!=y || hive.z!=z
+                    || level.getChunkIfLoaded(hive.getFloorX() >> 4, hive.getFloorZ() >> 4) != chunk
+                    || !tileState.equals(hive.namedTag) || hive.occupants.size() != original.length) return false;
+            if (afterNativeRemoval) {
+                BlockEntity coordinate=level.getBlockEntityIfLoaded(hive);
+                BlockEntity chunkEntry=chunk.getBlockEntities().get(id);
+                if (level.getBlockEntityById(id)!=hive || requireAir && !level.getBlock(hive).isAir()
+                        || !(coordinate==hive && chunkEntry==hive || coordinate==null && chunkEntry==null)) return false;
+            } else if (level.getBlockEntity(hive)!=hive) return false;
+            for (int i = 0; i < original.length; i++) {
+                if (hive.occupants.get(i) != original[i] || !authored[i].equals(original[i].saveNBT())) return false;
+            }
+            return true;
+        }
+
+        public boolean prepare() {
+            if (closed || consumed) return false;
+            if (prepared) return matches() && actors.stream().allMatch(EntityBee.PreparedBee::isValid);
+            if (!matches()) return false;
+            try {
+                for (Occupant occupant : original) {
+                    CompoundTag nbt = occupant.getSaveData();
+                    ThreadLocalRandom random = ThreadLocalRandom.current();
+                    Position pos = hive.add(random.nextDouble(), 0.2, random.nextDouble());
+                    Position look = pos.add(random.nextDouble(), 0, random.nextDouble());
+                    double dx = look.x - pos.x, dz = look.z - pos.z;
+                    float yaw = dx == 0 ? (dz < 0 ? (float) Math.PI : 0)
+                            : (float) ((dx < 0 ? 1.5 * Math.PI : 0.5 * Math.PI) - Math.atan(dz / dx));
+                    nbt.putList(new ListTag<DoubleTag>("Pos").add(new DoubleTag("0", pos.x))
+                            .add(new DoubleTag("1", pos.y)).add(new DoubleTag("2", pos.z)));
+                    nbt.putList(new ListTag<FloatTag>("Rotation").add(new FloatTag("0", -yaw * 180f / (float) Math.PI))
+                            .add(new FloatTag("1", 0)));
+                    EntityBee.PreparedBee actor = EntityBee.prepareExplosionBee(occupant.getActorIdentifier(), pos.getChunk(), nbt);
+                    if (actor == null) { close(); return false; }
+                    actors.add(actor);
+                }
+                prepared = true;
+                if (!matches() || !actors.stream().allMatch(EntityBee.PreparedBee::isValid)) { close(); return false; }
+                return true;
+            } catch (RuntimeException | Error failure) {
+                try { close(); } catch (RuntimeException | Error discardFailure) { failure.addSuppressed(discardFailure); }
+                return false;
+            }
+        }
+
+        /** No callbacks between exact complete debit and assignment-only sibling releases. */
+        public Throwable clearAccepted() { return clearAccepted(false); }
+        public Throwable clearAfterNativeRemoval() { return clearAccepted(true); }
+        /** Assignment-only sibling acceptance runs before any Bee publication callback. */
+        public Throwable clearAfterNativeRemoval(Runnable acceptSiblings) {
+            return clearAccepted(true, java.util.Objects.requireNonNull(acceptSiblings));
+        }
+        private Throwable clearAccepted(boolean afterNativeRemoval) {
+            return clearAccepted(afterNativeRemoval, () -> {});
+        }
+        private Throwable clearAccepted(boolean afterNativeRemoval, Runnable acceptSiblings) {
+            if (!prepared || closed || !(afterNativeRemoval ? matchesAfterNativeRemoval() : matches())
+                    || !actors.stream().allMatch(EntityBee.PreparedBee::isValid))
+                throw new IllegalStateException("Prepared explosion hive occupants changed before acceptance");
+            hive.occupants = emptied;
+            hive.namedTag = emptiedState;
+            consumed = true;
+            for (EntityBee.PreparedBee actor : actors) actor.release();
+            acceptSiblings.run();
+            Throwable failure = null;
+            for (EntityBee.PreparedBee actor : actors) {
+                try { actor.notifyPublished(angry); }
+                catch (RuntimeException | Error notification) {
+                    if (failure == null) failure = notification;
+                    else if (failure != notification) failure.addSuppressed(notification);
+                }
+            }
+            return failure;
+        }
+
+        @Override public void close() {
+            if (closed) return;
+            closed = true;
+            Throwable failure = null;
+            for (EntityBee.PreparedBee actor : actors) {
+                try { actor.close(); }
+                catch (RuntimeException | Error discarded) {
+                    if (failure == null) failure = discarded;
+                    else if (failure != discarded) failure.addSuppressed(discarded);
+                }
+            }
+            if (failure instanceof RuntimeException error) throw error;
+            if (failure instanceof Error error) throw error;
+        }
+    }
+
     @Override
     public void onBreak() {
         if (!isEmpty()) {

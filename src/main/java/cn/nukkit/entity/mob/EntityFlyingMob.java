@@ -20,7 +20,11 @@ public abstract class EntityFlyingMob extends EntityFlying implements EntityMob 
     protected boolean canAttack = true;
 
     public EntityFlyingMob(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
+        this(chunk, nbt, false);
+    }
+
+    protected EntityFlyingMob(FullChunk chunk, CompoundTag nbt, boolean prepared) {
+        super(chunk, nbt, prepared);
     }
 
     @Override

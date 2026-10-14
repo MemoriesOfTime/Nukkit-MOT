@@ -2626,6 +2626,11 @@ public class Level implements ChunkManager, Metadatable {
         return this.setBlock(pos, 0, block, direct, update);
     }
 
+    /** Observe native acceptance before callbacks and notifications. */
+    public boolean setBlock(Vector3 pos, Block block, boolean direct, boolean update, Runnable accepted) {
+        return this.setBlock(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ(), 0, block, direct, update, accepted);
+    }
+
     public boolean setBlock(Vector3 pos, BlockLayer layer, Block block, boolean direct, boolean update) {
         return this.setBlock(pos, layer.ordinal(), block, direct, update);
     }
@@ -2643,6 +2648,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean setBlock(int x, int y, int z, int layer, Block block, boolean direct, boolean update) {
+        return this.setBlock(x, y, z, layer, block, direct, update, null);
+    }
+
+    private boolean setBlock(int x, int y, int z, int layer, Block block, boolean direct, boolean update, Runnable accepted) {
         if (!isYInRange(y) || layer < 0 || layer > this.requireProvider().getMaximumLayer()) {
             return false;
         }
@@ -2652,6 +2661,7 @@ public class Level implements ChunkManager, Metadatable {
         if (blockPrevious.getFullId() == block.getFullId()) {
             return false;
         }
+        if (accepted != null) accepted.run();
         block.x = x;
         block.y = y;
         block.z = z;
@@ -2857,6 +2867,22 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    /** Prepare an exact manual drop without publishing a consumable world source. */
+    public final EntityItem.PreparedDrop prepareItemDrop(Vector3 source, Item item, Vector3 motion, int delay) {
+        if (item.getId() == Item.AIR || item.getCount() <= 0) return null;
+        CompoundTag itemTag = NBTIO.putItemHelper(item);
+        itemTag.setName("Item");
+        CompoundTag nbt = new CompoundTag()
+                .putList(new ListTag<DoubleTag>("Pos").add(new DoubleTag("", source.x))
+                        .add(new DoubleTag("", source.y)).add(new DoubleTag("", source.z)))
+                .putList(new ListTag<DoubleTag>("Motion").add(new DoubleTag("", motion.x))
+                        .add(new DoubleTag("", motion.y)).add(new DoubleTag("", motion.z)))
+                .putList(new ListTag<FloatTag>("Rotation").add(new FloatTag("", ThreadLocalRandom.current().nextFloat() * 360))
+                        .add(new FloatTag("", 0)))
+                .putShort("Health", 5).putCompound("Item", itemTag).putShort("PickupDelay", delay);
+        return EntityItem.prepareDrop(this.getChunk((int) source.x >> 4, (int) source.z >> 4, true), nbt, item);
+    }
+
     public void dropItem(Vector3 source, Item item) {
         this.dropItem(source, item, null);
     }
@@ -3057,6 +3083,12 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         BlockEntity blockEntity = this.getBlockEntity(target);
+        if (blockEntity instanceof cn.nukkit.inventory.InventoryHolder holder) {
+            cn.nukkit.inventory.Inventory contents = holder.getInventory();
+            // A deferred tile break cannot veto after its block has been removed.
+            if (contents != null && (!cn.nukkit.inventory.InventoryMutationGuard.canCaptureProfile(List.of(contents))
+                    || cn.nukkit.inventory.NativeContainerTransaction.isActive(contents))) return null;
+        }
         if (blockEntity != null) {
             blockEntity.onBreak();
             blockEntity.close();
@@ -4564,6 +4596,13 @@ public class Level implements ChunkManager, Metadatable {
             tasks.remove(index);
             this.chunkSendTaskStartTick.remove(index);
         }
+    }
+
+    /** Remove only the hidden identity; a constructor listener may already have changed its current level. */
+    public final void discardDeferredEntityRegistration(Entity entity) {
+        if (!entity.isPublicationDeferred()) throw new IllegalStateException("Entity is already published");
+        this.entities.computeIfPresent(entity.getId(), (key, current) -> current == entity ? null : current);
+        this.updateEntities.computeIfPresent(entity.getId(), (key, current) -> current == entity ? null : current);
     }
 
     public void removeEntity(Entity entity) {

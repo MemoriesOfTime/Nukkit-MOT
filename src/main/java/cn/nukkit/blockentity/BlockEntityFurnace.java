@@ -26,6 +26,13 @@ import java.util.concurrent.ThreadLocalRandom;
 public class BlockEntityFurnace extends BlockEntitySpawnable implements InventoryHolder, BlockEntityContainer, BlockEntityNameable {
 
     protected FurnaceInventory inventory;
+    private NativeContainerBreak containerBreak;
+
+    private NativeContainerBreak containerBreak() {
+        if (containerBreak == null) containerBreak = new NativeContainerBreak(() -> inventory, this::onBreak, this::close);
+        return containerBreak;
+    }
+
 
     protected int burnTime;
     protected int burnDuration;
@@ -139,6 +146,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
 
     @Override
     public void close() {
+        if (containerBreak().deferLifecycle(false)) return;
         if (!closed) {
             for (Player player : new HashSet<>(this.inventory.getViewers())) {
                 player.removeWindow(this.inventory);
@@ -150,11 +158,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
 
     @Override
     public void onBreak() {
-        for (Item content : inventory.getContents().values()) {
-            level.dropItem(this, content);
-        }
-        inventory.clearAll();
-        this.releaseExperience();
+        containerBreak().breakContents(this, this::releaseExperience);
     }
 
     @Override
@@ -245,31 +249,51 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
     }
 
     protected void checkFuel(Item fuel) {
-        FurnaceBurnEvent ev = new FurnaceBurnEvent(this, fuel, fuel.getFuelTime() == null ? 0 : fuel.getFuelTime());
-
-        this.server.getPluginManager().callEvent(ev);
-
-        if (ev.isCancelled()) {
-            return;
-        }
-
-        int newBurnTime = (int) Math.ceil(ev.getBurnTime() / (float) getSpeedMultiplier());
-        maxTime = newBurnTime;
-        burnTime = newBurnTime;
-        burnDuration = 0;
-        this.setBurning(true);
-
-        if (burnTime > 0 && ev.isBurning()) {
-            fuel.setCount(fuel.getCount() - 1);
-            if (fuel.getCount() == 0) {
-                if (fuel.getId() == Item.BUCKET && fuel.getDamage() == 10) {
-                    fuel.setDamage(0);
-                    fuel.setCount(1);
-                } else {
-                    fuel = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
-                }
+        Item originalFuel = this.inventory.getFuel();
+        if (!originalFuel.equalsExact(fuel)) return;
+        FurnaceState state = new FurnaceState(this);
+        FurnaceBurnEvent ev = new FurnaceBurnEvent(this, fuel.clone(), fuel.getFuelTime() == null ? 0 : fuel.getFuelTime());
+        int[] approvedTime = new int[1];
+        boolean[] consumeFuel = new boolean[1];
+        NativeContainerTransaction.convert(this.inventory, () -> {
+            this.server.getPluginManager().callEvent(ev);
+            approvedTime[0] = (int) Math.ceil(ev.getBurnTime() / (float) getSpeedMultiplier());
+            consumeFuel[0] = ev.isBurning();
+            return !ev.isCancelled();
+        }, () -> {
+            int time = approvedTime[0];
+            if (time <= 0 || !consumeFuel[0]) return java.util.Map.of();
+            Item debit = originalFuel.clone();
+            debit.setCount(debit.getCount() - 1);
+            if (debit.getCount() == 0 && debit.getId() == Item.BUCKET && debit.getDamage() == 10) {
+                debit.setDamage(0);
+                debit.setCount(1);
             }
-            this.inventory.setFuel(fuel);
+            return java.util.Map.of(1, debit);
+        }, state::matches, state::restore, () -> {
+            int time = approvedTime[0];
+            maxTime = time;
+            burnTime = time;
+            burnDuration = 0;
+            this.setBurning(true);
+        });
+    }
+
+    private record FurnaceState(BlockEntityFurnace furnace, int burn, int duration, int cook,
+                                int max, float xp) {
+        FurnaceState(BlockEntityFurnace furnace) {
+            this(furnace, furnace.burnTime, furnace.burnDuration, furnace.cookTime, furnace.maxTime, furnace.experience);
+        }
+        void restore() {
+            furnace.burnTime = burn;
+            furnace.burnDuration = duration;
+            furnace.cookTime = cook;
+            furnace.maxTime = max;
+            furnace.experience = xp;
+        }
+        boolean matches() {
+            return furnace.burnTime == burn && furnace.burnDuration == duration && furnace.cookTime == cook
+                    && furnace.maxTime == max && Float.compare(furnace.experience, xp) == 0;
         }
     }
 
@@ -283,7 +307,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
 
     @Override
     public boolean onUpdate() {
-        if (this.closed) {
+        if (this.closed || NativeContainerTransaction.isActive(this.inventory)) {
             return false;
         }
 
@@ -311,24 +335,36 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
             if (smelt != null && canSmelt) {
                 cookTime++;
                 if (cookTime >= readyAt) {
+                    Item productBefore = product.clone();
                     Item result = smelt.getResult();
                     Item newProduct = result.clone();
                     newProduct.setCount(product.getCount() + 1);
                     product = newProduct;
 
                     FurnaceSmeltEvent ev = new FurnaceSmeltEvent(this, raw, product, (float) this.server.getCraftingManager().getRecipeXp(smelt));
-                    this.server.getPluginManager().callEvent(ev);
-                    if (!ev.isCancelled()) {
-                        this.inventory.setResult(ev.getResult());
-                        this.experience += ev.getXp();
-                        raw.setCount(raw.getCount() - 1);
-                        if (raw.getCount() == 0) {
-                            raw = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
-                        }
-                        this.inventory.setSmelting(raw);
-                    }
+                    Item inputBefore = raw.clone();
+                    FurnaceState state = new FurnaceState(this);
+                    float[] approvedXp = new float[1];
+                    boolean converted = NativeContainerTransaction.convert(this.inventory, () -> {
+                        if (!this.inventory.getSmelting().equalsExact(inputBefore)
+                                || !this.inventory.getResult().equalsExact(productBefore)) return false;
+                        this.server.getPluginManager().callEvent(ev);
+                        approvedXp[0] = ev.getXp();
+                        return !ev.isCancelled();
+                    }, () -> {
+                        Item debit = inputBefore.clone();
+                        debit.setCount(debit.getCount() - 1);
+                        java.util.Map<Integer, Item> writes = new java.util.LinkedHashMap<>();
+                        writes.put(2, ev.getResult());
+                        writes.put(0, debit);
+                        return writes;
+                    }, state::matches, state::restore, () -> {
+                        this.experience += approvedXp[0];
+                        this.cookTime -= readyAt;
+                    });
 
-                    cookTime -= readyAt;
+                    // A cancelled/refused conversion keeps the stock cook-progress policy.
+                    if (!converted) cookTime -= readyAt;
                 }
             } else if (burnTime <= 0) {
                 burnTime = 0;

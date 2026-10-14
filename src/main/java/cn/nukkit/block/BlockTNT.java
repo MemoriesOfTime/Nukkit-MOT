@@ -70,8 +70,19 @@ public class BlockTNT extends BlockSolid {
         prime(fuse, null);
     }
 
-    public void prime(int fuse, Entity source) {
-        this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
+    private static final ThreadLocal<java.util.Set<PrimeCell>> PRIMING=ThreadLocal.withInitial(java.util.HashSet::new);
+    private record PrimeCell(Level level,int x,int y,int z,int layer){}
+    public void prime(int fuse, Entity source) { primeAccepted(fuse,source,()->{}); }
+    /** Keep the source intact until a sealed native actor and raw cell removal both succeed. */
+    public boolean primeAccepted(int fuse,Entity source,Runnable acceptedCallback) { return primeAccepted(fuse,source,()->{},acceptedCallback); }
+    public boolean primeAccepted(int fuse,Entity source,Runnable validateAccepted,Runnable acceptedCallback) {
+        PrimeCell key=new PrimeCell(level,getFloorX(),getFloorY(),getFloorZ(),layer);
+        var active=PRIMING.get();if(active.size()>=64 || !active.add(key))return false;
+        try{return preparePrimeAccepted(fuse,source,validateAccepted,acceptedCallback);}
+        finally{active.remove(key);if(active.isEmpty())PRIMING.remove();}
+    }
+    private boolean preparePrimeAccepted(int fuse,Entity source,Runnable validateAccepted,Runnable acceptedCallback) {
+        if(layer!=0 || level.getBlock(this,layer).getFullId()!=getFullId() || level.getBlockEntity(this)!=null)return false;
         double mot = (ThreadLocalRandom.current().nextFloat() * 2 - 1) * 6.283185307179586;
         CompoundTag nbt = new CompoundTag()
                 .putList(new ListTag<DoubleTag>("Pos")
@@ -86,13 +97,39 @@ public class BlockTNT extends BlockSolid {
                         .add(new FloatTag("", 0))
                         .add(new FloatTag("", 0)))
                 .putShort("Fuse", fuse);
-        Entity tnt = new EntityPrimedTNT(
-                this.getLevel().getChunk(this.getFloorX() >> 4, this.getFloorZ() >> 4),
-                nbt, source
-        );
-        tnt.spawnToAll();
-        this.level.addSound(new TNTPrimeSound(this));
-        this.level.getVibrationManager().callVibrationEvent(new VibrationEvent(source != null ? source : this, this.add(0.5, 0.5, 0.5), VibrationType.PRIME_FUSE));
+        EntityPrimedTNT.PreparedPrime ticket=EntityPrimedTNT.preparePrime(level.getChunk(getFloorX()>>4,getFloorZ()>>4),nbt,source);
+        if(ticket==null)return false;
+        boolean[] accepted={false};Throwable failure=null;
+        try {
+            if(!ticket.isValid() || level.getBlock(this,layer).getFullId()!=getFullId() || level.getBlockEntity(this)!=null)return false;
+            try {
+                level.setBlock(this,Block.get(BlockID.AIR),true,true,()->{
+                    if(!ticket.isValid() || !level.getBlock(this,layer).isAir() || level.getBlockEntity(this)!=null)throw new IllegalStateException("Prepared TNT source changed before publication");
+                    validateAccepted.run();accepted[0]=true;
+                    Throwable acceptedFailure=null;
+                    try{level.getServer().getPluginManager().callEvent(new cn.nukkit.event.entity.EntityPrimeAcceptedEvent(ticket.getEntity(),this));}
+                    catch(RuntimeException|Error error){acceptedFailure=error;}
+                    try{acceptedCallback.run();}
+                    catch(RuntimeException|Error error){if(acceptedFailure==null)acceptedFailure=error;else if(acceptedFailure!=error)acceptedFailure.addSuppressed(error);}
+                    finally{ticket.release();}
+                    if(acceptedFailure instanceof Error error)throw error;
+                    if(acceptedFailure instanceof RuntimeException error)throw error;
+                });
+            }catch(RuntimeException|Error error){failure=error;}
+            if(!accepted[0]) {
+                if(level.getBlock(this,layer).isAir())level.setBlock(this,clone(),false,false);
+                if(failure instanceof Error error)throw error;if(failure instanceof RuntimeException error)throw error;
+                return false;
+            }
+            try {
+                ticket.notifyPublished();
+                level.addLevelSoundEvent(this,cn.nukkit.network.protocol.LevelSoundEventPacket.SOUND_FIZZ);
+                level.addSound(new TNTPrimeSound(this));
+                level.getVibrationManager().callVibrationEvent(new VibrationEvent(source!=null?source:this,add(0.5,0.5,0.5),VibrationType.PRIME_FUSE));
+            } catch(RuntimeException|Error error){if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error);}
+            if(failure instanceof Error error)throw error;if(failure instanceof RuntimeException error)throw error;
+            return true;
+        }finally{if(!accepted[0])ticket.discard();}
     }
 
     @Override

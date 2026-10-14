@@ -100,7 +100,11 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     public Item[] armor;
 
     public BaseEntity(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
+        this(chunk, nbt, false);
+    }
+
+    protected BaseEntity(FullChunk chunk, CompoundTag nbt, boolean prepared) {
+        super(chunk, nbt, prepared);
 
         if (EMPTY_INVENTORY == null) {
             EMPTY_INVENTORY = new PlayerInventory(null);

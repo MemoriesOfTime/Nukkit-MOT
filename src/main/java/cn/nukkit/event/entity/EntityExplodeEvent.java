@@ -14,6 +14,15 @@ import java.util.Set;
  * Nukkit Project
  */
 public class EntityExplodeEvent extends EntityEvent implements Cancellable {
+    private final cn.nukkit.event.block.ExplosionBlockProcessing blockProcessing = new cn.nukkit.event.block.ExplosionBlockProcessing();
+    private final java.util.List<Block> originalBlocks;
+    public java.util.List<Block> getOriginalBlocks(){return originalBlocks.stream().map(Block::clone).toList();}
+    public void addBlockProcessor(cn.nukkit.event.block.NativeExplosionBlockProcessor processor) { blockProcessing.addBlockProcessor(processor); }
+    public cn.nukkit.event.block.NativeExplosionBlockProcessor.Result processBlock(cn.nukkit.block.Block block) { return blockProcessing.processBlock(block); }
+    public void blockRemoved(cn.nukkit.block.Block block) { blockProcessing.blockRemoved(block); }
+    public java.util.List<cn.nukkit.block.Block> getRemovedBlocks() { return blockProcessing.getRemovedBlocks(); }
+    public cn.nukkit.event.block.ExplosionBlockProcessing getBlockProcessing() { return blockProcessing; }
+
 
     private static final HandlerList handlers = new HandlerList();
 
@@ -31,6 +40,7 @@ public class EntityExplodeEvent extends EntityEvent implements Cancellable {
         this.entity = entity;
         this.position = position;
         this.blocks = blocks;
+        this.originalBlocks=blocks.stream().map(Block::clone).toList();
         this.yield = yield;
     }
 
