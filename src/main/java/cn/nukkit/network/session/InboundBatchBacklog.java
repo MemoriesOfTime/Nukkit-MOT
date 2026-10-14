@@ -25,12 +25,13 @@ final class InboundBatchBacklog {
                 && encodedBytes + bytes <= MAX_BYTES;
     }
 
-    synchronized void offer(byte[] payload, boolean prefixed, CompressionProvider compression) {
+    synchronized boolean offer(byte[] payload, boolean prefixed, CompressionProvider compression) {
         if (!canOffer(payload.length)) {
-            throw new IllegalStateException("Inbound backlog admission was not reserved");
+            return false;
         }
         encoded.addLast(new EncodedBatch(payload, prefixed, compression));
         encodedBytes += payload.length;
+        return true;
     }
 
     synchronized EncodedBatch poll() {

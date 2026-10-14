@@ -143,7 +143,10 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         }
         byte[] packetBuffer = new byte[payloadBytes];
         payload.readBytes(packetBuffer);
-        this.inboundBacklog.offer(packetBuffer, ci, receivedCompression);
+        if (!this.inboundBacklog.offer(packetBuffer, ci, receivedCompression)) {
+            // Disconnect may close the backlog while the event loop copies this frame.
+            return;
+        }
         this.drainDeferredInbound();
     }
 

@@ -211,6 +211,47 @@ class ReliableInboundBackpressureTest {
         assertFalse(retained.canOffer(1));
     }
 
+
+    @Test
+    void closeBetweenCapacityCheckAndOfferDoesNotThrowOrRetain() {
+        InboundBatchBacklog retained = new InboundBatchBacklog();
+        assertTrue(retained.canOffer(1));
+        retained.close();
+        assertDoesNotThrow(() -> retained.offer(new byte[]{1}, false, CompressionProvider.NONE));
+        assertEquals(0, retained.batchCount());
+        assertEquals(0L, retained.byteCount());
+        assertNull(retained.poll());
+    }
+
+    @Test
+    void sessionDisconnectDuringFrameCopyDoesNotLeakAnException() throws Exception {
+        for (boolean nether : new boolean[]{false, true}) {
+            Fixture fixture = fixture(nether);
+            InboundBatchBacklog retained = backlog(fixture);
+            byte[] bytes = completionAndClose();
+            ByteBuf buffer = spy(nether ? Unpooled.wrappedBuffer(bytes)
+                    : Unpooled.buffer().writeByte(0xfe).writeBytes(bytes));
+            doAnswer(call -> {
+                retained.close();
+                return call.callRealMethod();
+            }).when(buffer).readBytes(any(byte[].class));
+            try {
+                if (fixture.session instanceof RakNetPlayerSession session) {
+                    RakMessage message = new RakMessage(buffer);
+                    assertDoesNotThrow(() -> session.channelRead0(mock(ChannelHandlerContext.class), message));
+                } else {
+                    assertDoesNotThrow(() -> ((NetherNetPlayerSession) fixture.session)
+                            .channelRead0(mock(ChannelHandlerContext.class), buffer));
+                }
+                assertEquals(0, retained.batchCount());
+                assertEquals(0L, retained.byteCount());
+                verify(fixture.player, never()).handleDataPacket(any());
+            } finally {
+                buffer.release();
+            }
+        }
+    }
+
     private static Fixture fixture(boolean nether) {
         EventLoop loop = mock(EventLoop.class);
         io.netty.util.concurrent.ScheduledFuture<?> future = mock(io.netty.util.concurrent.ScheduledFuture.class);

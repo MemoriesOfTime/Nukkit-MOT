@@ -215,7 +215,10 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             }
             byte[] packetBuffer = new byte[payloadBytes];
             buffer.readBytes(packetBuffer);
-            this.inboundBacklog.offer(packetBuffer, ci, receivedCompression);
+            if (!this.inboundBacklog.offer(packetBuffer, ci, receivedCompression)) {
+                // Disconnect may close the backlog while the event loop copies this frame.
+                return;
+            }
             this.drainDeferredInbound();
         } else if (Nukkit.DEBUG > 1) {
             log.info("Unknown EncapsulatedPacket: {}", packetId);
