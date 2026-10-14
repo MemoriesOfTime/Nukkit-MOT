@@ -14,7 +14,6 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.session.login.NetworkSessionState;
 import cn.nukkit.network.session.login.SessionLoginContext;
 import cn.nukkit.network.session.login.SessionLoginPhase;
-import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
@@ -230,15 +229,6 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
             // A decoder failure is evidence about this session, not other users at its address.
             this.disconnect("Sent malformed packet");
-            Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
-                try {
-                    this.channel.close();
-                } catch (Throwable throwable) {
-                    if (Nukkit.DEBUG > 1) {
-                        log.info("Error while closing channel", throwable);
-                    }
-                }
-            }, 10);
         } else if (Nukkit.DEBUG > 1) {
             log.info("Unknown EncapsulatedPacket: {}", packetId);
         }

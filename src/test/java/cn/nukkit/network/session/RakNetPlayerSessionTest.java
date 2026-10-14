@@ -13,7 +13,6 @@ import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
 import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
 import cn.nukkit.network.proxy.ProxyProtocolHandler;
 import cn.nukkit.network.session.login.SessionLoginPhase;
-import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
@@ -498,6 +497,46 @@ class RakNetPlayerSessionTest {
         assertMalformedLoginPolicy(SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED);
     }
 
+    @Test
+    void malformedNetherLoginClosesWithoutRetainingMainThreadTasks() throws Exception {
+        for (SessionLoginPhase phase : new SessionLoginPhase[]{SessionLoginPhase.RESOURCE_PACK,
+                SessionLoginPhase.NETWORK_SETTINGS_NEGOTIATED}) {
+            EventLoop loop = mock(EventLoop.class);
+            io.netty.util.concurrent.ScheduledFuture<?> future = mock(io.netty.util.concurrent.ScheduledFuture.class);
+            doReturn(future).when(loop).scheduleAtFixedRate(any(Runnable.class), anyLong(), anyLong(), eq(TimeUnit.MILLISECONDS));
+            doReturn(future).when(loop).schedule(any(Runnable.class), anyLong(), eq(TimeUnit.MILLISECONDS));
+            var child = mock(org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel.class, RETURNS_DEEP_STUBS);
+            when(child.eventLoop()).thenReturn(loop);
+            when(child.isActive()).thenReturn(true);
+            when(child.isOpen()).thenReturn(true);
+            when(child.remoteAddress()).thenReturn(new InetSocketAddress("192.0.2.23", 20000));
+            var transport = mock(cn.nukkit.network.NetherNetInterface.class);
+            when(transport.getNetwork()).thenReturn(network);
+            var session = new NetherNetPlayerSession(transport, child);
+            Player player = mock(Player.class);
+            player.protocol = GameVersion.V1_21_130.getProtocol();
+            when(player.getGameVersion()).thenReturn(GameVersion.V1_21_130);
+            session.setPlayer(player);
+            session.setCompression(CompressionProvider.NONE);
+            session.getState().getLogin().setPhase(phase);
+            ServerScheduler scheduler = mock(ServerScheduler.class);
+            when(MockServer.get().getScheduler()).thenReturn(scheduler);
+            ByteBuf input = Unpooled.wrappedBuffer(new byte[]{(byte) 0x80});
+            try {
+                session.channelRead0(mock(ChannelHandlerContext.class), input);
+            } finally {
+                input.release();
+            }
+            assertEquals(SessionLoginPhase.DISCONNECTED, session.getState().getLogin().getPhase());
+            ArgumentCaptor<java.util.concurrent.Callable<?>> close = ArgumentCaptor.forClass(java.util.concurrent.Callable.class);
+            verify(loop).schedule(close.capture(), eq(10L), eq(TimeUnit.MILLISECONDS));
+            close.getValue().call();
+            verify(child).close();
+            verifyNoInteractions(scheduler);
+            verify(transport, never()).blockAddress(any(InetAddress.class), anyInt());
+        }
+    }
+
     private static void assertMalformedLoginPolicy(SessionLoginPhase phase) throws Exception {
         RakNetInterface networkInterface = mock(RakNetInterface.class, RETURNS_DEEP_STUBS);
         when(networkInterface.getNetwork()).thenReturn(network);
@@ -512,13 +551,14 @@ class RakNetPlayerSessionTest {
 
         assertEquals(SessionLoginPhase.DISCONNECTED, fixture.session.getState().getLogin().getPhase());
         assertEquals("Sent malformed packet", fixture.session.getDisconnectReason());
-        ArgumentCaptor<Runnable> callback = ArgumentCaptor.forClass(Runnable.class);
-        verify(scheduler).scheduleDelayedTask(eq(InternalPlugin.INSTANCE), callback.capture(), eq(10));
+        ArgumentCaptor<java.util.concurrent.Callable<?>> callback = ArgumentCaptor.forClass(java.util.concurrent.Callable.class);
+        verify(fixture.eventLoop).schedule(callback.capture(), eq(10L), eq(TimeUnit.MILLISECONDS));
         when(fixture.channel.remoteAddress()).thenThrow(new IllegalStateException("channel already closed"));
 
-        callback.getValue().run();
+        callback.getValue().call();
 
         verify(fixture.channel).close();
+        verifyNoInteractions(scheduler);
         verify(networkInterface, never()).blockAddress(any(InetAddress.class), anyInt());
         verify(fixture.channel, never()).unsafe();
     }
