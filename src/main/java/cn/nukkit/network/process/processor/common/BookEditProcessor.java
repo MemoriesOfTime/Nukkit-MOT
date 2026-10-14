@@ -35,6 +35,14 @@ public class BookEditProcessor extends DataPacketProcessor<BookEditPacket> {
             return;
         }
 
+        // Match ItemBookWritable's existing page contract before its throwing preconditions.
+        if (pk.action != BookEditPacket.Action.SIGN_BOOK
+                && (pk.pageNumber < 0 || pk.pageNumber >= 50
+                || (pk.action == BookEditPacket.Action.SWAP_PAGES
+                && (pk.secondaryPageNumber < 0 || pk.secondaryPageNumber >= 50)))) {
+            return;
+        }
+
         Item newBook = oldBook.clone();
         boolean success;
         switch (pk.action) {

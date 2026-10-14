@@ -1951,11 +1951,15 @@ public class BinaryStream {
     }
 
     public byte[] getByteArray(int maxLength) {
-        int length = (int) this.getUnsignedVarInt();
-        checkArgument(this.isReadable(length),
-                "Tried to read %s bytes but only has %s readable", length, this.readableBytes());
+        int end = this.buffer == null ? 0 : Math.min(this.count, this.buffer.length);
+        checkArgument(this.count >= 0 && this.offset >= 0 && this.offset < end,
+                "Missing byte array length prefix");
+        long length = this.getUnsignedVarInt();
+        checkArgument(this.offset <= end && length <= Integer.MAX_VALUE
+                        && length <= end - (long) this.offset,
+                "Tried to read %s bytes but only has %s readable", length, end - (long) this.offset);
         checkArgument(maxLength <= 0 || length <= maxLength, "Tried to read %s bytes but maximum is %s", length, maxLength);
-        return this.get(length);
+        return this.get((int) length);
     }
 
     public void putByteArray(byte[] b) {
