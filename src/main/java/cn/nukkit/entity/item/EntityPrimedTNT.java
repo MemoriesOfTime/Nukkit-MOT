@@ -62,6 +62,44 @@ public class EntityPrimedTNT extends Entity implements EntityExplosive {
         this.source = source;
     }
 
+    private EntityPrimedTNT(FullChunk chunk, CompoundTag nbt, Entity source, boolean prepared) {
+        super(chunk, nbt, prepared);
+        this.source=source;
+    }
+    /** A sealed, non-ticking actor until its exact TNT source cell has been accepted. */
+    public static PreparedPrime preparePrime(FullChunk chunk, CompoundTag nbt, Entity source) {
+        if(chunk==null || chunk.getProvider()==null || chunk.getProvider().getLevel()==null)return null;
+        EntityPrimedTNT entity=new EntityPrimedTNT(chunk,nbt.copy(),source,true);
+        PreparedPrime ticket=new PreparedPrime(entity,chunk,nbt.copy(),source);
+        if(!ticket.isValid()){ticket.discard();return null;}
+        return ticket;
+    }
+    public static final class PreparedPrime {
+        private final EntityPrimedTNT entity;
+        private final FullChunk chunk;
+        private final CompoundTag authored;
+        private final Entity source;
+        private boolean accepted,discarded;
+        private PreparedPrime(EntityPrimedTNT entity,FullChunk chunk,CompoundTag authored,Entity source){this.entity=entity;this.chunk=chunk;this.authored=authored;this.source=source;}
+        public EntityPrimedTNT getEntity(){return entity;}
+        public boolean isValid(){
+            var pos=authored.getList("Pos",cn.nukkit.nbt.tag.DoubleTag.class);
+            var motion=authored.getList("Motion",cn.nukkit.nbt.tag.DoubleTag.class);
+            return !accepted && !discarded && entity.getClass()==EntityPrimedTNT.class
+                    && entity.isDeferredPublicationIntact() && entity.isAlive() && entity.chunk==chunk
+                    && entity.level==chunk.getProvider().getLevel() && entity.source==source
+                    && entity.level.getChunkIfLoaded(chunk.getX(),chunk.getZ())==chunk
+                    && pos.size()==3 && motion.size()==3 && entity.x==pos.get(0).data && entity.y==pos.get(1).data && entity.z==pos.get(2).data
+                    && entity.motionX==motion.get(0).data && entity.motionY==motion.get(1).data && entity.motionZ==motion.get(2).data
+                    && entity.fuse==authored.getByte("Fuse") && entity.yaw==0 && entity.pitch==0;
+        }
+        /** Assignment-only release; no plugin or world notifications. */
+        public void release(){if(!accepted && !discarded){entity.releaseDeferredPublication();accepted=true;}}
+        public void discard(){if(!accepted && !discarded){discarded=true;entity.discardDeferredPublication();}}
+        public void notifyPublished(){if(accepted && !discarded){entity.scheduleUpdate();entity.spawnToAll();}}
+    }
+
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
@@ -85,7 +123,7 @@ public class EntityPrimedTNT extends Entity implements EntityExplosive {
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, true);
         this.setDataProperty(new IntEntityData(DATA_FUSE_LENGTH, fuse));
 
-        this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_FIZZ);
+        if (!isPublicationDeferred()) this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_FIZZ);
     }
 
     @Override
@@ -102,7 +140,7 @@ public class EntityPrimedTNT extends Entity implements EntityExplosive {
     @Override
     public boolean onUpdate(int currentTick) {
 
-        if (closed) {
+        if (closed || isPublicationDeferred()) {
             return false;
         }
 

@@ -27,6 +27,7 @@ jose4j = "0.9.6"
 junit = "5.10.2"
 junit_platform = "1.10.2"
 mockito = "5.23.0"
+assertj = "3.27.7"
 bytebuddy = "1.18.8"
 objenesis = "3.4"
 nukkitx_natives = "1.0.3"
@@ -98,6 +99,7 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit_platform" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
 byte-buddy = { module = "net.bytebuddy:byte-buddy", version.ref = "bytebuddy" }
 byte-buddy-agent = { module = "net.bytebuddy:byte-buddy-agent", version.ref = "bytebuddy" }

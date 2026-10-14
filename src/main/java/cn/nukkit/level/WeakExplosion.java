@@ -2,18 +2,14 @@ package cn.nukkit.level;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
-import cn.nukkit.block.BlockTNT;
-import cn.nukkit.blockentity.BlockEntity;
-import cn.nukkit.blockentity.BlockEntityShulkerBox;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
 import cn.nukkit.event.block.BlockUpdateEvent;
+import cn.nukkit.event.block.ExplosionBlockProcessing;
 import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
-import cn.nukkit.inventory.InventoryHolder;
-import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.particle.HugeExplodeSeedParticle;
 import cn.nukkit.level.util.ExplosionSource;
@@ -25,6 +21,7 @@ import it.unimi.dsi.fastutil.longs.LongArraySet;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Explosion that can't break stone (for fireballs)
@@ -109,8 +106,10 @@ public class WeakExplosion extends Explosion {
     public boolean explodeB() {
         LongArraySet updateBlocks = new LongArraySet();
         double yield = (1d / this.size) * 100d;
+        List<Block> selectedBlocks = this.affectedBlocks.stream().map(Block::clone).toList();
+        ExplosionBlockProcessing processing = null;
         if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
-            Entity exploder = entitySource.entity();
+            Entity exploder = entitySource.entity() != null ? entitySource.entity() : this.source instanceof Entity actor ? actor : null;
             EntityExplodeEvent ev = new EntityExplodeEvent(exploder, this.source, this.affectedBlocks, yield);
             this.level.getServer().getPluginManager().callEvent(ev);
             if (ev.isCancelled()) {
@@ -118,8 +117,11 @@ public class WeakExplosion extends Explosion {
             } else {
                 yield = ev.getYield();
                 this.affectedBlocks = ev.getBlockList();
+                processing = ev.getBlockProcessing();
             }
         }
+
+        beginBlockProcessing(processing, this.affectedBlocks, selectedBlocks);
 
         double explosionSize = this.size * 2d;
         double minX = NukkitMath.floorDouble(this.source.x - explosionSize - 1);
@@ -156,34 +158,12 @@ public class WeakExplosion extends Explosion {
         }
 
         ItemBlock air = new ItemBlock(Block.get(BlockID.AIR));
-        BlockEntity container;
-
-        for (Block block : this.affectedBlocks) {
-            if (block instanceof BlockTNT tnt) {
-                Entity exploder = (this.sourceObject instanceof ExplosionSource.EntitySource es) ? es.entity() : null;
-                tnt.prime(Utils.rand(10, 30), exploder);
-            } else if (block.getId() == Block.BED_BLOCK && (block.getDamage() & 0x08) == 0x08) {
-                this.level.setBlockAt(block.getFloorX(), block.getFloorY(), block.getFloorZ(), Block.AIR);
-                continue; // We don't want drops from both bed parts
-            } else if ((container = block.getLevel().getBlockEntity(block)) instanceof InventoryHolder inventoryHolder) {
-                if (block.getLevel().getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
-                    if (container instanceof BlockEntityShulkerBox) {
-                        this.level.dropItem(block.add(0.5, 0.5, 0.5), block.toItem());
-                        inventoryHolder.getInventory().clearAll();
-                    } else {
-                        for (Item drop : inventoryHolder.getInventory().getContents().values()) {
-                            this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
-                        }
-                        inventoryHolder.getInventory().clearAll();
-                    }
-                }
-            } else if (Math.random() * 100 < yield) {
-                for (Item drop : block.getDrops(air)) {
-                    this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
-                }
-            }
-
-            this.level.setBlockAt(block.getFloorX(), block.getFloorY(), block.getFloorZ(), BlockID.AIR);
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        boolean allowContainerLoot = level.getGameRules().getBoolean(GameRule.DO_TILE_DROPS);
+        for (Block selected : new ArrayList<>(this.affectedBlocks)) {
+            Block block = level.getBlock(selected.getFloorX(), selected.getFloorY(), selected.getFloorZ(), selected.layer);
+            if (block.isAir() || block.getFullId() != selected.getFullId()) continue;
+            if (!acceptExplosionBlock(block, air, yield, random, allowContainerLoot, false)) continue;
 
             Vector3 pos = new Vector3(block.x, block.y, block.z);
 

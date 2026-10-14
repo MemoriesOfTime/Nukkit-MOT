@@ -184,6 +184,7 @@ dependencies {
     testImplementation(libs.cloudburst.math)
     testImplementation(libs.netease.protocol.extension)
 
+    testImplementation(libs.assertj.core)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.bundles.mockito)
     testRuntimeOnly(libs.junit.engine)
