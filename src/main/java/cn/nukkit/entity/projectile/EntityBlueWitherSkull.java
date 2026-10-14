@@ -17,6 +17,7 @@ public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityEx
 
     private boolean canExplode;
     private boolean entityImpact;
+    private cn.nukkit.math.Vector3 entityImpactPosition;
 
     public EntityBlueWitherSkull(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -42,11 +43,14 @@ public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityEx
     @Override
     public void onCollideWithEntity(Entity entity) {
         boolean previousImpact = this.entityImpact;
+        cn.nukkit.math.Vector3 previousPosition = this.entityImpactPosition;
         this.entityImpact = true;
+        this.entityImpactPosition = this.getEntityImpactPosition(entity);
         try {
             super.onCollideWithEntity(entity);
         } finally {
             this.entityImpact = previousImpact;
+            this.entityImpactPosition = previousPosition;
         }
     }
 
@@ -55,6 +59,9 @@ public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityEx
         // Accepted entity hit only: keep the existing block-impact update order.
         if (this.entityImpact && this.canExplode
                 && this.level.getGameRules().getBoolean(GameRule.PROJECTILES_CAN_BREAK_BLOCKS)) {
+            if (this.entityImpactPosition != null) {
+                this.setPosition(this.entityImpactPosition);
+            }
             this.explode();
         }
     }
