@@ -209,14 +209,33 @@ public final class InventoryMutationGuard {
         }
 
         /** Restore only the failed native slot; earlier accepted bulk slots remain accepted. */
+        @SuppressWarnings("try") // Rollback observers cannot repeat the provisional expected credit.
         public void restorePreviousSlot() {
             if (!exactBulk || !(inventory instanceof BaseInventory nativeInventory)) {
                 throw new IllegalStateException("Exact bulk writes require a native inventory");
             }
-            if (slotBefore == null) nativeInventory.slots.remove(slot);
-            else nativeInventory.slots.put(slot, slotBefore.clone());
-            if (nativeInventory.getHolder() instanceof cn.nukkit.blockentity.BlockEntity holder) holder.setDirty();
-            if (nativeInventory instanceof BundleInventory bundle) bundle.getHolder().saveNBT();
+            try (WriteScope blocked = new WriteScope(owned, null, null, -1, null, false)) {
+                Item current = nativeInventory.slots.getOrDefault(slot, Item.AIR_ITEM).clone();
+                if (slotBefore == null) nativeInventory.slots.remove(slot);
+                else nativeInventory.slots.put(slot, slotBefore.clone());
+                Throwable restorationFailure = null;
+                try {
+                    if (nativeInventory.getHolder() instanceof cn.nukkit.blockentity.BlockEntity holder) holder.setDirty();
+                    if (nativeInventory instanceof BundleInventory bundle) bundle.getHolder().saveNBT();
+                } catch (RuntimeException | Error failure) {
+                    restorationFailure = failure;
+                }
+                if (!current.equalsExact(slotBefore == null ? Item.AIR_ITEM : slotBefore)) {
+                    try {
+                        nativeInventory.onSlotChange(slot, current, true);
+                    } catch (RuntimeException | Error failure) {
+                        if (restorationFailure == null) restorationFailure = failure;
+                        else if (restorationFailure != failure) restorationFailure.addSuppressed(failure);
+                    }
+                }
+                if (restorationFailure instanceof RuntimeException failure) throw failure;
+                if (restorationFailure instanceof Error failure) throw failure;
+            }
         }
 
         @Override public void close() {

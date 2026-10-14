@@ -544,8 +544,8 @@ public abstract class BaseInventory implements Inventory {
 
         if (!itemSlots.isEmpty() && !emptySlots.isEmpty()) {
             for (int slotIndex : emptySlots) {
-                if (!itemSlots.isEmpty()) {
-                    Item slot = itemSlots.get(0);
+                for (Iterator<Item> iterator = itemSlots.iterator(); iterator.hasNext();) {
+                    Item slot = iterator.next();
                     int amount = Math.min(Math.min(slot.getMaxStackSize(), this.getMaxStackSize()), slot.getCount());
                     if (amount <= 0) continue;
                     Item item = slot.clone();
@@ -553,10 +553,12 @@ public abstract class BaseInventory implements Inventory {
                     if (this.setItemExactBulk(slotIndex, item)) {
                         slot.setCount(slot.getCount() - amount);
                         if (slot.getCount() <= 0) {
-                            itemSlots.remove(slot);
+                            iterator.remove();
                         }
+                        break;
                     }
                 }
+                if (itemSlots.isEmpty()) break;
             }
         }
 
@@ -610,7 +612,11 @@ public abstract class BaseInventory implements Inventory {
                     return true;
                 }
             } catch (RuntimeException | Error failure) {
-                write.restorePreviousSlot();
+                try {
+                    write.restorePreviousSlot();
+                } catch (RuntimeException | Error restoreFailure) {
+                    if (restoreFailure != failure) failure.addSuppressed(restoreFailure);
+                }
                 throw failure;
             }
             write.restorePreviousSlot();

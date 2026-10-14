@@ -449,7 +449,7 @@ public class InventoryTransaction {
                     try (InventoryMutationGuard.WriteScope write = claim.expectWrite(action.getInventory(), action.getSlot(), expected.get(action))) {
                         if (!action.executeInventoryWrite(this.source)
                                 || !acceptedSlotTarget(action, expected.get(action))) {
-                            restoreSlotTransfer(before);
+                            restoreSlotTransfer(before, claim);
                             this.sendInventories(frozenActions, frozenInventories);
                             return false;
                         }
@@ -458,19 +458,23 @@ public class InventoryTransaction {
                 // A later callback must not rewrite an earlier accepted half of the transfer.
                 for (SlotChangeAction action : writes) {
                     if (!acceptedSlotTarget(action, expected.get(action))) {
-                        restoreSlotTransfer(before);
+                        restoreSlotTransfer(before, claim);
                         this.sendInventories(frozenActions, frozenInventories);
                         return false;
                     }
                 }
                 // Recheck after the last native callback/read, before any irreversible committed effects.
                 if (!matchesCreativeTransfer(frozenActions, frozenInventories, virtual)) {
-                    restoreSlotTransfer(before);
+                    restoreSlotTransfer(before, claim);
                     this.sendInventories(frozenActions, frozenInventories);
                     return false;
                 }
             } catch (RuntimeException | Error failure) {
-                restoreSlotTransfer(before);
+                try {
+                    restoreSlotTransfer(before, claim);
+                } catch (RuntimeException | Error restoreFailure) {
+                    if (restoreFailure != failure) failure.addSuppressed(restoreFailure);
+                }
                 try {
                     this.sendInventories(frozenActions, frozenInventories);
                 } catch (RuntimeException | Error updateFailure) {
@@ -531,16 +535,49 @@ public class InventoryTransaction {
         }
     }
 
-    private static void restoreSlotTransfer(Map<BaseInventory, Map<Integer, Item>> before) {
-        // Restoring a snapshot is not another grant: bypass cancellable setters and overflow routing.
-        before.forEach((inventory, snapshot) -> {
-            inventory.slots.clear();
-            inventory.slots.putAll(snapshot);
-        });
-        // Bundle slots are mirrored into their holder's serialized item NBT.
-        before.keySet().forEach(inventory -> {
-            if (inventory instanceof BundleInventory bundle) bundle.getHolder().saveNBT();
-        });
+    @SuppressWarnings("try") // Rollback observers cannot write into the restored transfer.
+    private static void restoreSlotTransfer(Map<BaseInventory, Map<Integer, Item>> before,
+                                            InventoryMutationGuard.Lease claim) {
+        try (InventoryMutationGuard.WriteScope blocked = claim.blockWrites()) {
+            Map<BaseInventory, Map<Integer, Item>> changed = new IdentityHashMap<>();
+            // Restore every backing before derived-state observers can read a different half of the move.
+            before.forEach((inventory, snapshot) -> {
+                Set<Integer> slots = new HashSet<>(snapshot.keySet());
+                slots.addAll(inventory.slots.keySet());
+                Map<Integer, Item> previous = new HashMap<>();
+                for (int slot : slots) {
+                    Item current = inventory.slots.getOrDefault(slot, Item.AIR_ITEM);
+                    Item original = snapshot.getOrDefault(slot, Item.AIR_ITEM);
+                    if (!current.equalsExact(original)) previous.put(slot, current.clone());
+                }
+                changed.put(inventory, previous);
+                // Restoring a snapshot is not another grant: bypass cancellable setters and overflow routing.
+                inventory.slots.clear();
+                inventory.slots.putAll(snapshot);
+            });
+            // Bundle slots are mirrored into their holder's serialized item NBT.
+            Throwable notificationFailure = null;
+            for (BaseInventory inventory : before.keySet()) {
+                try {
+                    if (inventory instanceof BundleInventory bundle) bundle.getHolder().saveNBT();
+                } catch (RuntimeException | Error failure) {
+                    if (notificationFailure == null) notificationFailure = failure;
+                    else if (notificationFailure != failure) notificationFailure.addSuppressed(failure);
+                }
+            }
+            for (var inventory : changed.entrySet()) {
+                for (var slot : inventory.getValue().entrySet()) {
+                    try {
+                        inventory.getKey().onSlotChange(slot.getKey(), slot.getValue(), true);
+                    } catch (RuntimeException | Error failure) {
+                        if (notificationFailure == null) notificationFailure = failure;
+                        else if (notificationFailure != failure) notificationFailure.addSuppressed(failure);
+                    }
+                }
+            }
+            if (notificationFailure instanceof RuntimeException failure) throw failure;
+            if (notificationFailure instanceof Error failure) throw failure;
+        }
     }
 
     public boolean hasExecuted() {
