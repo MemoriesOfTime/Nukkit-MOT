@@ -82,6 +82,11 @@ public abstract class EntityProjectile extends Entity {
         return this.collideWithEntity(entity);
     }
 
+    /** Acceptance without virtual helper dispatch, preserving existing projectile adapters. */
+    protected static boolean onCollideWithEntityAccepted(EntityProjectile projectile, Entity entity) {
+        return projectile.collideWithEntity(entity);
+    }
+
     private boolean collideWithEntity(Entity entity) {
         ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
         this.server.getPluginManager().callEvent(hitEvent);

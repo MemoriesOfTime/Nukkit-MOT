@@ -253,7 +253,9 @@ public class EntityArrow extends EntitySlenderProjectile {
 
     @Override
     public void onCollideWithEntity(Entity entity) {
-        super.onCollideWithEntity(entity);
+        if (!super.onCollideWithEntityAccepted(this, entity)) {
+            return;
+        }
 
         for (Effect effect : mobEffects.values()) {
             switch (effect.getId()) {
