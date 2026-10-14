@@ -52,6 +52,11 @@ public class ChunkSettings extends OkaeriConfig {
     @CustomKey("async-chunks")
     private boolean asyncChunks = true;
 
+    @Comment("Complete async chunk reads on the server thread after a freshness barrier; fail closed on IO errors")
+    @Comment("Disable to restore the legacy async loading behavior. Does not change chunk sending budgets or order.")
+    @CustomKey("async-chunk-load-completion")
+    private boolean asyncChunkLoadCompletion = true;
+
     @Comment("Max pending chunk writes per world before unloading pauses (backpressure)")
     @CustomKey("max-pending-chunk-writes")
     private int maxPendingChunkWrites = 128;
