@@ -46,6 +46,9 @@ public class AsyncChunkLoadTest {
 
         this.provider = Mockito.mock(LevelProvider.class);
         Mockito.lenient().when(this.provider.isOffThreadChunkReadSupported()).thenReturn(true);
+        // mountChunk 守卫要求 provider 处于存活状态（getLevel() 非 null 表示未关闭）
+        // The mountChunk guard requires a live provider (non-null getLevel() means not closed)
+        Mockito.lenient().when(this.provider.getLevel()).thenReturn(Mockito.mock(Level.class));
     }
 
     private Level newLevel(ExecutorService executor) throws Exception {
@@ -60,7 +63,7 @@ public class AsyncChunkLoadTest {
         setField(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
         setField(level, "unloadQueue", new Long2ObjectNonBlockingMap<>());
         setField(level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
-        setField(level, "playerLoaders", new ConcurrentHashMap<>());
+        setField(level, "playerLoaders", new Long2ObjectNonBlockingMap<>());
         setField(level, "loaders", new Int2ObjectOpenHashMap<>());
         setField(level, "loaderCounter", new Int2IntOpenHashMap());
         return level;

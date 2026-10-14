@@ -32,6 +32,11 @@ public class BlockSlabResinBrick extends BlockSlab {
     }
 
     @Override
+    public double getHardness() {
+        return 1.5;
+    }
+
+    @Override
     public int getToolTier() {
         return ItemTool.TIER_WOODEN;
     }
