@@ -19,6 +19,7 @@ import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -169,6 +170,22 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
         double expandY = Math.min(MAX_MOTION_EXPANSION, Math.max(0.5, motionAbsY + 0.3));
         double expandZ = Math.min(MAX_MOTION_EXPANSION, Math.max(0.5, motionAbsZ + 0.3));
 
+        ScanCache cache = this.scanCache;
+        if (cache != null && cache.valid && cache.simpleBoxes
+                && boundingBox != null && boundingBox.getClass() == SimpleAxisAlignedBB.class) {
+            // Capture the default grow's geometry before any virtual query-context getter can change it.
+            double scanMinX = boundingBox.getMinX() - expandX;
+            double scanMinY = boundingBox.getMinY() - expandY;
+            double scanMinZ = boundingBox.getMinZ() - expandZ;
+            double scanMaxX = boundingBox.getMaxX() + expandX;
+            double scanMaxY = boundingBox.getMaxY() + expandY;
+            double scanMaxZ = boundingBox.getMaxZ() + expandZ;
+            if (cache.matchesExpanded(boundingBox, scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ)) {
+                Block[] blocks = this.getExpandedCollisionCandidates(boundingBox,
+                        scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ);
+                return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ);
+            }
+        }
         Block[] blocks = this.getCollisionCandidates(boundingBox.grow(expandX, expandY, expandZ), boundingBox);
         return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ);
     }
@@ -181,7 +198,7 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                                          double expandX, double expandY, double expandZ) {
         if (blocks.length == 0) return Block.EMPTY_ARRAY;
 
-        Block[] result = new Block[Math.min(blocks.length, 4)];
+        Block[] result = Block.EMPTY_ARRAY;
         int count = 0;
 
         for (Block block : blocks) {
@@ -191,7 +208,8 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                     AxisAlignedBB trajectoryBB = boundingBox.grow(expandX, expandY, expandZ);
                     if (block.collidesWithBB(trajectoryBB, true)) {
                         if (count == result.length) {
-                            result = Arrays.copyOf(result, result.length << 1);
+                            result = count == 0 ? new Block[Math.min(blocks.length, 4)]
+                                    : Arrays.copyOf(result, result.length << 1);
                         }
                         result[count++] = block;
                     }
@@ -202,20 +220,23 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                     AxisAlignedBB shrinkBB = boundingBox.shrink(shrinkX, 0, shrinkZ);
                     if (block.collidesWithBB(shrinkBB, true)) {
                         if (count == result.length) {
-                            result = Arrays.copyOf(result, result.length << 1);
+                            result = count == 0 ? new Block[Math.min(blocks.length, 4)]
+                                    : Arrays.copyOf(result, result.length << 1);
                         }
                         result[count++] = block;
                     }
                 }
             } else if (block.collidesWithBB(boundingBox, true)) {
                 if (count == result.length) {
-                    result = Arrays.copyOf(result, result.length << 1);
+                    result = count == 0 ? new Block[Math.min(blocks.length, 4)]
+                            : Arrays.copyOf(result, result.length << 1);
                 }
                 result[count++] = block;
             }
         }
 
-        return count == 0 ? Block.EMPTY_ARRAY : Arrays.copyOf(result, count);
+        if (count == 0) return Block.EMPTY_ARRAY;
+        return count == result.length ? result : Arrays.copyOf(result, count);
     }
 
     /* ---------------------------------------------------------------------------------------------
@@ -335,8 +356,10 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
 
         if (minX > maxX || minY > maxY || minZ > maxZ) return Block.EMPTY_ARRAY;
 
-        int clampedMinY = Math.max(minY, level.getMinBlockY());
-        int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
+        int worldMinY = level.getMinBlockY();
+        int clampedMinY = Math.max(minY, worldMinY);
+        int worldMaxY = level.getMaxBlockY();
+        int clampedMaxY = Math.min(maxY, worldMaxY);
         if (clampedMinY > clampedMaxY) return Block.EMPTY_ARRAY;
 
         long estimatedCount = (long) (maxX - minX + 1) * (maxZ - minZ + 1) * (clampedMaxY - clampedMinY + 1);
@@ -345,13 +368,66 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
             return Block.EMPTY_ARRAY;
         }
 
+        return this.scanCollisionCandidates(level, flags, scanBox, entityBox, minX, minZ, maxX, maxZ,
+                clampedMinY, clampedMaxY, worldMinY, worldMaxY, estimatedCount, false);
+    }
+
+    /** A standard warm box can validate the same context and stamps without allocating its grow. */
+    private Block[] getExpandedCollisionCandidates(AxisAlignedBB entityBox,
+                                                   double scanMinX, double scanMinY, double scanMinZ,
+                                                   double scanMaxX, double scanMaxY, double scanMaxZ) {
+        Level level = entity.getLevel();
+        byte[] flags = shapeFlags();
+        if (level == null || entity.isClosed() || flags == null
+                || !Double.isFinite(scanMinX) || !Double.isFinite(scanMinY) || !Double.isFinite(scanMinZ)
+                || !Double.isFinite(scanMaxX) || !Double.isFinite(scanMaxY) || !Double.isFinite(scanMaxZ)
+                || !isFinite(entityBox) || level.getClass() != Level.class || level.getProvider() == null
+                || level.getProvider().getClass() != LevelDBProvider.class) {
+            return this.getBlocksInBoundingBox(new SimpleAxisAlignedBB(
+                    scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ));
+        }
+
+        int minX = NukkitMath.floorDouble(scanMinX);
+        int minY = NukkitMath.floorDouble(scanMinY);
+        int minZ = NukkitMath.floorDouble(scanMinZ);
+        int maxX = NukkitMath.floorDouble(scanMaxX);
+        int maxY = NukkitMath.floorDouble(scanMaxY);
+        int maxZ = NukkitMath.floorDouble(scanMaxZ);
+        if (minX > maxX || minY > maxY || minZ > maxZ) return Block.EMPTY_ARRAY;
+
+        int worldMinY = level.getMinBlockY();
+        int clampedMinY = Math.max(minY, worldMinY);
+        int worldMaxY = level.getMaxBlockY();
+        int clampedMaxY = Math.min(maxY, worldMaxY);
+        if (clampedMinY > clampedMaxY) return Block.EMPTY_ARRAY;
+
+        long estimatedCount = (long) (maxX - minX + 1) * (maxZ - minZ + 1) * (clampedMaxY - clampedMinY + 1);
+        if (estimatedCount <= 0 || estimatedCount > MAX_BOUNDING_BOX_ITERATIONS) {
+            logRunawayAABB(entity, new SimpleAxisAlignedBB(
+                    scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ), "getBlocksInBoundingBox");
+            return Block.EMPTY_ARRAY;
+        }
+
+        ScanCache cache = this.scanCache;
+        if (cache.holdsExpanded(level, entity.chunk, entityBox, worldMinY, worldMaxY,
+                scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ)) {
+            return cache.materialise(level);
+        }
+        return this.scanCollisionCandidates(level, flags, new SimpleAxisAlignedBB(
+                        scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ), entityBox,
+                minX, minZ, maxX, maxZ, clampedMinY, clampedMaxY, worldMinY, worldMaxY, estimatedCount, true);
+    }
+
+    private Block[] scanCollisionCandidates(Level level, byte[] flags, AxisAlignedBB scanBox, AxisAlignedBB entityBox,
+                                           int minX, int minZ, int maxX, int maxZ, int clampedMinY, int clampedMaxY,
+                                           int worldMinY, int worldMaxY, long estimatedCount, boolean cacheChecked) {
         // A resting entity whose blocks did not change gets the candidates of its last scan.
         ScanCache cache = this.scanCache;
         if (cache != null) {
-            if (cache.holds(level, entity.chunk, scanBox, entityBox)) {
+            if (!cacheChecked && cache.holds(level, entity.chunk, scanBox, entityBox, worldMinY, worldMaxY)) {
                 return cache.materialise(level);
             }
-            cache.begin(level);
+            cache.begin(level, worldMinY, worldMaxY);
         }
 
         // Cells whose own shape can reach the entity's box: x with x < maxX && x + 1 > minX, that is
@@ -432,7 +508,7 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
         }
 
         // Pass 2: the original x, z, y order; materialise what the filter can use.
-        Block[] result = new Block[(int) Math.min(estimatedCount, 16)];
+        Block[] result = Block.EMPTY_ARRAY;
         int count = 0;
         hint = entity.chunk;
         for (int x = minX; x <= maxX; x++) {
@@ -485,7 +561,8 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                     if (block == null || block.isAir()) continue;
 
                     if (count == result.length) {
-                        result = Arrays.copyOf(result, (int) Math.min((long) result.length * 2, estimatedCount));
+                        result = count == 0 ? new Block[(int) Math.min(estimatedCount, 16)]
+                                : Arrays.copyOf(result, (int) Math.min((long) result.length * 2, estimatedCount));
                     }
                     result[count++] = detached ? block : block.clone();
                 }
@@ -495,7 +572,8 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
         if (cache != null) {
             cache.commit(scanBox, entityBox);
         }
-        return count == 0 ? Block.EMPTY_ARRAY : Arrays.copyOf(result, count);
+        return count == 0 ? Block.EMPTY_ARRAY
+                : count == result.length ? result : Arrays.copyOf(result, count);
     }
 
     /**
@@ -516,12 +594,16 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
         private Level level;
         private boolean valid;
         private boolean cachable;
+        private boolean simpleBoxes;
+        private int worldMinY;
+        private int worldMaxY;
         private final double[] boxes = new double[12];
 
         private int stamps;
         private int[] stampChunkX = new int[4];
         private int[] stampChunkZ = new int[4];
         private int[] stampSectionY = new int[4];
+        private int[] stampSectionIndex = new int[4];
         private int[] stampVersion = new int[4];
         private Object[] stampChunk = new Object[4];
         private Object[] stampSection = new Object[4];
@@ -532,8 +614,10 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
         private int[] candidateZ = new int[8];
         private long[] candidatePair = new long[8];
 
-        boolean holds(Level level, FullChunk hint, AxisAlignedBB scanBox, AxisAlignedBB entityBox) {
+        boolean holds(Level level, FullChunk hint, AxisAlignedBB scanBox, AxisAlignedBB entityBox,
+                      int worldMinY, int worldMaxY) {
             if (!this.valid || this.level != level
+                    || this.worldMinY != worldMinY || this.worldMaxY != worldMaxY
                     || this.boxes[0] != scanBox.getMinX() || this.boxes[1] != scanBox.getMinY()
                     || this.boxes[2] != scanBox.getMinZ() || this.boxes[3] != scanBox.getMaxX()
                     || this.boxes[4] != scanBox.getMaxY() || this.boxes[5] != scanBox.getMaxZ()
@@ -542,6 +626,29 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                     || this.boxes[10] != entityBox.getMaxY() || this.boxes[11] != entityBox.getMaxZ()) {
                 return false;
             }
+            return this.holdsStamps(level, hint);
+        }
+
+        boolean matchesExpanded(AxisAlignedBB entityBox,
+                                double scanMinX, double scanMinY, double scanMinZ,
+                                double scanMaxX, double scanMaxY, double scanMaxZ) {
+            return this.valid && this.simpleBoxes && entityBox.getClass() == SimpleAxisAlignedBB.class
+                    && this.boxes[0] == scanMinX && this.boxes[1] == scanMinY && this.boxes[2] == scanMinZ
+                    && this.boxes[3] == scanMaxX && this.boxes[4] == scanMaxY && this.boxes[5] == scanMaxZ
+                    && this.boxes[6] == entityBox.getMinX() && this.boxes[7] == entityBox.getMinY()
+                    && this.boxes[8] == entityBox.getMinZ() && this.boxes[9] == entityBox.getMaxX()
+                    && this.boxes[10] == entityBox.getMaxY() && this.boxes[11] == entityBox.getMaxZ();
+        }
+
+        boolean holdsExpanded(Level level, FullChunk hint, AxisAlignedBB entityBox, int worldMinY, int worldMaxY,
+                              double scanMinX, double scanMinY, double scanMinZ,
+                              double scanMaxX, double scanMaxY, double scanMaxZ) {
+            return this.level == level && this.worldMinY == worldMinY && this.worldMaxY == worldMaxY
+                    && this.matchesExpanded(entityBox, scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ)
+                    && this.holdsStamps(level, hint);
+        }
+
+        private boolean holdsStamps(Level level, FullChunk hint) {
             for (int i = 0; i < this.stamps; i++) {
                 FullChunk chunk = chunkAt(level, hint, this.stampChunkX[i] << 4, this.stampChunkZ[i] << 4);
                 if (chunk != this.stampChunk[i]) {
@@ -551,7 +658,16 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                     continue;
                 }
                 hint = chunk;
-                ChunkSection section = ((LevelDBChunk) chunk).getSection(this.stampSectionY[i]);
+                LevelDBChunk leveldb = (LevelDBChunk) chunk;
+                int sectionIndex = this.stampSectionIndex[i];
+                ChunkSection section;
+                if (sectionIndex < 0) {
+                    section = leveldb.getSection(this.stampSectionY[i]);
+                } else {
+                    ChunkSection[] sections = leveldb.getSections();
+                    section = sectionIndex < sections.length
+                            ? sections[sectionIndex] : leveldb.getSection(this.stampSectionY[i]);
+                }
                 if (section != this.stampSection[i]) {
                     return false;
                 }
@@ -561,6 +677,11 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                 }
             }
             return true;
+        }
+
+        boolean holds(Level level, FullChunk hint, AxisAlignedBB scanBox, AxisAlignedBB entityBox) {
+            return this.holds(level, hint, scanBox, entityBox,
+                    level == null ? 0 : level.getMinBlockY(), level == null ? 0 : level.getMaxBlockY());
         }
 
         Block[] materialise(Level level) {
@@ -581,9 +702,12 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
             return count == result.length ? result : Arrays.copyOf(result, count);
         }
 
-        void begin(Level level) {
+        void begin(Level level, int worldMinY, int worldMaxY) {
             this.level = level;
+            this.worldMinY = worldMinY;
+            this.worldMaxY = worldMaxY;
             this.valid = false;
+            this.simpleBoxes = false;
             this.cachable = true;
             // Drop the chunk and section references of the previous scan: a slot past the new stamp
             // count would otherwise keep an unloaded or replaced chunk reachable while the entity lives.
@@ -591,6 +715,10 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
             Arrays.fill(this.stampSection, 0, this.stamps, null);
             this.stamps = 0;
             this.candidates = 0;
+        }
+
+        void begin(Level level) {
+            this.begin(level, level == null ? 0 : level.getMinBlockY(), level == null ? 0 : level.getMaxBlockY());
         }
 
         void uncachable() {
@@ -603,6 +731,7 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                 this.stampChunkX = Arrays.copyOf(this.stampChunkX, size);
                 this.stampChunkZ = Arrays.copyOf(this.stampChunkZ, size);
                 this.stampSectionY = Arrays.copyOf(this.stampSectionY, size);
+                this.stampSectionIndex = Arrays.copyOf(this.stampSectionIndex, size);
                 this.stampVersion = Arrays.copyOf(this.stampVersion, size);
                 this.stampChunk = Arrays.copyOf(this.stampChunk, size);
                 this.stampSection = Arrays.copyOf(this.stampSection, size);
@@ -611,6 +740,11 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
             this.stampChunkX[i] = chunkX;
             this.stampChunkZ[i] = chunkZ;
             this.stampSectionY[i] = sectionY;
+            // Only known fixed offsets can reuse an index; custom dimension getters stay live.
+            // each hit still reads the current section array, identity and layer-0 version.
+            this.stampSectionIndex[i] = chunk != null && chunk.getClass() == LevelDBChunk.class
+                    && ((LevelDBChunk) chunk).hasStableSectionOffset()
+                    ? (int) (((LevelDBChunk) chunk).getSectionOffset() + (float) sectionY) : -1;
             this.stampVersion[i] = version;
             this.stampChunk[i] = chunk;
             this.stampSection[i] = section;
@@ -649,6 +783,8 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
             this.boxes[10] = entityBox.getMaxY();
             this.boxes[11] = entityBox.getMaxZ();
             this.valid = true;
+            this.simpleBoxes = scanBox.getClass() == SimpleAxisAlignedBB.class
+                    && entityBox.getClass() == SimpleAxisAlignedBB.class;
         }
     }
 
