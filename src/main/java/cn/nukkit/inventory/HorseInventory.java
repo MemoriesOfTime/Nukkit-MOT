@@ -20,7 +20,7 @@ import java.util.Map;
  * <p>
  * Adapted from PowerNukkitX (<a href="https://github.com/PowerNukkitX/PowerNukkitX">PowerNukkitX</a>)
  */
-public class HorseInventory extends BaseInventory {
+public class HorseInventory extends ContainerInventory {
 
     public static final int SLOT_SADDLE = 0;
     public static final int SLOT_ARMOR = 1;

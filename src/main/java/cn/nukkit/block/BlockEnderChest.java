@@ -159,8 +159,7 @@ public class BlockEnderChest extends BlockTransparentMeta implements Faceable, B
                 }
             }
 
-            player.setViewingEnderChest(this);
-            player.addWindow(player.getEnderChestInventory());
+            player.requestEnderChestWindow(this);
 
             for (Entity e : this.getChunk().getEntities().values()) {
                 if (e instanceof EntityPiglin) {
@@ -191,7 +190,17 @@ public class BlockEnderChest extends BlockTransparentMeta implements Faceable, B
         return BlockColor.OBSIDIAN_BLOCK_COLOR;
     }
 
+    /**
+     * Players looking into the ender chest at this position. The set lives on the block entity when
+     * there is one, so every {@code BlockEnderChest} object of the same chest sees the same viewers.
+     */
     public Set<Player> getViewers() {
+        if (this.level != null) {
+            BlockEntity blockEntity = this.level.getBlockEntity(this);
+            if (blockEntity instanceof BlockEntityEnderChest) {
+                return ((BlockEntityEnderChest) blockEntity).getViewers();
+            }
+        }
         return viewers;
     }
 

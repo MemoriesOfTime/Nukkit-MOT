@@ -79,7 +79,7 @@ public class BlockSmokerLit extends BlockFurnaceBurning {
                 }
             }
 
-            player.addWindow(smoker.getInventory());
+            player.requestWindowOpen(smoker.getInventory());
         }
 
         return true;

@@ -33,10 +33,13 @@ public class CommandBlockInventory extends BaseInventory {
 
     @Override
     public void onClose(Player who) {
-        ContainerClosePacket pk = new ContainerClosePacket();
-        pk.windowId = who.getWindowId(this);
-        pk.type = cn.nukkit.network.protocol.types.inventory.ContainerType.from(this.type.getNetworkType());
-        who.dataPacket(pk);
+        if (who.getClosingWindowId() != Integer.MAX_VALUE) {
+            ContainerClosePacket pk = new ContainerClosePacket();
+            pk.windowId = who.getWindowId(this);
+            pk.wasServerInitiated = who.getClosingWindowId() != pk.windowId;
+            pk.type = cn.nukkit.network.protocol.types.inventory.ContainerType.from(this.type.getNetworkType());
+            who.dataPacket(pk);
+        }
         super.onClose(who);
     }
 

@@ -124,10 +124,15 @@ public class PlayerOffhandInventory extends BaseInventory {
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
+        return this.setItemObserved(index, item, send, null);
+    }
+
+    @Override
+    protected boolean setItemObserved(int index, Item item, boolean send, TotemConsumption receipt) {
         if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
             return false;
         } else if (item.getId() == 0 || item.getCount() <= 0) {
-            return this.clear(index, send);
+            return receipt == null ? this.clear(index, send) : this.clearObserved(index, send, receipt);
         }
 
         EntityHuman holder = this.getHolder();
@@ -163,7 +168,9 @@ public class PlayerOffhandInventory extends BaseInventory {
         Item[] parts = splitOverstack(item);
         item = parts[0];
 
+        Item consumedBefore = receipt == null ? null : this.slots.get(index);
         this.slots.put(index, item.clone());
+        if (receipt != null) receipt.committed(consumedBefore, this.slots.get(index), parts[1]);
         this.onSlotChange(index, oldItem, send);
         this.routeOverflow(parts[1]);
         return true;
@@ -171,6 +178,10 @@ public class PlayerOffhandInventory extends BaseInventory {
 
     @Override
     public boolean clear(int index, boolean send) {
+        return this.clearObserved(index, send, null);
+    }
+
+    private boolean clearObserved(int index, boolean send, TotemConsumption receipt) {
         Item old = this.slots.get(index);
         if (old != null && old.getId() != Item.AIR) {
             Item item = new ItemBlock(cn.nukkit.block.Block.get(cn.nukkit.block.BlockID.AIR), null, 0);
@@ -200,11 +211,13 @@ public class PlayerOffhandInventory extends BaseInventory {
 
             if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
 
+            Item consumedBefore = receipt == null ? null : this.slots.get(index);
             if (item.getId() != Item.AIR) {
                 this.slots.put(index, item.clone());
             } else {
                 this.slots.remove(index);
             }
+            if (receipt != null) receipt.committed(consumedBefore, this.slots.get(index), null);
             this.onSlotChange(index, old, send);
         }
         return true;

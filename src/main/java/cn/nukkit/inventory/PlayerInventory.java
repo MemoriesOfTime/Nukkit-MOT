@@ -280,10 +280,15 @@ public class PlayerInventory extends BaseInventory {
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
+        return this.setItemObserved(index, item, send, null);
+    }
+
+    @Override
+    protected boolean setItemObserved(int index, Item item, boolean send, TotemConsumption receipt) {
         if (index < 0 || index >= this.size) {
             return false;
         } else if (item.getId() == 0 || item.getCount() <= 0) {
-            return this.clear(index, send);
+            return receipt == null ? this.clear(index, send) : this.clearObserved(index, send, receipt);
         }
 
         if (index >= this.getSize()) { // Armor change
@@ -314,7 +319,9 @@ public class PlayerInventory extends BaseInventory {
         item = parts[0];
 
         Item old = this.getItem(index);
+        Item consumedBefore = receipt == null ? null : this.slots.get(index);
         this.slots.put(index, item.clone());
+        if (receipt != null) receipt.committed(consumedBefore, this.slots.get(index), parts[1]);
         this.onSlotChange(index, old, send);
         this.routeOverflow(parts[1]);
         return true;
@@ -322,6 +329,10 @@ public class PlayerInventory extends BaseInventory {
 
     @Override
     public boolean clear(int index, boolean send) {
+        return this.clearObserved(index, send, null);
+    }
+
+    private boolean clearObserved(int index, boolean send, TotemConsumption receipt) {
         Item old = this.slots.get(index);
         if (old != null) {
             Item item = new ItemBlock(Block.get(BlockID.AIR), null, 0);
@@ -353,11 +364,13 @@ public class PlayerInventory extends BaseInventory {
 
             if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
 
+            Item consumedBefore = receipt == null ? null : this.slots.get(index);
             if (item.getId() != Item.AIR) {
                 this.slots.put(index, item.clone());
             } else {
                 this.slots.remove(index);
             }
+            if (receipt != null) receipt.committed(consumedBefore, this.slots.get(index), null);
 
             this.onSlotChange(index, old, send);
         }

@@ -152,6 +152,7 @@ public class DoubleChestInventory extends ContainerInventory implements Inventor
     @Override
     public void onOpen(Player who) {
         super.onOpen(who);
+        if (!this.getViewers().contains(who)) return;
         this.left.viewers.add(who);
         this.right.viewers.add(who);
 

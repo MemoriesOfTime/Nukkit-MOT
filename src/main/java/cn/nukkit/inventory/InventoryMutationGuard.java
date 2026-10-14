@@ -33,6 +33,13 @@ public final class InventoryMutationGuard {
         return false;
     }
 
+    /** Direct native slot receipts must not escape an enclosing transaction's rollback. */
+    static boolean canConfirmSlotMutation(Inventory inventory) {
+        synchronized (CLAIMED) {
+            return !isOwned(Collections.singleton(inventory));
+        }
+    }
+
     /** A close error must never turn an accepted caller commit into a source refund. */
     private static void drainDeferredCloses() {
         java.util.List<Runnable> ready = new java.util.ArrayList<>();

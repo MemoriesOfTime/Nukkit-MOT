@@ -123,7 +123,7 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable, BlockEntity
             }
         }
 
-        player.addWindow(barrel.getInventory());
+        player.requestWindowOpen(barrel.getInventory());
         return true;
     }
 

@@ -84,6 +84,19 @@ public class EntityEnderman extends EntityWalkingMob {
 
     @Override
     public boolean attack(EntityDamageEvent ev) {
+        // Projectiles never hurt an enderman: it dodges before the hit lands. The dodge has to
+        // happen before super.attack(), which already applies the damage; cancelling afterwards
+        // only hid the event while the health was gone. Plugins can still veto the dodge through
+        // ProjectileHitEvent, which every projectile fires before calling attack().
+        if (ev.getCause() == EntityDamageEvent.DamageCause.PROJECTILE) {
+            if (!isAngry()) {
+                setAngry(2400);
+            }
+            ev.setCancelled(true);
+            this.teleport();
+            return false;
+        }
+
         super.attack(ev);
 
         if (!ev.isCancelled()) {
@@ -93,14 +106,7 @@ public class EntityEnderman extends EntityWalkingMob {
                 }
             }
 
-            if (ev.getCause() == EntityDamageEvent.DamageCause.PROJECTILE) {
-                if (!isAngry()) {
-                    setAngry(2400);
-                }
-                ev.setCancelled(true);
-                this.teleport();
-                return false;
-            } else if (!this.teleported && Utils.rand(1, 10) == 1) {
+            if (!this.teleported && Utils.rand(1, 10) == 1) {
                 this.teleport();
             }
         }
@@ -167,7 +173,23 @@ public class EntityEnderman extends EntityWalkingMob {
         }
     }
 
+    /**
+     * Random spots are often inside a wall or over the void, so a single roll left the enderman
+     * standing still most of the time. Vanilla keeps rolling; ten attempts is enough in practice.
+     */
+    static final int TELEPORT_ATTEMPTS = 10;
+
     private Location getSafeTpLocation() {
+        for (int attempt = 0; attempt < TELEPORT_ATTEMPTS; attempt++) {
+            Location to = this.rollSafeTpLocation();
+            if (to != null) {
+                return to;
+            }
+        }
+        return null;
+    }
+
+    private Location rollSafeTpLocation() {
         double dx = this.x + Utils.rand(-16, 16);
         double dz = this.z + Utils.rand(-16, 16);
         Vector3 pos = new Vector3(Math.floor(dx), (int) Math.floor(this.y + 0.1) + 16, Math.floor(dz));

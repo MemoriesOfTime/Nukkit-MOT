@@ -247,7 +247,7 @@ class PlayerCreativeUiResetTest {
     @Test
     void creativeRealCloseDiscardsTradeInputs() {
         TestPlayer player = player(Player.CREATIVE, 2169, false);
-        TradeInventory trade = new TradeInventory(mock(EntityVillager.class));
+        TradeInventory trade = openTrade(player);
         assertTrue(trade.setItem(0, Item.get(Item.EMERALD, 0, 64), false));
         assertTrue(trade.setItem(1, Item.get(Item.DIAMOND, 0, 32), false));
 
@@ -333,6 +333,7 @@ class PlayerCreativeUiResetTest {
         TestPlayer creative = player(Player.CREATIVE, 2169, false);
         creative.connected = false;
         BeaconInventory creativeBeacon = new BeaconInventory(creative.getUIInventory(), new Position(0, 64, 0, level));
+        creative.windowIndex.put(Player.BEACON_WINDOW_ID, creativeBeacon);
         assertTrue(creativeBeacon.setItem(0, Item.get(Item.IRON_INGOT, 0, 3), false));
 
         creative.removeWindow(creativeBeacon);
@@ -343,6 +344,7 @@ class PlayerCreativeUiResetTest {
         TestPlayer finite = player(Player.SURVIVAL, 2169, false);
         finite.connected = false;
         BeaconInventory finiteBeacon = new BeaconInventory(finite.getUIInventory(), new Position(0, 64, 0, level));
+        finite.windowIndex.put(Player.BEACON_WINDOW_ID, finiteBeacon);
         assertTrue(finiteBeacon.setItem(0, Item.get(Item.IRON_INGOT, 0, 3), false));
 
         finite.removeWindow(finiteBeacon);
