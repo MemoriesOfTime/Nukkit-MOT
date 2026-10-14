@@ -73,6 +73,12 @@ public class PalettedBlockStorage {
         }
     }
 
+    private PalettedBlockStorage(PalettedBlockStorage source) {
+        this.bitArray = source.bitArray.copy();
+        this.palette = new IntArrayList(source.palette);
+        // The independent copy needs the derived reverse index only when written.
+    }
+
     private void createPaletteIndex(int capacity) {
         this.paletteIndexLookup = new Int2IntOpenHashMap(capacity);
         this.paletteIndexLookup.defaultReturnValue(-1);
@@ -245,7 +251,7 @@ public class PalettedBlockStorage {
             if (this.palette.size() == 1 && this.palette.getInt(0) == runtimeId) {
                 return 0;
             }
-            this.createPaletteIndex(16);
+            this.createPaletteIndex(this.palette.size() > 1 ? this.palette.size() : 16);
         }
         int index = this.paletteIndexLookup.get(runtimeId);
         if (index != -1) {
@@ -278,7 +284,7 @@ public class PalettedBlockStorage {
     }
 
     public PalettedBlockStorage copy() {
-        return new PalettedBlockStorage(this.bitArray.copy(), new IntArrayList(this.palette));
+        return new PalettedBlockStorage(this);
     }
 
     public boolean contentEquals(PalettedBlockStorage other) {
