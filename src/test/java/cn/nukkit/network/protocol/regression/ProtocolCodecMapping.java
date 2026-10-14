@@ -1,8 +1,10 @@
 package cn.nukkit.network.protocol.regression;
 
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
+import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.codec.v1001.Bedrock_v1001;
 import org.cloudburstmc.protocol.bedrock.codec.v2168.Bedrock_v2168;
+import org.cloudburstmc.protocol.bedrock.codec.v2169.Bedrock_v2169;
 import org.cloudburstmc.protocol.bedrock.codec.v2193.Bedrock_v2193;
 import org.cloudburstmc.protocol.bedrock.codec.v291.Bedrock_v291;
 import org.cloudburstmc.protocol.bedrock.codec.v313.Bedrock_v313;
@@ -101,7 +103,9 @@ public final class ProtocolCodecMapping {
         codecs.put(575, Bedrock_v575.CODEC);   // 1.19.70
         codecs.put(582, Bedrock_v582.CODEC);   // 1.19.80
         codecs.put(589, Bedrock_v589.CODEC);   // 1.20.0
+        codecs.put(593, Bedrock_v594.CODEC);   // Preview reference; packet-specific exceptions below
         codecs.put(594, Bedrock_v594.CODEC);   // 1.20.10
+        codecs.put(617, Bedrock_v618.CODEC);   // Preview reference; packet-specific exceptions below
         codecs.put(618, Bedrock_v618.CODEC);   // 1.20.30
         codecs.put(622, Bedrock_v622.CODEC);   // 1.20.40
         codecs.put(630, Bedrock_v630.CODEC);   // 1.20.50
@@ -113,22 +117,28 @@ public final class ProtocolCodecMapping {
         codecs.put(712, Bedrock_v712.CODEC);   // 1.21.20
         codecs.put(729, Bedrock_v729.CODEC);   // 1.21.30
         codecs.put(748, Bedrock_v748.CODEC);   // 1.21.40
+        codecs.put(765, Bedrock_v766.CODEC);   // Preview reference; packet-specific exceptions below
         codecs.put(766, Bedrock_v766.CODEC);   // 1.21.50
         codecs.put(776, Bedrock_v776.CODEC);   // 1.21.60
+        codecs.put(785, Bedrock_v786.CODEC);   // Preview reference; packet-specific exceptions below
         codecs.put(786, Bedrock_v786.CODEC);   // 1.21.70
         codecs.put(800, Bedrock_v800.CODEC);   // 1.21.80
         codecs.put(818, Bedrock_v818.CODEC);   // 1.21.90
         codecs.put(819, Bedrock_v819.CODEC);   // 1.21.93
         codecs.put(827, Bedrock_v827.CODEC);   // 1.21.100
+        codecs.put(843, Bedrock_v844.CODEC);   // Preview reference; packet-specific exceptions below
         codecs.put(844, Bedrock_v844.CODEC);   // 1.21.111 - 1.21.114
         codecs.put(859, Bedrock_v859.CODEC);   // 1.21.120 - 1.21.123
         codecs.put(860, Bedrock_v860.CODEC);   // 1.21.124
+        codecs.put(897, Bedrock_v898.CODEC);   // Preview reference; packet-specific exceptions below
         codecs.put(898, Bedrock_v898.CODEC);   // 1.21.130 - 1.21.132
         codecs.put(924, Bedrock_v924.CODEC);   // 1.26.0 - 1.26.3
         codecs.put(944, Bedrock_v944.CODEC);   // 1.26.10
+        codecs.put(974, Bedrock_v975.CODEC);   // Preview reference; packet-specific exceptions below
         codecs.put(975, Bedrock_v975.CODEC);   // 1.26.20
         codecs.put(1001, Bedrock_v1001.CODEC); // 1.26.30
         codecs.put(2168, Bedrock_v2168.CODEC); // 1.26.40
+        codecs.put(2169, Bedrock_v2169.CODEC); // 1.26.45; use its exact independent wire reference
         codecs.put(2192, Bedrock_v2193.CODEC); // 1.26.50.27 preview
         codecs.put(2193, Bedrock_v2193.CODEC); // 1.26.50 stable, wire-identical to 2192
         CODECS = Collections.unmodifiableMap(codecs);
@@ -143,6 +153,36 @@ public final class ProtocolCodecMapping {
             throw new IllegalArgumentException("No CB Protocol codec for protocol version: " + protocolVersion);
         }
         return codec;
+    }
+
+    /**
+     * Preview IDs lack exact dependency codecs. Select compatible packet layouts,
+     * including the older helper where fields changed only in the stable release.
+     * This exercises preview encoder branches; it is not exact preview wire proof.
+     */
+    public static BedrockCodec getCodec(int protocolVersion, Class<? extends BedrockPacket> packetType) {
+        int reference = protocolVersion;
+        if (protocolVersion == 593 && packetType == org.cloudburstmc.protocol.bedrock.packet.ScriptCustomEventPacket.class) {
+            reference = 589;
+        } else if (protocolVersion == 765 && (
+                packetType == org.cloudburstmc.protocol.bedrock.packet.CameraAimAssistPacket.class
+                || packetType == org.cloudburstmc.protocol.bedrock.packet.CameraPresetsPacket.class
+                || packetType == org.cloudburstmc.protocol.bedrock.packet.ResourcePacksInfoPacket.class
+                || packetType == org.cloudburstmc.protocol.bedrock.packet.ItemStackResponsePacket.class)) {
+            reference = 748;
+        } else if (protocolVersion == 843 && packetType == org.cloudburstmc.protocol.bedrock.packet.PlayerArmorDamagePacket.class) {
+            reference = 827;
+        } else if (protocolVersion == 974 && packetType == org.cloudburstmc.protocol.bedrock.packet.DimensionDataPacket.class) {
+            reference = 944;
+        }
+        return getCodec(reference);
+    }
+
+    /** Keep newly aliased preview references out of the unrelated inbound matrix. */
+    public static Set<Integer> getDecodeSupportedVersions() {
+        Set<Integer> encodingOnlyPreviews = Set.of(593, 617, 765, 785, 843, 897, 974);
+        return CODECS.keySet().stream().filter(v -> !encodingOnlyPreviews.contains(v))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     public static Set<Integer> getSupportedVersions() {
