@@ -175,7 +175,12 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
         /**
          * Additional damage caused by critical hit
          */
-        CRITICAL
+        CRITICAL,
+        /**
+         * Previous raw damage already paid during the current hurt window.
+         * Applied before target reductions without rewriting BASE.
+         */
+        PREVIOUS_DAMAGE_COOLDOWN
     }
 
     public enum DamageCause {

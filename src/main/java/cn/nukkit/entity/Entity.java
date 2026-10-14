@@ -1827,7 +1827,8 @@ public abstract class Entity extends Location implements Metadatable {
             return false;
         }
 
-        if (source.isApplicable(EntityDamageEvent.DamageModifier.CRITICAL)) {
+        if (source.isApplicable(EntityDamageEvent.DamageModifier.CRITICAL)
+                && !source.isApplicable(EntityDamageEvent.DamageModifier.PREVIOUS_DAMAGE_COOLDOWN)) {
             AnimatePacket animate = new AnimatePacket();
             animate.action = AnimatePacket.Action.CRITICAL_HIT;
             animate.eid = this.getId();

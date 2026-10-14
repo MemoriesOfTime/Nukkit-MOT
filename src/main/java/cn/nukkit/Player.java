@@ -7604,10 +7604,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         ((Player) damager).foodData.updateFoodExpLevel(0.1);
                     }
                 }
-                EntityEventPacket pk = new EntityEventPacket();
-                pk.eid = this.id;
-                pk.event = EntityEventPacket.HURT_ANIMATION;
-                this.dataPacket(pk);
+                if (!source.isApplicable(EntityDamageEvent.DamageModifier.PREVIOUS_DAMAGE_COOLDOWN)) {
+                    EntityEventPacket pk = new EntityEventPacket();
+                    pk.eid = this.id;
+                    pk.event = EntityEventPacket.HURT_ANIMATION;
+                    this.dataPacket(pk);
+                }
             }
             return true;
         } else {
