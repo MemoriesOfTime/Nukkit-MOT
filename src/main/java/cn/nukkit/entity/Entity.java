@@ -569,6 +569,8 @@ public abstract class Entity extends Location implements Metadatable {
     private volatile boolean published;
     // Transient preparation state: listeners retain their constructor order but cannot publish this source.
     private volatile boolean publicationDeferred;
+    private boolean spawnEventDeferred;
+    private boolean retirementPending;
     private boolean deferredPublicationInvalidated;
     private FullChunk deferredRegisteredChunk;
     private Level deferredRegisteredLevel;
@@ -637,6 +639,11 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     protected Entity(FullChunk chunk, CompoundTag nbt, boolean publicationDeferred) {
+        this(chunk, nbt, publicationDeferred, false);
+    }
+
+    protected Entity(FullChunk chunk, CompoundTag nbt, boolean publicationDeferred, boolean spawnEventDeferred) {
+        this.spawnEventDeferred = spawnEventDeferred;
         this.publicationDeferred = publicationDeferred;
         this.isPlayer = this instanceof Player;
         if (this instanceof Player) {
@@ -807,7 +814,9 @@ public abstract class Entity extends Location implements Metadatable {
             this.lastUpdate = this.server.getTick();
             this.published = !this.publicationDeferred;
 
-            this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
+            if (!this.spawnEventDeferred) {
+                this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
+            }
 
             this.scheduleUpdate();
         } catch (RuntimeException | Error e) {
@@ -3452,6 +3461,27 @@ public abstract class Entity extends Location implements Metadatable {
         if (failure instanceof Error error) throw error;
     }
 
+    protected final void notifyDeferredSpawn() {
+        if (!this.spawnEventDeferred) return;
+        this.spawnEventDeferred = false;
+        this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
+    }
+
+    /** Assignment-only half of a native falling transition; never calls a listener. */
+    protected final boolean retireForFallingTransition() {
+        if (this.closed || this.publicationDeferred) return false;
+        this.closed = true;
+        this.published = false;
+        this.retirementPending = true;
+        return true;
+    }
+
+    protected final void notifyFallingRetirement() {
+        if (!this.retirementPending) return;
+        this.retirementPending = false;
+        finishClose(true);
+    }
+
     public void close() {
         this.close(true);
     }
@@ -3465,36 +3495,29 @@ public abstract class Entity extends Location implements Metadatable {
         }
         if (!this.closed) {
             this.closed = true;
+            finishClose(callDespawnEvent);
+        }
+    }
+
+    private void finishClose(boolean callDespawnEvent) {
+        try {
             if (callDespawnEvent) {
                 this.server.getPluginManager().callEvent(new EntityDespawnEvent(this));
             }
             this.published = false;
+            this.despawnFromAll();
+            this.collisionHelper = null;
+            this.blocksAround = null;
+            this.collisionBlocks = null;
+            this.removeAllEffects(callDespawnEvent ? EntityPotionEffectEvent.Cause.DEATH : null);
+            this.passengers.clear();
+            if (this.intProperties != null) this.intProperties.clear();
+            if (this.floatProperties != null) this.floatProperties.clear();
+        } finally {
             try {
-                this.despawnFromAll();
-
-                this.collisionHelper = null;
-                this.blocksAround = null;
-                this.collisionBlocks = null;
-
-                this.removeAllEffects(callDespawnEvent ? EntityPotionEffectEvent.Cause.DEATH : null);
-                this.passengers.clear();
-
-                if (this.intProperties != null) {
-                    this.intProperties.clear();
-                }
-                if (this.floatProperties != null) {
-                    this.floatProperties.clear();
-                }
+                if (this.chunk != null) this.chunk.removeEntity(this);
             } finally {
-                try {
-                    if (this.chunk != null) {
-                        this.chunk.removeEntity(this);
-                    }
-                } finally {
-                    if (this.level != null) {
-                        this.level.removeEntity(this);
-                    }
-                }
+                if (this.level != null) this.level.removeEntity(this);
             }
         }
     }
@@ -3509,7 +3532,8 @@ public abstract class Entity extends Location implements Metadatable {
         }
 
         this.dataProperties.put(data);
-        if (this.chunk != null && !(this instanceof Player)) {
+        if (this.chunk != null && !(this instanceof Player)
+                && !(this instanceof cn.nukkit.entity.item.EntityFallingBlock && this.publicationDeferred)) {
             this.chunk.setChanged();
         }
         if (send) {
