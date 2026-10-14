@@ -83,7 +83,7 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
                 return context.error();
             }
             Item authoritativeOutput = CraftRecipeActionProcessor.fireCraftItemEvent(
-                    player, recipe, output, consumedItems, 1);
+                    player, recipe, output, consumedItems, Math.max(1, action.getTimesCrafted()));
             if (authoritativeOutput == null) {
                 return context.error();
             }
