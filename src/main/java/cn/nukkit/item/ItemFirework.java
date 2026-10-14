@@ -24,6 +24,12 @@ import java.util.List;
  * @author CreeperFace
  */
 public class ItemFirework extends Item {
+
+    private static final ThreadLocal<GroundLaunch> GROUND_LAUNCH = new ThreadLocal<>();
+
+    private record GroundLaunch(ItemFirework item, Entity shooter) {
+    }
+
     private static final double PLAYER_LEASH_SCAN_RANGE = 16;
 
     public ItemFirework() {
@@ -59,7 +65,18 @@ public class ItemFirework extends Item {
     @Override
     public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
         if (block.canPassThrough()) {
-            this.spawnFirework(level, block, null, player);
+            GroundLaunch previous = GROUND_LAUNCH.get();
+            GROUND_LAUNCH.set(new GroundLaunch(this, player));
+            try {
+                // Retain both original virtual hooks before the shooter-aware overload.
+                this.spawnFirework(level, block);
+            } finally {
+                if (previous == null) {
+                    GROUND_LAUNCH.remove();
+                } else {
+                    GROUND_LAUNCH.set(previous);
+                }
+            }
 
             if (!player.isCreative()) {
                 player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
@@ -144,7 +161,9 @@ public class ItemFirework extends Item {
     }
 
     public EntityFirework spawnFirework(Level level, Vector3 pos, @Nullable Vector3 motion) {
-        return spawnFirework(level, pos, motion, null);
+        GroundLaunch launch = GROUND_LAUNCH.get();
+        Entity shooter = launch != null && launch.item() == this ? launch.shooter() : null;
+        return spawnFirework(level, pos, motion, shooter);
     }
 
     public EntityFirework spawnFirework(Level level, Vector3 pos, @Nullable Vector3 motion, @Nullable Entity shootingEntity) {
