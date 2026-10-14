@@ -74,10 +74,19 @@ public abstract class EntityProjectile extends Entity {
     }
 
     public void onCollideWithEntity(Entity entity) {
+        this.collideWithEntity(entity);
+    }
+
+    /** Damage acceptance for this invocation, independent of prior or nested collisions. */
+    protected boolean onCollideWithEntityAccepted(Entity entity) {
+        return this.collideWithEntity(entity);
+    }
+
+    private boolean collideWithEntity(Entity entity) {
         ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
         this.server.getPluginManager().callEvent(hitEvent);
         if (hitEvent.isCancelled()) {
-            return;
+            return false;
         }
 
         float damage = this instanceof EntitySnowball && entity instanceof EntityBlaze ? 3 : this.getResultDamage();
@@ -89,7 +98,8 @@ public abstract class EntityProjectile extends Entity {
             ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, DamageCause.PROJECTILE, damage);
         }
 
-        if (entity.attack(ev)) {
+        boolean accepted = entity.attack(ev);
+        if (accepted) {
             this.hadCollision = true;
 
             this.onHit();
@@ -104,6 +114,7 @@ public abstract class EntityProjectile extends Entity {
         }
 
         this.close();
+        return accepted;
     }
 
     @Override

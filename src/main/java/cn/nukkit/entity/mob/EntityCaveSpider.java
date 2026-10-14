@@ -71,8 +71,8 @@ public class EntityCaveSpider extends EntityWalkingMob implements EntityArthropo
 
                 EntityDamageByEntityEvent ev = new EntityDamageByEntityEvent(this, player, EntityDamageEvent.DamageCause.ENTITY_ATTACK, damage);
 
-                if (player.attack(ev) && !ev.isCancelled() && this.server.getDifficulty() > 0) {
-                    player.addEffect(Effect.getEffect(Effect.POISON).setDuration(this.server.getDifficulty() > 1 ? 300 : 140), EntityPotionEffectEvent.Cause.ATTACK);
+                if (player.attack(ev) && !ev.isCancelled() && this.server.getDifficulty() > 1) {
+                    player.addEffect(Effect.getEffect(Effect.POISON).setDuration(this.server.getDifficulty() > 2 ? 300 : 140), EntityPotionEffectEvent.Cause.ATTACK);
                 }
             }
         }
