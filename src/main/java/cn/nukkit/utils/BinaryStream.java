@@ -33,7 +33,6 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessi
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 import lombok.SneakyThrows;
@@ -881,8 +880,7 @@ public class BinaryStream {
         item.setCount(count);
 
         if (userData.length > 0) {
-            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(userData.length);
-            buf.writeBytes(userData);
+            ByteBuf buf = Unpooled.wrappedBuffer(userData);
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
                 int nbtSize = stream.readShort();
                 CompoundTag compoundTag = null;
@@ -964,8 +962,7 @@ public class BinaryStream {
         }
 
         byte[] bytes = this.getByteArray();
-        ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
-        buf.writeBytes(bytes);
+        ByteBuf buf = Unpooled.wrappedBuffer(bytes);
 
         byte[] nbt = new byte[0];
         String[] canPlace;
@@ -1685,8 +1682,7 @@ public class BinaryStream {
         byte[] bytes = this.getByteArray();
 
         if (bytes.length != 0) {
-            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
-            buf.writeBytes(bytes);
+            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
 
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
                 int nbtSize = stream.readShort();
