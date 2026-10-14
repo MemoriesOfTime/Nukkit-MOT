@@ -9,6 +9,11 @@ import cn.nukkit.entity.passive.EntitySkeletonHorse;
 import cn.nukkit.entity.route.RouteFinder;
 import cn.nukkit.entity.route.RouteFinderSearchTask;
 import cn.nukkit.entity.route.RouteFinderThreadPool;
+import cn.nukkit.entity.route.WalkerRouteFinder;
+import cn.nukkit.event.player.PlayerTeleportEvent;
+import cn.nukkit.level.Level;
+import cn.nukkit.level.Location;
+import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
 import cn.nukkit.math.NukkitMath;
@@ -29,6 +34,64 @@ public abstract class EntityWalking extends BaseEntity {
 
     public EntityWalking(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
+
+    @Override
+    public void close() {
+        try {
+            if (this.route != null && this.route.getClass() == WalkerRouteFinder.class) {
+                this.route.closeSearch();
+            }
+        } finally {
+            super.close();
+        }
+    }
+
+    @Override
+    protected boolean switchLevel(Level targetLevel) {
+        Level previousLevel = this.level;
+        if (!super.switchLevel(targetLevel)) {
+            return false;
+        }
+        if (this.level != previousLevel) {
+            if (this.route != null && this.route.getClass() == WalkerRouteFinder.class) {
+                this.route.cancelQueuedSearch();
+                // An already running search can publish only into the detached finder.
+                this.route = new WalkerRouteFinder(this);
+            }
+            if (!(this.target instanceof Position position && position.getLevel() == this.level)) {
+                this.target = null;
+            }
+            if (this.followTarget != null && this.followTarget.getLevel() != this.level) {
+                this.followTarget = null;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean teleport(Location location, PlayerTeleportEvent.TeleportCause cause) {
+        Level previousLevel = this.level;
+        RouteFinder previousRoute = this.route;
+        double previousX = this.x;
+        double previousY = this.y;
+        double previousZ = this.z;
+        if (!super.teleport(location, cause)) {
+            return false;
+        }
+        if (this.level == previousLevel && this.route == previousRoute
+                && (this.x != previousX || this.y != previousY || this.z != previousZ)
+                && previousRoute != null && previousRoute.getClass() == WalkerRouteFinder.class) {
+            previousRoute.cancelQueuedSearch();
+            // A running pre-teleport search can publish only into the detached finder.
+            this.route = new WalkerRouteFinder(this);
+            if (!(this.target instanceof Position)) {
+                // Keep checkTarget's live-goal retention gate while discarding the old waypoint.
+                this.target = this.followTarget != null && this.followTarget.getLevel() == this.level
+                        ? this.followTarget : null;
+            }
+        }
+        return true;
     }
 
     protected void checkTarget() {
@@ -150,7 +213,8 @@ public abstract class EntityWalking extends BaseEntity {
         }
 
         if (!isImmobile()) {
-            if (this.age % 10 == 0 && this.route != null && !this.route.isSearching()) {
+            if (this.age % 10 == 0 && this.route != null
+                    && !this.route.hasPendingSearch() && !this.route.isSearching()) {
                 // Only start the search: reading next() here raced with the async rebuild and
                 // returned the fresh path's first node, a point right beside the entity.
                 RouteFinderThreadPool.executeRouteFinderThread(new RouteFinderSearchTask(this.route));
@@ -300,11 +364,15 @@ public abstract class EntityWalking extends BaseEntity {
 
             this.updateMovement();
 
-            if (this.route != null && !this.route.isSearching()) {
-                if (this.route.hasCurrentNode() && this.route.hasArrivedNode(this)) {
-                    if (this.route.hasNext()) {
-                        this.target = this.route.next();
+            if (this.route != null && !this.route.isSearching() && this.route.hasCurrentNode()) {
+                if (this.route.getClass() == WalkerRouteFinder.class) {
+                    Vector3 next = this.route.advanceIfArrived(this);
+                    if (next != null) {
+                        this.target = next;
                     }
+                } else if (this.route.hasArrivedNode(this) && this.route.hasNext()) {
+                    // Custom finders retain their existing virtual navigation policy.
+                    this.target = this.route.next();
                 }
             }
             return this.followTarget != null ? this.followTarget : this.target;

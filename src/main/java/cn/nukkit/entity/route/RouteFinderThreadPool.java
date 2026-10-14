@@ -1,5 +1,6 @@
 package cn.nukkit.entity.route;
 
+import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -22,12 +23,40 @@ public class RouteFinderThreadPool {
 
     public static void executeRouteFinderThread(RouteFinderSearchTask t) {
         if (running) {
-            executor.execute(t);
+            submit(executor, t);
+        }
+    }
+
+    static void submit(ThreadPoolExecutor target, RouteFinderSearchTask task) {
+        if (!task.tryQueue()) {
+            return;
+        }
+        boolean accepted = false;
+        try {
+            target.execute(task);
+            accepted = true;
+        } finally {
+            if (!accepted) {
+                try {
+                    // Thread creation can fail after execute has offered the task.
+                    target.remove(task);
+                } finally {
+                    task.discardQueued();
+                }
+            }
+        }
+    }
+
+    static void discardQueued(List<Runnable> tasks) {
+        for (Runnable task : tasks) {
+            if (task instanceof RouteFinderSearchTask search) {
+                search.discardQueued();
+            }
         }
     }
 
     public static void shutdown() {
         running = false;
-        executor.shutdownNow();
+        discardQueued(executor.shutdownNow());
     }
 }
