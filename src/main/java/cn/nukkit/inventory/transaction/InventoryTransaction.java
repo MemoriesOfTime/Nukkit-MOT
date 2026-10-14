@@ -487,8 +487,12 @@ public class InventoryTransaction {
                         try { discardPreparedWorldDrops(tickets); } catch (RuntimeException | Error cleanup) {
                             if (cleanup != failure) failure.addSuppressed(cleanup);
                         }
-                        metadata.restore();
-                        restoreSlotTransfer(before, claim);
+                        try {
+                            metadata.restore();
+                            restoreSlotTransfer(before, claim);
+                        } catch (RuntimeException | Error cleanup) {
+                            if (cleanup != failure) failure.addSuppressed(cleanup);
+                        }
                         try { this.resyncWorldInventories(frozenActions, capturedInventories); } catch (RuntimeException | Error update) {
                             if (update != failure) failure.addSuppressed(update);
                         }

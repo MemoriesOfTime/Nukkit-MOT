@@ -766,6 +766,71 @@ class InventoryTransactionPreparedWorldDropTest {
         assertTrue((Boolean) adapter.invoke(null, f.levelEntities.values().iterator().next()));
     }
 
+    @Test void writeErrorKeepsItsIdentityWhenRollbackObserverAlsoThrows() throws Exception {
+        assertWriteErrorCleanup(true, false);
+    }
+
+    @Test void writeErrorWithHealthyRollbackStillRestoresAndResyncs() throws Exception {
+        assertWriteErrorCleanup(false, false);
+    }
+
+    @Test void sameThrowableFromRollbackObserverCannotPreventResync() throws Exception {
+        assertWriteErrorCleanup(true, true);
+    }
+
+    private void assertWriteErrorCleanup(boolean observerFails, boolean sameFailure) throws Exception {
+        PlayerInventory inventory = spy(f.sourceInventory);
+        Fixture.field(EntityHumanType.class, f.source, "inventory", inventory);
+        Error original = new AssertionError("accepted write callback");
+        Error restoration = sameFailure ? original : new AssertionError("restored slot observer");
+        doAnswer(call -> {
+            call.callRealMethod();
+            throw original;
+        }).when(inventory).onSlotChange(eq(0), any(Item.class), eq(false));
+        if (observerFails) doThrow(restoration).when(inventory).onSlotChange(eq(0), any(Item.class), eq(true));
+        doNothing().when(inventory).sendContents(f.source);
+        var transaction = new InventoryTransaction(f.source, List.of(
+                new SlotChangeAction(inventory, 0, Item.get(Item.EMERALD, 0, 4), Item.get(Item.AIR)),
+                new DropItemAction(Item.get(Item.AIR), Item.get(Item.EMERALD, 0, 4))));
+        assertTrue(transaction.canExecute());
+        Error actual = assertThrows(Error.class, transaction::execute);
+        assertAll(
+                () -> assertSame(original, actual),
+                () -> assertEquals(observerFails && !sameFailure ? List.of(restoration) : List.of(), List.of(actual.getSuppressed())),
+                () -> assertEquals(4, inventory.getItem(0).getCount()),
+                () -> assertTrue(f.levelEntities.isEmpty()),
+                () -> assertTrue(f.chunkEntities.isEmpty()),
+                () -> assertFalse(transaction.hasExecuted()),
+                () -> verify(inventory).sendContents(f.source),
+                () -> assertTrue(InventoryMutationGuard.canCaptureProfile(List.of(inventory))));
+    }
+
+    @Test void refusedWriteWithThrowingRollbackObserverStillDiscardsAndResyncs() throws Exception {
+        PlayerInventory inventory = spy(f.sourceInventory);
+        Fixture.field(EntityHumanType.class, f.source, "inventory", inventory);
+        inventory.setItemForce(1, Item.get(Item.DIAMOND, 0, 3));
+        Error restoration = new AssertionError("refused pair rollback observer");
+        doThrow(restoration).when(inventory).onSlotChange(eq(0), any(Item.class), eq(true));
+        doNothing().when(inventory).sendContents(f.source);
+        events(event -> {
+            if (event instanceof EntityInventoryChangeEvent change && change.getSlot() == 1) change.setCancelled();
+        });
+        var transaction = new InventoryTransaction(f.source, List.of(
+                new SlotChangeAction(inventory, 0, Item.get(Item.EMERALD, 0, 4), Item.get(Item.AIR)),
+                new DropItemAction(Item.get(Item.AIR), Item.get(Item.EMERALD, 0, 4)),
+                new SlotChangeAction(inventory, 1, Item.get(Item.DIAMOND, 0, 3), Item.get(Item.AIR)),
+                new DropItemAction(Item.get(Item.AIR), Item.get(Item.DIAMOND, 0, 3))));
+        assertTrue(transaction.canExecute());
+        assertSame(restoration, assertThrows(Error.class, transaction::execute));
+        assertEquals(4, inventory.getItem(0).getCount());
+        assertEquals(3, inventory.getItem(1).getCount());
+        assertTrue(f.levelEntities.isEmpty());
+        assertTrue(f.chunkEntities.isEmpty());
+        assertFalse(transaction.hasExecuted());
+        verify(inventory).sendContents(f.source);
+        assertTrue(InventoryMutationGuard.canCaptureProfile(List.of(inventory)));
+    }
+
     @FunctionalInterface private interface Callback { void apply(Event event) throws Exception; }
     private void events(Callback callback) {
         doAnswer(call -> { callback.apply(call.getArgument(0)); return null; })
