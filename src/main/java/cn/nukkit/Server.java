@@ -1800,7 +1800,23 @@ public class Server {
 
         // Do level ticks
         for (Level level : this.levelArray) {
-            if (level.isBeingConverted || (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0)) {
+            if (level.isBeingConverted) {
+                continue;
+            }
+            if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
+                if (!this.alwaysTickPlayers) {
+                    for (Player player : new ArrayList<>(level.getPlayers().values())) {
+                        if (!player.spawned || player.closed || player.level != level) {
+                            continue;
+                        }
+                        try {
+                            player.onUpdate(currentTick);
+                        } catch (Exception e) {
+                            log.error(this.baseLang.translateString("nukkit.level.tickError",
+                                    new String[]{level.getFolderName(), Utils.getExceptionMessage(e)}));
+                        }
+                    }
+                }
                 continue;
             }
 
