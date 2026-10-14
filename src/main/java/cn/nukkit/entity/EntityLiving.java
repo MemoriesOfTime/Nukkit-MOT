@@ -471,11 +471,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         }
         Item weapon = player.getInventory().getItemInHand().clone();
         Enchantment[] hitEnchantments = event.getWeaponEnchantments();
-        if (!projectile && hitEnchantments != null) {
+        if (!projectile) {
             CompoundTag tag = weapon.getOrCreateNamedTag();
             tag.remove("ench");
             weapon.setNamedTag(tag);
-            weapon.addEnchantment(hitEnchantments);
+            weapon.addEnchantment(hitEnchantments == null ? Enchantment.EMPTY_ARRAY : hitEnchantments);
         }
         return weapon;
     }

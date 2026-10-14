@@ -471,6 +471,47 @@ class VanillaLootingTest {
     @Test void nativeKillLootingUsesAcceptedWeaponSnapshot() { nativeKillCount(3, 0, 4); }
     @Test void nativeKillWithoutLootingRetainsBaseCount() { nativeKillCount(0, 3, 1); }
 
+
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void nullMeleeEnchantSnapshotCannotBorrowTheCurrentHeldLooting(boolean explicitKnockback) {
+        inventory.setItemInHand(weapon(3));
+        EntityDamageByEntityEvent event=explicitKnockback
+                ?new EntityDamageByEntityEvent(player,cow,ENTITY_ATTACK,20f,0.3f)
+                :new EntityDamageByEntityEvent(player,cow,ENTITY_ATTACK,20f);
+        assertNull(event.getWeaponEnchantments());cow.setLastDamageCause(event);
+        assertEquals(0,deathWeapon(cow).getEnchantmentLevel(Enchantment.ID_LOOTING));
+        assertEquals(3,inventory.getItemInHand().getEnchantmentLevel(Enchantment.ID_LOOTING));
+    }
+
+    @ParameterizedTest @MethodSource("newCommonNativeTypes")
+    void omittedExactBuiltInsReceiveTheirConfirmedCommonBonus(Class<? extends EntityLiving> type,int itemId){
+        EntityLiving entity=mock(type);
+        Item[] base={Item.get(itemId,0,1)};
+        assertEquals(4,count(apply(entity,weapon(3),base,()->0.9),itemId));
+        assertEquals(1,base[0].getCount());
+    }
+    static Stream<Arguments> newCommonNativeTypes(){
+        return Stream.of(Arguments.of(EntityZombieVillager.class,Item.ROTTEN_FLESH),
+                Arguments.of(EntityZombieVillagerV2.class,Item.ROTTEN_FLESH),
+                Arguments.of(EntityVindicator.class,Item.EMERALD));
+    }
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void zombieVillagerRarePoolKeepsTheInheritedZombieChance(boolean versionTwo){
+        EntityLiving entity=versionTwo?mock(EntityZombieVillagerV2.class):mock(EntityZombieVillager.class);
+        doReturn(new EntityDamageByEntityEvent(player,entity,ENTITY_ATTACK,20f)).when(entity).getLastDamageCause();
+        AtomicInteger rolls=new AtomicInteger();
+        Item[] result=apply(entity,weapon(3),Item.EMPTY_ARRAY,()->rolls.getAndIncrement()==1?0.0359:0.0);
+        assertEquals(1,count(result,Item.IRON_INGOT));assertEquals(3,rolls.get());
+    }
+    @Test void parrotHasNoBedrockLootingFunctionAndPluginSubclassesStayOutsideNativeRules(){
+        Item[] feathers={Item.get(Item.FEATHER,0,2)};
+        assertSame(feathers,apply(mock(EntityParrot.class),weapon(3),feathers,()->fail("Bedrock parrot has no looting_enchant")));
+        Item[] flesh={Item.get(Item.ROTTEN_FLESH,0,1)};
+        assertSame(flesh,apply(mock(CustomVillager.class),weapon(3),flesh,()->fail("exact native class only")));
+    }
+    static class CustomVillager extends EntityZombieVillager {
+        CustomVillager(FullChunk chunk,CompoundTag nbt){super(chunk,nbt);}
+    }
     private EntityDamageByEntityEvent melee(Enchantment[] enchantments) {
         Map<EntityDamageEvent.DamageModifier, Float> modifiers = new EnumMap<>(EntityDamageEvent.DamageModifier.class);
         modifiers.put(EntityDamageEvent.DamageModifier.BASE, 20f);

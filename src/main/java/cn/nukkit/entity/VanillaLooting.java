@@ -23,9 +23,12 @@ import java.util.function.DoubleSupplier;
  */
 final class VanillaLooting {
     private static final Map<Class<?>, Rule[]> RULES = rules();
+    private static final RareRule ZOMBIE_RARE = new RareRule(1.0 / 6, 0.01, new Item[]{
+            Item.get(Item.IRON_INGOT), Item.get(Item.CARROT), Item.get(Item.POTATO)});
     private static final Map<Class<?>, RareRule> RARE_RULES = Map.of(
-            EntityZombie.class, new RareRule(1.0 / 6, 0.01, new Item[]{
-                    Item.get(Item.IRON_INGOT), Item.get(Item.CARROT), Item.get(Item.POTATO)}),
+            EntityZombie.class, ZOMBIE_RARE,
+            EntityZombieVillager.class, ZOMBIE_RARE,
+            EntityZombieVillagerV2.class, ZOMBIE_RARE,
             EntityRabbit.class, new RareRule(10.0 / 102, 0.03, new Item[]{Item.get(Item.RABBIT_FOOT)}),
             EntityWitherSkeleton.class, new RareRule(1.0 / 40, 0.02, new Item[]{Item.get(Item.SKULL, 1)}));
 
@@ -118,6 +121,8 @@ final class VanillaLooting {
         rules.put(EntitySkeletonHorse.class, new Rule[]{bone});
         rules.put(EntityZombieHorse.class, new Rule[]{flesh});
         rules.put(EntityZombie.class, new Rule[]{flesh});
+        rules.put(EntityZombieVillager.class, new Rule[]{flesh});
+        rules.put(EntityZombieVillagerV2.class, new Rule[]{flesh});
         rules.put(EntityHusk.class, new Rule[]{flesh});
         rules.put(EntityDrowned.class, new Rule[]{flesh});
         rules.put(EntityZombiePigman.class, new Rule[]{flesh, common(Item.GOLD_NUGGET)});
@@ -137,6 +142,7 @@ final class VanillaLooting {
         rules.put(EntityPillager.class, new Rule[]{arrow});
         rules.put(EntityShulker.class, new Rule[]{common(Item.SHULKER_SHELL)});
         rules.put(EntityEvoker.class, new Rule[]{common(Item.EMERALD)});
+        rules.put(EntityVindicator.class, new Rule[]{common(Item.EMERALD)});
         rules.put(EntityWitherSkeleton.class, new Rule[]{bone, common(Item.COAL)});
         rules.put(EntitySlime.class, new Rule[]{present(Item.SLIMEBALL)});
         rules.put(EntityMagmaCube.class, new Rule[]{present(Item.MAGMA_CREAM)});
