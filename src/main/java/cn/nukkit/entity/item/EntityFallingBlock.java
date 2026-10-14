@@ -251,6 +251,7 @@ public class EntityFallingBlock extends Entity {
                         // stalactite item or one placed block (Cloudburst/Petteri's split).
                         Block settledBlock = event.getTo();
                         if (settledBlock.getId() == BlockID.POINTED_DRIPSTONE) {
+                            settledBlock.position(landingBlock);
                             if (this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
                                 this.level.dropItem(this, settledBlock.toItem());
                             }

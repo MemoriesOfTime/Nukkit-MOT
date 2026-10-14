@@ -5,6 +5,8 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.event.entity.EntityBlockChangeEvent;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityLiving;
+import cn.nukkit.event.entity.EntityDamageByBlockEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.GameRule;
@@ -20,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -91,6 +94,38 @@ class EntityFallingBlockConservationTest {
         } finally {
             reset(fixture.plugins);
         }
+    }
+
+    @Test
+    void stalactiteImpactCarriesTheLandingLevelAndCoordinatesWithoutPlacing() {
+        Fixture fixture = new Fixture(Block.POINTED_DRIPSTONE);
+        Block landing = Block.get(Block.AIR);
+        landing.position(new cn.nukkit.level.Position(0, 64, 0, fixture.level));
+        when(fixture.level.getBlock(any(Vector3.class))).thenReturn(landing);
+        fixture.entity.highestPosition = 68;
+        when(fixture.entity.canCollide()).thenReturn(true);
+        EntityLiving victim = mock(EntityLiving.class);
+        when(fixture.entity.canCollideWith(victim)).thenReturn(true);
+        when(victim.getBoundingBox()).thenReturn(new SimpleAxisAlignedBB(0, 64, 0, 1, 65, 1));
+        when(fixture.level.getChunkEntities(anyInt(), anyInt(), eq(false))).thenAnswer(call ->
+                (int) call.getArgument(0) == 0 && (int) call.getArgument(1) == 0
+                        ? Map.of(1L, victim) : Map.of());
+        EntityDamageByBlockEvent[] impact = {null};
+        when(victim.attack(any(EntityDamageByBlockEvent.class))).thenAnswer(call -> {
+            impact[0] = call.getArgument(0);
+            return true;
+        });
+
+        fixture.entity.onUpdate(1);
+
+        assertNotNull(impact[0], "native collision must dispatch the impact event");
+        var location = assertDoesNotThrow(() -> impact[0].getDamager().getLocation());
+        assertSame(fixture.level, location.getLevel());
+        assertEquals(0, location.x);
+        assertEquals(64, location.y);
+        assertEquals(0, location.z);
+        assertTrue(fixture.placements.isEmpty());
+        assertEquals(1, fixture.drops.size());
     }
 
     private static final class Fixture {
