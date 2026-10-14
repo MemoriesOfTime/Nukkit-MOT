@@ -152,9 +152,11 @@ public class BaseLang {
     }
 
     protected String parseTranslation(String text, String onlyPrefix) {
-        StringBuilder newString = new StringBuilder();
         text = String.valueOf(text);
-
+        if (text.indexOf('%') < 0) {
+            return text;
+        }
+        StringBuilder newString = new StringBuilder();
         StringBuilder replaceString = null;
 
         int len = text.length();
