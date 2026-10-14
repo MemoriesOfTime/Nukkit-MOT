@@ -12,6 +12,7 @@ import cn.nukkit.network.protocol.types.debugshape.DebugLine;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
+import org.cloudburstmc.protocol.bedrock.codec.v2169.Bedrock_v2169;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.common.util.VarInts;
 import org.junit.jupiter.api.BeforeAll;
@@ -42,6 +43,7 @@ class PacketFieldOrderRegressionTest {
     }
     // Only these three packet layouts are aliased; this is not a general preview codec mapping.
     private static BedrockCodec codec(int p) {
+        if (p == 2169) return Bedrock_v2169.CODEC;
         int reference = switch (p) {
             case 593 -> 594;
             case 617 -> 618;
@@ -89,7 +91,7 @@ class PacketFieldOrderRegressionTest {
         assertEquals(0, c.getField("TYPE_UNKNOWN").getInt(null));
         assertEquals(1, c.getField("TYPE_START_LOADING_SCREEN").getInt(null));
         assertEquals(2, c.getField("TYPE_STOP_LOADING_SCREEN").getInt(null));
-        assertEquals(2169, ProtocolCodecMapping.getCodec(2169).getProtocolVersion());
+        assertEquals(2169, codec(2169).getProtocolVersion());
     }
     @ParameterizedTest(name = "loading v{0} type{1} id{2}") @MethodSource("loadingCases")
     void loadingConstantsHaveIndependentMeaningInBothDirections(int protocol, int type, boolean present) {
