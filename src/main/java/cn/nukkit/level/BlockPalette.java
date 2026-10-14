@@ -42,6 +42,8 @@ public class BlockPalette {
             .build();
 
     private volatile boolean locked;
+    private volatile long networkVersion;
+    private volatile boolean networkMappingReady;
 
     @Deprecated
     public BlockPalette(int protocol) {
@@ -174,7 +176,13 @@ public class BlockPalette {
         return Int2IntMaps.unmodifiable(this.legacyToRuntimeId);
     }
 
-    public void clearStates() {
+    /** Generation of the completed network mapping; an in-progress rebuild cannot be cached. */
+    public long getNetworkVersion() {
+        return this.locked && this.networkMappingReady ? this.networkVersion : -1;
+    }
+
+    public synchronized void clearStates() {
+        this.networkMappingReady = false;
         this.locked = false;
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
@@ -183,7 +191,7 @@ public class BlockPalette {
         this.legacyToRuntimeIdCache.invalidateAll();
     }
 
-    public void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
+    public synchronized void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
         if (this.locked) {
             throw new IllegalStateException("Block palette is already locked!");
         }
@@ -198,7 +206,8 @@ public class BlockPalette {
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
     }
 
-    public void lock() {
+    public synchronized void lock() {
+        this.networkMappingReady = false;
         this.locked = true;
         this.trim();
     }
@@ -206,11 +215,15 @@ public class BlockPalette {
     /**
      * Shrinks the internal fastutil maps after bulk registration to release unused capacity.
      */
-    public void trim() {
+    public synchronized void trim() {
+        // Direct public trims also rehash live mappings. Publish only after every native map completes.
+        this.networkMappingReady = false;
         this.legacyToRuntimeId.trim();
         this.runtimeIdToLegacy.trim();
         this.stateHashToLegacy.trim();
         this.legacyToHashId.trim();
+        this.networkVersion++;
+        this.networkMappingReady = true;
     }
 
     public int getRuntimeId(int id) {
