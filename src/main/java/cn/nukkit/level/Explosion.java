@@ -232,8 +232,7 @@ public class Explosion {
             blockProcessing = ev.getBlockProcessing();
         }
 
-        if (blockProcessing == null) blockProcessing = new ExplosionBlockProcessing();
-        blockProcessing.begin(affectedBlocks,selectedBlocks);
+        beginBlockProcessing(blockProcessing, affectedBlocks, selectedBlocks);
         double explosionSize = this.size * 2d;
         AxisAlignedBB explosionBB = new SimpleAxisAlignedBB(
                 NukkitMath.floorDouble(this.source.x - explosionSize - 1),
@@ -286,16 +285,7 @@ public class Explosion {
                 continue;
             }
 
-            NativeExplosionBlockProcessor.Result planned = blockProcessing.processBlock(currentBlock);
-            if (planned != NativeExplosionBlockProcessor.Result.NATIVE) continue;
-
-            if (currentBlock instanceof BlockTNT tnt) {
-                Entity exploder = (this.sourceObject instanceof ExplosionSource.EntitySource es) ? es.entity() : null;
-                if (!blockProcessing.canRemove(List.of(currentBlock))) continue;
-                if (!tnt.primeAccepted(random.nextInt(10, 31), exploder, () -> { if (!blockProcessing.canRemove(List.of(currentBlock))) throw new IllegalStateException("TNT metadata validation refused"); }, () -> blockProcessing.blockRemoved(currentBlock))) continue;
-            } else {
-                if (!destroyExplosionBlock(currentBlock, explosionLootTool(currentBlock,air), yield, random)) continue;
-            }
+            if (!acceptExplosionBlock(currentBlock, air, yield, random, true, true)) continue;
 
             if (random.nextInt(8) == 0) {
                 smokePositions.add(currentBlock);
@@ -356,6 +346,47 @@ public class Explosion {
         return true;
     }
 
+    /** Derived ray and damage models share source acceptance, without inheriting the base blast model. */
+    protected final void beginBlockProcessing(ExplosionBlockProcessing processing,
+                                               Collection<Block> finalBlocks, Collection<Block> selectedBlocks) {
+        blockProcessing = processing == null ? new ExplosionBlockProcessing() : processing;
+        blockProcessing.begin(finalBlocks, selectedBlocks);
+    }
+
+    /** Harvest selection stays after source processors, retaining each model's original tool and gamerule. */
+    protected final boolean acceptExplosionBlock(Block currentBlock, Item tool, double yield,
+                                                  ThreadLocalRandom random, boolean allowContainerLoot,
+                                                  boolean useTntHarvestTool) {
+        CellKey retainedTnt = currentBlock instanceof BlockTNT ? CellKey.of(currentBlock) : null;
+        int retainedTntFullId = retainedTnt == null ? 0 : currentBlock.getFullId();
+        int retainedTntRawId = retainedTnt == null ? 0 : retainedTnt.level().getFullBlock(
+                retainedTnt.x(), retainedTnt.y(), retainedTnt.z(), retainedTnt.layer());
+        NativeExplosionBlockProcessor.Result planned = blockProcessing.processBlock(currentBlock);
+        if (planned != NativeExplosionBlockProcessor.Result.NATIVE) return false;
+
+        if (currentBlock instanceof BlockTNT tnt) {
+            Entity exploder = (this.sourceObject instanceof ExplosionSource.EntitySource es) ? es.entity() : null;
+            if (!blockProcessing.canRemove(List.of(currentBlock))) return false;
+            try {
+                if (!tnt.primeAccepted(random.nextInt(10, 31), exploder,
+                        () -> { if (!blockProcessing.canRemove(List.of(currentBlock))) throw new RefusedRemoval(); },
+                        () -> blockProcessing.blockRemoved(currentBlock))) return false;
+            } catch (RefusedRemoval refused) {
+                // A failed restoration is still an error, even when policy refused cleanly.
+                if (retainedTnt.level().getBlock(retainedTnt.x(), retainedTnt.y(), retainedTnt.z(),
+                        retainedTnt.layer()).getFullId() != retainedTntFullId
+                        || retainedTnt.level().getFullBlock(retainedTnt.x(), retainedTnt.y(), retainedTnt.z(),
+                        retainedTnt.layer()) != retainedTntRawId) {
+                    throw new IllegalStateException("TNT source restoration refused", refused);
+                }
+                return false;
+            }
+        } else {
+            if (!destroyExplosionBlock(currentBlock, useTntHarvestTool ? explosionLootTool(currentBlock,tool) : tool, yield, random, allowContainerLoot)) return false;
+        }
+        return true;
+    }
+
     private List<Item> ownLootOverride;
     private List<Item> storedGoodsOverride;
     /** One owner item per native composite, including serialized filled shulker contents. */
@@ -406,16 +437,19 @@ public class Explosion {
 
     /** Composite blocks and their payload share one observable removal decision. */
     private boolean destroyExplosionBlock(Block affected, Item tool, double yield, ThreadLocalRandom random) {
+        return destroyExplosionBlock(affected, tool, yield, random, true);
+    }
+    private boolean destroyExplosionBlock(Block affected, Item tool, double yield, ThreadLocalRandom random, boolean allowContainerLoot) {
         List<Block> cells = sourceCells(affected);
         Set<CellKey> claimed = REMOVING.get();
         List<CellKey> keys = cells.stream().map(CellKey::of).toList();
         if (keys.stream().anyMatch(claimed::contains)) return false;
         claimed.addAll(keys);
-        try { return destroyExplosionSource(cells, tool, yield, random); }
+        try { return destroyExplosionSource(cells, tool, yield, random, allowContainerLoot); }
         finally { claimed.removeAll(keys); if (claimed.isEmpty()) REMOVING.remove(); }
     }
 
-    private boolean destroyExplosionSource(List<Block> cells, Item tool, double yield, ThreadLocalRandom random) {
+    private boolean destroyExplosionSource(List<Block> cells, Item tool, double yield, ThreadLocalRandom random, boolean allowContainerLoot) {
         Block block=cells.get(0);
         List<BlockEntity> tiles=cells.stream().map(cell -> cell.layer==0 ? level.getBlockEntity(cell) : null).toList();
         BlockEntity tile=tiles.get(0);
@@ -424,7 +458,7 @@ public class Explosion {
         if(inventory!=null && (NativeContainerTransaction.isActive(inventory)
                 || !InventoryMutationGuard.canCaptureProfile(List.of(inventory)))) return false;
         boolean shulker=tile instanceof BlockEntityShulkerBox;
-        Item[] own=ownLootOverride!=null ? ownLootOverride.toArray(Item.EMPTY_ARRAY) : shulker ? new Item[]{block.toItem()}
+        Item[] own=!allowContainerLoot && inventory!=null ? Item.EMPTY_ARRAY : ownLootOverride!=null ? ownLootOverride.toArray(Item.EMPTY_ARRAY) : shulker ? new Item[]{block.toItem()}
                 : random.nextDouble()*100<yield ? canonicalOwnLoot(block,tool).toArray(Item.EMPTY_ARRAY) : Item.EMPTY_ARRAY;
         StoredPayload payload=StoredPayload.capture(tile);
         NativeContainerTransaction.Snapshot source=inventory==null ? null : NativeContainerTransaction.snapshot(inventory);
@@ -436,7 +470,7 @@ public class Explosion {
         try {
             List<Item> drops=new ArrayList<>(Arrays.asList(own));
             if(payload!=null) drops.addAll(storedGoodsOverride==null ? payload.goods() : storedGoodsOverride);
-            if(source!=null && (!shulker || own.length==0)) for(var backing:source.rawSlots().values()) drops.addAll(backing.values());
+            if(allowContainerLoot && source!=null && (!shulker || own.length==0)) for(var backing:source.rawSlots().values()) drops.addAll(backing.values());
             for(Item drop:drops) if(!drop.isNull()) {
                 EntityItem.PreparedDrop ticket=prepareExplosionDrop(block.add(0.5,0.5,0.5),drop);
                 if(ticket==null) return false; tickets.add(ticket);

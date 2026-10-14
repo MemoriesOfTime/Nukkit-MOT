@@ -14,8 +14,12 @@ public final class NativeActualLevelSetterTest {
  static void check(boolean ok,String name){if(!ok)throw new AssertionError(name);passed++;}
  static final class FaultChunk extends LevelDBChunk {
   boolean refusePartner;
+  Runnable afterSourceRawAir;
+  boolean refuseTntRestoration;
+  Block restoredBlockOverride;
+  int restoredTntMetadata = -1;
   FaultChunk(LevelDBProvider provider){super(provider,0,0);}
-  @Override public Block getAndSetBlock(int x,int y,int z,int layer,Block block){if(refusePartner && y==65 && block.isAir())return Block.fromFullId(getFullBlock(x,y,z,layer));return super.getAndSetBlock(x,y,z,layer,block);}
+  @Override public Block getAndSetBlock(int x,int y,int z,int layer,Block block){if(restoredTntMetadata>=0 && block.getId()==Block.TNT){Block previous=Block.fromFullId(getFullBlock(x,y,z,layer));setBlock(x,y,z,Block.TNT,restoredTntMetadata);return previous;}if(restoredBlockOverride!=null && block.getId()==Block.TNT)return super.getAndSetBlock(x,y,z,layer,restoredBlockOverride);if(refuseTntRestoration && block.getId()==Block.TNT)return Block.fromFullId(getFullBlock(x,y,z,layer));if(refusePartner && y==65 && block.isAir())return Block.fromFullId(getFullBlock(x,y,z,layer));Block previous=super.getAndSetBlock(x,y,z,layer,block);if(x==0 && y==64 && z==0 && layer==0 && block.isAir() && afterSourceRawAir!=null)afterSourceRawAir.run();return previous;}
  }
  static final class RealLevel extends Level {
   FaultChunk chunk;BlockEntity tile;Map<Long,Entity> actors;List<String> trace;int all(){return(int)actors.values().stream().filter(e->e instanceof EntityItem && !e.closed && !e.isPublicationDeferred()).count();}
@@ -45,6 +49,9 @@ public final class NativeActualLevelSetterTest {
   w.chunk=new FaultChunk(provider);NativeExplosionFixture.set(BaseFullChunk.class,w.chunk,"entities",new Long2ObjectNonBlockingMap<Entity>());
   var chunks=new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<BaseFullChunk>();chunks.put(Level.chunkHash(0,0),w.chunk);NativeExplosionFixture.set(LevelDBProvider.class,provider,"chunks",chunks);
   w.actors=seed.actors;w.trace=new ArrayList<>();
+  NativeExplosionFixture.set(Level.class,w,"lightQueue",new java.util.concurrent.ConcurrentHashMap<>());
+  NativeExplosionFixture.set(Level.class,w,"normalUpdateQueue",new java.util.concurrent.ConcurrentLinkedDeque<>());
+  NativeExplosionFixture.set(Level.class,w,"normalUpdateQueueSize",new java.util.concurrent.atomic.AtomicInteger());
   NativeExplosionFixture.set(Level.class,w,"changedBlocks",new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>());
   NativeExplosionFixture.set(Level.class,w,"callbackBlockSet",new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<java.util.function.BiConsumer<Block,Block>>());
   w.chunk.setBlock(0,64,0,id,0);check(w.chunk.getProvider().getClass()==LevelDBProvider.class && w.chunk.getProvider().getLevel()==w,"canonical real setter provider");return w;

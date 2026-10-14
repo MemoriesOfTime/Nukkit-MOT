@@ -218,7 +218,7 @@ public final class NativeExplosionFixture {
         }
     }
 
-    public static final class MemoryLevel extends Level {
+    public static class MemoryLevel extends Level {
         Block cell;
         BlockEntity tile;
         List<Item> output;
