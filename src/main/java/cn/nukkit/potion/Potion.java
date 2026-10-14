@@ -222,7 +222,7 @@ public class Potion implements Cloneable {
         switch (this.id) {
             case INSTANT_HEALTH:
             case INSTANT_HEALTH_II:
-                if (!entity.canBeAffected(this.id)) {
+                if (!entity.canBeAffected(Effect.HEALING)) {
                     break;
                 }
                 if (entity instanceof EntitySmite) {
@@ -233,7 +233,7 @@ public class Potion implements Cloneable {
                 break;
             case HARMING:
             case HARMING_II:
-                if (!entity.canBeAffected(this.id)) {
+                if (!entity.canBeAffected(Effect.HARMING)) {
                     break;
                 }
                 if (entity instanceof EntitySmite) {
@@ -310,10 +310,10 @@ public class Potion implements Cloneable {
                 break;
             case INSTANT_HEALTH:
             case INSTANT_HEALTH_II:
-                return Effect.getEffect(Effect.HEALING);
+                return Effect.getEffect(Effect.HEALING).setAmplifier(getLevel(potionType) - 1);
             case HARMING:
             case HARMING_II:
-                return Effect.getEffect(Effect.HARMING);
+                return Effect.getEffect(Effect.HARMING).setAmplifier(getLevel(potionType) - 1);
             case POISON:
             case POISON_LONG:
             case POISON_II:
