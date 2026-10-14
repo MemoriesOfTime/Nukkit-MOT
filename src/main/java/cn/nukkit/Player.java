@@ -2703,10 +2703,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 } else {
                     //1.7.0-
                     this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
-                            this.getViewers().values()
-                                    .stream()
-                                    .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
-                                    .collect(Collectors.toList()));
+                            this.legacyMovementViewers());
                     //1.7.0+
                     this.broadcastMovement();
                 }
@@ -2850,6 +2847,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastYaw = location.getYaw();
         this.lastHeadYaw = location.getHeadYaw();
         this.lastPitch = location.getPitch();
+    }
+
+    private List<Player> legacyMovementViewers() {
+        Collection<Player> currentViewers = this.getViewers().values();
+        List<Player> legacyViewers = new ArrayList<>();
+        for (Player viewer : currentViewers) {
+            if (viewer.protocol < ProtocolInfo.v1_7_0) {
+                legacyViewers.add(viewer);
+            }
+        }
+        return legacyViewers;
     }
 
     @Override
@@ -3033,10 +3041,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.needSendRotation) {
                 //1.7.0-
                 this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
-                        this.getViewers().values()
-                                .stream()
-                                .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
-                                .collect(Collectors.toList()));
+                        this.legacyMovementViewers());
                 //1.7.0+
                 this.broadcastMovement();
                 this.needSendRotation = false;
