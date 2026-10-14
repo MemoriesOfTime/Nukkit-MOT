@@ -952,6 +952,7 @@ public class BinaryStream {
         }
 
         int blockRuntimeId = this.getVarInt();// blockRuntimeId
+        damage = mushroomBlockDamage(gameVersion, id, damage, blockRuntimeId);
         //TODO 在1.21.30会得到错误数据
         if (protocolId < ProtocolInfo.v1_19_0_31) {
             if (id != null && id < 256 && id != 166) { // ItemBlock
@@ -1604,6 +1605,21 @@ public class BinaryStream {
         }
     }
 
+    // Mushroom variants share one item runtime ID; their state lives in the block palette ID.
+    // Keep this narrow: other item families have different metadata canonicalization rules.
+    private static int mushroomBlockDamage(GameVersion version, Integer id, int damage, int blockRuntimeId) {
+        if (version.getProtocol() < ProtocolInfo.v1_19_0_31 || id == null
+                || (id != Block.BROWN_MUSHROOM_BLOCK && id != Block.RED_MUSHROOM_BLOCK)) {
+            return damage;
+        }
+        int fullId = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(version)
+                ? GlobalBlockPalette.getLegacyFullIdFromHashId(version, blockRuntimeId)
+                : GlobalBlockPalette.getLegacyFullId(version, blockRuntimeId);
+        // A client's unrelated/unknown palette entry must not graft metadata onto this item.
+        return fullId != -1 && (fullId >> Block.DATA_BITS) == id
+                ? fullId & Block.DATA_MASK : damage;
+    }
+
     public Item getNetworkItemStackDescriptor(GameVersion gameVersion) {
         return this.getNetworkItemStackDescriptor(gameVersion, false);
     }
@@ -1674,6 +1690,8 @@ public class BinaryStream {
         } else {
             blockRuntimeId = (int) this.getUnsignedVarInt();
         }
+
+        damage = mushroomBlockDamage(gameVersion, id, damage, blockRuntimeId);
 
         byte[] nbt = new byte[0];
         String[] canPlace = null;
@@ -1951,11 +1969,15 @@ public class BinaryStream {
     }
 
     public byte[] getByteArray(int maxLength) {
-        int length = (int) this.getUnsignedVarInt();
-        checkArgument(this.isReadable(length),
-                "Tried to read %s bytes but only has %s readable", length, this.readableBytes());
+        int end = this.buffer == null ? 0 : Math.min(this.count, this.buffer.length);
+        checkArgument(this.count >= 0 && this.offset >= 0 && this.offset < end,
+                "Missing byte array length prefix");
+        long length = this.getUnsignedVarInt();
+        checkArgument(this.offset <= end && length <= Integer.MAX_VALUE
+                        && length <= end - (long) this.offset,
+                "Tried to read %s bytes but only has %s readable", length, end - (long) this.offset);
         checkArgument(maxLength <= 0 || length <= maxLength, "Tried to read %s bytes but maximum is %s", length, maxLength);
-        return this.get(length);
+        return this.get((int) length);
     }
 
     public void putByteArray(byte[] b) {
