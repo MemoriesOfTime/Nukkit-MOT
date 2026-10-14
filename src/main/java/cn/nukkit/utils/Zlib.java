@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import java.io.IOException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
+import java.util.function.Function;
 import java.util.zip.Deflater;
 
 public abstract class Zlib {
@@ -56,13 +57,23 @@ public abstract class Zlib {
     }
 
     /**
-     * Run with a stable concurrent compressor, or return null for the main-thread fallback.
+     * Run with a stable concurrent compressor, or return null for provider 1.
      * The action must not change the provider. Concurrent actions share the read lock.
      */
     public static <T> T withConcurrentCompression(Supplier<T> action) {
         providerLock.readLock().lock();
         try {
             return provider instanceof ZlibSingleThreadLowMem ? null : action.get();
+        } finally {
+            providerLock.readLock().unlock();
+        }
+    }
+
+    /** The action must not change the provider; provider 1 serializes its native state internally. */
+    static <T> T withStableCompression(Function<ZlibProvider, T> action) {
+        providerLock.readLock().lock();
+        try {
+            return action.apply(provider);
         } finally {
             providerLock.readLock().unlock();
         }
