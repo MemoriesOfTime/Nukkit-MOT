@@ -200,11 +200,11 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
         EntityExplosionPrimeEvent event = new EntityExplosionPrimeEvent(this, (4.0D + Utils.random.nextDouble() * 1.5D * root));
         server.getPluginManager().callEvent(event);
         if (this.closed || !this.isAlive()) return;
-        if (!this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
-            this.close();
+        if (event.isCancelled()) {
             return;
         }
-        if (event.isCancelled()) {
+        if (!this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
+            this.close();
             return;
         }
         Explosion explosion = new Explosion(this, event.getForce(), this);

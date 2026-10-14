@@ -14,6 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -35,13 +37,17 @@ class TntSourceRetirementTest {
    if(!cancel&&!closeInCallback)assertTrue(actor.closed);boolean accepted=!cancel&&ruleAfter&&!closeInCallback;
    assertEquals(accepted?1:0,construction.constructed().size());assertEquals(1,prime.get());
    if(accepted){detonate(actor);assertEquals(1,prime.get());verify(construction.constructed().get(0)).explodeB();verify(construction.constructed().get(0),never()).explodeA();}
-   if(cancel&&ruleAfter&&!closeInCallback)assertFalse(actor.closed,"A cancelled prime retains the existing source");
+   if(cancel&&!closeInCallback)assertFalse(actor.closed,"A cancelled prime retains the existing source");
   }
  }
  @Test void bothSourcesRetireBeforeEffectsAndReentrantRetry() throws Exception{run(false,false,true,false,false);run(true,false,true,false,false);}
  @Test void bothSourcesStayRetiredAfterEffectFailure() throws Exception{run(false,false,true,true,false);run(true,false,true,true,false);}
  @Test void finalGameRuleVetoRetiresWithoutBlast() throws Exception{run(false,false,false,false,false);run(true,false,false,false,false);}
  @Test void cancellationPreservesCharge() throws Exception{run(false,true,true,false,false);run(true,true,true,false,false);}
+ @ParameterizedTest @ValueSource(booleans={false,true})
+ void cancellationPreservesSourceWhenListenerAlsoDisablesExplosions(boolean cart) throws Exception {
+  run(cart,true,false,false,false);
+ }
  @Test void callbackClosedSourceCannotBlast() throws Exception{run(false,false,true,false,true);run(true,false,true,false,true);} 
  private void retirementNotificationFailure(boolean cart,boolean effectFailure) throws Exception {
   Entity actor=cart?mock(EntityMinecartTNT.class,CALLS_REAL_METHODS):mock(EntityPrimedTNT.class,CALLS_REAL_METHODS);

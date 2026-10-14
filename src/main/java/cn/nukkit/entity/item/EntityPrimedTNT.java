@@ -162,11 +162,11 @@ public class EntityPrimedTNT extends Entity implements EntityExplosive {
         EntityExplosionPrimeEvent event = new EntityExplosionPrimeEvent(this, 4);
         server.getPluginManager().callEvent(event);
         if (this.closed || !this.isAlive()) return;
-        if (!this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
-            this.close();
+        if (event.isCancelled()) {
             return;
         }
-        if (event.isCancelled()) {
+        if (!this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
+            this.close();
             return;
         }
         Explosion explosion = new Explosion(this, event.getForce(), this);
