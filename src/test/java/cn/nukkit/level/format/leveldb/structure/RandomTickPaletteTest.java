@@ -72,7 +72,7 @@ class RandomTickPaletteTest {
         section.getStorages()[0] = storage(BlockID.GRASS);
         assertTrue(section.mayHaveRandomTickBlocks());
         section.getStorages()[0] = storage(BlockID.STONE);
-        assertTrue(section.mayHaveRandomTickBlocks(), "positive memo is allowed to stay conservative");
+        assertFalse(section.mayHaveRandomTickBlocks(), "replaced layer zero is rechecked without copying");
         assertFalse(section.copy().mayHaveRandomTickBlocks(), "fresh section can rediscover inert data");
         ChunkSection unsupported = mock(ChunkSection.class, CALLS_REAL_METHODS);
         assertTrue(unsupported.mayHaveRandomTickBlocks(), "unknown providers retain old loop");

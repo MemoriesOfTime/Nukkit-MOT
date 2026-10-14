@@ -188,6 +188,8 @@ public class StateBlockStorage {
                 }
             }
         } finally {
+            // Invalidate observations made while the previous palette was still being replaced.
+            this.version++;
             try {
                 if (inputStream != null) {
                     inputStream.close();
@@ -562,6 +564,10 @@ public class StateBlockStorage {
 
     /** Unused palette entries are harmless false positives; do not scan all 4096 cells. */
     public boolean mayHaveRandomTickBlocks() {
+        // Legacy subclasses may expose ticking blocks through their virtual reads.
+        if (this.getClass() != StateBlockStorage.class) {
+            return true;
+        }
         // Large or long-lived palettes cost more to inspect than the usual three samples.
         // Keep those on the existing path rather than trading three reads for a full scan.
         if (this.palette.size() > 16) {
