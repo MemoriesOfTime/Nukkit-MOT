@@ -59,4 +59,35 @@ class ScalarSkyLightReadTest {
         assertEquals(4, section.getBlockSkyLight(14, 15, 15));
         assertEquals(15, section.getBlockSkyLight(15, 15, 15));
     }
+    @Test
+    void copyingDetachesMaterializedSkylightBeforeEitherSectionReads() {
+        Section source = new Section();
+        source.setBlockSkyLight(0, 0, 0, 7);
+        source.setBlockSkyLight(1, 0, 0, 11);
+        LevelDBChunkSection copy = (LevelDBChunkSection) source.copy();
+        source.setBlockSkyLight(0, 0, 0, 2);
+        assertEquals(7, copy.getBlockSkyLight(0, 0, 0));
+        assertEquals(11, copy.getBlockSkyLight(1, 0, 0));
+        copy.setBlockSkyLight(1, 0, 0, 4);
+        assertEquals(11, source.getBlockSkyLight(1, 0, 0));
+        assertEquals(2, source.getBlockSkyLight(0, 0, 0));
+    }
+
+    @Test
+    void compressedAndImplicitCopiesRetainIndependentWrites() throws Exception {
+        Section source = new Section();
+        byte[] combined = new byte[4096];
+        Arrays.fill(combined, 2048, 4096, (byte) 0xa7);
+        source.compressed(Zlib.deflate(combined));
+        LevelDBChunkSection compressedCopy = (LevelDBChunkSection) source.copy();
+        source.setBlockSkyLight(0, 0, 0, 1);
+        assertEquals(7, compressedCopy.getBlockSkyLight(0, 0, 0));
+        compressedCopy.setBlockSkyLight(1, 0, 0, 3);
+        assertEquals(10, source.getBlockSkyLight(1, 0, 0));
+        source.uniform(true);
+        LevelDBChunkSection implicitCopy = (LevelDBChunkSection) source.copy();
+        source.setBlockSkyLight(0, 0, 0, 2);
+        assertEquals(15, implicitCopy.getBlockSkyLight(0, 0, 0));
+    }
+
 }
