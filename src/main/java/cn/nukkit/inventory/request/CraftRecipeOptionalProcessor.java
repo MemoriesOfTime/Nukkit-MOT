@@ -80,7 +80,8 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
             }
             result = pair.result;
             levelCost = pair.levelCost;
-            CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, anvilInventory.getInputSlot(), 1);
+            CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, anvilInventory.getInputSlot(),
+                    anvilInventory.getInputSlot().getCount());
             CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, anvilInventory.getMaterialSlot(), pair.materialCost);
 
             // Mirror legacy RepairItemTransaction: fire RepairItemEvent before any
@@ -324,7 +325,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
                 extraCost += costHelper;
                 result.clearCustomName();
             }
-        } else {
+        } else if (!filterString.equals(target.getCustomName())) {
             if (filterString.length() > 50) {
                 return null;
             }
