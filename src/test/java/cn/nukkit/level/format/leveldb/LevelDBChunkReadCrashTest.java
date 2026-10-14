@@ -19,6 +19,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -161,7 +162,10 @@ class LevelDBChunkReadCrashTest {
                     }
                 }
             }
-            Files.writeString(root.resolve("ready"), phase);
+            Path ready = root.resolve("ready");
+            Path temporaryReady = root.resolve("ready.tmp");
+            Files.writeString(temporaryReady, phase);
+            Files.move(temporaryReady, ready, StandardCopyOption.ATOMIC_MOVE);
             // No close/shutdown hook. The parent kills only this isolated process.
             if (!release.await(60, TimeUnit.SECONDS)) throw new AssertionError("Expected process kill");
         }
