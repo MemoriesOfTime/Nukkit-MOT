@@ -81,6 +81,31 @@ class BlockTripWireHookLiveStateTest {
         assertEquals(1, f.wireWrites);
     }
 
+
+    @Test
+    void changedLivePowerSchedulesBothHooksAndTheirNextTickCorrectsPower() {
+        Fixture f = new Fixture(BlockFace.SOUTH, false);
+        f.onPowerChange(() -> f.put(f.wirePosition, new BlockTripWire(0)));
+        f.calculate(false, -1, null);
+        verify(f.level).scheduleUpdate(any(Block.class), eq(f.hook), eq(10));
+        verify(f.level).scheduleUpdate(any(Block.class), eq(f.peerPosition), eq(10));
+        BlockTripWireHook current = (BlockTripWireHook) f.at(f.hook);
+        try (MockedStatic<Block> blocks = mockStatic(Block.class, CALLS_REAL_METHODS)) {
+            blocks.when(() -> Block.get(Block.TRIPWIRE_HOOK)).thenAnswer(i -> new BlockTripWireHook());
+            current.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
+        }
+        assertFalse(((BlockTripWireHook) f.at(f.hook)).isPowered());
+        assertFalse(((BlockTripWireHook) f.at(f.peerPosition)).isPowered());
+        assertFalse(((BlockTripWire) f.at(f.wirePosition)).isPowered());
+    }
+
+    @Test
+    void unchangedLivePowerDoesNotCreateExtraScheduledHookWork() {
+        Fixture f = new Fixture(BlockFace.EAST, false);
+        f.calculate(false, -1, null);
+        verify(f.level, never()).scheduleUpdate(any(Block.class), any(Vector3.class), anyInt());
+    }
+
     private static final class Fixture {
         final Level level = mock(Level.class);
         final PluginManager manager = mock(PluginManager.class);
