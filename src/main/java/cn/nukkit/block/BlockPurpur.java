@@ -79,7 +79,8 @@ public class BlockPurpur extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(Block.PURPUR_BLOCK), this.getDamage() & 0x03, 1);
+        int damage = this.getDamage() & 0x03;
+        return new ItemBlock(Block.get(Block.PURPUR_BLOCK, damage), damage, 1);
     }
 
     @Override
