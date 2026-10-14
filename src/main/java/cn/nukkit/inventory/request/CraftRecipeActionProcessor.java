@@ -8,6 +8,7 @@ import cn.nukkit.event.inventory.EnchantItemEvent;
 import cn.nukkit.event.inventory.SmithingTableEvent;
 import cn.nukkit.event.inventory.StonecutterItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.inventory.transaction.CraftingTransaction;
 import cn.nukkit.inventory.transaction.ItemStackRequestCraftingTransaction;
 import cn.nukkit.item.Item;
@@ -278,14 +279,19 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (output == null || output.isNull()) {
             return null;
         }
+        List<Item> originalInputs = collectCraftingInputList(player);
         CraftingTransaction snapshot = new ItemStackRequestCraftingTransaction(
-                player, collectCraftingInputList(player), output, recipe);
+                player, originalInputs, output, recipe);
         CraftItemEvent craftEvent = new CraftItemEvent(snapshot);
         Server.getInstance().getPluginManager().callEvent(craftEvent);
         if (craftEvent.isCancelled()) {
             return null;
         }
         Item eventOutput = snapshot.getPrimaryOutput();
+        if (recipe instanceof RepairItemRecipe
+                && !RepairItemRecipe.preservesInputMetadata(eventOutput, originalInputs)) {
+            return null;
+        }
         return eventOutput == null || eventOutput.isNull() ? null : eventOutput.clone();
     }
 
