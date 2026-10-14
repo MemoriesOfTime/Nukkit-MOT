@@ -93,6 +93,15 @@ public class EntityMetadata {
     }
 
     public String getString(int id) {
+        if (getClass() == EntityMetadata.class) {
+            EntityData value = this.map.get(id);
+            if (value == null) {
+                return "";
+            }
+            if (value.getClass() == StringEntityData.class) {
+                return (String) value.setId(id).getData();
+            }
+        }
         return (String) this.getOrDefault(id, new StringEntityData(id, "")).getData();
     }
 
