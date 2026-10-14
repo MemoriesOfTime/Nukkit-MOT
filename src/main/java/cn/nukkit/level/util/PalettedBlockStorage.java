@@ -61,18 +61,30 @@ public class PalettedBlockStorage {
         this.bitArray = version.createPalette(SIZE);
         this.palette = new IntArrayList(16);
         this.palette.add(defaultState);
-        this.paletteIndexLookup = new Int2IntOpenHashMap(16);
-        this.paletteIndexLookup.defaultReturnValue(-1);
-        this.paletteIndexLookup.put(defaultState, 0);
+        // Uniform biome sections do not need a reverse index. Keep it lazy until
+        // a second state is added; the palette and cell words stay unchanged.
     }
 
     protected PalettedBlockStorage(BitArray bitArray, IntList palette) {
         this.palette = palette;
         this.bitArray = bitArray;
-        this.paletteIndexLookup = new Int2IntOpenHashMap(palette.size());
+        if (palette.size() > 1) {
+            this.createPaletteIndex(palette.size());
+        }
+    }
+
+    private PalettedBlockStorage(PalettedBlockStorage source) {
+        this.bitArray = source.bitArray.copy();
+        this.palette = new IntArrayList(source.palette);
+        // The independent copy needs the derived reverse index only when written.
+    }
+
+    private void createPaletteIndex(int capacity) {
+        this.paletteIndexLookup = new Int2IntOpenHashMap(capacity);
         this.paletteIndexLookup.defaultReturnValue(-1);
-        for (int i = 0; i < palette.size(); i++) {
-            this.paletteIndexLookup.put(palette.getInt(i), i);
+        for (int i = 0; i < this.palette.size(); i++) {
+            // A stored palette may contain duplicates: retain the original last-index rule.
+            this.paletteIndexLookup.put(this.palette.getInt(i), i);
         }
     }
 
@@ -144,7 +156,9 @@ public class PalettedBlockStorage {
         BitArrayVersion version  = BitArrayVersion.get(header >> 1, true);
 
         this.palette.clear();
-        this.paletteIndexLookup.clear();
+        if (this.paletteIndexLookup != null) {
+            this.paletteIndexLookup.clear();
+        }
 
         int paletteSize = 1;
         if (version == BitArrayVersion.V0) {
@@ -164,10 +178,18 @@ public class PalettedBlockStorage {
             throw new ChunkException("Invalid paletteSize size: " + paletteSize + ", max: " + version.getMaxEntryValue());
         }
 
+        if (paletteSize <= 1) {
+            this.paletteIndexLookup = null;
+        } else if (this.paletteIndexLookup == null) {
+            this.createPaletteIndex(16);
+        }
+
         for (int i = 0; i < paletteSize; i++) {
             int runtimeId = byteBuf.readIntLE();
             this.palette.add(runtimeId);
-            this.paletteIndexLookup.put(runtimeId, i);
+            if (this.paletteIndexLookup != null) {
+                this.paletteIndexLookup.put(runtimeId, i);
+            }
             if (runtimeId < 0) {
                 Server.getInstance().getLogger().warning("Invalid runtimeId: " + runtimeId + ", palette: " + palette);
             }
@@ -225,6 +247,12 @@ public class PalettedBlockStorage {
     }
 
     private int idFor(int runtimeId) {
+        if (this.paletteIndexLookup == null) {
+            if (this.palette.size() == 1 && this.palette.getInt(0) == runtimeId) {
+                return 0;
+            }
+            this.createPaletteIndex(this.palette.size() > 1 ? this.palette.size() : 16);
+        }
         int index = this.paletteIndexLookup.get(runtimeId);
         if (index != -1) {
             return index;
@@ -256,7 +284,7 @@ public class PalettedBlockStorage {
     }
 
     public PalettedBlockStorage copy() {
-        return new PalettedBlockStorage(this.bitArray.copy(), new IntArrayList(this.palette));
+        return new PalettedBlockStorage(this);
     }
 
     public boolean contentEquals(PalettedBlockStorage other) {
