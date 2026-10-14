@@ -21,6 +21,7 @@ class QuarantinedChunkAdmissionTest {
         field(level, "chunkGenerationQueue", new Long2ObjectOpenHashMap<>());
         field(level, "chunkPopulationQueueSize", 100);
         field(level, "chunkGenerationQueueSize", 100);
+        doReturn(centre).when(level).getChunkIfLoaded(anyInt(), anyInt());
         doReturn(centre).when(level).getChunk(anyInt(), anyInt(), eq(true));
         return level;
     }
