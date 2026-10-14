@@ -255,6 +255,7 @@ public class EntityItem extends Entity {
                                 if (newAmount > this.item.getMaxStackSize()) {
                                     continue;
                                 }
+                                this.age = Math.min(this.age, entity.age);
                                 closeItem.setCount(0);
                                 this.item.setCount(newAmount);
                                 entity.close();
