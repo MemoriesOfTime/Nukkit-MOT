@@ -38,6 +38,16 @@ class SpawnerSelectedLightCellTest {
  }
  @Test void cancelledSpawnDoesNotCreateOrReadLight(){Fixture f=new Fixture(0,0);EntityZombie mob=mock(EntityZombie.class);f.run(mob,event->event.setCancelled(true));assertEquals(0,f.factoryCalls);verifyNoInteractions(mob);verify(f.level,never()).getBlockLightAt(anyInt(),anyInt(),anyInt());}
  @Test void passiveSpawnStillIgnoresLight(){Fixture f=new Fixture(15,15);EntitySheep sheep=mock(EntitySheep.class);f.run(sheep,event->{});verify(sheep).spawnToAll();verify(sheep,never()).close();verify(f.level,never()).getBlockLightAt(anyInt(),anyInt(),anyInt());}
+
+ @ParameterizedTest @CsvSource({"15,0,true","0,15,false","0,3,true","3,4,false"})
+ void eventSelectedWorldOwnsTheLightQuery(int sourceLight,int destinationLight,boolean allowed){
+  Fixture f=new Fixture(sourceLight,sourceLight);Level destination=mock(Level.class);
+  when(destination.getBlockLightAt(2,64,2)).thenReturn(destinationLight);
+  EntityZombie mob=mock(EntityZombie.class);f.run(mob,event->event.getPosition().setLevel(destination));
+  verify(mob,allowed?times(1):never()).spawnToAll();verify(mob,allowed?never():times(1)).close();
+  verify(destination).getBlockLightAt(2,64,2);
+  verify(f.level,never()).getBlockLightAt(anyInt(),anyInt(),anyInt());
+ }
     private static final class Fixture {
         final Level level = mock(Level.class);
         final PluginManager plugins = mock(PluginManager.class);
