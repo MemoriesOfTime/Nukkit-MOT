@@ -1320,7 +1320,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         try {
             submitted = this.dataPacket(packet);
         } finally {
-            if (!submitted && tracked
+            if (!submitted && tracked && this.usedChunks.get(index) == Boolean.FALSE
                     && isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, true)) {
                 this.usedChunks.put(index, Boolean.FALSE);
                 this.loadQueue.add(index);

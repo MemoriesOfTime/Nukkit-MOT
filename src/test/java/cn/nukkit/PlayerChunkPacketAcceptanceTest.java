@@ -119,4 +119,33 @@ class PlayerChunkPacketAcceptanceTest {
         assertTrue(player.loadQueue.isEmpty());
         assertEquals(0, sent());
     }
+    @Test
+    void rejectedOuterSubmissionPreservesAcceptedReentrantReplacement() throws Exception {
+        DataPacket replacement = new LevelChunkPacket();
+        when(player.dataPacket(replacement)).thenReturn(true);
+        doAnswer(call -> {
+            player.sendChunk(3, 5, replacement);
+            return false;
+        }).when(player).dataPacket(packet);
+        player.sendChunk(3, 5, packet);
+        assertTrue(player.usedChunks.get(index));
+        assertTrue(player.loadQueue.isEmpty());
+        assertEquals(1, sent());
+    }
+
+    @Test
+    void throwingOuterSubmissionPreservesAcceptedReentrantReplacement() throws Exception {
+        DataPacket replacement = new LevelChunkPacket();
+        RuntimeException failure = new IllegalStateException("listener failure after replacement");
+        when(player.dataPacket(replacement)).thenReturn(true);
+        doAnswer(call -> {
+            player.sendChunk(3, 5, replacement);
+            throw failure;
+        }).when(player).dataPacket(packet);
+        assertSame(failure, assertThrows(RuntimeException.class, () -> player.sendChunk(3, 5, packet)));
+        assertTrue(player.usedChunks.get(index));
+        assertTrue(player.loadQueue.isEmpty());
+        assertEquals(1, sent());
+    }
+
 }
