@@ -42,7 +42,7 @@ class AddPlayerAbilitiesWireBoundaryTest {
         // Include both 2168 aliases: their GameVersion objects can select different item codecs.
         return Arrays.stream(GameVersion.values())
                 .filter(version -> !version.isNetEase())
-                .filter(version -> version.getProtocol() >= 589 && version.getProtocol() <= 2193);
+                .filter(version -> version.getProtocol() >= 589);
     }
 
     @ParameterizedTest(name = "AddPlayer abilities schema {0}")
