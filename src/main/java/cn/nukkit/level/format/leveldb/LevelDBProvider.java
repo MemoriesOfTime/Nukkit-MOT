@@ -1204,7 +1204,7 @@ public class LevelDBProvider implements LevelProvider {
                 || (deferredBlockUpdates != null && !deferredBlockUpdates.isEmpty())) {
             NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, deferredBlockUpdates, currentTick);
             if (ticks != null) {
-                ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+                ByteBuf byteBuf = Unpooled.buffer();
                 try {
                     try (NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf))) {
                         outputStream.writeTag(ticks);
