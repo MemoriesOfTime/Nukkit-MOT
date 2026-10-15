@@ -110,6 +110,30 @@ public class EntityItem extends Entity {
         }
     }
 
+    /** A falling coordinator distinguishes intentional ItemSpawnEvent closure from an invalid item. */
+    public static final class FallingDrop {
+        private final PreparedDrop drop;
+        private final boolean discarded;
+        private FallingDrop(PreparedDrop drop, boolean discarded) { this.drop = drop; this.discarded = discarded; }
+        public boolean isDiscarded() { return discarded; }
+        public boolean isValid() { return !discarded && drop.isValid(); }
+        public void release() { drop.release(); }
+        public void discard() { drop.discard(); }
+        public void notifyPublished() { drop.notifyPublished(); }
+    }
+
+    public static FallingDrop prepareFallingDrop(FullChunk chunk, CompoundTag nbt, Item expected) {
+        CompoundTag authored = nbt.clone();
+        EntityItem entity = new EntityItem(chunk, nbt, true);
+        try {
+            return new FallingDrop(new PreparedDrop(entity, chunk, authored, expected), entity.closed);
+        } catch (RuntimeException | Error failure) {
+            try { entity.discardDeferredPublication(); }
+            catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+            throw failure;
+        }
+    }
+
     private boolean deferredItemInvalid;
 
     public static PreparedDrop prepareDrop(FullChunk chunk, CompoundTag nbt, Item expected) {

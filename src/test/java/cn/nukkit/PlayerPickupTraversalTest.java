@@ -95,6 +95,28 @@ class PlayerPickupTraversalTest {
     }
 
     @Test
+    void genuinelyPreparedPublicationCannotBeConsumedByNativeTraversal() throws Exception {
+        Fixture f = new Fixture();
+        doCallRealMethod().when(f.level).discardDeferredEntityRegistration(any());
+        Item authored = Item.get(Item.DIAMOND, 0, 1);
+        var ticket = EntityItem.prepareDrop(f.chunk, Entity.getDefaultNBT(new Vector3(.25, 64, .25))
+                .putShort("Health", 5).putShort("PickupDelay", 0)
+                .putCompound("Item", NBTIO.putItemHelper(authored)), authored);
+        assertNotNull(ticket); assertTrue(ticket.isValid());
+        EntityItem deferred = (EntityItem) f.entities.values().iterator().next();
+        assertTrue(deferred.isPublicationDeferred());
+        deferred.boundingBox = f.player.boundingBox;
+        f.player.checkNearEntities();
+        assertFalse(deferred.closed); assertTrue(authored.equalsExact(deferred.getItem()));
+        assertSame(deferred, f.level.getEntity(deferred.getId()));
+        verify(f.plugins, never()).callEvent(any(InventoryPickupItemEvent.class));
+        verify(f.inventory, never()).setItem(anyInt(), any(Item.class), anyBoolean());
+        verify(f.inventory, never()).clear(anyInt(), anyBoolean());
+        assertTrue(f.inventory.getContents().isEmpty());
+        ticket.discard(); assertTrue(f.entities.isEmpty()); assertTrue(f.chunk.getEntities().isEmpty());
+    }
+
+    @Test
     void cancelledItemArrowAndTridentEventsStillLeaveEntitiesInWorld() throws Exception {
         Fixture f = new Fixture();
         EntityItem item = f.add(EntityItem.class, 1);

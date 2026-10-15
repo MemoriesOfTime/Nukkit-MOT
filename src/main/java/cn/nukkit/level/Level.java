@@ -12,6 +12,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.item.EntityItem;
+import cn.nukkit.entity.item.EntityFallingBlock;
 import cn.nukkit.entity.item.EntityXPOrb;
 import cn.nukkit.entity.mob.EntitySnowGolem;
 import cn.nukkit.entity.passive.EntityIronGolem;
@@ -2652,6 +2653,12 @@ public class Level implements ChunkManager, Metadatable {
         if (blockPrevious.getFullId() == block.getFullId()) {
             return false;
         }
+        notifyBlockSet(x, y, z, layer, blockPrevious, block, direct, update);
+        return true;
+    }
+
+    private void notifyBlockSet(int x, int y, int z, int layer, Block blockPrevious,
+                                Block block, boolean direct, boolean update) {
         block.x = x;
         block.y = y;
         block.z = z;
@@ -2703,7 +2710,80 @@ public class Level implements ChunkManager, Metadatable {
                 this.updateAround(new Vector3(x, y, z));
             }
         }
-        return true;
+    }
+
+    /** A short-lived receipt for a loaded, native falling cell; never loads a chunk. */
+    public static final class FallingCell implements AutoCloseable {
+        private final Level level;
+        private final cn.nukkit.level.format.generic.BaseChunk chunk;
+        private final int x, y, z, layer, before;
+        private final long revision;
+        private final cn.nukkit.level.format.ChunkSection section;
+        private int outputFullId;
+        private Block output;
+        private Block previous;
+        private boolean committed;
+        private boolean closed;
+
+        private FallingCell(Level level, cn.nukkit.level.format.generic.BaseChunk chunk,
+                            int x, int y, int z, int layer, int before) {
+            this.level = level; this.chunk = chunk;
+            this.x = x; this.y = y; this.z = z; this.layer = layer; this.before = before;
+            this.revision = chunk.getMutationRevision();
+            this.section = chunk.getSection(y >> 4);
+        }
+
+        public boolean isValid() {
+            return !closed && !committed && level.server.isPrimaryThread()
+                    && chunk.supportsNativeFallingCell(x & 15, y, z & 15, layer)
+                    && level.isYInRange(y) && layer >= 0 && layer <= level.requireProvider().getMaximumLayer()
+                    && level.getChunkIfLoaded(x >> 4, z >> 4) == chunk
+                    && chunk.getMutationRevision() == revision
+                    && chunk.getSection(y >> 4) == section
+                    && chunk.getFullBlock(x & 15, y, z & 15, layer) == before
+                    && chunk.getTile(x & 15, y, z & 15) == null;
+        }
+
+        /** Preallocate authored blocks before the assignment-only commit. */
+        public boolean approve(Block block) {
+            if (!isValid() || block instanceof cn.nukkit.block.BlockEntityHolder
+                    || block.getFullId() == before) return false;
+            outputFullId = block.getFullId();
+            output = Block.fromFullId(outputFullId);
+            previous = Block.fromFullId(before);
+            return true;
+        }
+
+        public boolean commit() {
+            if (output == null || !isValid()) return false;
+            if (!chunk.writeFallingCell(x & 15, y, z & 15, layer, outputFullId)) return false;
+            committed = true;
+            return true;
+        }
+
+        public void scheduleUpdate() { level.scheduleUpdate(level.getBlock(x, y, z, layer), 1); }
+
+        public void notifyCommitted() {
+            if (!committed || closed) return;
+            closed = true;
+            chunk.notifyFallingCell(x & 15, y, z & 15);
+            level.notifyBlockSet(x, y, z, layer, previous, output, true, true);
+        }
+
+        @Override public void close() { closed = true; }
+    }
+
+    public final FallingCell prepareFallingCell(Block expected) {
+        if (getClass() != Level.class || expected == null || expected.level != this || !server.isPrimaryThread()
+                || !isYInRange(expected.getFloorY()) || expected.layer < 0
+                || expected.layer > requireProvider().getMaximumLayer()) return null;
+        BaseFullChunk loaded = getChunkIfLoaded(expected.getFloorX() >> 4, expected.getFloorZ() >> 4);
+        if (!(loaded instanceof cn.nukkit.level.format.generic.BaseChunk chunk)
+                || chunk.getFullBlock(expected.getFloorX() & 15, expected.getFloorY(), expected.getFloorZ() & 15,
+                        expected.layer) != expected.getFullId()
+                || !chunk.prepareFallingCell(expected.getFloorX() & 15, expected.getFloorY(), expected.getFloorZ() & 15)) return null;
+        return new FallingCell(this, chunk, expected.getFloorX(), expected.getFloorY(), expected.getFloorZ(),
+                expected.layer, expected.getFullId());
     }
 
     /**
@@ -2871,6 +2951,25 @@ public class Level implements ChunkManager, Metadatable {
                         .add(new FloatTag("", 0)))
                 .putShort("Health", 5).putCompound("Item", itemTag).putShort("PickupDelay", delay);
         return EntityItem.prepareDrop(this.getChunk((int) source.x >> 4, (int) source.z >> 4, true), nbt, item);
+    }
+
+    /** Keep the falling policy outcome distinct from generic invalid drop preparation. */
+    public final EntityItem.FallingDrop prepareFallingItemDrop(cn.nukkit.entity.item.EntityFallingBlock source, Item item) {
+        BaseFullChunk loaded = getChunkIfLoaded(source.getFloorX() >> 4, source.getFloorZ() >> 4);
+        if (item == null || item.getId() == 0 || item.getCount() <= 0 || loaded == null
+                || loaded != source.chunk) return null;
+        Item authored = item.clone();
+        CompoundTag itemTag = NBTIO.putItemHelper(authored);
+        itemTag.setName("Item");
+        CompoundTag nbt = new CompoundTag()
+                .putList(new ListTag<DoubleTag>("Pos").add(new DoubleTag("", source.x))
+                        .add(new DoubleTag("", source.y)).add(new DoubleTag("", source.z)))
+                .putList(new ListTag<DoubleTag>("Motion").add(new DoubleTag("", Utils.random.nextDouble() * 0.2 - 0.1))
+                        .add(new DoubleTag("", 0.2)).add(new DoubleTag("", Utils.random.nextDouble() * 0.2 - 0.1)))
+                .putList(new ListTag<FloatTag>("Rotation").add(new FloatTag("", ThreadLocalRandom.current().nextFloat() * 360))
+                        .add(new FloatTag("", 0)))
+                .putShort("Health", 5).putCompound("Item", itemTag).putShort("PickupDelay", 10);
+        return EntityItem.prepareFallingDrop(loaded, nbt, authored);
     }
 
     public void dropItem(Vector3 source, Item item) {
