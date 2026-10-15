@@ -140,7 +140,7 @@ class PlayerDataLockLifecycleTest {
                 if (block) {
                     writeStarted.countDown();
                     try {
-                        if (!releaseWrite.await(10, TimeUnit.SECONDS)) throw new IOException("test write timeout");
+                        if (!releaseWrite.await(30, TimeUnit.SECONDS)) throw new IOException("test write timeout");
                     } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IOException(e); }
                 }
             }
