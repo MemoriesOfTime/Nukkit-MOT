@@ -1201,6 +1201,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.sleeping != null;
     }
 
+    // EaseCation uses a compact sleeping body; ordinary posture and wire offsets stay native.
+    @Override
+    public float getWidth() {
+        return this.isSleeping() ? 0.2f : super.getWidth();
+    }
+
+    @Override
+    public float getLength() {
+        return this.isSleeping() ? 0.2f : super.getLength();
+    }
+
+    @Override
+    public float getHeight() {
+        return this.isSleeping() ? 0.2f : super.getHeight();
+    }
+
+    @Override
+    public float getEyeHeight() {
+        return this.isSleeping() ? 0.18f : super.getEyeHeight();
+    }
+
     public int getInAirTicks() {
         return this.inAirTicks;
     }
@@ -1887,8 +1908,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
+        Vector3 previousSleeping = this.sleeping;
         this.sleeping = pos.clone();
-        this.teleport(new Location(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, this.yaw, this.pitch, this.headYaw, this.level), null);
+        this.recalculateBoundingBox(false);
+        if (!this.teleport(new Location(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, this.yaw, this.pitch, this.headYaw, this.level), null)) {
+            this.sleeping = previousSleeping;
+            this.recalculateBoundingBox(false);
+            return false;
+        }
 
         this.setDataProperty(new IntPositionEntityData(DATA_PLAYER_BED_POSITION, (int) pos.x, (int) pos.y, (int) pos.z));
         this.setDataFlag(DATA_PLAYER_FLAGS, DATA_PLAYER_FLAG_SLEEP, true);
@@ -1963,19 +1990,170 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void stopSleep() {
         if (this.sleeping != null) {
-            this.server.getPluginManager().callEvent(new PlayerBedLeaveEvent(this, this.level.getBlock(this.sleeping)));
+            Level sleepingLevel = this.level;
+            try {
+                this.server.getPluginManager().callEvent(new PlayerBedLeaveEvent(
+                        this, sleepingLevel.getBlock(this.sleeping, false)));
+            } finally {
+                this.sleeping = null;
+                this.removeDataProperty(DATA_PLAYER_BED_POSITION);
+                this.setDataFlag(DATA_PLAYER_FLAGS, DATA_PLAYER_FLAG_SLEEP, false);
+                this.recalculateBoundingBox(false);
+                sleepingLevel.sleepTicks = 0;
 
-            this.sleeping = null;
-            this.removeDataProperty(DATA_PLAYER_BED_POSITION);
-            this.setDataFlag(DATA_PLAYER_FLAGS, DATA_PLAYER_FLAG_SLEEP, false);
-
-            this.level.sleepTicks = 0;
-
-            AnimatePacket pk = new AnimatePacket();
-            pk.eid = this.id;
-            pk.action = AnimatePacket.Action.WAKE_UP;
-            this.dataPacket(pk);
+                try {
+                    this.relocateBlockedBedWake();
+                } catch (RuntimeException failure) {
+                    log.warn("module=core event=bed_wake_refused player={} world={} x={} y={} z={} reason={}",
+                            this.getName(), this.level == null ? "unknown" : this.level.getFolderName(),
+                            this.x, this.y, this.z, failure.getClass().getSimpleName());
+                } finally {
+                    // A relocation listener may have started a new sleep: do not animate it awake.
+                    if (this.sleeping == null) {
+                        AnimatePacket pk = new AnimatePacket();
+                        pk.eid = this.id;
+                        pk.action = AnimatePacket.Action.WAKE_UP;
+                        this.dataPacket(pk);
+                    }
+                }
+            }
         }
+    }
+
+    /** Best effort: failure or plugin cancellation never suppresses wake or grants immunity. */
+    private void relocateBlockedBedWake() {
+        if (!this.isOnline() || !this.isAlive() || this.sleeping != null) return;
+        NetworkPlayerSession wakeSession = this.getNetworkSession();
+        Location current = this.getLocation();
+        if (this.hasLoadedStandingBedSpace(current)) {
+            return;
+        }
+        Level currentLevel = current.getLevel();
+        if (currentLevel == null || !Double.isFinite(current.x)
+                || !Double.isFinite(current.y) || !Double.isFinite(current.z)) {
+            return;
+        }
+        int centerX = current.getFloorX();
+        int centerY = current.getFloorY();
+        int centerZ = current.getFloorZ();
+        // Never use the old bed vector: a sleeper may have changed level or position.
+        for (int ring = 0; ring <= 2; ring++) {
+            for (int dx = -ring; dx <= ring; dx++) {
+                for (int dz = -ring; dz <= ring; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue;
+                    double x = centerX + dx + 0.5;
+                    double z = centerZ + dz + 0.5;
+                    if (!this.hasLoadedBedWakeHalo(currentLevel, x, z)) continue;
+                    for (int supportY = centerY - 1; supportY <= centerY; supportY++) {
+                        Block support = currentLevel.getBlock(centerX + dx, supportY, centerZ + dz, false);
+                        if (isBedWakeHazard(support) || support.canPassThrough()) continue;
+                        AxisAlignedBB supportBox = support.getCollisionBoundingBox();
+                        if (supportBox == null) continue;
+                        double y = supportBox.getMaxY();
+                        // At most the local floor/bed surface, never an upward roof scan.
+                        if (y < current.y - 1 || y > current.y + 0.5625) continue;
+                        Location candidate = new Location(x, y, z, this.yaw, this.pitch, this.headYaw, currentLevel);
+                        if (!this.hasLoadedStandingBedSpace(candidate)) continue;
+                        PlayerTeleportEvent event = new PlayerTeleportEvent(
+                                this, current, candidate, TeleportCause.PLUGIN);
+                        this.server.getPluginManager().callEvent(event);
+                        // Respect a listener's own teleport, quit, death or newly entered bed.
+                        if (this.level != currentLevel || this.x != current.x
+                                || this.y != current.y || this.z != current.z || this.sleeping != null
+                                || !this.isOnline() || !this.isAlive()
+                                || this.getNetworkSession() != wakeSession) return;
+                        if (!event.isCancelled() && this.hasLoadedStandingBedTeleportSpace(event.getTo())) {
+                            this.teleport(event.getTo(), null); // The standard event was already fired once.
+                        }
+                        return; // Cancellation must not be bypassed with another candidate.
+                    }
+                }
+            }
+        }
+    }
+
+    /** Match Player.teleport's existing integral-Y adjustment before authorizing its final target. */
+    private boolean hasLoadedStandingBedTeleportSpace(Location target) {
+        if (target == null) return false;
+        double y = target.y == target.getFloorY() ? target.y + 0.00001 : target.y;
+        return this.hasLoadedStandingBedSpace(new Location(
+                target.x, y, target.z, target.yaw, target.pitch, target.headYaw, target.getLevel()));
+    }
+
+    /** Shape getters may read neighbouring blocks: require their horizontal halo first. */
+    private boolean hasLoadedBedWakeHalo(Level level, double x, double z) {
+        double radius = super.getWidth() * this.scale / 2d;
+        if (level == null || !Double.isFinite(x) || !Double.isFinite(z)
+                || !Double.isFinite(radius) || radius <= 0 || radius > 4
+                || Math.abs(x) > ENTITY_COORDINATES_MAX_VALUE - 8
+                || Math.abs(z) > ENTITY_COORDINATES_MAX_VALUE - 8) {
+            return false;
+        }
+        int minChunkX = (NukkitMath.floorDouble(x - radius) - 1) >> 4;
+        int maxChunkX = (NukkitMath.floorDouble(x + radius) + 1) >> 4;
+        int minChunkZ = (NukkitMath.floorDouble(z - radius) - 1) >> 4;
+        int maxChunkZ = (NukkitMath.floorDouble(z + radius) + 1) >> 4;
+        for (int cx = minChunkX; cx <= maxChunkX; cx++) {
+            for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
+                BaseFullChunk chunk = level.getChunkIfLoaded(cx, cz);
+                if (chunk == null || !chunk.isInitialized() || !chunk.isGenerated()
+                        || !chunk.isPopulated()) return false;
+            }
+        }
+        return true;
+    }
+
+    /** Full standing body, independent of the sleeper's preceding sneak/swim/glide pose. */
+    private boolean hasLoadedStandingBedSpace(Location position) {
+        if (position == null || !Double.isFinite(position.y)
+                || !this.hasLoadedBedWakeHalo(position.getLevel(), position.x, position.z)) return false;
+        Level level = position.getLevel();
+        double radius = super.getWidth() * this.scale / 2d;
+        double height = 1.8d * this.scale;
+        if (!Double.isFinite(height) || height <= 0 || height > 16) return false;
+        double epsilon = 0.000001;
+        // Native teleports raise integral feet Y by 1E-5; this still counts as floor support.
+        double supportEpsilon = 0.0001;
+        AxisAlignedBB body = new SimpleAxisAlignedBB(
+                position.x - radius + epsilon, position.y + epsilon, position.z - radius + epsilon,
+                position.x + radius - epsilon, position.y + height - epsilon, position.z + radius - epsilon);
+        AxisAlignedBB feet = new SimpleAxisAlignedBB(
+                body.getMinX(), position.y - supportEpsilon, body.getMinZ(),
+                body.getMaxX(), position.y + epsilon, body.getMaxZ());
+        int minX = NukkitMath.floorDouble(body.getMinX());
+        int maxX = NukkitMath.floorDouble(body.getMaxX());
+        int minY = NukkitMath.floorDouble(position.y - supportEpsilon);
+        int maxY = NukkitMath.floorDouble(body.getMaxY());
+        int minZ = NukkitMath.floorDouble(body.getMinZ());
+        int maxZ = NukkitMath.floorDouble(body.getMaxZ());
+        if (minY < level.getMinBlockY() || maxY > level.getMaxBlockY()) return false;
+        if ((long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1) > 512) return false;
+        boolean supported = false;
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    for (int layer = 0; layer <= 1; layer++) {
+                        Block block = level.getBlock(x, y, z, layer, false);
+                        if (isBedWakeHazard(block)) return false;
+                        if (block.canPassThrough()) continue;
+                        AxisAlignedBB box = block.getCollisionBoundingBox();
+                        if (box == null) continue;
+                        if (box.intersectsWith(body)) return false;
+                        if (box.getMaxY() <= position.y + supportEpsilon && box.intersectsWith(feet)) supported = true;
+                    }
+                }
+            }
+        }
+        return supported;
+    }
+
+    private static boolean isBedWakeHazard(Block block) {
+        return block.isLiquid() || switch (block.getId()) {
+            case BlockID.FIRE, BlockID.SOUL_FIRE, BlockID.CACTUS, BlockID.MAGMA,
+                    BlockID.CAMPFIRE_BLOCK, BlockID.SOUL_CAMPFIRE_BLOCK,
+                    BlockID.SWEET_BERRY_BUSH, BlockID.WITHER_ROSE, BlockID.POWDER_SNOW -> true;
+            default -> false;
+        };
     }
 
     public Vector3 getSleepingPos() {

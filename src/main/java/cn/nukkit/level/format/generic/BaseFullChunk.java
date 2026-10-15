@@ -215,6 +215,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return pk;
     }
 
+    /** Main-thread lifecycle query: native entity and block-entity initialization has completed. */
+    public boolean isInitialized() {
+        return this.isInit;
+    }
+
     @Override
     public void initChunk() {
         LevelProvider initProviderTemp = this.getProvider();
