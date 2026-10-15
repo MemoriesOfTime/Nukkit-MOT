@@ -318,6 +318,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
 
     private int chunksSent = 0;
+    private long chunkDeliveryEpoch;
     private boolean hasSpawnChunks;
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
     protected int nextChunkOrderRun = 1;
@@ -467,7 +468,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean worldClockSynced;
     private boolean foodEnabled = true;
     private int failedTransactions;
-    protected int failedMobEquipmentPacket;
     private int timeSinceRest;
     private boolean inSoulSand;
     private boolean dimensionChangeInProgress;
@@ -1252,6 +1252,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private void unloadChunks(boolean online) {
+        ++this.chunkDeliveryEpoch;
         for (long index : this.usedChunks.keySet()) {
             int chunkX = Level.getHashX(index);
             int chunkZ = Level.getHashZ(index);
@@ -1310,10 +1311,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        this.usedChunks.put(Level.chunkHash(x, z), Boolean.TRUE);
-
-        this.dataPacket(packet);
-
+        long index = Level.chunkHash(x, z);
+        Level sourceLevel = this.level;
+        long sourceEpoch = this.chunkDeliveryEpoch;
+        boolean tracked = this.usedChunks.containsKey(index);
+        boolean submitted = false;
+        try {
+            submitted = this.dataPacket(packet);
+        } finally {
+            if (!submitted && tracked && this.usedChunks.get(index) == Boolean.FALSE
+                    && isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, true)) {
+                this.usedChunks.put(index, Boolean.FALSE);
+                this.loadQueue.add(index);
+            }
+        }
+        if (!submitted || !isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, tracked)) {
+            return;
+        }
+        this.usedChunks.put(index, Boolean.TRUE);
         this.chunksSent++;
 
         if (this.spawned) {
@@ -1340,6 +1355,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             playerActionPacket.entityId = this.getId();
             this.dataPacket(playerActionPacket);
         }
+    }
+
+    private boolean isChunkSubmissionContextCurrent(Level sourceLevel, long sourceEpoch,
+                                                     long index, boolean tracked) {
+        return this.connected && this.level == sourceLevel && this.chunkDeliveryEpoch == sourceEpoch
+                && (!tracked || this.usedChunks.containsKey(index));
     }
 
     @Deprecated
@@ -3001,9 +3022,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastUpdate = currentTick;
 
         this.failedTransactions = 0;
-        if (currentTick%20 == 0) {
-            this.failedMobEquipmentPacket = 0;
-        }
 
         if (this.riptideTicks > 0) {
             this.riptideTicks -= tickDiff;
@@ -8437,11 +8455,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.tryEncode();
 
         byte[] buf = pk.getBuffer();
-        BinaryStream batched = new BinaryStream(new byte[5 + buf.length]).reset();
+        int lengthPrefixBytes = 1;
+        for (int remaining = buf.length; (remaining >>>= 7) != 0; ) {
+            lengthPrefixBytes++;
+        }
+        // This stream owns an exact batch and is never reused after compression.
+        BinaryStream batched = new BinaryStream(new byte[lengthPrefixBytes + buf.length]).reset();
         batched.putUnsignedVarInt(buf.length);
         batched.put(buf);
         try {
-            byte[] bytes = batched.getBuffer();
+            byte[] owned = batched.getBufferUnsafe();
+            // Preserve trimmed bytes if a future writer changes the capacity.
+            byte[] bytes = batched.getCount() == owned.length ? owned : batched.getBuffer();
             BatchPacket compress = new BatchPacket();
             if (Server.getInstance().useSnappy && protocol >= ProtocolInfo.v1_19_30_23) {
                 compress.payload = SnappyCompression.compress(bytes);

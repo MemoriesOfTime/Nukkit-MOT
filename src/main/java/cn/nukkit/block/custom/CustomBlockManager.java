@@ -254,6 +254,22 @@ public class CustomBlockManager {
             throw new IllegalArgumentException("Block network data can not be empty for block with more permutations: " + identifier);
         }
 
+        if (blockDefinition != null) {
+            CompoundTag networkData = blockDefinition.nbt().getCompound("vanilla_block_data");
+            if (blockDefinition.nukkitId() != nukkitId
+                    || !networkData.containsInt("block_id") || networkData.getInt("block_id") != nukkitId) {
+                CompoundTag ownedNbt = blockDefinition.nbt().copy();
+                CompoundTag ownedNetworkData = ownedNbt.getCompound("vanilla_block_data");
+                ownedNetworkData.putInt("block_id", nukkitId);
+                ownedNbt.putCompound("vanilla_block_data", ownedNetworkData);
+                log.warn("Rebinding custom block definition IDs: record={}, network={}, allocated={}",
+                        blockDefinition.nukkitId(), networkData.containsInt("block_id")
+                                ? Integer.toString(networkData.getInt("block_id")) : "missing-or-non-int", nukkitId);
+                blockDefinition = new CustomBlockDefinition(blockDefinition.identifier(), ownedNbt, nukkitId,
+                        blockDefinition.typeOf(), blockDefinition.registerCreativeItem());
+            }
+        }
+
         CustomBlockState defaultState = this.createBlockState(identifier, nukkitId << Block.DATA_BITS, properties, factory);
         this.legacy2CustomState.put(defaultState.getLegacyId(), defaultState);
 
