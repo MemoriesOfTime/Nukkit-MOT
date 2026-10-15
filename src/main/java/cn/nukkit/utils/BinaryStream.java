@@ -1022,6 +1022,9 @@ public class BinaryStream {
                 canBreak[i] = stream.readUTF();
             }
 
+            if (isUnsupportedSpearDisplay(gameVersion, runtimeId, compoundTag)) {
+                id = Item.INFO_UPDATE;
+            }
             if (id != null) {
                 if (id == ItemID.SHIELD) {
                     stream.readLong();
@@ -1365,6 +1368,10 @@ public class BinaryStream {
 
         if (!item.isSupportedOn(gameVersion) || isErrorItem) {
             item = degradeToInfoUpdate(gameVersion, item, isStringItem);
+            if (item.getId() != Item.INFO_UPDATE) {
+                isStringItem = item instanceof StringItem;
+                isErrorItem = false;
+            }
         }
 
         int id = item.getId();
@@ -1452,8 +1459,47 @@ public class BinaryStream {
      * MV_ORIGIN_* 标签里供解码端还原（见 getSlotNew / getNetworkItemStackDescriptor）。
      * putSlotNew 与 putNetworkItemStackDescriptor 共用，保证两条序列化路径行为一致。
      */
+    private static String unsupportedSpearDisplayNamespace(GameVersion gameVersion, String namespace) {
+        if (gameVersion.getProtocol() < ProtocolInfo.v1_20_0
+                || gameVersion.getProtocol() >= ProtocolInfo.v1_21_130_28) {
+            return null;
+        }
+        return switch (namespace) {
+            case "minecraft:wooden_spear" -> "minecraft:wooden_sword";
+            case "minecraft:stone_spear" -> "minecraft:stone_sword";
+            case "minecraft:copper_spear" -> gameVersion.getProtocol() >= ProtocolInfo.v1_21_100
+                    ? "minecraft:copper_sword" : "minecraft:iron_sword";
+            case "minecraft:iron_spear" -> "minecraft:iron_sword";
+            case "minecraft:golden_spear" -> "minecraft:golden_sword";
+            case "minecraft:diamond_spear" -> "minecraft:diamond_sword";
+            case "minecraft:netherite_spear" -> "minecraft:netherite_sword";
+            default -> null;
+        };
+    }
+
+    private static boolean isUnsupportedSpearDisplay(GameVersion gameVersion, int runtimeId, CompoundTag tag) {
+        if (tag == null || !tag.containsInt(MV_ORIGIN_ID) || !tag.containsInt(MV_ORIGIN_META)
+                || tag.getInt(MV_ORIGIN_ID) != ItemID.STRING_IDENTIFIED_ITEM
+                || !tag.containsString(MV_ORIGIN_NAMESPACE)
+                || (tag.contains(MV_ORIGIN_NBT) && !tag.containsCompound(MV_ORIGIN_NBT))) {
+            return false;
+        }
+        String namespace = tag.getString(MV_ORIGIN_NAMESPACE);
+        String expected = unsupportedSpearDisplayNamespace(gameVersion, namespace);
+        if (expected == null || !expected.equals(RuntimeItems.getMapping(gameVersion).getNamespacedIdByNetworkId(runtimeId))) {
+            return false;
+        }
+        Item origin = Item.fromString(namespace);
+        return origin instanceof ItemSpear && !origin.isSupportedOn(gameVersion);
+    }
+
     private static Item degradeToInfoUpdate(GameVersion gameVersion, Item originItem, boolean isStringItem) {
-        Item item = Item.get(Item.INFO_UPDATE, 0, originItem.getCount());
+        String fallback = originItem instanceof ItemSpear ? unsupportedSpearDisplayNamespace(gameVersion, originItem.getNamespaceId()) : null;
+        Item item = fallback == null ? Item.get(Item.INFO_UPDATE, 0, originItem.getCount()) : Item.fromString(fallback);
+        item.setCount(originItem.getCount());
+        if (fallback != null) {
+            item.setDamage(originItem.getDamage());
+        }
         CompoundTag compoundTag = originItem.getNamedTag();
         if (compoundTag != null) {
             item.setNamedTag(new CompoundTag().putCompound(MV_ORIGIN_NBT, compoundTag));
@@ -1502,6 +1548,10 @@ public class BinaryStream {
 
         if (item.getId() != Item.AIR && (!item.isSupportedOn(gameVersion) || isErrorItem)) {
             item = degradeToInfoUpdate(gameVersion, item, isStringItem);
+            if (item.getId() != Item.INFO_UPDATE) {
+                isStringItem = item instanceof StringItem;
+                isErrorItem = false;
+            }
         }
 
         int id = item.getId();
