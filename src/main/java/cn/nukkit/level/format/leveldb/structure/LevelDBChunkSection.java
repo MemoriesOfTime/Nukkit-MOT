@@ -4,6 +4,8 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.custom.container.BlockStorageContainer;
+import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
@@ -21,11 +23,11 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.function.Consumer;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_DATA_ARRAY;
 import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_ID_ARRAY;
@@ -138,8 +140,11 @@ public class LevelDBChunkSection implements ChunkSection {
             this.parent = new WeakReference<>(parent);
             this.wasAttached |= parent != null;
             // Set hasSkyLight based on dimension (Overworld = 0 has sky light).
+            // 异步解码挂载时 level 可能已被 close 置空，回退 legacy（主世界，含天光）
+            // The level may be nulled by close during async decode attach; fall back to legacy (overworld, with skylight)
             if (parent != null && parent.getProvider() != null) {
-                this.hasSkyLight = parent.getProvider().getLevel().getDimensionData().getDimensionId() == 0;
+                Level levelTemp = parent.getProvider().getLevel();
+                this.hasSkyLight = (levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData()).getDimensionId() == 0;
             }
         } finally {
             this.writeLock.unlock();
@@ -435,19 +440,21 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockSkyLight(int x, int y, int z) {
-        if (this.skyLight == null) {
-            if (!hasSkyLight) {
-                return 0;
-            } else if (compressedLight == null) {
-                return 15;
+        this.skyLightLock.lock();
+        try {
+            if (this.skyLight == null) {
+                if (!hasSkyLight) {
+                    return 0;
+                } else if (compressedLight == null) {
+                    return 15;
+                }
+                this.skyLight = getSkyLightArray();
             }
+            int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
+            return (x & 1) == 0 ? sl & 0x0f : sl >> 4;
+        } finally {
+            this.skyLightLock.unlock();
         }
-        this.skyLight = getSkyLightArray();
-        int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
-        if ((x & 1) == 0) {
-            return sl & 0x0f;
-        }
-        return sl >> 4;
     }
 
     @Override
@@ -845,7 +852,14 @@ public class LevelDBChunkSection implements ChunkSection {
                 }
                 storages[i] = storage.copy();
             }
-            return new LevelDBChunkSection(null, this.y, storages, this.blockLight, this.skyLight, this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+            this.skyLightLock.lock();
+            try {
+                byte[] copiedSkyLight = this.skyLight == null ? null : this.skyLight.clone();
+                return new LevelDBChunkSection(null, this.y, storages, this.blockLight, copiedSkyLight,
+                        this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+            } finally {
+                this.skyLightLock.unlock();
+            }
         } finally {
             this.readLock.unlock();
         }

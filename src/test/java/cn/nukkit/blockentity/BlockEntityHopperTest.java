@@ -566,7 +566,6 @@ public class BlockEntityHopperTest {
             when(ctx.level.getBlockEntity(any(Vector3.class))).thenReturn(null);
             lenient().when(ctx.level.getBlock(any(FullChunk.class), anyInt(), anyInt(), anyInt(), anyBoolean()))
                     .thenReturn(Block.get(Block.AIR));
-            when(ctx.level.getCollidingEntities(any())).thenReturn(new cn.nukkit.entity.Entity[0]);
 
             boolean result = ctx.hopper.onUpdate();
 
