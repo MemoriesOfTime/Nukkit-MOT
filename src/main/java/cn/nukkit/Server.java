@@ -150,6 +150,7 @@ public class Server {
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
     private volatile boolean hasStopped;
+    private volatile long shutdownProgressAt = Long.MAX_VALUE;
 
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
@@ -1489,6 +1490,8 @@ public class Server {
         if (this.hasStopped) {
             return;
         }
+        long shutdownStart = System.currentTimeMillis();
+        this.touchShutdownProgress();
         this.hasStopped = true;
 
         try {
@@ -1510,15 +1513,17 @@ public class Server {
             this.getLogger().debug("Disconnecting all players...");
             for (Player player : new ArrayList<>(this.players.values())) {
                 player.close(player.getLeaveMessage(), reason);
+                this.touchShutdownProgress();
             }
 
             this.getLogger().debug("Disabling all plugins...");
             this.disablePlugins();
+            this.touchShutdownProgress();
 
             this.getLogger().debug("Unloading all levels...");
             for (Level level : this.levelArray) {
                 this.unloadLevel(level, true);
-                this.nextTick = System.currentTimeMillis(); // Fix Watchdog killing the server while saving worlds
+                this.touchShutdownProgress();
             }
 
             this.getLogger().debug("Removing event handlers...");
@@ -1554,6 +1559,9 @@ public class Server {
                 this.getLogger().debug("Stopping Watchdog...");
                 this.watchdog.kill();
             }
+
+            this.getLogger().info(this.baseLang.translateString("nukkit.server.stopped",
+                    String.valueOf(NukkitMath.round((System.currentTimeMillis() - shutdownStart) / 1000d, 1))));
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
             Nukkit.shutdownLogging();
@@ -1978,6 +1986,18 @@ public class Server {
 
     public long getNextTick() {
         return nextTick;
+    }
+
+    public boolean isShutdownInProgress() {
+        return this.hasStopped;
+    }
+
+    public long getShutdownProgressAt() {
+        return this.shutdownProgressAt;
+    }
+
+    public void touchShutdownProgress() {
+        this.shutdownProgressAt = System.currentTimeMillis();
     }
 
     private void titleTick() {

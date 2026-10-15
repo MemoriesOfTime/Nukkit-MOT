@@ -334,6 +334,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
 
     private int chunksSent = 0;
+    private long chunkDeliveryEpoch;
     private boolean hasSpawnChunks;
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
     protected int nextChunkOrderRun = 1;
@@ -1298,6 +1299,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private void unloadChunks(boolean online) {
+        ++this.chunkDeliveryEpoch;
         for (long index : this.usedChunks.keySet()) {
             int chunkX = Level.getHashX(index);
             int chunkZ = Level.getHashZ(index);
@@ -1356,10 +1358,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        this.usedChunks.put(Level.chunkHash(x, z), Boolean.TRUE);
-
-        this.dataPacket(packet);
-
+        long index = Level.chunkHash(x, z);
+        Level sourceLevel = this.level;
+        long sourceEpoch = this.chunkDeliveryEpoch;
+        boolean tracked = this.usedChunks.containsKey(index);
+        boolean submitted = false;
+        try {
+            submitted = this.dataPacket(packet);
+        } finally {
+            if (!submitted && tracked && this.usedChunks.get(index) == Boolean.FALSE
+                    && isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, true)) {
+                this.usedChunks.put(index, Boolean.FALSE);
+                this.loadQueue.add(index);
+            }
+        }
+        if (!submitted || !isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, tracked)) {
+            return;
+        }
+        this.usedChunks.put(index, Boolean.TRUE);
         this.chunksSent++;
 
         if (this.spawned) {
@@ -1386,6 +1402,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             playerActionPacket.entityId = this.getId();
             this.dataPacket(playerActionPacket);
         }
+    }
+
+    private boolean isChunkSubmissionContextCurrent(Level sourceLevel, long sourceEpoch,
+                                                     long index, boolean tracked) {
+        return this.connected && this.level == sourceLevel && this.chunkDeliveryEpoch == sourceEpoch
+                && (!tracked || this.usedChunks.containsKey(index));
     }
 
     @Deprecated
