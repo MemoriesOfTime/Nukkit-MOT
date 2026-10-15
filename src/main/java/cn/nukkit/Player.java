@@ -5589,7 +5589,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             CompoundTag ta = (CompoundTag) tag;
                             if (ta.getCompound("buyA").getShort("id") == tradeInventory.getItem(0).getId()) {
                                 int tradeXP = ta.getInt("traderExp");
-                                this.addExperience(ta.getByte("rewardExp"));
+                                this.level.dropExpOrb(this, ta.getByte("rewardExp"));
                                 ent.addExperience(tradeXP);
                                 this.level.addSound(this, Sound.RANDOM_ORB, 0, 3f, this);
                             }

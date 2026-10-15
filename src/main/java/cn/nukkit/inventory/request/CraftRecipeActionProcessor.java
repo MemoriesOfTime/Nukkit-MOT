@@ -344,7 +344,7 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         context.onCommit(() -> {
             recipe.putInt("uses", uses + times);
             if (rewardExp > 0) {
-                player.addExperience(rewardExp * times);
+                player.getLevel().dropExpOrb(player, rewardExp * times);
             }
             if (villager != null) {
                 villager.namedTag.putBoolean("traded", true);
