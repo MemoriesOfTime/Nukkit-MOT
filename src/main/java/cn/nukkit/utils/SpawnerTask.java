@@ -206,6 +206,15 @@ public class SpawnerTask implements Runnable {
         }
         Map<Class<?>, EntitySpawner> spawners = monsterTurn ? this.mobSpawners : this.animalSpawners;
         int count = spawners.size();
+        if (count == 0 || (this.period > 1 && phase == 0)) {
+            return;
+        }
+        if (this.period > 1) {
+            int first = (int) (((long) (phase - 1) * count + this.period - 2L) / (this.period - 1));
+            if (first >= count || slot(first, count, this.period) != phase) {
+                return;
+            }
+        }
         int index = 0;
         for (EntitySpawner spawner : spawners.values()) {
             if (slot(index++, count, this.period) == phase) {
