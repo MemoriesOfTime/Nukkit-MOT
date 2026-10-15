@@ -86,6 +86,12 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
     }
 
     @Override
+    protected boolean canSleepOutOfRange() {
+        // A manually lit fuse advances on every update, even after players leave.
+        return this.explodeTimer <= 0 && super.canSleepOutOfRange();
+    }
+
+    @Override
     public boolean onUpdate(int currentTick) {
         if (this.closed) {
             return false;
