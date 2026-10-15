@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.utils.BlockColor;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 
 /**
  * @author MagicDroidX
@@ -33,6 +35,19 @@ public class BlockWood2 extends BlockWood {
     @Override
     public String getName() {
         return NAMES[this.getDamage() > 2 ? 0 : this.getDamage()];
+    }
+
+    @Override
+    public Item toItem() {
+        if (this.getClass() != BlockWood2.class) {
+            return super.toItem();
+        }
+        int meta = this.getDamage();
+        if (meta >= 12 && meta <= 15) {
+            int species = meta == 13 ? 5 : 4;
+            return new ItemBlock(Block.get(WOOD_BARK, species), species);
+        }
+        return new ItemBlock(this, meta & 0x03);
     }
 
     @Override
