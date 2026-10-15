@@ -88,9 +88,33 @@ public final class DriedGhastOrdinarySupportTest {
     }
 
     // Derived independently from the OLD public589 resource, before the typed-property repair.
-    // Normalize only the four published anchor ByteTag->IntTag variants; every other typed value/order is pinned.
+    // Normalize the four published anchor types and validate the exact five appended mud records.
+    // The original 15,827 rows retain their independent complete semantic hash and order checks.
     private static void assertKnown589Projection(Tag source) throws Exception {
         ListTag<?> root = assertInstanceOf(ListTag.class, source.copy());
+        if (root.size() == 15832) {
+            int[] ids = {728, 734, 734, 730, 732};
+            int[] metas = {0, 0, 1, 0, 0};
+            int[] runtimeIds = {11070, 609, 610, 11280, 715};
+            String[] names = {"mud", "mud_brick_double_slab", "mud_brick_double_slab", "mud_bricks", "packed_mud"};
+            for (int i = 0; i < ids.length; i++) {
+                CompoundTag row = assertInstanceOf(CompoundTag.class, root.get(15827 + i));
+                assertEquals(Set.of("id", "data", "runtimeId", "name", "version", "states"), row.getTags().keySet());
+                assertTrue(row.containsInt("id") && row.containsShort("data") && row.containsInt("runtimeId")
+                        && row.containsString("name") && row.containsInt("version") && row.containsCompound("states"));
+                assertEquals(ids[i], row.getInt("id")); assertEquals(metas[i], row.getShort("data"));
+                assertEquals(runtimeIds[i], row.getInt("runtimeId")); assertEquals(18087969, row.getInt("version"));
+                assertEquals("minecraft:" + names[i], row.getString("name"));
+                CompoundTag states = row.getCompound("states");
+                if (ids[i] == 734) {
+                    assertEquals(Set.of("top_slot_bit"), states.getTags().keySet());
+                    assertTrue(states.containsByte("top_slot_bit")); assertEquals(metas[i], states.getByte("top_slot_bit"));
+                } else assertTrue(states.isEmpty());
+            }
+            ListTag<Tag> original = new ListTag<>(root.getName());
+            for (int i = 0; i < 15827; i++) original.add(root.get(i));
+            root = original;
+        }
         assertEquals("", root.getName()); assertEquals(15827, root.size());
         Set<Integer> variants = new HashSet<>(); int changed = 0;
         for (int ordinal = 0; ordinal < root.size(); ordinal++) {
@@ -228,13 +252,17 @@ public final class DriedGhastOrdinarySupportTest {
         } finally { GlobalBlockPalette.setUseHashedBlockNetworkIds(previous); }
     }
 
-    @Test void releasedProtocol818PreservesExistingPublicFallbackWireIdentity() throws Exception {
+    @Test void releasedProtocol818UsesItsRestoredNativeStateWithoutChangingItemIdentity() throws Exception {
         assertEquals(818, GameVersion.V1_21_90.getProtocol());
         assertEquals(-1027, declaration(818, "minecraft:dried_ghast", "76b849ee98a7776056f43d222d01fddeff8e587212639c6caab30ed35a5101d5"));
-        // Public9cb has no Dried Ghast block row here. This support-only change preserves that mapping.
-        CompoundTag fallback = nativeState(818, 248, 0, "0984c9baf5a8dcef9fa3f135bb9d67fcbf7945241a50c1045b972ab66d02e91d");
-        assertEquals("minecraft:info_update", fallback.getString("name"));
-        assertTrue(fallback.getCompound("states").isEmpty());
+        // The released native ordinal/state is independently supplied by the version-pinned palette export.
+        CompoundTag state = nativeState(818, 1282, 0, "ff4e93213db398a9954f5d19f3aec41591ace27040627749942e0b711dc777c1");
+        assertEquals("minecraft:dried_ghast", state.getString("name")); assertEquals(3116, state.getInt("runtimeId"));
+        assertEquals(Set.of("minecraft:cardinal_direction", "rehydration_level"), state.getCompound("states").getTags().keySet());
+        assertTrue(state.getCompound("states").containsString("minecraft:cardinal_direction"));
+        assertEquals("south", state.getCompound("states").getString("minecraft:cardinal_direction"));
+        assertTrue(state.getCompound("states").containsInt("rehydration_level"));
+        assertEquals(0, state.getCompound("states").getInt("rehydration_level"));
         Item item = new ItemBlock(Block.get(Block.DRIED_GHAST, 0), 0, 7);
         item.setNamedTag(new CompoundTag().putString("opaque", "dried-ghast818").putInt("receipt", 42));
         assertTrue(item.isSupportedOn(GameVersion.V1_21_90));
@@ -245,7 +273,7 @@ public final class DriedGhastOrdinarySupportTest {
                 GlobalBlockPalette.setUseHashedBlockNetworkIds(hashed);
                 Slot actual = actualSlot(GameVersion.V1_21_90, item);
                 assertEquals(-1027, actual.networkId()); assertEquals(7, actual.count()); assertEquals(0, actual.damage());
-                assertEquals(hashed ? independentHash("minecraft:info_update", fallback.getCompound("states")) : fallback.getInt("runtimeId"), actual.blockRuntime());
+                assertEquals(hashed ? independentHash("minecraft:dried_ghast", state.getCompound("states")) : state.getInt("runtimeId"), actual.blockRuntime());
                 assertEquals(item.getNamedTag(), actual.tag());
                 assertArrayEquals(before, item.getCompoundTag()); assertEquals(1282, item.getBlockUnsafe().getId());
                 assertEquals(0, item.getBlockUnsafe().getDamage()); assertEquals(-1027, item.getId()); assertEquals(7, item.getCount());
