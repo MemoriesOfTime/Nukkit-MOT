@@ -12,7 +12,6 @@ import cn.nukkit.network.protocol.DisconnectPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.session.login.NetworkSessionState;
 import cn.nukkit.network.session.login.SessionLoginPhase;
-import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
@@ -26,7 +25,6 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.logging.log4j.message.FormattedMessage;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 
-import java.net.InetAddress;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -156,23 +154,8 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
             return;
         }
 
-        InetAddress malformedAddress = this.channel.remoteAddress() instanceof java.net.InetSocketAddress address
-                ? address.getAddress() : null;
-        boolean blockMalformedAddress = RakNetPlayerSession.shouldBlockAddressAfterMalformed(
-                this.state.getLogin().getPhase(), malformedAddress);
+        // A local decode failure says nothing about other sessions sharing the address.
         this.disconnect("Sent malformed packet");
-        Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
-            try {
-                this.channel.close();
-                if (blockMalformedAddress && malformedAddress != null) {
-                    this.server.blockAddress(malformedAddress, 60);
-                }
-            } catch (Throwable throwable) {
-                if (Nukkit.DEBUG > 1) {
-                    log.info("Error while closing channel", throwable);
-                }
-            }
-        }, 10);
     }
 
     @Override
