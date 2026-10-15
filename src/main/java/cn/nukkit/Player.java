@@ -467,7 +467,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean worldClockSynced;
     private boolean foodEnabled = true;
     private int failedTransactions;
-    protected int failedMobEquipmentPacket;
     private int timeSinceRest;
     private boolean inSoulSand;
     private boolean dimensionChangeInProgress;
@@ -3001,9 +3000,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastUpdate = currentTick;
 
         this.failedTransactions = 0;
-        if (currentTick%20 == 0) {
-            this.failedMobEquipmentPacket = 0;
-        }
 
         if (this.riptideTicks > 0) {
             this.riptideTicks -= tickDiff;
@@ -8437,11 +8433,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.tryEncode();
 
         byte[] buf = pk.getBuffer();
-        BinaryStream batched = new BinaryStream(new byte[5 + buf.length]).reset();
+        int lengthPrefixBytes = 1;
+        for (int remaining = buf.length; (remaining >>>= 7) != 0; ) {
+            lengthPrefixBytes++;
+        }
+        // This stream owns an exact batch and is never reused after compression.
+        BinaryStream batched = new BinaryStream(new byte[lengthPrefixBytes + buf.length]).reset();
         batched.putUnsignedVarInt(buf.length);
         batched.put(buf);
         try {
-            byte[] bytes = batched.getBuffer();
+            byte[] owned = batched.getBufferUnsafe();
+            // Preserve trimmed bytes if a future writer changes the capacity.
+            byte[] bytes = batched.getCount() == owned.length ? owned : batched.getBuffer();
             BatchPacket compress = new BatchPacket();
             if (Server.getInstance().useSnappy && protocol >= ProtocolInfo.v1_19_30_23) {
                 compress.payload = SnappyCompression.compress(bytes);
