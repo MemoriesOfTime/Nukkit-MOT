@@ -28,6 +28,7 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.InventoryTransactionPacket;
 import cn.nukkit.network.protocol.ItemStackResponsePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.protocol.types.ContainerIds;
 import cn.nukkit.network.protocol.types.NetworkInventoryAction;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
@@ -190,6 +191,7 @@ class NativeTradeExperienceOrbTest {
         final PluginManager originalPlugins = server.getPluginManager();
         final int originalTick = server.getTick();
         final PluginManager plugins = mock(PluginManager.class);
+        final NetworkPlayerSession session = mock(NetworkPlayerSession.class);
         final Player player = mock(Player.class, CALLS_REAL_METHODS);
         final Level level = mock(Level.class);
         final BaseFullChunk chunk = mock(BaseFullChunk.class);
@@ -211,6 +213,10 @@ class NativeTradeExperienceOrbTest {
             set(player, "offhandInventory", offhand);
             set(player, "playerUIInventory", ui);
             set(player, "craftingGrid", ui.getCraftingGrid());
+            set(player, "networkSession", session);
+            // Optional public window-lifecycle fields also need their constructor sentinels.
+            setIfPresent(player, "pendingCloseWindowId", Integer.MIN_VALUE);
+            setIfPresent(player, "closingWindowId", Integer.MIN_VALUE);
             BiMap<Inventory, Integer> windows = HashBiMap.create();
             set(player, "windows", windows);
             set(player, "windowIndex", windows.inverse());
@@ -219,7 +225,9 @@ class NativeTradeExperienceOrbTest {
             set(player, "hasSpawned", new ConcurrentHashMap<Integer, Player>());
             player.level = level;
             player.spawned = true;
+            player.connected = true;
             player.protocol = modern ? ProtocolInfo.v1_21_130 : ProtocolInfo.v1_20_0;
+            player.gameVersion = modern ? GameVersion.V1_21_130 : GameVersion.V1_20_0;
             player.x = 0.5;
             player.y = 64;
             player.z = 0.5;
@@ -229,14 +237,13 @@ class NativeTradeExperienceOrbTest {
             doReturn(false).when(player).isSpectator();
             doReturn(false).when(player).isCreative();
             doReturn(modern).when(player).isInventoryServerAuthoritative();
-            doReturn(modern ? GameVersion.V1_21_130 : GameVersion.V1_20_0).when(player).getGameVersion();
             doReturn("native-trader").when(player).getName();
             doAnswer(call -> {
                 if (call.getArgument(0) instanceof ItemStackResponsePacket response) {
                     responses.add(response);
                 }
-                return true;
-            }).when(player).dataPacket(any(DataPacket.class));
+                return null;
+            }).when(session).sendPacket(any(DataPacket.class));
 
             when(level.getServer()).thenReturn(server);
             when(level.getGameRules()).thenReturn(GameRules.getDefault());
@@ -436,6 +443,14 @@ class NativeTradeExperienceOrbTest {
                 }
             }
             throw new NoSuchFieldException(name);
+        }
+
+        private static void setIfPresent(Object object, String name, Object value) throws Exception {
+            try {
+                set(object, name, value);
+            } catch (NoSuchFieldException absentOnStandaloneMaster) {
+                // Keep this fixture portable before and after public window-lifecycle changes.
+            }
         }
     }
 }
