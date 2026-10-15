@@ -30,6 +30,10 @@ import java.util.concurrent.ThreadLocalRandom;
 @Getter
 public abstract class EntityProjectile extends Entity {
 
+    private EntityImpact activeEntityImpact;
+
+    private record EntityImpact(Entity target, EntityImpact previous) {}
+
     public static final int DATA_SHOOTER_ID = 17;
 
     public static final int PICKUP_NONE = 0;
@@ -96,38 +100,58 @@ public abstract class EntityProjectile extends Entity {
     }
 
     private boolean collideWithEntity(Entity entity) {
-        ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
-        this.server.getPluginManager().callEvent(hitEvent);
-        if (hitEvent.isCancelled()) {
+        if (this.closed) {
             return false;
         }
-
-        float damage = this instanceof EntitySnowball && entity instanceof EntityBlaze ? 3 : this.getResultDamage();
-
-        EntityDamageEvent ev;
-        if (this.shootingEntity == null) {
-            ev = new EntityDamageByEntityEvent(this, entity, DamageCause.PROJECTILE, damage);
-        } else {
-            ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, DamageCause.PROJECTILE, damage);
-        }
-
-        boolean accepted = entity.attack(ev);
-        if (accepted) {
-            this.hadCollision = true;
-
-            this.onHit();
-
-            if (this.fireTicks > 0) {
-                EntityCombustByEntityEvent event = new EntityCombustByEntityEvent(this, entity, 5);
-                this.server.getPluginManager().callEvent(event);
-                if (!event.isCancelled()) {
-                    entity.setOnFire(event.getDuration());
-                }
+        // Preserve distinct-target plugin redirects, but reject cycles through active targets.
+        for (EntityImpact impact = this.activeEntityImpact; impact != null; impact = impact.previous) {
+            if (impact.target == entity) {
+                return false;
             }
         }
+        EntityImpact previous = this.activeEntityImpact;
+        this.activeEntityImpact = new EntityImpact(entity, previous);
+        try {
+            ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
+            this.server.getPluginManager().callEvent(hitEvent);
+            if (hitEvent.isCancelled()) {
+                return false;
+            }
+            this.onAcceptedEntityCollision(entity);
 
-        this.close();
-        return accepted;
+            float damage = this instanceof EntitySnowball && entity instanceof EntityBlaze ? 3 : this.getResultDamage();
+
+            EntityDamageEvent ev;
+            if (this.shootingEntity == null) {
+                ev = new EntityDamageByEntityEvent(this, entity, DamageCause.PROJECTILE, damage);
+            } else {
+                ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, DamageCause.PROJECTILE, damage);
+            }
+
+            boolean accepted = entity.attack(ev);
+            if (accepted) {
+                this.hadCollision = true;
+
+                this.onHit();
+
+                if (this.fireTicks > 0) {
+                    EntityCombustByEntityEvent event = new EntityCombustByEntityEvent(this, entity, 5);
+                    this.server.getPluginManager().callEvent(event);
+                    if (!event.isCancelled()) {
+                        entity.setOnFire(event.getDuration());
+                    }
+                }
+            }
+
+            this.close();
+            return accepted;
+        } finally {
+            this.activeEntityImpact = previous;
+        }
+    }
+
+    /** Side effects of an entity impact run only after its cancellable hit event. */
+    protected void onAcceptedEntityCollision(Entity entity) {
     }
 
     @Override
@@ -155,7 +179,7 @@ public abstract class EntityProjectile extends Entity {
 
     @Override
     public boolean onUpdate(int currentTick) {
-        if (this.closed) {
+        if (this.closed || this.activeEntityImpact != null) {
             return false;
         }
 
