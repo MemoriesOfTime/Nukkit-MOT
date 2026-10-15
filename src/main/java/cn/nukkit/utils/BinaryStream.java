@@ -33,7 +33,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessi
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 import lombok.SneakyThrows;
 import org.cloudburstmc.nbt.NBTOutputStream;
@@ -880,8 +880,7 @@ public class BinaryStream {
         item.setCount(count);
 
         if (userData.length > 0) {
-            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(userData.length);
-            buf.writeBytes(userData);
+            ByteBuf buf = Unpooled.wrappedBuffer(userData);
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
                 int nbtSize = stream.readShort();
                 CompoundTag compoundTag = null;
@@ -952,6 +951,7 @@ public class BinaryStream {
         }
 
         int blockRuntimeId = this.getVarInt();// blockRuntimeId
+        damage = mushroomBlockDamage(gameVersion, id, damage, blockRuntimeId);
         //TODO 在1.21.30会得到错误数据
         if (protocolId < ProtocolInfo.v1_19_0_31) {
             if (id != null && id < 256 && id != 166) { // ItemBlock
@@ -963,8 +963,7 @@ public class BinaryStream {
         }
 
         byte[] bytes = this.getByteArray();
-        ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
-        buf.writeBytes(bytes);
+        ByteBuf buf = Unpooled.wrappedBuffer(bytes);
 
         byte[] nbt = new byte[0];
         String[] canPlace;
@@ -1397,7 +1396,8 @@ public class BinaryStream {
 
         this.putVarInt(getBlockRuntimeId(gameVersion, item));
 
-        ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+        // Invocation-owned heap scratch; only its bytes are copied into the packet.
+        ByteBuf userDataBuf = Unpooled.buffer(64);
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable) {
                 byte[] nbt = item.getCompoundTag();
@@ -1554,7 +1554,8 @@ public class BinaryStream {
             return;
         }
 
-        ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+        // Keep the same little-endian writer without per-item native allocations.
+        ByteBuf userDataBuf = Unpooled.buffer(64);
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable && runtimeEntry != null && !runtimeEntry.isHasDamage()) {
                 byte[] nbt = item.getCompoundTag();
@@ -1602,6 +1603,21 @@ public class BinaryStream {
         } finally {
             userDataBuf.release();
         }
+    }
+
+    // Mushroom variants share one item runtime ID; their state lives in the block palette ID.
+    // Keep this narrow: other item families have different metadata canonicalization rules.
+    private static int mushroomBlockDamage(GameVersion version, Integer id, int damage, int blockRuntimeId) {
+        if (version.getProtocol() < ProtocolInfo.v1_19_0_31 || id == null
+                || (id != Block.BROWN_MUSHROOM_BLOCK && id != Block.RED_MUSHROOM_BLOCK)) {
+            return damage;
+        }
+        int fullId = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(version)
+                ? GlobalBlockPalette.getLegacyFullIdFromHashId(version, blockRuntimeId)
+                : GlobalBlockPalette.getLegacyFullId(version, blockRuntimeId);
+        // A client's unrelated/unknown palette entry must not graft metadata onto this item.
+        return fullId != -1 && (fullId >> Block.DATA_BITS) == id
+                ? fullId & Block.DATA_MASK : damage;
     }
 
     public Item getNetworkItemStackDescriptor(GameVersion gameVersion) {
@@ -1675,6 +1691,8 @@ public class BinaryStream {
             blockRuntimeId = (int) this.getUnsignedVarInt();
         }
 
+        damage = mushroomBlockDamage(gameVersion, id, damage, blockRuntimeId);
+
         byte[] nbt = new byte[0];
         String[] canPlace = null;
         String[] canBreak = null;
@@ -1682,8 +1700,7 @@ public class BinaryStream {
         byte[] bytes = this.getByteArray();
 
         if (bytes.length != 0) {
-            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
-            buf.writeBytes(bytes);
+            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
 
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
                 int nbtSize = stream.readShort();
@@ -1951,11 +1968,15 @@ public class BinaryStream {
     }
 
     public byte[] getByteArray(int maxLength) {
-        int length = (int) this.getUnsignedVarInt();
-        checkArgument(this.isReadable(length),
-                "Tried to read %s bytes but only has %s readable", length, this.readableBytes());
+        int end = this.buffer == null ? 0 : Math.min(this.count, this.buffer.length);
+        checkArgument(this.count >= 0 && this.offset >= 0 && this.offset < end,
+                "Missing byte array length prefix");
+        long length = this.getUnsignedVarInt();
+        checkArgument(this.offset <= end && length <= Integer.MAX_VALUE
+                        && length <= end - (long) this.offset,
+                "Tried to read %s bytes but only has %s readable", length, end - (long) this.offset);
         checkArgument(maxLength <= 0 || length <= maxLength, "Tried to read %s bytes but maximum is %s", length, maxLength);
-        return this.get(length);
+        return this.get((int) length);
     }
 
     public void putByteArray(byte[] b) {

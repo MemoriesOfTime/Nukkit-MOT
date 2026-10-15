@@ -112,7 +112,7 @@ public abstract class EntityWalking extends BaseEntity {
             }
         }
 
-        if (!this.onGround || this.stayTime > 0) {
+        if (!this.onGround || this.stayTime > 0 || (dx == 0 && dz == 0)) {
             return false;
         }
 
@@ -222,7 +222,14 @@ public abstract class EntityWalking extends BaseEntity {
 
                     double diff = Math.abs(x) + Math.abs(z);
                     boolean distance = false;
-                    if (this.riding != null || diff <= 0.001 || !inWater && (this.stayTime > 0 || (this.distance(this.target) <= (this.getWidth() / 2 + 0.3) * nearbyDistanceMultiplier()))) {
+                    // A route node is a navigation point, not a ranged combat target.
+                    double stopDistance = this.getWidth() / 2 + 0.3;
+                    boolean nearTarget = this.distance(this.target) <= stopDistance
+                            * (this.target instanceof EntityLiving ? nearbyDistanceMultiplier() : 1);
+                    boolean nearFollowTarget = this.followTarget != null && !this.followTarget.closed
+                            && this.followTarget.isAlive() && this.followTarget.canBeFollowed()
+                            && this.distance(this.followTarget) <= stopDistance * nearbyDistanceMultiplier();
+                    if (this.riding != null || diff <= 0.001 || !inWater && (this.stayTime > 0 || nearTarget || nearFollowTarget)) {
                         if (!this.isInsideOfWater()) {
                             this.motionX = 0;
                             this.motionZ = 0;
