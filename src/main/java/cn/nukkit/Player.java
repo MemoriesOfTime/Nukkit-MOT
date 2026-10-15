@@ -2853,11 +2853,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.inSoulSand && down != BlockID.SOUL_SAND) {
                 this.inSoulSand = false;
                 this.removeMovementSpeedModifier(EntityMovementSpeedModifier.SOUL_SPEED_ENCHANTMENT);
-            } else if (!this.inSoulSand && down == BlockID.SOUL_SAND) {
-                this.inSoulSand = true;
+            } else if (down == BlockID.SOUL_SAND) {
                 float soulSpeed = (soulSpeedEnchantment.getLevel() * 0.105f) + 1.3f;
-                this.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.SOUL_SPEED_ENCHANTMENT, soulSpeed, EntityMovementSpeedModifier.Operation.MULTIPLY));
+                EntityMovementSpeedModifier current = this.getMovementSpeedModifiers().get(EntityMovementSpeedModifier.SOUL_SPEED_ENCHANTMENT);
+                if (!this.inSoulSand || current == null || Float.compare(current.getValue(), soulSpeed) != 0) {
+                    this.inSoulSand = true;
+                    this.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.SOUL_SPEED_ENCHANTMENT, soulSpeed, EntityMovementSpeedModifier.Operation.MULTIPLY));
+                }
             }
+        } else if (this.inSoulSand) {
+            this.inSoulSand = false;
+            this.removeMovementSpeedModifier(EntityMovementSpeedModifier.SOUL_SPEED_ENCHANTMENT);
         }
     }
 
