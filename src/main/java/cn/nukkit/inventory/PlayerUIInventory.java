@@ -2,6 +2,10 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
+import org.jetbrains.annotations.ApiStatus;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -20,13 +24,49 @@ public class PlayerUIInventory extends BaseInventory {
     private final BigCraftingGrid bigCraftingGrid;
 
     public PlayerUIInventory(Player player) {
+        this(player, null);
+    }
+
+    /** Restore a fresh login backing before any viewer or slot callback can observe partial data. */
+    @ApiStatus.Internal
+    public PlayerUIInventory(Player player, CompoundTag profile) {
         super(player, InventoryType.UI, new HashMap<>(), 54);
         this.player = player;
 
         this.cursorInventory = new PlayerCursorInventory(this);
         this.craftingGrid = new CraftingGrid(this);
         this.bigCraftingGrid = new BigCraftingGrid(this);
+        if (profile != null && profile.contains("PlayerUIItems")) {
+            var restored = new HashMap<Integer, Item>();
+            for (CompoundTag stored : profile.getList("PlayerUIItems", CompoundTag.class).getAll()) {
+                int slot = stored.getByte("Slot");
+                if (!isPersistentSlot(slot)) continue;
+                Item item = NBTIO.getItemHelper(stored);
+                if (item.isNull()) continue;
+                if (restored.putIfAbsent(slot, item) != null) throw new IllegalArgumentException("Duplicate saved UI slot: " + slot);
+                if (!item.isUsingStackNetId()) item.autoAssignStackNetworkId();
+            }
+            this.slots.putAll(restored);
+            profile.remove("PlayerUIItems");
+        }
         this.viewers.add(player);
+    }
+
+    /** Native inputs only: material-reducer outputs and the shared created-output preview are never custody. */
+    @ApiStatus.Internal
+    public static boolean isPersistentSlot(int slot) {
+        return slot >= 0 && slot <= 40 || slot >= 51 && slot <= 53;
+    }
+
+    @ApiStatus.Internal
+    public void savePlayerData(CompoundTag profile) {
+        ListTag<CompoundTag> saved = new ListTag<>("PlayerUIItems");
+        if (!this.player.isCreative()) {
+            this.getContents().forEach((slot, item) -> {
+                if (isPersistentSlot(slot) && !item.isNull()) saved.add(NBTIO.putItemHelper(item, slot));
+            });
+        }
+        profile.putList(saved);
     }
 
     public PlayerCursorInventory getCursorInventory() {

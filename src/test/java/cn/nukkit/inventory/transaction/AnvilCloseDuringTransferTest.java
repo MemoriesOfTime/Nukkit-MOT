@@ -46,6 +46,7 @@ class AnvilCloseDuringTransferTest {
   final List<Integer> closeWindowIds=new ArrayList<>();
   final com.google.common.collect.BiMap<Inventory,Integer> windows=HashBiMap.create();
   Fixture() throws Exception {
+   when(Server.getInstance().isPrimaryThread()).thenReturn(true);
    field(Entity.class,player,"server",Server.getInstance());field(EntityHumanType.class,player,"inventory",inventory);
    field(Player.class,player,"windows",windows);field(Player.class,player,"windowIndex",windows.inverse());field(Player.class,player,"permanentWindows",new HashSet<Integer>());
    field(Player.class,player,"closingWindowId",Integer.MIN_VALUE);

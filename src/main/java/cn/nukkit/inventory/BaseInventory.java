@@ -467,6 +467,13 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public Item[] addItem(Item... slots) {
+        // A profile requested by a slot callback observes the completed batch, including partial success.
+        try (InventoryMutationGuard.Lease batch = InventoryMutationGuard.tryClaim(java.util.List.of(this))) {
+            return this.addItemWithinBatch(slots);
+        }
+    }
+
+    private Item[] addItemWithinBatch(Item... slots) {
         List<Item> itemSlots = new ArrayList<>();
         for (Item slot : slots) {
             if (slot.getId() != 0 && slot.getCount() > 0) {
@@ -532,6 +539,13 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public Item[] removeItem(Item... slots) {
+        // A profile requested by a slot callback observes the completed batch, including partial success.
+        try (InventoryMutationGuard.Lease batch = InventoryMutationGuard.tryClaim(java.util.List.of(this))) {
+            return this.removeItemWithinBatch(slots);
+        }
+    }
+
+    private Item[] removeItemWithinBatch(Item... slots) {
         List<Item> itemSlots = new ArrayList<>();
         for (Item slot : slots) {
             if (slot.getId() != 0 && slot.getCount() > 0) {

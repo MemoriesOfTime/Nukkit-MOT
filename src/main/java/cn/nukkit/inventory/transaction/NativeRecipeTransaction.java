@@ -2,6 +2,9 @@ package cn.nukkit.inventory.transaction;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
+import cn.nukkit.entity.item.EntityItem;
+import cn.nukkit.inventory.StonecutterInventory;
+import cn.nukkit.inventory.transaction.action.StonecutterItemAction;
 import cn.nukkit.inventory.BaseInventory;
 import cn.nukkit.inventory.BundleInventory;
 import cn.nukkit.inventory.DoubleChestInventory;
@@ -39,13 +42,15 @@ final class NativeRecipeTransaction {
         boolean crafting = transaction.getClass() == CraftingTransaction.class;
         boolean repair = transaction.getClass() == RepairItemTransaction.class;
         boolean grinding = transaction.getClass() == GrindstoneTransaction.class;
-        if (!crafting && !repair && !grinding) return false;
+        boolean stonecutting = transaction.getClass() == StonecutterTransaction.class;
+        if (!crafting && !repair && !grinding && !stonecutting) return false;
         for (InventoryAction action : transaction.actions) {
             Class<?> type = action.getClass();
             if (type != SlotChangeAction.class && !(crafting
                     && (type == CraftingTakeResultAction.class || type == CraftingTransferMaterialAction.class)
                     || repair && type == RepairItemAction.class
-                    || grinding && type == GrindstoneItemAction.class)) return false;
+                    || grinding && type == GrindstoneItemAction.class
+                    || stonecutting && type == StonecutterItemAction.class)) return false;
         }
         return true;
     }
@@ -171,6 +176,208 @@ final class NativeRecipeTransaction {
         return true;
     }
 
+    /** Stonecutter output is server-placed: its native plan, not client-predicted slots, is authoritative. */
+    @SuppressWarnings("try")
+    static boolean executeStonecutter(StonecutterTransaction transaction, StonecutterInventory inventory,
+            Item originalInput, Item originalOutput, int consume, Supplier<Item> output,
+            BooleanSupplier executeEvent, BooleanSupplier recipeIntact) {
+        Player actor = transaction.source;
+        if (!supports(transaction) || transaction.hasExecuted || consume <= 0
+                || !fits(inventory, originalInput) || originalInput.getCount() < consume) return false;
+        List<InventoryAction> actions = List.copyOf(transaction.actions);
+        Set<Inventory> inventories = Collections.newSetFromMap(new IdentityHashMap<>());
+        inventories.addAll(transaction.inventories);
+        Map<InventoryAction, Payload> initial = new IdentityHashMap<>();
+        for (InventoryAction action : actions) initial.put(action, new Payload(action.getSourceItem(), action.getTargetItem()));
+        List<Inventory> captured = new ArrayList<>(inventories);
+        for (Inventory current : Arrays.asList(inventory, actor.getInventory(), actor.getOffhandInventory(),
+                actor.getEnderChestInventory(), actor.getUIInventory())) {
+            if (current != null) captured.add(current);
+        }
+        ActorContext context = new ActorContext(actor, Player.STONECUTTER_WINDOW_ID);
+        Map<BaseInventory, Map<Integer, Item>> before = new IdentityHashMap<>();
+        List<EntityItem.PreparedDrop> tickets = new ArrayList<>();
+        List<SlotChangeAction> writes = new ArrayList<>();
+        boolean committed = false;
+        try (InventoryMutationGuard.Lease claim = InventoryMutationGuard.tryClaimProfile(captured)) {
+            if (claim == null) return false;
+            for (Inventory current : captured) if (!capture(current, before)) return false;
+            InventoryMutationGuard.NativeMetadataSnapshot metadata = claim.captureNativeMetadata();
+            try (InventoryMutationGuard.WriteScope blocked = claim.blockWrites()) {
+                try {
+                    if (!membership(transaction, actions, inventories) || !context.matches(transaction)
+                            || context.window() != inventory || !recipeIntact.getAsBoolean() || !payloads(actions, initial)
+                            || !matches(before) || !metadata.matches()
+                            || !InventoryMutationGuard.matchesTarget(inventory.getInput(), originalInput)) {
+                        return discardAndRollback(tickets, before, metadata);
+                    }
+                    boolean accepted = executeEvent.getAsBoolean();
+                    Item approved = output.get();
+                    Map<InventoryAction, Payload> approvedPayloads = approved == null ? null
+                            : approvePayloads(actions, initial, originalOutput, approved);
+                    if (!accepted || !sameVariantAndCount(originalOutput, approved) || approvedPayloads == null
+                            || !context.matches(transaction) || !recipeIntact.getAsBoolean()
+                            || !membership(transaction, actions, inventories) || !matches(before) || !metadata.matches()) {
+                        return discardAndRollback(tickets, before, metadata);
+                    }
+                    Map<BaseInventory, Map<Integer, Item>> expected = copyBackings(before);
+                    Item remainingInput = originalInput.clone(); remainingInput.setCount(originalInput.getCount() - consume);
+                    Item inputTarget = remainingInput.getCount() == 0 ? Item.AIR_ITEM.clone() : remainingInput;
+                    writes.add(new SlotChangeAction(inventory, 0, originalInput.clone(), inputTarget));
+                    PhysicalSlot sourceSlot = physicalSlot(inventory, 0);
+                    if (sourceSlot == null || !expected.containsKey(sourceSlot.inventory())) {
+                        return discardAndRollback(tickets, before, metadata);
+                    }
+                    if (inputTarget.isNull()) expected.get(sourceSlot.inventory()).remove(sourceSlot.index());
+                    else expected.get(sourceSlot.inventory()).put(sourceSlot.index(), inputTarget.clone());
+
+                    Inventory main = actor.getInventory();
+                    if (!(main instanceof BaseInventory mainBacking) || !expected.containsKey(mainBacking)) {
+                        return discardAndRollback(tickets, before, metadata);
+                    }
+                    Map<Integer, Item> expectedMain = expected.get(mainBacking);
+                    int remaining = approved.getCount();
+                    int limit = Math.min(approved.getMaxStackSize(), main.getMaxStackSize());
+                    if (remaining <= 0 || limit <= 0 || remaining > approved.getMaxStackSize()) {
+                        return discardAndRollback(tickets, before, metadata);
+                    }
+                    // Preserve addItem's matching-stack-first, then empty-slot policy without writing yet.
+                    for (int pass = 0; pass < 2; pass++) {
+                        for (int slot = 0; slot < main.getSize() && remaining > 0; slot++) {
+                            Item current = expectedMain.get(slot);
+                            boolean empty = current == null || current.isNull();
+                            if (pass == 0 && empty || pass == 1 && !empty) continue;
+                            if (!empty && !current.equals(approved, true, true)) continue;
+                            int count = empty ? 0 : current.getCount();
+                            int added = Math.min(remaining, Math.max(0, limit - count));
+                            if (added == 0) continue;
+                            Item target = empty ? approved.clone() : current.clone();
+                            if (empty) target.autoAssignStackNetworkId();
+                            target.setCount(count + added);
+                            expectedMain.put(slot, target); remaining -= added;
+                        }
+                    }
+                    for (int slot = 0; slot < main.getSize(); slot++) {
+                        Item from = main.getItem(slot), target = expectedMain.get(slot);
+                        if (target != null && !InventoryMutationGuard.matchesTarget(from, target)) {
+                            writes.add(new SlotChangeAction(main, slot, from, target.clone()));
+                        }
+                    }
+                    for (InventoryAction action : actions) {
+                        if (!action.onPreExecute(actor) || !context.matches(transaction) || !metadata.matches()
+                                || !matches(before) || !recipeIntact.getAsBoolean()
+                                || !membership(transaction, actions, inventories) || !payloads(actions, approvedPayloads)) {
+                            return discardAndRollback(tickets, before, metadata);
+                        }
+                    }
+                    if (remaining > 0) {
+                        Item drop = approved.clone(); drop.setCount(remaining);
+                        // Player.dropItem has no PlayerDropItemEvent; retain that policy and the holder fallback.
+                        EntityItem.PreparedDrop ticket;
+                        cn.nukkit.math.Vector3 direction = actor.getDirectionVector();
+                        if (direction != null) {
+                            ticket = actor.getLevel().prepareItemDrop(actor.add(0, 1.3, 0), drop, direction.multiply(0.4), 40);
+                        } else {
+                            cn.nukkit.math.Vector3 motion = new cn.nukkit.math.Vector3(
+                                    cn.nukkit.utils.Utils.random.nextDouble() * 0.2 - 0.1, 0.2,
+                                    cn.nukkit.utils.Utils.random.nextDouble() * 0.2 - 0.1);
+                            ticket = inventory.getHolder().getLevel().prepareItemDrop(inventory.getHolder().add(0.5, 0.5, 0.5), drop, motion, 10);
+                        }
+                        if (ticket == null) return discardAndRollback(tickets, before, metadata);
+                        tickets.add(ticket);
+                    }
+                    if (!context.matches(transaction) || !metadata.matches() || !matches(before)
+                            || !recipeIntact.getAsBoolean() || !membership(transaction, actions, inventories)
+                            || !payloads(actions, approvedPayloads)
+                            || !tickets.stream().allMatch(EntityItem.PreparedDrop::isValid)) {
+                        return discardAndRollback(tickets, before, metadata);
+                    }
+                    for (SlotChangeAction write : writes) {
+                        Item target = write.getTargetItem();
+                        if (!claim.contains(write.getInventory()) || !fits(write.getInventory(), target)
+                                || !write.getInventory().allowedToAdd(target)) return discardAndRollback(tickets, before, metadata);
+                        try (InventoryMutationGuard.WriteScope scope = claim.expectWrite(write.getInventory(), write.getSlot(), target)) {
+                            if (!write.executeInventoryWrite(actor)
+                                    || !InventoryMutationGuard.matchesTarget(write.getInventory().getItem(write.getSlot()), target)) {
+                                return discardAndRollback(tickets, before, metadata);
+                            }
+                        }
+                    }
+                    if (!matches(expected) || !metadata.matches() || !context.matches(transaction)
+                            || !recipeIntact.getAsBoolean() || !membership(transaction, actions, inventories)
+                            || !payloads(actions, approvedPayloads)
+                            || !tickets.stream().allMatch(EntityItem.PreparedDrop::isValid)) {
+                        return discardAndRollback(tickets, before, metadata);
+                    }
+                    transaction.hasExecuted = true;
+                    committed = true;
+                    for (EntityItem.PreparedDrop ticket : tickets) ticket.release();
+                } catch (RuntimeException | Error failure) {
+                    if (!committed) {
+                        try { discardAndRollback(tickets, before, metadata); } catch (RuntimeException | Error cleanup) {
+                            if (failure != cleanup) failure.addSuppressed(cleanup);
+                        }
+                    }
+                    throw failure;
+                }
+            }
+        Throwable failure = null;
+        if (!tickets.isEmpty()) {
+            try { actor.setUsingItem(false); } catch (RuntimeException | Error notification) { failure = accumulate(failure, notification); }
+        }
+        for (EntityItem.PreparedDrop ticket : tickets) {
+            try { ticket.notifyPublished(); } catch (RuntimeException | Error notification) { failure = accumulate(failure, notification); }
+        }
+        for (SlotChangeAction write : writes) {
+            try { write.onInventoryWriteCommitted(actor); } catch (RuntimeException | Error notification) {
+                failure = accumulate(failure, notification);
+            }
+        }
+        for (SlotChangeAction write : writes) {
+            try { write.onExecuteSuccess(actor); } catch (RuntimeException | Error notification) { failure = accumulate(failure, notification); }
+        }
+        try { context.main().sendContents(actor); } catch (RuntimeException | Error notification) { failure = accumulate(failure, notification); }
+        if (failure instanceof RuntimeException exception) throw exception;
+        if (failure instanceof Error error) throw error;
+        return true;
+        }
+    }
+
+    private static boolean discardAndRollback(List<EntityItem.PreparedDrop> tickets,
+            Map<BaseInventory, Map<Integer, Item>> before, InventoryMutationGuard.NativeMetadataSnapshot metadata) {
+        Throwable failure = null;
+        for (EntityItem.PreparedDrop ticket : tickets) {
+            try { ticket.discard(); } catch (RuntimeException | Error cleanup) { failure = accumulate(failure, cleanup); }
+        }
+        try { restoreStonecutterSlots(before, metadata); } catch (RuntimeException | Error cleanup) { failure = accumulate(failure, cleanup); }
+        if (failure instanceof RuntimeException exception) throw exception;
+        if (failure instanceof Error error) throw error;
+        return false;
+    }
+
+    private static void restoreStonecutterSlots(Map<BaseInventory, Map<Integer, Item>> before,
+            InventoryMutationGuard.NativeMetadataSnapshot metadata) {
+        metadata.restore();
+        Map<BaseInventory, Map<Integer, Item>> changed = new IdentityHashMap<>();
+        before.forEach((inventory, snapshot) -> {
+            Set<Integer> slots = new java.util.HashSet<>(snapshot.keySet()); slots.addAll(inventory.slots.keySet());
+            Map<Integer, Item> previous = new HashMap<>();
+            for (int slot : slots) {
+                Item current = inventory.slots.getOrDefault(slot, Item.AIR_ITEM);
+                if (!current.equalsExact(snapshot.getOrDefault(slot, Item.AIR_ITEM))) previous.put(slot, current.clone());
+            }
+            changed.put(inventory, previous);
+            inventory.slots.clear(); inventory.slots.putAll(copySlots(snapshot));
+        });
+        Throwable failure = null;
+        for (var inventory : changed.entrySet()) for (var slot : inventory.getValue().entrySet()) {
+            try { inventory.getKey().onSlotChange(slot.getKey(), slot.getValue(), true); }
+            catch (RuntimeException | Error notification) { failure = accumulate(failure, notification); }
+        }
+        if (failure instanceof RuntimeException exception) throw exception;
+        if (failure instanceof Error error) throw error;
+    }
+
     private static Throwable accumulate(Throwable original, Throwable next) {
         if (original == null) return next;
         if (original != next) original.addSuppressed(next);
@@ -187,7 +394,7 @@ final class NativeRecipeTransaction {
     }
 
     private static boolean sameVariantAndCount(Item original, Item approved) {
-        return original != null && !approved.isNull() && original.equals(approved, true, false)
+        return original != null && approved != null && !approved.isNull() && original.equals(approved, true, false)
                 && original.getCount() == approved.getCount();
     }
 

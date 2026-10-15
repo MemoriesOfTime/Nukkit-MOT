@@ -275,6 +275,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public int craftingType = CRAFTING_SMALL;
 
     protected PlayerUIInventory playerUIInventory;
+    private final Object deferredProfileSaveIdentity = new Object();
+    private final Object deferredPlayerCloseIdentity = new Object();
+    private boolean capturingProfile;
+    private boolean savingProfile;
+    private boolean closingPlayer;
+    private Runnable pendingProfileClose;
+    private Runnable pendingPlayerCloseContinuation;
+    private Boolean pendingProfileSave;
     protected CraftingGrid craftingGrid;
     protected CraftingTransaction craftingTransaction;
     protected EnchantTransaction enchantTransaction;
@@ -2155,7 +2163,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // Resolve transient items under the accepted transition's old mode: recover finite
         // items and discard creative items before a delayed close can use the new mode.
         // Cancelled transitions must leave the inventory available to its current owner.
+        boolean nativeUiReturn = NativeUIItemReturn.isSupported(this);
+        PlayerUIInventory transitionUi = this.playerUIInventory;
+        if (nativeUiReturn && !InventoryMutationGuard.canCaptureProfile(this.profileInventories())) return false;
         this.resetCraftingGridType();
+        if (nativeUiReturn && (this.closed || this.inventory == null || this.playerUIInventory != transitionUi
+                || !InventoryMutationGuard.canCaptureProfile(this.profileInventories())
+                || !transitionUi.getContents().isEmpty())) return false;
         this.resolveOpenTradeInputs();
 
         this.gamemode = gamemode;
@@ -6927,6 +6941,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(TextContainer message, String reason, boolean notify, DisconnectFailReason failReason) {
+        if (this.closingPlayer) return;
+        if (!this.canCaptureProfileOnCurrentThread()) {
+            this.server.deferPlayerClose(this, () -> this.close(message, reason, notify, failReason));
+            return;
+        }
+        if (this.savingProfile) {
+            if (this.pendingProfileClose == null) this.pendingProfileClose = () -> this.close(message, reason, notify, failReason);
+            return;
+        }
+        if (InventoryMutationGuard.deferProfileUntilReleased(this.profileInventories(), this.deferredPlayerCloseIdentity,
+                () -> this.close(message, reason, notify, failReason))) return;
+        this.closingPlayer = true;
+        try {
+            Runnable continuation = this.pendingPlayerCloseContinuation;
+            this.pendingPlayerCloseContinuation = null;
+            if (continuation == null) this.closeNow(message, reason, notify, failReason);
+            else continuation.run();
+        } finally {
+            this.closingPlayer = false;
+        }
+    }
+
+    private void closeNow(TextContainer message, String reason, boolean notify, DisconnectFailReason failReason) {
         if (pendingLoginVerification != null) {
             pendingLoginVerification.cancel();
             pendingLoginVerification = null;
@@ -6945,93 +6982,142 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.connected = false;
             PlayerQuitEvent ev = null;
-            try {
-                if (this.username != null && !this.username.isEmpty()) {
+            if (this.username != null && !this.username.isEmpty()) {
+                try {
+                    this.server.getPluginManager().callEvent(ev = new PlayerQuitEvent(this, message, true, reason));
+                } catch (Throwable t) {
+                    this.server.getLogger().logException(t);
+                }
+                if (this.fishing != null) {
                     try {
-                        this.server.getPluginManager().callEvent(ev = new PlayerQuitEvent(this, message, true, reason));
+                        this.stopFishing(false);
                     } catch (Throwable t) {
                         this.server.getLogger().logException(t);
                     }
-                    if (this.loggedIn && (ev == null || ev.getAutoSave())) {
-                        try {
-                            this.save();
-                        } catch (Throwable t) {
-                            this.server.getLogger().logException(t);
-                        }
-                    }
-                    if (this.fishing != null) {
-                        try {
-                            this.stopFishing(false);
-                        } catch (Throwable t) {
-                            this.server.getLogger().logException(t);
-                        }
-                    }
-                }
-
-                for (Player player : new ArrayList<>(this.server.playerList.values())) {
-                    if (!player.canSee(this)) {
-                        player.showPlayer(this);
-                    }
-                }
-
-                this.hiddenPlayers.clear();
-
-                try {
-                    this.removeAllWindows(true);
-                } catch (Throwable t) {
-                    this.server.getLogger().logException(t);
-                }
-
-                DataDrivenScreen.removeActiveScreen(this);
-
-                this.unloadChunks(false);
-
-                try {
-                    super.close();
-                } catch (Throwable t) {
-                    this.server.getLogger().logException(t);
-                }
-            } finally {
-                this.interfaz.close(this, notify ? reason : "");
-
-                if (this.loggedIn) {
-                    this.server.removeOnlinePlayer(this);
-                    // 从曾收到过本玩家皮肤的其他观察者处清理记录（REMOVE 已由 removeOnlinePlayer 广播）。
-                    // Clear this player's UUID from viewers that previously received its list entry;
-                    // the REMOVE itself is broadcast by removeOnlinePlayer.
-                    this.server.getOnlinePlayers().values().stream()
-                            .filter(p -> p != this)
-                            .forEach(p -> {
-                                p.sentSkins.remove(this.getUniqueId());
-                                p.confirmedSkins.remove(this.getUniqueId());
-                            });
-                    this.loggedIn = false;
                 }
             }
 
-            if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
-                this.server.broadcastMessage(ev.getQuitMessage());
+            PlayerQuitEvent quit = ev;
+            if (!this.deferCloseContinuation(() -> this.closePlayerWindows(quit, reason, notify)))
+                this.closePlayerWindows(quit, reason, notify);
+            return;
+        }
+        this.clearRetiredPlayerState(reason, notify);
+    }
+
+    /** Preserve the already-fired quit event while a native callback finishes its inventory operation. */
+    private boolean deferCloseContinuation(Runnable continuation) {
+        this.pendingPlayerCloseContinuation = continuation;
+        if (InventoryMutationGuard.deferProfileUntilReleased(this.profileInventories(), this.deferredPlayerCloseIdentity,
+                this::close)) return true;
+        this.pendingPlayerCloseContinuation = null;
+        return false;
+    }
+
+    private void closePlayerWindows(PlayerQuitEvent ev, String reason, boolean notify) {
+        if (this.server.isShutdownTimedOut()) return;
+        for (Player player : new ArrayList<>(this.server.playerList.values())) {
+            if (!player.canSee(this)) {
+                player.showPlayer(this);
             }
-
-            this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
-            this.spawned = false;
-            this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logOut",
-                    TextFormat.AQUA + (this.getName() == null ? this.unverifiedUsername : this.getName()) + TextFormat.WHITE,
-                    this.getAddress(),
-                    String.valueOf(this.getPort()),
-                    this.getServer().getLanguage().translateString(reason)));
-            this.windows.clear();
-            this.topWindow = null;
-            this.hasSpawned.clear();
-            this.spawnPosition = null;
-
-            if (this.riding instanceof EntityRideable) {
-                this.riding.passengers.remove(this);
-            }
-
-            this.riding = null;
         }
 
+        this.hiddenPlayers.clear();
+
+        try {
+            this.removeAllWindows(true);
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        try {
+            this.resetCraftingGridType();
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+        if (!this.deferCloseContinuation(() -> this.saveAndRetirePlayer(ev, reason, notify)))
+            this.saveAndRetirePlayer(ev, reason, notify);
+    }
+
+    private void saveAndRetirePlayer(PlayerQuitEvent ev, String reason, boolean notify) {
+        if (this.server.isShutdownTimedOut()) return;
+        if (this.loggedIn && (ev == null || ev.getAutoSave() || this.pendingProfileSave != null)) {
+            try {
+                this.save();
+            } catch (Throwable t) {
+                this.server.getLogger().logException(t);
+            }
+        }
+
+        if (this.server.isShutdownTimedOut()) return;
+        // A serialize listener may retain a new claim after this capture. Save its final outcome before retirement.
+        if (this.deferCloseContinuation(() -> this.saveAndRetirePlayer(ev, reason, notify))) return;
+        try (InventoryMutationGuard.Lease retirement = InventoryMutationGuard.tryClaimProfile(this.profileInventories())) {
+            if (retirement == null) {
+                this.deferCloseContinuation(() -> this.saveAndRetirePlayer(ev, reason, notify));
+                return;
+            }
+            // The admitted profile owns these slots now; late despawn/network observers cannot accept another credit.
+            try (InventoryMutationGuard.WriteScope blocked = retirement.blockWrites()) {
+                this.retirePlayerNow(ev, reason, notify);
+            }
+        }
+    }
+
+    private void retirePlayerNow(PlayerQuitEvent ev, String reason, boolean notify) {
+        try {
+            DataDrivenScreen.removeActiveScreen(this);
+
+            this.unloadChunks(false);
+
+            try {
+                super.close();
+            } catch (Throwable t) {
+                this.server.getLogger().logException(t);
+            }
+        } finally {
+            this.interfaz.close(this, notify ? reason : "");
+
+            if (this.loggedIn) {
+                this.server.removeOnlinePlayer(this);
+                // 从曾收到过本玩家皮肤的其他观察者处清理记录（REMOVE 已由 removeOnlinePlayer 广播）。
+                // Clear this player's UUID from viewers that previously received its list entry;
+                // the REMOVE itself is broadcast by removeOnlinePlayer.
+                this.server.getOnlinePlayers().values().stream()
+                        .filter(p -> p != this)
+                        .forEach(p -> {
+                            p.sentSkins.remove(this.getUniqueId());
+                            p.confirmedSkins.remove(this.getUniqueId());
+                        });
+                this.loggedIn = false;
+            }
+        }
+
+        if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            this.server.broadcastMessage(ev.getQuitMessage());
+        }
+
+        this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
+        this.spawned = false;
+        this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logOut",
+                TextFormat.AQUA + (this.getName() == null ? this.unverifiedUsername : this.getName()) + TextFormat.WHITE,
+                this.getAddress(),
+                String.valueOf(this.getPort()),
+                this.getServer().getLanguage().translateString(reason)));
+        this.windows.clear();
+        this.topWindow = null;
+        this.hasSpawned.clear();
+        this.spawnPosition = null;
+
+        if (this.riding instanceof EntityRideable) {
+            this.riding.passengers.remove(this);
+        }
+
+        this.riding = null;
+        this.clearRetiredPlayerState(reason, notify);
+    }
+
+    private void clearRetiredPlayerState(String reason, boolean notify) {
         if (this.perm != null) {
             this.perm.clearPermissions();
             this.perm = null;
@@ -7058,17 +7144,77 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.save(false);
     }
 
-    /**
-     * Save player data to disk
-     *
-     * @param async save asynchronously
-     */
-    public void save(boolean async) {
-        if (this.closed) {
-            throw new IllegalStateException("Tried to save closed player");
-        }
+    private List<Inventory> profileInventories() {
+        return Arrays.asList(this.inventory, this.offhandInventory, this.enderChestInventory, this.playerUIInventory);
+    }
 
-        super.saveNBT();
+    private boolean canCaptureProfileOnCurrentThread() {
+        if (this.server.isPrimaryThread()) return true;
+        Thread owner = this.server.getPrimaryThread();
+        return owner != null && owner.getState() == Thread.State.TERMINATED && InventoryMutationGuard.isIdle();
+    }
+
+    /** Capture on the owner, or after its termination with no abandoned inventory mutation. */
+    @Override
+    public void saveNBT() {
+        if (this.server.isShutdownTimedOut()) throw new IllegalStateException("Player checkpoint exceeded the shutdown deadline");
+        if (!this.canCaptureProfileOnCurrentThread()) throw new IllegalStateException("Player snapshots require the inventory owner");
+        if (this.capturingProfile || !InventoryMutationGuard.canCaptureProfile(this.profileInventories())) {
+            throw new IllegalStateException("Player inventory snapshot is provisional");
+        }
+        this.capturingProfile = true;
+        try {
+            super.saveNBT();
+            if (this.playerUIInventory != null) this.playerUIInventory.savePlayerData(this.namedTag);
+        } finally {
+            this.capturingProfile = false;
+        }
+    }
+
+    /** Save on MAIN; async controls the later file write, not profile capture. */
+    public void save(boolean async) {
+        if (this.server.isShutdownTimedOut()) throw new IllegalStateException("Player checkpoint exceeded the shutdown deadline");
+        if (this.closed) throw new IllegalStateException("Tried to save closed player");
+        if (!this.canCaptureProfileOnCurrentThread()) throw new IllegalStateException("Player snapshots require the inventory owner");
+        // A serialize listener can refresh the tag being admitted, without recursively firing itself.
+        if (this.savingProfile) {
+            this.captureProfileData();
+            return;
+        }
+        this.pendingProfileSave = this.pendingProfileSave == null ? async : this.pendingProfileSave && async;
+        if (InventoryMutationGuard.deferProfileUntilReleased(this.profileInventories(), this.deferredProfileSaveIdentity, () -> {
+            Boolean requested = this.pendingProfileSave;
+            this.pendingProfileSave = null;
+            if (requested != null && !this.closed) this.save(requested);
+        })) return;
+        async = this.pendingProfileSave;
+        this.pendingProfileSave = null;
+        this.savingProfile = true;
+        Throwable originalFailure = null;
+        try {
+            this.captureProfileData();
+            if (this.level != null && !this.username.isEmpty()) {
+                if (this.server.savePlayerDataByUuid) this.server.saveOfflinePlayerData(this.uuid, this.namedTag, async);
+                else this.server.saveOfflinePlayerData(this.username, this.namedTag, async);
+            }
+        } catch (RuntimeException | Error failure) {
+            originalFailure = failure;
+            throw failure;
+        } finally {
+            this.savingProfile = false;
+            Runnable close = this.pendingProfileClose;
+            this.pendingProfileClose = null;
+            if (close != null) {
+                try { close.run(); } catch (RuntimeException | Error closeFailure) {
+                    if (originalFailure == null) throw closeFailure;
+                    if (originalFailure != closeFailure) originalFailure.addSuppressed(closeFailure);
+                }
+            }
+        }
+    }
+
+    private void captureProfileData() {
+        this.saveNBT();
 
         if (this.level != null) {
             this.namedTag.putString("Level", this.level.getFolderName());
@@ -7121,13 +7267,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.namedTag.putLong("wardenLastWarningTick", this.wardenWarningData.lastWarningTick);
             this.namedTag.putLong("wardenLastShriekTick", this.wardenWarningData.lastShriekTick);
 
-            if (!this.username.isEmpty() && this.namedTag != null) {
-                if (this.server.savePlayerDataByUuid) {
-                    this.server.saveOfflinePlayerData(this.uuid, this.namedTag, async);
-                } else {
-                    this.server.saveOfflinePlayerData(this.username, this.namedTag, async);
-                }
-            }
         }
     }
 
@@ -8503,7 +8642,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         Integer id = this.windows.get(inventory);
         if (id == null) return;
         // Hold the entire public window close until native transaction/UI ownership releases.
-        if ((inventory instanceof AnvilInventory || inventory instanceof GrindstoneInventory) && InventoryMutationGuard.deferUntilReleased(
+        if ((inventory instanceof AnvilInventory || inventory instanceof GrindstoneInventory
+                || inventory instanceof FakeBlockUIComponent fake && fake.usesNativeInputReturn()
+                && NativeUIItemReturn.isSupported(this)) && InventoryMutationGuard.deferProfileUntilReleased(
                 Arrays.asList(inventory, this.getInventory(), this.getUIInventory()), inventory,
                 () -> this.closeAndRemoveInventoryWindow(inventory, isResponse, fireEvent))) return;
         int previousClosingId = this.closingWindowId;
@@ -8526,7 +8667,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
             finally {
                 retainAnvilInputs = inventory instanceof AnvilInventory anvil && inventory.getViewers().contains(this)
-                        && (!anvil.getInputSlot().isNull() || !anvil.getMaterialSlot().isNull());
+                        && (!anvil.getInputSlot().isNull() || !anvil.getMaterialSlot().isNull())
+                        || inventory instanceof FakeBlockUIComponent fake && fake.usesNativeInputReturn()
+                        && NativeUIItemReturn.isSupported(this) && inventory.getViewers().contains(this) && this.playerUIInventory != null
+                        && this.playerUIInventory.getContents().entrySet().stream()
+                        .anyMatch(slot -> PlayerUIInventory.isPersistentSlot(slot.getKey()) && !slot.getValue().isNull());
             }
         } finally {
             try {
@@ -8565,7 +8710,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 && (this.inventoryOpen || activeId == ContainerIds.NONE || inventory instanceof PlayerEnderChestInventory
                     || isWorldBlockContainer(inventory));
         if (activeId != null && (id == (byte) activeId.intValue() || noneClosesActive)) {
-            if ((inventory instanceof AnvilInventory || inventory instanceof GrindstoneInventory) && InventoryMutationGuard.deferUntilReleased(
+            if ((inventory instanceof AnvilInventory || inventory instanceof GrindstoneInventory
+                || inventory instanceof FakeBlockUIComponent fake && fake.usesNativeInputReturn()
+                && NativeUIItemReturn.isSupported(this)) && InventoryMutationGuard.deferProfileUntilReleased(
                     Arrays.asList(inventory, this.getInventory(), this.getUIInventory()), inventory,
                     () -> this.handleInventoryScreenClose(packet))) return;
             ContainerType type = inventory != null && !(inventory instanceof CraftingGrid)
@@ -8932,7 +9079,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected void addDefaultWindows() {
         this.addWindow(this.getInventory(), ContainerIds.INVENTORY, true, true);
 
-        this.playerUIInventory = new PlayerUIInventory(this);
+        this.playerUIInventory = new PlayerUIInventory(this, this.namedTag);
         this.addWindow(this.playerUIInventory, ContainerIds.UI, true);
         this.addWindow(this.offhandInventory, ContainerIds.OFFHAND, true, true);
 
@@ -8967,6 +9114,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void resetCraftingGridType() {
+        // A custom Level's legacy void drop hook retains its existing authority and contract.
+        if (!NativeUIItemReturn.isSupported(this)) {
+            this.resetCraftingGridTypeLegacy();
+            return;
+        }
+        if (this.playerUIInventory != null) {
+            if (!NativeUIItemReturn.returnInputs(this)) return;
+            if (this.craftingGrid instanceof BigCraftingGrid && this.connected) {
+                this.craftingGrid = this.playerUIInventory.getCraftingGrid();
+                this.addWindow(this.craftingGrid, ContainerIds.NONE);
+            }
+        }
+        this.craftingType = CRAFTING_SMALL;
+    }
+
+    private void resetCraftingGridTypeLegacy() {
         if (this.playerUIInventory != null) {
             Item[] drops;
 

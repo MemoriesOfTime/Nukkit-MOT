@@ -36,6 +36,7 @@ class PlayerCreativeUiResetTest {
     @BeforeEach
     void setUp() {
         MockServer.reset();
+        when(MockServer.get().isPrimaryThread()).thenReturn(true);
         level = mock(Level.class);
         when(MockServer.get().getDefaultLevel()).thenReturn(level);
         when(MockServer.get().getPluginManager()).thenReturn(mock(PluginManager.class));
@@ -165,6 +166,7 @@ class PlayerCreativeUiResetTest {
     @ParameterizedTest
     @ValueSource(ints = {Player.SURVIVAL, Player.ADVENTURE})
     void finiteResetDropsOnlyOverflowAndPreservesItsNbt(int mode) {
+        useLegacyDropHook();
         TestPlayer player = player(mode, 589, false);
         fill(player);
         fillTransient(player);
@@ -276,6 +278,7 @@ class PlayerCreativeUiResetTest {
             assertEquals(placed, count(player), station.name() + ": repeated close must be idempotent");
 
             clearInvocations(level);
+            Level nativeLevel = useLegacyDropHook();
             TestPlayer fullPlayer = player(Player.SURVIVAL, 2169, false);
             fill(fullPlayer);
             FakeBlockUIComponent fullInv = openStation(fullPlayer, station);
@@ -289,6 +292,8 @@ class PlayerCreativeUiResetTest {
                     station.name() + ": overflow must keep its full counts");
             assertEquals(36 * 64, count(fullPlayer), station.name());
             assertTrue(fullInv.getContents().isEmpty(), station.name());
+            level = nativeLevel;
+            when(MockServer.get().getDefaultLevel()).thenReturn(level);
         }
     }
 
@@ -330,6 +335,7 @@ class PlayerCreativeUiResetTest {
 
     @Test
     void disconnectedBeaconCloseDropsForFiniteModesButNotCreative() {
+        useLegacyDropHook();
         TestPlayer creative = player(Player.CREATIVE, 2169, false);
         creative.connected = false;
         BeaconInventory creativeBeacon = new BeaconInventory(creative.getUIInventory(), new Position(0, 64, 0, level));
@@ -434,6 +440,21 @@ class PlayerCreativeUiResetTest {
 
     private static int count(TestPlayer player) {
         return player.getInventory().getContents().values().stream().mapToInt(Item::getCount).sum();
+    }
+
+    /** These cases assert the preexisting virtual void-drop hook and its exact captured arguments. */
+    private Level useLegacyDropHook() {
+        Level previous = this.level;
+        this.level = mock(LegacyDropLevel.class);
+        when(MockServer.get().getDefaultLevel()).thenReturn(this.level);
+        return previous;
+    }
+
+    private static class LegacyDropLevel extends Level {
+        LegacyDropLevel(Server server, String name, String path, Class<? extends cn.nukkit.level.format.LevelProvider> provider) {
+            super(server, name, path, provider);
+        }
+        @Override public void dropItem(cn.nukkit.math.Vector3 source, Item item) { super.dropItem(source, item); }
     }
 
     private TestPlayer player(int mode, int protocol, boolean big) {

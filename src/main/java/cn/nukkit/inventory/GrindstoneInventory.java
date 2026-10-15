@@ -224,13 +224,19 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
     @Override
     public void onClose(Player who) {
         if (this.cleanupCompleted) return;
-        if (InventoryMutationGuard.deferUntilReleased(
+        if (this.isReturningNativeInputs()) {
+            this.completeClose(who);
+            super.onClose(who);
+            return;
+        }
+        if (InventoryMutationGuard.deferProfileUntilReleased(
                 java.util.Arrays.asList(this, who.getInventory(), who.getUIInventory()),
                 this.deferredCleanupIdentity, () -> this.onClose(who))) return;
         // Keep ownership through cleanup and the close packet's mapped window identity.
-        try (InventoryMutationGuard.Lease close = InventoryMutationGuard.tryClaim(
-                java.util.Arrays.asList(this, who.getInventory(), who.getUIInventory()))) {
+        try (InventoryMutationGuard.Lease close = InventoryMutationGuard.tryClaimProfile(
+                java.util.Arrays.asList(this, who.getInventory(), who.getOffhandInventory(), who.getEnderChestInventory(), who.getUIInventory()))) {
             if (close == null) return;
+            if (NativeUIItemReturn.isSupported(who) && !NativeUIItemReturn.returnInputs(who, close, this)) return;
             this.completeClose(who);
             super.onClose(who);
         }

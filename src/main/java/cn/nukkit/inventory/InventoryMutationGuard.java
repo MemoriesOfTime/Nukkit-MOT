@@ -12,6 +12,7 @@ import java.util.Set;
 public final class InventoryMutationGuard {
     private static final Set<Inventory> CLAIMED = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final ThreadLocal<WriteScope> EXPECTED_WRITE = new ThreadLocal<>();
+    private static final java.util.Map<Inventory, Integer> ACTIVE_WRITES = new IdentityHashMap<>();
     private static final java.util.Map<Object, DeferredClose> DEFERRED_CLOSES = new IdentityHashMap<>();
 
     private InventoryMutationGuard() { }
@@ -27,10 +28,44 @@ public final class InventoryMutationGuard {
         }
     }
 
+    /** Defer a profile checkpoint with every reachable live bundle, not just its carrier slot. */
+    public static boolean deferProfileUntilReleased(Collection<? extends Inventory> inventories, Object identity, Runnable checkpoint) {
+        synchronized (CLAIMED) {
+            if (CLAIMED.isEmpty() && ACTIVE_WRITES.isEmpty()) return false;
+        }
+        Set<Inventory> backings = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Inventory inventory : inventories) collectProfileBackings(inventory, backings);
+        synchronized (CLAIMED) {
+            if (!isOwned(backings)) return false;
+            DEFERRED_CLOSES.putIfAbsent(identity, new DeferredClose(backings, checkpoint));
+            return true;
+        }
+    }
+
     private static boolean isOwned(Set<Inventory> backings) {
-        if (overlapsWrite(backings)) return true;
-        for (Inventory inventory : backings) if (CLAIMED.contains(inventory)) return true;
+        for (Inventory inventory : backings) {
+            if (CLAIMED.contains(inventory) || ACTIVE_WRITES.containsKey(inventory)) return true;
+        }
         return false;
+    }
+
+    /** Shutdown may run only after every native transaction and exact write has left its callback. */
+    public static boolean isIdle() {
+        synchronized (CLAIMED) {
+            return CLAIMED.isEmpty() && ACTIVE_WRITES.isEmpty();
+        }
+    }
+
+    /** The callback must recheck idle on entry: another owner may have appeared before its turn. */
+    public static boolean deferUntilIdle(Object identity, Runnable callback) {
+        synchronized (CLAIMED) {
+            if (CLAIMED.isEmpty() && ACTIVE_WRITES.isEmpty()) return false;
+            Set<Inventory> backings = Collections.newSetFromMap(new IdentityHashMap<>());
+            backings.addAll(CLAIMED);
+            backings.addAll(ACTIVE_WRITES.keySet());
+            DEFERRED_CLOSES.putIfAbsent(identity, new DeferredClose(backings, callback));
+            return true;
+        }
     }
 
     /** Direct native slot receipts must not escape an enclosing transaction's rollback. */
@@ -73,10 +108,21 @@ public final class InventoryMutationGuard {
         for (Inventory inventory : inventories) {
             collectBackings(inventory, owned);
         }
+        return claimBackings(owned);
+    }
+
+    /** Claim the native profile and every reachable live bundle before returning or retiring UI custody. */
+    public static Lease tryClaimProfile(Collection<? extends Inventory> inventories) {
+        Set<Inventory> owned = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Inventory inventory : inventories) collectProfileBackings(inventory, owned);
+        return claimBackings(owned);
+    }
+
+    private static Lease claimBackings(Set<Inventory> owned) {
         if (overlapsWrite(owned)) return null;
         synchronized (CLAIMED) {
             for (Inventory inventory : owned) {
-                if (CLAIMED.contains(inventory)) return null;
+                if (CLAIMED.contains(inventory) || ACTIVE_WRITES.containsKey(inventory)) return null;
             }
             CLAIMED.addAll(owned);
         }
@@ -87,17 +133,13 @@ public final class InventoryMutationGuard {
     public static boolean canCaptureProfile(Collection<? extends Inventory> inventories) {
         synchronized (CLAIMED) {
             // Ordinary autosave must not initialize lazy bundle containers or allocate a backing traversal.
-            if (CLAIMED.isEmpty() && EXPECTED_WRITE.get() == null) return true;
+            if (CLAIMED.isEmpty() && ACTIVE_WRITES.isEmpty()) return true;
         }
         Set<Inventory> backings = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Inventory inventory : inventories) collectProfileBackings(inventory, backings);
-        if (overlapsWrite(backings)) return false;
         synchronized (CLAIMED) {
-            for (Inventory inventory : backings) {
-                if (CLAIMED.contains(inventory)) return false;
-            }
+            return !isOwned(backings);
         }
-        return true;
     }
 
     private static void collectProfileBackings(Inventory inventory, Set<Inventory> backings) {
@@ -200,6 +242,7 @@ public final class InventoryMutationGuard {
         private final WriteScope previous;
         private final Item slotBefore;
         private final boolean exactBulk;
+        private boolean closed;
 
         private WriteScope(Set<Inventory> owned, Inventory inventory, Inventory requestedInventory, int slot, Item target, boolean exactBulk) {
             this.owned = owned;
@@ -212,6 +255,9 @@ public final class InventoryMutationGuard {
                     ? nativeInventory.slots.get(slot) : null;
             this.slotBefore = stored == null ? null : stored.clone();
             this.previous = EXPECTED_WRITE.get();
+            synchronized (CLAIMED) {
+                for (Inventory backing : owned) ACTIVE_WRITES.merge(backing, 1, Integer::sum);
+            }
             EXPECTED_WRITE.set(this);
         }
 
@@ -246,6 +292,15 @@ public final class InventoryMutationGuard {
         }
 
         @Override public void close() {
+            synchronized (CLAIMED) {
+                if (closed) return;
+                closed = true;
+                for (Inventory backing : owned) {
+                    int remaining = ACTIVE_WRITES.get(backing) - 1;
+                    if (remaining == 0) ACTIVE_WRITES.remove(backing);
+                    else ACTIVE_WRITES.put(backing, remaining);
+                }
+            }
             if (previous == null) EXPECTED_WRITE.remove();
             else EXPECTED_WRITE.set(previous);
             drainDeferredCloses();

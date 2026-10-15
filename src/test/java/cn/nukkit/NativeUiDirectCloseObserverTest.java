@@ -84,10 +84,16 @@ class NativeUiDirectCloseObserverTest {
     }
 
     private void directCleanupObserverRemovesWindow(boolean grinding) {
-        PlayerUIComponent station = grinding
+        directCleanupObserverRemovesWindow(grinding ? 1 : 0);
+    }
+    private void directCleanupObserverRemovesWindow(int kind) {
+        boolean grinding = kind == 1;
+        PlayerUIComponent station = kind == 2
+                ? new cn.nukkit.inventory.StonecutterInventory(player.getUIInventory(), new Position(1, 0, 1, level))
+                : grinding
                 ? new GrindstoneInventory(player.getUIInventory(), new Position(1, 0, 1, level))
                 : new AnvilInventory(player.getUIInventory(), new Position(1, 0, 1, level));
-        int id = player.addWindow(station, grinding ? Player.GRINDSTONE_WINDOW_ID : Player.ANVIL_WINDOW_ID);
+        int id = player.addWindow(station, kind == 2 ? Player.STONECUTTER_WINDOW_ID : grinding ? Player.GRINDSTONE_WINDOW_ID : Player.ANVIL_WINDOW_ID);
         assertTrue(id >= 0);
         station.setItemForce(0, stack(4));
         AtomicBoolean observerRemovedWindow = new AtomicBoolean();
@@ -110,6 +116,7 @@ class NativeUiDirectCloseObserverTest {
         List<ContainerClosePacket> closes = sent.stream().filter(ContainerClosePacket.class::isInstance)
                 .map(ContainerClosePacket.class::cast).toList();
         assertFalse(closes.isEmpty());
+        if (kind == 2) assertEquals(1, closes.size(), "one native direct close keeps one mapped packet");
         assertTrue(closes.stream().allMatch(packet -> packet.windowId == id),
                 "Reentrant removal during custody return cannot replace the real window id by -1");
     }
@@ -119,6 +126,20 @@ class NativeUiDirectCloseObserverTest {
     }
     @Test void directGrindstoneCleanupObserverRetainsValidCloseWindowId() {
         directCleanupObserverRemovesWindow(true);
+    }
+
+    @Test void directStonecutterCleanupObserverRetainsOneMappedClose() {
+        directCleanupObserverRemovesWindow(2);
+    }
+
+    @Test void aCustomAnvilCloseHookStillObservesItsAuthoredInputs() {
+        AtomicInteger observed = new AtomicInteger();
+        AnvilInventory custom = new AnvilInventory(player.getUIInventory(), new Position(1,0,1,level)) {
+            @Override public void onClose(Player who) { observed.set(this.getInputSlot().getCount()); }
+        };
+        assertTrue(player.addWindow(custom, Player.ANVIL_WINDOW_ID) >= 0);
+        custom.setItemForce(0, stack(4)); custom.close(player);
+        assertEquals(4, observed.get()); assertEquals(4, custom.getInputSlot().getCount());
     }
 
     private static final class TestPlayer extends Player {

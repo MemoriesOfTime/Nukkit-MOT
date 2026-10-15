@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.StonecutterItemEvent;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.NativeUIItemReturn;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.StonecutterInventory;
 import cn.nukkit.inventory.StonecutterRecipe;
@@ -25,6 +26,7 @@ public class StonecutterTransaction extends InventoryTransaction {
     private Item outputItem;
     private final List<Item> outputItemCheck = new ArrayList<>();
     private StonecutterRecipe recipe;
+    private boolean executionInProgress;
 
     public StonecutterTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions);
@@ -127,6 +129,44 @@ public class StonecutterTransaction extends InventoryTransaction {
 
     @Override
     public boolean execute() {
+        Inventory window = this.source.getWindowById(Player.STONECUTTER_WINDOW_ID);
+        // Keep existing virtual placement/drop hooks for custom native API implementations.
+        if (this.getClass() != StonecutterTransaction.class || window == null || window.getClass() != StonecutterInventory.class
+                || !NativeUIItemReturn.isSupported(this.source)) return this.executeLegacy();
+        if (executionInProgress || this.hasExecuted() || !NativeRecipeTransaction.supports(this)) return false;
+        executionInProgress = true;
+        try {
+            if (!this.canExecute()) {
+                this.sendInventories();
+                return false;
+            }
+            StonecutterInventory inventory = (StonecutterInventory) window;
+            Item input = this.inputItem.clone(), physicalInput = inventory.getInput().clone(), originalOutput = this.outputItem.clone();
+            StonecutterRecipe frozenRecipe = this.recipe;
+            Item ingredient = frozenRecipe.getIngredient().clone(), result = frozenRecipe.getResult().clone();
+            StonecutterItemEvent event = new StonecutterItemEvent(inventory, input.clone(), originalOutput.clone(), this.source);
+            boolean committed = NativeRecipeTransaction.executeStonecutter(this, inventory, physicalInput, originalOutput,
+                    ingredient.getCount(), this::getOutputItem, () -> {
+                this.source.getServer().getPluginManager().callEvent(event);
+                if (event.isCancelled()) return false;
+                Item approved = applyEventOutputToActions(originalOutput, event.getOutputItem());
+                if (approved == null) return false;
+                this.outputItem = approved;
+                return true;
+            }, () -> this.inputItem.equalsExact(input) && this.recipe == frozenRecipe
+                    && frozenRecipe.getIngredient().equalsExact(ingredient) && frozenRecipe.getResult().equalsExact(result)
+                    && this.source.getWindowById(Player.STONECUTTER_WINDOW_ID) == inventory);
+            if (!committed) {
+                this.sendInventories();
+                source.setNeedSendInventory(true);
+            }
+            return committed;
+        } finally {
+            executionInProgress = false;
+        }
+    }
+
+    private boolean executeLegacy() {
         if (this.invalid || this.hasExecuted() || !this.canExecute()) {
             this.source.removeAllWindows(false);
             this.sendInventories();
