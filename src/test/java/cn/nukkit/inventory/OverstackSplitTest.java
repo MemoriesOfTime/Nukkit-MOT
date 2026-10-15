@@ -99,14 +99,14 @@ class OverstackSplitTest {
     }
 
     @Test
-    void setItemForceChunksOverflowIntoEmptySlotsWithoutSideEffects() {
+    void setItemForceRestoresTheSnapshotWithoutMovingItemsToOtherSlots() {
         TestInventory inventory = new TestInventory(3);
 
         inventory.setItemForce(0, Item.get(Item.STONE, 0, 150));
 
-        assertEquals(64, inventory.getItem(0).getCount());
-        assertEquals(64, inventory.getItem(1).getCount());
-        assertEquals(22, inventory.getItem(2).getCount());
+        assertEquals(150, inventory.getItem(0).getCount());
+        assertTrue(inventory.getItem(1).isNull());
+        assertTrue(inventory.getItem(2).isNull());
     }
 
     @Test
@@ -121,13 +121,13 @@ class OverstackSplitTest {
     }
 
     @Test
-    void overriddenMaxStackSizeGetterLimitsSetItemForceChunks() {
+    void authoritativeSnapshotRestorePreservesCountDespiteTighterSlotLimit() {
         LimitOneInventory inventory = new LimitOneInventory(2);
 
         inventory.setItemForce(0, Item.get(Item.STONE, 0, 3));
 
-        assertEquals(1, inventory.getItem(0).getCount());
-        assertEquals(1, inventory.getItem(1).getCount());
+        assertEquals(3, inventory.getItem(0).getCount());
+        assertTrue(inventory.getItem(1).isNull());
     }
 
     @Test

@@ -19,14 +19,46 @@ public class AnvilInventory extends FakeBlockUIComponent {
     public static final int RESULT = ANVIL_OUTPUT_UI_SLOT - 1; //1: offset
 
     private int cost;
+    private final Object deferredCloseIdentity = new Object();
+    private final Object deferredCleanupIdentity = new Object();
+    private boolean cleanupCompleted;
 
     public AnvilInventory(PlayerUIInventory playerUI, Position position) {
         super(playerUI, InventoryType.ANVIL, 1, position);
     }
 
     @Override
+    public void close(Player who) {
+        if (InventoryMutationGuard.deferUntilReleased(
+                java.util.Arrays.asList(this, who.getInventory(), who.getUIInventory()),
+                this.deferredCloseIdentity, () -> this.close(who))) return;
+        super.close(who);
+    }
+
+    @Override
     public void onClose(Player who) {
-        super.onClose(who);
+        if (this.cleanupCompleted) return;
+        if (this.isReturningNativeInputs()) {
+            this.completeClose(who);
+            super.onClose(who);
+            return;
+        }
+        if (InventoryMutationGuard.deferProfileUntilReleased(
+                java.util.Arrays.asList(this, who.getInventory(), who.getUIInventory()),
+                this.deferredCleanupIdentity, () -> this.onClose(who))) return;
+        // Keep ownership through cleanup and the close packet's mapped window identity.
+        try (InventoryMutationGuard.Lease close = InventoryMutationGuard.tryClaimProfile(
+                java.util.Arrays.asList(this, who.getInventory(), who.getOffhandInventory(), who.getEnderChestInventory(), who.getUIInventory()))) {
+            if (close == null) return;
+            if (NativeUIItemReturn.isSupported(who) && !NativeUIItemReturn.returnInputs(who, close)) return;
+            this.completeClose(who);
+            super.onClose(who);
+        }
+    }
+
+    private void completeClose(Player who) {
+        if (this.cleanupCompleted) return;
+        this.cleanupCompleted = true;
         who.craftingType = Player.CRAFTING_SMALL;
         who.resetCraftingGridType();
 
@@ -38,6 +70,7 @@ public class AnvilInventory extends FakeBlockUIComponent {
 
     @Override
     public void onOpen(Player who) {
+        this.cleanupCompleted = false;
         super.onOpen(who);
         who.craftingType = Player.ANVIL_WINDOW_ID;
     }

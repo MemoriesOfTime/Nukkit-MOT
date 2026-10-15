@@ -132,7 +132,7 @@ public class BlockDropper extends BlockSolidMeta implements Faceable, BlockEntit
             return false;
         }
 
-        player.addWindow(((BlockEntityDropper) blockEntity).getInventory());
+        player.requestWindowOpen(((BlockEntityDropper) blockEntity).getInventory());
         return true;
     }
 

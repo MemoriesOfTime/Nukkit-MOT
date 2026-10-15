@@ -115,7 +115,7 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
             return false;
         }
 
-        player.addWindow(((BlockEntityDispenser) blockEntity).getInventory());
+        player.requestWindowOpen(((BlockEntityDispenser) blockEntity).getInventory());
         return true;
     }
 

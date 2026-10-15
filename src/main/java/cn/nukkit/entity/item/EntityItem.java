@@ -4,6 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockLiquid;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityPickupClaim;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.ItemBurnEvent;
@@ -58,6 +59,100 @@ public class EntityItem extends Entity {
 
     public EntityItem(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
+
+    private EntityItem(FullChunk chunk, CompoundTag nbt, boolean prepared) {
+        super(chunk, nbt, prepared);
+    }
+
+    /** A capability kept by the transaction, never exposed by the entity shown to spawn listeners. */
+    public static final class PreparedDrop {
+        private final EntityItem entity;
+        private final FullChunk chunk;
+        private final cn.nukkit.level.Level level;
+        private final double x, y, z, motionX, motionY, motionZ;
+        private final Item approvedItem;
+
+        private PreparedDrop(EntityItem entity, FullChunk chunk, CompoundTag authored, Item expected) {
+            this.entity = entity;
+            this.chunk = chunk;
+            this.level = chunk.getProvider().getLevel();
+            var pos = authored.getList("Pos", cn.nukkit.nbt.tag.DoubleTag.class);
+            var motion = authored.getList("Motion", cn.nukkit.nbt.tag.DoubleTag.class);
+            this.x = pos.get(0).data; this.y = pos.get(1).data; this.z = pos.get(2).data;
+            this.motionX = motion.get(0).data; this.motionY = motion.get(1).data; this.motionZ = motion.get(2).data;
+            // Spawn listeners may sanitize server metadata, but cannot change the physical quantity or variant.
+            Item actual = entity.item;
+            this.approvedItem = actual == null ? Item.get(Item.AIR) : actual.clone();
+            if (actual == null || actual.getId() != expected.getId()
+                    || !actual.getNamespaceId().equals(expected.getNamespaceId())
+                    || actual.getDamage() != expected.getDamage() || actual.getCount() != expected.getCount()) {
+                entity.deferredItemInvalid = true;
+            }
+        }
+
+        public boolean isValid() {
+            return this.entity.isDeferredPublicationIntact() && !this.entity.deferredItemInvalid
+                    && this.entity.isAlive() && this.entity.chunk == this.chunk && this.entity.level == this.level
+                    && this.chunk.getEntities().get(this.entity.getId()) == this.entity
+                    && this.level.getEntity(this.entity.getId()) == this.entity
+                    && this.entity.x == this.x && this.entity.y == this.y && this.entity.z == this.z
+                    && this.entity.motionX == this.motionX && this.entity.motionY == this.motionY && this.entity.motionZ == this.motionZ
+                    && this.entity.item != null && this.entity.item.equalsExact(this.approvedItem);
+        }
+
+        /** Preconditions were checked by the coordinator; publication itself is assignment-only. */
+        public void release() { this.entity.releaseDeferredPublication(); }
+        public void discard() { this.entity.discardDeferredPublication(); }
+        public void notifyPublished() {
+            this.entity.scheduleUpdate();
+            this.entity.spawnToAll();
+        }
+    }
+
+    /** A falling coordinator distinguishes intentional ItemSpawnEvent closure from an invalid item. */
+    public static final class FallingDrop {
+        private final PreparedDrop drop;
+        private final boolean discarded;
+        private FallingDrop(PreparedDrop drop, boolean discarded) { this.drop = drop; this.discarded = discarded; }
+        public boolean isDiscarded() { return discarded; }
+        public boolean isValid() { return !discarded && drop.isValid(); }
+        public void release() { drop.release(); }
+        public void discard() { drop.discard(); }
+        public void notifyPublished() { drop.notifyPublished(); }
+    }
+
+    public static FallingDrop prepareFallingDrop(FullChunk chunk, CompoundTag nbt, Item expected) {
+        CompoundTag authored = nbt.clone();
+        EntityItem entity = new EntityItem(chunk, nbt, true);
+        try {
+            return new FallingDrop(new PreparedDrop(entity, chunk, authored, expected), entity.closed);
+        } catch (RuntimeException | Error failure) {
+            try { entity.discardDeferredPublication(); }
+            catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+            throw failure;
+        }
+    }
+
+    private boolean deferredItemInvalid;
+
+    public static PreparedDrop prepareDrop(FullChunk chunk, CompoundTag nbt, Item expected) {
+        // Keep a detached geometry snapshot: the constructor owns and exposes its own NBT to listeners.
+        CompoundTag authored = nbt.clone();
+        EntityItem entity = new EntityItem(chunk, nbt, true);
+        try {
+            PreparedDrop ticket = new PreparedDrop(entity, chunk, authored, expected);
+            if (!ticket.isValid()) {
+                ticket.discard();
+                return null;
+            }
+            return ticket;
+        } catch (RuntimeException | Error failure) {
+            try { entity.discardDeferredPublication(); } catch (RuntimeException | Error cleanup) {
+                if (cleanup != failure) failure.addSuppressed(cleanup);
+            }
+            throw failure;
+        }
     }
 
     @Override
@@ -143,6 +238,7 @@ public class EntityItem extends Entity {
 
     @Override
     public boolean attack(EntityDamageEvent source) {
+        if (isPublicationDeferred()) return false;
         DamageCause cause = source.getCause();
         if ((cause == DamageCause.VOID || cause == DamageCause.CONTACT || cause == DamageCause.FIRE_TICK
                 || (cause == DamageCause.ENTITY_EXPLOSION || cause == DamageCause.BLOCK_EXPLOSION) && !this.isInsideOfWater()
@@ -174,6 +270,7 @@ public class EntityItem extends Entity {
 
     @Override
     public boolean onUpdate(int currentTick) {
+        if (isPublicationDeferred()) return false;
         if (this.closed) {
             return false;
         }
@@ -246,19 +343,24 @@ public class EntityItem extends Entity {
                             if (!entity.isOnGround()) {
                                 continue;
                             }
-                            int newAmount = this.item.getCount() + closeItem.getCount();
-                            if (newAmount > this.item.getMaxStackSize()) {
-                                continue;
+                            // Native despawn and merge-packet callbacks must not consume either participant.
+                            try (EntityPickupClaim.Lease receiver = EntityPickupClaim.tryClaim(this);
+                                 EntityPickupClaim.Lease donor = EntityPickupClaim.tryClaim(entity)) {
+                                if (receiver == null || donor == null) continue;
+                                int newAmount = this.item.getCount() + closeItem.getCount();
+                                if (newAmount > this.item.getMaxStackSize()) {
+                                    continue;
+                                }
+                                this.age = Math.min(this.age, entity.age);
+                                closeItem.setCount(0);
+                                this.item.setCount(newAmount);
+                                entity.close();
+                                EntityEventPacket packet = new EntityEventPacket();
+                                packet.eid = getId();
+                                packet.data = newAmount;
+                                packet.event = EntityEventPacket.MERGE_ITEMS;
+                                Server.broadcastPacket(this.getViewers().values(), packet);
                             }
-                            this.age = Math.min(this.age, entity.age);
-                            closeItem.setCount(0);
-                            entity.close();
-                            this.item.setCount(newAmount);
-                            EntityEventPacket packet = new EntityEventPacket();
-                            packet.eid = getId();
-                            packet.data = newAmount;
-                            packet.event = EntityEventPacket.MERGE_ITEMS;
-                            Server.broadcastPacket(this.getViewers().values(), packet);
                         }
                     }
                 }
@@ -324,6 +426,7 @@ public class EntityItem extends Entity {
 
     @Override
     public void saveNBT() {
+        if (isPublicationDeferred()) return;
         super.saveNBT();
         if (this.item != null) { // Yes, a item can be null... I don't know what causes this, but it can happen.
             this.namedTag.putCompound("Item", NBTIO.putItemHelper(this.item, -1));
@@ -347,7 +450,7 @@ public class EntityItem extends Entity {
 
     /** True unless the entity opted out of merging; see {@link #mergeItems}. */
     public boolean isMergeable() {
-        return this.mergeItems;
+        return !isPublicationDeferred() && this.mergeItems;
     }
 
     /**
@@ -367,7 +470,9 @@ public class EntityItem extends Entity {
 
     /** Both entities must allow merging; the item equality check stays with the caller. */
     protected boolean mergeableWith(EntityItem other) {
-        return this.mergeItems && other != null && other.mergeItems;
+        return !this.isPublicationDeferred() && this.mergeItems && other != null
+                && !other.isPublicationDeferred() && other.mergeItems
+                && !EntityPickupClaim.isClaimed(this) && !EntityPickupClaim.isClaimed(other);
     }
 
     static boolean mergeableFromNbt(CompoundTag tag) {
@@ -402,6 +507,7 @@ public class EntityItem extends Entity {
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
+        if (isPublicationDeferred()) return false;
         this.collisionBlocks = null;
         this.justCreated = false;
 

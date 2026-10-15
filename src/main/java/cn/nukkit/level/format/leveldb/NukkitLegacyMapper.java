@@ -68,6 +68,11 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
 
     private BlockPalette blockPalette;
 
+    /** The cached native palette resolves cell writes without plugin-defined virtual callbacks. */
+    public final boolean hasNativeFallingMapping() {
+        return getBlockPalette().getClass() == BlockPalette.class;
+    }
+
     @Override
     public int legacyToRuntime(int legacyId, int meta) {
         return this.getBlockPalette().getRuntimeId(legacyId, meta);

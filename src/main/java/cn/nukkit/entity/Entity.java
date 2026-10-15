@@ -24,6 +24,7 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
 import cn.nukkit.event.player.PlayerTeleportEvent;
+import cn.nukkit.event.player.PlayerTotemConsumeEvent;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.PlayerOffhandInventory;
 import cn.nukkit.item.Item;
@@ -567,6 +568,13 @@ public abstract class Entity extends Location implements Metadatable {
     private volatile boolean init;
     private volatile boolean initEntity;
     private volatile boolean published;
+    // Transient preparation state: listeners retain their constructor order but cannot publish this source.
+    private volatile boolean publicationDeferred;
+    private boolean spawnEventDeferred;
+    private boolean retirementPending;
+    private boolean deferredPublicationInvalidated;
+    private FullChunk deferredRegisteredChunk;
+    private Level deferredRegisteredLevel;
 
     protected volatile boolean saveWithChunk = true;
 
@@ -628,6 +636,16 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public Entity(FullChunk chunk, CompoundTag nbt) {
+        this(chunk, nbt, false);
+    }
+
+    protected Entity(FullChunk chunk, CompoundTag nbt, boolean publicationDeferred) {
+        this(chunk, nbt, publicationDeferred, false);
+    }
+
+    protected Entity(FullChunk chunk, CompoundTag nbt, boolean publicationDeferred, boolean spawnEventDeferred) {
+        this.spawnEventDeferred = spawnEventDeferred;
+        this.publicationDeferred = publicationDeferred;
         this.isPlayer = this instanceof Player;
         if (this instanceof Player) {
             initEntityProperties("minecraft:player");
@@ -788,12 +806,18 @@ public abstract class Entity extends Location implements Metadatable {
                 return;
             }
 
+            if (this.publicationDeferred) {
+                this.deferredRegisteredChunk = this.chunk;
+                this.deferredRegisteredLevel = this.level;
+            }
             this.chunk.addEntity(this);
             this.level.addEntity(this);
             this.lastUpdate = this.server.getTick();
-            this.published = true;
+            this.published = !this.publicationDeferred;
 
-            this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
+            if (!this.spawnEventDeferred) {
+                this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
+            }
 
             this.scheduleUpdate();
         } catch (RuntimeException | Error e) {
@@ -1531,6 +1555,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void saveNBT() {
+        if (this.publicationDeferred) return;
         if (!(this instanceof Player)) {
             this.namedTag.putString("id", this.getSaveId());
             if (!this.getNameTag().isEmpty()) {
@@ -1607,6 +1632,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void spawnTo(Player player) {
+        if (this.publicationDeferred) return;
         if (!init || !initEntity) {
             this.server.getLogger().warning("(BUG) Spawned an entity that is not initialized yet: " + this.getName() + " (" + this.id + ')');
         }
@@ -1691,6 +1717,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void sendData(Player player, EntityMetadata data) {
+        if (this.publicationDeferred) return;
         SetEntityDataPacket pk = new SetEntityDataPacket();
         pk.eid = this.id;
         pk.metadata = data == null ? this.dataProperties.clone() : data;
@@ -1704,6 +1731,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void sendData(Player[] players, EntityMetadata data) {
+        if (this.publicationDeferred) return;
         SetEntityDataPacket pk = new SetEntityDataPacket();
         pk.eid = this.id;
         //pk.metadata = data == null ? this.dataProperties : data;
@@ -1723,6 +1751,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void despawnFrom(Player player) {
+        if (this.publicationDeferred) return;
         if (this.hasSpawned.containsKey(player.getLoaderId())) {
             RemoveEntityPacket pk = new RemoveEntityPacket();
             pk.eid = this.id;
@@ -1881,12 +1910,16 @@ public abstract class Entity extends Location implements Metadatable {
             if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.SUICIDE) {
                 boolean totem = false;
                 boolean isOffhand = false;
+                Item selectedTotem = inv == null ? null : inv.getItemInHandFast();
+                int selectedSlot = -1;
                 // A deliberately held totem takes precedence over the offhand.
-                if (inv != null && isTotem(inv.getItemInHandFast())) {
+                if (isTotem(selectedTotem)) {
                     totem = true;
-                } else if (offhand != null && isTotem(offhand.getItemFast(0))) {
+                    selectedSlot = inv.getHeldItemIndex();
+                } else if (offhand != null && isTotem(selectedTotem = offhand.getItemFast(0))) {
                     totem = true;
                     isOffhand = true;
+                    selectedSlot = 0;
                 }
                 if (totem) {
                     this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_TOTEM);
@@ -1905,13 +1938,25 @@ public abstract class Entity extends Location implements Metadatable {
                     pk.event = EntityEventPacket.CONSUME_TOTEM;
                     p.dataPacket(pk);
 
-                    if (isOffhand) {
-                        offhand.decreaseCount(0);
-                    } else {
-                        inv.decreaseCount(inv.getHeldItemIndex());
-                    }
+                    Item consumedTotem = isOffhand
+                            ? offhand.decreaseTotemCount(0, selectedSlot, selectedTotem)
+                            : inv.decreaseTotemCount(inv.getHeldItemIndex(), selectedSlot, selectedTotem);
 
+                    // A totem consumes the lethal hit but returns false below, so EntityLiving
+                    // cannot arm its usual attackTime. Retain that same hurt window, including
+                    // its stronger-hit rule, without granting absolute noDamageTicks immunity.
+                    EntityLiving living = p;
+                    living.attackTime = Math.max(living.attackTime, source.getAttackCooldown());
+                    this.scheduleUpdate();
                     source.setCancelled(true);
+                    if (consumedTotem != null) {
+                        try {
+                            this.server.getPluginManager().callEvent(new PlayerTotemConsumeEvent(
+                                    p, consumedTotem, source, selectedSlot, isOffhand));
+                        } catch (RuntimeException failure) {
+                            this.server.getLogger().error("Totem consumption notification failed", failure);
+                        }
+                    }
                     return false;
                 }
             } else if (offhand != null && isTotem(offhand.getItemFast(0))) {
@@ -2020,7 +2065,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean canBeSavedWithChunk() {
-        return this.saveWithChunk;
+        return !this.publicationDeferred && this.saveWithChunk;
     }
 
     /**
@@ -2287,6 +2332,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void updateMovement() {
+        if (this.publicationDeferred) return;
         // Reset motion when it approaches 0 to avoid unnecessary processing of move()
         if (Math.abs(this.motionX) < 0.00001) {
             this.motionX = 0;
@@ -2327,6 +2373,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void addMovement(double x, double y, double z, double yaw, double pitch, double headYaw) {
+        if (this.publicationDeferred) return;
         this.level.addEntityMovement(this, x, y, z, yaw, pitch, headYaw);
     }
 
@@ -2554,10 +2601,21 @@ public abstract class Entity extends Location implements Metadatable {
         return absorption;
     }
 
+    static Attribute clientAbsorptionAttribute(float absorption, int protocol) {
+        Attribute attribute = Attribute.getAttribute(Attribute.ABSORPTION);
+        if (protocol >= ProtocolInfo.v1_26_0) {
+            // Bedrock 1.26 builds one HUD heart slot per advertised capacity point. Sending the
+            // server-side Float.MAX_VALUE range therefore freezes mobile clients. Preserve
+            // custom values above vanilla's 16 absorption points instead of clipping them.
+            attribute.setMaxValue(Math.max(16.0f, absorption));
+        }
+        return attribute.setValue(absorption);
+    }
+
     public void setAbsorption(float absorption) {
         if (absorption != this.absorption || (this instanceof Player player && player.protocol >= ProtocolInfo.v1_21_60)) {
             this.absorption = absorption;
-            if (this instanceof Player player) player.setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
+            if (this instanceof Player player) player.setAttribute(clientAbsorptionAttribute(absorption, player.protocol));
         }
     }
 
@@ -2772,6 +2830,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     protected boolean switchLevel(Level targetLevel) {
+        if (invalidateDeferredMovement()) return false;
         if (this.closed) {
             return false;
         }
@@ -2935,6 +2994,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean move(double dx, double dy, double dz) {
+        if (invalidateDeferredMovement()) return false;
         if (dx == 0 && dy == 0 && dz == 0) {
             this.onGround = !this.getPosition().setComponents(this.down()).getLevelBlock().canPassThrough();
             return false;
@@ -3091,8 +3151,7 @@ public abstract class Entity extends Location implements Metadatable {
             }
 
             if (block.getId() == Block.POWDER_SNOW) {
-                portal = true;
-                continue;
+                powderSnow = true;
             }
 
             block.onEntityCollide(this);
@@ -3104,6 +3163,18 @@ public abstract class Entity extends Location implements Metadatable {
             inPortalTicks++;
         } else {
             this.inPortalTicks = 0;
+        }
+
+        if (powderSnow) {
+            if (this.getFreezingTicks() < 140) {
+                this.addFreezingTicks(1);
+            }
+        } else if (this.getFreezingTicks() > 0) {
+            this.addFreezingTicks(-1);
+        }
+
+        if (this.getFreezingTicks() == 140 && this.getServer().getTick() % 40 == 0) {
+            this.attack(new EntityDamageEvent(this, EntityDamageEvent.DamageCause.FREEZING, getFrostbiteInjury()));
         }
 
         if (vector.lengthSquared() > 0) {
@@ -3153,6 +3224,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     protected void checkChunks() {
+        if (this.publicationDeferred) return;
         int cx = (int) this.x >> 4;
         int cz = (int) this.z >> 4;
         if (this.chunk == null || (this.chunk.getX() != cx) || this.chunk.getZ() != cz) {
@@ -3185,6 +3257,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean setPosition(Vector3 pos) {
+        if (invalidateDeferredMovement()) return false;
         if (this.closed) {
             return false;
         }
@@ -3247,6 +3320,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean setMotion(Vector3 motion) {
+        if (invalidateDeferredMovement()) return false;
         if (server.callEntityMotionEv && !this.justCreated) {
             EntityMotionEvent ev = new EntityMotionEvent(this, motion);
             this.server.getPluginManager().callEvent(ev);
@@ -3271,6 +3345,11 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void kill() {
+        if (this.publicationDeferred) {
+            this.deferredPublicationInvalidated = true;
+            this.health = 0;
+            return;
+        }
         this.health = 0;
         this.scheduleUpdate();
 
@@ -3300,6 +3379,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean teleport(Location location, PlayerTeleportEvent.TeleportCause cause) {
+        if (invalidateDeferredMovement()) return false;
         Location from = this.getLocation();
         Location to = location;
         if (cause != null) {
@@ -3351,6 +3431,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void spawnToAll() {
+        if (this.publicationDeferred) return;
         if (this.chunk == null || this.closed) {
             return;
         }
@@ -3368,43 +3449,114 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
+    public final boolean isPublicationDeferred() {
+        return this.publicationDeferred;
+    }
+
+    protected final boolean isDeferredPublicationIntact() {
+        return this.publicationDeferred && !this.deferredPublicationInvalidated && !this.closed;
+    }
+
+    private boolean invalidateDeferredMovement() {
+        if (!this.publicationDeferred || !this.initEntity) return false;
+        this.deferredPublicationInvalidated = true;
+        return true;
+    }
+
+    // Only a subclass's private preparation ticket releases its entity; this method runs no callbacks.
+    protected final void releaseDeferredPublication() {
+        this.published = true;
+        this.publicationDeferred = false;
+        this.deferredRegisteredChunk = null;
+        this.deferredRegisteredLevel = null;
+    }
+
+    protected final void discardDeferredPublication() {
+        if (!this.publicationDeferred) return;
+        this.closed = true;
+        this.published = false;
+        Throwable failure = null;
+        FullChunk[] chunks = {this.deferredRegisteredChunk, this.chunk};
+        for (int i = 0; i < chunks.length; i++) {
+            FullChunk registered = chunks[i];
+            if (registered == null || i == 1 && registered == chunks[0]) continue;
+            try {
+                registered.getEntities().computeIfPresent(this.id, (key, current) -> current == this ? null : current);
+            } catch (RuntimeException | Error error) {
+                if (failure == null) failure = error; else if (failure != error) failure.addSuppressed(error);
+            }
+        }
+        Level[] levels = {this.deferredRegisteredLevel, this.level};
+        for (int i = 0; i < levels.length; i++) {
+            Level registered = levels[i];
+            if (registered == null || i == 1 && registered == levels[0]) continue;
+            try {
+                registered.discardDeferredEntityRegistration(this);
+            } catch (RuntimeException | Error error) {
+                if (failure == null) failure = error; else if (failure != error) failure.addSuppressed(error);
+            }
+        }
+        if (failure instanceof RuntimeException error) throw error;
+        if (failure instanceof Error error) throw error;
+    }
+
+    protected final void notifyDeferredSpawn() {
+        if (!this.spawnEventDeferred) return;
+        this.spawnEventDeferred = false;
+        this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
+    }
+
+    /** Assignment-only half of a native falling transition; never calls a listener. */
+    protected final boolean retireForFallingTransition() {
+        if (this.closed || this.publicationDeferred) return false;
+        this.closed = true;
+        this.published = false;
+        this.retirementPending = true;
+        return true;
+    }
+
+    protected final void notifyFallingRetirement() {
+        if (!this.retirementPending) return;
+        this.retirementPending = false;
+        finishClose(true);
+    }
+
     public void close() {
         this.close(true);
     }
 
     private void close(boolean callDespawnEvent) {
+        if (this.publicationDeferred) {
+            this.closed = true;
+            this.published = false;
+            discardDeferredPublication();
+            return;
+        }
         if (!this.closed) {
             this.closed = true;
+            finishClose(callDespawnEvent);
+        }
+    }
+
+    private void finishClose(boolean callDespawnEvent) {
+        try {
             if (callDespawnEvent) {
                 this.server.getPluginManager().callEvent(new EntityDespawnEvent(this));
             }
             this.published = false;
+            this.despawnFromAll();
+            this.collisionHelper = null;
+            this.blocksAround = null;
+            this.collisionBlocks = null;
+            this.removeAllEffects(callDespawnEvent ? EntityPotionEffectEvent.Cause.DEATH : null);
+            this.passengers.clear();
+            if (this.intProperties != null) this.intProperties.clear();
+            if (this.floatProperties != null) this.floatProperties.clear();
+        } finally {
             try {
-                this.despawnFromAll();
-
-                this.collisionHelper = null;
-                this.blocksAround = null;
-                this.collisionBlocks = null;
-
-                this.removeAllEffects(callDespawnEvent ? EntityPotionEffectEvent.Cause.DEATH : null);
-                this.passengers.clear();
-
-                if (this.intProperties != null) {
-                    this.intProperties.clear();
-                }
-                if (this.floatProperties != null) {
-                    this.floatProperties.clear();
-                }
+                if (this.chunk != null) this.chunk.removeEntity(this);
             } finally {
-                try {
-                    if (this.chunk != null) {
-                        this.chunk.removeEntity(this);
-                    }
-                } finally {
-                    if (this.level != null) {
-                        this.level.removeEntity(this);
-                    }
-                }
+                if (this.level != null) this.level.removeEntity(this);
             }
         }
     }
@@ -3419,7 +3571,8 @@ public abstract class Entity extends Location implements Metadatable {
         }
 
         this.dataProperties.put(data);
-        if (this.chunk != null && !(this instanceof Player)) {
+        if (this.chunk != null && !(this instanceof Player)
+                && !(this instanceof cn.nukkit.entity.item.EntityFallingBlock && this.publicationDeferred)) {
             this.chunk.setChanged();
         }
         if (send) {
