@@ -70,9 +70,8 @@ public class EntitySmallFireBall extends EntityProjectile {
     
     @Override
     public void onCollideWithEntity(Entity entity) {
+        this.fireTicks = Math.max(this.fireTicks, 2);
         super.onCollideWithEntity(entity);
-        this.isCollided = true;
-        entity.setOnFire(5);
     }
 
     @Override
