@@ -440,19 +440,21 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockSkyLight(int x, int y, int z) {
-        if (this.skyLight == null) {
-            if (!hasSkyLight) {
-                return 0;
-            } else if (compressedLight == null) {
-                return 15;
+        this.skyLightLock.lock();
+        try {
+            if (this.skyLight == null) {
+                if (!hasSkyLight) {
+                    return 0;
+                } else if (compressedLight == null) {
+                    return 15;
+                }
+                this.skyLight = getSkyLightArray();
             }
+            int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
+            return (x & 1) == 0 ? sl & 0x0f : sl >> 4;
+        } finally {
+            this.skyLightLock.unlock();
         }
-        this.skyLight = getSkyLightArray();
-        int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
-        if ((x & 1) == 0) {
-            return sl & 0x0f;
-        }
-        return sl >> 4;
     }
 
     @Override
@@ -850,7 +852,14 @@ public class LevelDBChunkSection implements ChunkSection {
                 }
                 storages[i] = storage.copy();
             }
-            return new LevelDBChunkSection(null, this.y, storages, this.blockLight, this.skyLight, this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+            this.skyLightLock.lock();
+            try {
+                byte[] copiedSkyLight = this.skyLight == null ? null : this.skyLight.clone();
+                return new LevelDBChunkSection(null, this.y, storages, this.blockLight, copiedSkyLight,
+                        this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+            } finally {
+                this.skyLightLock.unlock();
+            }
         } finally {
             this.readLock.unlock();
         }

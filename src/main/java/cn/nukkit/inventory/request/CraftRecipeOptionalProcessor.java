@@ -209,7 +209,9 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
             int repair;
             int repair2;
             int repair3;
-            if (result.getMaxDurability() != -1 && sacrifice.getId() == repairMaterial) {
+            if (result.getMaxDurability() != -1 && (sacrifice.getId() == repairMaterial
+                    || target.getId() == Item.SHIELD
+                    && ItemTag.getTagSet(sacrifice.getNamespaceId()).contains(ItemTag.PLANKS.toString()))) {
                 // Anvil - repair via material
                 repair = Math.min(result.getDamage(), result.getMaxDurability() / 4);
                 if (repair <= 0) {
@@ -430,7 +432,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
 
     private static int getRepairMaterial(Item target) {
         return switch (target.getId()) {
-            case Item.WOODEN_SWORD, Item.WOODEN_PICKAXE, Item.WOODEN_SHOVEL, Item.WOODEN_AXE, Item.WOODEN_HOE ->
+            case Item.WOODEN_SWORD, Item.WOODEN_PICKAXE, Item.WOODEN_SHOVEL, Item.WOODEN_AXE, Item.WOODEN_HOE, Item.SHIELD ->
                     Item.PLANKS;
             case Item.IRON_SWORD, Item.IRON_PICKAXE, Item.IRON_SHOVEL, Item.IRON_AXE, Item.IRON_HOE,
                  Item.IRON_HELMET, Item.IRON_CHESTPLATE, Item.IRON_LEGGINGS, Item.IRON_BOOTS,
@@ -450,6 +452,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
                  Item.NETHERITE_HELMET, Item.NETHERITE_CHESTPLATE, Item.NETHERITE_LEGGINGS, Item.NETHERITE_BOOTS ->
                     Item.NETHERITE_INGOT;
             case Item.ELYTRA -> Item.PHANTOM_MEMBRANE;
+            case Item.TURTLE_SHELL -> Item.SCUTE;
             default -> Item.AIR;
         };
     }
