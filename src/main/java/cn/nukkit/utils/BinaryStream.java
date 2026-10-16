@@ -941,7 +941,6 @@ public class BinaryStream {
             if (stringId == null) {
                 throw new IllegalArgumentException("Unknown item: runtimeID=" + runtimeId + " protocol=" + protocolId);
             }
-            stringId = stringId + ":" + damage;
             id = null;
         }
 
