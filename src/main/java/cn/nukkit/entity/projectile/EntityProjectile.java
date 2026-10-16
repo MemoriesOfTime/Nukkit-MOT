@@ -39,6 +39,14 @@ public abstract class EntityProjectile extends Entity {
     public Entity shootingEntity;
     public boolean hadCollision = false;
     private boolean shootVibrationSent = false;
+    @Getter(lombok.AccessLevel.NONE)
+    private MovingObjectPosition entityCollision;
+
+    protected Vector3 getEntityImpactPosition(Entity entity) {
+        return this.entityCollision != null && this.entityCollision.entityHit == entity
+                ? this.entityCollision.hitVector : null;
+    }
+
     public int piercing;
 
     @Getter
@@ -156,6 +164,7 @@ public abstract class EntityProjectile extends Entity {
 
             double nearDistance = Integer.MAX_VALUE;
             Entity nearEntity = null;
+            Vector3 nearHitVector = null;
 
             for (Entity entity : list) {
                 if (/*!entity.canCollideWith(this) || */(entity == this.shootingEntity && this.age < 5) || (entity instanceof Player player && player.getGamemode() == Player.SPECTATOR)) {
@@ -174,15 +183,23 @@ public abstract class EntityProjectile extends Entity {
                 if (distance < nearDistance) {
                     nearDistance = distance;
                     nearEntity = entity;
+                    nearHitVector = ob.hitVector;
                 }
             }
 
             if (nearEntity != null) {
                 movingObjectPosition = MovingObjectPosition.fromEntity(nearEntity);
+                movingObjectPosition.hitVector = nearHitVector;
             }
 
             if (movingObjectPosition != null && movingObjectPosition.entityHit != null) {
-                onCollideWithEntity(movingObjectPosition.entityHit);
+                MovingObjectPosition previousCollision = this.entityCollision;
+                this.entityCollision = movingObjectPosition;
+                try {
+                    onCollideWithEntity(movingObjectPosition.entityHit);
+                } finally {
+                    this.entityCollision = previousCollision;
+                }
                 hasUpdate = true;
                 if (this.closed) {
                     return false;

@@ -542,12 +542,4 @@ public final class PlayerHandle {
     private NetworkSessionState getSessionState() {
         return player.networkSession != null ? player.networkSession.getState() : null;
     }
-
-    public int getFailedMobEquipmentPacket() {
-        return player.failedMobEquipmentPacket;
-    }
-
-    public void setFailedMobEquipmentPacket(int failedCount) {
-        player.failedMobEquipmentPacket = failedCount;
-    }
 }
