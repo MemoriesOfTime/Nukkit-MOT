@@ -293,17 +293,17 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                             adjacentDecay = decay + multiplier;
                         }
                         if (adjacentDecay < 8) {
-                            boolean[] flags = this.getOptimalFlowDirections();
-                            if (flags[0]) {
+                            int directions = this.getOptimalFlowDirections();
+                            if ((directions & 1) != 0) {
                                 this.flowIntoBlock(this.level.getBlock((int) this.x - 1, (int) this.y, (int) this.z), adjacentDecay);
                             }
-                            if (flags[1]) {
+                            if ((directions & 2) != 0) {
                                 this.flowIntoBlock(this.level.getBlock((int) this.x + 1, (int) this.y, (int) this.z), adjacentDecay);
                             }
-                            if (flags[2]) {
+                            if ((directions & 4) != 0) {
                                 this.flowIntoBlock(this.level.getBlock((int) this.x, (int) this.y, (int) this.z - 1), adjacentDecay);
                             }
-                            if (flags[3]) {
+                            if ((directions & 8) != 0) {
                                 this.flowIntoBlock(this.level.getBlock((int) this.x, (int) this.y, (int) this.z + 1), adjacentDecay);
                             }
                         }
@@ -398,15 +398,12 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
         return 500;
     }
 
-    private boolean[] getOptimalFlowDirections() {
-        int[] flowCost = new int[]{
-                1000,
-                1000,
-                1000,
-                1000
-        };
+    private int getOptimalFlowDirections() {
+        int minCost = Integer.MAX_VALUE;
+        int directions = 0;
         int maxCost = 4 / this.getFlowDecayPerBlock();
         for (int j = 0; j < 4; ++j) {
+            int flowCost = 1000;
             int x = (int) this.x;
             int y = (int) this.y;
             int z = (int) this.z;
@@ -426,26 +423,21 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                     this.level.getBlock(x, y - 1, z).canWaterloggingFlowInto():
                     this.level.getBlock(x, y - 1, z).canBeFlowedInto()) {
                 this.flowCostVisited.put(Level.blockHash(x, y, z, this.level.getDimensionData()), CAN_FLOW_DOWN);
-                flowCost[j] = maxCost = 0;
+                flowCost = maxCost = 0;
             } else if (maxCost > 0) {
                 this.flowCostVisited.put(Level.blockHash(x, y, z, this.level.getDimensionData()), CAN_FLOW);
-                flowCost[j] = this.calculateFlowCost(x, y, z, 1, maxCost, j ^ 0x01, j ^ 0x01);
-                maxCost = Math.min(maxCost, flowCost[j]);
+                flowCost = this.calculateFlowCost(x, y, z, 1, maxCost, j ^ 0x01, j ^ 0x01);
+                maxCost = Math.min(maxCost, flowCost);
+            }
+            if (flowCost < minCost) {
+                minCost = flowCost;
+                directions = 1 << j;
+            } else if (flowCost == minCost) {
+                directions |= 1 << j;
             }
         }
         this.flowCostVisited.clear();
-        double minCost = Double.MAX_VALUE;
-        for (int i = 0; i < 4; i++) {
-            double d = flowCost[i];
-            if (d < minCost) {
-                minCost = d;
-            }
-        }
-        boolean[] isOptimalFlowDirection = new boolean[4];
-        for (int i = 0; i < 4; ++i) {
-            isOptimalFlowDirection[i] = (flowCost[i] == minCost);
-        }
-        return isOptimalFlowDirection;
+        return directions;
     }
 
     private int getSmallestFlowDecay(Block block, int decay) {
