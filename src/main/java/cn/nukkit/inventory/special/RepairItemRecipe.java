@@ -19,11 +19,14 @@ public class RepairItemRecipe extends MultiRecipe {
 
     @Override
     public boolean canExecute(Player player, Item outputItem, List<Item> inputs) {
+        if (outputItem.getCount() != 1) {
+            return false;
+        }
         // Processing the checks about the inputs and outputItem
         if (inputs.size() == 2) {
             Item item1 = inputs.get(0);
             Item item2 = inputs.get(1);
-            if (item1.equals(item2, false, false)) {
+            if (item1.getCount() == 1 && item2.getCount() == 1 && item1.equals(item2, false, false)) {
                 if (item1 instanceof ItemDurable) {
                     int damage = calculateDamage(item1.getDamage(), item2.getDamage(), item1.getMaxDurability());
                     if (matchesRepairOutput(outputItem, item1, item2)) {

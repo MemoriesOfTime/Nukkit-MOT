@@ -48,6 +48,16 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
     public static final String ENCH_RECIPE_KEY = "enchRecipe";
     public static final String TIMES_CRAFTED_KEY = "timesCrafted";
     public static final String EVENT_AUTHORED_MULTI_OUTPUT_KEY = "eventAuthoredMultiOutput";
+    private static final String WORKSTATION_RECIPE_KEY = "paidWorkstationRecipe";
+
+    /** A request has one paid workstation result; duplicate generators must not queue another fee. */
+    static boolean reserveWorkstationRecipe(ItemStackRequestContext context) {
+        if (context.has(WORKSTATION_RECIPE_KEY)) {
+            return false;
+        }
+        context.put(WORKSTATION_RECIPE_KEY, Boolean.TRUE);
+        return true;
+    }
 
     @Override
     public ItemStackRequestActionType getType() {
@@ -98,6 +108,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         context.put(CreateActionProcessor.RECIPE_DATA_KEY, recipe);
 
         if (recipe instanceof MultiRecipe multiRecipe) {
+            if (multiRecipe instanceof RepairItemRecipe && action.getNumberOfRequestedCrafts() != 1) {
+                return context.error();
+            }
             int times = Math.max(1, action.getNumberOfRequestedCrafts());
             context.put(TIMES_CRAFTED_KEY, times);
             CraftResultsDeprecatedAction resultsAction = findCraftResultsAction(
@@ -185,6 +198,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         if (!(inventory instanceof EnchantInventory enchantInventory)) {
             return context.error();
         }
+        if (!reserveWorkstationRecipe(context)) {
+            return context.error();
+        }
         if (!enchantInventory.hasPublishedOption(action.getRecipeNetworkId())) {
             log.warn("{}: enchant recipe netId {} is not published for the current window",
                     player.getName(), action.getRecipeNetworkId());
@@ -251,6 +267,9 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             return context.error();
         }
         int finalCost = event.getXpCost();
+        if (finalCost < 0 || !player.isCreative() && finalCost > player.getExperienceLevel()) {
+            return context.error();
+        }
 
         if (!player.isCreative()) {
             context.onCommit(() -> player.setExperience(player.getExperience(), player.getExperienceLevel() - finalCost));

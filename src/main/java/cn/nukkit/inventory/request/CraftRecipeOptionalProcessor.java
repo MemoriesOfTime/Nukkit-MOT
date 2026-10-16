@@ -71,6 +71,9 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
         int levelCost = 0;
         List<Item> expectedConsumes = new ArrayList<>(2);
         if (inventory instanceof AnvilInventory anvilInventory) {
+            if (!CraftRecipeActionProcessor.reserveWorkstationRecipe(context)) {
+                return context.error();
+            }
             AnvilResult pair = updateAnvilResult(player, anvilInventory, filterString);
             if (pair == null || pair.result.isNull()) {
                 return context.error();
@@ -98,10 +101,8 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
             }
             result = eventOutput.clone();
             int finalCost = repairEvent.getCost();
-            if (!player.isCreative() && finalCost > 0) {
-                if (player.getExperienceLevel() < finalCost) {
-                    return context.error();
-                }
+            if (finalCost < 0 || !player.isCreative() && finalCost > player.getExperienceLevel()) {
+                return context.error();
             }
             final int commitCost = finalCost;
             context.onCommit(() -> {
