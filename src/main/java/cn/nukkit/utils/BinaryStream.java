@@ -68,6 +68,19 @@ public class BinaryStream {
     private static final int MAX_ITEM_STACK_REQUEST_FILTER_STRINGS = 128;
     private static final int MAX_ITEM_STACK_REQUEST_CRAFT_ITEMS = 128;
 
+    private static final ClassValue<Boolean> DIRECT_BYTE_WRITE = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            try {
+                return type.getMethod("put", byte[].class).getDeclaringClass() == BinaryStream.class;
+            } catch (ReflectiveOperationException | SecurityException | LinkageError failure) {
+                return false;
+            }
+        }
+    };
+
+    private final boolean directByteWrite = DIRECT_BYTE_WRITE.get(getClass());
+
     public BinaryStream() {
         this.buffer = new byte[32];
         this.offset = 0;
@@ -276,7 +289,13 @@ public class BinaryStream {
     }
 
     public void putByte(byte b) {
-        this.put(new byte[]{b});
+        if (!directByteWrite) {
+            this.put(new byte[]{b});
+            return;
+        }
+        this.ensureCapacity(this.count + 1);
+        this.buffer[this.count] = b;
+        this.count += 1;
     }
 
     public void putByte(int b) {
