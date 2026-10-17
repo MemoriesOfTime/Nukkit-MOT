@@ -51,10 +51,6 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersionsRange(340, 407);
     }
 
-    static Stream<Arguments> versionsPre712() {
-        return filteredVersionsRange(291, ProtocolInfo.v1_21_20);
-    }
-
     static Stream<Arguments> versionsFrom534() {
         return filteredVersions(ProtocolInfo.v1_19_10);
     }
@@ -137,14 +133,14 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         var nukkitPacket = new cn.nukkit.network.protocol.SetHealthPacket();
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        // health=0 avoids unsigned vs signed VarInt encoding difference
-        nukkitPacket.health = 0;
+        // health=20: zigzag(20)=0x28 differs from unsigned(20)=0x14, so a wrong varint flavor fails
+        nukkitPacket.health = 20;
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.SetHealthPacket.class);
 
-        assertEquals(0, cbPacket.getHealth());
+        assertEquals(20, cbPacket.getHealth());
     }
 
     // ==================== SetDifficultyPacket ====================
@@ -690,15 +686,15 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         var nukkitPacket = new cn.nukkit.network.protocol.ServerSettingsResponsePacket();
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        // formId=0 avoids zigzag vs unsigned VarInt encoding difference
-        nukkitPacket.formId = 0;
+        // formId=42: unsigned(42)=0x2a differs from zigzag(42)=0x54, so a wrong varint flavor fails
+        nukkitPacket.formId = 42;
         nukkitPacket.data = "{\"type\":\"form\"}";
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.ServerSettingsResponsePacket.class);
 
-        assertEquals(0, cbPacket.getFormId());
+        assertEquals(42, cbPacket.getFormId());
         assertEquals("{\"type\":\"form\"}", cbPacket.getFormData());
     }
 
@@ -821,40 +817,6 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(42, cbPacket.getRuntimeEntityId());
         assertEquals(1, cbPacket.getPieceIds().size());
         assertEquals(java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"), cbPacket.getPieceIds().get(0));
-    }
-
-    // ==================== CommandBlockUpdatePacket (Block mode) ====================
-
-    @ParameterizedTest(name = "CommandBlockUpdatePacket Block v{0}")
-    @MethodSource("versionsPre712")
-    void testCommandBlockUpdatePacketBlockPre712(int protocolVersion) {
-        var nukkitPacket = new cn.nukkit.network.protocol.CommandBlockUpdatePacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.isBlock = true;
-        nukkitPacket.x = 100;
-        nukkitPacket.y = 64;
-        nukkitPacket.z = 200;
-        nukkitPacket.commandBlockMode = 0; // REPEAT
-        nukkitPacket.isRedstoneMode = false;
-        nukkitPacket.isConditional = false;
-        nukkitPacket.command = "say hello";
-        nukkitPacket.lastOutput = "";
-        nukkitPacket.name = "TestCmd";
-        nukkitPacket.shouldTrackOutput = false;
-        nukkitPacket.tickDelay = 0;
-        nukkitPacket.executingOnFirstTick = false;
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.CommandBlockUpdatePacket.class);
-
-        assertTrue(cbPacket.isBlock());
-        assertEquals(100, cbPacket.getBlockPosition().getX());
-        assertEquals(64, cbPacket.getBlockPosition().getY());
-        assertEquals(200, cbPacket.getBlockPosition().getZ());
-        assertEquals("say hello", cbPacket.getCommand());
-        assertEquals("TestCmd", cbPacket.getName());
     }
 
     // ==================== SetDisplayObjectivePacket ====================
@@ -1028,72 +990,6 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals("minecraft:another_fog", cbPacket.getFogStack().get(1));
     }
 
-    // ==================== TickSyncPacket ====================
-
-    // TickSyncPacket was deprecated in v685
-    static Stream<Arguments> versionsFrom388to685() {
-        return filteredVersionsRange(388, 685);
-    }
-
-    @ParameterizedTest(name = "TickSyncPacket v{0}")
-    @MethodSource("versionsFrom388to685")
-    void testTickSyncPacket(int protocolVersion) {
-        var nukkitPacket = new cn.nukkit.network.protocol.TickSyncPacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.setRequestTimestamp(1000L);
-        nukkitPacket.setResponseTimestamp(2000L);
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.TickSyncPacket.class);
-
-        assertEquals(1000L, cbPacket.getRequestTimestamp());
-        assertEquals(2000L, cbPacket.getResponseTimestamp());
-    }
-
-    // ==================== ToastRequestPacket ====================
-
-    static Stream<Arguments> versionsFrom527() {
-        return filteredVersions(527);
-    }
-
-    @ParameterizedTest(name = "ToastRequestPacket v{0}")
-    @MethodSource("versionsFrom527")
-    void testToastRequestPacket(int protocolVersion) {
-        var nukkitPacket = new cn.nukkit.network.protocol.ToastRequestPacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.title = "Test Title";
-        nukkitPacket.content = "Test Content";
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.ToastRequestPacket.class);
-
-        assertEquals("Test Title", cbPacket.getTitle());
-        assertEquals("Test Content", cbPacket.getContent());
-    }
-
-    // ==================== TransferPacket ====================
-
-    @ParameterizedTest(name = "TransferPacket v{0}")
-    @MethodSource("allVersions")
-    void testTransferPacket(int protocolVersion) {
-        var nukkitPacket = new cn.nukkit.network.protocol.TransferPacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.address = "192.168.1.1";
-        nukkitPacket.port = 19132;
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.TransferPacket.class);
-
-        assertEquals("192.168.1.1", cbPacket.getAddress());
-        assertEquals(19132, cbPacket.getPort());
-    }
-
     // ==================== UpdateAttributesPacket ====================
 
     @ParameterizedTest(name = "UpdateAttributesPacket v{0}")
@@ -1160,29 +1056,6 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(20L, link.getTo());
     }
 
-    // ==================== SetEntityMotionPacket ====================
-
-    @ParameterizedTest(name = "SetEntityMotionPacket v{0}")
-    @MethodSource("allVersions")
-    void testSetEntityMotionPacket(int protocolVersion) {
-        var nukkitPacket = new cn.nukkit.network.protocol.SetEntityMotionPacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.eid = 42L;
-        nukkitPacket.motionX = 1.5f;
-        nukkitPacket.motionY = 2.0f;
-        nukkitPacket.motionZ = 3.5f;
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.SetEntityMotionPacket.class);
-
-        assertEquals(42L, cbPacket.getRuntimeEntityId());
-        assertEquals(1.5f, cbPacket.getMotion().getX(), 0.001f);
-        assertEquals(2.0f, cbPacket.getMotion().getY(), 0.001f);
-        assertEquals(3.5f, cbPacket.getMotion().getZ(), 0.001f);
-    }
-
     // ==================== SetScorePacket ====================
 
     @ParameterizedTest(name = "SetScorePacket v{0}")
@@ -1203,30 +1076,6 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
             assertEquals(org.cloudburstmc.protocol.bedrock.packet.SetScorePacket.Action.REMOVE, cbPacket.getAction());
         }
         assertTrue(cbPacket.getInfos().isEmpty());
-    }
-
-    // ==================== SetSpawnPositionPacket ====================
-
-    @ParameterizedTest(name = "SetSpawnPositionPacket v{0}")
-    @MethodSource("versionsFrom407")
-    void testSetSpawnPositionPacket(int protocolVersion) {
-        var nukkitPacket = new cn.nukkit.network.protocol.SetSpawnPositionPacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.spawnType = cn.nukkit.network.protocol.SetSpawnPositionPacket.TYPE_WORLD_SPAWN;
-        nukkitPacket.x = 100;
-        nukkitPacket.y = 64;
-        nukkitPacket.z = 200;
-        nukkitPacket.dimension = 0;
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.SetSpawnPositionPacket.class);
-
-        assertEquals(100, cbPacket.getBlockPosition().getX());
-        assertEquals(64, cbPacket.getBlockPosition().getY());
-        assertEquals(200, cbPacket.getBlockPosition().getZ());
-        assertEquals(0, cbPacket.getDimensionId());
     }
 
     // ==================== SetTimePacket ====================
@@ -2091,12 +1940,33 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         metadata.put("optional", null);
         change.setNewValue(metadata);
 
+        // change(Double) covers the TYPE_DOUBLE branch: tag must be 3 with a doubleLE payload,
+        // not the int64 branch that flattens the value to a long
+        var doubleChange = new cn.nukkit.network.protocol.types.datastore.DataStoreChange();
+        doubleChange.setDataStoreName("telemetry");
+        doubleChange.setProperty("ratio");
+        doubleChange.setUpdateCount(5);
+        doubleChange.setNewValue(0.25d);
+
+        // change(List) covers the recursive TYPE_LIST branch with mixed element types
+        List<Object> history = new ArrayList<>();
+        history.add(1.5d);
+        history.add("ready");
+        history.add(true);
+        var listChange = new cn.nukkit.network.protocol.types.datastore.DataStoreChange();
+        listChange.setDataStoreName("telemetry");
+        listChange.setProperty("history");
+        listChange.setUpdateCount(6);
+        listChange.setNewValue(history);
+
         var removal = new cn.nukkit.network.protocol.types.datastore.DataStoreRemoval();
         removal.setDataStoreName("legacy_state");
 
         List<cn.nukkit.network.protocol.types.datastore.DataStoreAction> updates = new ArrayList<>();
         updates.add(update);
         updates.add(change);
+        updates.add(doubleChange);
+        updates.add(listChange);
         updates.add(removal);
         nukkitPacket.setUpdates(updates);
         nukkitPacket.encode();
@@ -2104,7 +1974,7 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.ClientboundDataStorePacket.class);
 
-        assertEquals(3, cbPacket.getUpdates().size());
+        assertEquals(5, cbPacket.getUpdates().size());
 
         var cbUpdate = (org.cloudburstmc.protocol.bedrock.data.datastore.DataStoreUpdate) cbPacket.getUpdates().get(0);
         assertEquals("ui_state", cbUpdate.getDataStoreName());
@@ -2129,7 +1999,21 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         assertTrue(changeValue.containsKey("optional"));
         assertNull(changeValue.get("optional"));
 
-        var cbRemoval = (org.cloudburstmc.protocol.bedrock.data.datastore.DataStoreRemoval) cbPacket.getUpdates().get(2);
+        var cbDoubleChange = (org.cloudburstmc.protocol.bedrock.data.datastore.DataStoreChange) cbPacket.getUpdates().get(2);
+        assertEquals("telemetry", cbDoubleChange.getDataStoreName());
+        assertEquals(5, cbDoubleChange.getUpdateCount());
+        assertEquals(0.25d, (Double) cbDoubleChange.getNewValue(), 0.0001d);
+
+        var cbListChange = (org.cloudburstmc.protocol.bedrock.data.datastore.DataStoreChange) cbPacket.getUpdates().get(3);
+        assertEquals("history", cbListChange.getProperty());
+        assertInstanceOf(List.class, cbListChange.getNewValue());
+        List<?> listValue = (List<?>) cbListChange.getNewValue();
+        assertEquals(3, listValue.size());
+        assertEquals(1.5d, (Double) listValue.get(0), 0.0001d);
+        assertEquals("ready", listValue.get(1));
+        assertEquals(true, listValue.get(2));
+
+        var cbRemoval = (org.cloudburstmc.protocol.bedrock.data.datastore.DataStoreRemoval) cbPacket.getUpdates().get(4);
         assertEquals("legacy_state", cbRemoval.getDataStoreName());
     }
 

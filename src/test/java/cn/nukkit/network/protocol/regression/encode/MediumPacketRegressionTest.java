@@ -332,7 +332,8 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.z = 200.5;
         nukkitPacket.pitch = 45.0;
         nukkitPacket.headYaw = 90.0;
-        nukkitPacket.yaw = 180.0;
+        // 160 rather than 180: the byte angle for 180 is -128, read back as -180
+        nukkitPacket.yaw = 160.0;
         nukkitPacket.onGround = true;
         nukkitPacket.teleport = false;
         nukkitPacket.forceMoveLocalEntity = false;
@@ -347,6 +348,10 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(200.5f, cbPacket.getPosition().getZ(), 0.5f);
         assertTrue(cbPacket.isOnGround());
         assertFalse(cbPacket.isTeleported());
+        // wire order is pitch, yaw, headYaw; swapped byte 2/3 shows up as Y/Z exchange
+        assertEquals(45.0f, cbPacket.getRotation().getX(), 2.0f);
+        assertEquals(160.0f, cbPacket.getRotation().getY(), 2.0f);
+        assertEquals(90.0f, cbPacket.getRotation().getZ(), 2.0f);
     }
 
     // ==================== SetTitlePacket ====================
@@ -719,9 +724,11 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.type = cn.nukkit.network.protocol.BossEventPacket.TYPE_SHOW;
         nukkitPacket.title = "Dragon Boss";
         nukkitPacket.healthPercent = 0.75f;
+        // non-zero values: BE-vs-LE and short-vs-byte width bugs are invisible at 0
         nukkitPacket.darkenScreen = 1;
-        nukkitPacket.color = 0;
-        nukkitPacket.overlay = 0;
+        nukkitPacket.color = 5;
+        nukkitPacket.overlay = 2;
+        nukkitPacket.playerEid = 200;
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -731,6 +738,15 @@ public class MediumPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(org.cloudburstmc.protocol.bedrock.packet.BossEventPacket.Action.CREATE, cbPacket.getAction());
         assertEquals("Dragon Boss", cbPacket.getTitle());
         assertEquals(0.75f, cbPacket.getHealthPercentage(), 0.001f);
+        assertEquals(5, cbPacket.getColor());
+        assertEquals(2, cbPacket.getOverlay());
+        if (protocolVersion < ProtocolInfo.v1_26_30) {
+            // legacy layout carries darkenScreen as uint16 LE; big-endian writes decode as 0x0100=256
+            assertEquals(1, cbPacket.getDarkenSky());
+        } else if (protocolVersion < ProtocolInfo.v1_26_50_27) {
+            // flat layout drops darkenScreen from the wire but carries playerEid until v2192
+            assertEquals(200, cbPacket.getPlayerUniqueEntityId());
+        }
     }
 
     @ParameterizedTest(name = "BossEventPacket HEALTH_PERCENT v{0}")

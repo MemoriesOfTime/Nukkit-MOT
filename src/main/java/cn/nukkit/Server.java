@@ -92,6 +92,7 @@ import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.MapMaker;
 import com.google.gson.JsonParser;
 import eu.okaeri.configs.ConfigManager;
 import eu.okaeri.configs.yaml.snakeyaml.YamlSnakeYamlConfigurer;
@@ -121,10 +122,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -152,6 +150,7 @@ public class Server {
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
     private volatile boolean hasStopped;
+    private volatile long shutdownProgressAt = Long.MAX_VALUE;
 
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
@@ -273,6 +272,11 @@ public class Server {
     private Watchdog watchdog;
     private NukkitMetrics nukkitMetrics;
     private final DB nameLookup;
+    /**
+     * Trimmed lower-case names whose padded profiles were not folded at startup, with the reason.
+     * Their offline logins are refused: the profile a login would open may not be the latest.
+     */
+    private Map<String, String> profileFoldBlockedNames = Map.of();
     private PlayerDataSerializer playerDataSerializer;
     private SpawnerTask spawnerTask;
 
@@ -282,7 +286,7 @@ public class Server {
      * Per-identity locks for player data IO, keyed by the data path identity (UUID string or
      * lowercased name).
      */
-    private final ConcurrentHashMap<String, ReentrantLock> playerDataLocks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ReentrantLock> playerDataLocks = createPlayerDataLocks();
     /**
      * 已调度未执行的异步保存任务，按身份索引；迁移前同步冲刷。
      * <p>
@@ -346,6 +350,12 @@ public class Server {
      * Xbox authentication enabled.
      */
     public boolean xboxAuth;
+
+    /**
+     * When true a duplicate login refuses the newcomer instead of closing the session that is
+     * already in the world. Defaults to false, the historical behaviour.
+     */
+    private boolean keepExistingSessionOnDuplicateLogin;
     /**
      * Spawn eggs enabled.
      */
@@ -477,6 +487,11 @@ public class Server {
      * Mob despawning enabled.
      */
     public boolean despawnMobs;
+    /**
+     * Squared horizontal distance past which mobs are updated once per second (entity activation).
+     * Zero or less disables the throttle.
+     */
+    public double entityActivationRangeSquared;
     /**
      * Strong RakNet level IP bans enabled.
      */
@@ -686,11 +701,11 @@ public class Server {
 
         this.console = new NukkitConsole();
         this.consoleThread = new ConsoleThread();
-        this.consoleThread.start();
         this.console.setExecutingCommands(true);
 
         // Load server.properties (standard MC settings)
         log.info("Loading server properties...");
+        NukkitConsole.takeOverTerminalClose();
         this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
         this.properties.setHeader("Nukkit-MOT Server Properties\n"
                 + "For advanced settings, see nukkit-mot.yml\n"
@@ -757,7 +772,8 @@ public class Server {
 
         Zlib.setProvider(this.serverConfig.networkSettings().zlibProvider());
 
-        this.scheduler = new ServerScheduler();
+        this.scheduler = new ServerScheduler(this.serverConfig.performanceSettings().virtualThreads());
+        log.info("Virtual threads for async tasks: {}", this.scheduler.isVirtualThreadsEnabled() ? "enabled" : "disabled");
 
         if (this.getPropertyBoolean("enable-rcon", false)) {
             try {
@@ -844,13 +860,33 @@ public class Server {
 
         if (this.savePlayerDataByUuid) {
             convertLegacyPlayerData();
+            // Before the network opens: a login trimmed to "Name" must find the profile that a
+            // padded "Name " used to save under, and never an older twin of it.
+            if (this.spaceMode == 2) {
+                // Replace mode turns "Name " into "Name_" and does not trim, so padded keys are
+                // not twins of the trimmed name there.
+                log.warn("Not folding player data saved under padded names: space-name-mode is replace");
+            } else {
+                try {
+                    PlayerNameEdgeWhitespaceMigration.Report fold = PlayerNameEdgeWhitespaceMigration.run(nameLookup,
+                            new File(dataPath, "players"),
+                            new File(dataPath, PlayerNameEdgeWhitespaceMigration.QUARANTINE_DIRECTORY));
+                    this.profileFoldBlockedNames = fold.blocked();
+                } catch (RuntimeException failure) {
+                    // Each name is handled inside the run; this only keeps an unexpected fault from
+                    // stopping the whole server.
+                    log.error("Could not fold player data saved under padded names", failure);
+                }
+            }
         }
 
         this.serverID = UUID.randomUUID();
 
         this.craftingManager = new CraftingManager();
         ResourcePackMigration.migrate(new File(Nukkit.DATA_PATH));
-        HashSet<ResourcePackLoader> packLoaders = new HashSet<>();
+        // Registration order is the stack order among packs of equal priority: resource packs first,
+        // then behaviour packs, then packs shipped inside plugin jars.
+        Set<ResourcePackLoader> packLoaders = new LinkedHashSet<>();
         packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")));
         packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs")));
         packLoaders.add(new JarPluginResourcePackLoader(new File(this.pluginPath)));
@@ -882,7 +918,24 @@ public class Server {
         NetherNetSettings netherNetSettings = this.serverConfig != null
                 ? this.serverConfig.networkSettings().netherNetSettings() : null;
         if (netherNetSettings != null && netherNetSettings.enabled()) {
-            this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
+            try {
+                this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
+            } catch (Throwable t) {
+                // NetherNet 启动失败（原生库缺失、端口配置错误等）按致命错误处理：提示根因与关闭方式后中止启动，
+                // 不带残缺的网络栈继续运行（与下方 defaultLevel 加载失败同路）
+                // A NetherNet startup failure (missing native lib, bad port config, ...) is fatal:
+                // report the root cause and the disable hint, then abort like a defaultLevel load failure
+                Throwable cause = t;
+                while (cause.getCause() != null) {
+                    cause = cause.getCause();
+                }
+                this.getLogger().emergency(this.baseLang.translateString("nukkit.nethernet.startFailed",
+                        cause.getMessage() != null ? cause.getMessage() : cause.toString()));
+                this.getLogger().emergency(this.baseLang.translateString("nukkit.nethernet.startFailed.hint"));
+                log.debug("NetherNet startup aborted", t);
+                this.forceShutdown();
+                return;
+            }
         }
 
         EntityProperty.init();
@@ -1437,6 +1490,8 @@ public class Server {
         if (this.hasStopped) {
             return;
         }
+        long shutdownStart = System.currentTimeMillis();
+        this.touchShutdownProgress();
         this.hasStopped = true;
 
         try {
@@ -1458,15 +1513,17 @@ public class Server {
             this.getLogger().debug("Disconnecting all players...");
             for (Player player : new ArrayList<>(this.players.values())) {
                 player.close(player.getLeaveMessage(), reason);
+                this.touchShutdownProgress();
             }
 
             this.getLogger().debug("Disabling all plugins...");
             this.disablePlugins();
+            this.touchShutdownProgress();
 
             this.getLogger().debug("Unloading all levels...");
             for (Level level : this.levelArray) {
                 this.unloadLevel(level, true);
-                this.nextTick = System.currentTimeMillis(); // Fix Watchdog killing the server while saving worlds
+                this.touchShutdownProgress();
             }
 
             this.getLogger().debug("Removing event handlers...");
@@ -1481,7 +1538,9 @@ public class Server {
             this.consoleThread.interrupt();
 
             this.getLogger().debug("Stopping network interfaces...");
-            for (SourceInterface interfaz : this.network.getInterfaces()) {
+            // unregisterInterface 会边迭代边从 getInterfaces() 的活集合删除，拷贝防 CME
+            // unregisterInterface mutates the live set mid-iteration; copy to avoid CME
+            for (SourceInterface interfaz : new ArrayList<>(this.network.getInterfaces())) {
                 interfaz.shutdown();
                 this.network.unregisterInterface(interfaz);
             }
@@ -1500,8 +1559,12 @@ public class Server {
                 this.getLogger().debug("Stopping Watchdog...");
                 this.watchdog.kill();
             }
+
+            this.getLogger().info(this.baseLang.translateString("nukkit.server.stopped",
+                    String.valueOf(NukkitMath.round((System.currentTimeMillis() - shutdownStart) / 1000d, 1))));
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
+            Nukkit.shutdownLogging();
             System.exit(1);
         }
     }
@@ -1520,6 +1583,12 @@ public class Server {
         this.tickCounter = 0;
 
         log.info(this.baseLang.translateString("nukkit.server.startFinished", String.valueOf((double) (System.currentTimeMillis() - Nukkit.START_TIME) / 1000)));
+
+        // 控制台线程推迟到服务器就绪后启动：此前读到的命令依赖尚未创建的对象会被静默丢弃
+        // （如引导下载期间管道送达的 stop），留在 stdin 等就绪后读取
+        // Console thread starts after the server is ready; earlier commands would be silently dropped
+        this.consoleThread.start();
+
         this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, System::gc, 20);
 
         this.tickProcessor();
@@ -1728,8 +1797,8 @@ public class Server {
 
     private void checkTickUpdates(int currentTick) {
         if (this.alwaysTickPlayers) {
-            for (Player p : new ArrayList<>(this.players.values())) {
-                p.onUpdate(currentTick);
+            for (Object p : this.players.values().toArray()) {
+                ((Player) p).onUpdate(currentTick);
             }
         }
 
@@ -1739,7 +1808,23 @@ public class Server {
 
         // Do level ticks
         for (Level level : this.levelArray) {
-            if (level.isBeingConverted || (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0)) {
+            if (level.isBeingConverted) {
+                continue;
+            }
+            if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
+                if (!this.alwaysTickPlayers) {
+                    for (Player player : new ArrayList<>(level.getPlayers().values())) {
+                        if (!player.spawned || player.closed || player.level != level) {
+                            continue;
+                        }
+                        try {
+                            player.onUpdate(currentTick);
+                        } catch (Exception e) {
+                            log.error(this.baseLang.translateString("nukkit.level.tickError",
+                                    new String[]{level.getFolderName(), Utils.getExceptionMessage(e)}));
+                        }
+                    }
+                }
                 continue;
             }
 
@@ -1833,8 +1918,8 @@ public class Server {
 
             this.checkTickUpdates(this.tickCounter);
 
-            for (Player player : new ArrayList<>(this.players.values())) {
-                player.checkNetwork();
+            for (Object player : this.players.values().toArray()) {
+                ((Player) player).checkNetwork();
             }
 
             if ((this.tickCounter & 0b1111) == 0) {
@@ -1917,6 +2002,18 @@ public class Server {
 
     public long getNextTick() {
         return nextTick;
+    }
+
+    public boolean isShutdownInProgress() {
+        return this.hasStopped;
+    }
+
+    public long getShutdownProgressAt() {
+        return this.shutdownProgressAt;
+    }
+
+    public void touchShutdownProgress() {
+        this.shutdownProgressAt = System.currentTimeMillis();
     }
 
     private void titleTick() {
@@ -2313,6 +2410,15 @@ public class Server {
         return Optional.of(entry);
     }
 
+    /**
+     * @param lowerCaseName login name after trimming, lower case
+     * @return why startup left this name's padded profiles unfolded, or {@code null} when offline
+     * logins with it may proceed
+     */
+    String profileFoldBlockReason(String lowerCaseName) {
+        return lowerCaseName == null ? null : profileFoldBlockedNames.get(lowerCaseName);
+    }
+
     void updateName(UUID uuid, String name, boolean xboxAuthed) {
         byte[] nameBytes = name.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
         nameLookup.put(nameBytes, encodeNameEntry(uuid,
@@ -2477,6 +2583,15 @@ public class Server {
         } finally {
             first.unlock();
         }
+    }
+
+    /**
+     * A lock remains strongly reachable in every holder/waiter's local variable until unlock.
+     * Weak values therefore release retired identities without replacing any live lock.
+     * Never use weak keys or size/age eviction: equal identities must share a live lock.
+     */
+    static ConcurrentMap<String, ReentrantLock> createPlayerDataLocks() {
+        return new MapMaker().weakValues().makeMap();
     }
 
     private ReentrantLock playerDataLock(String key) {
@@ -3201,6 +3316,7 @@ public class Server {
             logConfigError(e);
             if (firstLoad) {
                 log.error("Server cannot start with an invalid configuration. Please fix nukkit-mot.yml and restart.");
+                Nukkit.shutdownLogging();
                 System.exit(1);
             } else {
                 log.error("Failed to reload nukkit-mot.yml. Keeping previous configuration.");
@@ -3429,6 +3545,13 @@ public class Server {
     public void removeWhitelist(String name) {
         this.whitelist.remove(name.toLowerCase(Locale.ROOT));
         this.whitelist.save(true);
+    }
+
+    /**
+     * @return true when a duplicate login refuses the newcomer and keeps the session already in the world
+     */
+    public boolean isDuplicateLoginKeepingExistingSession() {
+        return this.keepExistingSessionOnDuplicateLogin;
     }
 
     /**
@@ -3907,6 +4030,7 @@ public class Server {
         this.flyChecks = this.getPropertyBoolean("allow-flight", false);
         this.spawnRadius = this.getPropertyInt("spawn-protection", 10);
         this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
+        this.keepExistingSessionOnDuplicateLogin = this.getPropertyBoolean("keep-existing-session-on-duplicate-login", false);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
         if (!this.encryptionEnabled) {
             log.warn("Encryption is not enabled. For better security, it's recommended to enable it if you don't use a proxy software.");
@@ -3973,6 +4097,9 @@ public class Server {
         this.mobAiEnabled = config.entitySettings().mobAi();
         this.despawnMobs = config.entitySettings().despawnTask();
         this.mobDespawnTicks = config.entitySettings().ticksPerDespawns();
+        int activationBlocks = config.entitySettings().activationBlocks();
+        // Below 16 blocks a mob could sleep inside a player's own view of it; clamp instead of guessing.
+        this.entityActivationRangeSquared = activationBlocks <= 0 ? 0 : (double) Math.max(16, activationBlocks) * Math.max(16, activationBlocks);
 
         // World
         this.netherEnabled = config.worldSettings().nether();
@@ -4137,6 +4264,7 @@ public class Server {
             put("white-list", false);
             put("whitelist-reason", "§cServer is white-listed");
             put("xbox-auth", true);
+            put("keep-existing-session-on-duplicate-login", false);
             put("encryption", true);
 
             put("force-resources", false);

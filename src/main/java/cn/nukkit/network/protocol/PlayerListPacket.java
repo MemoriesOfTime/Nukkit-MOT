@@ -17,6 +17,8 @@ public class PlayerListPacket extends DataPacket {
     public static final byte TYPE_ADD = 0;
     public static final byte TYPE_REMOVE = 1;
 
+    public static final int BUILD_PLATFORM_UNKNOWN = -1;
+
     public byte type;
     public Entry[] entries = new Entry[0];
 
@@ -139,7 +141,7 @@ public class PlayerListPacket extends DataPacket {
         public Skin skin;
         public String xboxUserId = "";
         public String platformChatId = "";
-        public int buildPlatform = 1;
+        public int buildPlatform = BUILD_PLATFORM_UNKNOWN;
         public boolean isTeacher;
         public boolean isHost;
         public boolean isSubClient;

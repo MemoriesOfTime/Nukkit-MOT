@@ -3,10 +3,7 @@ package cn.nukkit.network;
 import cn.nukkit.*;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
-import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
-import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
-import cn.nukkit.network.protocol.netease.PyRpcPacket;
-import cn.nukkit.network.protocol.netease.SyncSkinPacket;
+import cn.nukkit.network.protocol.netease.*;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -28,6 +25,7 @@ import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author MagicDroidX
@@ -67,7 +65,12 @@ public class Network {
     private String subName;
 
     private final List<NetworkIF> hardWareNetworkInterfaces;
-    private final LinkedList<NetWorkStatisticData> netWorkStatisticDataList = new LinkedList<>();
+    private final AtomicBoolean networkStatisticsPending = new AtomicBoolean();
+    private final AtomicBoolean networkStatisticsFailureReported = new AtomicBoolean();
+    private volatile NetworkStatisticsSnapshot networkStatistics;
+
+    private record NetworkStatisticsSnapshot(long sent, long received, long upload, long download) {
+    }
 
     public Network(Server server) {
         this.registerPackets();
@@ -90,37 +93,62 @@ public class Network {
     }
 
     public double getUpload() {
-        //return upload;
-        if (netWorkStatisticDataList.size() < 2) {
-            return 0;
-        }
-        return netWorkStatisticDataList.get(1).upload - netWorkStatisticDataList.get(0).upload;
+        NetworkStatisticsSnapshot snapshot = networkStatistics;
+        return snapshot == null ? 0 : snapshot.upload;
     }
 
     public double getDownload() {
-        //return download;
-        if (netWorkStatisticDataList.size() < 2) {
-            return 0;
-        }
-        return netWorkStatisticDataList.get(1).download - netWorkStatisticDataList.get(0).download;
+        NetworkStatisticsSnapshot snapshot = networkStatistics;
+        return snapshot == null ? 0 : snapshot.download;
     }
 
+    /**
+     * Request a host NIC sample without performing hardware I/O on the tick thread.
+     * The getters expose byte deltas between the latest two completed samples,
+     * preserving the historical units (not an elapsed-time-normalized rate).
+     */
     public void resetStatistics() {
-        /*this.upload = 0;
-        this.download = 0;*/
-        long upload = 0;
-        long download = 0;
-        if (netWorkStatisticDataList.size() > 1) {
-            netWorkStatisticDataList.removeFirst();
+        if (hardWareNetworkInterfaces == null || hardWareNetworkInterfaces.isEmpty()
+                || !networkStatisticsPending.compareAndSet(false, true)) {
+            return;
         }
-        if (this.hardWareNetworkInterfaces != null) {
-            for (NetworkIF networkIF : this.hardWareNetworkInterfaces) {
+        try {
+            // This pool is owned and stopped by ServerScheduler. Single-flight keeps
+            // slow OSHI reads from creating a backlog or overlapping NIC updates.
+            server.getScheduler().getAsyncPool().execute(this::sampleNetworkStatistics);
+        } catch (RuntimeException e) {
+            networkStatisticsPending.set(false);
+            reportNetworkStatisticsFailure(e);
+        }
+    }
+
+    private void sampleNetworkStatistics() {
+        try {
+            long sent = 0;
+            long received = 0;
+            for (NetworkIF networkIF : hardWareNetworkInterfaces) {
                 networkIF.updateAttributes();
-                upload += networkIF.getBytesSent();
-                download += networkIF.getBytesRecv();
+                sent += networkIF.getBytesSent();
+                received += networkIF.getBytesRecv();
             }
+            NetworkStatisticsSnapshot previous = networkStatistics;
+            // Publish totals and their deltas together, only after every NIC was read.
+            networkStatistics = new NetworkStatisticsSnapshot(sent, received,
+                    previous == null ? 0 : sent - previous.sent,
+                    previous == null ? 0 : received - previous.received);
+            networkStatisticsFailureReported.set(false);
+        } catch (RuntimeException e) {
+            // Keep the last complete sample; a later tick may retry the read.
+            reportNetworkStatisticsFailure(e);
+        } finally {
+            networkStatisticsPending.set(false);
         }
-        netWorkStatisticDataList.add(new NetWorkStatisticData(upload, download));
+    }
+
+    private void reportNetworkStatisticsFailure(RuntimeException error) {
+        if (networkStatisticsFailureReported.compareAndSet(false, true)) {
+            log.warn("Unable to refresh host network statistics; retaining the last complete sample", error);
+        }
     }
 
     public Set<SourceInterface> getInterfaces() {
@@ -805,6 +833,7 @@ public class Network {
         this.packetPool137NetEase = this.packetPool137.toBuilder()
             .netEase(true)
             .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
+            .registerPacket(ProtocolInfo.NETEASE_PACKET_STORE_BUY_SUCC, StoreBuySuccessPacket.class)
             .registerPacket(ProtocolInfo.NETEASE_JSON_PACKET, NeteaseJsonPacket.class)
             .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
             .build();
@@ -814,7 +843,12 @@ public class Network {
             .minecraftVersion(ProtocolInfo.MINECRAFT_VERSION)
             .deregisterPacket(ProtocolInfo.PLAYER_INPUT_PACKET)
             .deregisterPacket(ProtocolInfo.RIDER_JUMP_PACKET)
+            .deregisterPacket(ProtocolInfo.SCRIPT_CUSTOM_EVENT_PACKET)
+            .deregisterPacket(ProtocolInfo.ITEM_FRAME_DROP_ITEM_PACKET)
+            .deregisterPacket(ProtocolInfo.FILTER_TEXT_PACKET)
             .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
+            // v844 packets (CB v898 registry carries 330/332)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_STORE_PACKET, ClientboundDataStorePacket.class)
             // v924 packets
             .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET, ClientboundDataDrivenUIShowScreenPacket.class)
             .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_SCREEN_PACKET, ClientboundDataDrivenUICloseScreenPacket.class)
@@ -847,6 +881,7 @@ public class Network {
         this.packetPoolCurrentNetEase = this.packetPoolCurrent.toBuilder()
             .netEase(true)
             .registerPacket(ProtocolInfo.PY_RPC_PACKET, PyRpcPacket.class)
+            .registerPacket(ProtocolInfo.NETEASE_PACKET_STORE_BUY_SUCC, StoreBuySuccessPacket.class)
             .registerPacket(ProtocolInfo.NETEASE_JSON_PACKET, NeteaseJsonPacket.class)
             .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
             .registerPacket(ProtocolInfo.PACKET_SYNC_SKIN, SyncSkinPacket.class)

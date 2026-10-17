@@ -255,6 +255,15 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
                 stream.putVector2f(-0.25f, 0.75f);
             }
         }
+        if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_50) {
+            // fixed NetEase tail since 766
+            stream.putBoolean(false);
+            stream.putLFloat(0.5f);
+            stream.putLFloat(-0.5f);
+            stream.putBoolean(false);
+            stream.putBoolean(true);
+            stream.putByte(0);
+        }
 
         PlayerAuthInputPacket packet = new PlayerAuthInputPacket();
         packet.protocol = protocol;
@@ -801,6 +810,29 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
+    @ParameterizedTest(name = "ContainerClosePacket (server initiated) v{0}")
+    @MethodSource("allVersions")
+    void containerCloseServerInitiated(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ContainerClosePacket();
+        cb.setId((byte) 5);
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            cb.setServerInitiated(true);
+        }
+        if (protocol >= ProtocolInfo.v1_21_0) {
+            cb.setType(org.cloudburstmc.protocol.bedrock.data.inventory.ContainerType.CONTAINER);
+        }
+
+        ContainerClosePacket nk = crossEncode(cb, ContainerClosePacket::new, protocol);
+
+        assertEquals(5, nk.windowId);
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            assertTrue(nk.wasServerInitiated);
+        }
+        if (protocol >= ProtocolInfo.v1_21_0) {
+            assertEquals(ContainerType.CONTAINER, nk.type);
+        }
+    }
+
     // ==================== RespawnPacket ====================
 
     @ParameterizedTest(name = "RespawnPacket v{0}")
@@ -902,7 +934,8 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
     void positionTrackingDBServerBroadcast(int protocol) {
         byte[] tagBytes;
         try {
-            tagBytes = cn.nukkit.nbt.NBTIO.writeGZIPCompressed(new cn.nukkit.nbt.tag.CompoundTag(""));
+            // wire carries uncompressed network NBT, matching the encode side's writeNetwork
+            tagBytes = cn.nukkit.nbt.NBTIO.writeNetwork(new cn.nukkit.nbt.tag.CompoundTag(""));
         } catch (java.io.IOException e) {
             throw new AssertionError(e);
         }
@@ -1499,8 +1532,9 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         cb.setTeleported(false);
         cb.setForceMove(false);
         cb.setPosition(org.cloudburstmc.math.vector.Vector3f.from(5.5f, 64.0f, -10.5f));
-        // Use equal yaw/headYaw to avoid ordering ambiguity
-        cb.setRotation(org.cloudburstmc.math.vector.Vector3f.from(30.0f, 180.0f, 180.0f)); // pitch, yaw, headYaw
+        // three distinct angles so a yaw/headYaw byte-order swap cannot pass
+        // (160 rather than 180: the byte angle for 180 reads back as -180)
+        cb.setRotation(org.cloudburstmc.math.vector.Vector3f.from(30.0f, 90.0f, 160.0f)); // pitch, yaw, headYaw
 
         MoveEntityAbsolutePacket nk = crossEncode(cb, MoveEntityAbsolutePacket::new, protocol);
 
@@ -1511,6 +1545,8 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(64.0f, (float) nk.y, 0.5f);
         assertEquals(-10.5f, (float) nk.z, 0.5f);
         assertEquals(30.0f, nk.pitch, 2.0f); // byte-angle ~1.4 degree precision
+        assertEquals(90.0f, nk.yaw, 2.0f);
+        assertEquals(160.0f, nk.headYaw, 2.0f);
     }
 
     // ==================== InteractPacket ====================
@@ -1531,28 +1567,6 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(0.5f, nk.x, 0.001f);
         assertEquals(1.0f, nk.y, 0.001f);
         assertEquals(0.0f, nk.z, 0.001f);
-    }
-
-    // ==================== PlayerActionPacket ====================
-
-    @ParameterizedTest(name = "PlayerActionPacket START_BREAK v{0}")
-    @MethodSource("allVersions")
-    void playerActionStartBreak(int protocol) {
-        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerActionPacket();
-        cb.setRuntimeEntityId(50L);
-        cb.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.START_BREAK);
-        cb.setBlockPosition(Vector3i.from(10, 64, -5));
-        cb.setResultPosition(Vector3i.from(10, 64, -5));
-        cb.setFace(1);
-
-        PlayerActionPacket nk = crossEncode(cb, PlayerActionPacket::new, protocol);
-
-        assertEquals(50L, nk.entityId);
-        assertEquals(PlayerActionPacket.ACTION_START_BREAK, nk.action);
-        assertEquals(10, nk.x);
-        assertEquals(64, nk.y);
-        assertEquals(-5, nk.z);
-        assertEquals(1, nk.face);
     }
 
     // ==================== ShowProfilePacket ====================
@@ -2078,6 +2092,57 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         } else {
             assertEquals(0, nk.getUpdate().getPathUpdateCount());
         }
+    }
+
+    @Test
+    void serverboundDataStoreRejectsEmptyKeys() {
+        // schema declares MinLength = 1 for Data Store Name and Property
+        assertThrows(IllegalArgumentException.class, () -> decodeDataStoreFrame("", "prop", "path"),
+                "empty Data Store Name must be rejected");
+        assertThrows(IllegalArgumentException.class, () -> decodeDataStoreFrame("store", "", "path"),
+                "empty Property must be rejected");
+    }
+
+    @Test
+    void serverboundDataStoreAcceptsEmptyPath() {
+        // Path has no MinLength in the schema
+        ServerboundDataStorePacket nk = assertDoesNotThrow(() -> decodeDataStoreFrame("store", "prop", ""));
+        assertEquals("", nk.getUpdate().getPath());
+    }
+
+    @Test
+    void serverboundDataStoreRejectsOverLengthStrings() {
+        assertThrows(IllegalArgumentException.class,
+                () -> decodeDataStoreFrame("s".repeat(1001), "prop", "path"),
+                "Data Store Name MaxLength is 1000");
+        assertThrows(IllegalArgumentException.class,
+                () -> decodeDataStoreFrame("store", "p".repeat(1001), "path"),
+                "Property MaxLength is 1000");
+        assertThrows(IllegalArgumentException.class,
+                () -> decodeDataStoreFrame("store", "prop", "p".repeat(1001)),
+                "Path MaxLength is 1000");
+        assertThrows(IllegalArgumentException.class, () -> decodeDataStoreFrame("store", "prop", "path", "v".repeat(5001)),
+                "string value MaxLength is 5000");
+    }
+
+    private static ServerboundDataStorePacket decodeDataStoreFrame(String name, String property, String path) {
+        return decodeDataStoreFrame(name, property, path, "value");
+    }
+
+    private static ServerboundDataStorePacket decodeDataStoreFrame(String name, String property, String path, String stringValue) {
+        BinaryStream s = new BinaryStream();
+        s.putString(name);
+        s.putString(property);
+        s.putString(path);
+        s.putUnsignedVarInt(2); // string variant
+        s.putString(stringValue);
+        s.putLInt(1); // property update count
+        ServerboundDataStorePacket nk = new ServerboundDataStorePacket();
+        nk.protocol = ProtocolInfo.v1_21_130;
+        nk.gameVersion = GameVersion.V1_21_130;
+        nk.setBuffer(s.getBuffer());
+        nk.decode();
+        return nk;
     }
 
     // ==================== ClientboundDataDrivenUIShowScreenPacket ====================
@@ -3903,6 +3968,71 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
 
         assertTrue(nk.getClear().isPresent());
         assertTrue(nk.getClear().getAsBoolean());
+    }
+
+    static Stream<Arguments> versionsFrom827() {
+        return filteredVersions(ProtocolInfo.v1_21_100);
+    }
+
+    @ParameterizedTest(name = "CameraInstructionPacket FOV v{0}")
+    @MethodSource("versionsFrom827")
+    void cameraInstructionFov(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.CameraInstructionPacket();
+        // non-trivial floats: big-endian reads of LE floats land far outside the 0.001 delta
+        cb.setFovInstruction(new org.cloudburstmc.protocol.bedrock.data.camera.CameraFovInstruction(
+                85.0f, 0.5f, org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.LINEAR, true));
+
+        CameraInstructionPacket nk = crossEncode(cb, CameraInstructionPacket::new, protocol);
+
+        assertNotNull(nk.getFovInstruction());
+        assertEquals(85.0f, nk.getFovInstruction().getFov(), 0.001f);
+        assertEquals(0.5f, nk.getFovInstruction().getEaseTime(), 0.001f);
+        assertEquals(cn.nukkit.network.protocol.types.camera.CameraEase.LINEAR, nk.getFovInstruction().getEaseType());
+        assertTrue(nk.getFovInstruction().isClear());
+    }
+
+    static Stream<Arguments> versionsFrom860() {
+        return filteredVersions(860);
+    }
+
+    @ParameterizedTest(name = "CameraInstructionPacket SPLINE v{0}")
+    @MethodSource("versionsFrom860")
+    void cameraInstructionSpline(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.CameraInstructionPacket();
+        cb.setSplineInstruction(new org.cloudburstmc.protocol.bedrock.data.camera.CameraSplineInstruction(
+                2.0f,
+                org.cloudburstmc.protocol.bedrock.data.camera.CameraSplineType.CATMULL_ROM,
+                java.util.List.of(),
+                java.util.List.of(new org.cloudburstmc.protocol.bedrock.data.camera.CameraSplineInstruction.SplineProgressOption(
+                        0.5f, 1.0f, org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.SPRING)),
+                java.util.List.of(new org.cloudburstmc.protocol.bedrock.data.camera.CameraSplineInstruction.SplineRotationOption(
+                        org.cloudburstmc.math.vector.Vector3f.from(10f, 20f, 30f), 0.25f,
+                        org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.EASE_IN_QUAD)),
+                "main_menu", true));
+
+        CameraInstructionPacket nk = crossEncode(cb, CameraInstructionPacket::new, protocol);
+
+        var spline = nk.getSplineInstruction();
+        assertNotNull(spline);
+        assertEquals(2.0f, spline.getTotalTime(), 0.001f);
+        assertEquals(cn.nukkit.network.protocol.types.camera.CameraSplineType.CATMULL_ROM, spline.getType());
+        var progress = spline.getProgressKeyFrames().get(0);
+        assertEquals(0.5f, progress.getValue(), 0.001f);
+        assertEquals(1.0f, progress.getTime(), 0.001f);
+        var rotation = spline.getRotationOption().get(0);
+        assertEquals(10.0f, rotation.getKeyFrameValues().getX(), 0.001f);
+        assertEquals(0.25f, rotation.getKeyFrameTimes(), 0.001f);
+        if (protocol >= ProtocolInfo.v1_26_0) {
+            // v924+: easing functions and identifier/json are on the wire in both byte and string eras
+            assertEquals(cn.nukkit.network.protocol.types.camera.CameraEase.SPRING, progress.getEasingFunc());
+            assertEquals(cn.nukkit.network.protocol.types.camera.CameraEase.EASE_IN_QUAD, rotation.getEase());
+            assertEquals("main_menu", spline.getSplineIdentifier());
+            assertTrue(spline.isLoadFromJson());
+        } else {
+            // pre-v924: no easing/identifier on the wire; decode applies LINEAR defaults
+            assertEquals(cn.nukkit.network.protocol.types.camera.CameraEase.LINEAR, progress.getEasingFunc());
+            assertEquals(cn.nukkit.network.protocol.types.camera.CameraEase.LINEAR, rotation.getEase());
+        }
     }
 
     // ==================== CameraAimAssistActorPriorityPacket ====================

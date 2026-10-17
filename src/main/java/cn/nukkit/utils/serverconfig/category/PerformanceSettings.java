@@ -16,6 +16,10 @@ public class PerformanceSettings extends OkaeriConfig {
     @CustomKey("async-workers")
     private String asyncWorkers = "auto";
 
+    @Comment("Use virtual threads for opt-in async tasks (requires JVM 21+; cannot be enabled otherwise)")
+    @CustomKey("virtual-threads")
+    private boolean virtualThreads = true;
+
     @Comment("Automatically adjust tick rate based on server load")
     @CustomKey("auto-tick-rate")
     private boolean autoTickRate = true;
@@ -39,6 +43,10 @@ public class PerformanceSettings extends OkaeriConfig {
     @Comment("Thread watchdog check interval (ms)")
     @CustomKey("thread-watchdog-tick")
     private int threadWatchdogTick = 60000;
+
+    @Comment("Kill a stalled shutdown after this many ms without save progress (0 = warn only)")
+    @CustomKey("shutdown-watchdog-kill-timeout")
+    private long shutdownWatchdogKillTimeout = 600000;
 
     @Comment("Enable level garbage collection")
     @CustomKey("do-level-gc")

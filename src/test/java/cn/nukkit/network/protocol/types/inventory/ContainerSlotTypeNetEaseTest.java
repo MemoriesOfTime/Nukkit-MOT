@@ -93,6 +93,7 @@ class ContainerSlotTypeNetEaseTest {
                 GameVersion.V1_21_50_NETEASE,
                 GameVersion.V1_21_93_NETEASE,
                 GameVersion.V1_21_124_NETEASE,
+                GameVersion.V1_21_130_NETEASE,
         };
         for (GameVersion version : netEaseVersions) {
             assertEquals(30, ContainerSlotType.INVENTORY.getId(version),

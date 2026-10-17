@@ -56,7 +56,12 @@ public class DebugDrawerPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_26_0) {
             this.putOptionalNull(shape.getAttachedToEntityId(), val -> this.putUnsignedVarLong(val));
         }
-        this.putUnsignedVarInt(this.toPayloadType(shape.getType()));
+        int payloadType = this.toPayloadType(shape.getType());
+        if (payloadType > 5 && this.protocol < ProtocolInfo.v1_26_30) {
+            // CYLINDER/PYRAMID/ELLIPSOID/CONE are only defined since v1001; older wire formats treat 6-9 as undefined
+            throw new IllegalStateException("DebugDrawer shape " + shape.getType() + " requires v1.26.30+ client");
+        }
+        this.putUnsignedVarInt(payloadType);
 
         if (shape.getType() != null) {
             switch (shape.getType()) {
@@ -186,6 +191,11 @@ public class DebugDrawerPacket extends DataPacket {
                     this.putBoolean(false);
                     this.putBoolean(false);
                     break;
+            }
+        } else if (this.protocol >= ProtocolInfo.v1_21_90) {
+            // Legacy deletion retains all six absent shape-payload optionals.
+            for (int i = 0; i < 6; i++) {
+                this.putBoolean(false);
             }
         }
     }
