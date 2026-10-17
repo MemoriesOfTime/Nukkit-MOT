@@ -8715,6 +8715,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return success
      */
     public boolean pickupEntity(Entity entity, boolean near) {
+        if (!near || !(entity instanceof EntityItem || entity instanceof EntityArrow || entity instanceof EntityThrownTrident)) {
+            return this.pickupEntityUnclaimed(entity, near);
+        }
+        try (InventoryMutationGuard.Lease destination = InventoryMutationGuard.tryClaim(Collections.singleton(this.inventory))) {
+            return destination != null && this.pickupEntityUnclaimed(entity, true);
+        }
+    }
+
+    private boolean pickupEntityUnclaimed(Entity entity, boolean near) {
         if (!this.spawned || !this.isAlive() || !this.isOnline() || this.isSpectator() || entity.isClosed()) {
             return false;
         }
