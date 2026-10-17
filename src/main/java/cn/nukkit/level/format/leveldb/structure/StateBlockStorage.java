@@ -18,6 +18,8 @@ import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
@@ -31,6 +33,7 @@ import org.cloudburstmc.nbt.*;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 
@@ -47,10 +50,19 @@ public class StateBlockStorage {
 
     private static final int SECTION_SIZE = 16 * 16 * 16;
 
+    // No chunk/provider references. Limit retained serialized bytes across all loaded sections/versions.
+    private static final Cache<NetworkKey, byte[]> NETWORK_BYTES = Caffeine.newBuilder()
+            .maximumWeight(Math.min(32L << 20, Runtime.getRuntime().maxMemory() / 64))
+            .weigher((NetworkKey key, byte[] bytes) -> bytes.length + 256 + 5 * key.paletteSize())
+            .expireAfterAccess(1, TimeUnit.MINUTES)
+            .build();
+
     private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
     // Snapshot acknowledgements must also notice public storage mutations that bypass section setters.
     private volatile int version;
+    private volatile NetworkSnapshot networkSnapshot;
+    private boolean networkCacheable = true;
 
     //用于兼容1.13以下版本
     private byte[] blockIds;
@@ -70,6 +82,8 @@ public class StateBlockStorage {
     }
 
     protected StateBlockStorage(BitArray bitArray, List<BlockStateSnapshot> palette, byte[] blockIds, NibbleArray blockData) {
+        // Protected callers retain access to these arrays/lists; their edits have no version callback.
+        this.networkCacheable = false;
         this.palette = palette;
         this.bitArray = bitArray;
         this.blockIds = blockIds;
@@ -113,7 +127,8 @@ public class StateBlockStorage {
         }
     }
 
-    public void readFromStorage(ByteBuf buffer, ChunkBuilder chunkBuilder) {
+    public synchronized void readFromStorage(ByteBuf buffer, ChunkBuilder chunkBuilder) {
+        this.networkSnapshot = null;
         this.version++;
         short header = buffer.readUnsignedByte();
 
@@ -219,7 +234,8 @@ public class StateBlockStorage {
         return this.get(elementIndex(pos.x, pos.y, pos.z));
     }
 
-    public void set(int index, BlockStateSnapshot value) {
+    public synchronized void set(int index, BlockStateSnapshot value) {
+        this.networkSnapshot = null;
         try {
             int paletteIndex = this.getOrAdd(value);
             this.bitArray.set(index, paletteIndex);
@@ -255,18 +271,68 @@ public class StateBlockStorage {
         this.writeTo(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), stream, antiXray);
     }
 
-    public void writeTo(GameVersion protocol, BinaryStream stream, boolean antiXray) {
-        if (protocol.getProtocol() >= ProtocolInfo.v1_16_100 && this.palette.size() > 4) {
-            writeSizedNetworkPalette(protocol, stream, antiXray);
+    public synchronized void writeTo(GameVersion protocol, BinaryStream stream, boolean antiXray) {
+        if (!this.networkCacheable || getClass() != StateBlockStorage.class || protocol.getProtocol() < ProtocolInfo.v1_20_0_23
+                || protocol.getProtocol() > ProtocolInfo.v1_26_50) {
+            this.writeToUncached(protocol, stream, antiXray);
             return;
         }
-        PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
+        BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocol);
+        long paletteVersion = blockPalette.getNetworkVersion();
+        if (blockPalette.getClass() != BlockPalette.class || paletteVersion < 0) {
+            this.writeToUncached(protocol, stream, antiXray);
+            return;
+        }
+        for (BlockStateSnapshot state : this.palette) {
+            // Foreign-version snapshots may resolve legacy IDs through a replaceable live mapper on every read.
+            if (state != null && (state.getClass() != BlockStateSnapshot.class
+                    || state.getVersion() != BlockStateMapping.get().getVersion())) {
+                this.writeToUncached(protocol, stream, antiXray);
+                return;
+            }
+        }
+        NetworkSnapshot snapshot = this.networkSnapshot();
+        Object identity = snapshot.identity(this.palette, this.bitArray, antiXray);
+        boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
+        NetworkKey key = new NetworkKey(identity, blockPalette, paletteVersion, useHash, this.palette.size());
+        // Caffeine's atomic load also coalesces concurrent cold requests from independent async copies.
+        byte[] bytes = NETWORK_BYTES.get(key, ignored -> {
+            BinaryStream encoded = new BinaryStream();
+            this.writeToUncached(protocol, encoded, antiXray, blockPalette, useHash,
+                    identity instanceof XrayMask mask ? mask.concealed : null);
+            return encoded.getBuffer();
+        });
+        if (blockPalette.getNetworkVersion() != paletteVersion
+                || GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol) != useHash
+                || snapshot.identity(this.palette, this.bitArray, antiXray) != identity) {
+            NETWORK_BYTES.invalidate(key);
+            this.writeToUncached(protocol, stream, antiXray);
+            return;
+        }
+        stream.put(bytes);
+    }
+
+    private void writeToUncached(GameVersion protocol, BinaryStream stream, boolean antiXray) {
+        BlockPalette blockPalette = protocol.getProtocol() >= ProtocolInfo.v1_16_100
+                ? GlobalBlockPalette.getPaletteByProtocol(protocol) : null;
+        boolean useHash = protocol.getProtocol() >= ProtocolInfo.v1_16_100
+                && GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
+        this.writeToUncached(protocol, stream, antiXray, blockPalette, useHash, null);
+    }
+
+    private void writeToUncached(GameVersion protocol, BinaryStream stream, boolean antiXray,
+                                 BlockPalette blockPalette, boolean useHash, boolean[] concealed) {
+        if (protocol.getProtocol() >= ProtocolInfo.v1_16_100 && this.palette.size() > 4) {
+            writeSizedNetworkPalette(stream, antiXray, blockPalette, useHash, concealed);
+            return;
+        }
+        PalettedBlockStorage palettedBlockStorage = protocol.getProtocol() >= ProtocolInfo.v1_16_100
+                ? PalettedBlockStorage.createWithDefaultState(useHash ? blockPalette.getHashId(0, 0) : blockPalette.getRuntimeId(0, 0))
+                : PalettedBlockStorage.createFromBlockPalette(protocol);
 
         // Resolve the palette and network-ID format once per section, as in anvil BlockStorage.
         // Older protocols still need GlobalBlockPalette's legacy runtime-ID tables.
         if (protocol.getProtocol() >= ProtocolInfo.v1_16_100) {
-            BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocol);
-            boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
             // A section holds 4096 cells but only a handful of states. Translate each palette entry once, when
             // a cell first uses it, instead of looking the state up in the protocol palette for every cell.
             // Cells are still fed to the network storage one by one in the same order with the same ids, so
@@ -285,12 +351,12 @@ public class StateBlockStorage {
                     } else {
                         BlockStateSnapshot snapshot = this.palette.get(local);
                         int networkId = networkId(blockPalette, useHash, antiXray,
-                                snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData());
+                                snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData(), concealed, local);
                         networkIndex[local] = palettedBlockStorage.setBlockReturningIndex(i, networkId);
                     }
                 } else {
                     // Out of the palette: keep the per-cell read, including the exception it throws.
-                    palettedBlockStorage.setBlock(i, networkId(blockPalette, useHash, antiXray, get(i)));
+                    palettedBlockStorage.setBlock(i, networkId(blockPalette, useHash, antiXray, get(i), concealed, local));
                 }
             }
         } else {
@@ -309,10 +375,13 @@ public class StateBlockStorage {
         palettedBlockStorage.writeTo(stream);
     }
 
-    private static int networkId(BlockPalette blockPalette, boolean useHash, boolean antiXray, int fullId) {
+    private static int networkId(BlockPalette blockPalette, boolean useHash, boolean antiXray, int fullId,
+                                 boolean[] concealed, int local) {
         int id = fullId >> Block.DATA_BITS;
         int meta = fullId & Block.DATA_MASK;
-        if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
+        boolean hide = concealed == null ? antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]
+                : id < 0 ? Level.xrayableBlocks[id] : concealed[local];
+        if (hide) {
             id = Block.STONE;
             meta = 0;
         }
@@ -324,15 +393,14 @@ public class StateBlockStorage {
      * width allocates another 4096-cell array and copies all cells at each boundary. Keep the original
      * first-use ordering, air at index zero, alias merging and minimum V2 width on the wire.
      */
-    private void writeSizedNetworkPalette(GameVersion protocol, BinaryStream stream, boolean antiXray) {
-        BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocol);
-        boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
+    private void writeSizedNetworkPalette(BinaryStream stream, boolean antiXray,
+                                         BlockPalette blockPalette, boolean useHash, boolean[] concealed) {
         int[] networkIndex = new int[this.palette.size()];
         Arrays.fill(networkIndex, -1);
         IntArrayList networkPalette = new IntArrayList(16);
         Int2IntOpenHashMap paletteIndex = new Int2IntOpenHashMap(16);
         paletteIndex.defaultReturnValue(-1);
-        int air = GlobalBlockPalette.getOrCreateRuntimeId(protocol, 0);
+        int air = useHash ? blockPalette.getHashId(0, 0) : blockPalette.getRuntimeId(0, 0);
         networkPalette.add(air);
         paletteIndex.put(air, 0);
 
@@ -347,7 +415,7 @@ public class StateBlockStorage {
             }
             BlockStateSnapshot snapshot = this.palette.get(local);
             int fullId = snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData();
-            int id = networkId(blockPalette, useHash, antiXray, fullId);
+            int id = networkId(blockPalette, useHash, antiXray, fullId, concealed, local);
             int index = paletteIndex.get(id);
             if (index < 0) {
                 index = networkPalette.size();
@@ -448,7 +516,7 @@ public class StateBlockStorage {
     /**
      * @return dirty
      */
-    public boolean compress() {
+    public synchronized boolean compress() {
         if (this.palette.isEmpty()) {
             return false;
         }
@@ -468,6 +536,7 @@ public class StateBlockStorage {
             break;
         }
         if (noBlock) {
+            this.networkSnapshot = null;
             BlockStateSnapshot firstId = this.palette.get(0);
             this.palette.clear();
             this.palette.add(firstId);
@@ -515,6 +584,7 @@ public class StateBlockStorage {
 
             newArray.set(i, newIndex);
         }
+        this.networkSnapshot = null;
         this.bitArray = newArray;
         this.palette = newPalette;
         this.version++;
@@ -534,13 +604,79 @@ public class StateBlockStorage {
         }
     }
 
-    public StateBlockStorage copy() {
-        return new StateBlockStorage(
+    public synchronized StateBlockStorage copy() {
+        StateBlockStorage copy = new StateBlockStorage(
                 this.bitArray.copy(),
                 new ObjectArrayList<>(this.palette),
                 this.blockIds != null ? this.blockIds.clone() : null,
                 this.blockData != null ? this.blockData.copy(): null
         );
+        // copy() and writeTo() are called under the section read lock. Each mutator detaches only
+        // its own snapshot, so a worker's old clone remains valid after a live block edit.
+        copy.networkCacheable = true;
+        copy.networkSnapshot = this.networkCacheable ? this.networkSnapshot() : null;
+        return copy;
+    }
+
+    private NetworkSnapshot networkSnapshot() {
+        NetworkSnapshot snapshot = this.networkSnapshot;
+        if (snapshot == null) {
+            synchronized (this) {
+                snapshot = this.networkSnapshot;
+                if (snapshot == null) this.networkSnapshot = snapshot = new NetworkSnapshot();
+            }
+        }
+        return snapshot;
+    }
+
+    private record NetworkKey(Object snapshot, BlockPalette palette, long paletteVersion, boolean hashed,
+                              int paletteSize) { }
+
+    private static final class NetworkSnapshot {
+        private XrayMask mask;
+        private int[] used;
+
+        private Object identity(List<BlockStateSnapshot> states, BitArray cells, boolean antiXray) {
+            if (!antiXray) return this;
+            synchronized (this) {
+                if (this.used == null) {
+                    boolean[] present = new boolean[states.size()];
+                    int count = 0;
+                    for (int i = 0; i < SECTION_SIZE; i++) {
+                        int local = cells.get(i);
+                        // Leave corrupt-index exceptions to the original writer, in its original order.
+                        if (local >= 0 && local < present.length && !present[local]) {
+                            present[local] = true;
+                            count++;
+                        }
+                    }
+                    this.used = new int[count];
+                    for (int i = 0, n = 0; i < present.length; i++) if (present[i]) this.used[n++] = i;
+                }
+                if (this.mask != null) {
+                    boolean matches = true;
+                    for (int i : this.used) {
+                        if (this.mask.concealed[i] != concealed(states.get(i))) { matches = false; break; }
+                    }
+                    if (matches) return this.mask;
+                }
+                boolean[] concealed = new boolean[states.size()];
+                for (int i : this.used) concealed[i] = concealed(states.get(i));
+                return this.mask = new XrayMask(concealed);
+            }
+        }
+
+        private static boolean concealed(BlockStateSnapshot state) {
+            if (state == null) return false;
+            int id = (state.getLegacyId() << Block.DATA_BITS | state.getLegacyData()) >> Block.DATA_BITS;
+            return id >= 0 && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id];
+        }
+    }
+
+    // Identity equality is deliberate: never treat a hash of the mutable obfuscation mask as proof.
+    private static final class XrayMask {
+        private final boolean[] concealed;
+        private XrayMask(boolean[] concealed) { this.concealed = concealed; }
     }
 
     /**
