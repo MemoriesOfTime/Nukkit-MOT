@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockRefusalDiagnostics;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
@@ -65,6 +66,7 @@ public class BlockSapling extends BlockFlowable {
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
         if (!(this instanceof BlockMangrovePropagule) &&
                 (block instanceof BlockWater || block.level.isBlockWaterloggedAt(block.getChunk(), (int) block.x, (int) block.y, (int) block.z))) {
+            BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.SAPLING_LIQUID);
             return false;
         }
 
@@ -73,6 +75,7 @@ public class BlockSapling extends BlockFlowable {
             return true;
         }
 
+        BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.SAPLING_SUPPORT);
         return false;
     }
 
