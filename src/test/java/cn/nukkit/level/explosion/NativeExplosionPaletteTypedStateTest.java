@@ -102,10 +102,10 @@ public final class NativeExplosionPaletteTypedStateTest {
             case 567 -> 14903;
             case 575 -> 14912;
             case 582 -> 15424;
-            case 589 -> 15827;
-            case 594 -> 15827;
-            case 618 -> 15839;
-            case 622 -> 15819;
+            case 589 -> 15832;
+            case 594 -> 15832;
+            case 618 -> 15844;
+            case 622 -> 15824;
             case 1001 -> 20082;
             case 2168 -> 20082;
             case 2193 -> 20050;
