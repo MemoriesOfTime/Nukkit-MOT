@@ -14,131 +14,148 @@ public class ZlibSingleThreadLowMem implements ZlibProvider {
     private static final Deflater DEFLATER_RAW = new Deflater(7, true);
     private static final Inflater INFLATER_RAW = new Inflater(true);
     private static final byte[] BUFFER = new byte[8192];
+    // Raw and wrapped codecs share native state and BUFFER across all instances.
+    private static final Object NATIVE_LOCK = new Object();
 
     @Override
-    public synchronized byte[] deflate(byte[][] datas, int level) throws IOException {
-        DEFLATER.reset();
-        FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
-        bos.reset();
-        for (byte[] data : datas) {
-            DEFLATER.setInput(data);
-            while (!DEFLATER.needsInput()) {
-                int i = DEFLATER.deflate(BUFFER);
-                bos.write(BUFFER, 0, i);
+    public byte[] deflate(byte[][] datas, int level) throws IOException {
+        synchronized (NATIVE_LOCK) {
+            DEFLATER.reset();
+            FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
+            bos.reset();
+            for (byte[] data : datas) {
+                DEFLATER.setInput(data);
+                while (!DEFLATER.needsInput()) {
+                    int i = DEFLATER.deflate(BUFFER);
+                    bos.write(BUFFER, 0, i);
+                }
             }
-        }
-        DEFLATER.finish();
-        while (!DEFLATER.finished()) {
-            int i = DEFLATER.deflate(BUFFER);
-            bos.write(BUFFER, 0, i);
-        }
-        //Deflater::end is called the time when the process exits.
-        return bos.toByteArray();
-    }
-
-    @Override
-    public synchronized byte[] deflate(byte[] data, int level) throws IOException {
-        DEFLATER.reset();
-        DEFLATER.setInput(data);
-        DEFLATER.finish();
-        FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
-        bos.reset();
-        //try {
+            DEFLATER.finish();
             while (!DEFLATER.finished()) {
                 int i = DEFLATER.deflate(BUFFER);
                 bos.write(BUFFER, 0, i);
             }
-        /*} finally {
-            deflater.end();
-        }*/
-        return bos.toByteArray();
+            //Deflater::end is called the time when the process exits.
+            return bos.toByteArray();
+        }
+    }
+
+    @Override
+    public byte[] deflate(byte[] data, int level) throws IOException {
+        synchronized (NATIVE_LOCK) {
+            DEFLATER.reset();
+            DEFLATER.setInput(data);
+            DEFLATER.finish();
+            FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
+            bos.reset();
+            //try {
+                while (!DEFLATER.finished()) {
+                    int i = DEFLATER.deflate(BUFFER);
+                    bos.write(BUFFER, 0, i);
+                }
+            /*} finally {
+                deflater.end();
+            }*/
+            return bos.toByteArray();
+        }
     }
 
     @Override
     public byte[] deflateRaw(byte[][] datas, int level) throws IOException {
-        DEFLATER_RAW.reset();
-        FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
-        bos.reset();
-        for (byte[] data : datas) {
-            DEFLATER_RAW.setInput(data);
-            while (!DEFLATER_RAW.needsInput()) {
+        synchronized (NATIVE_LOCK) {
+            DEFLATER_RAW.reset();
+            FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
+            bos.reset();
+            for (byte[] data : datas) {
+                DEFLATER_RAW.setInput(data);
+                while (!DEFLATER_RAW.needsInput()) {
+                    int i = DEFLATER_RAW.deflate(BUFFER);
+                    bos.write(BUFFER, 0, i);
+                }
+            }
+            DEFLATER_RAW.finish();
+            while (!DEFLATER_RAW.finished()) {
                 int i = DEFLATER_RAW.deflate(BUFFER);
                 bos.write(BUFFER, 0, i);
             }
+            //Deflater::end is called the time when the process exits.
+            return bos.toByteArray();
         }
-        DEFLATER_RAW.finish();
-        while (!DEFLATER_RAW.finished()) {
-            int i = DEFLATER_RAW.deflate(BUFFER);
-            bos.write(BUFFER, 0, i);
-        }
-        //Deflater::end is called the time when the process exits.
-        return bos.toByteArray();
     }
 
     @Override
     public byte[] deflateRaw(byte[] data, int level) throws IOException {
-        DEFLATER_RAW.reset();
-        DEFLATER_RAW.setInput(data);
-        DEFLATER_RAW.finish();
-        FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
-        bos.reset();
-        //try {
-        while (!DEFLATER_RAW.finished()) {
-            int i = DEFLATER_RAW.deflate(BUFFER);
-            bos.write(BUFFER, 0, i);
+        synchronized (NATIVE_LOCK) {
+            DEFLATER_RAW.reset();
+            DEFLATER_RAW.setInput(data);
+            DEFLATER_RAW.finish();
+            FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
+            bos.reset();
+            //try {
+            while (!DEFLATER_RAW.finished()) {
+                int i = DEFLATER_RAW.deflate(BUFFER);
+                bos.write(BUFFER, 0, i);
+            }
+            /*} finally {
+                deflater.end();
+            }*/
+            return bos.toByteArray();
         }
-        /*} finally {
-            deflater.end();
-        }*/
-        return bos.toByteArray();
     }
 
     @Override
-    public synchronized byte[] inflate(byte[] data, int maxSize) throws IOException {
-        INFLATER.reset();
-        INFLATER.setInput(data);
-        INFLATER.finished();
-        FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
-        bos.reset();
-        try {
-            int length = 0;
-            while (!INFLATER.finished()) {
-                int i = INFLATER.inflate(BUFFER);
-                length += i;
-                if (maxSize > 0 && length >= maxSize) {
-                    throw new IOException("Inflated data exceeds maximum size");
+    public byte[] inflate(byte[] data, int maxSize) throws IOException {
+        synchronized (NATIVE_LOCK) {
+            INFLATER.reset();
+            INFLATER.setInput(data);
+            INFLATER.finished();
+            FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
+            bos.reset();
+            try {
+                int length = 0;
+                while (!INFLATER.finished()) {
+                    int i = INFLATER.inflate(BUFFER);
+                    if (i == 0 && !INFLATER.finished()) {
+                        throw new IOException("Could not decompress data");
+                    }
+                    length += i;
+                    if (maxSize > 0 && length >= maxSize) {
+                        throw new IOException("Inflated data exceeds maximum size");
+                    }
+                    bos.write(BUFFER, 0, i);
                 }
-                bos.write(BUFFER, 0, i);
+                return bos.toByteArray();
+            } catch (DataFormatException e) {
+                throw new IOException("Unable to inflate Zlib stream", e);
             }
-            return bos.toByteArray();
-        } catch (DataFormatException e) {
-            throw new IOException("Unable to inflate Zlib stream", e);
         }
     }
 
     @Override
     public byte[] inflateRaw(byte[] data, int maxSize) throws IOException {
-        INFLATER_RAW.reset();
-        INFLATER_RAW.setInput(data);
-        INFLATER_RAW.finished();
-        FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
-        bos.reset();
-        try {
-            int length = 0;
-            while (!INFLATER_RAW.finished()) {
-                int i = INFLATER_RAW.inflate(BUFFER);
-                if (i == 0) {
-                    throw new IOException("Could not decompress data");
+        synchronized (NATIVE_LOCK) {
+            INFLATER_RAW.reset();
+            INFLATER_RAW.setInput(data);
+            INFLATER_RAW.finished();
+            FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
+            bos.reset();
+            try {
+                int length = 0;
+                while (!INFLATER_RAW.finished()) {
+                    int i = INFLATER_RAW.inflate(BUFFER);
+                    if (i == 0) {
+                        throw new IOException("Could not decompress data");
+                    }
+                    length += i;
+                    if (maxSize > 0 && length >= maxSize) {
+                        throw new IOException("Inflated data exceeds maximum size");
+                    }
+                    bos.write(BUFFER, 0, i);
                 }
-                length += i;
-                if (maxSize > 0 && length >= maxSize) {
-                    throw new IOException("Inflated data exceeds maximum size");
-                }
-                bos.write(BUFFER, 0, i);
+                return bos.toByteArray();
+            } catch (DataFormatException e) {
+                throw new IOException("Unable to inflate Zlib stream", e);
             }
-            return bos.toByteArray();
-        } catch (DataFormatException e) {
-            throw new IOException("Unable to inflate Zlib stream", e);
         }
     }
 }
