@@ -234,6 +234,14 @@ public class StateBlockStorage {
         }
     }
 
+    /** Native falling assignment must not call a custom snapshot or palette-compaction hook. */
+    public final boolean supportsNativeFallingCell(int x, int y, int z) {
+        return getClass() == StateBlockStorage.class
+                && getBlockState(x, y, z).getClass() == BlockStateSnapshot.class
+                && (this.palette.size() <= this.bitArray.getVersion().getMaxEntryValue()
+                    || this.bitArray.getVersion().next() != null);
+    }
+
     public int getVersion() {
         return this.version;
     }
