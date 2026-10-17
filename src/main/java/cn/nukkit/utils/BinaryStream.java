@@ -33,7 +33,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessi
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 import lombok.SneakyThrows;
 import org.cloudburstmc.nbt.NBTOutputStream;
@@ -67,6 +67,19 @@ public class BinaryStream {
     private static final int MAX_ITEM_STACK_REQUEST_ACTIONS = 128;
     private static final int MAX_ITEM_STACK_REQUEST_FILTER_STRINGS = 128;
     private static final int MAX_ITEM_STACK_REQUEST_CRAFT_ITEMS = 128;
+
+    private static final ClassValue<Boolean> DIRECT_BYTE_WRITE = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            try {
+                return type.getMethod("put", byte[].class).getDeclaringClass() == BinaryStream.class;
+            } catch (ReflectiveOperationException | SecurityException | LinkageError failure) {
+                return false;
+            }
+        }
+    };
+
+    private final boolean directByteWrite = DIRECT_BYTE_WRITE.get(getClass());
 
     public BinaryStream() {
         this.buffer = new byte[32];
@@ -276,7 +289,13 @@ public class BinaryStream {
     }
 
     public void putByte(byte b) {
-        this.put(new byte[]{b});
+        if (!directByteWrite) {
+            this.put(new byte[]{b});
+            return;
+        }
+        this.ensureCapacity(this.count + 1);
+        this.buffer[this.count] = b;
+        this.count += 1;
     }
 
     public void putByte(int b) {
@@ -880,8 +899,7 @@ public class BinaryStream {
         item.setCount(count);
 
         if (userData.length > 0) {
-            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(userData.length);
-            buf.writeBytes(userData);
+            ByteBuf buf = Unpooled.wrappedBuffer(userData);
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
                 int nbtSize = stream.readShort();
                 CompoundTag compoundTag = null;
@@ -942,7 +960,6 @@ public class BinaryStream {
             if (stringId == null) {
                 throw new IllegalArgumentException("Unknown item: runtimeID=" + runtimeId + " protocol=" + protocolId);
             }
-            stringId = stringId + ":" + damage;
             id = null;
         }
 
@@ -964,8 +981,7 @@ public class BinaryStream {
         }
 
         byte[] bytes = this.getByteArray();
-        ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
-        buf.writeBytes(bytes);
+        ByteBuf buf = Unpooled.wrappedBuffer(bytes);
 
         byte[] nbt = new byte[0];
         String[] canPlace;
@@ -1398,7 +1414,8 @@ public class BinaryStream {
 
         this.putVarInt(getBlockRuntimeId(gameVersion, item));
 
-        ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+        // Invocation-owned heap scratch; only its bytes are copied into the packet.
+        ByteBuf userDataBuf = Unpooled.buffer(64);
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable) {
                 byte[] nbt = item.getCompoundTag();
@@ -1555,7 +1572,8 @@ public class BinaryStream {
             return;
         }
 
-        ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+        // Keep the same little-endian writer without per-item native allocations.
+        ByteBuf userDataBuf = Unpooled.buffer(64);
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable && runtimeEntry != null && !runtimeEntry.isHasDamage()) {
                 byte[] nbt = item.getCompoundTag();
@@ -1700,8 +1718,7 @@ public class BinaryStream {
         byte[] bytes = this.getByteArray();
 
         if (bytes.length != 0) {
-            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
-            buf.writeBytes(bytes);
+            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
 
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
                 int nbtSize = stream.readShort();

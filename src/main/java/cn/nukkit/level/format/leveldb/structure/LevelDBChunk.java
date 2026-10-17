@@ -158,6 +158,12 @@ public class LevelDBChunk extends BaseChunk {
         return this.dimensionData.getSectionOffset();
     }
 
+    /** Whether the dimension captured by this chunk has a fixed section offset. */
+    public boolean hasStableSectionOffset() {
+        return this.dimensionData.getClass() == DimensionData.class
+                || this.dimensionData == DimensionData.LEGACY_DIMENSION;
+    }
+
     public void setState(@NotNull ChunkState state) {
         this.state = state;
     }

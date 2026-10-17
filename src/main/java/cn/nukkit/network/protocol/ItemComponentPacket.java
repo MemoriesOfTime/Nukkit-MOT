@@ -3,7 +3,7 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.MainLogger;
-import lombok.AllArgsConstructor;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -59,7 +59,9 @@ public class ItemComponentPacket extends DataPacket {
                     this.putBoolean(itemDefinition.isComponentBased());
                     this.putVarInt(itemDefinition.getVersion());
 
-                    if (itemDefinition.getNetworkData() != null) {
+                    if (itemDefinition.cachedNetworkData != null && !itemDefinition.networkDataExposed) {
+                        this.put(itemDefinition.cachedNetworkData);
+                    } else if (itemDefinition.getNetworkData() != null) {
                         this.put(NBTIO.write(itemDefinition.getNetworkData(), ByteOrder.LITTLE_ENDIAN, true));
                     } else {
                         this.put(EMPTY_COMPOUND_TAG);
@@ -76,7 +78,6 @@ public class ItemComponentPacket extends DataPacket {
         }
     }
 
-    @AllArgsConstructor
     @Getter
     @ToString
     public static class ItemDefinition {
@@ -94,7 +95,55 @@ public class ItemComponentPacket extends DataPacket {
          * @since v776 1.21.60
          */
         private final int version;
+        @ToString.Exclude
         private final CompoundTag networkData;
+
+        @Getter(AccessLevel.NONE)
+        @ToString.Exclude
+        private final byte[] cachedNetworkData;
+        @Getter(AccessLevel.NONE)
+        @ToString.Exclude
+        private volatile boolean networkDataExposed;
+
+        // Keep the existing custom-definition constructor and its input alias semantics.
+        public ItemDefinition(String identifier, int runtimeId, boolean componentBased, int version,
+                              CompoundTag networkData) {
+            this(identifier, runtimeId, componentBased, version, networkData, null);
+        }
+
+        private ItemDefinition(String identifier, int runtimeId, boolean componentBased, int version,
+                               CompoundTag networkData, byte[] cachedNetworkData) {
+            this.identifier = identifier;
+            this.runtimeId = runtimeId;
+            this.componentBased = componentBased;
+            this.version = version;
+            this.networkData = networkData;
+            this.cachedNetworkData = cachedNetworkData;
+        }
+
+        /** Own the vanilla tag; external access permanently restores dynamic serialization. */
+        public static ItemDefinition vanilla(String identifier, int runtimeId, boolean componentBased,
+                                             int version, CompoundTag networkData) {
+            CompoundTag owned = networkData == null ? null : networkData.copy();
+            byte[] encoded = null;
+            try {
+                encoded = owned == null ? EMPTY_COMPOUND_TAG
+                        : NBTIO.write(owned, ByteOrder.LITTLE_ENDIAN, true);
+            } catch (IOException ignored) {
+                // Preserve the existing encode-time logging/error path if precompilation fails.
+            }
+            return new ItemDefinition(identifier, runtimeId, componentBased, version, owned, encoded);
+        }
+
+        @ToString.Include(name = "networkData")
+        private CompoundTag networkDataForToString() {
+            return cachedNetworkData != null ? networkData : getNetworkData();
+        }
+
+        public CompoundTag getNetworkData() {
+            if (cachedNetworkData != null) networkDataExposed = true;
+            return networkData;
+        }
 
     }
 

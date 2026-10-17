@@ -319,6 +319,54 @@ public class LevelDBChunkSection implements ChunkSection {
         }
     }
 
+    /**
+     * Reads a cuboid of block state pairs under one read lock.
+     *
+     * <p>Each cell is encoded exactly like {@link #getBlockStatePair}. Bounds are section-local and
+     * inclusive; cells are written column by column in x, z, y order, the order a bounding-box scan
+     * visits them: {@code out[base + (x - x0) * strideX + (z - z0) * strideZ + (y - y0)]}.
+     *
+     * <p>A bounding-box scan used to lock and unlock the section once per cell - a horse visits about
+     * eighty cells every tick. One acquisition per section gives the same values (the cuboid is now read
+     * atomically) without the per-cell synchronisation.
+     *
+     * @return the {@link #getBlockVersion(int) version} of the layer the cells were read from
+     */
+    public int getBlockStatePairs(int layer, int x0, int y0, int z0, int x1, int y1, int z1,
+                                  long[] out, int base, int strideX, int strideZ) {
+        this.readLock.lock();
+        try {
+            StateBlockStorage storage = this.hasLayerUnsafe(layer) ? this.storages[layer] : null;
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    int index = base + (x - x0) * strideX + (z - z0) * strideZ;
+                    for (int y = y0; y <= y1; y++, index++) {
+                        if (storage == null) {
+                            out[index] = 0L;
+                            continue;
+                        }
+                        BlockStateSnapshot state = storage.getBlockState(x, y, z);
+                        out[index] = ((long) state.getLegacyId() << 32) | (state.getLegacyData() & 0xffffffffL);
+                    }
+                }
+            }
+            return storage == null ? -1 : storage.getVersion();
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
+    /**
+     * Version of a layer's states, or -1 while the layer does not exist; unchanged means no cell of the
+     * layer changed. Read without the lock: an answer that races a writer is either the old version
+     * (the reader's cells are consistent with it) or a new one (the reader rescans).
+     */
+    public int getBlockVersion(int layer) {
+        StateBlockStorage[] storages = this.storages;
+        StateBlockStorage storage = layer < storages.length ? storages[layer] : null;
+        return storage == null ? -1 : storage.getVersion();
+    }
+
     @Override
     public boolean setBlock(int x, int y, int z, int blockId) {
         return setBlockAtLayer(x, y, z, 0, blockId, 0);
@@ -440,19 +488,21 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockSkyLight(int x, int y, int z) {
-        if (this.skyLight == null) {
-            if (!hasSkyLight) {
-                return 0;
-            } else if (compressedLight == null) {
-                return 15;
+        this.skyLightLock.lock();
+        try {
+            if (this.skyLight == null) {
+                if (!hasSkyLight) {
+                    return 0;
+                } else if (compressedLight == null) {
+                    return 15;
+                }
+                this.skyLight = getSkyLightArray();
             }
+            int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
+            return (x & 1) == 0 ? sl & 0x0f : sl >> 4;
+        } finally {
+            this.skyLightLock.unlock();
         }
-        this.skyLight = getSkyLightArray();
-        int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
-        if ((x & 1) == 0) {
-            return sl & 0x0f;
-        }
-        return sl >> 4;
     }
 
     @Override
@@ -850,7 +900,14 @@ public class LevelDBChunkSection implements ChunkSection {
                 }
                 storages[i] = storage.copy();
             }
-            return new LevelDBChunkSection(null, this.y, storages, this.blockLight, this.skyLight, this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+            this.skyLightLock.lock();
+            try {
+                byte[] copiedSkyLight = this.skyLight == null ? null : this.skyLight.clone();
+                return new LevelDBChunkSection(null, this.y, storages, this.blockLight, copiedSkyLight,
+                        this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+            } finally {
+                this.skyLightLock.unlock();
+            }
         } finally {
             this.readLock.unlock();
         }

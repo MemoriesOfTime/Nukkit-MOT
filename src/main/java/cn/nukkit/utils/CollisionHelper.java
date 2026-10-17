@@ -3,6 +3,11 @@ package cn.nukkit.utils;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockBarrier;
+import cn.nukkit.block.BlockBell;
+import cn.nukkit.block.BlockFence;
+import cn.nukkit.block.BlockFenceGate;
+import cn.nukkit.block.BlockUnknown;
+import cn.nukkit.block.BlockWall;
 import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
@@ -14,6 +19,7 @@ import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -24,7 +30,12 @@ import java.util.function.Predicate;
  * Collision helper for entities and other targets.
  * @author labarjni
  */
-public record CollisionHelper(Entity entity) {
+public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache) {
+
+    /** A helper that keeps the entity's last collision scan; see {@link ScanCache}. */
+    public CollisionHelper(Entity entity) {
+        this(entity, new ScanCache());
+    }
 
     /** Cap on block positions visited per collision query; guards against runaway loops from malformed AABBs (cf. EaseCation). */
     private static final int MAX_BOUNDING_BOX_ITERATIONS = 1_000_000;
@@ -159,11 +170,35 @@ public record CollisionHelper(Entity entity) {
         double expandY = Math.min(MAX_MOTION_EXPANSION, Math.max(0.5, motionAbsY + 0.3));
         double expandZ = Math.min(MAX_MOTION_EXPANSION, Math.max(0.5, motionAbsZ + 0.3));
 
-        Block[] blocks = this.getBlocksInBoundingBox(boundingBox.grow(expandX, expandY, expandZ));
+        ScanCache cache = this.scanCache;
+        if (cache != null && cache.valid && cache.simpleBoxes
+                && boundingBox != null && boundingBox.getClass() == SimpleAxisAlignedBB.class) {
+            // Capture the default grow's geometry before any virtual query-context getter can change it.
+            double scanMinX = boundingBox.getMinX() - expandX;
+            double scanMinY = boundingBox.getMinY() - expandY;
+            double scanMinZ = boundingBox.getMinZ() - expandZ;
+            double scanMaxX = boundingBox.getMaxX() + expandX;
+            double scanMaxY = boundingBox.getMaxY() + expandY;
+            double scanMaxZ = boundingBox.getMaxZ() + expandZ;
+            if (cache.matchesExpanded(boundingBox, scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ)) {
+                Block[] blocks = this.getExpandedCollisionCandidates(boundingBox,
+                        scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ);
+                return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ);
+            }
+        }
+        Block[] blocks = this.getCollisionCandidates(boundingBox.grow(expandX, expandY, expandZ), boundingBox);
+        return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ);
+    }
 
+    /**
+     * The per-block half of {@link #getCollisionBlocks()}: which scanned blocks the entity touches.
+     * Split out unchanged so the scan can be checked against {@link #getBlocksInBoundingBox} by tests.
+     */
+    static Block[] filterCollisionBlocks(Block[] blocks, AxisAlignedBB boundingBox,
+                                         double expandX, double expandY, double expandZ) {
         if (blocks.length == 0) return Block.EMPTY_ARRAY;
 
-        Block[] result = new Block[Math.min(blocks.length, 4)];
+        Block[] result = Block.EMPTY_ARRAY;
         int count = 0;
 
         for (Block block : blocks) {
@@ -173,7 +208,8 @@ public record CollisionHelper(Entity entity) {
                     AxisAlignedBB trajectoryBB = boundingBox.grow(expandX, expandY, expandZ);
                     if (block.collidesWithBB(trajectoryBB, true)) {
                         if (count == result.length) {
-                            result = Arrays.copyOf(result, result.length << 1);
+                            result = count == 0 ? new Block[Math.min(blocks.length, 4)]
+                                    : Arrays.copyOf(result, result.length << 1);
                         }
                         result[count++] = block;
                     }
@@ -184,20 +220,596 @@ public record CollisionHelper(Entity entity) {
                     AxisAlignedBB shrinkBB = boundingBox.shrink(shrinkX, 0, shrinkZ);
                     if (block.collidesWithBB(shrinkBB, true)) {
                         if (count == result.length) {
-                            result = Arrays.copyOf(result, result.length << 1);
+                            result = count == 0 ? new Block[Math.min(blocks.length, 4)]
+                                    : Arrays.copyOf(result, result.length << 1);
                         }
                         result[count++] = block;
                     }
                 }
             } else if (block.collidesWithBB(boundingBox, true)) {
                 if (count == result.length) {
-                    result = Arrays.copyOf(result, result.length << 1);
+                    result = count == 0 ? new Block[Math.min(blocks.length, 4)]
+                            : Arrays.copyOf(result, result.length << 1);
                 }
                 result[count++] = block;
             }
         }
 
-        return count == 0 ? Block.EMPTY_ARRAY : Arrays.copyOf(result, count);
+        if (count == 0) return Block.EMPTY_ARRAY;
+        return count == result.length ? result : Arrays.copyOf(result, count);
+    }
+
+    /* ---------------------------------------------------------------------------------------------
+     * Collision candidates.
+     *
+     * getCollisionBlocks scans the bounding box grown by at least half a block on every side, but the
+     * margin only exists for fire and nether portals (hasDynamicCollision), which are tested against
+     * that grown "trajectory" box. Every other block is tested against the entity's own box (solid) or
+     * a box inside it (pass-through), and its shape lies inside its own cell - except fences, fence
+     * gates and walls, which reach half a block above it, and bells, padded by 1e-6 on every side.
+     * So outside the cells the entity's box overlaps only fire, portals, the one layer of fences,
+     * gates and walls below the feet, bells, custom blocks and unregistered ids can ever pass the
+     * filter. Everything else there - above all the floor every mob stands on - used to be
+     * materialised, tested and dropped every tick, one section lock per cell.
+     *
+     * The candidate scan keeps the very same cells, in the very same x, z, y order, and materialises
+     * blocks exactly as getBlocksInBoundingBox does; it only leaves out blocks that cannot pass the
+     * unchanged filter. Standard LevelDB sections are read one cuboid per section under a single lock.
+     * ------------------------------------------------------------------------------------------- */
+
+    /** Shape flags per legacy block id; see {@link #shapeFlags()}. */
+    static final byte SHAPE_UNKNOWN = 1;
+    static final byte SHAPE_DYNAMIC = 2;
+    static final byte SHAPE_OVERHANG = 4;
+
+    /** Collision shapes of fences, gates and walls end this far above their cell. */
+    private static final double COLLISION_OVERHANG = 0.5;
+
+    private static volatile byte[] shapeFlags;
+
+    private static final byte CELL_AIR = 0;
+    private static final byte CELL_PAIR = 1;
+    private static final byte CELL_FALLBACK = 2;
+
+    /** Scratch buffers kept per thread; larger scans allocate instead of pinning memory. */
+    private static final int SCRATCH_RETAIN_LIMIT = 1 << 14;
+    private static final ThreadLocal<long[]> SCRATCH_PAIRS = ThreadLocal.withInitial(() -> new long[256]);
+    private static final ThreadLocal<byte[]> SCRATCH_CELLS = ThreadLocal.withInitial(() -> new byte[256]);
+
+    /**
+     * Per legacy id: SHAPE_DYNAMIC when the block collides through the trajectory box, SHAPE_OVERHANG
+     * when its collision shape rises above its cell, SHAPE_UNKNOWN when nothing is known about the id
+     * (not registered or no prototype). Ids outside the table (custom blocks) are treated as unknown.
+     * Returns null before {@link Block#init()}, which keeps the original scan.
+     */
+    static byte[] shapeFlags() {
+        byte[] flags = shapeFlags;
+        if (flags == null) {
+            @SuppressWarnings("rawtypes")
+            Class[] list = Block.list;
+            if (list == null) {
+                return null;
+            }
+            flags = new byte[list.length];
+            for (int id = 0; id < list.length; id++) {
+                if (list[id] == null) {
+                    flags[id] = SHAPE_UNKNOWN;
+                    continue;
+                }
+                byte flag;
+                try {
+                    // The same prototypes the scan materialises from, so the table cannot disagree with them.
+                    Block prototype = Block.get(id);
+                    if (prototype == null || prototype instanceof BlockUnknown || prototype instanceof BlockBell) {
+                        // A bell pads its collision box by 1e-6 on every side so a dropped item rings it.
+                        flag = SHAPE_UNKNOWN;
+                    } else {
+                        flag = 0;
+                        if (prototype.hasDynamicCollision()) {
+                            flag |= SHAPE_DYNAMIC;
+                        }
+                        if (prototype instanceof BlockFence || prototype instanceof BlockFenceGate
+                                || prototype instanceof BlockWall) {
+                            flag |= SHAPE_OVERHANG;
+                        }
+                    }
+                } catch (Throwable ignored) {
+                    flag = SHAPE_UNKNOWN;
+                }
+                flags[id] = flag;
+            }
+            shapeFlags = flags;
+        }
+        return flags;
+    }
+
+    /** Whether a block with this raw id, outside the cells the entity overlaps, can still pass the filter. */
+    private static boolean mayCollideFromOutside(byte[] flags, int id, boolean overhangLayer) {
+        if (id < 0 || id >= flags.length) {
+            return true;
+        }
+        int flag = flags[id];
+        return (flag & (SHAPE_UNKNOWN | SHAPE_DYNAMIC)) != 0 || (overhangLayer && (flag & SHAPE_OVERHANG) != 0);
+    }
+
+    /**
+     * Blocks of {@code scanBox} that {@link #filterCollisionBlocks} can accept for an entity whose own
+     * box is {@code entityBox}: the result of {@code getBlocksInBoundingBox(scanBox)} without the blocks
+     * the filter always rejects, in the same order and materialised the same way.
+     */
+    Block[] getCollisionCandidates(AxisAlignedBB scanBox, AxisAlignedBB entityBox) {
+        Level level = entity.getLevel();
+        byte[] flags = shapeFlags();
+        if (level == null || entity.isClosed() || flags == null || !isFinite(scanBox) || !isFinite(entityBox)
+                || level.getClass() != Level.class || level.getProvider() == null
+                || level.getProvider().getClass() != LevelDBProvider.class) {
+            return this.getBlocksInBoundingBox(scanBox);
+        }
+
+        int minX = NukkitMath.floorDouble(scanBox.getMinX());
+        int minY = NukkitMath.floorDouble(scanBox.getMinY());
+        int minZ = NukkitMath.floorDouble(scanBox.getMinZ());
+        // The same inclusive cell range as getBlocksInBoundingBox, which the scan has to reproduce.
+        int maxX = NukkitMath.floorDouble(scanBox.getMaxX());
+        int maxY = NukkitMath.floorDouble(scanBox.getMaxY());
+        int maxZ = NukkitMath.floorDouble(scanBox.getMaxZ());
+
+        if (minX > maxX || minY > maxY || minZ > maxZ) return Block.EMPTY_ARRAY;
+
+        int worldMinY = level.getMinBlockY();
+        int clampedMinY = Math.max(minY, worldMinY);
+        int worldMaxY = level.getMaxBlockY();
+        int clampedMaxY = Math.min(maxY, worldMaxY);
+        if (clampedMinY > clampedMaxY) return Block.EMPTY_ARRAY;
+
+        long estimatedCount = (long) (maxX - minX + 1) * (maxZ - minZ + 1) * (clampedMaxY - clampedMinY + 1);
+        if (estimatedCount <= 0 || estimatedCount > MAX_BOUNDING_BOX_ITERATIONS) {
+            logRunawayAABB(entity, scanBox, "getBlocksInBoundingBox");
+            return Block.EMPTY_ARRAY;
+        }
+
+        return this.scanCollisionCandidates(level, flags, scanBox, entityBox, minX, minZ, maxX, maxZ,
+                clampedMinY, clampedMaxY, worldMinY, worldMaxY, estimatedCount, false);
+    }
+
+    /** A standard warm box can validate the same context and stamps without allocating its grow. */
+    private Block[] getExpandedCollisionCandidates(AxisAlignedBB entityBox,
+                                                   double scanMinX, double scanMinY, double scanMinZ,
+                                                   double scanMaxX, double scanMaxY, double scanMaxZ) {
+        Level level = entity.getLevel();
+        byte[] flags = shapeFlags();
+        if (level == null || entity.isClosed() || flags == null
+                || !Double.isFinite(scanMinX) || !Double.isFinite(scanMinY) || !Double.isFinite(scanMinZ)
+                || !Double.isFinite(scanMaxX) || !Double.isFinite(scanMaxY) || !Double.isFinite(scanMaxZ)
+                || !isFinite(entityBox) || level.getClass() != Level.class || level.getProvider() == null
+                || level.getProvider().getClass() != LevelDBProvider.class) {
+            return this.getBlocksInBoundingBox(new SimpleAxisAlignedBB(
+                    scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ));
+        }
+
+        int minX = NukkitMath.floorDouble(scanMinX);
+        int minY = NukkitMath.floorDouble(scanMinY);
+        int minZ = NukkitMath.floorDouble(scanMinZ);
+        int maxX = NukkitMath.floorDouble(scanMaxX);
+        int maxY = NukkitMath.floorDouble(scanMaxY);
+        int maxZ = NukkitMath.floorDouble(scanMaxZ);
+        if (minX > maxX || minY > maxY || minZ > maxZ) return Block.EMPTY_ARRAY;
+
+        int worldMinY = level.getMinBlockY();
+        int clampedMinY = Math.max(minY, worldMinY);
+        int worldMaxY = level.getMaxBlockY();
+        int clampedMaxY = Math.min(maxY, worldMaxY);
+        if (clampedMinY > clampedMaxY) return Block.EMPTY_ARRAY;
+
+        long estimatedCount = (long) (maxX - minX + 1) * (maxZ - minZ + 1) * (clampedMaxY - clampedMinY + 1);
+        if (estimatedCount <= 0 || estimatedCount > MAX_BOUNDING_BOX_ITERATIONS) {
+            logRunawayAABB(entity, new SimpleAxisAlignedBB(
+                    scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ), "getBlocksInBoundingBox");
+            return Block.EMPTY_ARRAY;
+        }
+
+        ScanCache cache = this.scanCache;
+        if (cache.holdsExpanded(level, entity.chunk, entityBox, worldMinY, worldMaxY,
+                scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ)) {
+            return cache.materialise(level);
+        }
+        return this.scanCollisionCandidates(level, flags, new SimpleAxisAlignedBB(
+                        scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ), entityBox,
+                minX, minZ, maxX, maxZ, clampedMinY, clampedMaxY, worldMinY, worldMaxY, estimatedCount, true);
+    }
+
+    private Block[] scanCollisionCandidates(Level level, byte[] flags, AxisAlignedBB scanBox, AxisAlignedBB entityBox,
+                                           int minX, int minZ, int maxX, int maxZ, int clampedMinY, int clampedMaxY,
+                                           int worldMinY, int worldMaxY, long estimatedCount, boolean cacheChecked) {
+        // A resting entity whose blocks did not change gets the candidates of its last scan.
+        ScanCache cache = this.scanCache;
+        if (cache != null) {
+            if (!cacheChecked && cache.holds(level, entity.chunk, scanBox, entityBox, worldMinY, worldMaxY)) {
+                return cache.materialise(level);
+            }
+            cache.begin(level, worldMinY, worldMaxY);
+        }
+
+        // Cells whose own shape can reach the entity's box: x with x < maxX && x + 1 > minX, that is
+        // floor(minX) .. ceil(maxX) - 1, the same for z and y, plus the layers from which a shape rising
+        // COLLISION_OVERHANG above its cell can.
+        int innerMinX = NukkitMath.floorDouble(entityBox.getMinX());
+        int innerMaxX = (int) Math.ceil(entityBox.getMaxX()) - 1;
+        int innerMinZ = NukkitMath.floorDouble(entityBox.getMinZ());
+        int innerMaxZ = (int) Math.ceil(entityBox.getMaxZ()) - 1;
+        int innerMinY = NukkitMath.floorDouble(entityBox.getMinY());
+        int innerMaxY = (int) Math.ceil(entityBox.getMaxY()) - 1;
+        int overhangMinY = NukkitMath.floorDouble(entityBox.getMinY() - COLLISION_OVERHANG);
+
+        int sizeY = clampedMaxY - clampedMinY + 1;
+        int sizeZ = maxZ - minZ + 1;
+        int strideX = sizeZ * sizeY;
+        int cells = (int) estimatedCount;
+        long[] pairs = scratchPairs(cells);
+        byte[] kinds = scratchCells(cells);
+        Arrays.fill(kinds, 0, cells, CELL_AIR);
+
+        // Pass 1: every chunk once, every standard section as one locked cuboid read.
+        FullChunk hint = entity.chunk;
+        for (int chunkX = minX >> 4; chunkX <= maxX >> 4; chunkX++) {
+            int x0 = Math.max(minX, chunkX << 4);
+            int x1 = Math.min(maxX, (chunkX << 4) + 15);
+            for (int chunkZ = minZ >> 4; chunkZ <= maxZ >> 4; chunkZ++) {
+                int z0 = Math.max(minZ, chunkZ << 4);
+                int z1 = Math.min(maxZ, (chunkZ << 4) + 15);
+                FullChunk chunk = chunkAt(level, hint, x0, z0);
+                if (chunk == null) {
+                    if (cache != null) {
+                        cache.stamp(chunkX, chunkZ, 0, null, null, ScanCache.NO_VERSION);
+                    }
+                    continue;
+                }
+                hint = chunk;
+                boolean standardChunk = chunk.getClass() == LevelDBChunk.class
+                        && chunk.getProvider() == level.getProvider()
+                        && chunk.getX() == chunkX && chunk.getZ() == chunkZ;
+                for (int sectionY = clampedMinY >> 4; sectionY <= clampedMaxY >> 4; sectionY++) {
+                    int y0 = Math.max(clampedMinY, sectionY << 4);
+                    int y1 = Math.min(clampedMaxY, (sectionY << 4) + 15);
+                    int base = (x0 - minX) * strideX + (z0 - minZ) * sizeY + (y0 - clampedMinY);
+                    byte kind;
+                    if (standardChunk) {
+                        ChunkSection section = ((LevelDBChunk) chunk).getSection(sectionY);
+                        if (section.getClass() == EmptyChunkSection.class) {
+                            if (cache != null) {
+                                cache.stamp(chunkX, chunkZ, sectionY, chunk, section, ScanCache.NO_VERSION);
+                            }
+                            continue;
+                        }
+                        if (section.getClass() == LevelDBChunkSection.class) {
+                            int version = ((LevelDBChunkSection) section).getBlockStatePairs(0, x0 & 0xF, y0 & 0xF, z0 & 0xF,
+                                    x1 & 0xF, y1 & 0xF, z1 & 0xF, pairs, base, strideX, sizeY);
+                            if (cache != null) {
+                                cache.stamp(chunkX, chunkZ, sectionY, chunk, section, version);
+                            }
+                            kind = CELL_PAIR;
+                        } else {
+                            kind = CELL_FALLBACK;
+                        }
+                    } else {
+                        kind = CELL_FALLBACK;
+                    }
+                    if (kind == CELL_FALLBACK && cache != null) {
+                        cache.uncachable();
+                    }
+                    for (int x = x0; x <= x1; x++) {
+                        for (int z = z0; z <= z1; z++) {
+                            int index = base + (x - x0) * strideX + (z - z0) * sizeY;
+                            Arrays.fill(kinds, index, index + (y1 - y0 + 1), kind);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pass 2: the original x, z, y order; materialise what the filter can use.
+        Block[] result = Block.EMPTY_ARRAY;
+        int count = 0;
+        hint = entity.chunk;
+        for (int x = minX; x <= maxX; x++) {
+            boolean insideX = x >= innerMinX && x <= innerMaxX;
+            for (int z = minZ; z <= maxZ; z++) {
+                boolean inside = insideX && z >= innerMinZ && z <= innerMaxZ;
+                int index = (x - minX) * strideX + (z - minZ) * sizeY;
+                FullChunk chunk = null;
+                for (int y = clampedMinY; y <= clampedMaxY; y++, index++) {
+                    byte kind = kinds[index];
+                    if (kind == CELL_AIR) {
+                        continue;
+                    }
+                    Block block;
+                    boolean detached = false;
+                    if (kind == CELL_PAIR) {
+                        long pair = pairs[index];
+                        int id = (int) (pair >>> 32);
+                        if (id == Block.AIR) {
+                            continue;
+                        }
+                        if (!(inside && y >= innerMinY && y <= innerMaxY)
+                                && !mayCollideFromOutside(flags, id, inside && y >= overhangMinY && y < innerMinY)) {
+                            continue;
+                        }
+                        block = Block.get(id, (int) pair, level, x, y, z, 0);
+                        // The earlier air probe or a custom factory's returned id cannot prove ownership.
+                        detached = id >= 0 && id < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID;
+                        if (cache != null && block != null && !block.isAir()) {
+                            cache.candidate(x, y, z, pair);
+                        }
+                    } else {
+                        // Non-standard chunk or section: exactly the per-cell path of getBlocksInBoundingBox.
+                        if (chunk == null) {
+                            chunk = chunkAt(level, hint, x, z);
+                            if (chunk != null) {
+                                hint = chunk;
+                            }
+                        }
+                        if (isAirAt(chunk, x, y, z)) continue;
+                        if (level.isYInRange(y) && chunk != null
+                                && chunk.getX() == (x >> 4) && chunk.getZ() == (z >> 4)) {
+                            int[] state = chunk.getBlockState(x & 0xF, y, z & 0xF, 0);
+                            block = Block.get(state[0], state[1], level, x, y, z, 0);
+                            detached = state[0] >= 0 && state[0] < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID;
+                        } else {
+                            block = level.getBlock(chunk, x, y, z, 0, false);
+                        }
+                    }
+                    if (block == null || block.isAir()) continue;
+
+                    if (count == result.length) {
+                        result = count == 0 ? new Block[(int) Math.min(estimatedCount, 16)]
+                                : Arrays.copyOf(result, (int) Math.min((long) result.length * 2, estimatedCount));
+                    }
+                    result[count++] = detached ? block : block.clone();
+                }
+            }
+        }
+
+        if (cache != null) {
+            cache.commit(scanBox, entityBox);
+        }
+        return count == 0 ? Block.EMPTY_ARRAY
+                : count == result.length ? result : Arrays.copyOf(result, count);
+    }
+
+    /**
+     * The last candidate scan of one entity.
+     *
+     * <p>The candidates depend on nothing but the two boxes and the layer-0 states of the scanned cells,
+     * so they stay exact while the boxes are unchanged and every chunk, section and section version the
+     * scan read is still the same - checked with a few identity comparisons and one volatile read per
+     * section instead of reading every cell again. A resting mob (horses in a pen measured at a
+     * fifth of a busy server's main thread) rescans only when a block around it changes. The blocks are
+     * materialised afresh on every hit and the per-block filter still runs every tick, so shapes that
+     * depend on neighbours or block entities are evaluated as before. Scans that touched a non-standard
+     * chunk or section are not kept.
+     */
+    public static final class ScanCache {
+        static final int NO_VERSION = Integer.MIN_VALUE;
+
+        private Level level;
+        private boolean valid;
+        private boolean cachable;
+        private boolean simpleBoxes;
+        private int worldMinY;
+        private int worldMaxY;
+        private final double[] boxes = new double[12];
+
+        private int stamps;
+        private int[] stampChunkX = new int[4];
+        private int[] stampChunkZ = new int[4];
+        private int[] stampSectionY = new int[4];
+        private int[] stampSectionIndex = new int[4];
+        private int[] stampVersion = new int[4];
+        private Object[] stampChunk = new Object[4];
+        private Object[] stampSection = new Object[4];
+
+        private int candidates;
+        private int[] candidateX = new int[8];
+        private int[] candidateY = new int[8];
+        private int[] candidateZ = new int[8];
+        private long[] candidatePair = new long[8];
+
+        boolean holds(Level level, FullChunk hint, AxisAlignedBB scanBox, AxisAlignedBB entityBox,
+                      int worldMinY, int worldMaxY) {
+            if (!this.valid || this.level != level
+                    || this.worldMinY != worldMinY || this.worldMaxY != worldMaxY
+                    || this.boxes[0] != scanBox.getMinX() || this.boxes[1] != scanBox.getMinY()
+                    || this.boxes[2] != scanBox.getMinZ() || this.boxes[3] != scanBox.getMaxX()
+                    || this.boxes[4] != scanBox.getMaxY() || this.boxes[5] != scanBox.getMaxZ()
+                    || this.boxes[6] != entityBox.getMinX() || this.boxes[7] != entityBox.getMinY()
+                    || this.boxes[8] != entityBox.getMinZ() || this.boxes[9] != entityBox.getMaxX()
+                    || this.boxes[10] != entityBox.getMaxY() || this.boxes[11] != entityBox.getMaxZ()) {
+                return false;
+            }
+            return this.holdsStamps(level, hint);
+        }
+
+        boolean matchesExpanded(AxisAlignedBB entityBox,
+                                double scanMinX, double scanMinY, double scanMinZ,
+                                double scanMaxX, double scanMaxY, double scanMaxZ) {
+            return this.valid && this.simpleBoxes && entityBox.getClass() == SimpleAxisAlignedBB.class
+                    && this.boxes[0] == scanMinX && this.boxes[1] == scanMinY && this.boxes[2] == scanMinZ
+                    && this.boxes[3] == scanMaxX && this.boxes[4] == scanMaxY && this.boxes[5] == scanMaxZ
+                    && this.boxes[6] == entityBox.getMinX() && this.boxes[7] == entityBox.getMinY()
+                    && this.boxes[8] == entityBox.getMinZ() && this.boxes[9] == entityBox.getMaxX()
+                    && this.boxes[10] == entityBox.getMaxY() && this.boxes[11] == entityBox.getMaxZ();
+        }
+
+        boolean holdsExpanded(Level level, FullChunk hint, AxisAlignedBB entityBox, int worldMinY, int worldMaxY,
+                              double scanMinX, double scanMinY, double scanMinZ,
+                              double scanMaxX, double scanMaxY, double scanMaxZ) {
+            return this.level == level && this.worldMinY == worldMinY && this.worldMaxY == worldMaxY
+                    && this.matchesExpanded(entityBox, scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ)
+                    && this.holdsStamps(level, hint);
+        }
+
+        private boolean holdsStamps(Level level, FullChunk hint) {
+            for (int i = 0; i < this.stamps; i++) {
+                FullChunk chunk = chunkAt(level, hint, this.stampChunkX[i] << 4, this.stampChunkZ[i] << 4);
+                if (chunk != this.stampChunk[i]) {
+                    return false;
+                }
+                if (chunk == null) {
+                    continue;
+                }
+                hint = chunk;
+                LevelDBChunk leveldb = (LevelDBChunk) chunk;
+                int sectionIndex = this.stampSectionIndex[i];
+                ChunkSection section;
+                if (sectionIndex < 0) {
+                    section = leveldb.getSection(this.stampSectionY[i]);
+                } else {
+                    ChunkSection[] sections = leveldb.getSections();
+                    section = sectionIndex < sections.length
+                            ? sections[sectionIndex] : leveldb.getSection(this.stampSectionY[i]);
+                }
+                if (section != this.stampSection[i]) {
+                    return false;
+                }
+                if (this.stampVersion[i] != NO_VERSION
+                        && ((LevelDBChunkSection) section).getBlockVersion(0) != this.stampVersion[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        boolean holds(Level level, FullChunk hint, AxisAlignedBB scanBox, AxisAlignedBB entityBox) {
+            return this.holds(level, hint, scanBox, entityBox,
+                    level == null ? 0 : level.getMinBlockY(), level == null ? 0 : level.getMaxBlockY());
+        }
+
+        Block[] materialise(Level level) {
+            if (this.candidates == 0) {
+                return Block.EMPTY_ARRAY;
+            }
+            Block[] result = new Block[this.candidates];
+            int count = 0;
+            for (int i = 0; i < this.candidates; i++) {
+                long pair = this.candidatePair[i];
+                int id = (int) (pair >>> 32);
+                Block block = Block.get(id, (int) pair, level, this.candidateX[i], this.candidateY[i], this.candidateZ[i], 0);
+                if (block == null || block.isAir()) {
+                    continue;
+                }
+                result[count++] = id >= 0 && id < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID ? block : block.clone();
+            }
+            return count == result.length ? result : Arrays.copyOf(result, count);
+        }
+
+        void begin(Level level, int worldMinY, int worldMaxY) {
+            this.level = level;
+            this.worldMinY = worldMinY;
+            this.worldMaxY = worldMaxY;
+            this.valid = false;
+            this.simpleBoxes = false;
+            this.cachable = true;
+            // Drop the chunk and section references of the previous scan: a slot past the new stamp
+            // count would otherwise keep an unloaded or replaced chunk reachable while the entity lives.
+            Arrays.fill(this.stampChunk, 0, this.stamps, null);
+            Arrays.fill(this.stampSection, 0, this.stamps, null);
+            this.stamps = 0;
+            this.candidates = 0;
+        }
+
+        void begin(Level level) {
+            this.begin(level, level == null ? 0 : level.getMinBlockY(), level == null ? 0 : level.getMaxBlockY());
+        }
+
+        void uncachable() {
+            this.cachable = false;
+        }
+
+        void stamp(int chunkX, int chunkZ, int sectionY, Object chunk, Object section, int version) {
+            if (this.stamps == this.stampChunkX.length) {
+                int size = this.stamps << 1;
+                this.stampChunkX = Arrays.copyOf(this.stampChunkX, size);
+                this.stampChunkZ = Arrays.copyOf(this.stampChunkZ, size);
+                this.stampSectionY = Arrays.copyOf(this.stampSectionY, size);
+                this.stampSectionIndex = Arrays.copyOf(this.stampSectionIndex, size);
+                this.stampVersion = Arrays.copyOf(this.stampVersion, size);
+                this.stampChunk = Arrays.copyOf(this.stampChunk, size);
+                this.stampSection = Arrays.copyOf(this.stampSection, size);
+            }
+            int i = this.stamps++;
+            this.stampChunkX[i] = chunkX;
+            this.stampChunkZ[i] = chunkZ;
+            this.stampSectionY[i] = sectionY;
+            // Only known fixed offsets can reuse an index; custom dimension getters stay live.
+            // each hit still reads the current section array, identity and layer-0 version.
+            this.stampSectionIndex[i] = chunk != null && chunk.getClass() == LevelDBChunk.class
+                    && ((LevelDBChunk) chunk).hasStableSectionOffset()
+                    ? (int) (((LevelDBChunk) chunk).getSectionOffset() + (float) sectionY) : -1;
+            this.stampVersion[i] = version;
+            this.stampChunk[i] = chunk;
+            this.stampSection[i] = section;
+        }
+
+        void candidate(int x, int y, int z, long pair) {
+            if (this.candidates == this.candidateX.length) {
+                int size = this.candidates << 1;
+                this.candidateX = Arrays.copyOf(this.candidateX, size);
+                this.candidateY = Arrays.copyOf(this.candidateY, size);
+                this.candidateZ = Arrays.copyOf(this.candidateZ, size);
+                this.candidatePair = Arrays.copyOf(this.candidatePair, size);
+            }
+            int i = this.candidates++;
+            this.candidateX[i] = x;
+            this.candidateY[i] = y;
+            this.candidateZ[i] = z;
+            this.candidatePair[i] = pair;
+        }
+
+        void commit(AxisAlignedBB scanBox, AxisAlignedBB entityBox) {
+            if (!this.cachable) {
+                this.valid = false;
+                return;
+            }
+            this.boxes[0] = scanBox.getMinX();
+            this.boxes[1] = scanBox.getMinY();
+            this.boxes[2] = scanBox.getMinZ();
+            this.boxes[3] = scanBox.getMaxX();
+            this.boxes[4] = scanBox.getMaxY();
+            this.boxes[5] = scanBox.getMaxZ();
+            this.boxes[6] = entityBox.getMinX();
+            this.boxes[7] = entityBox.getMinY();
+            this.boxes[8] = entityBox.getMinZ();
+            this.boxes[9] = entityBox.getMaxX();
+            this.boxes[10] = entityBox.getMaxY();
+            this.boxes[11] = entityBox.getMaxZ();
+            this.valid = true;
+            this.simpleBoxes = scanBox.getClass() == SimpleAxisAlignedBB.class
+                    && entityBox.getClass() == SimpleAxisAlignedBB.class;
+        }
+    }
+
+    private static long[] scratchPairs(int size) {
+        if (size > SCRATCH_RETAIN_LIMIT) {
+            return new long[size];
+        }
+        long[] buffer = SCRATCH_PAIRS.get();
+        if (buffer.length < size) {
+            buffer = new long[Math.max(size, buffer.length << 1)];
+            SCRATCH_PAIRS.set(buffer);
+        }
+        return buffer;
+    }
+
+    private static byte[] scratchCells(int size) {
+        if (size > SCRATCH_RETAIN_LIMIT) {
+            return new byte[size];
+        }
+        byte[] buffer = SCRATCH_CELLS.get();
+        if (buffer.length < size) {
+            buffer = new byte[Math.max(size, buffer.length << 1)];
+            SCRATCH_CELLS.set(buffer);
+        }
+        return buffer;
     }
 
     /**
@@ -411,7 +1023,7 @@ public record CollisionHelper(Entity entity) {
 
     /**
      * Typed pickup snapshot, using PNX's loaded-only item query and MOT's chunk/iteration order.
-     * Empty indexed chunks never traverse their entity map. A lazy linked snapshot avoids the
+     * Empty indexed chunks never traverse their entity map. A lazy detached snapshot avoids the
      * intermediate Entity array while preserving the old pre-event spatial snapshot: a plugin
      * moving or spawning an entity during pickup must not change this query's remaining results.
      */
@@ -434,7 +1046,7 @@ public record CollisionHelper(Entity entity) {
                 for (Entity entity : chunk.getEntities().values()) {
                     if (FullChunk.isPickupEntity(entity, itemsOnly)
                             && (itemsOnly ? entity.getBoundingBox() : entity.boundingBox).intersectsWith(boundingBox)) {
-                        if (nearby == null) nearby = new LinkedList<>();
+                        if (nearby == null) nearby = new ArrayList<>(3);
                         nearby.add(entity);
                     }
                 }

@@ -318,6 +318,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
 
     private int chunksSent = 0;
+    private long chunkDeliveryEpoch;
     private boolean hasSpawnChunks;
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
     protected int nextChunkOrderRun = 1;
@@ -1251,6 +1252,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private void unloadChunks(boolean online) {
+        ++this.chunkDeliveryEpoch;
         for (long index : this.usedChunks.keySet()) {
             int chunkX = Level.getHashX(index);
             int chunkZ = Level.getHashZ(index);
@@ -1309,10 +1311,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        this.usedChunks.put(Level.chunkHash(x, z), Boolean.TRUE);
-
-        this.dataPacket(packet);
-
+        long index = Level.chunkHash(x, z);
+        Level sourceLevel = this.level;
+        long sourceEpoch = this.chunkDeliveryEpoch;
+        boolean tracked = this.usedChunks.containsKey(index);
+        boolean submitted = false;
+        try {
+            submitted = this.dataPacket(packet);
+        } finally {
+            if (!submitted && tracked && this.usedChunks.get(index) == Boolean.FALSE
+                    && isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, true)) {
+                this.usedChunks.put(index, Boolean.FALSE);
+                this.loadQueue.add(index);
+            }
+        }
+        if (!submitted || !isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, tracked)) {
+            return;
+        }
+        this.usedChunks.put(index, Boolean.TRUE);
         this.chunksSent++;
 
         if (this.spawned) {
@@ -1339,6 +1355,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             playerActionPacket.entityId = this.getId();
             this.dataPacket(playerActionPacket);
         }
+    }
+
+    private boolean isChunkSubmissionContextCurrent(Level sourceLevel, long sourceEpoch,
+                                                     long index, boolean tracked) {
+        return this.connected && this.level == sourceLevel && this.chunkDeliveryEpoch == sourceEpoch
+                && (!tracked || this.usedChunks.containsKey(index));
     }
 
     @Deprecated
@@ -2703,10 +2725,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 } else {
                     //1.7.0-
                     this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
-                            this.getViewers().values()
-                                    .stream()
-                                    .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
-                                    .collect(Collectors.toList()));
+                            this.legacyMovementViewers());
                     //1.7.0+
                     this.broadcastMovement();
                 }
@@ -2850,6 +2869,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastYaw = location.getYaw();
         this.lastHeadYaw = location.getHeadYaw();
         this.lastPitch = location.getPitch();
+    }
+
+    private List<Player> legacyMovementViewers() {
+        Collection<Player> currentViewers = this.getViewers().values();
+        List<Player> legacyViewers = new ArrayList<>();
+        for (Player viewer : currentViewers) {
+            if (viewer.protocol < ProtocolInfo.v1_7_0) {
+                legacyViewers.add(viewer);
+            }
+        }
+        return legacyViewers;
     }
 
     @Override
@@ -3033,10 +3063,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.needSendRotation) {
                 //1.7.0-
                 this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
-                        this.getViewers().values()
-                                .stream()
-                                .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
-                                .collect(Collectors.toList()));
+                        this.legacyMovementViewers());
                 //1.7.0+
                 this.broadcastMovement();
                 this.needSendRotation = false;
@@ -8816,26 +8843,31 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.getLevel().addSound(new ExperienceOrbSound(this));
                 pickedXPOrb = server.getTick();
 
-                ArrayList<Integer> itemsWithMending = new ArrayList<>();
+                // Four armor slots, hand and offhand shield; keep discovery order.
+                int[] itemsWithMending = null;
+                int mendingCount = 0;
                 for (int i = 0; i < 4; i++) {
                     Item item = inventory.getArmorItem(i);
                     if (item.getDamage() != 0 && item.hasEnchantment(Enchantment.ID_MENDING)) {
-                        itemsWithMending.add(inventory.getSize() + i);
+                        if (itemsWithMending == null) itemsWithMending = new int[6];
+                        itemsWithMending[mendingCount++] = inventory.getSize() + i;
                     }
                 }
 
                 Item hand = inventory.getItemInHandFast();
                 if (hand.getDamage() != 0 && hand.hasEnchantment(Enchantment.ID_MENDING)) {
-                    itemsWithMending.add(inventory.getHeldItemIndex());
+                    if (itemsWithMending == null) itemsWithMending = new int[6];
+                    itemsWithMending[mendingCount++] = inventory.getHeldItemIndex();
                 }
 
                 Item offhand = this.getOffhandInventory().getItem(0);
                 if (offhand.getId() == Item.SHIELD && offhand.getDamage() != 0 && offhand.hasEnchantment(Enchantment.ID_MENDING)) {
-                    itemsWithMending.add(-1);
+                    if (itemsWithMending == null) itemsWithMending = new int[6];
+                    itemsWithMending[mendingCount++] = -1;
                 }
 
-                if (!itemsWithMending.isEmpty()) {
-                    int itemToRepair = itemsWithMending.get(ThreadLocalRandom.current().nextInt(itemsWithMending.size()));
+                if (mendingCount != 0) {
+                    int itemToRepair = itemsWithMending[ThreadLocalRandom.current().nextInt(mendingCount)];
                     boolean isOffhand = itemToRepair == -1;
 
                     Item toRepair = isOffhand ? offhand : this.inventory.getItem(itemToRepair);

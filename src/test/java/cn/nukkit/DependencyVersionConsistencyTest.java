@@ -234,35 +234,6 @@ public class DependencyVersionConsistencyTest {
      */
     private record DepInfo(String version, String source) {}
 
-    /**
-     * 打印依赖详情
-     */
-    @Test
-    public void printDependencyDetails() throws Exception {
-        Path pomPath = findPomXml();
-        Path tomlPath = findLibsVersionsToml();
-
-        String pomContent = Files.readString(pomPath);
-        String tomlContent = Files.readString(tomlPath);
-
-        Map<String, DepInfo> mavenDeps = parseMavenDependencies(pomContent);
-        Map<String, DepInfo> gradleDeps = parseGradleDependencies(tomlContent);
-
-        System.out.println("=== Maven 依赖 ===");
-        for (Map.Entry<String, DepInfo> entry : new TreeMap<>(mavenDeps).entrySet()) {
-            DepInfo info = gradleDeps.get(entry.getKey());
-            String status = info != null ? (info.version.equals(entry.getValue().version) ? "✓" : "✗") : "?";
-            System.out.println(status + " " + entry.getKey() + " = " + entry.getValue().version);
-        }
-
-        System.out.println("\n=== Gradle 依赖 ===");
-        for (Map.Entry<String, DepInfo> entry : new TreeMap<>(gradleDeps).entrySet()) {
-            DepInfo info = mavenDeps.get(entry.getKey());
-            String status = info != null ? (info.version.equals(entry.getValue().version) ? "✓" : "✗") : "?";
-            System.out.println(status + " " + entry.getKey() + " = " + entry.getValue().version + " (" + entry.getValue().source + ")");
-        }
-    }
-
     private Path findPomXml() throws Exception {
         Path current = Path.of(".");
         while (current != null) {

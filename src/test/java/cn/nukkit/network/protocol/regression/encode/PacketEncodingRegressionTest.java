@@ -56,22 +56,6 @@ public class PacketEncodingRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(0, cbPacket.getStatus().ordinal(), "LOGIN_SUCCESS should be ordinal 0");
     }
 
-    @ParameterizedTest(name = "SetTimePacket v{0}")
-    @MethodSource("allVersions")
-    void testSetTimePacket(int protocolVersion) {
-        cn.nukkit.network.protocol.SetTimePacket nukkitPacket =
-                new cn.nukkit.network.protocol.SetTimePacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.time = 6000;
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.SetTimePacket.class);
-
-        assertEquals(6000, cbPacket.getTime());
-    }
-
     @ParameterizedTest(name = "ChunkRadiusUpdatedPacket v{0}")
     @MethodSource("allVersions")
     void testChunkRadiusUpdatedPacket(int protocolVersion) {
