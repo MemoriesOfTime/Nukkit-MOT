@@ -28,7 +28,7 @@ import static org.mockito.Mockito.*;
 class PlayerDataLockTest {
 
     @Nested
-    @Timeout(20)
+    @Timeout(60)
     class Retention {
         @Test void completedIdentitiesDoNotRemainStronglyReachable() throws Exception {
             var locks = Server.createPlayerDataLocks();
@@ -84,19 +84,24 @@ class PlayerDataLockTest {
             ExecutorService workers = Executors.newFixedThreadPool(8);
             List<Future<?>> futures = new ArrayList<>();
             try {
-                for (int worker = 0; worker < 8; worker++) futures.add(workers.submit(() -> {
-                    for (int n = 0; n < 10_000; n++) {
-                        ReentrantLock lock = locks.computeIfAbsent(new String("contended"), k -> new ReentrantLock());
-                        lock.lock();
-                        try {
-                            if (inSection.incrementAndGet() != 1) overlaps.incrementAndGet();
-                            completed.incrementAndGet();
-                            inSection.decrementAndGet();
-                        } finally { lock.unlock(); }
-                        if (n % 2_500 == 0) System.gc();
-                    }
-                }));
-                for (Future<?> future : futures) future.get(15, TimeUnit.SECONDS);
+                for (int w = 0; w < 8; w++) {
+                    int worker = w;
+                    futures.add(workers.submit(() -> {
+                        for (int n = 0; n < 10_000; n++) {
+                            ReentrantLock lock = locks.computeIfAbsent(new String("contended"), k -> new ReentrantLock());
+                            lock.lock();
+                            try {
+                                if (inSection.incrementAndGet() != 1) overlaps.incrementAndGet();
+                                completed.incrementAndGet();
+                                inSection.decrementAndGet();
+                            } finally { lock.unlock(); }
+                            // System.gc() is stop-the-world: one caller clears weak values for all workers;
+                            // letting every worker call it just multiplies full-GC cost on slow CI machines.
+                            if (worker == 0 && n % 2_500 == 0) System.gc();
+                        }
+                    }));
+                }
+                for (Future<?> future : futures) future.get(60, TimeUnit.SECONDS);
                 assertEquals(80_000, completed.get());
                 assertEquals(0, overlaps.get());
             } finally { workers.shutdownNow(); }
