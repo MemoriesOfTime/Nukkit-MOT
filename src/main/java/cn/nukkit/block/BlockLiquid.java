@@ -359,19 +359,21 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                 ++z;
             }
             long hash = Level.blockHash(x, y, z, this.level.getDimensionData());
-            if (!this.flowCostVisited.containsKey(hash)) {
+            byte status = this.flowCostVisited.getOrDefault(hash, (byte) 2);
+            // The presence check preserves extension values stored in this protected map.
+            if (status == 2 && !this.flowCostVisited.containsKey(hash)) {
                 Block blockSide = this.level.getBlock(x, y, z);
                 if (!this.canFlowInto(blockSide)) {
-                    this.flowCostVisited.put(hash, BLOCKED);
+                    status = BLOCKED;
                 } else if (usesWaterLogging()?
                         this.level.getBlock(x, y - 1, z).canWaterloggingFlowInto() :
                         this.level.getBlock(x, y - 1, z).canBeFlowedInto()) {
-                    this.flowCostVisited.put(hash, CAN_FLOW_DOWN);
+                    status = CAN_FLOW_DOWN;
                 } else {
-                    this.flowCostVisited.put(hash, CAN_FLOW);
+                    status = CAN_FLOW;
                 }
+                this.flowCostVisited.put(hash, status);
             }
-            byte status = this.flowCostVisited.get(hash);
             if (status == BLOCKED) {
                 continue;
             } else if (status == CAN_FLOW_DOWN) {
