@@ -1797,8 +1797,8 @@ public class Server {
 
     private void checkTickUpdates(int currentTick) {
         if (this.alwaysTickPlayers) {
-            for (Player p : new ArrayList<>(this.players.values())) {
-                p.onUpdate(currentTick);
+            for (Object p : this.players.values().toArray()) {
+                ((Player) p).onUpdate(currentTick);
             }
         }
 
@@ -1918,8 +1918,8 @@ public class Server {
 
             this.checkTickUpdates(this.tickCounter);
 
-            for (Player player : new ArrayList<>(this.players.values())) {
-                player.checkNetwork();
+            for (Object player : this.players.values().toArray()) {
+                ((Player) player).checkNetwork();
             }
 
             if ((this.tickCounter & 0b1111) == 0) {

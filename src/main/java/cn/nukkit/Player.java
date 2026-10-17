@@ -8838,26 +8838,31 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.getLevel().addSound(new ExperienceOrbSound(this));
                 pickedXPOrb = server.getTick();
 
-                ArrayList<Integer> itemsWithMending = new ArrayList<>();
+                // Four armor slots, hand and offhand shield; keep discovery order.
+                int[] itemsWithMending = null;
+                int mendingCount = 0;
                 for (int i = 0; i < 4; i++) {
                     Item item = inventory.getArmorItem(i);
                     if (item.getDamage() != 0 && item.hasEnchantment(Enchantment.ID_MENDING)) {
-                        itemsWithMending.add(inventory.getSize() + i);
+                        if (itemsWithMending == null) itemsWithMending = new int[6];
+                        itemsWithMending[mendingCount++] = inventory.getSize() + i;
                     }
                 }
 
                 Item hand = inventory.getItemInHandFast();
                 if (hand.getDamage() != 0 && hand.hasEnchantment(Enchantment.ID_MENDING)) {
-                    itemsWithMending.add(inventory.getHeldItemIndex());
+                    if (itemsWithMending == null) itemsWithMending = new int[6];
+                    itemsWithMending[mendingCount++] = inventory.getHeldItemIndex();
                 }
 
                 Item offhand = this.getOffhandInventory().getItem(0);
                 if (offhand.getId() == Item.SHIELD && offhand.getDamage() != 0 && offhand.hasEnchantment(Enchantment.ID_MENDING)) {
-                    itemsWithMending.add(-1);
+                    if (itemsWithMending == null) itemsWithMending = new int[6];
+                    itemsWithMending[mendingCount++] = -1;
                 }
 
-                if (!itemsWithMending.isEmpty()) {
-                    int itemToRepair = itemsWithMending.get(ThreadLocalRandom.current().nextInt(itemsWithMending.size()));
+                if (mendingCount != 0) {
+                    int itemToRepair = itemsWithMending[ThreadLocalRandom.current().nextInt(mendingCount)];
                     boolean isOffhand = itemToRepair == -1;
 
                     Item toRepair = isOffhand ? offhand : this.inventory.getItem(itemToRepair);
