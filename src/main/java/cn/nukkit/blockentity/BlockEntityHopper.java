@@ -10,6 +10,7 @@ import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.FurnaceInventory;
 import cn.nukkit.inventory.HopperInventory;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.NativeComposterTransaction;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
@@ -383,23 +384,10 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
         }
 
         if (block instanceof BlockComposter composter) {
-            if (composter.isFull()) {
-                return false;
-            }
             for (int i = 0; i < inv.getSize(); i++) {
-                Item item = inv.getItem(i);
-                if (!item.isNull()) {
-                    Item itemToAdd = item.clone();
-                    itemToAdd.setCount(1);
-
-                    int chance = BlockComposter.getChance(itemToAdd);
-                    if (chance > 0 && composter.addItem(itemToAdd, null, chance)) {
-                        item.count--;
-                        inv.setItem(i, item);
-                        this.setDirty();
-                        return true;
-                    }
-                }
+                if (NativeComposterTransaction.fill(this, inv, i, composter,
+                        () -> this.getInventory() == inv && this.level.getBlockEntity(this) == this
+                                && (this.level.getBlockDataAt(x, y, z) & 0x7) == blockData)) return true;
             }
             return false;
         }

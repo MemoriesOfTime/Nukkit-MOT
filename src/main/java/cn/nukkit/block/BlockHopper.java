@@ -10,6 +10,7 @@ import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.FurnaceInventory;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.NativeComposterTransaction;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemHopper;
@@ -376,25 +377,8 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                 }
             } else {
                 if (block instanceof BlockComposter composter) {
-                    if (!composter.isFull()) {
-                        return false;
-                    }
-                    Item item = composter.empty();
-                    if (item == null || item.isNull()) {
-                        return false;
-                    }
-                    Item itemToAdd = item.clone();
-                    itemToAdd.setCount(1);
-                    if (!inventory.canAddItem(itemToAdd)) {
-                        return false;
-                    }
-                    InventoryMoveItemEvent ev = new InventoryMoveItemEvent(null, inventory, this, item, InventoryMoveItemEvent.Action.PICKUP);
-                    ev.call();
-                    if (ev.isCancelled()) {
-                        return false;
-                    }
-                    Item[] items = inventory.addItem(itemToAdd);
-                    return items.length < 1;
+                    return NativeComposterTransaction.pull(this, inventory, composter,
+                            () -> this.getInventory() == inventory);
                 }
             }
             return false;
