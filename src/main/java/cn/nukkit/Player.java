@@ -8619,6 +8619,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void setSprinting(boolean value, boolean send) {
         if (isSprinting() != value) {
             super.setSprinting(value);
+            // Metadata publication may synchronously change sprinting again.
+            if (isSprinting() != value) return;
             if (value) {
                 this.addMovementSpeedModifier(EntityMovementSpeedModifier.of(EntityMovementSpeedModifier.SPRINTING, 1.3f, EntityMovementSpeedModifier.Operation.MULTIPLY, send));
             } else {
