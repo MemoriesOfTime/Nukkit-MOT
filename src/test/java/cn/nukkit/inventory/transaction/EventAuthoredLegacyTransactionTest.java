@@ -12,6 +12,7 @@ import cn.nukkit.event.inventory.StonecutterItemEvent;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.action.*;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.network.protocol.types.NetworkInventoryAction;
@@ -34,10 +35,12 @@ class EventAuthoredLegacyTransactionTest {
     private PlayerInventory inventory;
     private PluginManager pluginManager;
     private Level level;
+    private static CraftingManager nativeRecipes;
 
     @BeforeAll
     static void init() {
         MockServer.init();
+        nativeRecipes = new CraftingManager();
     }
 
     @BeforeEach
@@ -45,11 +48,19 @@ class EventAuthoredLegacyTransactionTest {
         MockServer.reset();
         player = Mockito.mock(Player.class);
         player.craftingType = Player.CRAFTING_BIG;
+        player.protocol = 2193;
+        player.spawned = true;
+        Mockito.when(player.isAlive()).thenReturn(true);
+        Mockito.when(player.isOnline()).thenReturn(true);
+        Mockito.when(player.getGameVersion()).thenReturn(cn.nukkit.GameVersion.V1_26_50);
         ui = new PlayerUIInventory(player);
         inventory = new PlayerInventory(player);
         pluginManager = Mockito.mock(PluginManager.class);
         level = Mockito.mock(Level.class);
         player.level = level;
+        Mockito.when(player.getLevel()).thenReturn(level);
+        Mockito.when(MockServer.get().isPrimaryThread()).thenReturn(true);
+        Mockito.when(MockServer.get().getCraftingManager()).thenReturn(nativeRecipes);
 
         Mockito.when(player.getServer()).thenReturn(MockServer.get());
         Mockito.when(player.getName()).thenReturn("test");
@@ -67,7 +78,7 @@ class EventAuthoredLegacyTransactionTest {
             Item output = null;
             if (event instanceof CraftItemEvent e) {
                 output = e.getTransaction().getPrimaryOutput().clone();
-                output.setNamedTag(output.getOrCreateNamedTag().putString("km_origin", "kit:legacy"));
+                output.setNamedTag(output.getOrCreateNamedTag().putString("example:origin", "example:legacy"));
                 e.getTransaction().setPrimaryOutput(output);
                 return null;
             } else if (event instanceof RepairItemEvent e) {
@@ -82,7 +93,7 @@ class EventAuthoredLegacyTransactionTest {
                 output = e.getOutputItem();
             }
             if (output != null && !output.isNull()) {
-                output.setNamedTag(output.getOrCreateNamedTag().putString("km_origin", "kit:legacy"));
+                output.setNamedTag(output.getOrCreateNamedTag().putString("example:origin", "example:legacy"));
             }
             return null;
         }).when(pluginManager).callEvent(Mockito.any());
@@ -90,13 +101,17 @@ class EventAuthoredLegacyTransactionTest {
 
     @Test
     void craftingEventOutputRewritesAndExecutesRealSlotAction() {
+        Item input = Item.get(Item.WHEAT, 0, 3);
         Item output = Item.get(Item.BREAD, 0, 1);
+        CraftingGrid grid = ui.getBigCraftingGrid();
+        assertTrue(grid.setItem(0, input, false));
         List<InventoryAction> actions = new ArrayList<>();
+        actions.add(new CraftingTransferMaterialAction(Item.get(Item.AIR), input.clone(), 0));
         actions.add(new CraftingTakeResultAction(output.clone(), Item.get(Item.AIR)));
+        actions.add(new SlotChangeAction(grid, 0, input.clone(), Item.get(Item.AIR)));
         actions.add(delivery(0, output));
-        CraftingTransaction transaction = new CraftingTransaction(player, actions) {
-            @Override public boolean canExecute() { return true; }
-        };
+        CraftingTransaction transaction = new CraftingTransaction(player, actions);
+        assertTrue(transaction.canExecute());
 
         assertTrue(transaction.execute());
         assertDelivered(0);
@@ -106,12 +121,17 @@ class EventAuthoredLegacyTransactionTest {
     void anvilEventOutputRewritesAndExecutesRealSlotAction() {
         AnvilInventory anvil = new AnvilInventory(ui, position());
         bindWindow(Player.ANVIL_WINDOW_ID, anvil);
-        Item output = Item.get(Item.DIAMOND_SWORD, 10, 1);
+        Item input = Item.get(Item.DIAMOND_SWORD, 10, 1);
+        Item output = input.clone();
+        output.setCustomName("Renamed");
+        anvil.setCost(1);
+        assertTrue(anvil.setItem(0, input, false));
         RepairItemTransaction transaction = new RepairItemTransaction(player, List.of(
+                new RepairItemAction(Item.get(Item.AIR), input.clone(), NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT),
                 new RepairItemAction(output.clone(), Item.get(Item.AIR), NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT),
-                delivery(1, output))) {
-            @Override public boolean canExecute() { return true; }
-        };
+                new SlotChangeAction(anvil, 0, input.clone(), Item.get(Item.AIR)),
+                delivery(1, output)));
+        assertTrue(transaction.canExecute());
 
         assertTrue(transaction.execute());
         assertDelivered(1);
@@ -121,12 +141,16 @@ class EventAuthoredLegacyTransactionTest {
     void grindstoneEventOutputRewritesAndExecutesRealSlotAction() {
         GrindstoneInventory grindstone = new GrindstoneInventory(ui, position());
         bindWindow(Player.GRINDSTONE_WINDOW_ID, grindstone);
-        Item output = Item.get(Item.DIAMOND_SWORD, 10, 1);
+        Item input = Item.get(Item.DIAMOND_SWORD, 10, 1);
+        input.addEnchantment(Enchantment.getEnchantment(Enchantment.ID_DURABILITY).setLevel(1));
+        assertTrue(grindstone.setItem(0, input, false));
+        Item output = grindstone.getResult();
         GrindstoneTransaction transaction = new GrindstoneTransaction(player, List.of(
+                new GrindstoneItemAction(Item.get(Item.AIR), input.clone(), NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT),
                 new GrindstoneItemAction(output.clone(), Item.get(Item.AIR), NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT),
-                delivery(2, output))) {
-            @Override public boolean canExecute() { return true; }
-        };
+                new SlotChangeAction(grindstone, 0, input.clone(), Item.get(Item.AIR)),
+                delivery(2, output)));
+        assertTrue(transaction.canExecute());
 
         assertTrue(transaction.execute());
         assertDelivered(2);
@@ -195,6 +219,6 @@ class EventAuthoredLegacyTransactionTest {
     }
 
     private void assertDelivered(int slot) {
-        assertEquals("kit:legacy", inventory.getItem(slot).getNamedTag().getString("km_origin"));
+        assertEquals("example:legacy", inventory.getItem(slot).getNamedTag().getString("example:origin"));
     }
 }

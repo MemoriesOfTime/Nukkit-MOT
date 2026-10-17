@@ -17,6 +17,7 @@ import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
@@ -53,6 +54,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
     private int riptideLevel;
     private int impalingLevel;
     private boolean didHit;
+    private int loyaltyReturnDelay = -1;
 
     @Override
     public int getNetworkId() {
@@ -200,44 +202,137 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
         return 8;
     }
 
+    /**
+     * Loyalty return trajectory adapted from EaseCation/Nukkit 4ae1f9b2 (GPL-3.0).
+     * https://github.com/EaseCation/Nukkit/blob/4ae1f9b2f76724fd7a6c331e4c0bf99c1abff9d0/src/main/java/cn/nukkit/entity/projectile/EntityThrownTrident.java
+     */
     @Override
     public boolean onUpdate(int currentTick) {
         if (this.closed) {
             return false;
         }
-
+        if (currentTick <= this.lastUpdate && !this.justCreated) {
+            return true;
+        }
         if (this.age > 1200 && this.pickupMode < 1) {
             this.close();
             return false;
         }
 
+        int tickDiff = Math.max(1, currentTick - this.lastUpdate);
+        if (this.loyaltyReturnDelay >= 0) {
+            if (this.loyaltyLevel <= 0) {
+                this.loyaltyReturnDelay = -1;
+            } else if (!this.isReturnOwnerValid()) {
+                this.retireLoyaltyReturn();
+                return false;
+            }
+        }
+        if (!this.noClip && this.loyaltyLevel > 0 && this.isReturnOwnerValid()
+                && this.shootingEntity.level == this.level
+                && (this.y <= this.level.getMinBlockY() - 15
+                    || this.loyaltyReturnDelay >= 0 && (this.loyaltyReturnDelay -= tickDiff) <= 0)) {
+            this.beginLoyaltyReturn();
+        }
+        if (this.noClip) {
+            this.lastUpdate = currentTick;
+            if (!this.isReturnOwnerValid()) {
+                this.retireLoyaltyReturn();
+                return false;
+            }
+            // Loyalty cannot pursue its owner through a dimension change.
+            if (this.shootingEntity.level != this.level) {
+                return true;
+            }
+            Player owner = (Player) this.shootingEntity;
+            this.entityBaseTick(tickDiff);
+            if (this.closed) {
+                return false;
+            }
+            if (this.shootingEntity != owner || !this.isReturnOwnerValid() || owner.level != this.level) {
+                return true;
+            }
+            Vector3 previous = new Vector3(this.x, this.y, this.z);
+            Vector3 direction = owner.getEyePosition().subtract(this);
+            Vector3 velocity = this.getMotion().multiply(0.95)
+                    .add(direction.normalize().multiply(0.05 * this.loyaltyLevel));
+            Vector3 next = this.add(velocity).add(0, direction.y * 0.015 * this.loyaltyLevel, 0);
+            if (!this.setPosition(next)) {
+                return !this.closed;
+            }
+            Vector3 actual = new Vector3(this.x, this.y, this.z);
+            this.motionX = velocity.x * 0.99;
+            this.motionY = velocity.y * 0.99;
+            this.motionZ = velocity.z * 0.99;
+            this.updateRotation();
+            this.yaw = (this.yaw + 180) % 360;
+            this.updateMovement();
+
+            if (this.closed || this.shootingEntity != owner || !this.isReturnOwnerValid() || owner.level != this.level) {
+                return !this.closed;
+            }
+            AxisAlignedBB pickupBox = owner.getBoundingBox().grow(1.0, 0.5, 1.0);
+            if (pickupBox.isVectorInside(previous) || pickupBox.isVectorInside(actual)
+                    || pickupBox.calculateIntercept(previous, actual) != null) {
+                // Keep the native world-source claim and accepted inventory receipt.
+                owner.pickupEntity(this, true);
+            }
+            return !this.closed;
+        }
+
         if (this.isCollided && !this.hadCollision) {
             this.getLevel().addSound(this, Sound.ITEM_TRIDENT_HIT_GROUND);
         }
-
         boolean hasUpdate = super.onUpdate(currentTick);
-
         if (this.onGround || this.hadCollision) {
             this.setCritical(false);
         }
+        // A resting trident must remain scheduled while its block-impact delay elapses.
+        return hasUpdate || this.loyaltyReturnDelay >= 0;
+    }
 
-        if (this.noClip) {
-            if (this.canReturnToShooter()) {
-                Entity shooter = this.shootingEntity;
-                double force = 0.05d * (double) loyaltyLevel;
-                Vector3 vector3 = new Vector3(shooter.x - this.x, shooter.y + shooter.getEyeHeight() - this.y, shooter.z - this.z);
-                this.setPosition(new Vector3(this.x + vector3.x * force, this.y + vector3.y * force, this.z + vector3.z * force));
-                this.setMotion(vector3.multiply(force));
-                hasUpdate = true;
-            } else {
-                if (!this.closed && level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
-                    this.level.dropItem(this, this.trident);
-                }
-                this.close();
-            }
+    private void retireLoyaltyReturn() {
+        // Only ordinary recoverable projectiles may become an item on owner loss.
+        boolean recoverable = this.pickupMode == PICKUP_ANY;
+        Item item = this.trident;
+        this.close();
+        if (recoverable && item != null && !item.isNull()
+                && level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
+            this.level.dropItem(this, item);
         }
+    }
 
-        return hasUpdate;
+    private boolean isReturnOwnerValid() {
+        return this.shootingEntity instanceof Player shooter && !shooter.closed
+                && shooter.isAlive() && shooter.isOnline() && !shooter.isSpectator();
+    }
+
+    private void beginLoyaltyReturn() {
+        this.noClip = true;
+        this.onGround = false;
+        this.isCollided = false;
+        this.hadCollision = false;
+        this.didHit = true;
+        this.loyaltyReturnDelay = -1;
+        this.getLevel().addSound(this, Sound.ITEM_TRIDENT_RETURN);
+        this.setTridentRope(true);
+    }
+
+    @Override
+    public boolean canCollideWith(Entity entity) {
+        return !this.noClip && !this.didHit && super.canCollideWith(entity);
+    }
+
+    @Override
+    public boolean attack(EntityDamageEvent source) {
+        return !this.noClip && super.attack(source);
+    }
+
+    @Override
+    protected void checkBlockCollision() {
+        if (!this.noClip) {
+            super.checkBlockCollision();
+        }
     }
 
     @Override
@@ -286,10 +381,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
         }
 
         if (this.canReturnToShooter()) {
-            this.getLevel().addSound(this, Sound.ITEM_TRIDENT_RETURN);
-            this.setNoClip(true);
-            this.hadCollision = false;
-            this.setTridentRope(true);
+            this.beginLoyaltyReturn();
         }
     }
 
@@ -306,9 +398,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
         super.onHitGround(vector3);
         this.setStuckToBlockPos(new BlockVector3(vector3.getFloorX(), vector3.getFloorY(), vector3.getFloorZ()));
         if (this.canReturnToShooter()) {
-            this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ITEM_TRIDENT_RETURN);
-            this.noClip = true;
-            this.setTridentRope(true);
+            this.loyaltyReturnDelay = 5;
         }
     }
 
@@ -436,9 +526,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
 
         Entity shooter = this.shootingEntity;
         if (shooter != null) {
-            if (shooter.isAlive() && shooter instanceof Player) {
-                return !(((Player) shooter).isSpectator());
-            }
+            return this.isReturnOwnerValid() && shooter.level == this.level;
         }
         return false;
     }
