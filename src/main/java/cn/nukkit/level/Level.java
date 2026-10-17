@@ -1349,18 +1349,7 @@ public class Level implements ChunkManager, Metadatable {
             this.reportBlockUpdateLoad(fuseTripped);
         }
 
-        if (!this.updateEntities.isEmpty()) {
-            for (long id : this.updateEntities.keySetLong()) {
-                Entity entity = this.updateEntities.get(id);
-                if (entity == null) {
-                    this.updateEntities.remove(id);
-                    continue;
-                }
-                if (!this.updateEntity(entity, currentTick)) {
-                    this.updateEntities.remove(id);
-                }
-            }
-        }
+        this.tickEntities(currentTick);
 
         this.reportEntityActivation();
 
@@ -1465,6 +1454,38 @@ public class Level implements ChunkManager, Metadatable {
             packet.gameRulesMap = gameRules.getGameRules();
             Server.broadcastPacket(players.values().toArray(Player.EMPTY_ARRAY), packet);
             gameRules.refresh();
+        }
+    }
+
+    // Retain at most 128 KiB per level; unusually large snapshots keep their old allocation cost.
+    private static final int MAX_RETAINED_ENTITY_TICK_KEYS = 16_384;
+    private long[] entityTickKeys;
+
+    /** Materialize keys before callbacks, retaining fresh lookups and the old size-bound snapshot. */
+    void tickEntities(int currentTick) {
+        if (this.updateEntities.isEmpty()) return;
+        long[] keys = this.entityTickKeys;
+        // A callback may reenter: the nested update must never overwrite the outer snapshot.
+        this.entityTickKeys = null;
+        try {
+            int count = this.updateEntities.size();
+            if (keys == null || keys.length < count) keys = new long[count];
+            var iterator = this.updateEntities.fastKeyIterator();
+            int copied = 0;
+            while (copied < count && iterator.hasNext()) keys[copied++] = iterator.nextLong();
+            // keySetLong also zero-pads when concurrent removals shorten its traversal.
+            Arrays.fill(keys, copied, count, 0L);
+            for (int i = 0; i < count; i++) {
+                long id = keys[i];
+                Entity entity = this.updateEntities.get(id);
+                if (entity == null) {
+                    this.updateEntities.remove(id);
+                    continue;
+                }
+                if (!this.updateEntity(entity, currentTick)) this.updateEntities.remove(id);
+            }
+        } finally {
+            if (keys != null && keys.length <= MAX_RETAINED_ENTITY_TICK_KEYS) this.entityTickKeys = keys;
         }
     }
 
