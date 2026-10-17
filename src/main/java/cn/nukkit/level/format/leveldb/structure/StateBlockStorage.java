@@ -60,6 +60,11 @@ public class StateBlockStorage {
     private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
     // Snapshot acknowledgements must also notice public storage mutations that bypass section setters.
+
+    /**
+     * Bumped by every change of the stored states. Whoever read cells together with a version knows
+     * they still hold while {@link #getVersion()} returns the same value (the collision scan cache).
+     */
     private volatile int version;
     private volatile NetworkSnapshot networkSnapshot;
     private boolean networkCacheable = true;
@@ -137,6 +142,7 @@ public class StateBlockStorage {
         }
 
         this.palette.clear();
+        this.version++;
 
         BitArrayVersion version = BitArrayVersion.get(header >> 1, true);
 
@@ -250,6 +256,7 @@ public class StateBlockStorage {
         }
     }
 
+    /** See {@link #version}. */
     public int getVersion() {
         return this.version;
     }
@@ -536,6 +543,7 @@ public class StateBlockStorage {
             break;
         }
         if (noBlock) {
+            this.version++;
             this.networkSnapshot = null;
             BlockStateSnapshot firstId = this.palette.get(0);
             this.palette.clear();
