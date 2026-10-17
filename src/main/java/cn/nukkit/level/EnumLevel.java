@@ -23,10 +23,19 @@ public enum EnumLevel {
     /**
      * Get Level
      *
-     * @return Level or null if the dimension is not enabled
+     * @return Level, or null if the dimension is disabled or its registered level has closed
      */
     public Level getLevel() {
         return level;
+    }
+
+    /** Release only the instance that actually closed; preserve an already-loaded replacement. */
+    static void onLevelClosed(Level closedLevel) {
+        for (EnumLevel dimension : values()) {
+            if (dimension.level == closedLevel) {
+                dimension.level = null;
+            }
+        }
     }
 
     /**
