@@ -65,13 +65,19 @@ public final class ItemStackRequestHandler {
     private ItemStackRequestHandler() {
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "try"})
     public static void handleRequests(Player player, List<ItemStackRequest> requests) {
         List<ItemStackResponse> responses = new ArrayList<>();
 
         for (ItemStackRequest request : requests) {
             ItemStackRequestAction[] actions = request.getActions();
             ItemStackRequestContext context = new ItemStackRequestContext(request);
+            try (NativeItemStackRequestOwnership ownership =
+                         NativeItemStackRequestOwnership.acquire(player, actions, context)) {
+            if (!ownership.ready()) {
+                responses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR, request.getRequestId(), List.of()));
+                continue;
+            }
             List<ItemStackResponseContainer> responseContainers = new ArrayList<>();
             Set<Inventory> affectedInventories = new LinkedHashSet<>();
             Set<NetworkMapping.BundleHolderRef> affectedBundleOuters = new LinkedHashSet<>();
@@ -83,6 +89,10 @@ public final class ItemStackRequestHandler {
                 context.setCurrentActionIndex(i);
                 affectedInventories.addAll(resolveAffectedInventories(player, action));
                 affectedBundleOuters.addAll(resolveAffectedBundleOuters(player, action));
+                for (NetworkMapping.BundleHolderRef ref : affectedBundleOuters) {
+                    affectedInventories.add(ref.outer());
+                    for (ItemBundle bundle : ref.chain()) affectedInventories.add(bundle.getInventory());
+                }
                 captureSnapshots(snapshots, affectedInventories);
 
                 ItemStackRequestActionProcessor<ItemStackRequestAction> processor =
@@ -114,6 +124,10 @@ public final class ItemStackRequestHandler {
                     }
 
                     ActionResponse response = processor.handle(action, player, context);
+                    if (!ownership.metadataMatches()) {
+                        error = true;
+                        break;
+                    }
                     if (response == null) {
                         continue;
                     }
@@ -122,7 +136,7 @@ public final class ItemStackRequestHandler {
                         break;
                     }
                     responseContainers.addAll(response.containers());
-                } catch (Exception e) {
+                } catch (Exception | Error e) {
                     log.error("{}: error processing item stack request action {}", player.getName(), action.getType(), e);
                     error = true;
                     break;
@@ -140,6 +154,7 @@ public final class ItemStackRequestHandler {
             }
 
             if (error) {
+                ownership.restoreMetadata();
                 rollbackSnapshots(snapshots, context.getPluginModifiedSlots());
                 resyncActor(player, snapshots.keySet());
             }
@@ -152,6 +167,7 @@ public final class ItemStackRequestHandler {
                     request.getRequestId(),
                     error ? List.of() : compactContainers(responseContainers)
             ));
+            }
         }
 
         ItemStackResponsePacket packet = new ItemStackResponsePacket();
