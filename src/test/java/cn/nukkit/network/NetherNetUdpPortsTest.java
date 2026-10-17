@@ -3,6 +3,7 @@ package cn.nukkit.network;
 import cn.nukkit.lang.BaseLang;
 import io.netty.channel.EventLoop;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
 import org.junit.jupiter.api.Test;
 import tel.schich.libdatachannel.PeerConnectionConfiguration;
 
@@ -275,7 +276,7 @@ class NetherNetUdpPortsTest {
 
         assertNotNull(decorated);
         assertNotSame(signaling, decorated);
-        decorated.sendFullSdp("peer", "a=candidate:1 1 UDP 2130706431 192.168.1.5 32000 typ host\r\n");
+        decorated.sendDescription("peer", "a=candidate:1 1 UDP 2130706431 192.168.1.5 32000 typ host\r\n");
         assertNotNull(signaling.lastSdp, "the wrapper delegates the answer onward");
         assertTrue(signaling.lastSdp.contains(" 19132 typ host"), "the delegated answer carries the external port");
     }
@@ -293,7 +294,7 @@ class NetherNetUdpPortsTest {
         String lastSdp;
 
         @Override
-        public void sendFullSdp(String targetNetworkId, String sdp) {
+        public void sendDescription(String targetNetworkId, String sdp) {
             this.lastSdp = sdp;
         }
 
@@ -310,11 +311,11 @@ class NetherNetUdpPortsTest {
         }
 
         @Override
-        public void setSignalHandler(long connectionId, SignalHandler handler) {
+        public void setSignalHandler(String connectionId, SignalHandler handler) {
         }
 
         @Override
-        public void removeSignalHandler(long connectionId) {
+        public void removeSignalHandler(String connectionId) {
         }
 
         @Override
