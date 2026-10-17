@@ -22,7 +22,7 @@ public class PlaySoundPacket extends DataPacket {
      */
     public long loopCount;
     /**
-     * v2192 起在 loopCount 与 serverSoundHandle 之间插入 / inserted between loopCount and serverSoundHandle since v2192
+     * @since v2192 v1_26_50_27
      */
     public boolean bypassListenerRangeCheck;
     /**
@@ -48,16 +48,12 @@ public class PlaySoundPacket extends DataPacket {
         this.putLFloat(this.volume);
         this.putLFloat(this.pitch);
         if (protocol >= ProtocolInfo.v1_26_50_27) {
-            if (protocol >= ProtocolInfo.v1_26_50) {
-                this.putVarInt((int) this.loopCount);
-            } else {
-                this.putUnsignedVarInt(this.loopCount);
-            }
+            this.putVarInt((int) this.loopCount);
             this.putBoolean(this.bypassListenerRangeCheck);
             this.putOptionalNull(this.serverSoundHandle, this::putLLong);
             this.putOptionalNull(this.playbackPositionSeconds, this::putLFloat);
         } else if (protocol >= ProtocolInfo.v1_26_40) {
-            this.putUnsignedVarInt(this.loopCount);
+            this.putVarInt((int) this.loopCount);
             this.putOptionalNull(this.serverSoundHandle, this::putLLong);
         } else if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.putOptionalNull(this.serverSoundHandle, this::putLLong);
