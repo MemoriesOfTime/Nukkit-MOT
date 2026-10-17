@@ -3,6 +3,7 @@ package cn.nukkit.level.format.leveldb;
 import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
@@ -38,6 +39,7 @@ import org.iq80.leveldb.*;
 
 import javax.annotation.Nullable;
 import java.io.*;
+import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -50,6 +52,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -85,6 +88,8 @@ public class LevelDBProvider implements LevelProvider {
     // 读锁保护异步读，写锁保护 DB 关闭。/ Read lock guards reads; write lock guards DB close.
     private final ReadWriteLock dbReadCloseLock = new ReentrantReadWriteLock();
     private final ExecutorService executor;
+    /** Latest serialized level.dat not yet on disk; the writer thread (or close) takes it. */
+    private final AtomicReference<byte[]> pendingLevelDat = new AtomicReference<>();
 
     // 每区块单写槽：新 batch 覆盖旧 batch，读取前先落盘。
     // One slot per chunk: newest batch wins and commits before reads.
@@ -117,6 +122,7 @@ public class LevelDBProvider implements LevelProvider {
         final ReentrantLock commitLock = new ReentrantLock();
         WriteBatch batch;
         EntitySerializer.Cleanup cleanup;
+        List<LevelDBChunkSection.SaveToken> sections;
         long sequence;
         volatile long durableSequence;
         boolean writing;
@@ -313,8 +319,29 @@ public class LevelDBProvider implements LevelProvider {
                 .createIfMissing(true)
                 .compressionType(CompressionType.ZLIB_RAW)
                 .cacheSize(1024L * 1024L * Server.getInstance().levelDbCache)
+                .writeBufferSize(1024 * 1024 * writeBufferSizeMb(getTotalPhysicalMemory()))
                 .blockSize(64 * 1024);
         return Server.getInstance().useNativeLevelDB ? LevelDB.PROVIDER.open(dir, options) : JAVA_LDB_PROVIDER.open(dir, options);
+    }
+
+    static int writeBufferSizeMb(long totalMemoryBytes) {
+        long gib = 1024L * 1024L * 1024L;
+        if (totalMemoryBytes < gib) {
+            return 2;
+        } else if (totalMemoryBytes <= 2 * gib) {
+            return 4;
+        } else if (totalMemoryBytes <= 6 * gib) {
+            return 8;
+        }
+        return 16;
+    }
+
+    private static long getTotalPhysicalMemory() {
+        var operatingSystem = ManagementFactory.getOperatingSystemMXBean();
+        if (operatingSystem instanceof com.sun.management.OperatingSystemMXBean systemBean) {
+            return systemBean.getTotalMemorySize();
+        }
+        return Runtime.getRuntime().maxMemory();
     }
 
     private void migrateLegacyNukkitFinalizationStates() {
@@ -512,13 +539,47 @@ public class LevelDBProvider implements LevelProvider {
     public void saveLevelData() {
         updateLevelData(levelData);
 
-        try (OutputStream stream = Files.newOutputStream(Paths.get(path, "level.dat"))) {
+        // Serialize on the caller (it owns levelData); the file IO goes to the provider's writer
+        // thread. Autosave used to truncate and rewrite level.dat on MAIN, and a truncate waits
+        // for the filesystem journal: on a busy HDD that held the tick for 5 s.
+        byte[] image;
+        try {
             byte[] data = NBTIO.write(levelData, ByteOrder.LITTLE_ENDIAN);
-            stream.write(Binary.writeLInt(CURRENT_STORAGE_VERSION));
-            stream.write(Binary.writeLInt(data.length));
-            stream.write(data);
+            image = new byte[8 + data.length];
+            System.arraycopy(Binary.writeLInt(CURRENT_STORAGE_VERSION), 0, image, 0, 4);
+            System.arraycopy(Binary.writeLInt(data.length), 0, image, 4, 4);
+            System.arraycopy(data, 0, image, 8, data.length);
         } catch (IOException e) {
             throw new RuntimeException("Unable to save level.dat: " + path, e);
+        }
+        if (this.pendingLevelDat.getAndSet(image) != null) {
+            return; // A queued write has not started yet; it will take this newer image.
+        }
+        ExecutorService writer = this.executor;
+        if (writer != null) {
+            try {
+                // Single writer thread: saves land in call order; close() writes what is left.
+                writer.execute(() -> this.writePendingLevelDat(false));
+                return;
+            } catch (RejectedExecutionException closing) {
+                // Provider closing: write on the caller as before.
+            }
+        }
+        this.writePendingLevelDat(true);
+    }
+
+    /** Replaces level.dat through a sibling file, so a crash never leaves it truncated. */
+    private void writePendingLevelDat(boolean rethrow) {
+        byte[] image = this.pendingLevelDat.getAndSet(null);
+        if (image == null) return;
+        Path target = Paths.get(path, "level.dat");
+        Path temporary = target.resolveSibling("level.dat.tmp");
+        try {
+            Files.write(temporary, image);
+            Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            if (rethrow) throw new RuntimeException("Unable to save level.dat: " + path, e);
+            log.error("Unable to save level.dat: {}", path, e);
         }
     }
 
@@ -830,6 +891,7 @@ public class LevelDBProvider implements LevelProvider {
                 }
                 pw.batch = batch;
                 pw.cleanup = captured.cleanup();
+                pw.sections = captured.sections();
                 pw.sequence++;
                 ticket[0] = new PendingWriteTicket(pw, pw.sequence);
                 pw.changeSnapshot = snapshot;
@@ -844,7 +906,24 @@ public class LevelDBProvider implements LevelProvider {
             return pw;
         });
         this.warnOnPendingWriteBacklog();
+        Server.getInstance().touchShutdownProgress();
         return ticket[0];
+    }
+
+    /**
+     * 槽位里已有与区块当前版本一致的待写批次(排队中或写入中)。/ A slot holds a queued or writing batch matching the chunk's current version.
+     */
+    private boolean isPendingWriteCurrent(long hash, LevelDBChunk chunk) {
+        PendingWrite pw = this.pendingWrites.get(hash);
+        if (pw == null) {
+            return false;
+        }
+        pw.lock.lock();
+        try {
+            return (pw.batch != null || pw.writing) && pw.changeSnapshot == chunk.getChanges();
+        } finally {
+            pw.lock.unlock();
+        }
     }
 
     /**
@@ -927,11 +1006,13 @@ public class LevelDBProvider implements LevelProvider {
         WriteBatch batch = pw.batch;
         if (batch == null) return PendingWriteCommit.COMMITTED;
         EntitySerializer.Cleanup cleanup = pw.cleanup;
+        List<LevelDBChunkSection.SaveToken> sections = pw.sections;
         long sequence = pw.sequence;
         long changeSnapshot = pw.changeSnapshot;
         LevelDBChunk chunk = pw.chunkRef;
         pw.batch = null;
         pw.cleanup = null;
+        pw.sections = null;
         pw.writing = true;
         Throwable error = null;
         pw.lock.unlock();
@@ -943,13 +1024,20 @@ public class LevelDBProvider implements LevelProvider {
                 }
             }
             this.db.write(batch);
+            // Metadata is unlocked, and ACK never waits for a section writer. A successful
+            // older in-flight batch may acknowledge unchanged sections even if superseded.
+            if (sections != null) sections.forEach(LevelDBChunkSection.SaveToken::acknowledge);
         } catch (Exception failure) {
             error = failure;
         } finally {
             pw.lock.lock();
             pw.writing = false;
         }
-        if (error == null) pw.durableSequence = Math.max(pw.durableSequence, sequence);
+        if (error == null) {
+            pw.durableSequence = Math.max(pw.durableSequence, sequence);
+            // drain 阶段 watchdog 仅靠此处心跳。/ The drain's only heartbeat for the watchdog.
+            Server.getInstance().touchShutdownProgress();
+        }
         if (pw.sequence != sequence) {
             // A newer main-thread snapshot owns the metadata/retry budget now. It will be
             // committed next; never restore an older failed batch over it or clear its changes.
@@ -968,6 +1056,7 @@ public class LevelDBProvider implements LevelProvider {
             pw.retries++;
             pw.batch = batch;
             pw.cleanup = cleanup;
+            pw.sections = sections;
             log.warn("Chunk write failed for {} at {}, {} (retry {}/{})", this.getName(),
                     Level.getHashX(hash), Level.getHashZ(hash), pw.retries, MAX_PENDING_WRITE_RETRIES, error);
             return PendingWriteCommit.RETRY;
@@ -975,6 +1064,7 @@ public class LevelDBProvider implements LevelProvider {
         if (pw.failed || this.tryReserveFailedWrite(pw)) {
             pw.batch = batch;
             pw.cleanup = cleanup;
+            pw.sections = sections;
             log.warn("Chunk write remains pending for {} at {}, {} after {} retries: {}", this.getName(),
                     Level.getHashX(hash), Level.getHashZ(hash), MAX_PENDING_WRITE_RETRIES, error.toString());
         } else {
@@ -1132,13 +1222,16 @@ public class LevelDBProvider implements LevelProvider {
         return this.getActivePendingWriteCount() >= Server.getInstance().maxPendingChunkWrites;
     }
 
-    private record CapturedBatch(WriteBatch batch, EntitySerializer.Cleanup cleanup) {}
+    private record CapturedBatch(WriteBatch batch, EntitySerializer.Cleanup cleanup,
+                                 List<LevelDBChunkSection.SaveToken> sections) {}
 
     private CapturedBatch save0(int chunkX, int chunkZ, LevelDBChunk chunk) {
+        chunk.prepareStorageSave();
         WriteBatch writeBatch = this.db.createWriteBatch();
+        List<LevelDBChunkSection.SaveToken> sections = new ArrayList<>();
 
         if (chunk.isSubChunksDirty()) {
-            ChunkSerializers.serializeChunk(writeBatch, chunk, CURRENT_LEVEL_CHUNK_VERSION);
+            ChunkSerializers.serializeChunk(writeBatch, chunk, CURRENT_LEVEL_CHUNK_VERSION, sections::add);
         }
 
         if (chunk.isHeightmapOrBiomesDirty()) {
@@ -1184,7 +1277,7 @@ public class LevelDBProvider implements LevelProvider {
                 || (deferredBlockUpdates != null && !deferredBlockUpdates.isEmpty())) {
             NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, deferredBlockUpdates, currentTick);
             if (ticks != null) {
-                ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+                ByteBuf byteBuf = Unpooled.buffer();
                 try {
                     try (NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf))) {
                         outputStream.writeTag(ticks);
@@ -1221,7 +1314,7 @@ public class LevelDBProvider implements LevelProvider {
         writeBatch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ, this.level.getDimension()));
         writeBatch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ, this.level.getDimension()));
 
-        return new CapturedBatch(writeBatch, entityCleanup);
+        return new CapturedBatch(writeBatch, entityCleanup, List.copyOf(sections));
     }
 
     @Override
@@ -1245,17 +1338,22 @@ public class LevelDBProvider implements LevelProvider {
             if (wait) {
                 // 单个区块失败不得中断其余区块的保存。/ One failing chunk must not abort the remaining saves.
                 try {
-                    // 先提交挂起写，避免关闭时重复序列化。/ Commit pending data before close-time save.
-                    this.commitPendingWrite(Level.chunkHash(chunk.getX(), chunk.getZ()));
-                    // 落盘后仍脏才同步重存。/ Sync-save only if still dirty.
-                    if (chunk.hasChanged()) {
-                        this.saveChunkSync(chunk.getX(), chunk.getZ(), chunk);
+                    // 关服路径只排队快照,落盘交单线程 executor 串行执行;主线程同步 db.write 会被 write stall 挂起。
+                    // The close path only stages snapshots; writes go to the single-thread executor,
+                    // since a synchronous db.write on the main thread hangs on write stalls.
+                    long hash = Level.chunkHash(chunk.getX(), chunk.getZ());
+                    if (chunk.isGenerated() && chunk.hasChanged() && !this.isPendingWriteCurrent(hash, chunk)) {
+                        this.stagePendingWrite(hash, chunk.getX(), chunk.getZ(), chunk, true);
+                        this.executor.execute(() -> this.commitPendingWrite(hash));
                     }
                 } catch (Exception e) {
-                    log.error("Failed to save chunk {}, {} during close for: {}", chunk.getX(), chunk.getZ(), this.getName(), e);
+                    log.error("Failed to stage chunk {}, {} during close for: {}", chunk.getX(), chunk.getZ(), this.getName(), e);
                 }
+                // 保存已显式排队,跳过卸载的内嵌保存避免重复序列化。/ Saving was staged above; skip the unload's own save.
+                chunk.unload(false, false);
+            } else {
+                chunk.unload(level.isSaveOnUnloadEnabled(), false);
             }
-            chunk.unload(level.isSaveOnUnloadEnabled(), false);
             iterator.remove();
         }
     }
@@ -1438,6 +1536,9 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private synchronized LevelDBChunk readOrCreateChunk(int chunkX, int chunkZ, boolean create) {
+        if (this.closed) {
+            return null;
+        }
         // 读取前提交挂起写。/ Commit pending data before reading.
         this.commitPendingWrite(Level.chunkHash(chunkX, chunkZ));
         LevelDBChunk chunk = null;
@@ -1481,7 +1582,27 @@ public class LevelDBProvider implements LevelProvider {
             this.executor.shutdown();
             boolean drained = false;
             try {
-                drained = this.executor.awaitTermination(this.closeDrainTimeoutMillis, TimeUnit.MILLISECONDS);
+                // 轮询本身不算进度:心跳只来自 executor 的每次落盘,否则 executor 真死会被误判为健康。
+                // Polling is not progress: the heartbeat comes only from executor commits, or a dead executor looks healthy.
+                long drainDeadline = System.currentTimeMillis() + this.closeDrainTimeoutMillis;
+                // 首条 5 秒内即出,避免序列化后紧接着又一段静默。/ First line lands within 5s to avoid another silent gap after serialization.
+                long lastDrainLog = System.currentTimeMillis() - 25000;
+                while (!(drained = this.executor.awaitTermination(Math.max(1L,
+                        Math.min(5000L, drainDeadline - System.currentTimeMillis())), TimeUnit.MILLISECONDS))) {
+                    if (System.currentTimeMillis() >= drainDeadline) {
+                        break;
+                    }
+                    if (System.currentTimeMillis() - lastDrainLog >= 30000) {
+                        lastDrainLog = System.currentTimeMillis();
+                        // 传 String[] 走 varargs 重载;三个散参 String 会被 (String,String,String) 重载
+                        // 当作 onlyPrefix 吞掉,导致输出键名而非翻译
+                        // Pass a String[] for the varargs overload; three loose Strings hit the
+                        // (String,String,String) overload, which treats the count as onlyPrefix
+                        // and prints the raw key instead of the translation
+                        log.info(Server.getInstance().getLanguage().translateString("nukkit.shutdown.waitingWrites",
+                                new String[]{this.getName(), String.valueOf(this.pendingWrites.size())}));
+                    }
+                }
                 if (!drained) {
                     log.warn("LevelDB executor did not terminate in time, forcing shutdown for: {}", this.getName());
                     java.util.List<Runnable> droppedTasks = this.executor.shutdownNow();
@@ -1495,6 +1616,8 @@ public class LevelDBProvider implements LevelProvider {
             } catch (InterruptedException e) {
                 this.executor.shutdownNow();
             }
+            // A level.dat write dropped by a forced shutdown (or never queued) still lands.
+            this.writePendingLevelDat(false);
             // 限时抢救残留 batch；持续故障时每槽写入可能耗时数秒，故两条路径共用同一预算。
             // Flush leftover batches within a budget; a sustained fault costs seconds per slot, so both paths share it.
             long deadline = System.currentTimeMillis() + this.closeSweepBudgetMillis;
@@ -1508,6 +1631,7 @@ public class LevelDBProvider implements LevelProvider {
                     // 单个槽位失败不得中断其余槽位的排空。/ One failing slot must not abort the remaining flushes.
                     try {
                         this.commitPendingWrite(hash);
+                        Server.getInstance().touchShutdownProgress();
                     } catch (DBException e) {
                         log.error("Failed to flush pending chunk write at {}, {} during close for: {}",
                                 Level.getHashX(hash), Level.getHashZ(hash), this.getName(), e);
@@ -1524,6 +1648,8 @@ public class LevelDBProvider implements LevelProvider {
                     if (System.currentTimeMillis() >= deadline
                             || !this.tryCommitPendingWrite(hash, this.closeSweepLockTimeoutMillis)) {
                         abandoned++;
+                    } else {
+                        Server.getInstance().touchShutdownProgress();
                     }
                 }
                 if (abandoned > 0) {
@@ -1737,12 +1863,14 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public int getMinBlockY() {
-        return this.level.getDimensionData().getMinHeight();
+        Level levelTemp = this.level;
+        return (levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData()).getMinHeight();
     }
 
     @Override
     public int getMaxBlockY() {
-        return this.level.getDimensionData().getMaxHeight();
+        Level levelTemp = this.level;
+        return (levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData()).getMaxHeight();
     }
 
     protected static BlockVector3 deserializeExtraDataKey(int chunkVersion, int key) {

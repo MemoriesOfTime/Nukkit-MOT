@@ -13,6 +13,7 @@ import cn.nukkit.network.protocol.types.AuthoritativeMovementMode;
 import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Binary;
+import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.NbtMapDeserializer;
 import cn.nukkit.utils.Utils;
 import com.google.gson.GsonBuilder;
@@ -58,6 +59,9 @@ public class StartGamePacket extends DataPacket {
      */
     private static final List<BlockPropertyData> vanillaBlockProperties;
 
+    // Private, protocol-independent network NBT. Preserve JSON order and keep custom data dynamic.
+    private static final byte[] vanillaBlockPropertyBytes;
+
     @Value
     private static class BlockPropertyData {
         String name;
@@ -73,6 +77,12 @@ public class StartGamePacket extends DataPacket {
                     .registerTypeAdapter(NbtMap.class, new NbtMapDeserializer())
                     .create()
                     .fromJson(reader, type);
+            BinaryStream compiled = new BinaryStream();
+            for (BlockPropertyData data : vanillaBlockProperties) {
+                compiled.putString(data.name);
+                compiled.putNbtTag(data.properties);
+            }
+            vanillaBlockPropertyBytes = compiled.getBuffer();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -446,9 +456,14 @@ public class StartGamePacket extends DataPacket {
                 // Since v2192 vanilla data-driven block properties and custom blocks share one list
                 boolean hasCustomBlocks = this.blockDefinitions != null && !this.blockDefinitions.isEmpty();
                 this.putUnsignedVarInt(vanillaBlockProperties.size() + (hasCustomBlocks ? this.blockDefinitions.size() : 0));
-                for (BlockPropertyData data : vanillaBlockProperties) {
-                    this.putString(data.name);
-                    this.putNbtTag(data.properties);
+                if (this.getClass() == StartGamePacket.class) {
+                    this.put(vanillaBlockPropertyBytes);
+                } else {
+                    // Packet subclasses retain their existing virtual string/NBT writer hooks.
+                    for (BlockPropertyData data : vanillaBlockProperties) {
+                        this.putString(data.name);
+                        this.putNbtTag(data.properties);
+                    }
                 }
                 if (hasCustomBlocks) {
                     for (CustomBlockDefinition definition : this.blockDefinitions) {

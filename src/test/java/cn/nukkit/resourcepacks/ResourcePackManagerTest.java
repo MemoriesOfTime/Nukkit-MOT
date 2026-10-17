@@ -18,10 +18,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class ResourcePackManagerTest {
 
@@ -32,7 +29,7 @@ class ResourcePackManagerTest {
     void setUp() {
         MockServer.reset();
         BaseLang language = mock(BaseLang.class);
-        when(language.translateString(any(String.class), any(Object[].class))).thenReturn("loaded");
+        when(language.translateString(any(String.class), any(String[].class))).thenReturn("loaded");
         when(Server.getInstance().getLanguage()).thenReturn(language);
     }
 

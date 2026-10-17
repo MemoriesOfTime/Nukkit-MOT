@@ -4,6 +4,9 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.custom.container.BlockStorageContainer;
+import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.Level;
+import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
@@ -24,6 +27,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_DATA_ARRAY;
 import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_ID_ARRAY;
@@ -31,7 +35,7 @@ import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_ID_ARRAY;
 @Log4j2
 public class LevelDBChunkSection implements ChunkSection {
 
-    private WeakReference<LevelDBChunk> parent;
+    private volatile WeakReference<LevelDBChunk> parent;
 
     protected final int y;
     protected StateBlockStorage[] storages;
@@ -45,6 +49,9 @@ public class LevelDBChunkSection implements ChunkSection {
 
 
     protected boolean dirty;
+    private long saveRevision;
+    private boolean wasAttached;
+    private SaveToken savedToken;
 
     protected ReadWriteLock lock = new ReentrantReadWriteLock();
     protected Lock readLock = lock.readLock();
@@ -123,11 +130,24 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     public void setParent(LevelDBChunk parent) {
-        this.parent = new WeakReference<>(parent);
-
-        // Set hasSkyLight based on dimension (Overworld = 0 has sky light)
-        if (parent != null && parent.getProvider() != null) {
-            this.hasSkyLight = parent.getProvider().getLevel().getDimensionData().getDimensionId() == 0;
+        this.writeLock.lock();
+        try {
+            if (this.parent != null && this.parent.get() != parent && this.wasAttached) {
+                this.saveRevision++;
+                this.dirty = true;
+                this.savedToken = null;
+            }
+            this.parent = new WeakReference<>(parent);
+            this.wasAttached |= parent != null;
+            // Set hasSkyLight based on dimension (Overworld = 0 has sky light).
+            // 异步解码挂载时 level 可能已被 close 置空，回退 legacy（主世界，含天光）
+            // The level may be nulled by close during async decode attach; fall back to legacy (overworld, with skylight)
+            if (parent != null && parent.getProvider() != null) {
+                Level levelTemp = parent.getProvider().getLevel();
+                this.hasSkyLight = (levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData()).getDimensionId() == 0;
+            }
+        } finally {
+            this.writeLock.unlock();
         }
     }
 
@@ -185,6 +205,7 @@ public class LevelDBChunkSection implements ChunkSection {
             storage.set(x, y, z, fullId);
 
             dirty = true;
+            this.saveRevision++;
             parent.get().onSubChunkBlockChanged(this, x, y, z, layer, previous, fullId);
         } finally {
             this.writeLock.unlock();
@@ -241,6 +262,7 @@ public class LevelDBChunkSection implements ChunkSection {
             storage.set(x, y, z, fullId);
 
             dirty = true;
+            this.saveRevision++;
             parent.get().onSubChunkBlockChanged(this, x, y, z, layer, previous, fullId);
         } finally {
             this.writeLock.unlock();
@@ -363,6 +385,7 @@ public class LevelDBChunkSection implements ChunkSection {
             }
 
             dirty = true;
+            this.saveRevision++;
             parent.get().onSubChunkBlockChanged(this, x, y, z, layer, previous, fullId);
         } finally {
             this.writeLock.unlock();
@@ -403,6 +426,7 @@ public class LevelDBChunkSection implements ChunkSection {
             storage.set(x, y, z, fullId);
 
             dirty = true;
+            this.saveRevision++;
             parent.get().onSubChunkBlockChanged(this, x, y, z, layer, previous, fullId);
             return true;
         } finally {
@@ -416,19 +440,21 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockSkyLight(int x, int y, int z) {
-        if (this.skyLight == null) {
-            if (!hasSkyLight) {
-                return 0;
-            } else if (compressedLight == null) {
-                return 15;
+        this.skyLightLock.lock();
+        try {
+            if (this.skyLight == null) {
+                if (!hasSkyLight) {
+                    return 0;
+                } else if (compressedLight == null) {
+                    return 15;
+                }
+                this.skyLight = getSkyLightArray();
             }
+            int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
+            return (x & 1) == 0 ? sl & 0x0f : sl >> 4;
+        } finally {
+            this.skyLightLock.unlock();
         }
-        this.skyLight = getSkyLightArray();
-        int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
-        if ((x & 1) == 0) {
-            return sl & 0x0f;
-        }
-        return sl >> 4;
     }
 
     @Override
@@ -804,6 +830,7 @@ public class LevelDBChunkSection implements ChunkSection {
             }
 
             this.dirty |= dirty;
+            if (dirty) this.saveRevision++;
 
             return dirty;
         } finally {
@@ -825,7 +852,14 @@ public class LevelDBChunkSection implements ChunkSection {
                 }
                 storages[i] = storage.copy();
             }
-            return new LevelDBChunkSection(null, this.y, storages, this.blockLight, this.skyLight, this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+            this.skyLightLock.lock();
+            try {
+                byte[] copiedSkyLight = this.skyLight == null ? null : this.skyLight.clone();
+                return new LevelDBChunkSection(null, this.y, storages, this.blockLight, copiedSkyLight,
+                        this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+            } finally {
+                this.skyLightLock.unlock();
+            }
         } finally {
             this.readLock.unlock();
         }
@@ -833,12 +867,89 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public boolean isDirty() {
-        return this.dirty;
+        this.readLock.lock();
+        try {
+            return this.dirty || this.savedToken != null && !this.savedToken.sameStorageRevision();
+        } finally {
+            this.readLock.unlock();
+        }
     }
 
     @Override
     public void setDirty() {
-        this.dirty = true;
+        this.writeLock.lock();
+        try {
+            this.dirty = true;
+            this.saveRevision++;
+        } finally {
+            this.writeLock.unlock();
+        }
+    }
+
+    /** Capture bytes and their exact ownership/revision together; no section lock escapes. */
+    public SaveToken captureSave(Chunk owner, int sectionY, Consumer<StateBlockStorage[]> encode) {
+        this.readLock.lock();
+        try {
+            if (!this.dirty && (this.savedToken == null || this.savedToken.matches(owner, sectionY))) return null;
+            SaveToken token = new SaveToken(owner, sectionY);
+            encode.accept(this.storages);
+            return token;
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
+    /** An ACK token retains neither an unloaded chunk nor its provider after the batch is gone. */
+    public final class SaveToken {
+        private final WeakReference<Chunk> owner;
+        private final WeakReference<cn.nukkit.level.format.LevelProvider> provider;
+        private final int x, z, sectionY;
+        private final long revision;
+        private final StateBlockStorage[] storages;
+        private final int[] versions;
+
+        private SaveToken(Chunk owner, int sectionY) {
+            this.owner = new WeakReference<>(owner);
+            this.provider = new WeakReference<>(owner.getProvider());
+            this.x = owner.getX();
+            this.z = owner.getZ();
+            this.sectionY = sectionY;
+            this.revision = saveRevision;
+            this.storages = LevelDBChunkSection.this.storages.clone();
+            this.versions = new int[this.storages.length];
+            for (int i = 0; i < this.storages.length; i++) {
+                this.versions[i] = this.storages[i] == null ? 0 : this.storages[i].getVersion();
+            }
+        }
+
+        private boolean sameStorageRevision() {
+            if (this.revision != saveRevision || this.storages.length != LevelDBChunkSection.this.storages.length) return false;
+            for (int i = 0; i < this.storages.length; i++) {
+                if (this.storages[i] != LevelDBChunkSection.this.storages[i]
+                        || this.storages[i] != null && this.versions[i] != this.storages[i].getVersion()) return false;
+            }
+            return true;
+        }
+
+        private boolean matches(Chunk current, int y) {
+            return current != null && this.owner.get() == current && this.provider.get() == current.getProvider()
+                    && this.x == current.getX() && this.z == current.getZ() && this.sectionY == y
+                    && sameStorageRevision();
+        }
+
+        /** Called only after successful DB.write; never wait behind main-thread section work. */
+        public void acknowledge() {
+            if (!writeLock.tryLock()) return;
+            try {
+                LevelDBChunk current = getParent();
+                if (matches(current, this.sectionY) && current.getSection(this.sectionY) == LevelDBChunkSection.this) {
+                    dirty = false;
+                    savedToken = this;
+                }
+            } finally {
+                writeLock.unlock();
+            }
+        }
     }
 
     @Override

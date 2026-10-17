@@ -245,7 +245,7 @@ class CakeCraftingReproTest {
 
     @Test
     void eventAuthoredNbtReachesDeliveredSingleAndMultiOutputCrafts() {
-        authorCraftOutput("kit:craft");
+        authorCraftOutput("example:craft");
         ui.getBigCraftingGrid().setItem(0, Item.get(Item.WHEAT, 0, 1), false);
         ui.getBigCraftingGrid().setItem(1, Item.get(Item.WHEAT, 0, 1), false);
         ui.getBigCraftingGrid().setItem(2, Item.get(Item.WHEAT, 0, 1), false);
@@ -259,7 +259,7 @@ class CakeCraftingReproTest {
 
         ItemStackRequestHandler.handleRequests(player, List.of(bread));
         assertOk();
-        assertEquals("kit:craft", inventory.getItem(0).getNamedTag().getString("km_origin"));
+        assertEquals("example:craft", inventory.getItem(0).getNamedTag().getString("example:origin"));
 
         Mockito.clearInvocations(player);
         fillGrid();
@@ -269,12 +269,21 @@ class CakeCraftingReproTest {
 
         ItemStackRequestHandler.handleRequests(player, List.of(cake));
         assertOk();
-        assertEquals("kit:craft", inventory.getItem(1).getNamedTag().getString("km_origin"));
+        assertEquals("example:craft", inventory.getItem(1).getNamedTag().getString("example:origin"));
     }
 
     @Test
     void eventAuthoredNbtReachesDeliveredDynamicMultiRecipeOutput() {
-        authorCraftOutput("kit:multi");
+        Mockito.doAnswer(invocation -> {
+            Object called = invocation.getArgument(0);
+            if (called instanceof CraftItemEvent event) {
+                Item output = event.getTransaction().getPrimaryOutput().clone();
+                output.setNamedTag(output.getOrCreateNamedTag()
+                        .putString("example:origin", "example:original").putString("example:audit", "event"));
+                event.getTransaction().setPrimaryOutput(output);
+            }
+            return null;
+        }).when(pluginManager).callEvent(Mockito.any());
         RepairItemRecipe repair = manager.getMultiRecipes().values().stream()
                 .filter(RepairItemRecipe.class::isInstance)
                 .map(RepairItemRecipe.class::cast)
@@ -282,7 +291,7 @@ class CakeCraftingReproTest {
                 .orElseThrow();
         Item clean = Item.get(Item.DIAMOND_PICKAXE, 1000, 1);
         Item tagged = Item.get(Item.DIAMOND_PICKAXE, 1000, 1);
-        tagged.setNamedTag(tagged.getOrCreateNamedTag().putString("km_origin", "kit:input"));
+        tagged.setNamedTag(tagged.getOrCreateNamedTag().putString("example:origin", "example:original"));
         ui.getBigCraftingGrid().setItem(0, clean, false);
         ui.getBigCraftingGrid().setItem(1, tagged, false);
         Item repaired = Item.get(Item.DIAMOND_PICKAXE,
@@ -299,7 +308,8 @@ class CakeCraftingReproTest {
         ItemStackRequestHandler.handleRequests(player, List.of(request));
 
         assertOk();
-        assertEquals("kit:multi", inventory.getItem(2).getNamedTag().getString("km_origin"));
+        assertEquals("example:original", inventory.getItem(2).getNamedTag().getString("example:origin"));
+        assertEquals("event", inventory.getItem(2).getNamedTag().getString("example:audit"));
     }
 
     private static void authorCraftOutput(String origin) {
@@ -308,7 +318,7 @@ class CakeCraftingReproTest {
             if (called instanceof CraftItemEvent event) {
                 Item output = event.getTransaction().getPrimaryOutput().clone();
                 assertNotNull(output, "CraftItemEvent must never expose a null output");
-                output.setNamedTag(output.getOrCreateNamedTag().putString("km_origin", origin));
+                output.setNamedTag(output.getOrCreateNamedTag().putString("example:origin", origin));
                 event.getTransaction().setPrimaryOutput(output);
             }
             return null;

@@ -191,25 +191,7 @@ public class BlockScaffolding extends BlockFallable {
                 return type;
             }
 
-            int stability = 7;
-            for (BlockFace face : BlockFace.values()) {
-                if (face == BlockFace.UP) {
-                    continue;
-                }
-
-                Block otherBlock = this.getSide(face);
-                if (otherBlock.getId() == SCAFFOLDING) {
-                    BlockScaffolding other = (BlockScaffolding) otherBlock;
-                    int otherStability = other.getStability();
-                    if (otherStability < stability) {
-                        if (face == BlockFace.DOWN) {
-                            stability = otherStability;
-                        } else {
-                            stability = otherStability + 1;
-                        }
-                    }
-                }
-            }
+            int stability = calculateStability();
 
             if (stability >= 7) {
                 if (this.getStabilityCheck()) {
@@ -225,11 +207,45 @@ public class BlockScaffolding extends BlockFallable {
             this.getLevel().setBlock(this, this, true, true);
             return type;
         } else if (type == Level.BLOCK_UPDATE_SCHEDULED) {
-            this.getLevel().useBreakOn(this);
+            // The queued tick can outlive the missing support that scheduled it.
+            // Revalidate like EaseCation before committing an automatic break.
+            if (calculateStability() >= 7) {
+                this.getLevel().useBreakOn(this);
+            } else {
+                this.onUpdate(Level.BLOCK_UPDATE_NORMAL);
+            }
             return type;
         }
 
         return 0;
+    }
+
+    private int calculateStability() {
+        if (this.down().isSolid()) {
+            return 0;
+        }
+
+        int stability = 7;
+        for (BlockFace face : BlockFace.values()) {
+            if (face == BlockFace.UP) {
+                continue;
+            }
+
+            Block otherBlock = this.getSide(face);
+            if (otherBlock.getId() == SCAFFOLDING) {
+                BlockScaffolding other = (BlockScaffolding) otherBlock;
+                int otherStability = other.getStability();
+                if (otherStability < stability) {
+                    if (face == BlockFace.DOWN) {
+                        stability = otherStability;
+                    } else {
+                        stability = otherStability + 1;
+                    }
+                }
+            }
+        }
+
+        return stability;
     }
 
     @Override

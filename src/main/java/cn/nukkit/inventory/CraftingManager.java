@@ -11,6 +11,9 @@ import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.CraftingDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import io.netty.util.collection.CharObjectHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
@@ -18,6 +21,13 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.UncheckedIOException;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.Deflater;
 
@@ -27,6 +37,42 @@ import java.util.zip.Deflater;
  */
 @Log4j2
 public class CraftingManager {
+
+    // Keep the number types produced by the previous YAML loader: recipe consumers cast to Integer.
+    private static final Gson RECIPE_JSON = new GsonBuilder().setObjectToNumberStrategy(reader -> {
+        String value = reader.nextString();
+        if (value.indexOf('.') >= 0 || value.indexOf('e') >= 0 || value.indexOf('E') >= 0) {
+            return Double.valueOf(value);
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException ignored) {
+            try {
+                return Long.valueOf(value);
+            } catch (NumberFormatException alsoIgnored) {
+                return new BigInteger(value);
+            }
+        }
+    }).create();
+
+    static Config readRecipeJson(Reader reader) {
+        LinkedHashMap<String, Object> root = RECIPE_JSON.fromJson(reader, new TypeToken<LinkedHashMap<String, Object>>() {});
+        Config config = new Config(Config.JSON);
+        config.setAll(root);
+        return config;
+    }
+
+    private static Config loadRecipeJson(String resource) {
+        InputStream stream = Server.class.getClassLoader().getResourceAsStream(resource);
+        if (stream == null) {
+            throw new IllegalStateException("Missing recipe resource: " + resource);
+        }
+        try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+            return readRecipeJson(reader);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read recipe resource: " + resource, e);
+        }
+    }
 
     public final Collection<Recipe> recipes = new ArrayDeque<>();
 
@@ -146,9 +192,9 @@ public class CraftingManager {
         this.registerMultiRecipe(new FireworkRecipe());
         this.registerMultiRecipe(new DecoratedPotRecipe());
 
-        Map<String, Object> root = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes.json")).getRootSection();
+        Map<String, Object> root = loadRecipeJson("recipes.json").getRootSection();
         RuntimeItemMapping itemMapping = selectRecipeItemMapping(root);
-        Config furnaceXpConfig = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/furnace_xp.json"));
+        Config furnaceXpConfig = loadRecipeJson("recipes/furnace_xp.json");
 
         for (Map recipe : (List<Map>) root.get("recipes")) {
             try {
@@ -241,7 +287,7 @@ public class CraftingManager {
         }
 
         // Smithing recipes
-        ConfigSection smithing = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("smithing.json")).getRootSection();
+        ConfigSection smithing = loadRecipeJson("smithing.json").getRootSection();
         top:
         for (Map<String, Object> recipe : (List<Map<String, Object>>) smithing.get((Object) "smithing")) {
             String recipeId = (String) recipe.get("id");
