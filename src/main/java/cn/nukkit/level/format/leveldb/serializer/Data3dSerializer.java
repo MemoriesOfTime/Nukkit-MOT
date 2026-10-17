@@ -8,7 +8,7 @@ import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.utils.Utils;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 
@@ -19,7 +19,7 @@ public class Data3dSerializer {
     public static void serialize(WriteBatch db, LevelDBChunk chunk) {
         DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
 
-        ByteBuf buffer  = ByteBufAllocator.DEFAULT.ioBuffer();
+        ByteBuf buffer  = Unpooled.buffer();
         try {
             short[] heightMap = chunk.getHeightMapArray();
             for (int height : heightMap) {
@@ -57,9 +57,8 @@ public class Data3dSerializer {
         int sectionCount = maxSectionY - minSectionY + 1;
         PalettedBlockStorage[] biomes = new PalettedBlockStorage[sectionCount];
 
-        ByteBuf buffer = ByteBufAllocator.DEFAULT.ioBuffer(data3d.length);
+        ByteBuf buffer = Unpooled.wrappedBuffer(data3d);
         try {
-            buffer.writeBytes(data3d);
             for (int i = 0; i < 256; i++) {
                 heightMap[i] = buffer.readUnsignedShortLE();
             }

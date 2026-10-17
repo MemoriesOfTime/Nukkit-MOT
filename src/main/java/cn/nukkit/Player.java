@@ -158,6 +158,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int SPECTATOR = 3;
     public static final int VIEW = SPECTATOR;
 
+    private static final double CREATIVE_BREAK_POSITION_EPSILON = 1.0E-4;
+    // Bedrock resting contact can sit 0.005 blocks below the collision top. This
+    // controls packets only; the authoritative position still stays on the floor.
+    private static final double CREATIVE_BREAK_CORRECTION_TOLERANCE = 0.01;
+    private static final int CREATIVE_BREAK_CORRECTION_TICKS = 5;
+
     public static final int CRAFTING_SMALL = 0;
     public static final int CRAFTING_BIG = 1;
     public static final int ANVIL_WINDOW_ID = 2;
@@ -240,6 +246,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int closingWindowId = Integer.MIN_VALUE;
 
     public Vector3 speed = null;
+    /**
+     * Server tick at which {@link #speed} last took a real movement, and how many ticks that
+     * movement spanned. {@code speed} is only refreshed when a new position arrives, so without the
+     * tick a player who stopped would keep the speed of his last step.
+     */
+    private int speedSampleTick = -1;
+    private int speedSampleTicks = 1;
 
     public final HashSet<String> achievements = new HashSet<>();
 
@@ -259,6 +272,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected long randomClientId;
 
     protected Location forceMovement = null;
+
+    private Level deniedCreativeBreakLevel;
+    private BlockVector3 deniedCreativeBreakBlock;
+    private int deniedCreativeBreakExpiresAtTick;
 
     protected Location teleportPosition = null;
 
@@ -301,6 +318,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
 
     private int chunksSent = 0;
+    private long chunkDeliveryEpoch;
     private boolean hasSpawnChunks;
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
     protected int nextChunkOrderRun = 1;
@@ -436,6 +454,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public long lastSkinChange = -1;
     private double lastRightClickTime = 0.0;
     private long lastClickAirTime = 0;
+    /**
+     * Server tick of the last accepted spear jab ({@link InventoryTransactionPacket#USE_ITEM_ACTION_USE_AS_ATTACK}).
+     */
+    private int lastSpearJabTick = Integer.MIN_VALUE;
     private BlockVector3 lastRightClickPos = null;
     private final IntOpenHashSet processedItemStackRequestIds = new IntOpenHashSet();
     private int processedItemStackRequestTick = Integer.MIN_VALUE;
@@ -446,7 +468,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean worldClockSynced;
     private boolean foodEnabled = true;
     private int failedTransactions;
-    protected int failedMobEquipmentPacket;
     private int timeSinceRest;
     private boolean inSoulSand;
     private boolean dimensionChangeInProgress;
@@ -644,7 +665,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean getAllowFlight() {
-        return this.adventureSettings.get(Type.ALLOW_FLIGHT);
+        return this.adventureSettings != null && this.adventureSettings.get(Type.ALLOW_FLIGHT);
     }
 
     /**
@@ -666,6 +687,90 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         double speedRatio = (double) configuredFlySpeed / DEFAULT_FLY_SPEED;
         return vanillaLimitSquared * speedRatio * speedRatio;
+    }
+
+    void armDeniedCreativeBreakCorrection(BlockVector3 blockPos) {
+        if (!this.isCreative() || this.noClip || this.riding != null
+                || blockPos.distanceSquared(this) > 4
+                || blockPos.getY() + CREATIVE_BREAK_POSITION_EPSILON >= this.y) {
+            return;
+        }
+
+        Block block = this.level.getBlock(blockPos.asVector3(), false);
+        AxisAlignedBB feet = this.boundingBox.clone().shrink(0.05, 0, 0.05);
+        feet.setMinY(this.y - 0.05);
+        feet.setMaxY(this.y + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(feet)) {
+            return;
+        }
+
+        this.deniedCreativeBreakLevel = this.level;
+        this.deniedCreativeBreakBlock = new BlockVector3(
+                blockPos.getX(), blockPos.getY(), blockPos.getZ());
+        this.deniedCreativeBreakExpiresAtTick = this.server.getTick()
+                + CREATIVE_BREAK_CORRECTION_TICKS;
+    }
+
+    private Vector3 correctDeniedCreativeBreakMovement(Vector3 clientPos) {
+        if (this.deniedCreativeBreakBlock == null) {
+            return clientPos;
+        }
+        if (!this.isCreative() || this.noClip || this.riding != null
+                || this.level != this.deniedCreativeBreakLevel
+                || this.server.getTick() > this.deniedCreativeBreakExpiresAtTick) {
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+        if (clientPos.y >= this.y) {
+            return clientPos;
+        }
+
+        Block block = this.level.getBlock(this.deniedCreativeBreakBlock.asVector3(), false);
+        AxisAlignedBB targetFeet = this.boundingBox
+                .getOffsetBoundingBox(clientPos.x - this.x, 0, clientPos.z - this.z)
+                .shrink(0.05, 0, 0.05);
+        targetFeet.setMinY(clientPos.y);
+        targetFeet.setMaxY(this.y + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(targetFeet)) {
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+
+        // Locate the highest crossed surface using the block's actual collision
+        // predicate. getBoundingBox() alone omits the upper half of stairs.
+        // Testing the interval above each midpoint makes the search monotonic,
+        // including blocks whose collision consists of disconnected pieces.
+        double lowerY = clientPos.y;
+        double upperY = this.y + CREATIVE_BREAK_POSITION_EPSILON;
+        for (int probe = 0; probe < 40 && upperY - lowerY > 1.0E-7; probe++) {
+            double middleY = (lowerY + upperY) * 0.5;
+            targetFeet.setMinY(middleY);
+            if (block.collidesWithBB(targetFeet)) {
+                lowerY = middleY;
+            } else {
+                upperY = middleY;
+            }
+        }
+        // A replacement block may enclose the current feet. Preserve the existing
+        // denial guard without pushing the player above their accepted height.
+        double floorY = Math.min(this.y, upperY);
+        double crossedAt = (this.y - floorY) / (this.y - clientPos.y);
+        targetFeet.offset(-(clientPos.x - this.x) * (1 - crossedAt), 0,
+                -(clientPos.z - this.z) * (1 - crossedAt));
+        targetFeet.setMinY(floorY - CREATIVE_BREAK_POSITION_EPSILON);
+        targetFeet.setMaxY(floorY + CREATIVE_BREAK_POSITION_EPSILON);
+        if (!block.collidesWithBB(targetFeet)) {
+            // Diagonal motion may enter this column after passing below its top.
+            this.clearDeniedCreativeBreakCorrection();
+            return clientPos;
+        }
+
+        return new Vector3(clientPos.x, floorY, clientPos.z);
+    }
+
+    private void clearDeniedCreativeBreakCorrection() {
+        this.deniedCreativeBreakLevel = null;
+        this.deniedCreativeBreakBlock = null;
     }
 
     public void setAllowModifyWorld(boolean value) {
@@ -1133,7 +1238,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         level = level == null ? this.level : level;
         long index = Level.chunkHash(x, z);
         if (this.usedChunks.containsKey(index)) {
-            for (Entity entity : level.getChunkEntities(x, z).values()) {
+            // Only live entities have viewers; abandoning a chunk must not reload it from storage.
+            for (Entity entity : level.getChunkEntities(x, z, false).values()) {
                 if (entity != this) {
                     entity.despawnFrom(this);
                 }
@@ -1146,12 +1252,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private void unloadChunks(boolean online) {
+        ++this.chunkDeliveryEpoch;
         for (long index : this.usedChunks.keySet()) {
             int chunkX = Level.getHashX(index);
             int chunkZ = Level.getHashZ(index);
             this.level.unregisterChunkLoader(this, chunkX, chunkZ);
 
-            for (Entity entity : level.getChunkEntities(chunkX, chunkZ).values()) {
+            for (Entity entity : level.getChunkEntities(chunkX, chunkZ, false).values()) {
                 if (entity != this) {
                     if (online) {
                         entity.despawnFrom(this);
@@ -1204,10 +1311,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        this.usedChunks.put(Level.chunkHash(x, z), Boolean.TRUE);
-
-        this.dataPacket(packet);
-
+        long index = Level.chunkHash(x, z);
+        Level sourceLevel = this.level;
+        long sourceEpoch = this.chunkDeliveryEpoch;
+        boolean tracked = this.usedChunks.containsKey(index);
+        boolean submitted = false;
+        try {
+            submitted = this.dataPacket(packet);
+        } finally {
+            if (!submitted && tracked && this.usedChunks.get(index) == Boolean.FALSE
+                    && isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, true)) {
+                this.usedChunks.put(index, Boolean.FALSE);
+                this.loadQueue.add(index);
+            }
+        }
+        if (!submitted || !isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, tracked)) {
+            return;
+        }
+        this.usedChunks.put(index, Boolean.TRUE);
         this.chunksSent++;
 
         if (this.spawned) {
@@ -1234,6 +1355,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             playerActionPacket.entityId = this.getId();
             this.dataPacket(playerActionPacket);
         }
+    }
+
+    private boolean isChunkSubmissionContextCurrent(Level sourceLevel, long sourceEpoch,
+                                                     long index, boolean tracked) {
+        return this.connected && this.level == sourceLevel && this.chunkDeliveryEpoch == sourceEpoch
+                && (!tracked || this.usedChunks.containsKey(index));
     }
 
     @Deprecated
@@ -2159,9 +2286,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int minX = NukkitMath.floorDouble(bb.getMinX());
             int minY = NukkitMath.floorDouble(bb.getMinY());
             int minZ = NukkitMath.floorDouble(bb.getMinZ());
-            int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-            int maxY = NukkitMath.ceilDouble(bb.getMaxY());
-            int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
+            int maxX = NukkitMath.floorDouble(bb.getMaxX());
+            int maxY = NukkitMath.floorDouble(bb.getMaxY());
+            int maxZ = NukkitMath.floorDouble(bb.getMaxZ());
 
             for (int z = minZ; z <= maxZ; ++z) {
                 for (int x = minX; x <= maxX; ++x) {
@@ -2396,8 +2523,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Internal: Check nearby entities and try to pick them up
      */
     protected void checkNearEntities() {
-        Entity[] e = this.level.getNearbyEntities(this.boundingBox.grow(1, 0.5, 1), this);
-        for (Entity entity : e) {
+        for (Entity entity : CollisionHelper.getPickupEntities(this.level, this.boundingBox.grow(1, 0.5, 1), false)) {
             //entity.scheduleUpdate();
 
             if (!entity.isAlive()) {
@@ -2480,6 +2606,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
         }
+
+        Vector3 correctedClientPos = this.correctDeniedCreativeBreakMovement(clientPos);
+        boolean correctedDeniedCreativeBreak = correctedClientPos.y - clientPos.y
+                > CREATIVE_BREAK_CORRECTION_TOLERANCE;
+        clientPos = correctedClientPos;
 
         double dx = clientPos.x - this.x;
         double dy = clientPos.y - this.y;
@@ -2594,10 +2725,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 } else {
                     //1.7.0-
                     this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
-                            this.getViewers().values()
-                                    .stream()
-                                    .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
-                                    .collect(Collectors.toList()));
+                            this.legacyMovementViewers());
                     //1.7.0+
                     this.broadcastMovement();
                 }
@@ -2638,13 +2766,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.speed.setComponents(0, 0, 0);
             }
         } else {
-            this.forceMovement = null;
+            if (correctedDeniedCreativeBreak) {
+                Location correction = this.getLocation().add(0, 0.00001, 0);
+                this.sendPosition(correction, MovePlayerPacket.MODE_NORMAL);
+                this.forceMovement = correction;
+            } else {
+                this.forceMovement = null;
+            }
 
             if (this.speed == null) {
                 speed = new Vector3(from.x - to.x, from.y - to.y, from.z - to.z);
             } else {
                 this.speed.setComponents(from.x - to.x, from.y - to.y, from.z - to.z);
             }
+            this.speedSampleTick = this.server.getTick();
+            this.speedSampleTicks = Math.max(1, tickDiff);
 
             if (this.riding == null && this.inventory != null) {
                 if (this.isFoodEnabled() && distanceSquared >= 0.05 && this.getServer().getDifficulty() > 0) {
@@ -2692,10 +2828,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int radius = 2 + Math.min(frostWalkerLevel, EnchantmentFrostWalker.MAX_FREEZE_RADIUS - 2);
             for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
                 for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
-                    Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
                     Block block = level.getBlock(coordX, this.getFloorY() - 1, coordZ);
-                    if (block instanceof BlockWater water && up.isAir()) {
-                        if (water.getFluidHeightPercent() < 0.15) {
+                    if (block instanceof BlockWater water && water.getFluidHeightPercent() < 0.15) {
+                        if (level.getBlock(coordX, this.getFloorY(), coordZ).isAir()) {
                             WaterFrostEvent ev = new WaterFrostEvent(block);
                             server.getPluginManager().callEvent(ev);
                             if (!ev.isCancelled()) {
@@ -2733,6 +2868,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastYaw = location.getYaw();
         this.lastHeadYaw = location.getHeadYaw();
         this.lastPitch = location.getPitch();
+    }
+
+    private List<Player> legacyMovementViewers() {
+        Collection<Player> currentViewers = this.getViewers().values();
+        List<Player> legacyViewers = new ArrayList<>();
+        for (Player viewer : currentViewers) {
+            if (viewer.protocol < ProtocolInfo.v1_7_0) {
+                legacyViewers.add(viewer);
+            }
+        }
+        return legacyViewers;
     }
 
     @Override
@@ -2883,9 +3029,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastUpdate = currentTick;
 
         this.failedTransactions = 0;
-        if (currentTick%20 == 0) {
-            this.failedMobEquipmentPacket = 0;
-        }
 
         if (this.riptideTicks > 0) {
             this.riptideTicks -= tickDiff;
@@ -2919,10 +3062,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.needSendRotation) {
                 //1.7.0-
                 this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
-                        this.getViewers().values()
-                                .stream()
-                                .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
-                                .collect(Collectors.toList()));
+                        this.legacyMovementViewers());
                 //1.7.0+
                 this.broadcastMovement();
                 this.needSendRotation = false;
@@ -3353,10 +3493,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         for (Player p : new ArrayList<>(this.server.playerList.values())) {
             if (p != this && p.username != null) {
                 if (p.username.equalsIgnoreCase(this.username)) {
+                    if (this.server.isDuplicateLoginKeepingExistingSession()) {
+                        // The session that is already in the world stays and the newcomer is the one
+                        // that is refused: closing the older session hands the world to whoever knocks
+                        // last, so a player carrying loot loses it to a stranger reusing the nickname.
+                        // A stale session still times out by itself.
+                        this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        return;
+                    }
                     p.close("", "disconnectionScreen.loggedinOtherLocation");
                     break;
                 }
                 if (this.getUniqueId().equals(p.getUniqueId())) {
+                    if (this.server.isDuplicateLoginKeepingExistingSession()) {
+                        this.server.getLogger().warning("Refused the login of " + this.username + ": "
+                                + p.getName() + " is already playing under identity " + this.getUniqueId());
+                        this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        return;
+                    }
                     this.server.getLogger().warning("Evicting " + p.getName() + " as a duplicate login of "
                             + this.username + ": both resolved to identity " + this.getUniqueId());
                     p.close("", "disconnectionScreen.loggedinOtherLocation");
@@ -4050,7 +4204,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                 double dis = newPos.distanceSquared(this);
 
-                if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
+                if (this.forceMovement == null && dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
                     break;
                 }
 
@@ -4227,7 +4381,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 // The inventory is built by initEntity, which runs at login. An auth input that
                 // reaches the session before that (a client that keeps moving while its profile
                 // is still loading) used to throw here and drop the connection.
-                Item authHeldItem = this.inventory == null ? null : this.inventory.getItemInHand();
+                // A held-stack snapshot is needed only for START_USING_ITEM. Both consumers of
+                // authHoldToUse require that flag; keep cloning before custom item code/events.
+                Item authHeldItem = !authStartUsingItem || this.inventory == null
+                        ? null : this.inventory.getItemInHand();
                 boolean authHoldToUse = UsingItemReceive.isHoldToUseItem(authHeldItem);
                 if (UsingItemReceive.shouldStartUsingFromAuthInput(
                         this.spawned && this.isAlive(),
@@ -4250,8 +4407,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
+                        // A spear charge (minecraft:kinetic_weapon) is meant to be run with: it only
+                        // strikes above a closing speed, and the spear does not slow the player down.
                         if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
-                                this.isJavaClient(), authHoldToUse, authStartUsingItem)) {
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem)
+                                && !(this.inventory != null && this.inventory.getItemInHandFast().isSpear())) {
                             this.setUsingItem(false);
                         }
                     }
@@ -4486,7 +4646,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 double distSqrt = clientPosition.distanceSquared(this);
-                if (distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
+                if (this.forceMovement == null && distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
                     break;
                 }
 
@@ -5629,6 +5789,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 break;
                             }
 
+                            this.armDeniedCreativeBreakCorrection(blockVector);
                             inventory.sendContents(this);
                             inventory.sendHeldItem(this);
 
@@ -5712,6 +5873,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     this.inventory.sendContents(this);
                                 }
                             }
+                            break;
+                        case InventoryTransactionPacket.USE_ITEM_ACTION_USE_AS_ATTACK:
+                            // 1.21.110+ clients jab with a spear through the attack button: they send this
+                            // action and no USE_ITEM_ON_ENTITY attack, so without it the jab neither hit
+                            // anything nor wore the spear down.
+                            if (this.isSpectator() || !this.spawned || !this.isAlive()) {
+                                break;
+                            }
+                            item = this.inventory.getItemInHand();
+                            if (!(item instanceof ItemSpear spear)) {
+                                break;
+                            }
+                            if (useItemData.itemInHand == null || !item.equalsFast(useItemData.itemInHand)) {
+                                this.needSendHeldItem = true;
+                                break;
+                            }
+                            int jabTick = this.server.getTick();
+                            if (!isSpearJabReady(this.lastSpearJabTick, jabTick, spear.getJabCooldownTicks())) {
+                                break;
+                            }
+                            this.lastSpearJabTick = jabTick;
+                            spear.onJab(this);
                             break;
                         default:
                             break;
@@ -6055,6 +6238,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * The sort is stable, so actions of the same group keep the order they already had.
      */
     static List<PlayerBlockActionData> orderBlockActions(Collection<PlayerBlockActionData> actions) {
+        if (actions.isEmpty()) {
+            return List.of();
+        }
         List<PlayerBlockActionData> ordered = new ArrayList<>(actions);
         if (ordered.size() > 1) {
             ordered.sort(Comparator.comparingInt(action -> endsBlockDestruction(action.getAction()) ? 0 : 1));
@@ -6182,6 +6368,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (canInteract) {
             handItem = this.level.useBreakOn(blockPos.asVector3(), face, handItem, this, true);
             if (handItem == null) {
+                this.armDeniedCreativeBreakCorrection(blockPos);
                 this.level.sendBlocks(new Player[]{this}, new Vector3[]{blockPos.asVector3()}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
 
                 BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
@@ -6206,6 +6393,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         inventory.sendContents(this);
         inventory.sendHeldItem(this);
+
+        this.armDeniedCreativeBreakCorrection(blockPos);
 
         if (blockPos.distanceSquared(this) < 10000) {
             Vector3 pos = blockPos.asVector3();
@@ -6597,6 +6786,39 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         return end;
     }
+
+    /**
+     * Whether a spear jab arriving at {@code nowTick} may act. The client already waits for the
+     * spear's swing cool down before it sends the jab; the server only refuses jabs that come
+     * clearly faster than that, allowing a few ticks of network jitter.
+     */
+    static boolean isSpearJabReady(int lastJabTick, int nowTick, int coolDownTicks) {
+        if (lastJabTick == Integer.MIN_VALUE) {
+            return true;
+        }
+        return nowTick - lastJabTick >= Math.max(1, coolDownTicks - SPEAR_JAB_JITTER_TICKS);
+    }
+
+    private static final int SPEAR_JAB_JITTER_TICKS = 3;
+
+    /**
+     * Velocity of this player in blocks per tick from the last accepted movement, or zero when no
+     * movement came in the last {@value #RECENT_VELOCITY_TICKS} ticks (the player stands still).
+     */
+    public Vector3 getRecentVelocity() {
+        return recentVelocity(this.speed, this.speedSampleTick, this.speedSampleTicks, this.server.getTick());
+    }
+
+    static Vector3 recentVelocity(Vector3 speed, int sampleTick, int sampleTicks, int nowTick) {
+        if (speed == null || sampleTick < 0 || nowTick - sampleTick > RECENT_VELOCITY_TICKS) {
+            return new Vector3(0, 0, 0);
+        }
+        double ticks = Math.max(1, sampleTicks);
+        // speed holds from - to: the step backwards.
+        return new Vector3(-speed.x / ticks, -speed.y / ticks, -speed.z / ticks);
+    }
+
+    private static final int RECENT_VELOCITY_TICKS = 2;
 
     /**
      * 判断指定itemCategory的冷却是否已经结束
@@ -8243,11 +8465,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.tryEncode();
 
         byte[] buf = pk.getBuffer();
-        BinaryStream batched = new BinaryStream(new byte[5 + buf.length]).reset();
+        int lengthPrefixBytes = 1;
+        for (int remaining = buf.length; (remaining >>>= 7) != 0; ) {
+            lengthPrefixBytes++;
+        }
+        // This stream owns an exact batch and is never reused after compression.
+        BinaryStream batched = new BinaryStream(new byte[lengthPrefixBytes + buf.length]).reset();
         batched.putUnsignedVarInt(buf.length);
         batched.put(buf);
         try {
-            byte[] bytes = batched.getBuffer();
+            byte[] owned = batched.getBufferUnsafe();
+            // Preserve trimmed bytes if a future writer changes the capacity.
+            byte[] bytes = batched.getCount() == owned.length ? owned : batched.getBuffer();
             BatchPacket compress = new BatchPacket();
             if (Server.getInstance().useSnappy && protocol >= ProtocolInfo.v1_19_30_23) {
                 compress.payload = SnappyCompression.compress(bytes);
@@ -8619,26 +8848,31 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.getLevel().addSound(new ExperienceOrbSound(this));
                 pickedXPOrb = server.getTick();
 
-                ArrayList<Integer> itemsWithMending = new ArrayList<>();
+                // Four armor slots, hand and offhand shield; keep discovery order.
+                int[] itemsWithMending = null;
+                int mendingCount = 0;
                 for (int i = 0; i < 4; i++) {
                     Item item = inventory.getArmorItem(i);
                     if (item.getDamage() != 0 && item.hasEnchantment(Enchantment.ID_MENDING)) {
-                        itemsWithMending.add(inventory.getSize() + i);
+                        if (itemsWithMending == null) itemsWithMending = new int[6];
+                        itemsWithMending[mendingCount++] = inventory.getSize() + i;
                     }
                 }
 
                 Item hand = inventory.getItemInHandFast();
                 if (hand.getDamage() != 0 && hand.hasEnchantment(Enchantment.ID_MENDING)) {
-                    itemsWithMending.add(inventory.getHeldItemIndex());
+                    if (itemsWithMending == null) itemsWithMending = new int[6];
+                    itemsWithMending[mendingCount++] = inventory.getHeldItemIndex();
                 }
 
                 Item offhand = this.getOffhandInventory().getItem(0);
                 if (offhand.getId() == Item.SHIELD && offhand.getDamage() != 0 && offhand.hasEnchantment(Enchantment.ID_MENDING)) {
-                    itemsWithMending.add(-1);
+                    if (itemsWithMending == null) itemsWithMending = new int[6];
+                    itemsWithMending[mendingCount++] = -1;
                 }
 
-                if (!itemsWithMending.isEmpty()) {
-                    int itemToRepair = itemsWithMending.get(ThreadLocalRandom.current().nextInt(itemsWithMending.size()));
+                if (mendingCount != 0) {
+                    int itemToRepair = itemsWithMending[ThreadLocalRandom.current().nextInt(mendingCount)];
                     boolean isOffhand = itemToRepair == -1;
 
                     Item toRepair = isOffhand ? offhand : this.inventory.getItem(itemToRepair);
@@ -8926,6 +9160,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    /**
+     * The name a verified login is known by: format codes removed and whitespace at either end
+     * trimmed.
+     * <p>
+     * Clients can report {@code "Name "} or {@code " Name"} for the account that otherwise logs
+     * in as {@code "Name"}. Left untrimmed, the padded form derived its own offline identity and
+     * its own player data file, so one account owned two inventories and a relog between the two
+     * spellings loaded whatever the other file still held. Trimming also stops the padded form
+     * from slipping past a name ban, the whitelist and the duplicate login check. Spaces inside
+     * the name are part of it and stay.
+     *
+     * @param chainUsername name from the verified login chain
+     * @return the trimmed name, or {@code null} when the chain carries none
+     */
+    static String verifiedLoginName(String chainUsername) {
+        String cleaned = TextFormat.clean(chainUsername);
+        return cleaned == null ? null : cleaned.strip();
+    }
+
     // Called only by the main-thread AsyncTask completion after successful verification.
     void continueVerifiedLogin(Skin loginSkin, ClientChainData validated) {
         this.loginChainData = validated;
@@ -8945,7 +9198,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.version = loginChainData.getGameVersion();
 
         // Use verified identity data from ClientChainData (signature-validated) as the source of truth
-        String verifiedName = TextFormat.clean(loginChainData.getUsername());
+        // The name is trimmed before anything keys on it: whitelist, bans, the duplicate login
+        // check, the name lookup table and the offline identity all see the same string.
+        // Replace mode keeps its historical form ("Name " -> "Name_") and is not trimmed.
+        String verifiedName = this.server.spaceMode == 2
+                ? TextFormat.clean(loginChainData.getUsername())
+                : verifiedLoginName(loginChainData.getUsername());
         if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
             verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
         }
@@ -8965,6 +9223,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.minecraftId = loginChainData.getMinecraftId();
 
         boolean valid = true;
+        // Length and characters are still checked on the raw name, exactly as before trimming
+        // existed: a short name padded with a space ("gg ") keeps logging in.
         String rawVerifiedName = loginChainData.getUsername();
         int len = rawVerifiedName == null ? 0 : rawVerifiedName.length();
         if (((len > 16 || len < 3) && !gameVersion.isNetEase())
@@ -8991,6 +9251,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!valid || Objects.equals(this.iusername, "rcon") || Objects.equals(this.iusername, "console")) {
             this.close("", "disconnectionScreen.invalidName");
+            return;
+        }
+
+        // An Xbox login has its own profile and is not affected by an unfolded offline name.
+        String foldBlock = loginChainData.isXboxAuthed() ? null : this.server.profileFoldBlockReason(this.iusername);
+        if (foldBlock != null) {
+            this.server.getLogger().warning("Refused the offline login of " + this.username + ": the player data "
+                    + "saved under a padded spelling of this name was not folded at startup (" + foldBlock + ")");
+            this.close("", "Your player data is unavailable, please contact the server administrators");
             return;
         }
 

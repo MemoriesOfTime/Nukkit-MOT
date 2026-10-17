@@ -119,7 +119,7 @@ public class Potion implements Cloneable {
         potions[Potion.TURTLE_MASTER_II] = new Potion(Potion.TURTLE_MASTER_II, 2);
         potions[Potion.SLOW_FALLING] = new Potion(Potion.SLOW_FALLING);
         potions[Potion.SLOW_FALLING_LONG] = new Potion(Potion.SLOW_FALLING_LONG);
-        potions[Potion.SLOWNESS_IV] = new Potion(Potion.SLOWNESS, 4);
+        potions[Potion.SLOWNESS_IV] = new Potion(Potion.SLOWNESS_IV, 4);
         potions[Potion.WIND_CHARGED] = new Potion(Potion.WIND_CHARGED);
         potions[Potion.WEAVING] = new Potion(Potion.WEAVING);
         potions[Potion.OOZING] = new Potion(Potion.OOZING);
@@ -222,7 +222,7 @@ public class Potion implements Cloneable {
         switch (this.id) {
             case INSTANT_HEALTH:
             case INSTANT_HEALTH_II:
-                if (!entity.canBeAffected(this.id)) {
+                if (!entity.canBeAffected(Effect.HEALING)) {
                     break;
                 }
                 if (entity instanceof EntitySmite) {
@@ -233,7 +233,7 @@ public class Potion implements Cloneable {
                 break;
             case HARMING:
             case HARMING_II:
-                if (!entity.canBeAffected(this.id)) {
+                if (!entity.canBeAffected(Effect.HARMING)) {
                     break;
                 }
                 if (entity instanceof EntitySmite) {
@@ -310,10 +310,10 @@ public class Potion implements Cloneable {
                 break;
             case INSTANT_HEALTH:
             case INSTANT_HEALTH_II:
-                return Effect.getEffect(Effect.HEALING);
+                return Effect.getEffect(Effect.HEALING).setAmplifier(getLevel(potionType) - 1);
             case HARMING:
             case HARMING_II:
-                return Effect.getEffect(Effect.HARMING);
+                return Effect.getEffect(Effect.HARMING).setAmplifier(getLevel(potionType) - 1);
             case POISON:
             case POISON_LONG:
             case POISON_II:
@@ -368,7 +368,7 @@ public class Potion implements Cloneable {
         }
 
         if (getLevel(potionType) > 1) {
-            effect.setAmplifier(1);
+            effect.setAmplifier(getLevel(potionType) - 1);
         }
 
         if (!isInstant(potionType)) {
