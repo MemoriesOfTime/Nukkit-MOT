@@ -16,7 +16,7 @@ import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -349,7 +349,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
 
-        ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 1 : 0) + compressedPayload.length);
+        ByteBuf finalPayload = Unpooled.directBuffer((ci ? 1 : 0) + compressedPayload.length);
         if (ci) {
             finalPayload.writeByte(this.compressionOut.getPrefix());
         }
