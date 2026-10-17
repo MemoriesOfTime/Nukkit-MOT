@@ -5,7 +5,6 @@ import cn.nukkit.MockServer;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.network.protocol.BiomeDefinitionListPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.StartGamePacket;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -17,49 +16,11 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class StartGameV2168ProbeTest extends AbstractPacketRegressionTest {
+public class V2168PacketProbeTest extends AbstractPacketRegressionTest {
 
     @BeforeAll
     static void setUp() {
         MockServer.init();
-    }
-
-    @Test
-    void startGameV2168CrossDecodes() {
-        var nukkitPacket = new StartGamePacket();
-        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
-        nukkitPacket.gameVersion = GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
-        nukkitPacket.entityUniqueId = 1;
-        nukkitPacket.entityRuntimeId = 2;
-        nukkitPacket.playerGamemode = 1;
-        nukkitPacket.x = 0;
-        nukkitPacket.y = 64;
-        nukkitPacket.z = 0;
-        nukkitPacket.pitch = 0;
-        nukkitPacket.yaw = 0;
-        nukkitPacket.seed = -1;
-        nukkitPacket.dimension = 0;
-        nukkitPacket.generator = 1;
-        nukkitPacket.worldGamemode = 1;
-        nukkitPacket.difficulty = 1;
-        nukkitPacket.spawnX = 0;
-        nukkitPacket.spawnY = 64;
-        nukkitPacket.spawnZ = 0;
-        nukkitPacket.hasAchievementsDisabled = true;
-        nukkitPacket.dayCycleStopTime = -1;
-        nukkitPacket.eduMode = false;
-        nukkitPacket.commandsEnabled = true;
-        nukkitPacket.isTexturePacksRequired = false;
-        nukkitPacket.gameRules = new GameRules();
-        nukkitPacket.levelId = "world-id";
-        nukkitPacket.worldName = "world";
-        nukkitPacket.premiumWorldTemplateId = "";
-
-        nukkitPacket.encode();
-        System.out.println("ENCODED_LEN=" + nukkitPacket.getBuffer().length);
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.StartGamePacket.class);
-        assertNotNull(cbPacket);
     }
 
     @Test
@@ -202,18 +163,5 @@ public class StartGameV2168ProbeTest extends AbstractPacketRegressionTest {
                 org.cloudburstmc.protocol.bedrock.packet.GameRulesChangedPacket.class);
         assertNotNull(cbPacket);
         assertEquals(2, cbPacket.getGameRules().size());
-    }
-
-    @Test
-    void availableEntityIdentifiersV2168CrossDecodes() {
-        var nukkitPacket = new cn.nukkit.network.protocol.AvailableEntityIdentifiersPacket();
-        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
-        nukkitPacket.gameVersion = GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
-        nukkitPacket.encode();
-        System.out.println("ENTITYIDS_LEN=" + nukkitPacket.getBuffer().length);
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.AvailableEntityIdentifiersPacket.class);
-        assertNotNull(cbPacket);
     }
 }

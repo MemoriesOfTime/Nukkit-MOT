@@ -1,6 +1,7 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.MockServer;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBucket;
 import org.junit.jupiter.api.BeforeAll;
@@ -13,7 +14,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class CraftingManagerCakeRecipeTest {
+class CraftingManagerRecipeTest {
 
     private CraftingManager manager;
 
@@ -25,6 +26,35 @@ class CraftingManagerCakeRecipeTest {
     @BeforeEach
     void setUp() {
         manager = new CraftingManager();
+    }
+
+    @Test
+    void matchesCopperTorchRecipeWithStringItemDefaultIngredientAndItemTag() {
+        Item copperNugget = Item.fromString("minecraft:copper_nugget");
+        assertEquals(Item.STRING_IDENTIFIED_ITEM, copperNugget.getId());
+
+        CraftingRecipe recipe = manager.matchRecipe(
+                new ArrayList<>(List.of(copperNugget, Item.get(Item.COAL), Item.get(Item.STICK))),
+                Item.get(255 - BlockID.COPPER_TORCH, 0, 4),
+                Collections.emptyList()
+        );
+
+        assertNotNull(recipe);
+    }
+
+    @Test
+    void tagExpandedFurnaceRecipeKeepsStableClientRecipeMetadata() {
+        List<Item> cobblestoneRing = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            cobblestoneRing.add(Item.get(BlockID.COBBLESTONE));
+        }
+
+        CraftingRecipe recipe = manager.matchRecipe(cobblestoneRing, Item.get(BlockID.FURNACE), Collections.emptyList());
+
+        assertNotNull(recipe);
+        assertEquals("minecraft:furnace_from_cobblestone", recipe.getRecipeId(),
+                "expanded furnace recipes need stable recipe ids for client recipe book visibility");
+        assertEquals(-1, recipe.getPriority());
     }
 
     @Test

@@ -1,27 +1,89 @@
 package cn.nukkit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.math.Vector3;
+import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.types.PlayerActionType;
 import cn.nukkit.network.protocol.types.PlayerBlockActionData;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * A player who holds the dig button finishes one block and reaches for the next one inside a single
- * input tick. {@code PlayerAuthInputPacket} keeps the block actions of that tick in an
- * {@link EnumMap}, so they are replayed by {@link PlayerActionType} ordinal and the start of the
- * next block overtakes the completion of the current one. That order restarts the dig timer an
- * instant before the completion is judged, and the finished block is refused as a fast break.
+ * 覆盖 {@link Player} 的纯静态辅助方法：长枪戳刺冷却、近期速度、登录名修剪与方块动作排序。
+ * <p>
+ * Covers {@link Player}'s pure static helpers: spear jab cool down, recent velocity, verified login name trimming, and block action ordering.
  */
-class PlayerBlockActionOrderTest {
+class PlayerStaticHelpersTest {
+
+    @Test
+    void firstJabIsAlwaysAccepted() {
+        assertTrue(Player.isSpearJabReady(Integer.MIN_VALUE, 0, 19));
+        assertTrue(Player.isSpearJabReady(Integer.MIN_VALUE, Integer.MAX_VALUE, 19));
+    }
+
+    @Test
+    void jabInsideCoolDownIsRefused() {
+        assertFalse(Player.isSpearJabReady(100, 100, 19));
+        assertFalse(Player.isSpearJabReady(100, 115, 19));
+    }
+
+    @Test
+    void jabAfterCoolDownWithJitterIsAccepted() {
+        assertTrue(Player.isSpearJabReady(100, 116, 19));
+        assertTrue(Player.isSpearJabReady(100, 119, 19));
+    }
+
+    @Test
+    void freshStepIsTheVelocityPerTick() {
+        // speed holds from - to: a step of +0.56 on z over two ticks.
+        Vector3 velocity = Player.recentVelocity(new Vector3(0, 0, -0.56), 100, 2, 101);
+        assertEquals(0.28, velocity.z, 1e-9);
+        assertEquals(0.0, velocity.x, 1e-9);
+    }
+
+    @Test
+    void staleStepIsStandingStill() {
+        Vector3 velocity = Player.recentVelocity(new Vector3(0, 0, -0.28), 100, 1, 103);
+        assertEquals(0.0, velocity.lengthSquared(), 1e-12);
+    }
+
+    @Test
+    void noMovementYetIsStandingStill() {
+        assertEquals(0.0, Player.recentVelocity(null, 100, 1, 100).lengthSquared(), 1e-12);
+        assertEquals(0.0, Player.recentVelocity(new Vector3(0, 0, -0.28), -1, 1, 5).lengthSquared(), 1e-12);
+    }
+
+    @Test
+    void paddedNameIsTrimmedButInnerSpacesStay() {
+        assertEquals("Steve alex", Player.verifiedLoginName("Steve alex "));
+        assertEquals("Steve alex", Player.verifiedLoginName(" Steve alex"));
+        assertEquals("STEVE", Player.verifiedLoginName("  STEVE"));
+        assertEquals("Steve  alex", Player.verifiedLoginName("Steve  alex "));
+        assertEquals("Name", Player.verifiedLoginName("§aName §r"));
+        assertNull(Player.verifiedLoginName(null));
+    }
+
+    @Test
+    void paddedAndTrimmedNamesDeriveTheSameOfflineIdentity() {
+        assertEquals(EncryptionUtils.deriveOfflineIdentity("Name"),
+                EncryptionUtils.deriveOfflineIdentity(Player.verifiedLoginName("Name ")));
+        assertNotEquals(EncryptionUtils.deriveOfflineIdentity("Steve alex"),
+                EncryptionUtils.deriveOfflineIdentity(Player.verifiedLoginName("Steve  alex")),
+                "a space inside the name is part of it");
+    }
+
+    @Test
+    void paddingNoLongerHidesReservedNames() {
+        assertEquals("rcon", Player.verifiedLoginName("rcon "));
+        assertEquals("console", Player.verifiedLoginName(" console"));
+    }
 
     private static PlayerBlockActionData action(PlayerActionType type, int x, int y, int z) {
         return new PlayerBlockActionData(type, new BlockVector3(x, y, z), 1);
