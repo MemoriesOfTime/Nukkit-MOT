@@ -34,7 +34,30 @@ public class SpawnerTask implements Runnable {
      */
     private boolean mobsNext;
 
+    /**
+     * Ticks of one turn of {@link #tick()}: monsters and animals take turns, each spawner of the turn once.
+     */
+    private final int period;
+
     public SpawnerTask() {
+        this(100);
+    }
+
+    /**
+     * @param period ticks of one turn of {@link #tick()}, half of {@code ticks-per-spawns}
+     */
+    public SpawnerTask(int period) {
+        this(period, true);
+    }
+
+    SpawnerTask(int period, boolean registerDefaults) {
+        this.period = Math.max(1, period);
+        if (registerDefaults) {
+            this.registerDefaultSpawners();
+        }
+    }
+
+    private void registerDefaultSpawners() {
         this.registerAnimalSpawner(BatSpawner.class);
         this.registerAnimalSpawner(ChickenSpawner.class);
         this.registerAnimalSpawner(CowSpawner.class);
@@ -159,6 +182,49 @@ public class SpawnerTask implements Runnable {
         return this.mobSpawners.remove(clazz) != null;
     }
 
+    /**
+     * Spawns for one server tick. The server calls this every tick instead of {@link #run()} every
+     * {@code period} ticks: run() started every spawner of a turn in one tick, for every player of every
+     * level, and that tick was also the one of the chunk garbage collection and the minute-aligned tasks.
+     * Here each spawner of the turn starts at its own tick of the period, never at its phase 0, and
+     * still spawns once per turn; monsters and animals still take turns.
+     */
+    public void tick() {
+        Server server = Server.getInstance();
+        this.tick(server.getTick(), server.getOnlinePlayersCount() != 0, server.spawnMonsters, server.spawnAnimals);
+    }
+
+    void tick(int serverTick, boolean playersOnline, boolean monsters, boolean animals) {
+        if (!playersOnline) {
+            return;
+        }
+        int turn = Math.floorDiv(serverTick, this.period);
+        int phase = Math.floorMod(serverTick, this.period);
+        boolean monsterTurn = (turn & 1) == 0;
+        if (monsterTurn ? !monsters : !animals) {
+            return;
+        }
+        Map<Class<?>, EntitySpawner> spawners = monsterTurn ? this.mobSpawners : this.animalSpawners;
+        int count = spawners.size();
+        int index = 0;
+        for (EntitySpawner spawner : spawners.values()) {
+            if (slot(index++, count, this.period) == phase) {
+                spawner.spawn();
+            }
+        }
+    }
+
+    /**
+     * Tick of the period at which spawner {@code index} of {@code count} starts: spread evenly over 1..period-1.
+     */
+    static int slot(int index, int count, int period) {
+        return period <= 1 ? 0 : 1 + (int) ((long) index * (period - 1) / count);
+    }
+
+    /**
+     * Spawns every spawner of the next turn at once. Kept for callers that drive the task themselves;
+     * the server uses {@link #tick()}.
+     */
     @Override
     public void run() {
         if (Server.getInstance().getOnlinePlayersCount() != 0) {
