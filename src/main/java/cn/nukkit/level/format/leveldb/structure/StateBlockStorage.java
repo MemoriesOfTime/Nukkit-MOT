@@ -553,7 +553,7 @@ public class StateBlockStorage {
             this.version++;
             this.networkSnapshot = null;
             BlockStateSnapshot firstId = this.palette.get(0);
-            this.palette.clear();
+            this.palette = new ObjectArrayList<>(1);
             this.palette.add(firstId);
 
 //            Arrays.fill(this.bitArray.getWords(), 0);
@@ -564,7 +564,7 @@ public class StateBlockStorage {
 
         BitArrayVersion version = BitArrayVersion.V2;
         BitArray newArray = version.createPalette(SECTION_SIZE);
-        List<BlockStateSnapshot> newPalette = new ObjectArrayList<>(count);
+        ObjectArrayList<BlockStateSnapshot> newPalette = new ObjectArrayList<>(count);
         newPalette.add(this.palette.get(0));
         // Remap each old palette entry once, instead of searching an expanding list
         // for every cell. Keep entry zero and first-use order exactly as before.
@@ -599,6 +599,8 @@ public class StateBlockStorage {
 
             newArray.set(i, newIndex);
         }
+        // Drop the historical high-water capacity together with unused states.
+        newPalette.trim();
         this.networkSnapshot = null;
         this.bitArray = newArray;
         this.palette = newPalette;
