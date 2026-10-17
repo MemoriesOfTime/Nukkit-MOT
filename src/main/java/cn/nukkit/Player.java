@@ -6294,10 +6294,37 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        Block block = target.getSide(face);
+        Block block = target.getId() == Block.FIRE || target.getId() == Block.SOUL_FIRE
+                ? target : target.getSide(face);
         if (block.getId() == Block.FIRE || block.getId() == Block.SOUL_FIRE) {
-            this.level.setBlock(block, Block.get(BlockID.AIR), true);
-            this.level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_EXTINGUISH_FIRE);
+            // A fire hit ends here; it must not retain another block's active break state.
+            this.breakingBlock = null;
+            if (this.isSpectator() || !this.canInteract(block.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7)) {
+                return;
+            }
+            Level fireLevel = block.getLevel();
+            if (block != target) {
+                // Keep the original support interaction and also authorize the block we mutate.
+                PlayerInteractEvent fireEvent = new PlayerInteractEvent(this, this.inventory.getItemInHand(),
+                        block, face, Action.LEFT_CLICK_BLOCK);
+                this.getServer().getPluginManager().callEvent(fireEvent);
+                if (fireEvent.isCancelled()) {
+                    this.needSendHeldItem = true;
+                    return;
+                }
+            }
+            // A synchronous protection callback can move the player or replace the flame.
+            if (this.level != fireLevel || this.isSpectator()
+                    || !this.canInteract(block.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7)) {
+                return;
+            }
+            Block live = fireLevel.getBlock(block);
+            if (live.getId() != Block.FIRE && live.getId() != Block.SOUL_FIRE) {
+                return;
+            }
+            if (fireLevel.setBlock(live, Block.get(BlockID.AIR), true)) {
+                fireLevel.addLevelSoundEvent(live, LevelSoundEventPacket.SOUND_EXTINGUISH_FIRE);
+            }
             return;
         }
 
