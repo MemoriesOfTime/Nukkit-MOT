@@ -111,11 +111,7 @@ public class LevelDBChunkSection implements ChunkSection {
         }
 
         int count = maxLayer + 1;
-        if (count == storages.length) {
-            this.storages = storages;
-        }
-
-        this.storages = Arrays.copyOf(this.storages, count);
+        this.storages = Arrays.copyOf(storages, count);
 
         this.blockLight = blockLight;
         this.skyLight = skyLight;
