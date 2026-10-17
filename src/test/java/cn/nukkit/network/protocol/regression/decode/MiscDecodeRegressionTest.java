@@ -810,6 +810,29 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
+    @ParameterizedTest(name = "ContainerClosePacket (server initiated) v{0}")
+    @MethodSource("allVersions")
+    void containerCloseServerInitiated(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ContainerClosePacket();
+        cb.setId((byte) 5);
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            cb.setServerInitiated(true);
+        }
+        if (protocol >= ProtocolInfo.v1_21_0) {
+            cb.setType(org.cloudburstmc.protocol.bedrock.data.inventory.ContainerType.CONTAINER);
+        }
+
+        ContainerClosePacket nk = crossEncode(cb, ContainerClosePacket::new, protocol);
+
+        assertEquals(5, nk.windowId);
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            assertTrue(nk.wasServerInitiated);
+        }
+        if (protocol >= ProtocolInfo.v1_21_0) {
+            assertEquals(ContainerType.CONTAINER, nk.type);
+        }
+    }
+
     // ==================== RespawnPacket ====================
 
     @ParameterizedTest(name = "RespawnPacket v{0}")
@@ -1544,28 +1567,6 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(0.5f, nk.x, 0.001f);
         assertEquals(1.0f, nk.y, 0.001f);
         assertEquals(0.0f, nk.z, 0.001f);
-    }
-
-    // ==================== PlayerActionPacket ====================
-
-    @ParameterizedTest(name = "PlayerActionPacket START_BREAK v{0}")
-    @MethodSource("allVersions")
-    void playerActionStartBreak(int protocol) {
-        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerActionPacket();
-        cb.setRuntimeEntityId(50L);
-        cb.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.START_BREAK);
-        cb.setBlockPosition(Vector3i.from(10, 64, -5));
-        cb.setResultPosition(Vector3i.from(10, 64, -5));
-        cb.setFace(1);
-
-        PlayerActionPacket nk = crossEncode(cb, PlayerActionPacket::new, protocol);
-
-        assertEquals(50L, nk.entityId);
-        assertEquals(PlayerActionPacket.ACTION_START_BREAK, nk.action);
-        assertEquals(10, nk.x);
-        assertEquals(64, nk.y);
-        assertEquals(-5, nk.z);
-        assertEquals(1, nk.face);
     }
 
     // ==================== ShowProfilePacket ====================

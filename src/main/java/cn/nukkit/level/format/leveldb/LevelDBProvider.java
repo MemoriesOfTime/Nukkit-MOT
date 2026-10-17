@@ -39,6 +39,7 @@ import org.iq80.leveldb.*;
 
 import javax.annotation.Nullable;
 import java.io.*;
+import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -289,8 +290,29 @@ public class LevelDBProvider implements LevelProvider {
                 .createIfMissing(true)
                 .compressionType(CompressionType.ZLIB_RAW)
                 .cacheSize(1024L * 1024L * Server.getInstance().levelDbCache)
+                .writeBufferSize(1024 * 1024 * writeBufferSizeMb(getTotalPhysicalMemory()))
                 .blockSize(64 * 1024);
         return Server.getInstance().useNativeLevelDB ? LevelDB.PROVIDER.open(dir, options) : JAVA_LDB_PROVIDER.open(dir, options);
+    }
+
+    static int writeBufferSizeMb(long totalMemoryBytes) {
+        long gib = 1024L * 1024L * 1024L;
+        if (totalMemoryBytes < gib) {
+            return 2;
+        } else if (totalMemoryBytes <= 2 * gib) {
+            return 4;
+        } else if (totalMemoryBytes <= 6 * gib) {
+            return 8;
+        }
+        return 16;
+    }
+
+    private static long getTotalPhysicalMemory() {
+        var operatingSystem = ManagementFactory.getOperatingSystemMXBean();
+        if (operatingSystem instanceof com.sun.management.OperatingSystemMXBean systemBean) {
+            return systemBean.getTotalMemorySize();
+        }
+        return Runtime.getRuntime().maxMemory();
     }
 
     private void migrateLegacyNukkitFinalizationStates() {
@@ -854,7 +876,24 @@ public class LevelDBProvider implements LevelProvider {
             return pw;
         });
         this.warnOnPendingWriteBacklog();
+        Server.getInstance().touchShutdownProgress();
         return ticket[0];
+    }
+
+    /**
+     * 槽位里已有与区块当前版本一致的待写批次(排队中或写入中)。/ A slot holds a queued or writing batch matching the chunk's current version.
+     */
+    private boolean isPendingWriteCurrent(long hash, LevelDBChunk chunk) {
+        PendingWrite pw = this.pendingWrites.get(hash);
+        if (pw == null) {
+            return false;
+        }
+        pw.lock.lock();
+        try {
+            return (pw.batch != null || pw.writing) && pw.changeSnapshot == chunk.getChanges();
+        } finally {
+            pw.lock.unlock();
+        }
     }
 
     /**
@@ -964,7 +1003,11 @@ public class LevelDBProvider implements LevelProvider {
             pw.lock.lock();
             pw.writing = false;
         }
-        if (error == null) pw.durableSequence = Math.max(pw.durableSequence, sequence);
+        if (error == null) {
+            pw.durableSequence = Math.max(pw.durableSequence, sequence);
+            // drain 阶段 watchdog 仅靠此处心跳。/ The drain's only heartbeat for the watchdog.
+            Server.getInstance().touchShutdownProgress();
+        }
         if (pw.sequence != sequence) {
             // A newer main-thread snapshot owns the metadata/retry budget now. It will be
             // committed next; never restore an older failed batch over it or clear its changes.
@@ -1204,7 +1247,7 @@ public class LevelDBProvider implements LevelProvider {
                 || (deferredBlockUpdates != null && !deferredBlockUpdates.isEmpty())) {
             NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, deferredBlockUpdates, currentTick);
             if (ticks != null) {
-                ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+                ByteBuf byteBuf = Unpooled.buffer();
                 try {
                     try (NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf))) {
                         outputStream.writeTag(ticks);
@@ -1265,17 +1308,22 @@ public class LevelDBProvider implements LevelProvider {
             if (wait) {
                 // 单个区块失败不得中断其余区块的保存。/ One failing chunk must not abort the remaining saves.
                 try {
-                    // 先提交挂起写，避免关闭时重复序列化。/ Commit pending data before close-time save.
-                    this.commitPendingWrite(Level.chunkHash(chunk.getX(), chunk.getZ()));
-                    // 落盘后仍脏才同步重存。/ Sync-save only if still dirty.
-                    if (chunk.hasChanged()) {
-                        this.saveChunkSync(chunk.getX(), chunk.getZ(), chunk);
+                    // 关服路径只排队快照,落盘交单线程 executor 串行执行;主线程同步 db.write 会被 write stall 挂起。
+                    // The close path only stages snapshots; writes go to the single-thread executor,
+                    // since a synchronous db.write on the main thread hangs on write stalls.
+                    long hash = Level.chunkHash(chunk.getX(), chunk.getZ());
+                    if (chunk.isGenerated() && chunk.hasChanged() && !this.isPendingWriteCurrent(hash, chunk)) {
+                        this.stagePendingWrite(hash, chunk.getX(), chunk.getZ(), chunk, true);
+                        this.executor.execute(() -> this.commitPendingWrite(hash));
                     }
                 } catch (Exception e) {
-                    log.error("Failed to save chunk {}, {} during close for: {}", chunk.getX(), chunk.getZ(), this.getName(), e);
+                    log.error("Failed to stage chunk {}, {} during close for: {}", chunk.getX(), chunk.getZ(), this.getName(), e);
                 }
+                // 保存已显式排队,跳过卸载的内嵌保存避免重复序列化。/ Saving was staged above; skip the unload's own save.
+                chunk.unload(false, false);
+            } else {
+                chunk.unload(level.isSaveOnUnloadEnabled(), false);
             }
-            chunk.unload(level.isSaveOnUnloadEnabled(), false);
             iterator.remove();
         }
     }
@@ -1504,7 +1552,27 @@ public class LevelDBProvider implements LevelProvider {
             this.executor.shutdown();
             boolean drained = false;
             try {
-                drained = this.executor.awaitTermination(this.closeDrainTimeoutMillis, TimeUnit.MILLISECONDS);
+                // 轮询本身不算进度:心跳只来自 executor 的每次落盘,否则 executor 真死会被误判为健康。
+                // Polling is not progress: the heartbeat comes only from executor commits, or a dead executor looks healthy.
+                long drainDeadline = System.currentTimeMillis() + this.closeDrainTimeoutMillis;
+                // 首条 5 秒内即出,避免序列化后紧接着又一段静默。/ First line lands within 5s to avoid another silent gap after serialization.
+                long lastDrainLog = System.currentTimeMillis() - 25000;
+                while (!(drained = this.executor.awaitTermination(Math.max(1L,
+                        Math.min(5000L, drainDeadline - System.currentTimeMillis())), TimeUnit.MILLISECONDS))) {
+                    if (System.currentTimeMillis() >= drainDeadline) {
+                        break;
+                    }
+                    if (System.currentTimeMillis() - lastDrainLog >= 30000) {
+                        lastDrainLog = System.currentTimeMillis();
+                        // 传 String[] 走 varargs 重载;三个散参 String 会被 (String,String,String) 重载
+                        // 当作 onlyPrefix 吞掉,导致输出键名而非翻译
+                        // Pass a String[] for the varargs overload; three loose Strings hit the
+                        // (String,String,String) overload, which treats the count as onlyPrefix
+                        // and prints the raw key instead of the translation
+                        log.info(Server.getInstance().getLanguage().translateString("nukkit.shutdown.waitingWrites",
+                                new String[]{this.getName(), String.valueOf(this.pendingWrites.size())}));
+                    }
+                }
                 if (!drained) {
                     log.warn("LevelDB executor did not terminate in time, forcing shutdown for: {}", this.getName());
                     java.util.List<Runnable> droppedTasks = this.executor.shutdownNow();
@@ -1533,6 +1601,7 @@ public class LevelDBProvider implements LevelProvider {
                     // 单个槽位失败不得中断其余槽位的排空。/ One failing slot must not abort the remaining flushes.
                     try {
                         this.commitPendingWrite(hash);
+                        Server.getInstance().touchShutdownProgress();
                     } catch (DBException e) {
                         log.error("Failed to flush pending chunk write at {}, {} during close for: {}",
                                 Level.getHashX(hash), Level.getHashZ(hash), this.getName(), e);
@@ -1549,6 +1618,8 @@ public class LevelDBProvider implements LevelProvider {
                     if (System.currentTimeMillis() >= deadline
                             || !this.tryCommitPendingWrite(hash, this.closeSweepLockTimeoutMillis)) {
                         abandoned++;
+                    } else {
+                        Server.getInstance().touchShutdownProgress();
                     }
                 }
                 if (abandoned > 0) {

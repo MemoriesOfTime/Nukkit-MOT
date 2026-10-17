@@ -1023,7 +1023,7 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
 
     /**
      * Typed pickup snapshot, using PNX's loaded-only item query and MOT's chunk/iteration order.
-     * Empty indexed chunks never traverse their entity map. A lazy linked snapshot avoids the
+     * Empty indexed chunks never traverse their entity map. A lazy detached snapshot avoids the
      * intermediate Entity array while preserving the old pre-event spatial snapshot: a plugin
      * moving or spawning an entity during pickup must not change this query's remaining results.
      */
@@ -1046,7 +1046,7 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                 for (Entity entity : chunk.getEntities().values()) {
                     if (FullChunk.isPickupEntity(entity, itemsOnly)
                             && (itemsOnly ? entity.getBoundingBox() : entity.boundingBox).intersectsWith(boundingBox)) {
-                        if (nearby == null) nearby = new LinkedList<>();
+                        if (nearby == null) nearby = new ArrayList<>(3);
                         nearby.add(entity);
                     }
                 }

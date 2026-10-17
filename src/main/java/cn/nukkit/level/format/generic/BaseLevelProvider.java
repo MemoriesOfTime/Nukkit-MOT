@@ -329,6 +329,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
             if (chunk.getChanges() != 0) {
                 this.saveChunk(chunk.getX(), chunk.getZ());
                 chunk.setChanged(false);
+                Server.getInstance().touchShutdownProgress();
             }
         }
     }
