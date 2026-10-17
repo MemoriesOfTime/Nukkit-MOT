@@ -5107,13 +5107,18 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean populateChunk(int x, int z, boolean force) {
+        long index = Level.chunkHash(x, z);
+        // PopulationTask publishes its populated flag before height and light work finishes.
+        if (this.chunkPopulationQueue.containsKey(index)) {
+            return false;
+        }
+
         BaseFullChunk loadedChunk = this.getChunkIfLoaded(x, z);
         if (loadedChunk != null && loadedChunk.isPopulated()) {
             return true;
         }
 
-        long index = Level.chunkHash(x, z);
-        if (this.chunkPopulationQueue.containsKey(index) || this.chunkPopulationQueue.size() >= this.chunkPopulationQueueSize && !force) {
+        if (this.chunkPopulationQueue.size() >= this.chunkPopulationQueueSize && !force) {
             return false;
         }
 
