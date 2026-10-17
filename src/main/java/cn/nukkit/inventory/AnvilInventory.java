@@ -30,10 +30,11 @@ public class AnvilInventory extends FakeBlockUIComponent {
         who.craftingType = Player.CRAFTING_SMALL;
         who.resetCraftingGridType();
 
-        for (int i = 0; i < 2; ++i) {
-            this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), this.getItem(i));
-            this.clear(i);
-        }
+        // Like every other station: back into the backpack, only the overflow on the ground,
+        // and nothing at all in creative, where the inputs are free items.
+        who.returnUiItems(this.getItem(TARGET), this.getItem(SACRIFICE));
+        this.clear(TARGET);
+        this.clear(SACRIFICE);
     }
 
     @Override

@@ -65,6 +65,11 @@ public class BlockSlabStone4 extends BlockSlab {
     }
 
     @Override
+    public double getHardness() {
+        return (this.getDamage() & 0x07) == MOSSY_STONE_BRICKS ? 1.5 : 2;
+    }
+
+    @Override
     public int getToolType() {
         return ItemTool.TYPE_PICKAXE;
     }

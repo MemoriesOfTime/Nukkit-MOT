@@ -8,17 +8,14 @@ import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import tel.schich.libdatachannel.*;
 
-import java.net.DatagramSocket;
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
+import java.net.*;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -111,14 +108,14 @@ class NetherNetSharedPortRelayIntegrationTest {
 
         this.client.setLocalDescription("offer");
         clientSide.gathered.get(10, TimeUnit.SECONDS);
-        signaling.handler.onConnect(1L, "peer", this.client.localDescription(), null, null);
+        signaling.handler.onConnect("1", "peer", this.client.localDescription(), null, null);
         String strippedOffer = offerForServer.get(5, TimeUnit.SECONDS);
         assertFalse(strippedOffer.contains("a=candidate:"), "the server never learns the client's own candidates");
 
         this.server.setRemoteDescription(strippedOffer, SessionDescriptionType.OFFER);
         this.server.setLocalDescription("answer");
         serverSide.gathered.get(10, TimeUnit.SECONDS);
-        decorated.sendFullSdp("peer", this.server.localDescription());
+        decorated.sendDescription("peer", this.server.localDescription());
         String answer = signaling.lastSdp;
         assertNotNull(answer);
         assertTrue(answer.contains(" " + LOOPBACK.getHostAddress() + " " + listenerPort + " typ host"),
@@ -208,7 +205,7 @@ class NetherNetSharedPortRelayIntegrationTest {
         String lastSdp;
 
         @Override
-        public void sendFullSdp(String targetNetworkId, String sdp) {
+        public void sendDescription(String targetNetworkId, String sdp) {
             this.lastSdp = sdp;
         }
 
@@ -226,11 +223,11 @@ class NetherNetSharedPortRelayIntegrationTest {
         }
 
         @Override
-        public void setSignalHandler(long connectionId, SignalHandler handler) {
+        public void setSignalHandler(String connectionId, SignalHandler handler) {
         }
 
         @Override
-        public void removeSignalHandler(long connectionId) {
+        public void removeSignalHandler(String connectionId) {
         }
 
         @Override
