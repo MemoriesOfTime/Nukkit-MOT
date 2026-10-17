@@ -24,6 +24,11 @@ public class ChunkSettings extends OkaeriConfig {
     @CustomKey("ticking-radius")
     private int tickingRadius = 3;
 
+    @Comment("Pause block entities outside the existing chunk ticking range; keep queued updates for resumption")
+    @Comment("Disable to restore updates in every loaded chunk. BlockEntity.alwaysTick() opts out without pinning chunks.")
+    @CustomKey("block-entity-ticking-range")
+    private boolean blockEntityTickingRange = true;
+
     @Comment("Chunk generation queue size")
     @CustomKey("generation-queue-size")
     private int generationQueueSize = 8;
