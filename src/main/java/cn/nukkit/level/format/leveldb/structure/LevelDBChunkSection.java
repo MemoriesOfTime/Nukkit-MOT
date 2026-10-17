@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -39,6 +40,10 @@ public class LevelDBChunkSection implements ChunkSection {
 
     protected final int y;
     protected StateBlockStorage[] storages;
+
+    // Positive-only memo. Storage replacement or mutation must recheck the palette.
+    private volatile StateBlockStorage randomTickStorage;
+    private volatile int randomTickStorageVersion;
 
 
     protected byte[] blockLight;
@@ -284,6 +289,38 @@ public class LevelDBChunkSection implements ChunkSection {
             }
 
             return this.storages[layer].get(x, y, z);
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
+    /**
+     * Batch at most sixteen consecutive random samples under one read lock. Stop at the
+     * first ticking block: its callback must run after unlocking and before the next RNG
+     * draw or state read. The result stores consumed attempts in bits 44+, local x/z/y
+     * in bits 32/36/40, and the full block in bits 0..31; air means no callback.
+     */
+    public long sampleRandomTickBlocks(int attempts, Random random) {
+        int limit = Math.min(attempts, 16);
+        if (limit <= 0) {
+            return 0L;
+        }
+        this.readLock.lock();
+        try {
+            StateBlockStorage storage = this.hasLayerUnsafe(0) ? this.storages[0] : null;
+            for (int consumed = 1; consumed <= limit; consumed++) {
+                int n = random.nextInt();
+                int x = n & 0xF;
+                int z = n >>> 8 & 0xF;
+                int y = n >>> 16 & 0xF;
+                int fullBlock = storage == null ? BlockID.AIR : storage.get(x, y, z);
+                if (Level.isRandomTickBlock(fullBlock >> Block.DATA_BITS)) {
+                    int position = x | (z << 4) | (y << 8);
+                    return ((long) consumed << 44) | ((long) position << 32)
+                            | (fullBlock & 0xffffffffL);
+                }
+            }
+            return (long) limit << 44;
         } finally {
             this.readLock.unlock();
         }
@@ -762,6 +799,39 @@ public class LevelDBChunkSection implements ChunkSection {
             this.readLock.unlock();
         }
     }
+
+    @Override
+    public boolean mayHaveRandomTickBlocks() {
+        // Legacy subclasses may expose ticking blocks through their virtual reads.
+        if (this.getClass() != LevelDBChunkSection.class) {
+            return true;
+        }
+        StateBlockStorage[] current = this.storages;
+        StateBlockStorage storage = current.length == 0 ? null : current[0];
+        if (storage != null && storage == this.randomTickStorage
+                && storage.getVersion() == this.randomTickStorageVersion) {
+            return true;
+        }
+        // A busy writer is not evidence of an empty section. Fall back to the usual samples.
+        if (!this.readLock.tryLock()) {
+            return true;
+        }
+        try {
+            storage = this.hasLayerUnsafe(0) ? this.storages[0] : null;
+            if (storage != null && storage.mayHaveRandomTickBlocks()) {
+                this.randomTickStorageVersion = storage.getVersion();
+                this.randomTickStorage = storage;
+                return true;
+            }
+            // Never memoize a negative: borrowed data and dynamic mappings can change
+            // without the storage mutation counter.
+            this.randomTickStorage = null;
+            return false;
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
 
     public StateBlockStorage[] getStorages() {
         return storages;
