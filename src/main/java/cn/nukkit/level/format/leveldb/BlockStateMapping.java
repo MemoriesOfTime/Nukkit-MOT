@@ -175,6 +175,12 @@ public class BlockStateMapping {
     public void clearMapping() {
         this.runtime2State.clear();
         this.paletteMap.clear();
+        // The caller is about to rebuild the palette with custom blocks inserted, which shifts
+        // every runtime id. A default resolved against the previous palette would keep pointing
+        // at a runtime id that now belongs to a different state - and to one the legacy tables
+        // may not map at all, so every later lookup of an unknown state would fail.
+        this.defaultRuntimeId = -1;
+        this.defaultState = null;
         synchronized (this.customCacheMap) {
             this.customCacheMap.clear();
         }
@@ -250,7 +256,7 @@ public class BlockStateMapping {
         int fullId = this.legacyMapper.runtimeToFullId(runtimeId);
         if (fullId == -1) {
             log.warn("Can not find legacyId! No runtime2FullId mapping for {}", runtimeId);
-            fullId = this.legacyMapper.runtimeToFullId(this.getDefaultRuntimeId());
+            fullId = this.legacyMapper.runtimeToFullId(this.getMappedDefaultRuntimeId());
             Preconditions.checkArgument(fullId != -1, "Can not find fullId for default runtimeId: " + this.getDefaultRuntimeId());
         }
         return fullId;
@@ -260,7 +266,7 @@ public class BlockStateMapping {
         int legacyId = this.legacyMapper.runtimeToLegacyId(runtimeId);
         if (legacyId == -1) {
             log.warn("Can not find legacyId! No runtime2legacy mapping for " + runtimeId);
-            legacyId = this.legacyMapper.runtimeToLegacyId(this.getDefaultRuntimeId());
+            legacyId = this.legacyMapper.runtimeToLegacyId(this.getMappedDefaultRuntimeId());
             Preconditions.checkArgument(legacyId != -1, "Can not find legacyId for default runtimeId: " + this.getDefaultRuntimeId());
         }
         return legacyId;
@@ -270,9 +276,27 @@ public class BlockStateMapping {
         int data = this.legacyMapper.runtimeToLegacyData(runtimeId);
         if (data == -1) {
             log.warn("Can not find legacyId! No runtime2legacy mapping for " + runtimeId);
-            data = this.legacyMapper.runtimeToLegacyData(this.getDefaultRuntimeId());
+            data = this.legacyMapper.runtimeToLegacyData(this.getMappedDefaultRuntimeId());
             Preconditions.checkArgument(data != -1, "Can not find legacyData for default runtimeId: " + this.getDefaultRuntimeId());        }
         return data;
+    }
+
+    /**
+     * 回退到默认方块时使用的 runtimeId：若缓存的默认值在当前调色板中已无 legacy 映射，则重新解析一次。
+     * <p>
+     * The runtime id to fall back on. A palette rebuild replaces every runtime id, so a default
+     * cached before the rebuild can survive as a stale value with no legacy mapping left. Failing
+     * here aborts the level tick for every unknown state in the world, so re-resolve the default
+     * once instead; only a default that cannot be resolved at all still raises.
+     */
+    private int getMappedDefaultRuntimeId() {
+        int runtimeId = this.getDefaultRuntimeId();
+        if (this.legacyMapper.runtimeToFullId(runtimeId) != -1) {
+            return runtimeId;
+        }
+        log.warn("Default block state {} has no legacy mapping, resolving it again", runtimeId);
+        this.setDefaultBlock(Block.INFO_UPDATE, 0);
+        return this.defaultRuntimeId;
     }
 
     public void setDefaultBlock(int legacyId, int legacyData) {
