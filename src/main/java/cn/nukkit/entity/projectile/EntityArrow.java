@@ -28,6 +28,10 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
  */
 public class EntityArrow extends EntitySlenderProjectile {
 
+    private ArrowImpact activeArrowImpact;
+
+    private record ArrowImpact(Entity target, ArrowImpact previous) {}
+
     public static final int NETWORK_ID = 80;
 
     public static final int DATA_SOURCE_ID = 17;
@@ -253,52 +257,68 @@ public class EntityArrow extends EntitySlenderProjectile {
 
     @Override
     public void onCollideWithEntity(Entity entity) {
-        super.onCollideWithEntity(entity);
-
-        for (Effect effect : mobEffects.values()) {
-            switch (effect.getId()) {
-                case Effect.NO_EFFECT:
-                    break;
-                case Effect.INSTANT_HEALTH:
-                    if (!entity.canBeAffected(effect.getId())) {
+        if (this.closed) {
+            return;
+        }
+        // Preserve distinct-target plugin redirects, but reject cycles through active targets.
+        for (ArrowImpact impact = this.activeArrowImpact; impact != null; impact = impact.previous) {
+            if (impact.target == entity) {
+                return;
+            }
+        }
+        ArrowImpact previous = this.activeArrowImpact;
+        this.activeArrowImpact = new ArrowImpact(entity, previous);
+        try {
+            if (!super.onCollideWithEntityAccepted(this, entity)) {
+                return;
+            }
+            for (Effect effect : mobEffects.values()) {
+                switch (effect.getId()) {
+                    case Effect.NO_EFFECT:
                         break;
-                    }
-                    if (entity instanceof EntitySmite) {
-                        if (shootingEntity != null) {
+                    case Effect.INSTANT_HEALTH:
+                        if (!entity.canBeAffected(effect.getId())) {
+                            break;
+                        }
+                        if (entity instanceof EntitySmite) {
+                            if (shootingEntity != null) {
+                                entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                            } else {
+                                entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                            }
+                        } else {
+                            entity.heal(new EntityRegainHealthEvent(entity, 0.5f * (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
+                        }
+                        break;
+                    case Effect.INSTANT_DAMAGE:
+                        if (!entity.canBeAffected(effect.getId())) {
+                            break;
+                        }
+                        if (entity instanceof EntitySmite) {
+                            entity.heal(new EntityRegainHealthEvent(entity, 0.5f * (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
+                        } else if (shootingEntity != null) {
                             entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
                         } else {
                             entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
                         }
-                    } else {
-                        entity.heal(new EntityRegainHealthEvent(entity, 0.5f * (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
-                    }
-                    break;
-                case Effect.INSTANT_DAMAGE:
-                    if (!entity.canBeAffected(effect.getId())) {
                         break;
-                    }
-                    if (entity instanceof EntitySmite) {
-                        entity.heal(new EntityRegainHealthEvent(entity, 0.5f * (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
-                    } else if (shootingEntity != null) {
-                        entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
-                    } else {
-                        entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
-                    }
-                    break;
-                case Effect.SATURATION:
-                    if (entity instanceof Player player) {
-                        int level = 1 + effect.getAmplifier();
-                        player.getFoodData().addFoodLevel(level, level * 2);
-                    }
-                    break;
-                default:
-                    Effect clone = effect.clone();
-                    if (!this.isFullEffect) {
-                        clone.setDuration(effect.getDuration() / 8);
-                    }
-                    entity.addEffect(clone, EntityPotionEffectEvent.Cause.ARROW);
-                    break;
+                    case Effect.SATURATION:
+                        if (entity instanceof Player player) {
+                            int level = 1 + effect.getAmplifier();
+                            player.getFoodData().addFoodLevel(level, level * 2);
+                        }
+                        break;
+                    default:
+                        Effect clone = effect.clone();
+                        if (!this.isFullEffect) {
+                            clone.setDuration(effect.getDuration() / 8);
+                        }
+                        entity.addEffect(clone, EntityPotionEffectEvent.Cause.ARROW);
+                        break;
+                }
             }
+        } finally {
+            this.activeArrowImpact = previous;
         }
     }
 }
