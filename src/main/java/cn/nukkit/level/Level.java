@@ -1424,7 +1424,8 @@ public class Level implements ChunkManager, Metadatable {
             NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
-                this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
+                this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload(),
+                        data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities());
             }
         }
 
@@ -4656,7 +4657,13 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
-        this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp, x, z, subChunkCount, payload));
+        this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload, null, null, null);
+    }
+
+    public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                          List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities) {
+        this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(
+                gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities));
     }
 
     /**
@@ -4674,6 +4681,17 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
+        this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload, null, null, null);
+    }
+
+    /**
+     * 序列化回调装配：按接收者能力分流——全量推送 / 全量+blob 哈希 / 子区块 shell。
+     * <p>
+     * Serializer callback assembly: recipients are partitioned by delivery mode —
+     * full payload / full payload + blob hashes / sub-chunk shell.
+     */
+    public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                     List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities) {
         long index = Level.chunkHash(x, z);
 
         if (!this.retainChunkRecipients(protocol, index)) {
@@ -4682,7 +4700,25 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
-        if (server.cacheChunks) {
+        Int2ObjectMap<Player> recipients = this.getChunkSendQueue(protocol).get(index);
+        boolean anyBlobMode = false;
+        boolean anyPullMode = false;
+        if (recipients != null) {
+            for (Player player : recipients.values()) {
+                if (this.isChunkRecipient(player, index) && matchMVChunkProtocol(protocol, player.getGameVersion())) {
+                    if (player.isSubChunkPullMode()) {
+                        anyPullMode = true;
+                    }
+                    if (player.isClientBlobCacheActive()) {
+                        anyBlobMode = true;
+                    }
+                }
+            }
+        }
+
+        // 缓存/拉取模式接收者存在时不能用 BatchPacket 快路径 / the BatchPacket fast path
+        // only applies when no cache/pull-mode recipient remains
+        if (server.cacheChunks && !anyBlobMode && !anyPullMode) {
             BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunkIfLoaded(x, z);
             if (chunk != null && chunk.getChanges() <= timestamp) {
@@ -4698,11 +4734,55 @@ public class Level implements ChunkManager, Metadatable {
             ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
 
             if (queue.containsKey(index)) {
+                LevelChunkPacket blobPacket = null;
+                LevelChunkPacket pullCachePacket = null;
+                LevelChunkPacket pullRawPacket = null;
+                long biomeBlobHash = 0;
+                boolean biomeBlobPrepared = false;
+
                 for (Player player : queue.get(index).values()) {
-                    if (this.isChunkRecipient(player, index)) {
-                        if (matchMVChunkProtocol(protocol, player.getGameVersion())) {
+                    if (!this.isChunkRecipient(player, index) || !matchMVChunkProtocol(protocol, player.getGameVersion())) {
+                        continue;
+                    }
+                    if (player.isSubChunkPullMode()) {
+                        if (player.isClientBlobCacheActive() && biomes != null) {
+                            if (!biomeBlobPrepared) {
+                                biomeBlobHash = XXHash64.hash(biomes);
+                                this.server.getClientCacheBlobStore().put(biomeBlobHash, biomes);
+                                biomeBlobPrepared = true;
+                            }
+                            if (player.tryTrackClientCacheBlob(biomeBlobHash, biomes)) {
+                                if (pullCachePacket == null) {
+                                    pullCachePacket = this.buildPullLevelChunkPacket(protocol, x, z, subChunkCount, true, biomeBlobHash, null);
+                                }
+                                player.sendChunk(x, z, pullCachePacket);
+                                continue;
+                            }
+                            // pending 超限降级为 raw shell / pending over cap: degrade to a raw shell
+                        }
+                        if (biomes != null) {
+                            if (pullRawPacket == null) {
+                                pullRawPacket = this.buildPullLevelChunkPacket(protocol, x, z, subChunkCount, false, 0, biomes);
+                            }
+                            player.sendChunk(x, z, pullRawPacket);
+                        } else {
+                            // 序列化时捕获未开启（/reload 翻转窗口）：退全量，避免发出无 biomes 的空壳
+                            // / Capture was off when this column was serialized (a /reload
+                            // flip window): fall back to a full send instead of a biome-less shell
                             player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                         }
+                    } else if (player.isClientBlobCacheActive() && subChunkBlobs != null) {
+                        if (blobPacket == null) {
+                            blobPacket = this.buildBlobLevelChunkPacket(protocol, x, z, subChunkCount, subChunkBlobs, biomes, blockEntities);
+                        }
+                        if (player.tryOpenBlobTransaction(blobPacket.blobIds)) {
+                            player.sendChunk(x, z, blobPacket);
+                        } else {
+                            // pending 超限降级全量 / pending over cap: degrade to a full send
+                            player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
+                        }
+                    } else {
+                        player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                     }
                 }
             }
@@ -4711,6 +4791,81 @@ public class Level implements ChunkManager, Metadatable {
             tasks.remove(index);
             this.chunkSendTaskStartTick.remove(index);
         }
+    }
+
+    /**
+     * 是否需要捕获结构化产物（blob/子区块装配原料）。
+     * <p>
+     * Whether structured capture (blob / sub-chunk assembly inputs) is wanted.
+     */
+    public boolean isClientCacheDeliveryWanted() {
+        return this.server.getServerConfig().chunkSettings().clientCache()
+                || this.server.getServerConfig().chunkSettings().subChunkRequests();
+    }
+
+    /**
+     * 缓存模式整列装配：blobIds = 逐子区块哈希 + biomes 哈希，data = border 字节 + 方块实体 NBT。
+     * <p>
+     * Cached full-column assembly: blobIds = per-sub-chunk hashes + the biomes hash;
+     * data = border byte + block entity NBT.
+     */
+    // 包级可见供装配层单测（LevelBlobAssemblyPacketTest）/ package-private for the
+    // assembly-layer unit test (LevelBlobAssemblyPacketTest)
+    LevelChunkPacket buildBlobLevelChunkPacket(GameVersion protocol, int x, int z, int subChunkCount,
+                                               List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities) {
+        ClientCacheBlobStore store = this.server.getClientCacheBlobStore();
+        long[] hashes = new long[subChunkBlobs.size() + 1];
+        for (int i = 0; i < subChunkBlobs.size(); i++) {
+            byte[] blob = subChunkBlobs.get(i);
+            hashes[i] = XXHash64.hash(blob);
+            store.put(hashes[i], blob);
+        }
+        hashes[subChunkBlobs.size()] = XXHash64.hash(biomes);
+        store.put(hashes[subChunkBlobs.size()], biomes);
+
+        byte[] entities = blockEntities == null ? new byte[0] : blockEntities;
+        byte[] data = new byte[1 + entities.length];
+        data[0] = 0; // border blocks
+        System.arraycopy(entities, 0, data, 1, entities.length);
+
+        LevelChunkPacket pk = new LevelChunkPacket();
+        pk.chunkX = x;
+        pk.chunkZ = z;
+        pk.dimension = this.getDimension();
+        pk.subChunkCount = subChunkCount;
+        pk.cacheEnabled = true;
+        pk.blobIds = hashes;
+        pk.data = data;
+        return pk;
+    }
+
+    /**
+     * 拉取模式装配：LevelChunk 只带 biomes（缓存模式为 blob 哈希），方块数据由客户端按需拉取。
+     * <p>
+     * Pull-mode assembly: the LevelChunk carries only biomes (a blob hash when cached);
+     * block data is pulled by the client on demand.
+     */
+    LevelChunkPacket buildPullLevelChunkPacket(GameVersion protocol, int x, int z, int subChunkCount,
+                                               boolean cacheMode, long biomeBlobHash, byte[] biomes) {
+        LevelChunkPacket pk = new LevelChunkPacket();
+        pk.chunkX = x;
+        pk.chunkZ = z;
+        pk.dimension = this.getDimension();
+        pk.requestSubChunks = true;
+        pk.subChunkCount = 0;
+        pk.subChunkLimit = subChunkCount;
+        if (cacheMode) {
+            pk.cacheEnabled = true;
+            pk.blobIds = new long[]{biomeBlobHash};
+            pk.data = new byte[]{0}; // border blocks
+        } else {
+            byte[] data = new byte[1 + (biomes == null ? 0 : biomes.length)];
+            if (biomes != null) {
+                System.arraycopy(biomes, 0, data, 0, biomes.length);
+            }
+            pk.data = data;
+        }
+        return pk;
     }
 
     public void removeEntity(Entity entity) {

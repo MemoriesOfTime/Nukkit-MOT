@@ -23,7 +23,10 @@ import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.netty.buffer.*;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -601,9 +604,12 @@ public class LevelDBProvider implements LevelProvider {
                                 chunkX,
                                 chunkZ,
                                 networkChunkSerializerCallback.getSubchunks(),
-                                networkChunkSerializerCallback.getStream().getBuffer()
+                                networkChunkSerializerCallback.getStream().getBuffer(),
+                                networkChunkSerializerCallback.getSubChunkBlobs(),
+                                networkChunkSerializerCallback.getBiomes(),
+                                networkChunkSerializerCallback.getBlockEntities()
                         );
-                    }, level.antiXrayEnabled(), getLevel().getDimensionData());
+                    }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                     for (GameVersion gv : protocols) {
@@ -619,9 +625,12 @@ public class LevelDBProvider implements LevelProvider {
                             chunkX,
                             chunkZ,
                             networkChunkSerializerCallback.getSubchunks(),
-                            networkChunkSerializerCallback.getStream().getBuffer()
+                            networkChunkSerializerCallback.getStream().getBuffer(),
+                            networkChunkSerializerCallback.getSubChunkBlobs(),
+                            networkChunkSerializerCallback.getBiomes(),
+                            networkChunkSerializerCallback.getBlockEntities()
                     );
-                }, level.antiXrayEnabled(), this.level.getDimensionData());
+                }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
             } catch (Throwable t) {
                 getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                 for (GameVersion gv : protocols) {

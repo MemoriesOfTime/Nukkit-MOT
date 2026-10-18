@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -44,6 +45,32 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     protected Long2ObjectNonBlockingMap<BlockEntity> tiles;
 
     protected Long2ObjectNonBlockingMap<BlockEntity> tileList;
+
+    /**
+     * 方块实体的 section 索引（key = 世界 section Y，((int) y) >> 4）：子区块序列化按段取用，
+     * 免去每个子区块全列扫描。懒构建缓存，增删经 {@link #blockEntityRevision} 失效；
+     * clone/转换路径直接 putAll 到全新 chunk，缓存为 null 会整体重建，无失同步步风险。
+     * <p>
+     * Section index of block entities (key = world section Y, ((int) y) >> 4): sub-chunk
+     * serialization reads one section instead of scanning the whole column. Lazily built
+     * and cached, invalidated on add/remove via {@link #blockEntityRevision}; clone and
+     * conversion paths putAll into fresh chunks whose null cache rebuilds wholly, so they
+     * cannot desynchronize.
+     */
+    private transient Int2ObjectOpenHashMap<List<BlockEntity>> blockEntitiesBySection;
+
+    /**
+     * 方块实体增删的失效版本号。写入方必须先完成全部 tiles 写入再自增——读到新 revision
+     * 的并发读者才能保证看到新数据（seqlock 先数据后版本；AtomicInteger 提供 volatile 发布）。
+     * <p>
+     * Invalidation version for block entity add/remove. Writers must finish all tiles
+     * writes before incrementing, so a concurrent reader that observes the new revision
+     * is guaranteed to see the new data (seqlock: data first, then version; the
+     * AtomicInteger provides volatile publication).
+     */
+    private final transient AtomicInteger blockEntityRevision = new AtomicInteger();
+
+    private transient int blockEntitiesBySectionRevision;
 
     /**
      * encoded as:
@@ -736,6 +763,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             existing.onReplacedWith(blockEntity);
             existing.close();
         }
+        // seqlock：须在全部 tiles 写入后自增 / seqlock: bump after all tiles writes
+        this.blockEntityRevision.incrementAndGet();
         if (this.isInit) {
             this.setChanged();
         }
@@ -753,6 +782,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 this.createPersistentBlockContainer(blockEntity, blockEntity.getPersistentDataContainer().getStorage());
             }
 
+            // seqlock：须在全部 tiles 写入后自增 / seqlock: bump after all tiles writes
+            this.blockEntityRevision.incrementAndGet();
             if (this.isInit) {
                 this.setChanged();
             }
@@ -790,6 +821,33 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public Map<Long, BlockEntity> getBlockEntities() {
         return tiles == null ? Collections.emptyMap() : tiles;
+    }
+
+    /**
+     * 取某世界 section 内的方块实体（子区块序列化用），无则返回空列表。section 索引懒
+     * 构建并缓存，增删方块实体后自动重建；revision 在遍历前捕获，并发新增至多延后到
+     * 下一次重建可见。
+     * <p>
+     * Block entities of one world section (sub-chunk serialization); empty list when
+     * none. The section index is lazily built and cached, rebuilt after any
+     * add/remove; the revision is captured before iterating, so a concurrent add is
+     * at worst deferred to the next rebuild.
+     */
+    public List<BlockEntity> getBlockEntitiesOfSection(int worldSectionY) {
+        if (this.tiles == null || this.tiles.isEmpty()) {
+            return Collections.emptyList();
+        }
+        int revision = this.blockEntityRevision.get();
+        if (this.blockEntitiesBySection == null || this.blockEntitiesBySectionRevision != revision) {
+            Int2ObjectOpenHashMap<List<BlockEntity>> index = new Int2ObjectOpenHashMap<>();
+            for (BlockEntity blockEntity : this.tiles.values()) {
+                index.computeIfAbsent((int) blockEntity.y >> 4, k -> new ArrayList<>()).add(blockEntity);
+            }
+            this.blockEntitiesBySection = index;
+            this.blockEntitiesBySectionRevision = revision;
+        }
+        List<BlockEntity> list = this.blockEntitiesBySection.get(worldSectionY);
+        return list == null ? Collections.emptyList() : list;
     }
 
     /**

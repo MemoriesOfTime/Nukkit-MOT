@@ -6,6 +6,8 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.inventory.transaction.*;
 import cn.nukkit.level.Location;
+import cn.nukkit.level.PlayerBlobCacheState;
+import cn.nukkit.level.PlayerSubChunkRequestState;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.SourceInterface;
@@ -64,6 +66,14 @@ public final class PlayerHandle {
 
     public NetworkPlayerSession getNetworkSession() {
         return player.networkSession;
+    }
+
+    public PlayerBlobCacheState getBlobCacheState() {
+        return player.blobCacheState;
+    }
+
+    public PlayerSubChunkRequestState getSubChunkRequestState() {
+        return player.subChunkRequestState;
     }
 
     public void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {

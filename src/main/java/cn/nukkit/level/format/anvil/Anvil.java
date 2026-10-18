@@ -126,9 +126,12 @@ public class Anvil extends BaseLevelProvider {
                                 x,
                                 z,
                                 networkChunkSerializerCallback.getSubchunks(),
-                                networkChunkSerializerCallback.getStream().getBuffer()
+                                networkChunkSerializerCallback.getStream().getBuffer(),
+                                networkChunkSerializerCallback.getSubChunkBlobs(),
+                                networkChunkSerializerCallback.getBiomes(),
+                                networkChunkSerializerCallback.getBlockEntities()
                         );
-                    }, level.antiXrayEnabled(), getLevel().getDimensionData());
+                    }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + x + ", " + z + ")", t);
                     for (GameVersion gv : protocols) {
@@ -144,9 +147,12 @@ public class Anvil extends BaseLevelProvider {
                             x,
                             z,
                             networkChunkSerializerCallback.getSubchunks(),
-                            networkChunkSerializerCallback.getStream().getBuffer()
+                            networkChunkSerializerCallback.getStream().getBuffer(),
+                            networkChunkSerializerCallback.getSubChunkBlobs(),
+                            networkChunkSerializerCallback.getBiomes(),
+                            networkChunkSerializerCallback.getBlockEntities()
                     );
-                }, level.antiXrayEnabled(), this.level.getDimensionData());
+                }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
             } catch (Throwable t) {
                 getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + x + ", " + z + ")", t);
                 for (GameVersion gv : protocols) {

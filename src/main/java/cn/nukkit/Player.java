@@ -75,6 +75,8 @@ import cn.nukkit.network.encryption.LoginChainVerifier;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.process.UsingItemReceive;
+import cn.nukkit.network.process.processor.common.ClientCacheBlobStatusProcessor;
+import cn.nukkit.network.process.processor.common.SubChunkRequestProcessor;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.netease.NeteaseJsonPacket;
 import cn.nukkit.network.protocol.netease.PyRpcPacket;
@@ -322,6 +324,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private boolean hasSpawnChunks;
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
     protected int nextChunkOrderRun = 1;
+    // 客户端缓存协商与事务状态 / Client cache negotiation & transaction state
+    private boolean clientCacheSupported = false;
+    // 供 ClientCacheBlobStatusProcessor 读取（经 PlayerHandle 桥接）/ read by
+    // ClientCacheBlobStatusProcessor (bridged via PlayerHandle)
+    PlayerBlobCacheState blobCacheState;
+    // 子区块延期队列与流量记账，由 SubChunkRequestProcessor 驱动（经 PlayerHandle 桥接）
+    // / Deferred sub-chunk queue and flow accounting, driven by SubChunkRequestProcessor
+    // (bridged via PlayerHandle)
+    final PlayerSubChunkRequestState subChunkRequestState = new PlayerSubChunkRequestState();
     // 供 checkNetwork 检测跨区块/转向即时重排 / For checkNetwork cross-chunk/turn instant reorder
     private int lastOrderChunkX = Integer.MIN_VALUE;
     private int lastOrderChunkZ = Integer.MIN_VALUE;
@@ -1274,6 +1285,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private void unloadChunks(boolean online) {
         ++this.chunkDeliveryEpoch;
+        // 切世界后旧事务引用的 blob 全部作废 / old transaction blob refs are void after a world switch
+        this.clearBlobCacheState();
         for (long index : this.usedChunks.keySet()) {
             int chunkX = Level.getHashX(index);
             int chunkZ = Level.getHashZ(index);
@@ -1360,7 +1373,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        if (this.protocol >= ProtocolInfo.v1_19_10) {
+        // 拉取模式下方块实体由子区块条目携带，跳过全量推送的 workaround
+        // In pull mode block entities ride the sub-chunk entries; skip the full-push workaround
+        if (this.protocol >= ProtocolInfo.v1_19_10 && !this.isSubChunkPullMode()) {
             for (BlockEntity blockEntity : this.level.getChunkBlockEntities(x, z).values()) {
                 if (!(blockEntity instanceof BlockEntityItemFrame) && !(blockEntity instanceof BlockEntityCampfire))
                     continue;
@@ -1404,6 +1419,92 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.sendChunk(x, z, pk);
     }
+
+    /**
+     * 客户端缓存（blob cache）投递是否激活：配置开 + 客户端协商支持 + 协议 ≥ v1_18_0。
+     * 未发送 ClientCacheStatusPacket 的客户端始终走全量推送。
+     * <p>
+     * Whether client blob-cache delivery is active: config on + negotiated client support
+     * + protocol ≥ v1_18_0. Clients that never send ClientCacheStatusPacket stay full-push.
+     */
+    public boolean isClientBlobCacheActive() {
+        return this.server.getServerConfig().chunkSettings().clientCache() && this.clientCacheSupported
+                && this.gameVersion.getProtocol() >= ProtocolInfo.v1_18_0;
+    }
+
+    /**
+     * 子区块按需拉取模式：配置开 + 协议 ≥ v1_19_10（更早版本的子区块系统有方块实体渲染缺陷）。
+     * <p>
+     * Sub-chunk pull mode: config on + protocol ≥ v1_19_10 (earlier sub-chunk systems
+     * render block entities incorrectly).
+     */
+    public boolean isSubChunkPullMode() {
+        return this.server.getServerConfig().chunkSettings().subChunkRequests()
+                && this.gameVersion.getProtocol() >= ProtocolInfo.v1_19_10;
+    }
+
+    public void setClientCacheSupported(boolean supported) {
+        this.clientCacheSupported = supported;
+    }
+
+    private PlayerBlobCacheState getOrCreateBlobCacheState() {
+        if (this.blobCacheState == null) {
+            this.blobCacheState = new PlayerBlobCacheState(this.server.getClientCacheBlobStore(),
+                    Math.max(64, this.server.getServerConfig().chunkSettings().blobPendingCap()));
+        }
+        return this.blobCacheState;
+    }
+
+    /**
+     * 开一个列 blob 事务；pending 超限时返回 false（调用方降级全量发送）。
+     * <p>
+     * Opens a chunk blob transaction; false over the pending cap (caller degrades to a full send).
+     */
+    public boolean tryOpenBlobTransaction(long[] hashes) {
+        if (!this.isClientBlobCacheActive() || this.level == null) {
+            return false;
+        }
+        boolean accepted = this.getOrCreateBlobCacheState().tryOpenTransaction(hashes, this.server.getTick());
+        if (!accepted) {
+            log.debug("{}({}): client cache pending cap hit, chunk degrades to a full send", this.getName(), this.getId());
+        }
+        return accepted;
+    }
+
+    /**
+     * 记账单个 blob（子区块条目用）；pending 超限返回 false。
+     * <p>
+     * Tracks a single blob (sub-chunk entries); false over the pending cap.
+     */
+    public boolean tryTrackClientCacheBlob(long hash, byte[] payload) {
+        if (!this.isClientBlobCacheActive() || this.level == null) {
+            return false;
+        }
+        return this.getOrCreateBlobCacheState().trackBlob(hash, payload, this.server.getTick());
+    }
+
+    /**
+     * 清空缓存事务与延期队列（切维度/换世界/下线时）。
+     * <p>
+     * Clears cache transactions and the deferred queue (dimension switch / world change / quit).
+     */
+    private void clearBlobCacheState() {
+        if (this.blobCacheState != null) {
+            this.blobCacheState.clear();
+            this.blobCacheState = null;
+        }
+        if (this.subChunkRequestState != null) {
+            this.subChunkRequestState.clear();
+        }
+    }
+
+    /**
+     * blob 事务与 trackBlob 独立记账的超时（tick），取值依据见 checkNetwork 清扫处注释。
+     * <p>
+     * Blob transaction and standalone trackBlob timeout in ticks; see the sweep comment
+     * in checkNetwork for the rationale.
+     */
+    private static final int BLOB_TRANSACTION_TIMEOUT_TICKS = 1200;
 
     protected void sendNextChunk() {
         if (!this.connected) {
@@ -3585,6 +3686,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.nextChunkOrderRun-- <= 0 || this.chunk == null || crossedChunk || turned) {
                 this.orderChunks();
             }
+
+            if (this.blobCacheState != null) {
+                int expired = this.blobCacheState.closeExpired(this.server.getTick(), BLOB_TRANSACTION_TIMEOUT_TICKS);
+                if (expired > 0) {
+                    log.debug("{}({}): force-closed {} expired client cache transactions/tracked blobs", this.getName(), this.getId(), expired);
+                }
+            }
+
+            // miss 补发先排空：兑现的是已发出的哈希引用，子区块队列可多等一 tick
+            // / Miss backlog drains first: it fulfills already-sent hash references,
+            // while the sub-chunk queue can wait another tick
+            ClientCacheBlobStatusProcessor.drainDeferredMissResponses(this.playerHandle);
+
+            SubChunkRequestProcessor.drainDeferredRequests(this.playerHandle);
 
             if (!this.loadQueue.isEmpty() || !this.spawned) {
                 this.sendNextChunk();
