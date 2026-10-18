@@ -2725,10 +2725,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 } else {
                     //1.7.0-
                     this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
-                            this.getViewers().values()
-                                    .stream()
-                                    .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
-                                    .collect(Collectors.toList()));
+                            this.legacyMovementViewers());
                     //1.7.0+
                     this.broadcastMovement();
                 }
@@ -2831,10 +2828,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int radius = 2 + Math.min(frostWalkerLevel, EnchantmentFrostWalker.MAX_FREEZE_RADIUS - 2);
             for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
                 for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
-                    Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
                     Block block = level.getBlock(coordX, this.getFloorY() - 1, coordZ);
-                    if (block instanceof BlockWater water && up.isAir()) {
-                        if (water.getFluidHeightPercent() < 0.15) {
+                    if (block instanceof BlockWater water && water.getFluidHeightPercent() < 0.15) {
+                        if (level.getBlock(coordX, this.getFloorY(), coordZ).isAir()) {
                             WaterFrostEvent ev = new WaterFrostEvent(block);
                             server.getPluginManager().callEvent(ev);
                             if (!ev.isCancelled()) {
@@ -2872,6 +2868,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastYaw = location.getYaw();
         this.lastHeadYaw = location.getHeadYaw();
         this.lastPitch = location.getPitch();
+    }
+
+    private List<Player> legacyMovementViewers() {
+        Collection<Player> currentViewers = this.getViewers().values();
+        List<Player> legacyViewers = new ArrayList<>();
+        for (Player viewer : currentViewers) {
+            if (viewer.protocol < ProtocolInfo.v1_7_0) {
+                legacyViewers.add(viewer);
+            }
+        }
+        return legacyViewers;
     }
 
     @Override
@@ -3055,10 +3062,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.needSendRotation) {
                 //1.7.0-
                 this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
-                        this.getViewers().values()
-                                .stream()
-                                .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
-                                .collect(Collectors.toList()));
+                        this.legacyMovementViewers());
                 //1.7.0+
                 this.broadcastMovement();
                 this.needSendRotation = false;
@@ -4050,6 +4054,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+        // The remaining switch only accepts unsigned-byte legacy packet IDs.
+        // Modern packets without a processor intentionally have no legacy pid().
+        if (pid > 0xff) {
+            return;
+        }
+
         byte pidOld;
         try {
             pidOld = packet.pid();
@@ -4377,7 +4387,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 // The inventory is built by initEntity, which runs at login. An auth input that
                 // reaches the session before that (a client that keeps moving while its profile
                 // is still loading) used to throw here and drop the connection.
-                Item authHeldItem = this.inventory == null ? null : this.inventory.getItemInHand();
+                // A held-stack snapshot is needed only for START_USING_ITEM. Both consumers of
+                // authHoldToUse require that flag; keep cloning before custom item code/events.
+                Item authHeldItem = !authStartUsingItem || this.inventory == null
+                        ? null : this.inventory.getItemInHand();
                 boolean authHoldToUse = UsingItemReceive.isHoldToUseItem(authHeldItem);
                 if (UsingItemReceive.shouldStartUsingFromAuthInput(
                         this.spawned && this.isAlive(),
@@ -6231,6 +6244,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * The sort is stable, so actions of the same group keep the order they already had.
      */
     static List<PlayerBlockActionData> orderBlockActions(Collection<PlayerBlockActionData> actions) {
+        if (actions.isEmpty()) {
+            return List.of();
+        }
         List<PlayerBlockActionData> ordered = new ArrayList<>(actions);
         if (ordered.size() > 1) {
             ordered.sort(Comparator.comparingInt(action -> endsBlockDestruction(action.getAction()) ? 0 : 1));
@@ -6489,6 +6505,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setViewDistance(int distance) {
+        if (this.chunkRadius != distance) {
+            this.nextChunkOrderRun = 0;
+        }
         this.chunkRadius = distance;
 
         ChunkRadiusUpdatedPacket pk = new ChunkRadiusUpdatedPacket();
@@ -8838,26 +8857,31 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.getLevel().addSound(new ExperienceOrbSound(this));
                 pickedXPOrb = server.getTick();
 
-                ArrayList<Integer> itemsWithMending = new ArrayList<>();
+                // Four armor slots, hand and offhand shield; keep discovery order.
+                int[] itemsWithMending = null;
+                int mendingCount = 0;
                 for (int i = 0; i < 4; i++) {
                     Item item = inventory.getArmorItem(i);
                     if (item.getDamage() != 0 && item.hasEnchantment(Enchantment.ID_MENDING)) {
-                        itemsWithMending.add(inventory.getSize() + i);
+                        if (itemsWithMending == null) itemsWithMending = new int[6];
+                        itemsWithMending[mendingCount++] = inventory.getSize() + i;
                     }
                 }
 
                 Item hand = inventory.getItemInHandFast();
                 if (hand.getDamage() != 0 && hand.hasEnchantment(Enchantment.ID_MENDING)) {
-                    itemsWithMending.add(inventory.getHeldItemIndex());
+                    if (itemsWithMending == null) itemsWithMending = new int[6];
+                    itemsWithMending[mendingCount++] = inventory.getHeldItemIndex();
                 }
 
                 Item offhand = this.getOffhandInventory().getItem(0);
                 if (offhand.getId() == Item.SHIELD && offhand.getDamage() != 0 && offhand.hasEnchantment(Enchantment.ID_MENDING)) {
-                    itemsWithMending.add(-1);
+                    if (itemsWithMending == null) itemsWithMending = new int[6];
+                    itemsWithMending[mendingCount++] = -1;
                 }
 
-                if (!itemsWithMending.isEmpty()) {
-                    int itemToRepair = itemsWithMending.get(ThreadLocalRandom.current().nextInt(itemsWithMending.size()));
+                if (mendingCount != 0) {
+                    int itemToRepair = itemsWithMending[ThreadLocalRandom.current().nextInt(mendingCount)];
                     boolean isOffhand = itemToRepair == -1;
 
                     Item toRepair = isOffhand ? offhand : this.inventory.getItem(itemToRepair);

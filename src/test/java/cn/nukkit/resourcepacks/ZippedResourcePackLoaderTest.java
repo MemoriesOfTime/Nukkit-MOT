@@ -42,7 +42,7 @@ class ZippedResourcePackLoaderTest {
     void setUp() throws Exception {
         MockServer.reset();
         BaseLang language = mock(BaseLang.class);
-        when(language.translateString(any(String.class), any(Object[].class))).thenReturn("loaded");
+        when(language.translateString(any(String.class), any(String[].class))).thenReturn("loaded");
         when(Server.getInstance().getLanguage()).thenReturn(language);
 
         packsDir = Files.createDirectories(tempDir.resolve("resource_packs")).toFile();

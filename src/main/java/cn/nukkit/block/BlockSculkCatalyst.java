@@ -5,7 +5,16 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockSculkCatalyst extends BlockSolid {
+public class BlockSculkCatalyst extends BlockSolidMeta {
+
+    public BlockSculkCatalyst() {
+        this(0);
+    }
+
+    public BlockSculkCatalyst(int meta) {
+        super(meta);
+    }
+
 
     @Override
     public int getId() {

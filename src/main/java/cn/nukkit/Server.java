@@ -1798,8 +1798,8 @@ public class Server {
 
     private void checkTickUpdates(int currentTick) {
         if (this.alwaysTickPlayers) {
-            for (Player p : new ArrayList<>(this.players.values())) {
-                p.onUpdate(currentTick);
+            for (Object p : this.players.values().toArray()) {
+                ((Player) p).onUpdate(currentTick);
             }
         }
 
@@ -1809,7 +1809,23 @@ public class Server {
 
         // Do level ticks
         for (Level level : this.levelArray) {
-            if (level.isBeingConverted || (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0)) {
+            if (level.isBeingConverted) {
+                continue;
+            }
+            if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
+                if (!this.alwaysTickPlayers) {
+                    for (Player player : new ArrayList<>(level.getPlayers().values())) {
+                        if (!player.spawned || player.closed || player.level != level) {
+                            continue;
+                        }
+                        try {
+                            player.onUpdate(currentTick);
+                        } catch (Exception e) {
+                            log.error(this.baseLang.translateString("nukkit.level.tickError",
+                                    new String[]{level.getFolderName(), Utils.getExceptionMessage(e)}));
+                        }
+                    }
+                }
                 continue;
             }
 
@@ -1903,8 +1919,8 @@ public class Server {
 
             this.checkTickUpdates(this.tickCounter);
 
-            for (Player player : new ArrayList<>(this.players.values())) {
-                player.checkNetwork();
+            for (Object player : this.players.values().toArray()) {
+                ((Player) player).checkNetwork();
             }
 
             if ((this.tickCounter & 0b1111) == 0) {

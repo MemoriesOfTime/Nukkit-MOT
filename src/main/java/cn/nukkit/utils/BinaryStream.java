@@ -13,6 +13,7 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
@@ -67,6 +68,19 @@ public class BinaryStream {
     private static final int MAX_ITEM_STACK_REQUEST_ACTIONS = 128;
     private static final int MAX_ITEM_STACK_REQUEST_FILTER_STRINGS = 128;
     private static final int MAX_ITEM_STACK_REQUEST_CRAFT_ITEMS = 128;
+
+    private static final ClassValue<Boolean> DIRECT_BYTE_WRITE = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            try {
+                return type.getMethod("put", byte[].class).getDeclaringClass() == BinaryStream.class;
+            } catch (ReflectiveOperationException | SecurityException | LinkageError failure) {
+                return false;
+            }
+        }
+    };
+
+    private final boolean directByteWrite = DIRECT_BYTE_WRITE.get(getClass());
 
     public BinaryStream() {
         this.buffer = new byte[32];
@@ -192,6 +206,17 @@ public class BinaryStream {
     }
 
     public int getLInt() {
+        return readLittleEndianInt();
+    }
+
+    private int readLittleEndianInt() {
+        // Keep the old short-read/padded-buffer behavior on malformed input.
+        if (this.offset >= 0 && this.count >= 4 && this.offset <= this.count - 4
+                && this.buffer != null && this.offset <= this.buffer.length - 4) {
+            int value = Binary.readLInt(this.buffer, this.offset);
+            this.offset += 4;
+            return value;
+        }
         return Binary.readLInt(this.get(4));
     }
 
@@ -232,7 +257,8 @@ public class BinaryStream {
     }
 
     public float getLFloat(int accuracy) {
-        return Binary.readLFloat(this.get(4), accuracy);
+        float value = Float.intBitsToFloat(readLittleEndianInt());
+        return accuracy > -1 ? (float) NukkitMath.round(value, accuracy) : value;
     }
 
     public void putLFloat(float v) {
@@ -276,7 +302,13 @@ public class BinaryStream {
     }
 
     public void putByte(byte b) {
-        this.put(new byte[]{b});
+        if (!directByteWrite) {
+            this.put(new byte[]{b});
+            return;
+        }
+        this.ensureCapacity(this.count + 1);
+        this.buffer[this.count] = b;
+        this.count += 1;
     }
 
     public void putByte(int b) {
@@ -941,7 +973,6 @@ public class BinaryStream {
             if (stringId == null) {
                 throw new IllegalArgumentException("Unknown item: runtimeID=" + runtimeId + " protocol=" + protocolId);
             }
-            stringId = stringId + ":" + damage;
             id = null;
         }
 

@@ -4,6 +4,15 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockStemStrippedCrimson extends BlockStemStripped {
 
+    public BlockStemStrippedCrimson() {
+        this(0);
+    }
+
+    public BlockStemStrippedCrimson(int meta) {
+        super(meta);
+    }
+
+
     @Override
     public int getId() {
         return STRIPPED_CRIMSON_STEM;

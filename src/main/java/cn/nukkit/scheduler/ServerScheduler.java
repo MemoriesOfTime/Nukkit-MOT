@@ -7,6 +7,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayDeque;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -26,6 +28,7 @@ public class ServerScheduler {
     private final ExecutorService virtualPool;
 
     private final Queue<TaskHandler> pending;
+    private final Queue<TaskHandler> cancelled = new ConcurrentLinkedQueue<>();
     private final Map<Integer, ArrayDeque<TaskHandler>> queueMap;
     private final Map<Integer, TaskHandler> taskMap;
     private final AtomicInteger currentTaskId;
@@ -266,9 +269,10 @@ public class ServerScheduler {
     }
 
     public void cancelTask(int taskId) {
-        if (taskMap.containsKey(taskId)) {
+        TaskHandler taskHandler = taskMap.remove(taskId);
+        if (taskHandler != null) {
             try {
-                taskMap.remove(taskId).cancel();
+                taskHandler.cancel();
             } catch (RuntimeException ex) {
                 Server.getInstance().getLogger().critical("Exception while invoking onCancel", ex);
             }
@@ -303,6 +307,8 @@ public class ServerScheduler {
         }
         this.taskMap.clear();
         this.queueMap.clear();
+        this.pending.clear();
+        this.cancelled.clear();
         this.currentTaskId.set(0);
     }
 
@@ -356,7 +362,7 @@ public class ServerScheduler {
             throw new PluginException("Virtual thread tasks must be asynchronous.");
         }
 
-        TaskHandler taskHandler = new TaskHandler(plugin, task, nextTaskId(), asynchronous, virtual);
+        TaskHandler taskHandler = new TaskHandler(plugin, task, nextTaskId(), asynchronous, virtual, cancelled::offer);
         taskHandler.setDelay(delay);
         taskHandler.setPeriod(period);
         taskHandler.setNextRunTick(taskHandler.isDelayed() ? currentTick + taskHandler.getDelay() : currentTick);
@@ -375,7 +381,12 @@ public class ServerScheduler {
          // Accepts pending.
         TaskHandler task;
         while ((task = pending.poll()) != null) {
+            if (task.isCancelled()) {
+                taskMap.remove(task.getTaskId(), task);
+                continue;
+            }
             int tick = Math.max(currentTick, task.getNextRunTick()); // Do not schedule in the past
+            task.setNextRunTick(tick);
             ArrayDeque<TaskHandler> queue = queueMap.get(tick);
             if (queue == null) {
                 ArrayDeque<TaskHandler> created = new ArrayDeque<>();
@@ -385,6 +396,22 @@ public class ServerScheduler {
                 }
             }
             queue.add(task);
+        }
+        // Cancelled long-delay closures must not retain a player/world until their due tick.
+        // Only visit the affected bucket; cancellation from worker threads only enqueues here.
+        if (!cancelled.isEmpty()) {
+            Set<Integer> affectedTicks = new HashSet<>();
+            while ((task = cancelled.poll()) != null) {
+                taskMap.remove(task.getTaskId(), task);
+                affectedTicks.add(task.getNextRunTick());
+            }
+            for (int tick : affectedTicks) {
+                ArrayDeque<TaskHandler> queue = queueMap.get(tick);
+                if (queue != null) {
+                    queue.removeIf(TaskHandler::isCancelled);
+                    if (queue.isEmpty()) queueMap.remove(tick, queue);
+                }
+            }
         }
         if (currentTick - this.currentTick > queueMap.size()) { // A large number of ticks have passed since the last execution
             for (Map.Entry<Integer, ArrayDeque<TaskHandler>> entry : queueMap.entrySet()) {
