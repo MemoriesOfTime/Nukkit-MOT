@@ -3,7 +3,16 @@ package cn.nukkit.block;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockMangroveRoots extends BlockTransparent {
+public class BlockMangroveRoots extends BlockTransparentMeta {
+
+    public BlockMangroveRoots() {
+        this(0);
+    }
+
+    public BlockMangroveRoots(int meta) {
+        super(meta);
+    }
+
 
     @Override
     public String getName() {
