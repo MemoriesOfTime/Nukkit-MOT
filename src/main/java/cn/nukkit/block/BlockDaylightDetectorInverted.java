@@ -43,7 +43,7 @@ public class BlockDaylightDetectorInverted extends BlockDaylightDetector {
 
     @Override
     public boolean isPowerSource() {
-        return !this.level.isAnimalSpawningAllowedByTime();
+        return true;
     }
 
     @Override

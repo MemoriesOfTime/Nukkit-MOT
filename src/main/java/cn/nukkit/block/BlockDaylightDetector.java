@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
@@ -76,12 +77,33 @@ public class BlockDaylightDetector extends BlockTransparentMeta {
     
     @Override
     public boolean isPowerSource() {
-        return this.level.isAnimalSpawningAllowedByTime();
+        return true;
     }
     
     @Override
     public int getWeakPower(BlockFace face) {
         return this.level.isAnimalSpawningAllowedByTime() ? 15 : 0;
+    }
+
+    @Override
+    public int onUpdate(int type) {
+        if (type == Level.BLOCK_UPDATE_NORMAL || type == Level.BLOCK_UPDATE_SCHEDULED) {
+            if (type == Level.BLOCK_UPDATE_SCHEDULED) {
+                this.level.updateAroundRedstone(this, null);
+            }
+            this.level.scheduleUpdate(this, 20);
+        }
+        return 0;
+    }
+
+    @Override
+    public boolean place(Item item, Block block, Block target, BlockFace face,
+                         double fx, double fy, double fz, Player player) {
+        if (this.level.setBlock(this, this, true, true)) {
+            this.level.scheduleUpdate(this, 20);
+            return true;
+        }
+        return false;
     }
 
     @Override
