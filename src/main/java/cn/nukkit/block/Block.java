@@ -866,8 +866,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     private static double breakTime0(double blockHardness, boolean correctTool, boolean canHarvestWithHand,
-                                     int blockId, int toolType, int toolTier, int efficiencyLoreLevel, int hasteEffectLevel,
-                                     boolean insideOfWaterWithoutAquaAffinity, boolean outOfWaterButNotOnGround) {
+                                 int blockId, int toolType, int toolTier, int efficiencyLoreLevel, int hasteEffectLevel,
+                                 boolean insideOfWaterWithoutAquaAffinity, boolean outOfWaterButNotOnGround) {
         double baseTime = ((correctTool || canHarvestWithHand) ? 1.5 : 5.0) * blockHardness;
         double speed = 1.0 / baseTime;
         if (correctTool) speed *= toolBreakTimeBonus0(toolType, toolTier, blockId);
@@ -877,14 +877,14 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (outOfWaterButNotOnGround) speed *= 0.2;
         return 1.0 / speed;
     }
-
+    
     public double calculateBreakTime(@NotNull Item item) {
         return calculateBreakTime(item, null);
     }
-
+    
     public double calculateBreakTime(@NotNull Item item, Player player) {
         double seconds = this.calculateBreakTimeNotInAir(item, player);
-
+    
         if (player != null && !player.getAdventureSettings().get(AdventureSettings.Type.FLYING)) {
             // A flying player mines at normal speed on Bedrock: the in-air penalty is for
             // jumping and falling only, and the client never applies it while flight is on.
@@ -896,19 +896,19 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
         return seconds;
     }
-
+    
     public double calculateBreakTimeNotInAir(@NotNull Item item, @Nullable Player player) {
         Objects.requireNonNull(item, "Block#calculateBreakTime(): Item can not be null");
         double seconds = 0;
         double blockHardness = this.getHardness();
         boolean canHarvest = this.canHarvest(item);
-
+    
         if (canHarvest) {
             seconds = blockHardness * 1.5;
         } else {
             seconds = blockHardness * 5;
         }
-
+    
         double speedMultiplier = 1;
         boolean hasConduitPower = false;
         boolean hasAquaAffinity = false;
@@ -923,44 +923,43 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             miningFatigueLevel = Optional.ofNullable(player.getEffect(Effect.MINING_FATIGUE))
                     .map(Effect::getAmplifier).orElse(-1) + 1;
         }
-
-
+    
         int blockId = this.getId();
-
+    
         if (blockId == BAMBOO && item.isSword()) {
             return 0; //用剑挖竹子时瞬间破坏
         }
-
+    
         if (correctTool0(this.getToolType(), item, blockId)) {
             speedMultiplier = toolBreakTimeBonus0(item);
-
+    
             int efficiencyLevel = Optional.ofNullable(item.getEnchantment(Enchantment.ID_EFFICIENCY))
                     .map(Enchantment::getLevel).orElse(0);
-
+    
             if (canHarvest && efficiencyLevel > 0) {
                 speedMultiplier += efficiencyLevel * efficiencyLevel + 1;
             }
         }
-
+    
         int effectiveHasteEffectLevel = hasConduitPower
                 ? Integer.max(hasteEffectLevel, 2)
                 : hasteEffectLevel;
-
+    
         if (effectiveHasteEffectLevel > 0) {
             speedMultiplier *= 1 + (0.2 * effectiveHasteEffectLevel);
         }
-
+    
         if (hasteEffectLevel > 0) {
             // Bedrock applies an additional exponential bonus to the actual haste effect.
             speedMultiplier *= Math.pow(1.2, hasteEffectLevel);
         }
-
+    
         if (miningFatigueLevel > 0) {
             speedMultiplier *= Math.pow(0.3, miningFatigueLevel);
         }
-
+    
         seconds /= speedMultiplier;
-
+    
         if (player != null) {
             if (player.isSubmerged() && !hasAquaAffinity) {
                 seconds *= hasConduitPower && blockHardness >= 0.5 ? 2.5 : 5;
@@ -968,7 +967,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
         return seconds;
     }
-
+    
     public double getBreakTime(@NotNull Item item, Player player) {
         return calculateBreakTime(item, player);
         /*Objects.requireNonNull(item, "getBreakTime: Item can not be null");
