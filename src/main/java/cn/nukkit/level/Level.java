@@ -3844,6 +3844,12 @@ public class Level implements ChunkManager, Metadatable {
         return this.requireProvider().getLoadedChunks();
     }
 
+    /** Loaded count without copying chunk values; zero after close. */
+    public int getLoadedChunkCount() {
+        LevelProvider levelProvider = this.provider;
+        return levelProvider == null ? 0 : levelProvider.getLoadedChunkCount();
+    }
+
     @Override
     public BaseFullChunk getChunk(int chunkX, int chunkZ) {
         return this.getChunk(chunkX, chunkZ, false);
@@ -5191,12 +5197,10 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         LevelProvider levelProvider = this.requireProvider();
-        for (Map.Entry<Long, ? extends FullChunk> entry : levelProvider.getLoadedChunks().entrySet()) {
-            long index = entry.getKey();
+        for (long index : levelProvider.getLoadedChunkHashes()) {
             if (!this.unloadQueue.containsKey(index)) {
-                FullChunk chunk = entry.getValue();
-                int X = chunk.getX();
-                int Z = chunk.getZ();
+                int X = getHashX(index);
+                int Z = getHashZ(index);
                 if (!this.isSpawnChunk(X, Z)) {
                     this.unloadChunkRequest(X, Z, true);
                 }
