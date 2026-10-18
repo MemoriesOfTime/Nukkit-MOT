@@ -1,28 +1,27 @@
 package cn.nukkit.level;
 
-import cn.nukkit.entity.Entity;
 import cn.nukkit.MockServer;
-import cn.nukkit.scheduler.BlockUpdateScheduler;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.level.format.LevelProvider;
-import static org.mockito.Mockito.*;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicInteger;
-
+import cn.nukkit.scheduler.BlockUpdateScheduler;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntPredicate;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
 
 /** Callback order and admission remain those of a key snapshot, not a live entity iterator. */
 class LevelEntityTickSnapshotTest {
@@ -146,7 +145,8 @@ class LevelEntityTickSnapshotTest {
             set(level, "server", MockServer.get());
             set(level, "provider", mock(LevelProvider.class));
             set(level, "updateEntities", new Long2ObjectNonBlockingMap<Entity>());
-            set(level, "players", new Long2ObjectNonBlockingMap<>());
+            set(level, "players", new PlayerRangeMap());
+            set(level, "entities", new Long2ObjectNonBlockingMap<Entity>());
             set(level, "chunkTickList", new Long2IntOpenHashMap());
             set(level, "changedBlocks", new Long2ObjectOpenHashMap<>());
             set(level, "dimensionData", DimensionData.LEGACY_DIMENSION);

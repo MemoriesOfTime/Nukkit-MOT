@@ -252,6 +252,32 @@ class EntityActivationTest {
     }
 
     @Test
+    void movingPlayerIntoRangeImmediatelyPreventsMobDespawnWithCachedMembership() {
+        PlayerRangeMap tickingPlayers = new PlayerRangeMap();
+        when(level.getPlayers()).thenReturn(tickingPlayers);
+        Player player = mock(Player.class);
+        player.x = 200;
+        player.y = 500;
+        tickingPlayers.put(1L, player);
+        EntityPig pig = spawn(EntityPig::new, 0, 0);
+        boolean previousDespawn = server.despawnMobs;
+        server.despawnMobs = true;
+        tickingPlayers.beginTick();
+        try {
+            assertTrue(pig.canDespawn());
+            Player[] snapshot = tickingPlayers.tickSnapshot();
+            player.x = 96;
+            assertTrue(pig.canDespawn(), "the 96-block boundary remains exclusive");
+            player.x = 0;
+            assertFalse(pig.canDespawn(), "a player moving nearby must prevent despawn immediately");
+            assertSame(snapshot, tickingPlayers.tickSnapshot(), "movement keeps the reference snapshot valid");
+        } finally {
+            tickingPlayers.endTick();
+            server.despawnMobs = previousDespawn;
+        }
+    }
+
+    @Test
     void sleepingMobStillDespawnsOnCaughtUpTicks() {
         boolean despawn = server.despawnMobs;
         int despawnTicks = server.mobDespawnTicks;

@@ -293,7 +293,7 @@ public class Level implements ChunkManager, Metadatable {
     private final Long2ObjectNonBlockingMap<BlockEntity> blockEntities = new Long2ObjectNonBlockingMap<>();
 
     @NonComputationAtomic
-    private final Long2ObjectNonBlockingMap<Player> players = new Long2ObjectNonBlockingMap<>();
+    private final Map<Long, Player> players = new PlayerRangeMap();
 
     @NonComputationAtomic
     private final Long2ObjectNonBlockingMap<Entity> entities = new Long2ObjectNonBlockingMap<>();
@@ -1486,6 +1486,8 @@ public class Level implements ChunkManager, Metadatable {
     void tickEntities(int currentTick) {
         if (this.updateEntities.isEmpty()) return;
         long[] keys = this.entityTickKeys;
+        PlayerRangeMap playerRanges = this.getPlayers() instanceof PlayerRangeMap map ? map : null;
+        if (playerRanges != null) playerRanges.beginTick();
         // A callback may reenter: the nested update must never overwrite the outer snapshot.
         this.entityTickKeys = null;
         try {
@@ -1507,6 +1509,7 @@ public class Level implements ChunkManager, Metadatable {
             }
         } finally {
             if (keys != null && keys.length <= MAX_RETAINED_ENTITY_TICK_KEYS) this.entityTickKeys = keys;
+            if (playerRanges != null) playerRanges.endTick();
         }
     }
 
