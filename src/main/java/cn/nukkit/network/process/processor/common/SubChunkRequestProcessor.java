@@ -18,6 +18,7 @@ import cn.nukkit.network.protocol.SubChunkPacket;
 import cn.nukkit.network.protocol.SubChunkRequestPacket;
 import cn.nukkit.network.protocol.types.SubChunkRequestResult;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.ThreadCache;
 import cn.nukkit.utils.XXHash64;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -355,28 +356,34 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         }
 
         GameVersion gameVersion = playerHandle.getGameVersion();
-        BinaryStream stream = new BinaryStream();
-        sections[subIndex].writeTo(gameVersion, stream, antiXray);
-        byte[] sectionBytes = stream.getBuffer();
-        byte[] entityBytes = NetworkChunkSerializer.serializeEntitiesForSubChunk((BaseChunk) chunk, gameVersion.getProtocol(), subIndex, minSectionY);
-        computeHeightMap(entry, chunk::getHeightMap, subIndex, dimensionData.getMinSectionY());
-        entry.result = SubChunkRequestResult.SUCCESS;
+        BinaryStream stream = ThreadCache.acquireBinaryStream();
+        try {
+            sections[subIndex].writeTo(gameVersion, stream, antiXray);
+            byte[] entityBytes = NetworkChunkSerializer.serializeEntitiesForSubChunk((BaseChunk) chunk, gameVersion.getProtocol(), subIndex, minSectionY);
+            computeHeightMap(entry, chunk::getHeightMap, subIndex, dimensionData.getMinSectionY());
+            entry.result = SubChunkRequestResult.SUCCESS;
 
-        if (cacheMode) {
-            long hash = XXHash64.hash(sectionBytes);
-            if (player.tryTrackClientCacheBlob(hash, sectionBytes)) {
-                entry.blobId = hash;
-                entry.hasBlobId = true;
-                entry.data = entityBytes;
-                return entry;
+            if (cacheMode) {
+                byte[] sectionBytes = stream.getBuffer();
+                long hash = XXHash64.hash(sectionBytes);
+                if (player.tryTrackClientCacheBlob(hash, sectionBytes)) {
+                    entry.blobId = hash;
+                    entry.hasBlobId = true;
+                    entry.data = entityBytes;
+                    return entry;
+                }
+                if (entityBytes.length == 0) {
+                    entry.data = sectionBytes;
+                    return entry;
+                }
+                // pending 超限降级 raw / pending over cap: degrade to raw
             }
-            // pending 超限降级 raw / pending over cap: degrade to raw
+            stream.put(entityBytes);
+            entry.data = stream.getBuffer();
+            return entry;
+        } finally {
+            ThreadCache.releaseBinaryStream(stream);
         }
-        byte[] data = new byte[sectionBytes.length + entityBytes.length];
-        System.arraycopy(sectionBytes, 0, data, 0, sectionBytes.length);
-        System.arraycopy(entityBytes, 0, data, sectionBytes.length, entityBytes.length);
-        entry.data = data;
-        return entry;
     }
 
     /**

@@ -12,11 +12,7 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
-import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.NukkitMath;
-import cn.nukkit.math.BlockVector3;
-import cn.nukkit.math.Vector2f;
-import cn.nukkit.math.Vector3f;
+import cn.nukkit.math.*;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -170,6 +166,25 @@ public class BinaryStream {
         this.offset += Math.min(len, this.count - this.offset);
     }
 
+    /**
+     * 为后续写入预留额外容量，不改变已有字节或读写位置。
+     * <p>
+     * Reserves additional writable bytes without changing existing bytes or read/write positions.
+     */
+    public void reserve(int additionalBytes) {
+        if (additionalBytes < 0) {
+            throw new IllegalArgumentException("Negative additional capacity: " + additionalBytes);
+        }
+        if (additionalBytes == 0) {
+            return;
+        }
+        long required = (long) this.count + additionalBytes;
+        if (required > Integer.MAX_VALUE) {
+            throw new OutOfMemoryError("Required array size too large");
+        }
+        this.ensureCapacity((int) required);
+    }
+
     public void put(byte[] bytes) {
         if (bytes == null) {
             return;
@@ -221,7 +236,17 @@ public class BinaryStream {
     }
 
     public void putLInt(int i) {
-        this.put(Binary.writeLInt(i));
+        if (!directByteWrite) {
+            this.put(Binary.writeLInt(i));
+            return;
+        }
+        this.ensureCapacity(this.count + Integer.BYTES);
+        int index = this.count;
+        this.buffer[index] = (byte) i;
+        this.buffer[index + 1] = (byte) (i >>> 8);
+        this.buffer[index + 2] = (byte) (i >>> 16);
+        this.buffer[index + 3] = (byte) (i >>> 24);
+        this.count = index + Integer.BYTES;
     }
 
     public int getShort() {

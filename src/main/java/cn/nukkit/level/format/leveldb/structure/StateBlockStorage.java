@@ -18,6 +18,7 @@ import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.ThreadCache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.netty.buffer.ByteBuf;
@@ -50,6 +51,7 @@ public class StateBlockStorage {
     private static final String PMMP_DATA_VERSION = "PMMPDataVersion";
 
     private static final int SECTION_SIZE = 16 * 16 * 16;
+    private static final int MAX_VAR_INT_BYTES = 5;
 
     // No chunk/provider references. Limit retained serialized bytes across all loaded sections/versions.
     private static final Cache<NetworkKey, byte[]> NETWORK_BYTES = Caffeine.newBuilder()
@@ -308,10 +310,14 @@ public class StateBlockStorage {
         NetworkKey key = new NetworkKey(identity, blockPalette, paletteVersion, useHash, this.palette.size());
         // Caffeine's atomic load also coalesces concurrent cold requests from independent async copies.
         byte[] bytes = NETWORK_BYTES.get(key, ignored -> {
-            BinaryStream encoded = new BinaryStream();
-            this.writeToUncached(protocol, encoded, antiXray, blockPalette, useHash,
-                    identity instanceof XrayMask mask ? mask.concealed : null);
-            return encoded.getBuffer();
+            BinaryStream encoded = ThreadCache.acquireBinaryStream();
+            try {
+                this.writeToUncached(protocol, encoded, antiXray, blockPalette, useHash,
+                        identity instanceof XrayMask mask ? mask.concealed : null);
+                return encoded.getBuffer();
+            } finally {
+                ThreadCache.releaseBinaryStream(encoded);
+            }
         });
         if (blockPalette.getNetworkVersion() != paletteVersion
                 || GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol) != useHash
@@ -452,8 +458,12 @@ public class StateBlockStorage {
             words.set(i, networkIndex[local]);
         }
 
+        int[] packedWords = words.getWords();
         stream.putByte((byte) getPaletteHeader(version, true));
-        for (int word : words.getWords()) {
+        int wordBytes = Math.multiplyExact(packedWords.length, Integer.BYTES);
+        int paletteBytes = Math.multiplyExact(Math.addExact(networkPalette.size(), 1), MAX_VAR_INT_BYTES);
+        stream.reserve(Math.addExact(wordBytes, paletteBytes));
+        for (int word : packedWords) {
             stream.putLInt(word);
         }
         stream.putVarInt(networkPalette.size());
