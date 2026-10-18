@@ -18,6 +18,7 @@ import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.ThreadCache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.netty.buffer.ByteBuf;
@@ -25,6 +26,7 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
@@ -49,6 +51,7 @@ public class StateBlockStorage {
     private static final String PMMP_DATA_VERSION = "PMMPDataVersion";
 
     private static final int SECTION_SIZE = 16 * 16 * 16;
+    private static final int MAX_VAR_INT_BYTES = 5;
 
     // No chunk/provider references. Limit retained serialized bytes across all loaded sections/versions.
     private static final Cache<NetworkKey, byte[]> NETWORK_BYTES = Caffeine.newBuilder()
@@ -74,7 +77,8 @@ public class StateBlockStorage {
     private NibbleArray blockData;
 
     public StateBlockStorage() {
-        this(BitArrayVersion.V2);
+        // A fresh layer contains only air: allocate cell words on its first mutation.
+        this(BitArrayVersion.V0);
     }
 
     public StateBlockStorage(BitArrayVersion version) {
@@ -209,6 +213,8 @@ public class StateBlockStorage {
                 }
             }
         } finally {
+            // Invalidate observations made while the previous palette was still being replaced.
+            this.version++;
             try {
                 if (inputStream != null) {
                     inputStream.close();
@@ -304,10 +310,14 @@ public class StateBlockStorage {
         NetworkKey key = new NetworkKey(identity, blockPalette, paletteVersion, useHash, this.palette.size());
         // Caffeine's atomic load also coalesces concurrent cold requests from independent async copies.
         byte[] bytes = NETWORK_BYTES.get(key, ignored -> {
-            BinaryStream encoded = new BinaryStream();
-            this.writeToUncached(protocol, encoded, antiXray, blockPalette, useHash,
-                    identity instanceof XrayMask mask ? mask.concealed : null);
-            return encoded.getBuffer();
+            BinaryStream encoded = ThreadCache.acquireBinaryStream();
+            try {
+                this.writeToUncached(protocol, encoded, antiXray, blockPalette, useHash,
+                        identity instanceof XrayMask mask ? mask.concealed : null);
+                return encoded.getBuffer();
+            } finally {
+                ThreadCache.releaseBinaryStream(encoded);
+            }
         });
         if (blockPalette.getNetworkVersion() != paletteVersion
                 || GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol) != useHash
@@ -448,8 +458,12 @@ public class StateBlockStorage {
             words.set(i, networkIndex[local]);
         }
 
+        int[] packedWords = words.getWords();
         stream.putByte((byte) getPaletteHeader(version, true));
-        for (int word : words.getWords()) {
+        int wordBytes = Math.multiplyExact(packedWords.length, Integer.BYTES);
+        int paletteBytes = Math.multiplyExact(Math.addExact(networkPalette.size(), 1), MAX_VAR_INT_BYTES);
+        stream.reserve(Math.addExact(wordBytes, paletteBytes));
+        for (int word : packedWords) {
             stream.putLInt(word);
         }
         stream.putVarInt(networkPalette.size());
@@ -459,6 +473,12 @@ public class StateBlockStorage {
     }
 
     private void grow(BitArrayVersion version) {
+        if (this.bitArray.getVersion() == BitArrayVersion.V0 && this.bitArray.get(0) == 0) {
+            // A singleton has only index zero. Start at the previous default width
+            // without copying 4096 zeros or immediately growing through V1 again.
+            this.bitArray = BitArrayVersion.V2.createPalette(SECTION_SIZE);
+            return;
+        }
         BitArray newBitArray = version.createPalette(SECTION_SIZE);
         for (int i = 0; i < SECTION_SIZE; i++) {
             newBitArray.set(i, this.bitArray.get(i));
@@ -500,6 +520,23 @@ public class StateBlockStorage {
             }
         }
         return true;
+    }
+
+    /** Unknown/custom states are not evidence that a connection-driven block is absent. */
+    public boolean mayContainBlockIds(IntSet blockIds) {
+        if (this.palette == null || this.palette.isEmpty()) {
+            return true;
+        }
+        for (BlockStateSnapshot state : this.palette) {
+            if (state == null || state.isCustom()) {
+                return true;
+            }
+            int id = state.getLegacyId();
+            if (id < 0 || id >= Block.MAX_BLOCK_ID || id == Block.INFO_UPDATE || blockIds.contains(id)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public byte[] getBlockIds() {
@@ -546,7 +583,7 @@ public class StateBlockStorage {
             this.version++;
             this.networkSnapshot = null;
             BlockStateSnapshot firstId = this.palette.get(0);
-            this.palette.clear();
+            this.palette = new ObjectArrayList<>(1);
             this.palette.add(firstId);
 
 //            Arrays.fill(this.bitArray.getWords(), 0);
@@ -557,7 +594,7 @@ public class StateBlockStorage {
 
         BitArrayVersion version = BitArrayVersion.V2;
         BitArray newArray = version.createPalette(SECTION_SIZE);
-        List<BlockStateSnapshot> newPalette = new ObjectArrayList<>(count);
+        ObjectArrayList<BlockStateSnapshot> newPalette = new ObjectArrayList<>(count);
         newPalette.add(this.palette.get(0));
         // Remap each old palette entry once, instead of searching an expanding list
         // for every cell. Keep entry zero and first-use order exactly as before.
@@ -592,6 +629,8 @@ public class StateBlockStorage {
 
             newArray.set(i, newIndex);
         }
+        // Drop the historical high-water capacity together with unused states.
+        newPalette.trim();
         this.networkSnapshot = null;
         this.bitArray = newArray;
         this.palette = newPalette;
@@ -698,6 +737,25 @@ public class StateBlockStorage {
     public boolean maybeHasLightSource() {
         for (BlockStateSnapshot state : this.palette) {
             if (Block.getBlockLight(state.getLegacyId()) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Unused palette entries are harmless false positives; do not scan all 4096 cells. */
+    public boolean mayHaveRandomTickBlocks() {
+        // Legacy subclasses may expose ticking blocks through their virtual reads.
+        if (this.getClass() != StateBlockStorage.class) {
+            return true;
+        }
+        // Large or long-lived palettes cost more to inspect than the usual three samples.
+        // Keep those on the existing path rather than trading three reads for a full scan.
+        if (this.palette.size() > 16) {
+            return true;
+        }
+        for (int i = 0; i < this.palette.size(); i++) {
+            if (Level.isRandomTickBlock(this.palette.get(i).getLegacyId())) {
                 return true;
             }
         }

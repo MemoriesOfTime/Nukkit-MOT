@@ -22,9 +22,11 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.netty.buffer.*;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -602,9 +604,12 @@ public class LevelDBProvider implements LevelProvider {
                                 chunkX,
                                 chunkZ,
                                 networkChunkSerializerCallback.getSubchunks(),
-                                networkChunkSerializerCallback.getStream().getBuffer()
+                                networkChunkSerializerCallback.getStream().getBuffer(),
+                                networkChunkSerializerCallback.getSubChunkBlobs(),
+                                networkChunkSerializerCallback.getBiomes(),
+                                networkChunkSerializerCallback.getBlockEntities()
                         );
-                    }, level.antiXrayEnabled(), getLevel().getDimensionData());
+                    }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                     for (GameVersion gv : protocols) {
@@ -620,9 +625,12 @@ public class LevelDBProvider implements LevelProvider {
                             chunkX,
                             chunkZ,
                             networkChunkSerializerCallback.getSubchunks(),
-                            networkChunkSerializerCallback.getStream().getBuffer()
+                            networkChunkSerializerCallback.getStream().getBuffer(),
+                            networkChunkSerializerCallback.getSubChunkBlobs(),
+                            networkChunkSerializerCallback.getBiomes(),
+                            networkChunkSerializerCallback.getBlockEntities()
                     );
-                }, level.antiXrayEnabled(), this.level.getDimensionData());
+                }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
             } catch (Throwable t) {
                 getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                 for (GameVersion gv : protocols) {
@@ -652,7 +660,29 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        return ImmutableMap.copyOf(chunks);
+        // Chunk-coordinate Long keys often share x ^ z, which makes Guava's boxed
+        // snapshot overflow its buckets and rebuild through an exception.
+        // Keep the detached, read-only snapshot contract and synchronize iteration.
+        synchronized (this.chunks) {
+            Long2ObjectOpenHashMap<BaseFullChunk> snapshot = new Long2ObjectOpenHashMap<>(this.chunks);
+            // Match ImmutableMap's non-null value contract for callers of the unsafe map API.
+            if (snapshot.containsValue(null)) {
+                throw new NullPointerException("Loaded chunk snapshot contains a null chunk");
+            }
+            return Collections.unmodifiableMap(snapshot);
+        }
+    }
+
+    @Override
+    public long[] getLoadedChunkHashes() {
+        synchronized (this.chunks) {
+            return this.chunks.keySet().toLongArray();
+        }
+    }
+
+    @Override
+    public int getLoadedChunkCount() {
+        return this.chunks.size();
     }
 
     public Long2ObjectMap<? extends FullChunk> getLoadedChunksUnsafe() {

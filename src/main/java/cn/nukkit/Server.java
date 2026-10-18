@@ -29,10 +29,7 @@ import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.BaseLang;
 import cn.nukkit.lang.TextContainer;
-import cn.nukkit.level.EnumLevel;
-import cn.nukkit.level.GlobalBlockPalette;
-import cn.nukkit.level.Level;
-import cn.nukkit.level.Position;
+import cn.nukkit.level.*;
 import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.LevelProviderManager;
@@ -268,6 +265,7 @@ public class Server {
     private Level[] levelArray = new Level[0];
     private final ServiceManager serviceManager = new NKServiceManager();
     private Level defaultLevel;
+    private ClientCacheBlobStore clientCacheBlobStore;
     private final Thread currentThread;
     private Watchdog watchdog;
     private NukkitMetrics nukkitMetrics;
@@ -1054,9 +1052,10 @@ public class Server {
         nonAutoSaveWorlds.addAll(this.serverConfig.worldSettings().autoSaveDisabledWorlds());
 
         if (this.serverConfig.entitySettings().autoSpawnTask()) {
-            this.spawnerTask = new SpawnerTask();
             int spawnerTicks = Math.max(this.serverConfig.entitySettings().ticksPerSpawns(), 2) >> 1; // Run the spawner on 2x speed but spawn only either monsters or animals
-            this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask, spawnerTicks, spawnerTicks);
+            this.spawnerTask = new SpawnerTask(spawnerTicks);
+            // Every tick, one spawner at a time: see SpawnerTask#tick
+            this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask::tick, 1, 1);
         }
 
         if (this.serverConfig.debugSettings().bstatsMetrics()) {
@@ -1948,11 +1947,9 @@ public class Server {
                 this.doAutoSave();
             }
 
-            if (this.tickCounter % 100 == 0) {
-                for (Level level : this.levelArray) {
-                    if (!level.isBeingConverted) {
-                        level.doChunkGarbageCollection();
-                    }
+            for (Level level : this.levelArray) {
+                if (!level.isBeingConverted && level.isChunkGarbageCollectionTick(this.tickCounter)) {
+                    level.doChunkGarbageCollection();
                 }
             }
 
@@ -2887,6 +2884,20 @@ public class Server {
      */
     public Level getDefaultLevel() {
         return defaultLevel;
+    }
+
+    /**
+     * 获取全服共享的客户端缓存 blob 仓库：内容寻址字节预算 LRU，跨世界去重。
+     * <p>
+     * Gets the server-wide shared client cache blob store: content-addressed,
+     * byte-budget LRU, deduplicated across all levels.
+     */
+    public ClientCacheBlobStore getClientCacheBlobStore() {
+        if (this.clientCacheBlobStore == null) {
+            this.clientCacheBlobStore = new ClientCacheBlobStore(
+                    Math.max(1, this.getServerConfig().chunkSettings().blobStoreMaxMb()) * 1024L * 1024L);
+        }
+        return this.clientCacheBlobStore;
     }
 
     /**

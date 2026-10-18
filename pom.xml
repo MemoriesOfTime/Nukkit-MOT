@@ -44,7 +44,7 @@
         <log4j2.version>2.26.1</log4j2.version>
         <jline.version>3.30.15</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
-        <leveldb-mcpe-jni.version>0.0.11</leveldb-mcpe-jni.version>
+        <leveldb-mcpe-jni.version>0.0.12</leveldb-mcpe-jni.version>
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
         <netty.version>4.2.16.Final</netty.version>
 
@@ -540,6 +540,12 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-math3</artifactId>
             <version>${commons-math3.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial.snappy</groupId>
+            <artifactId>snappy-java</artifactId>
+            <version>1.1.10.12</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

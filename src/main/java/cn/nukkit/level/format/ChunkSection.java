@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BinaryStream;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
 /**
  * @author MagicDroidX
@@ -96,6 +97,11 @@ public interface ChunkSection {
 
     boolean isEmpty();
 
+    /** False only when layer zero cannot contain a block selected by Level's random ticks. */
+    default boolean mayHaveRandomTickBlocks() {
+        return true;
+    }
+
     boolean hasLayer(int layer);
 
     @Deprecated
@@ -141,6 +147,14 @@ public interface ChunkSection {
 
     default void setDirty() {
 
+    }
+
+    /**
+     * Conservative palette probe for the normal block layer. False excludes every cell;
+     * providers without a palette stay on the existing position-by-position scan.
+     */
+    default boolean mayContainBlockIds(IntSet blockIds) {
+        return true;
     }
 
     /**
