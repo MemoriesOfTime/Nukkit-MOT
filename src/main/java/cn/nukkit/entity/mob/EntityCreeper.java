@@ -127,6 +127,11 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
         }
 
         Vector3 target = this.updateMove(tickDiff);
+        // Losing a creature cancels a proximity fuse, never a manually lit one.
+        if (this.explodeTimer <= 0 && !(target instanceof EntityCreature)) {
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, false);
+            this.bombTime = 0;
+        }
         if (target != null) {
             double distance = target.distanceSquared(this);
             if (distance <= 16) { // 4 blocks
