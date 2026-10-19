@@ -6,12 +6,18 @@ import cn.nukkit.math.Vector3;
 
 import java.util.ArrayList;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author zzz1999 @ MobPlugin
  */
 public abstract class RouteFinder {
+
+    private static final AtomicReferenceFieldUpdater<RouteFinder, RouteFinderSearchTask> SEARCH_OWNER =
+            AtomicReferenceFieldUpdater.newUpdater(RouteFinder.class, RouteFinderSearchTask.class, "pendingSearch");
+
+    private volatile RouteFinderSearchTask pendingSearch;
 
     protected final ArrayList<Node> nodes = new ArrayList<>();
     protected boolean finished;
@@ -58,6 +64,18 @@ public abstract class RouteFinder {
 
     public int getCurrent() {
         return this.current;
+    }
+
+    public boolean hasPendingSearch() {
+        return this.pendingSearch != null;
+    }
+
+    boolean reserveSearch(RouteFinderSearchTask task) {
+        return SEARCH_OWNER.compareAndSet(this, null, task);
+    }
+
+    void releaseSearch(RouteFinderSearchTask task) {
+        SEARCH_OWNER.compareAndSet(this, task, null);
     }
 
     public Node getCurrentNode() {

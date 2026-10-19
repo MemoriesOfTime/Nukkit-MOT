@@ -165,7 +165,8 @@ public abstract class EntityWalking extends BaseEntity {
         }
 
         if (!isImmobile()) {
-            if (this.age % 10 == 0 && this.route != null && !this.route.isSearching()) {
+            if (this.age % 10 == 0 && this.route != null
+                    && !this.route.hasPendingSearch() && !this.route.isSearching()) {
                 // Only start the search: reading next() here raced with the async rebuild and
                 // returned the fresh path's first node, a point right beside the entity.
                 RouteFinderThreadPool.executeRouteFinderThread(new RouteFinderSearchTask(this.route));
