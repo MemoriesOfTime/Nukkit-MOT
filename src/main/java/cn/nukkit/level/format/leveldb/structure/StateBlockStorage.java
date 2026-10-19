@@ -54,9 +54,9 @@ public class StateBlockStorage {
     private static final int MAX_VAR_INT_BYTES = 5;
 
     // No chunk/provider references. Limit retained serialized bytes across all loaded sections/versions.
-    private static final Cache<NetworkKey, byte[]> NETWORK_BYTES = Caffeine.newBuilder()
+    private static final Cache<Long, NetworkEntry> NETWORK_BYTES = Caffeine.newBuilder()
             .maximumWeight(Math.min(32L << 20, Runtime.getRuntime().maxMemory() / 64))
-            .weigher((NetworkKey key, byte[] bytes) -> bytes.length + 256 + 5 * key.paletteSize())
+            .weigher((Long key, NetworkEntry entry) -> entry.weight())
             .expireAfterAccess(1, TimeUnit.MINUTES)
             .build();
 
@@ -66,10 +66,9 @@ public class StateBlockStorage {
 
     /**
      * Bumped by every change of the stored states. Whoever read cells together with a version knows
-     * they still hold while {@link #getVersion()} returns the same value (the collision scan cache).
+     * they still hold while {@link #getVersion()} returns the same value.
      */
     private volatile int version;
-    private volatile NetworkSnapshot networkSnapshot;
     private boolean networkCacheable = true;
 
     //用于兼容1.13以下版本
@@ -137,7 +136,6 @@ public class StateBlockStorage {
     }
 
     public synchronized void readFromStorage(ByteBuf buffer, ChunkBuilder chunkBuilder) {
-        this.networkSnapshot = null;
         this.version++;
         short header = buffer.readUnsignedByte();
 
@@ -247,7 +245,6 @@ public class StateBlockStorage {
     }
 
     public synchronized void set(int index, BlockStateSnapshot value) {
-        this.networkSnapshot = null;
         try {
             int paletteIndex = this.getOrAdd(value);
             this.bitArray.set(index, paletteIndex);
@@ -298,35 +295,50 @@ public class StateBlockStorage {
         }
         for (BlockStateSnapshot state : this.palette) {
             // Foreign-version snapshots may resolve legacy IDs through a replaceable live mapper on every read.
-            if (state != null && (state.getClass() != BlockStateSnapshot.class
-                    || state.getVersion() != BlockStateMapping.get().getVersion())) {
+            // Null entries keep the lazy per-cell read of the uncoded path instead of failing the id precompute.
+            if (state == null || state.getClass() != BlockStateSnapshot.class
+                    || state.getVersion() != BlockStateMapping.get().getVersion()) {
                 this.writeToUncached(protocol, stream, antiXray);
                 return;
             }
         }
-        NetworkSnapshot snapshot = this.networkSnapshot();
-        Object identity = snapshot.identity(this.palette, this.bitArray, antiXray);
         boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
-        NetworkKey key = new NetworkKey(identity, blockPalette, paletteVersion, useHash, this.palette.size());
+        int[] networkIds = new int[this.palette.size()];
+        for (int i = 0; i < networkIds.length; i++) {
+            BlockStateSnapshot state = this.palette.get(i);
+            networkIds[i] = networkId(blockPalette, useHash, antiXray,
+                    state.getLegacyId() << Block.DATA_BITS | state.getLegacyData());
+        }
+        BitArrayVersion cellsVersion = this.bitArray.getVersion();
+        int[] cells = this.bitArray.getWords();
+        // V0 keeps its only index in SingletonBitArray.value while getWords() stays empty.
+        boolean singleton = cellsVersion == BitArrayVersion.V0;
+        int singletonIndex = singleton ? this.bitArray.get(0) : 0;
+        // 内容寻址:cells 词表(或 V0 单值)加逐调色板项网络 ID 完全决定编码字节,与对象身份无关;
+        // 命中以逐词比对确认,指纹碰撞不可能误命中。
+        // <p>
+        // Content addressing: the cell words (or V0 singleton) plus per-entry network ids fully
+        // determine the encoded bytes; every hit is confirmed word-by-word, so a collision never mis-hits.
+        long fingerprint = contentFingerprint(cellsVersion, singletonIndex, cells, networkIds, blockPalette, paletteVersion, useHash);
         // Caffeine's atomic load also coalesces concurrent cold requests from independent async copies.
-        byte[] bytes = NETWORK_BYTES.get(key, ignored -> {
+        NetworkEntry entry = NETWORK_BYTES.get(fingerprint, ignored -> {
             BinaryStream encoded = ThreadCache.acquireBinaryStream();
             try {
-                this.writeToUncached(protocol, encoded, antiXray, blockPalette, useHash,
-                        identity instanceof XrayMask mask ? mask.concealed : null);
-                return encoded.getBuffer();
+                this.writeToUncached(protocol, encoded, antiXray, blockPalette, useHash, networkIds);
+                return new NetworkEntry(cellsVersion, singletonIndex, cells, networkIds, encoded.getBuffer(),
+                        blockPalette, paletteVersion, useHash);
             } finally {
                 ThreadCache.releaseBinaryStream(encoded);
             }
         });
         if (blockPalette.getNetworkVersion() != paletteVersion
                 || GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol) != useHash
-                || snapshot.identity(this.palette, this.bitArray, antiXray) != identity) {
-            NETWORK_BYTES.invalidate(key);
+                || !entry.matches(cellsVersion, singletonIndex, cells, networkIds, blockPalette, paletteVersion, useHash)) {
+            NETWORK_BYTES.invalidate(fingerprint);
             this.writeToUncached(protocol, stream, antiXray);
             return;
         }
-        stream.put(bytes);
+        stream.put(entry.bytes);
     }
 
     private void writeToUncached(GameVersion protocol, BinaryStream stream, boolean antiXray) {
@@ -338,9 +350,9 @@ public class StateBlockStorage {
     }
 
     private void writeToUncached(GameVersion protocol, BinaryStream stream, boolean antiXray,
-                                 BlockPalette blockPalette, boolean useHash, boolean[] concealed) {
+                                 BlockPalette blockPalette, boolean useHash, int[] networkIds) {
         if (protocol.getProtocol() >= ProtocolInfo.v1_16_100 && this.palette.size() > 4) {
-            writeSizedNetworkPalette(stream, antiXray, blockPalette, useHash, concealed);
+            writeSizedNetworkPalette(stream, antiXray, blockPalette, useHash, networkIds);
             return;
         }
         PalettedBlockStorage palettedBlockStorage = protocol.getProtocol() >= ProtocolInfo.v1_16_100
@@ -367,13 +379,14 @@ public class StateBlockStorage {
                         palettedBlockStorage.setPaletteIndex(i, known);
                     } else {
                         BlockStateSnapshot snapshot = this.palette.get(local);
-                        int networkId = networkId(blockPalette, useHash, antiXray,
-                                snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData(), concealed, local);
+                        int networkId = networkIds != null ? networkIds[local]
+                                : networkId(blockPalette, useHash, antiXray,
+                                snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData());
                         networkIndex[local] = palettedBlockStorage.setBlockReturningIndex(i, networkId);
                     }
                 } else {
                     // Out of the palette: keep the per-cell read, including the exception it throws.
-                    palettedBlockStorage.setBlock(i, networkId(blockPalette, useHash, antiXray, get(i), concealed, local));
+                    palettedBlockStorage.setBlock(i, networkId(blockPalette, useHash, antiXray, get(i)));
                 }
             }
         } else {
@@ -392,13 +405,10 @@ public class StateBlockStorage {
         palettedBlockStorage.writeTo(stream);
     }
 
-    private static int networkId(BlockPalette blockPalette, boolean useHash, boolean antiXray, int fullId,
-                                 boolean[] concealed, int local) {
+    private static int networkId(BlockPalette blockPalette, boolean useHash, boolean antiXray, int fullId) {
         int id = fullId >> Block.DATA_BITS;
         int meta = fullId & Block.DATA_MASK;
-        boolean hide = concealed == null ? antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]
-                : id < 0 ? Level.xrayableBlocks[id] : concealed[local];
-        if (hide) {
+        if (antiXray && id >= 0 && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
             id = Block.STONE;
             meta = 0;
         }
@@ -411,7 +421,7 @@ public class StateBlockStorage {
      * first-use ordering, air at index zero, alias merging and minimum V2 width on the wire.
      */
     private void writeSizedNetworkPalette(BinaryStream stream, boolean antiXray,
-                                         BlockPalette blockPalette, boolean useHash, boolean[] concealed) {
+                                         BlockPalette blockPalette, boolean useHash, int[] networkIds) {
         int[] networkIndex = new int[this.palette.size()];
         Arrays.fill(networkIndex, -1);
         IntArrayList networkPalette = new IntArrayList(16);
@@ -431,8 +441,9 @@ public class StateBlockStorage {
                 continue;
             }
             BlockStateSnapshot snapshot = this.palette.get(local);
-            int fullId = snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData();
-            int id = networkId(blockPalette, useHash, antiXray, fullId, concealed, local);
+            int id = networkIds != null ? networkIds[local]
+                    : networkId(blockPalette, useHash, antiXray,
+                    snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData());
             int index = paletteIndex.get(id);
             if (index < 0) {
                 index = networkPalette.size();
@@ -581,7 +592,6 @@ public class StateBlockStorage {
         }
         if (noBlock) {
             this.version++;
-            this.networkSnapshot = null;
             BlockStateSnapshot firstId = this.palette.get(0);
             this.palette = new ObjectArrayList<>(1);
             this.palette.add(firstId);
@@ -631,7 +641,6 @@ public class StateBlockStorage {
         }
         // Drop the historical high-water capacity together with unused states.
         newPalette.trim();
-        this.networkSnapshot = null;
         this.bitArray = newArray;
         this.palette = newPalette;
         this.version++;
@@ -658,72 +667,98 @@ public class StateBlockStorage {
                 this.blockIds != null ? this.blockIds.clone() : null,
                 this.blockData != null ? this.blockData.copy(): null
         );
-        // copy() and writeTo() are called under the section read lock. Each mutator detaches only
-        // its own snapshot, so a worker's old clone remains valid after a live block edit.
+        // copy() runs under the section read lock and hands out deep copies of every array,
+        // so a worker's clone stays valid and self-contained after live block edits.
         copy.networkCacheable = true;
-        copy.networkSnapshot = this.networkCacheable ? this.networkSnapshot() : null;
         return copy;
     }
 
-    private NetworkSnapshot networkSnapshot() {
-        NetworkSnapshot snapshot = this.networkSnapshot;
-        if (snapshot == null) {
-            synchronized (this) {
-                snapshot = this.networkSnapshot;
-                if (snapshot == null) this.networkSnapshot = snapshot = new NetworkSnapshot();
-            }
-        }
-        return snapshot;
-    }
+    /**
+     * 内容寻址条目:持有 cells、V0 单值与逐项网络 ID 的快照副本用于逐词命中确认,指纹碰撞不可能误命中;
+     * 数组构造时克隆,条目不随后续原地修改漂移。
+     * <p>
+     * Content-addressed entry: snapshot copies of the cells, V0 singleton value and per-entry
+     * network ids for the word-by-word hit check; arrays are cloned, so the entry never drifts.
+     */
+    private static final class NetworkEntry {
+        private final BitArrayVersion version;
+        private final int singletonIndex;
+        private final int[] words;
+        private final int[] networkIds;
+        private final byte[] bytes;
+        private final BlockPalette palette;
+        private final long paletteVersion;
+        private final boolean hashed;
 
-    private record NetworkKey(Object snapshot, BlockPalette palette, long paletteVersion, boolean hashed,
-                              int paletteSize) { }
-
-    private static final class NetworkSnapshot {
-        private XrayMask mask;
-        private int[] used;
-
-        private Object identity(List<BlockStateSnapshot> states, BitArray cells, boolean antiXray) {
-            if (!antiXray) return this;
-            synchronized (this) {
-                if (this.used == null) {
-                    boolean[] present = new boolean[states.size()];
-                    int count = 0;
-                    for (int i = 0; i < SECTION_SIZE; i++) {
-                        int local = cells.get(i);
-                        // Leave corrupt-index exceptions to the original writer, in its original order.
-                        if (local >= 0 && local < present.length && !present[local]) {
-                            present[local] = true;
-                            count++;
-                        }
-                    }
-                    this.used = new int[count];
-                    for (int i = 0, n = 0; i < present.length; i++) if (present[i]) this.used[n++] = i;
-                }
-                if (this.mask != null) {
-                    boolean matches = true;
-                    for (int i : this.used) {
-                        if (this.mask.concealed[i] != concealed(states.get(i))) { matches = false; break; }
-                    }
-                    if (matches) return this.mask;
-                }
-                boolean[] concealed = new boolean[states.size()];
-                for (int i : this.used) concealed[i] = concealed(states.get(i));
-                return this.mask = new XrayMask(concealed);
-            }
+        private NetworkEntry(BitArrayVersion version, int singletonIndex, int[] words, int[] networkIds, byte[] bytes,
+                             BlockPalette palette, long paletteVersion, boolean hashed) {
+            this.version = version;
+            this.singletonIndex = singletonIndex;
+            this.words = words.clone();
+            this.networkIds = networkIds.clone();
+            this.bytes = bytes;
+            this.palette = palette;
+            this.paletteVersion = paletteVersion;
+            this.hashed = hashed;
         }
 
-        private static boolean concealed(BlockStateSnapshot state) {
-            if (state == null) return false;
-            int id = (state.getLegacyId() << Block.DATA_BITS | state.getLegacyData()) >> Block.DATA_BITS;
-            return id >= 0 && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id];
+        private boolean matches(BitArrayVersion version, int singletonIndex, int[] words, int[] networkIds,
+                                BlockPalette palette, long paletteVersion, boolean hashed) {
+            return this.version == version && this.singletonIndex == singletonIndex && this.hashed == hashed
+                    && this.paletteVersion == paletteVersion && this.palette == palette
+                    && Arrays.equals(this.words, words) && Arrays.equals(this.networkIds, networkIds);
+        }
+
+        private int weight() {
+            return this.bytes.length + 256 + 4 * (this.words.length + this.networkIds.length);
         }
     }
 
-    // Identity equality is deliberate: never treat a hash of the mutable obfuscation mask as proof.
-    private static final class XrayMask {
-        private final boolean[] concealed;
-        private XrayMask(boolean[] concealed) { this.concealed = concealed; }
+    private static final long CELL_PRIME = 0x9E3779B97F4A7C15L;
+    private static final long PALETTE_PRIME = 0xC2B2AE35D247B573L;
+    private static final long BLOCK_PRIME = 0x9E3779B185EBCA87L;
+
+    /**
+     * murmur3 式逐词步进:不可简化为"旋转后异或"的仿射折叠——其位置权重以 64 为周期,
+     * 相隔 64 个 word(或调色板位)的贡献会同权重碰撞,失配校验反而逐出正确条目,缓存每次重建。
+     * <p>
+     * Murmur3-style per-word step. A plain rotate-then-xor fold must not replace it: its positional
+     * weights repeat every 64 rounds, so contributions 64 words (or palette slots) apart collide
+     * and the failed match evicts the good entry, rebuilding the cache on every encode.
+     */
+    private static long mixWord(long h, long word, long prime) {
+        long k = word * prime;
+        k = Long.rotateLeft(k, 31);
+        k *= BLOCK_PRIME;
+        h ^= k;
+        return Long.rotateLeft(h, 27) * 5 + 0x52DCE729;
+    }
+
+    /** Murmur-style 64-bit mix; quality only affects hit rate, exactness is restored by {@link NetworkEntry#matches}. */
+    private static long contentFingerprint(BitArrayVersion version, int singletonIndex, int[] cells, int[] networkIds,
+                                           BlockPalette palette, long paletteVersion, boolean hashed) {
+        long h = 0x9E3779B97F4A7C15L;
+        h = mixWord(h, singletonIndex & 0xFFFFFFFFL, CELL_PRIME);
+        for (int cell : cells) {
+            h = mixWord(h, cell & 0xFFFFFFFFL, CELL_PRIME);
+        }
+        for (int id : networkIds) {
+            h = mixWord(h, id & 0xFFFFFFFFL, PALETTE_PRIME);
+        }
+        h = mixWord(h, version.ordinal(), PALETTE_PRIME);
+        h = mixWord(h, cells.length, PALETTE_PRIME);
+        h = mixWord(h, networkIds.length, PALETTE_PRIME);
+        h = mixWord(h, paletteVersion, PALETTE_PRIME);
+        h = mixWord(h, System.identityHashCode(palette) & 0xFFFFFFFFL, PALETTE_PRIME);
+        if (hashed) {
+            h ^= CELL_PRIME;
+        }
+        h ^= h >>> 33;
+        h *= 0xff51afd7ed558ccdL;
+        h ^= h >>> 33;
+        h *= 0xc4ceb9fe1a85ec53L;
+        h ^= h >>> 33;
+        return h;
     }
 
     /**
