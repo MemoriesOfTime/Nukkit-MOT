@@ -17,6 +17,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
+import cn.nukkit.level.PlayerRangeMap;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.HeartParticle;
 import cn.nukkit.math.AxisAlignedBB;
@@ -915,12 +916,28 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     protected boolean isInTickingRange(double rangeSquared) {
+        Player[] snapshot = this.level.getPlayers() instanceof PlayerRangeMap map ? map.tickSnapshot() : null;
+        if (snapshot != null) {
+            for (Player player : snapshot) {
+                if (this.withinHorizontalRange(player, rangeSquared)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         for (Player player : this.level.getPlayers().values()) {
-            // Ignore y so mobs won't stop falling into void unless movement behavior is tweaked for this
-            if (Math.pow(player.x - this.x, 2.0) + Math.pow(player.z - this.z, 2.0) < rangeSquared) {
+            if (this.withinHorizontalRange(player, rangeSquared)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private boolean withinHorizontalRange(Player player, double rangeSquared) {
+        // 忽略高度，避免生物掉入虚空时因垂直距离超范围而被冻结。
+        // Ignore height so mobs falling into the void keep moving instead of freezing once only the vertical gap exceeds the range.
+        double dx = player.x - this.x;
+        double dz = player.z - this.z;
+        return dx * dx + dz * dz < rangeSquared;
     }
 }

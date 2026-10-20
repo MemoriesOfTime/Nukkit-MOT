@@ -12,7 +12,16 @@ import org.jetbrains.annotations.NotNull;
 /**
  * @author CreeperFace
  */
-public class BlockBone extends BlockSolid implements Faceable {
+public class BlockBone extends BlockSolidMeta implements Faceable {
+
+    public BlockBone() {
+        this(0);
+    }
+
+    public BlockBone(int meta) {
+        super(meta);
+    }
+
 
     private static final int[] faces = {
             0,

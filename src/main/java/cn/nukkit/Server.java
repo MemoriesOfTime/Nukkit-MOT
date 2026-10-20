@@ -29,10 +29,7 @@ import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.BaseLang;
 import cn.nukkit.lang.TextContainer;
-import cn.nukkit.level.EnumLevel;
-import cn.nukkit.level.GlobalBlockPalette;
-import cn.nukkit.level.Level;
-import cn.nukkit.level.Position;
+import cn.nukkit.level.*;
 import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.LevelProviderManager;
@@ -150,6 +147,7 @@ public class Server {
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
     private volatile boolean hasStopped;
+    private volatile long shutdownProgressAt = Long.MAX_VALUE;
 
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
@@ -267,6 +265,7 @@ public class Server {
     private Level[] levelArray = new Level[0];
     private final ServiceManager serviceManager = new NKServiceManager();
     private Level defaultLevel;
+    private ClientCacheBlobStore clientCacheBlobStore;
     private final Thread currentThread;
     private Watchdog watchdog;
     private NukkitMetrics nukkitMetrics;
@@ -1053,9 +1052,10 @@ public class Server {
         nonAutoSaveWorlds.addAll(this.serverConfig.worldSettings().autoSaveDisabledWorlds());
 
         if (this.serverConfig.entitySettings().autoSpawnTask()) {
-            this.spawnerTask = new SpawnerTask();
             int spawnerTicks = Math.max(this.serverConfig.entitySettings().ticksPerSpawns(), 2) >> 1; // Run the spawner on 2x speed but spawn only either monsters or animals
-            this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask, spawnerTicks, spawnerTicks);
+            this.spawnerTask = new SpawnerTask(spawnerTicks);
+            // Every tick, one spawner at a time: see SpawnerTask#tick
+            this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask::tick, 1, 1);
         }
 
         if (this.serverConfig.debugSettings().bstatsMetrics()) {
@@ -1489,6 +1489,8 @@ public class Server {
         if (this.hasStopped) {
             return;
         }
+        long shutdownStart = System.currentTimeMillis();
+        this.touchShutdownProgress();
         this.hasStopped = true;
 
         try {
@@ -1510,15 +1512,17 @@ public class Server {
             this.getLogger().debug("Disconnecting all players...");
             for (Player player : new ArrayList<>(this.players.values())) {
                 player.close(player.getLeaveMessage(), reason);
+                this.touchShutdownProgress();
             }
 
             this.getLogger().debug("Disabling all plugins...");
             this.disablePlugins();
+            this.touchShutdownProgress();
 
             this.getLogger().debug("Unloading all levels...");
             for (Level level : this.levelArray) {
                 this.unloadLevel(level, true);
-                this.nextTick = System.currentTimeMillis(); // Fix Watchdog killing the server while saving worlds
+                this.touchShutdownProgress();
             }
 
             this.getLogger().debug("Removing event handlers...");
@@ -1554,6 +1558,9 @@ public class Server {
                 this.getLogger().debug("Stopping Watchdog...");
                 this.watchdog.kill();
             }
+
+            this.getLogger().info(this.baseLang.translateString("nukkit.server.stopped",
+                    String.valueOf(NukkitMath.round((System.currentTimeMillis() - shutdownStart) / 1000d, 1))));
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
             Nukkit.shutdownLogging();
@@ -1789,8 +1796,8 @@ public class Server {
 
     private void checkTickUpdates(int currentTick) {
         if (this.alwaysTickPlayers) {
-            for (Player p : new ArrayList<>(this.players.values())) {
-                p.onUpdate(currentTick);
+            for (Object p : this.players.values().toArray()) {
+                ((Player) p).onUpdate(currentTick);
             }
         }
 
@@ -1800,7 +1807,23 @@ public class Server {
 
         // Do level ticks
         for (Level level : this.levelArray) {
-            if (level.isBeingConverted || (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0)) {
+            if (level.isBeingConverted) {
+                continue;
+            }
+            if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
+                if (!this.alwaysTickPlayers) {
+                    for (Player player : new ArrayList<>(level.getPlayers().values())) {
+                        if (!player.spawned || player.closed || player.level != level) {
+                            continue;
+                        }
+                        try {
+                            player.onUpdate(currentTick);
+                        } catch (Exception e) {
+                            log.error(this.baseLang.translateString("nukkit.level.tickError",
+                                    new String[]{level.getFolderName(), Utils.getExceptionMessage(e)}));
+                        }
+                    }
+                }
                 continue;
             }
 
@@ -1894,8 +1917,8 @@ public class Server {
 
             this.checkTickUpdates(this.tickCounter);
 
-            for (Player player : new ArrayList<>(this.players.values())) {
-                player.checkNetwork();
+            for (Object player : this.players.values().toArray()) {
+                ((Player) player).checkNetwork();
             }
 
             if ((this.tickCounter & 0b1111) == 0) {
@@ -1924,11 +1947,9 @@ public class Server {
                 this.doAutoSave();
             }
 
-            if (this.tickCounter % 100 == 0) {
-                for (Level level : this.levelArray) {
-                    if (!level.isBeingConverted) {
-                        level.doChunkGarbageCollection();
-                    }
+            for (Level level : this.levelArray) {
+                if (!level.isBeingConverted && level.isChunkGarbageCollectionTick(this.tickCounter)) {
+                    level.doChunkGarbageCollection();
                 }
             }
 
@@ -1978,6 +1999,18 @@ public class Server {
 
     public long getNextTick() {
         return nextTick;
+    }
+
+    public boolean isShutdownInProgress() {
+        return this.hasStopped;
+    }
+
+    public long getShutdownProgressAt() {
+        return this.shutdownProgressAt;
+    }
+
+    public void touchShutdownProgress() {
+        this.shutdownProgressAt = System.currentTimeMillis();
     }
 
     private void titleTick() {
@@ -2851,6 +2884,20 @@ public class Server {
      */
     public Level getDefaultLevel() {
         return defaultLevel;
+    }
+
+    /**
+     * 获取全服共享的客户端缓存 blob 仓库：内容寻址字节预算 LRU，跨世界去重。
+     * <p>
+     * Gets the server-wide shared client cache blob store: content-addressed,
+     * byte-budget LRU, deduplicated across all levels.
+     */
+    public ClientCacheBlobStore getClientCacheBlobStore() {
+        if (this.clientCacheBlobStore == null) {
+            this.clientCacheBlobStore = new ClientCacheBlobStore(
+                    Math.max(1, this.getServerConfig().chunkSettings().blobStoreMaxMb()) * 1024L * 1024L);
+        }
+        return this.clientCacheBlobStore;
     }
 
     /**

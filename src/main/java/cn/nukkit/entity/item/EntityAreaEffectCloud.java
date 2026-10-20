@@ -240,7 +240,7 @@ public class EntityAreaEffectCloud extends Entity {
         if (this.namedTag.contains("ReapplicationDelay")) {
             this.reapplicationDelay = this.namedTag.getInt("ReapplicationDelay");
         } else {
-            this.reapplicationDelay = 0;
+            this.reapplicationDelay = 40;
         }
 
         if (this.namedTag.contains("InitialRadius")) {
