@@ -2730,7 +2730,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void computeRemoveBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue,
-                                         IntArrayFIFOQueue removalLevels, LongArrayFIFOQueue spreadQueue, Set<Long> visited, Set<Long> spreadVisited, List<Long> roots, long sourceNode) {
+                                         IntArrayFIFOQueue removalLevels, LongArrayFIFOQueue spreadQueue, LongSet visited, LongSet spreadVisited, List<Long> roots, long sourceNode) {
         if (!isYInRange(y)) return;
         BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
         if (!BlockLightBoundary.healthy(chunk)) {
@@ -2742,22 +2742,20 @@ public class Level implements ChunkManager, Metadatable {
             chunk.setBlockLight(x & 15, y, z & 15, 0);
             if (current > 1) {
                 long index = Hash.hashBlock(x, y, z);
-                if (!visited.contains(index)) {
-                    visited.add(index);
+                if (visited.add(index)) {
                     queue.enqueue(index);
                     removalLevels.enqueue(current);
                 }
             }
         } else if (current >= currentLight) {
             long index = Hash.hashBlock(x, y, z);
-            if (!spreadVisited.contains(index)) {
-                spreadVisited.add(index);
+            if (spreadVisited.add(index)) {
                 spreadQueue.enqueue(index);
             }
         }
     }
 
-    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue, Set<Long> visited, List<Long> roots, BaseFullChunk source) {
+    private void computeSpreadBlockLight(int x, int y, int z, int currentLight, LongArrayFIFOQueue queue, LongSet visited, List<Long> roots, BaseFullChunk source) {
         if (!isYInRange(y)) return;
         BaseFullChunk chunk = getChunkIfLoaded(x >> 4, z >> 4);
         if (!BlockLightBoundary.healthy(chunk)) {
@@ -2769,8 +2767,7 @@ public class Level implements ChunkManager, Metadatable {
             chunk.setBlockLight(x & 15, y, z & 15, currentLight);
 
             long index = Hash.hashBlock(x, y, z);
-            if (!visited.contains(index)) {
-                visited.add(index);
+            if (visited.add(index)) {
                 if (currentLight > 1) {
                     queue.enqueue(index);
                 }
