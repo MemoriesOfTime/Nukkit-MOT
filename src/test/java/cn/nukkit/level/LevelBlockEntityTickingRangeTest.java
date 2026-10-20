@@ -211,6 +211,51 @@ class LevelBlockEntityTickingRangeTest {
         assertTrue(Files.readString(file).contains("block-entity-ticking-range: false"));
     }
 
+    @Test
+    void stationaryLoadersReuseCoverageAndChangedInputsMatchLegacyUnion() throws Exception {
+        Fixture f = new Fixture(8, 40);
+        ChunkLoader first = f.loader(0, 0);
+        f.loader(0, 0); // Duplicate centres still affect effective radius through loader count.
+        CountingBlockEntity be = f.entity(0, 0);
+        class CountedCoverage extends LongOpenHashSet {
+            int writes;
+            @Override public boolean add(long value) { writes++; return super.add(value); }
+            @Override public void clear() { writes++; super.clear(); }
+        }
+        CountedCoverage coverage = new CountedCoverage();
+        set(f.level, "blockEntityTickingChunks", coverage);
+        f.level.tickBlockEntities();
+        int initialWrites = coverage.writes;
+        LongOpenHashSet initial = new LongOpenHashSet(coverage);
+        for (int i = 0; i < 10; i++) f.level.tickBlockEntities();
+        assertEquals(11, be.updates);
+        assertEquals(initial, coverage);
+        assertEquals(initialWrites, coverage.writes, "stationary coverage must not be rebuilt");
+        when(first.getX()).thenReturn(-16.5);
+        when(first.getZ()).thenReturn(-0.5);
+        f.level.tickBlockEntities();
+        LongOpenHashSet expected = new LongOpenHashSet();
+        for (int x : new int[]{-1, 0})
+            for (int dx = -3; dx < 3; dx++) for (int dz = -3; dz < 3; dz++)
+                expected.add(Level.chunkHash(x + dx, dz));
+        assertEquals(expected, coverage);
+        f.loaders.remove(2); // Budget-dependent radius grows from 3 to 4.
+        f.level.tickBlockEntities();
+        expected.clear();
+        for (int dx = -4; dx < 4; dx++) for (int dz = -4; dz < 4; dz++)
+            expected.add(Level.chunkHash(-1 + dx, dz));
+        assertEquals(expected, coverage);
+        set(f.level, "chunksPerTicks", 0);
+        f.level.tickBlockEntities();
+        assertTrue(coverage.isEmpty());
+        set(f.level, "chunksPerTicks", 40);
+        f.level.tickBlockEntities();
+        assertEquals(expected, coverage);
+        f.loaders.clear();
+        f.level.tickBlockEntities();
+        assertTrue(coverage.isEmpty());
+    }
+
     private static void set(Level level, String name, Object value) throws Exception {
         Field field = Level.class.getDeclaredField(name);
         field.setAccessible(true);
