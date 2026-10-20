@@ -115,12 +115,18 @@ class BlockFireLoadedNeighboursTest {
 
     @Test
     void loadedFuelStillReceivesCancellableSpreadOrBurnEvent() {
-        Fixture f = new Fixture(8, 8, new BlockPlanks());
-        f.put(new Fuel(), 9, 64, 8);
+        // Only the target fuel may burn; wooden support can emit a second random event.
+        Fixture f = new Fixture(8, 8, new BlockStone());
+        Fuel fuel = new Fuel();
+        f.put(fuel, 9, 64, 8);
         f.fire.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
-        verify(f.plugins).callEvent(argThat(event -> event instanceof BlockIgniteEvent || event instanceof BlockBurnEvent));
+        verify(f.plugins).callEvent(argThat(event ->
+                (event instanceof BlockIgniteEvent ignite && ignite.getBlock() == fuel
+                        && ignite.getCause() == BlockIgniteEvent.BlockIgniteCause.SPREAD)
+                        || (event instanceof BlockBurnEvent burn && burn.getBlock() == fuel)));
+        verifyNoMoreInteractions(f.plugins);
         assertFalse(f.removed);
-        assertInstanceOf(Fuel.class, f.at(9, 64, 8, true));
+        assertSame(fuel, f.at(9, 64, 8, true));
     }
 
     private static final class Fuel extends BlockPlanks {
