@@ -2,6 +2,7 @@ package cn.nukkit.level.format;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
+import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.generic.BaseFullChunk;
@@ -146,6 +147,29 @@ public interface LevelProvider {
 
     Map<Long, ? extends FullChunk> getLoadedChunks();
 
+    /**
+     * Hashes of the loaded chunks at the time of the call, see {@link cn.nukkit.level.Level#chunkHash(int, int)}.
+     * <p>
+     * A caller that only needs coordinates should prefer this to {@link #getLoadedChunks()}: that one copies
+     * the whole map and boxes every key.
+     */
+    default long[] getLoadedChunkHashes() {
+        Map<Long, ? extends FullChunk> chunks = this.getLoadedChunks();
+        long[] hashes = new long[chunks.size()];
+        int i = 0;
+        for (Long hash : chunks.keySet()) {
+            hashes[i++] = hash;
+        }
+        return hashes;
+    }
+
+    /**
+     * Number of loaded chunks, without copying them.
+     */
+    default int getLoadedChunkCount() {
+        return this.getLoadedChunks().size();
+    }
+
     void doGarbageCollection();
 
     default void doGarbageCollection(long time) {
@@ -169,10 +193,12 @@ public interface LevelProvider {
     }
 
     default int getMinBlockY() {
-        return Math.max(this.getLevel().getDimensionData().getMinHeight(), 0);
+        Level level = this.getLevel();
+        return Math.max((level == null ? DimensionData.LEGACY_DIMENSION : level.getDimensionData()).getMinHeight(), 0);
     }
 
     default int getMaxBlockY() {
-        return Math.min(this.getLevel().getDimensionData().getMaxHeight(), 255);
+        Level level = this.getLevel();
+        return Math.min((level == null ? DimensionData.LEGACY_DIMENSION : level.getDimensionData()).getMaxHeight(), 255);
     }
 }

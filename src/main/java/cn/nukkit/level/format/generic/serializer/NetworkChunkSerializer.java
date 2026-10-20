@@ -25,6 +25,8 @@ import lombok.Data;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -36,6 +38,8 @@ public class NetworkChunkSerializer {
 
     private static final byte[] negativeSubChunksV8;
     private static final byte[] negativeSubChunksV9;
+    private static final byte[][] negativeSubChunkBlobsV8;
+    private static final byte[][] negativeSubChunkBlobsV9;
 
     static {
         // Build up 4 SubChunks for the extended negative height
@@ -48,11 +52,18 @@ public class NetworkChunkSerializer {
 
         stream = new BinaryStream();
         for (int i = 0; i < EXTENDED_NEGATIVE_SUB_CHUNKS; i++) {
-            stream.putByte((byte) 9); // SubChunk version
+            stream.putByte((byte) 9);
             stream.putByte((byte) 0); // 0 layers
             stream.putByte((byte) (-4 + i)); // section y
         }
         negativeSubChunksV9 = stream.getBuffer();
+
+        negativeSubChunkBlobsV8 = new byte[EXTENDED_NEGATIVE_SUB_CHUNKS][];
+        negativeSubChunkBlobsV9 = new byte[EXTENDED_NEGATIVE_SUB_CHUNKS][];
+        for (int i = 0; i < EXTENDED_NEGATIVE_SUB_CHUNKS; i++) {
+            negativeSubChunkBlobsV8[i] = new byte[]{(byte) 8, (byte) 0};
+            negativeSubChunkBlobsV9[i] = new byte[]{(byte) 9, (byte) 0, (byte) (-4 + i)};
+        }
     }
 
     @Deprecated
@@ -62,6 +73,18 @@ public class NetworkChunkSerializer {
     }
 
     public static void serialize(ObjectSet<GameVersion> protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback, boolean antiXray, DimensionData dimensionData) {
+        serialize(protocols, chunk, callback, antiXray, dimensionData, false);
+    }
+
+    /**
+     * serialize 并可选捕获结构化产物：≥v1_18_0 时逐子区块字节、biomes、方块实体 NBT，
+     * 供客户端缓存（blob hash）与子区块拉取装配使用；捕获与整列 payload 同流同序。
+     * <p>
+     * Serializes, optionally capturing structured output for ≥v1_18_0: per-sub-chunk bytes,
+     * biomes and block entity NBT, used by client-cache (blob hash) and sub-chunk pull
+     * assembly. Capture reuses the same stream pass as the full-column payload.
+     */
+    public static void serialize(ObjectSet<GameVersion> protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback, boolean antiXray, DimensionData dimensionData, boolean captureBlobs) {
         for (GameVersion gameVersion : protocols) {
             int protocolId = gameVersion.getProtocol();
             byte[] blockEntities;
@@ -82,10 +105,12 @@ public class NetworkChunkSerializer {
 
             BinaryStream stream = ThreadCache.binaryStream.get().reset();
             NetworkChunkData networkChunkData = new NetworkChunkData(gameVersion, subChunkCount, antiXray, dimensionData);
+            List<byte[]> subChunkBlobs = captureBlobs && protocolId >= ProtocolInfo.v1_18_0 ? new ArrayList<>() : null;
+            byte[] biomes = null;
             if (protocolId >= ProtocolInfo.v1_18_30) {
-                serialize1_18_30(stream, chunk, sections, networkChunkData);
+                biomes = serialize1_18_30(stream, chunk, sections, networkChunkData, subChunkBlobs);
             } else if (protocolId >= ProtocolInfo.v1_18_0) {
-                serialize1_18_0(stream, chunk, sections, networkChunkData);
+                biomes = serialize1_18_0(stream, chunk, sections, networkChunkData, subChunkBlobs);
             } else {
                 int offset = chunk.getSectionOffset();
                 subChunkCount = Math.max(1, subChunkCount - offset);
@@ -128,11 +153,11 @@ public class NetworkChunkSerializer {
             }
             stream.put(blockEntities);
 
-            callback.accept(new NetworkChunkSerializerCallback(gameVersion, stream, networkChunkData.getChunkSections()));
+            callback.accept(new NetworkChunkSerializerCallback(gameVersion, stream, networkChunkData.getChunkSections(), subChunkBlobs, biomes, blockEntities));
         }
     }
 
-    private static void serialize1_18_30(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData) {
+    private static byte[] serialize1_18_30(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData, List<byte[]> blobSink) {
         DimensionData dimensionData = chunkData.getDimensionData();
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
@@ -143,21 +168,31 @@ public class NetworkChunkSerializer {
         // Overworld has negative coordinates, But the anvil world does not support it
         int writtenSections = subChunkCount;
         if (dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD && chunk.getSectionOffset() == 0) {
-            stream.put(chunkData.getGameVersion().getProtocol() >= ProtocolInfo.v1_19_80 ? negativeSubChunksV9 : negativeSubChunksV8);
+            boolean v9 = chunkData.getGameVersion().getProtocol() >= ProtocolInfo.v1_19_80;
+            stream.put(v9 ? negativeSubChunksV9 : negativeSubChunksV8);
+            if (blobSink != null) {
+                blobSink.addAll(Arrays.asList(v9 ? negativeSubChunkBlobsV9 : negativeSubChunkBlobsV8));
+            }
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 
+        int start = stream.getOffset();
         for (int i = 0; i < subChunkCount; i++) {
             sections[i].writeTo(chunkData.getGameVersion(), stream, chunkData.isAntiXray());
+            if (blobSink != null) {
+                blobSink.add(Arrays.copyOfRange(stream.getBufferUnsafe(), start, stream.getOffset()));
+                start = stream.getOffset();
+            }
         }
 
         stream.put(biomePalettes);
         stream.putByte((byte) 0); // Border blocks
 
         chunkData.setChunkSections(writtenSections);
+        return biomePalettes;
     }
 
-    private static void serialize1_18_0(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData) {
+    private static byte[] serialize1_18_0(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData, List<byte[]> blobSink) {
         DimensionData dimensionData = chunkData.getDimensionData();
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
@@ -169,17 +204,26 @@ public class NetworkChunkSerializer {
         int writtenSections = subChunkCount;
         if (dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD && chunk.getSectionOffset() == 0) {
             stream.put(negativeSubChunksV8);
+            if (blobSink != null) {
+                blobSink.addAll(Arrays.asList(negativeSubChunkBlobsV8));
+            }
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 
+        int start = stream.getOffset();
         for (int i = 0; i < subChunkCount; i++) {
             sections[i].writeTo(chunkData.getGameVersion(), stream, chunkData.isAntiXray());
+            if (blobSink != null) {
+                blobSink.add(Arrays.copyOfRange(stream.getBufferUnsafe(), start, stream.getOffset()));
+                start = stream.getOffset();
+            }
         }
 
         stream.put(biomePalettes);
         stream.putByte((byte) 0); // Border blocks
 
         chunkData.setChunkSections(writtenSections);
+        return biomePalettes;
     }
 
     private static byte[] serialize3DBiomes(BaseFullChunk chunk, GameVersion protocolId, int maxDimensionSections) {
@@ -205,6 +249,34 @@ public class NetworkChunkSerializer {
             }
         }
 
+        try {
+            return NBTIO.write(tagList, ByteOrder.LITTLE_ENDIAN, true);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 序列化单个子区块内的方块实体 NBT（子区块拉取响应用；空时返回空数组）。经 chunk 的
+     * section 索引取本段实体，代价与段内实体数同阶而非全列。
+     * <p>
+     * Serializes the block entity NBT of a single sub-chunk (sub-chunk pull responses;
+     * empty array when none). Reads the section's entities through the chunk's section
+     * index, costing O(entities in this section) rather than O(entities in the column).
+     */
+    public static byte[] serializeEntitiesForSubChunk(BaseChunk chunk, int protocol, int subIndex, int minSectionY) {
+        List<CompoundTag> tagList = null;
+        for (BlockEntity blockEntity : chunk.getBlockEntitiesOfSection(subIndex + minSectionY)) {
+            if (blockEntity instanceof BlockEntitySpawnable) {
+                if (tagList == null) {
+                    tagList = new ObjectArrayList<>();
+                }
+                tagList.add(((BlockEntitySpawnable) blockEntity).getSpawnCompound(protocol));
+            }
+        }
+        if (tagList == null) {
+            return new byte[0];
+        }
         try {
             return NBTIO.write(tagList, ByteOrder.LITTLE_ENDIAN, true);
         } catch (IOException e) {
@@ -244,6 +316,26 @@ public class NetworkChunkSerializer {
         private GameVersion gameVersion;
         private BinaryStream stream;
         private Integer subchunks;
+        /**
+         * ≥v1_18_0 且开启捕获时非 null：逐子区块字节（含主世界负坐标 4 个空子区块），与 payload 同源同序。
+         * <p>
+         * Non-null when ≥v1_18_0 and capture is on: per-sub-chunk bytes (including the 4
+         * negative empty sub-chunks in the overworld), same pass and order as the payload.
+         */
+        private List<byte[]> subChunkBlobs;
+        /**
+         * ≥v1_18_0 且开启捕获时非 null：3D biomes 序列化字节 / Non-null when captured: serialized 3D biomes.
+         */
+        private byte[] biomes;
+        /**
+         * 方块实体网络 NBT（可能为空数组，未捕获时为 null）/ Block entity network NBT
+         * (possibly empty; null when not captured).
+         */
+        private byte[] blockEntities;
+
+        public NetworkChunkSerializerCallback(GameVersion gameVersion, BinaryStream stream, Integer subchunks) {
+            this(gameVersion, stream, subchunks, null, null, null);
+        }
     }
 
     @AllArgsConstructor
@@ -255,5 +347,12 @@ public class NetworkChunkSerializer {
         private int z;
         private int subChunkCount;
         private byte[] payload;
+        private List<byte[]> subChunkBlobs;
+        private byte[] biomes;
+        private byte[] blockEntities;
+
+        public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
+            this(gameVersion, timestamp, x, z, subChunkCount, payload, null, null, null);
+        }
     }
 }

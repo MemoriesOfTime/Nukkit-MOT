@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -39,9 +40,37 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected Long2ObjectNonBlockingMap<Entity> entities;
 
+    private volatile PickupEntityIndex pickupEntityIndex;
+
     protected Long2ObjectNonBlockingMap<BlockEntity> tiles;
 
     protected Long2ObjectNonBlockingMap<BlockEntity> tileList;
+
+    /**
+     * 方块实体的 section 索引（key = 世界 section Y，((int) y) >> 4）：子区块序列化按段取用，
+     * 免去每个子区块全列扫描。懒构建缓存，增删经 {@link #blockEntityRevision} 失效；
+     * clone/转换路径直接 putAll 到全新 chunk，缓存为 null 会整体重建，无失同步步风险。
+     * <p>
+     * Section index of block entities (key = world section Y, ((int) y) >> 4): sub-chunk
+     * serialization reads one section instead of scanning the whole column. Lazily built
+     * and cached, invalidated on add/remove via {@link #blockEntityRevision}; clone and
+     * conversion paths putAll into fresh chunks whose null cache rebuilds wholly, so they
+     * cannot desynchronize.
+     */
+    private transient Int2ObjectOpenHashMap<List<BlockEntity>> blockEntitiesBySection;
+
+    /**
+     * 方块实体增删的失效版本号。写入方必须先完成全部 tiles 写入再自增——读到新 revision
+     * 的并发读者才能保证看到新数据（seqlock 先数据后版本；AtomicInteger 提供 volatile 发布）。
+     * <p>
+     * Invalidation version for block entity add/remove. Writers must finish all tiles
+     * writes before incrementing, so a concurrent reader that observes the new revision
+     * is guaranteed to see the new data (seqlock: data first, then version; the
+     * AtomicInteger provides volatile publication).
+     */
+    private final transient AtomicInteger blockEntityRevision = new AtomicInteger();
+
+    private transient int blockEntitiesBySectionRevision;
 
     /**
      * encoded as:
@@ -123,6 +152,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public BaseFullChunk clone() {
+        if (this.entities != null) this.entityIndex();
         BaseFullChunk chunk;
         try {
             chunk = (BaseFullChunk) super.clone();
@@ -171,6 +201,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         }
 
         chunk.entities = null;
+        chunk.pickupEntityIndex = null;
         chunk.tileList = null;
         chunk.NBTentities = null;
         chunk.NBTtiles = null;
@@ -211,9 +242,15 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return pk;
     }
 
+    /** Main-thread lifecycle query: native entity and block-entity initialization has completed. */
+    public boolean isInitialized() {
+        return this.isInit;
+    }
+
     @Override
     public void initChunk() {
-        if (this.getProvider() != null && !this.isInit) {
+        LevelProvider initProviderTemp = this.getProvider();
+        if (initProviderTemp != null && initProviderTemp.getLevel() != null && !this.isInit) {
             boolean changed = this.hasChanged();
             if (this.NBTentities != null) {
                 for (CompoundTag nbt : NBTentities) {
@@ -460,7 +497,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public int getHeightMap(int x, int z) {
-        return this.heightMap[(z << 4) | x] + this.getProvider().getMinBlockY();
+        LevelProvider providerTemp = this.getProvider();
+        return this.heightMap[(z << 4) | x] + (providerTemp == null ? 0 : providerTemp.getMinBlockY());
     }
 
     @Override
@@ -468,7 +506,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         //基岩版3d-data保存heightMap是以0为索引保存的，所以这里需要减去世界最小值，详情查看
         //Bedrock Edition 3d-data saves the height map start from index of 0, so need to subtract the world minimum height here, see for details:
         //https://github.com/bedrock-dev/bedrock-level/blob/main/src/include/data_3d.h#L115
-        this.heightMap[(z << 4) | x] = (short) (value - this.getProvider().getMinBlockY());
+        LevelProvider providerTemp = this.getProvider();
+        this.heightMap[(z << 4) | x] = (short) (value - (providerTemp == null ? 0 : providerTemp.getMinBlockY()));
         this.setChanged();
     }
 
@@ -531,6 +570,9 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void populateSkyLight() {
+        LevelProvider providerTemp = this.getProvider();
+        int minY = providerTemp == null ? 0 : providerTemp.getMinBlockY();
+        int maxY = providerTemp == null ? 255 : providerTemp.getMaxBlockY();
         // basic light calculation
         for (int z = 0; z < 16; ++z) {
             for (int x = 0; x < 16; ++x) { // iterating over all columns in chunk
@@ -539,7 +581,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
                 int y;
 
-                for (y = this.getProvider().getMaxBlockY(); y > top; --y) {
+                for (y = maxY; y > top; --y) {
                     // all the blocks above the top-most block are exposed to sun and
                     // thus have a skylight value of 15
                     this.setBlockSkyLight(x, y, z, 15);
@@ -549,7 +591,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 int nextDecrease = 0; // decrease that that will be applied starting with the next block
 
                 // Process from top-most block downward
-                for (y = top; y >= this.getProvider().getMinBlockY(); --y) {
+                for (y = top; y >= minY; --y) {
                     nextLight -= nextDecrease;
                     int light = nextLight; // this light value will be applied for this block. The following checks are all about the next blocks
 
@@ -586,8 +628,9 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void populateBlockLight() {
-        int minY = this.getProvider().getMinBlockY();
-        int maxY = this.getProvider().getMaxBlockY();
+        LevelProvider providerTemp = this.getProvider();
+        int minY = providerTemp == null ? 0 : providerTemp.getMinBlockY();
+        int maxY = providerTemp == null ? 255 : providerTemp.getMaxBlockY();
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -686,7 +729,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (this.entities == null) {
             this.entities = new Long2ObjectNonBlockingMap<>();
         }
-        this.entities.put(entity.getId(), entity);
+        this.entityIndex().put(entity.getId(), entity);
         if (!(entity instanceof Player) && this.isInit) {
             this.setChanged();
         }
@@ -695,7 +738,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void removeEntity(Entity entity) {
         if (this.entities != null) {
-            this.entities.remove(entity.getId());
+            this.entityIndex().remove(entity.getId());
             if (!(entity instanceof Player) && this.isInit) {
                 this.setChanged();
             }
@@ -720,6 +763,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             existing.onReplacedWith(blockEntity);
             existing.close();
         }
+        // seqlock：须在全部 tiles 写入后自增 / seqlock: bump after all tiles writes
+        this.blockEntityRevision.incrementAndGet();
         if (this.isInit) {
             this.setChanged();
         }
@@ -737,6 +782,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 this.createPersistentBlockContainer(blockEntity, blockEntity.getPersistentDataContainer().getStorage());
             }
 
+            // seqlock：须在全部 tiles 写入后自增 / seqlock: bump after all tiles writes
+            this.blockEntityRevision.incrementAndGet();
             if (this.isInit) {
                 this.setChanged();
             }
@@ -751,12 +798,56 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public Map<Long, Entity> getEntities() {
-        return entities == null ? Collections.emptyMap() : entities;
+        return entities == null ? Collections.emptyMap() : entityIndex();
+    }
+
+    private PickupEntityIndex entityIndex() {
+        PickupEntityIndex index = this.pickupEntityIndex;
+        if (index != null && index.backing() == this.entities) return index;
+        synchronized (this) {
+            // Conversion and chunk sending can replace the backing map. A live clone shares both.
+            if (this.pickupEntityIndex == null || this.pickupEntityIndex.backing() != this.entities) {
+                this.pickupEntityIndex = new PickupEntityIndex(this.entities);
+            }
+            return this.pickupEntityIndex;
+        }
+    }
+
+    @Override
+    public boolean hasPickupEntities(boolean itemsOnly) {
+        return this.entities != null && this.entityIndex().hasPickupEntities(itemsOnly);
     }
 
     @Override
     public Map<Long, BlockEntity> getBlockEntities() {
         return tiles == null ? Collections.emptyMap() : tiles;
+    }
+
+    /**
+     * 取某世界 section 内的方块实体（子区块序列化用），无则返回空列表。section 索引懒
+     * 构建并缓存，增删方块实体后自动重建；revision 在遍历前捕获，并发新增至多延后到
+     * 下一次重建可见。
+     * <p>
+     * Block entities of one world section (sub-chunk serialization); empty list when
+     * none. The section index is lazily built and cached, rebuilt after any
+     * add/remove; the revision is captured before iterating, so a concurrent add is
+     * at worst deferred to the next rebuild.
+     */
+    public List<BlockEntity> getBlockEntitiesOfSection(int worldSectionY) {
+        if (this.tiles == null || this.tiles.isEmpty()) {
+            return Collections.emptyList();
+        }
+        int revision = this.blockEntityRevision.get();
+        if (this.blockEntitiesBySection == null || this.blockEntitiesBySectionRevision != revision) {
+            Int2ObjectOpenHashMap<List<BlockEntity>> index = new Int2ObjectOpenHashMap<>();
+            for (BlockEntity blockEntity : this.tiles.values()) {
+                index.computeIfAbsent((int) blockEntity.y >> 4, k -> new ArrayList<>()).add(blockEntity);
+            }
+            this.blockEntitiesBySection = index;
+            this.blockEntitiesBySectionRevision = revision;
+        }
+        List<BlockEntity> list = this.blockEntitiesBySection.get(worldSectionY);
+        return list == null ? Collections.emptyList() : list;
     }
 
     /**

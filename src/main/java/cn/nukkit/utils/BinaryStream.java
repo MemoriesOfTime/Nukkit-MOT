@@ -12,10 +12,7 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
-import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.BlockVector3;
-import cn.nukkit.math.Vector2f;
-import cn.nukkit.math.Vector3f;
+import cn.nukkit.math.*;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -33,7 +30,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessi
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 import lombok.SneakyThrows;
 import org.cloudburstmc.nbt.NBTOutputStream;
@@ -64,6 +61,22 @@ public class BinaryStream {
     protected int count;
 
     private static final int MAX_ARRAY_SIZE = 2147483639;
+    private static final int MAX_ITEM_STACK_REQUEST_ACTIONS = 128;
+    private static final int MAX_ITEM_STACK_REQUEST_FILTER_STRINGS = 128;
+    private static final int MAX_ITEM_STACK_REQUEST_CRAFT_ITEMS = 128;
+
+    private static final ClassValue<Boolean> DIRECT_BYTE_WRITE = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            try {
+                return type.getMethod("put", byte[].class).getDeclaringClass() == BinaryStream.class;
+            } catch (ReflectiveOperationException | SecurityException | LinkageError failure) {
+                return false;
+            }
+        }
+    };
+
+    private final boolean directByteWrite = DIRECT_BYTE_WRITE.get(getClass());
 
     public BinaryStream() {
         this.buffer = new byte[32];
@@ -153,6 +166,25 @@ public class BinaryStream {
         this.offset += Math.min(len, this.count - this.offset);
     }
 
+    /**
+     * 为后续写入预留额外容量，不改变已有字节或读写位置。
+     * <p>
+     * Reserves additional writable bytes without changing existing bytes or read/write positions.
+     */
+    public void reserve(int additionalBytes) {
+        if (additionalBytes < 0) {
+            throw new IllegalArgumentException("Negative additional capacity: " + additionalBytes);
+        }
+        if (additionalBytes == 0) {
+            return;
+        }
+        long required = (long) this.count + additionalBytes;
+        if (required > Integer.MAX_VALUE) {
+            throw new OutOfMemoryError("Required array size too large");
+        }
+        this.ensureCapacity((int) required);
+    }
+
     public void put(byte[] bytes) {
         if (bytes == null) {
             return;
@@ -189,11 +221,32 @@ public class BinaryStream {
     }
 
     public int getLInt() {
+        return readLittleEndianInt();
+    }
+
+    private int readLittleEndianInt() {
+        // Keep the old short-read/padded-buffer behavior on malformed input.
+        if (this.offset >= 0 && this.count >= 4 && this.offset <= this.count - 4
+                && this.buffer != null && this.offset <= this.buffer.length - 4) {
+            int value = Binary.readLInt(this.buffer, this.offset);
+            this.offset += 4;
+            return value;
+        }
         return Binary.readLInt(this.get(4));
     }
 
     public void putLInt(int i) {
-        this.put(Binary.writeLInt(i));
+        if (!directByteWrite) {
+            this.put(Binary.writeLInt(i));
+            return;
+        }
+        this.ensureCapacity(this.count + Integer.BYTES);
+        int index = this.count;
+        this.buffer[index] = (byte) i;
+        this.buffer[index + 1] = (byte) (i >>> 8);
+        this.buffer[index + 2] = (byte) (i >>> 16);
+        this.buffer[index + 3] = (byte) (i >>> 24);
+        this.count = index + Integer.BYTES;
     }
 
     public int getShort() {
@@ -229,7 +282,8 @@ public class BinaryStream {
     }
 
     public float getLFloat(int accuracy) {
-        return Binary.readLFloat(this.get(4), accuracy);
+        float value = Float.intBitsToFloat(readLittleEndianInt());
+        return accuracy > -1 ? (float) NukkitMath.round(value, accuracy) : value;
     }
 
     public void putLFloat(float v) {
@@ -273,7 +327,13 @@ public class BinaryStream {
     }
 
     public void putByte(byte b) {
-        this.put(new byte[]{b});
+        if (!directByteWrite) {
+            this.put(new byte[]{b});
+            return;
+        }
+        this.ensureCapacity(this.count + 1);
+        this.buffer[this.count] = b;
+        this.count += 1;
     }
 
     public void putByte(int b) {
@@ -877,8 +937,7 @@ public class BinaryStream {
         item.setCount(count);
 
         if (userData.length > 0) {
-            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(userData.length);
-            buf.writeBytes(userData);
+            ByteBuf buf = Unpooled.wrappedBuffer(userData);
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
                 int nbtSize = stream.readShort();
                 CompoundTag compoundTag = null;
@@ -939,7 +998,6 @@ public class BinaryStream {
             if (stringId == null) {
                 throw new IllegalArgumentException("Unknown item: runtimeID=" + runtimeId + " protocol=" + protocolId);
             }
-            stringId = stringId + ":" + damage;
             id = null;
         }
 
@@ -949,6 +1007,7 @@ public class BinaryStream {
         }
 
         int blockRuntimeId = this.getVarInt();// blockRuntimeId
+        damage = mushroomBlockDamage(gameVersion, id, damage, blockRuntimeId);
         //TODO 在1.21.30会得到错误数据
         if (protocolId < ProtocolInfo.v1_19_0_31) {
             if (id != null && id < 256 && id != 166) { // ItemBlock
@@ -960,8 +1019,7 @@ public class BinaryStream {
         }
 
         byte[] bytes = this.getByteArray();
-        ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
-        buf.writeBytes(bytes);
+        ByteBuf buf = Unpooled.wrappedBuffer(bytes);
 
         byte[] nbt = new byte[0];
         String[] canPlace;
@@ -1020,6 +1078,9 @@ public class BinaryStream {
                 canBreak[i] = stream.readUTF();
             }
 
+            if (isUnsupportedSpearDisplay(gameVersion, runtimeId, compoundTag)) {
+                id = Item.INFO_UPDATE;
+            }
             if (id != null) {
                 if (id == ItemID.SHIELD) {
                     stream.readLong();
@@ -1363,6 +1424,10 @@ public class BinaryStream {
 
         if (!item.isSupportedOn(gameVersion) || isErrorItem) {
             item = degradeToInfoUpdate(gameVersion, item, isStringItem);
+            if (item.getId() != Item.INFO_UPDATE) {
+                isStringItem = item instanceof StringItem;
+                isErrorItem = false;
+            }
         }
 
         int id = item.getId();
@@ -1394,7 +1459,8 @@ public class BinaryStream {
 
         this.putVarInt(getBlockRuntimeId(gameVersion, item));
 
-        ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+        // Invocation-owned heap scratch; only its bytes are copied into the packet.
+        ByteBuf userDataBuf = Unpooled.buffer(64);
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable) {
                 byte[] nbt = item.getCompoundTag();
@@ -1449,8 +1515,47 @@ public class BinaryStream {
      * MV_ORIGIN_* 标签里供解码端还原（见 getSlotNew / getNetworkItemStackDescriptor）。
      * putSlotNew 与 putNetworkItemStackDescriptor 共用，保证两条序列化路径行为一致。
      */
+    private static String unsupportedSpearDisplayNamespace(GameVersion gameVersion, String namespace) {
+        if (gameVersion.getProtocol() < ProtocolInfo.v1_20_0
+                || gameVersion.getProtocol() >= ProtocolInfo.v1_21_130_28) {
+            return null;
+        }
+        return switch (namespace) {
+            case "minecraft:wooden_spear" -> "minecraft:wooden_sword";
+            case "minecraft:stone_spear" -> "minecraft:stone_sword";
+            case "minecraft:copper_spear" -> gameVersion.getProtocol() >= ProtocolInfo.v1_21_100
+                    ? "minecraft:copper_sword" : "minecraft:iron_sword";
+            case "minecraft:iron_spear" -> "minecraft:iron_sword";
+            case "minecraft:golden_spear" -> "minecraft:golden_sword";
+            case "minecraft:diamond_spear" -> "minecraft:diamond_sword";
+            case "minecraft:netherite_spear" -> "minecraft:netherite_sword";
+            default -> null;
+        };
+    }
+
+    private static boolean isUnsupportedSpearDisplay(GameVersion gameVersion, int runtimeId, CompoundTag tag) {
+        if (tag == null || !tag.containsInt(MV_ORIGIN_ID) || !tag.containsInt(MV_ORIGIN_META)
+                || tag.getInt(MV_ORIGIN_ID) != ItemID.STRING_IDENTIFIED_ITEM
+                || !tag.containsString(MV_ORIGIN_NAMESPACE)
+                || (tag.contains(MV_ORIGIN_NBT) && !tag.containsCompound(MV_ORIGIN_NBT))) {
+            return false;
+        }
+        String namespace = tag.getString(MV_ORIGIN_NAMESPACE);
+        String expected = unsupportedSpearDisplayNamespace(gameVersion, namespace);
+        if (expected == null || !expected.equals(RuntimeItems.getMapping(gameVersion).getNamespacedIdByNetworkId(runtimeId))) {
+            return false;
+        }
+        Item origin = Item.fromString(namespace);
+        return origin instanceof ItemSpear && !origin.isSupportedOn(gameVersion);
+    }
+
     private static Item degradeToInfoUpdate(GameVersion gameVersion, Item originItem, boolean isStringItem) {
-        Item item = Item.get(Item.INFO_UPDATE, 0, originItem.getCount());
+        String fallback = originItem instanceof ItemSpear ? unsupportedSpearDisplayNamespace(gameVersion, originItem.getNamespaceId()) : null;
+        Item item = fallback == null ? Item.get(Item.INFO_UPDATE, 0, originItem.getCount()) : Item.fromString(fallback);
+        item.setCount(originItem.getCount());
+        if (fallback != null) {
+            item.setDamage(originItem.getDamage());
+        }
         CompoundTag compoundTag = originItem.getNamedTag();
         if (compoundTag != null) {
             item.setNamedTag(new CompoundTag().putCompound(MV_ORIGIN_NBT, compoundTag));
@@ -1499,6 +1604,10 @@ public class BinaryStream {
 
         if (item.getId() != Item.AIR && (!item.isSupportedOn(gameVersion) || isErrorItem)) {
             item = degradeToInfoUpdate(gameVersion, item, isStringItem);
+            if (item.getId() != Item.INFO_UPDATE) {
+                isStringItem = item instanceof StringItem;
+                isErrorItem = false;
+            }
         }
 
         int id = item.getId();
@@ -1551,7 +1660,8 @@ public class BinaryStream {
             return;
         }
 
-        ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+        // Keep the same little-endian writer without per-item native allocations.
+        ByteBuf userDataBuf = Unpooled.buffer(64);
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable && runtimeEntry != null && !runtimeEntry.isHasDamage()) {
                 byte[] nbt = item.getCompoundTag();
@@ -1599,6 +1709,21 @@ public class BinaryStream {
         } finally {
             userDataBuf.release();
         }
+    }
+
+    // Mushroom variants share one item runtime ID; their state lives in the block palette ID.
+    // Keep this narrow: other item families have different metadata canonicalization rules.
+    private static int mushroomBlockDamage(GameVersion version, Integer id, int damage, int blockRuntimeId) {
+        if (version.getProtocol() < ProtocolInfo.v1_19_0_31 || id == null
+                || (id != Block.BROWN_MUSHROOM_BLOCK && id != Block.RED_MUSHROOM_BLOCK)) {
+            return damage;
+        }
+        int fullId = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(version)
+                ? GlobalBlockPalette.getLegacyFullIdFromHashId(version, blockRuntimeId)
+                : GlobalBlockPalette.getLegacyFullId(version, blockRuntimeId);
+        // A client's unrelated/unknown palette entry must not graft metadata onto this item.
+        return fullId != -1 && (fullId >> Block.DATA_BITS) == id
+                ? fullId & Block.DATA_MASK : damage;
     }
 
     public Item getNetworkItemStackDescriptor(GameVersion gameVersion) {
@@ -1672,6 +1797,8 @@ public class BinaryStream {
             blockRuntimeId = (int) this.getUnsignedVarInt();
         }
 
+        damage = mushroomBlockDamage(gameVersion, id, damage, blockRuntimeId);
+
         byte[] nbt = new byte[0];
         String[] canPlace = null;
         String[] canBreak = null;
@@ -1679,8 +1806,7 @@ public class BinaryStream {
         byte[] bytes = this.getByteArray();
 
         if (bytes.length != 0) {
-            ByteBuf buf = ByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
-            buf.writeBytes(bytes);
+            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
 
             try (LittleEndianByteBufInputStream stream = new LittleEndianByteBufInputStream(buf)) {
                 int nbtSize = stream.readShort();
@@ -1948,11 +2074,15 @@ public class BinaryStream {
     }
 
     public byte[] getByteArray(int maxLength) {
-        int length = (int) this.getUnsignedVarInt();
-        checkArgument(this.isReadable(length),
-                "Tried to read %s bytes but only has %s readable", length, this.readableBytes());
+        int end = this.buffer == null ? 0 : Math.min(this.count, this.buffer.length);
+        checkArgument(this.count >= 0 && this.offset >= 0 && this.offset < end,
+                "Missing byte array length prefix");
+        long length = this.getUnsignedVarInt();
+        checkArgument(this.offset <= end && length <= Integer.MAX_VALUE
+                        && length <= end - (long) this.offset,
+                "Tried to read %s bytes but only has %s readable", length, end - (long) this.offset);
         checkArgument(maxLength <= 0 || length <= maxLength, "Tried to read %s bytes but maximum is %s", length, maxLength);
-        return this.get(length);
+        return this.get((int) length);
     }
 
     public void putByteArray(byte[] b) {
@@ -1992,6 +2122,30 @@ public class BinaryStream {
 
     public long getUnsignedVarInt() {
         return VarInt.readUnsignedVarInt(this);
+    }
+
+    /** Reads an untrusted collection length without narrowing it before validation. */
+    public int getUnsignedVarInt(int maxValue, String fieldName) {
+        long value = this.getUnsignedVarInt();
+        if (value > maxValue) {
+            throw new IllegalArgumentException(fieldName + " exceeds maximum " + maxValue + ": " + value);
+        }
+        return (int) value;
+    }
+
+    /**
+     * Reads a collection count whose elements each consume at least one wire byte.
+     * Check the remaining payload before narrowing or allocating; unlike a fixed
+     * policy limit, this accepts every collection that can fit in the packet.
+     */
+    protected int getUnsignedVarIntCount(String fieldName) {
+        long value = this.getUnsignedVarInt();
+        long remaining = this.buffer == null ? 0
+                : Math.max(0L, Math.min(this.count, this.buffer.length) - (long) this.offset);
+        if (value > remaining) {
+            throw new IllegalArgumentException(fieldName + " exceeds remaining payload: " + value);
+        }
+        return (int) value;
     }
 
     public void putUnsignedVarInt(long v) {
@@ -2220,6 +2374,16 @@ public class BinaryStream {
         return deque.toArray((T[]) Array.newInstance(clazz, 0));
     }
 
+    @SuppressWarnings("unchecked")
+    public <T> T[] getArray(Class<T> clazz, Function<BinaryStream, T> function, int maxLength, String fieldName) {
+        ArrayDeque<T> deque = new ArrayDeque<>();
+        int count = this.getUnsignedVarInt(maxLength, fieldName);
+        for (int i = 0; i < count; i++) {
+            deque.add(function.apply(this));
+        }
+        return deque.toArray((T[]) Array.newInstance(clazz, 0));
+    }
+
     public <T> void getArray(Collection<T> array, Function<BinaryStream, T> function) {
         getArray(array, BinaryStream::getUnsignedVarInt, function);
     }
@@ -2415,9 +2579,10 @@ public class BinaryStream {
                 s.getByte(); // 重复类型字节，丢弃 / duplicate type byte, discarded
             }
             return readRequestActionData(gameVersion, itemStackRequestActionType);
-        });
+        }, MAX_ITEM_STACK_REQUEST_ACTIONS, "item stack request action count");
         String[] filteredStrings = protocol >= ProtocolInfo.v1_16_200
-                ? getArray(String.class, BinaryStream::getString)
+                ? getArray(String.class, BinaryStream::getString, MAX_ITEM_STACK_REQUEST_FILTER_STRINGS,
+                "item stack request filtered string count")
                 : new String[0];
 
         if (protocol >= ProtocolInfo.v1_19_30) {
@@ -2454,7 +2619,13 @@ public class BinaryStream {
                 List<ItemDescriptorWithCount> ingredients = new ArrayList<>();
                 if (protocol >= ProtocolInfo.v1_19_40) {
                     // v2168: ingredients 数组 count 改用 VarUInt / ingredients array count uses VarUInt
-                    int size = protocol >= ProtocolInfo.v1_26_40 ? (int) getUnsignedVarInt() : getByte() & 0xFF;
+                    int size = protocol >= ProtocolInfo.v1_26_40
+                            ? getUnsignedVarInt(MAX_ITEM_STACK_REQUEST_CRAFT_ITEMS, "item stack recipe ingredient count")
+                            : getByte() & 0xFF;
+                    if (size > MAX_ITEM_STACK_REQUEST_CRAFT_ITEMS) {
+                        throw new IllegalArgumentException("Item stack recipe ingredient count exceeds maximum "
+                                + MAX_ITEM_STACK_REQUEST_CRAFT_ITEMS + ": " + size);
+                    }
                     for (int i = 0; i < size; i++) {
                         ingredients.add(readIngredientDescriptor(gameVersion));
                     }
@@ -2471,7 +2642,7 @@ public class BinaryStream {
                             return this.getSlotNew(gameVersion, true);
                         }
                         return this.getSlot(gameVersion);
-                    }),
+                    }, MAX_ITEM_STACK_REQUEST_CRAFT_ITEMS, "item stack craft result count"),
                     getByte() & 0xFF
             );
             // v2168: stackNetworkId 改为 LInt / stackNetworkId changed to LInt

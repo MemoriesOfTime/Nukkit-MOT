@@ -4,9 +4,13 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockDoubleSlabCrimson extends BlockSolid {
+public class BlockDoubleSlabCrimson extends BlockSolidMeta {
     public BlockDoubleSlabCrimson() {
+        this(0);
+    }
 
+    public BlockDoubleSlabCrimson(int meta) {
+        super(meta);
     }
 
     @Override

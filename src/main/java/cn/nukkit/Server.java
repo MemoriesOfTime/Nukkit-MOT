@@ -29,10 +29,7 @@ import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.BaseLang;
 import cn.nukkit.lang.TextContainer;
-import cn.nukkit.level.EnumLevel;
-import cn.nukkit.level.GlobalBlockPalette;
-import cn.nukkit.level.Level;
-import cn.nukkit.level.Position;
+import cn.nukkit.level.*;
 import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.LevelProviderManager;
@@ -92,6 +89,7 @@ import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.MapMaker;
 import com.google.gson.JsonParser;
 import eu.okaeri.configs.ConfigManager;
 import eu.okaeri.configs.yaml.snakeyaml.YamlSnakeYamlConfigurer;
@@ -121,10 +119,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -152,6 +147,7 @@ public class Server {
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
     private volatile boolean hasStopped;
+    private volatile long shutdownProgressAt = Long.MAX_VALUE;
 
     private final PluginManager pluginManager;
     private final ServerScheduler scheduler;
@@ -269,6 +265,7 @@ public class Server {
     private Level[] levelArray = new Level[0];
     private final ServiceManager serviceManager = new NKServiceManager();
     private Level defaultLevel;
+    private ClientCacheBlobStore clientCacheBlobStore;
     private final Thread currentThread;
     private Watchdog watchdog;
     private NukkitMetrics nukkitMetrics;
@@ -287,7 +284,7 @@ public class Server {
      * Per-identity locks for player data IO, keyed by the data path identity (UUID string or
      * lowercased name).
      */
-    private final ConcurrentHashMap<String, ReentrantLock> playerDataLocks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ReentrantLock> playerDataLocks = createPlayerDataLocks();
     /**
      * 已调度未执行的异步保存任务，按身份索引；迁移前同步冲刷。
      * <p>
@@ -704,11 +701,11 @@ public class Server {
 
         this.console = new NukkitConsole();
         this.consoleThread = new ConsoleThread();
-        this.consoleThread.start();
         this.console.setExecutingCommands(true);
 
         // Load server.properties (standard MC settings)
         log.info("Loading server properties...");
+        NukkitConsole.takeOverTerminalClose();
         this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
         this.properties.setHeader("Nukkit-MOT Server Properties\n"
                 + "For advanced settings, see nukkit-mot.yml\n"
@@ -775,7 +772,8 @@ public class Server {
 
         Zlib.setProvider(this.serverConfig.networkSettings().zlibProvider());
 
-        this.scheduler = new ServerScheduler();
+        this.scheduler = new ServerScheduler(this.serverConfig.performanceSettings().virtualThreads());
+        log.info("Virtual threads for async tasks: {}", this.scheduler.isVirtualThreadsEnabled() ? "enabled" : "disabled");
 
         if (this.getPropertyBoolean("enable-rcon", false)) {
             try {
@@ -920,7 +918,24 @@ public class Server {
         NetherNetSettings netherNetSettings = this.serverConfig != null
                 ? this.serverConfig.networkSettings().netherNetSettings() : null;
         if (netherNetSettings != null && netherNetSettings.enabled()) {
-            this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
+            try {
+                this.network.registerInterface(new NetherNetInterface(this, netherNetSettings, rakNetInterface));
+            } catch (Throwable t) {
+                // NetherNet 启动失败（原生库缺失、端口配置错误等）按致命错误处理：提示根因与关闭方式后中止启动，
+                // 不带残缺的网络栈继续运行（与下方 defaultLevel 加载失败同路）
+                // A NetherNet startup failure (missing native lib, bad port config, ...) is fatal:
+                // report the root cause and the disable hint, then abort like a defaultLevel load failure
+                Throwable cause = t;
+                while (cause.getCause() != null) {
+                    cause = cause.getCause();
+                }
+                this.getLogger().emergency(this.baseLang.translateString("nukkit.nethernet.startFailed",
+                        cause.getMessage() != null ? cause.getMessage() : cause.toString()));
+                this.getLogger().emergency(this.baseLang.translateString("nukkit.nethernet.startFailed.hint"));
+                log.debug("NetherNet startup aborted", t);
+                this.forceShutdown();
+                return;
+            }
         }
 
         EntityProperty.init();
@@ -1039,9 +1054,10 @@ public class Server {
         nonAutoSaveWorlds.addAll(this.serverConfig.worldSettings().autoSaveDisabledWorlds());
 
         if (this.serverConfig.entitySettings().autoSpawnTask()) {
-            this.spawnerTask = new SpawnerTask();
             int spawnerTicks = Math.max(this.serverConfig.entitySettings().ticksPerSpawns(), 2) >> 1; // Run the spawner on 2x speed but spawn only either monsters or animals
-            this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask, spawnerTicks, spawnerTicks);
+            this.spawnerTask = new SpawnerTask(spawnerTicks);
+            // Every tick, one spawner at a time: see SpawnerTask#tick
+            this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask::tick, 1, 1);
         }
 
         if (this.serverConfig.debugSettings().bstatsMetrics()) {
@@ -1475,6 +1491,8 @@ public class Server {
         if (this.hasStopped) {
             return;
         }
+        long shutdownStart = System.currentTimeMillis();
+        this.touchShutdownProgress();
         this.hasStopped = true;
 
         try {
@@ -1496,15 +1514,17 @@ public class Server {
             this.getLogger().debug("Disconnecting all players...");
             for (Player player : new ArrayList<>(this.players.values())) {
                 player.close(player.getLeaveMessage(), reason);
+                this.touchShutdownProgress();
             }
 
             this.getLogger().debug("Disabling all plugins...");
             this.disablePlugins();
+            this.touchShutdownProgress();
 
             this.getLogger().debug("Unloading all levels...");
             for (Level level : this.levelArray) {
                 this.unloadLevel(level, true);
-                this.nextTick = System.currentTimeMillis(); // Fix Watchdog killing the server while saving worlds
+                this.touchShutdownProgress();
             }
 
             this.getLogger().debug("Removing event handlers...");
@@ -1519,7 +1539,9 @@ public class Server {
             this.consoleThread.interrupt();
 
             this.getLogger().debug("Stopping network interfaces...");
-            for (SourceInterface interfaz : this.network.getInterfaces()) {
+            // unregisterInterface 会边迭代边从 getInterfaces() 的活集合删除，拷贝防 CME
+            // unregisterInterface mutates the live set mid-iteration; copy to avoid CME
+            for (SourceInterface interfaz : new ArrayList<>(this.network.getInterfaces())) {
                 interfaz.shutdown();
                 this.network.unregisterInterface(interfaz);
             }
@@ -1538,8 +1560,12 @@ public class Server {
                 this.getLogger().debug("Stopping Watchdog...");
                 this.watchdog.kill();
             }
+
+            this.getLogger().info(this.baseLang.translateString("nukkit.server.stopped",
+                    String.valueOf(NukkitMath.round((System.currentTimeMillis() - shutdownStart) / 1000d, 1))));
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
+            Nukkit.shutdownLogging();
             System.exit(1);
         }
     }
@@ -1558,6 +1584,12 @@ public class Server {
         this.tickCounter = 0;
 
         log.info(this.baseLang.translateString("nukkit.server.startFinished", String.valueOf((double) (System.currentTimeMillis() - Nukkit.START_TIME) / 1000)));
+
+        // 控制台线程推迟到服务器就绪后启动：此前读到的命令依赖尚未创建的对象会被静默丢弃
+        // （如引导下载期间管道送达的 stop），留在 stdin 等就绪后读取
+        // Console thread starts after the server is ready; earlier commands would be silently dropped
+        this.consoleThread.start();
+
         this.scheduler.scheduleDelayedTask(InternalPlugin.INSTANCE, System::gc, 20);
 
         this.tickProcessor();
@@ -1766,8 +1798,8 @@ public class Server {
 
     private void checkTickUpdates(int currentTick) {
         if (this.alwaysTickPlayers) {
-            for (Player p : new ArrayList<>(this.players.values())) {
-                p.onUpdate(currentTick);
+            for (Object p : this.players.values().toArray()) {
+                ((Player) p).onUpdate(currentTick);
             }
         }
 
@@ -1777,7 +1809,23 @@ public class Server {
 
         // Do level ticks
         for (Level level : this.levelArray) {
-            if (level.isBeingConverted || (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0)) {
+            if (level.isBeingConverted) {
+                continue;
+            }
+            if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
+                if (!this.alwaysTickPlayers) {
+                    for (Player player : new ArrayList<>(level.getPlayers().values())) {
+                        if (!player.spawned || player.closed || player.level != level) {
+                            continue;
+                        }
+                        try {
+                            player.onUpdate(currentTick);
+                        } catch (Exception e) {
+                            log.error(this.baseLang.translateString("nukkit.level.tickError",
+                                    new String[]{level.getFolderName(), Utils.getExceptionMessage(e)}));
+                        }
+                    }
+                }
                 continue;
             }
 
@@ -1871,8 +1919,8 @@ public class Server {
 
             this.checkTickUpdates(this.tickCounter);
 
-            for (Player player : new ArrayList<>(this.players.values())) {
-                player.checkNetwork();
+            for (Object player : this.players.values().toArray()) {
+                ((Player) player).checkNetwork();
             }
 
             if ((this.tickCounter & 0b1111) == 0) {
@@ -1901,11 +1949,9 @@ public class Server {
                 this.doAutoSave();
             }
 
-            if (this.tickCounter % 100 == 0) {
-                for (Level level : this.levelArray) {
-                    if (!level.isBeingConverted) {
-                        level.doChunkGarbageCollection();
-                    }
+            for (Level level : this.levelArray) {
+                if (!level.isBeingConverted && level.isChunkGarbageCollectionTick(this.tickCounter)) {
+                    level.doChunkGarbageCollection();
                 }
             }
 
@@ -1955,6 +2001,18 @@ public class Server {
 
     public long getNextTick() {
         return nextTick;
+    }
+
+    public boolean isShutdownInProgress() {
+        return this.hasStopped;
+    }
+
+    public long getShutdownProgressAt() {
+        return this.shutdownProgressAt;
+    }
+
+    public void touchShutdownProgress() {
+        this.shutdownProgressAt = System.currentTimeMillis();
     }
 
     private void titleTick() {
@@ -2526,6 +2584,15 @@ public class Server {
         }
     }
 
+    /**
+     * A lock remains strongly reachable in every holder/waiter's local variable until unlock.
+     * Weak values therefore release retired identities without replacing any live lock.
+     * Never use weak keys or size/age eviction: equal identities must share a live lock.
+     */
+    static ConcurrentMap<String, ReentrantLock> createPlayerDataLocks() {
+        return new MapMaker().weakValues().makeMap();
+    }
+
     private ReentrantLock playerDataLock(String key) {
         return playerDataLocks.computeIfAbsent(key, k -> new ReentrantLock());
     }
@@ -2819,6 +2886,20 @@ public class Server {
      */
     public Level getDefaultLevel() {
         return defaultLevel;
+    }
+
+    /**
+     * 获取全服共享的客户端缓存 blob 仓库：内容寻址字节预算 LRU，跨世界去重。
+     * <p>
+     * Gets the server-wide shared client cache blob store: content-addressed,
+     * byte-budget LRU, deduplicated across all levels.
+     */
+    public ClientCacheBlobStore getClientCacheBlobStore() {
+        if (this.clientCacheBlobStore == null) {
+            this.clientCacheBlobStore = new ClientCacheBlobStore(
+                    Math.max(1, this.getServerConfig().chunkSettings().blobStoreMaxMb()) * 1024L * 1024L);
+        }
+        return this.clientCacheBlobStore;
     }
 
     /**
@@ -3248,6 +3329,7 @@ public class Server {
             logConfigError(e);
             if (firstLoad) {
                 log.error("Server cannot start with an invalid configuration. Please fix nukkit-mot.yml and restart.");
+                Nukkit.shutdownLogging();
                 System.exit(1);
             } else {
                 log.error("Failed to reload nukkit-mot.yml. Keeping previous configuration.");

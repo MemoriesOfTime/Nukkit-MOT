@@ -23,6 +23,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
+import cn.nukkit.utils.CollisionHelper;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -407,7 +408,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
 
             boolean pickedUpItem = false;
 
-            for (Entity entity : this.getPosition().getLevel().getCollidingEntities(pickupArea)) {
+            for (Entity entity : CollisionHelper.getPickupEntities(this.getPosition().getLevel(), pickupArea, true)) {
                 if (entity.isClosed() || !(entity instanceof EntityItem)) {
                     continue;
                 }

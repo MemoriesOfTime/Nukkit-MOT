@@ -128,15 +128,22 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
             if (this.level.getBlockIdAt((int) this.x, (int) this.y, (int) this.z) != this.getId()) {
                 return 0;
             }
+            int expectedDamage = this.getDamage();
+            Level expectedLevel = this.level;
+            int expectedLayer = this.layer;
+            double expectedX = this.x, expectedY = this.y, expectedZ = this.z;
             RedstoneUpdateEvent ev = new RedstoneUpdateEvent(this);
             PluginManager pluginManager = level.getServer().getPluginManager();
             pluginManager.callEvent(ev);
-            if (ev.isCancelled()) {
+            if (ev.isCancelled() || !isCurrentState(expectedLevel, expectedLayer, expectedX, expectedY, expectedZ, expectedDamage)) {
                 return 0;
             }
 
             if (!isPowered()) {
                 pluginManager.callEvent(new BlockRedstoneEvent(this, 0, 15));
+                if (!isCurrentState(expectedLevel, expectedLayer, expectedX, expectedY, expectedZ, expectedDamage)) {
+                    return 0;
+                }
                 this.setPowered(true);
 
                 if (this.level.setBlock(this, this)) {
@@ -145,6 +152,9 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
                 }
             } else {
                 pluginManager.callEvent(new BlockRedstoneEvent(this, 15, 0));
+                if (!isCurrentState(expectedLevel, expectedLayer, expectedX, expectedY, expectedZ, expectedDamage)) {
+                    return 0;
+                }
                 this.setPowered(false);
 
                 this.level.setBlock(this, this);
@@ -153,6 +163,17 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
             return type;
         }
         return 0;
+    }
+
+    private boolean isCurrentState(Level expectedLevel, int expectedLayer,
+                                   double expectedX, double expectedY, double expectedZ, int expectedDamage) {
+        if (this.level != expectedLevel || this.layer != expectedLayer
+                || this.x != expectedX || this.y != expectedY || this.z != expectedZ) {
+            return false;
+        }
+        Block current = expectedLevel.getBlock(this, expectedLayer, false);
+        return this.getDamage() == expectedDamage && current.getId() == this.getId()
+                && current.getDamage() == expectedDamage;
     }
 
     @Override
