@@ -23,12 +23,19 @@ public class RouteFinderSearchTask implements Runnable {
     }
 
     boolean tryQueue() {
-        if (this.route == null || this.admissionState != DIRECT || !this.route.reserveSearch(this)) {
+        if (this.route == null || !ADMISSION.compareAndSet(this, DIRECT, QUEUED)) {
             return false;
         }
-        // Publish before execute; native movement creates a fresh task per request.
-        this.admissionState = QUEUED;
-        return true;
+        // Cancellation must see QUEUED as soon as the route exposes this owner.
+        if (!this.route.reserveSearch(this)) {
+            ADMISSION.compareAndSet(this, QUEUED, DIRECT);
+            return false;
+        }
+        if (this.route.isSearchClosed()) {
+            discardQueued();
+            return false;
+        }
+        return this.admissionState == QUEUED;
     }
 
     void discardQueued() {

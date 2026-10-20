@@ -83,16 +83,19 @@ class ClosedWalkingRouteP13Test {
     }
 
     @Test
-    void freshReservedTaskForAClosedFinderReturnsWithoutLeakingOwnership() throws Exception {
+    void freshRequestForAClosedFinderIsRejectedWithoutLeakingOwnership() throws Exception {
         Fixture f = new Fixture();
         f.entity.close();
         RouteFinder route = f.entity.route;
-        RouteFinderSearchTask task = queued(route);
-        assertTrue(route.hasPendingSearch());
+        RouteFinderSearchTask task = new RouteFinderSearchTask(route);
+        Method method = RouteFinderSearchTask.class.getDeclaredMethod("tryQueue");
+        method.setAccessible(true);
+        assertFalse((boolean) method.invoke(task));
+        assertFalse(route.hasPendingSearch());
         f.originQueries.set(0);
         task.run();
         assertEquals(0, f.originQueries.get());
-        assertFalse(route.hasPendingSearch(), "the early worker return must release the claimed lease");
+        assertFalse(route.hasPendingSearch(), "a rejected request must not acquire a lease");
         assertFalse(route.hasCurrentNode());
     }
 

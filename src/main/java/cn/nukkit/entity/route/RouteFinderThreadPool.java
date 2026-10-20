@@ -1,7 +1,8 @@
 package cn.nukkit.entity.route;
 
 import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -10,20 +11,25 @@ import java.util.concurrent.TimeUnit;
  */
 public class RouteFinderThreadPool {
 
+    private static final int MAX_PENDING_SEARCHES = 1024;
     private static volatile boolean running = true;
 
     private static final ThreadPoolExecutor executor =
             new ThreadPoolExecutor(
                     1,
-                    Runtime.getRuntime().availableProcessors(),
+                    1,
                     1, TimeUnit.SECONDS,
-                    new LinkedBlockingQueue<>(),
+                    new ArrayBlockingQueue<>(MAX_PENDING_SEARCHES),
                     new ThreadPoolExecutor.AbortPolicy()
             );
 
     public static void executeRouteFinderThread(RouteFinderSearchTask t) {
         if (running) {
-            submit(executor, t);
+            try {
+                submit(executor, t);
+            } catch (RejectedExecutionException saturatedOrStopped) {
+                // Retry through the normal movement tick; never run a search on MAIN.
+            }
         }
     }
 
