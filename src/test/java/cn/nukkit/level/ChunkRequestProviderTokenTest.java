@@ -34,7 +34,12 @@ class ChunkRequestProviderTokenTest {
     @ParameterizedTest
     @CsvSource({"false,false", "false,true", "true,false", "true,true"})
     void bothProvidersCarryTheLiveOwnerThroughSyncAndAsyncSerialization(boolean anvil, boolean async) throws Exception {
-        Level level = mock(Level.class);
+        Level level = mock(Level.class, CALLS_REAL_METHODS);
+        doReturn(false).when(level).isClientCacheDeliveryWanted();
+        doNothing().when(level).asyncChunkRequestCallback(any(GameVersion.class), anyLong(),
+                anyInt(), anyInt(), anyInt(), any(byte[].class), any(), any(), any(), any(ChunkRequestToken.class));
+        doNothing().when(level).chunkRequestCallback(any(GameVersion.class), anyLong(),
+                anyInt(), anyInt(), anyInt(), any(byte[].class), any(), any(), any(), any(ChunkRequestToken.class));
         Server server = mock(Server.class);
         server.asyncChunkSending = async;
         when(level.getServer()).thenReturn(server);
@@ -72,7 +77,7 @@ class ChunkRequestProviderTokenTest {
         byte[] payload = {1, 2, 3};
         try (var serializer = mockStatic(NetworkChunkSerializer.class)) {
             serializer.when(() -> NetworkChunkSerializer.serialize(eq(versions), any(BaseChunk.class),
-                    any(), eq(false), any(DimensionData.class))).thenAnswer(call -> {
+                    any(), eq(false), any(DimensionData.class), eq(false))).thenAnswer(call -> {
                 assertSame(async ? copy : source, call.getArgument(1));
                 Consumer<NetworkChunkSerializer.NetworkChunkSerializerCallback> callback = call.getArgument(2);
                 callback.accept(new NetworkChunkSerializer.NetworkChunkSerializerCallback(
@@ -83,9 +88,9 @@ class ChunkRequestProviderTokenTest {
         }
         ArgumentCaptor<ChunkRequestToken> token = ArgumentCaptor.forClass(ChunkRequestToken.class);
         if (async) verify(level).asyncChunkRequestCallback(eq(GameVersion.V1_20_0), eq(7L),
-                eq(3), eq(5), eq(1), eq(payload), token.capture());
+                eq(3), eq(5), eq(1), eq(payload), isNull(), isNull(), isNull(), token.capture());
         else verify(level).chunkRequestCallback(eq(GameVersion.V1_20_0), eq(7L),
-                eq(3), eq(5), eq(1), eq(payload), token.capture());
+                eq(3), eq(5), eq(1), eq(payload), isNull(), isNull(), isNull(), token.capture());
         assertTrue(token.getValue().matches(source));
         assertFalse(token.getValue().matches(copy));
         when(source.getMutationRevision()).thenReturn(12L);

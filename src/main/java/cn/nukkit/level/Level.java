@@ -460,7 +460,17 @@ public class Level implements ChunkManager, Metadatable {
     private final Queue<PreparedChunkRequest> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
     private record PreparedChunkRequest(NetworkChunkSerializer.NetworkChunkSerializerCallbackData data,
-                                        BatchPacket packet, ChunkRequestToken token) { }
+                                        BatchPacket packet, ChunkRequestToken token, boolean selectDelivery,
+                                        DeferredChunkCompression compression, Throwable failure) { }
+
+    // MAIN owns request identity and recipient state; workers only return owned bytes.
+    private Object2ObjectMap<GameVersion, Long2ObjectMap<DeferredChunkCompression>> deferredChunkCompressions;
+
+    private record ChunkCompressionRecipient(int loaderId, Player player, long epoch) { }
+
+    private record DeferredChunkCompression(GameVersion version, long index,
+                                            Int2ObjectMap<Player> owner, LongSet tasks,
+                                            List<ChunkCompressionRecipient> recipients) { }
 
     // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
     // Posted to main thread to clear tasks (tasks isn't thread-safe; async worker can't touch it)
@@ -1428,10 +1438,7 @@ public class Level implements ChunkManager, Metadatable {
             PreparedChunkRequest prepared;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (prepared = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
-                var data = prepared.data();
-                this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(),
-                        data.getSubChunkCount(), data.getPayload(), data.getSubChunkBlobs(),
-                        data.getBiomes(), data.getBlockEntities(), prepared.packet(), prepared.token());
+                this.completePreparedChunkRequest(prepared);
             }
         }
 
@@ -4451,6 +4458,7 @@ public class Level implements ChunkManager, Metadatable {
                     this.chunkSendTaskStartTick.remove(index);
                 }
                 if (!tasks.contains(index) && queue.containsKey(index)) {
+                    this.getDeferredChunkCompressions(protocolId).remove(index);
                     chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
                     tasks.add(index);
                 }
@@ -4665,6 +4673,71 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    private enum ChunkCallbackHook { STRUCTURED_TOKEN, STRUCTURED, TOKEN }
+
+    private record ChunkCallbackHooks(ChunkCallbackHook sync, ChunkCallbackHook async) { }
+
+    private static final ClassValue<ChunkCallbackHooks> CHUNK_CALLBACK_HOOKS = new ClassValue<>() {
+        @Override
+        protected ChunkCallbackHooks computeValue(Class<?> type) {
+            return new ChunkCallbackHooks(chunkCallbackHook(type, "chunkRequestCallback"),
+                    chunkCallbackHook(type, "asyncChunkRequestCallback"));
+        }
+    };
+
+    private static ChunkCallbackHook chunkCallbackHook(Class<?> type, String name) {
+        try {
+            if (type.getMethod(name, GameVersion.class, long.class, int.class, int.class, int.class,
+                    byte[].class, List.class, byte[].class, byte[].class, ChunkRequestToken.class)
+                    .getDeclaringClass() != Level.class) {
+                return ChunkCallbackHook.STRUCTURED_TOKEN;
+            }
+            if (type.getMethod(name, GameVersion.class, long.class, int.class, int.class, int.class,
+                    byte[].class, List.class, byte[].class, byte[].class).getDeclaringClass() != Level.class) {
+                return ChunkCallbackHook.STRUCTURED;
+            }
+            if (type.getMethod(name, GameVersion.class, long.class, int.class, int.class, int.class,
+                    byte[].class, ChunkRequestToken.class).getDeclaringClass() != Level.class) {
+                return ChunkCallbackHook.TOKEN;
+            }
+            return ChunkCallbackHook.STRUCTURED_TOKEN;
+        } catch (NoSuchMethodException impossible) {
+            throw new IllegalStateException("Missing Level chunk callback", impossible);
+        }
+    }
+
+    /**
+     * Provider dispatch keeps existing Level extension hooks reachable. If a subclass implements
+     * several signatures, structured+token wins, then structured, then the older token hook.
+     * The hook is selected only here: its super call never re-enters dispatch.
+     * A legacy structured hook has no source token and cannot publish a persistent chunk cache.
+     */
+    public void dispatchChunkRequestCallback(NetworkChunkSerializer.NetworkChunkSerializerCallback data,
+                                              long timestamp, int x, int z, ChunkRequestToken token, boolean async) {
+        ChunkCallbackHooks hooks = CHUNK_CALLBACK_HOOKS.get(this.getClass());
+        ChunkCallbackHook hook = async ? hooks.async() : hooks.sync();
+        GameVersion version = data.getGameVersion();
+        int count = data.getSubchunks();
+        byte[] payload = data.getStream().getBuffer();
+        if (async) {
+            switch (hook) {
+                case STRUCTURED_TOKEN -> this.asyncChunkRequestCallback(version, timestamp, x, z, count, payload,
+                        data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities(), token);
+                case STRUCTURED -> this.asyncChunkRequestCallback(version, timestamp, x, z, count, payload,
+                        data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities());
+                case TOKEN -> this.asyncChunkRequestCallback(version, timestamp, x, z, count, payload, token);
+            }
+        } else {
+            switch (hook) {
+                case STRUCTURED_TOKEN -> this.chunkRequestCallback(version, timestamp, x, z, count, payload,
+                        data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities(), token);
+                case STRUCTURED -> this.chunkRequestCallback(version, timestamp, x, z, count, payload,
+                        data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities());
+                case TOKEN -> this.chunkRequestCallback(version, timestamp, x, z, count, payload, token);
+            }
+        }
+    }
+
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
         this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload, null, null, null, null);
     }
@@ -4682,14 +4755,141 @@ public class Level implements ChunkManager, Metadatable {
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
                                           List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, ChunkRequestToken token) {
+        // Structured output can become a shell/blob delivery. MAIN selects current recipients
+        // before spending work on a full batch that those modes would discard.
+        boolean selectDelivery = this.asyncChuckExecutor != null && server.cacheChunks
+                && (subChunkBlobs != null || biomes != null);
         // Only owned bytes and immutable metadata are used on the serialization worker.
-        BatchPacket packet = server.cacheChunks
+        BatchPacket packet = server.cacheChunks && !selectDelivery
                 ? Zlib.withConcurrentCompression(() -> Player.getChunkCacheFromData(
                         gameVersion, x, z, subChunkCount, payload, this.getDimension()))
                 : null;
         this.asyncChunkRequestCallbackQueue.add(new PreparedChunkRequest(
                 new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp,
-                        x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities), packet, token));
+                        x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities),
+                packet, token, selectDelivery, null, null));
+    }
+
+    private Long2ObjectMap<DeferredChunkCompression> getDeferredChunkCompressions(GameVersion version) {
+        if (this.deferredChunkCompressions == null) {
+            this.deferredChunkCompressions = new Object2ObjectOpenHashMap<>();
+        }
+        return this.deferredChunkCompressions.computeIfAbsent(version, ignored -> new Long2ObjectOpenHashMap<>());
+    }
+
+    private boolean ownsDeferredChunkTask(DeferredChunkCompression compression) {
+        return this.getChunkSendTasks(compression.version()) == compression.tasks()
+                && compression.tasks().contains(compression.index())
+                && this.getChunkSendQueue(compression.version()).get(compression.index()) == compression.owner();
+    }
+
+    private boolean matchesDeferredRecipients(DeferredChunkCompression compression) {
+        if (compression.owner().size() != compression.recipients().size()) {
+            return false;
+        }
+        for (ChunkCompressionRecipient recipient : compression.recipients()) {
+            Player player = recipient.player();
+            if (compression.owner().get(recipient.loaderId()) != player
+                    || player.getChunkDeliveryEpoch() != recipient.epoch()
+                    || !this.isChunkRecipient(player, compression.index())
+                    || !matchMVChunkProtocol(compression.version(), player.getGameVersion())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void retryDeferredChunkRequest(DeferredChunkCompression compression) {
+        if (!this.ownsDeferredChunkTask(compression)) {
+            return;
+        }
+        compression.tasks().remove(compression.index());
+        this.chunkSendTaskStartTick.remove(compression.index());
+        if (this.retainChunkRecipients(compression.version(), compression.index())) {
+            this.getPendingChunkRequests(compression.version()).add(compression.index());
+        }
+    }
+
+    private void completePreparedChunkRequest(PreparedChunkRequest prepared) {
+        var data = prepared.data();
+        GameVersion version = data.getGameVersion();
+        long index = Level.chunkHash(data.getX(), data.getZ());
+        DeferredChunkCompression compression = prepared.compression();
+        if (compression == null && prepared.selectDelivery() && !this.getChunkSendTasks(version).contains(index)) {
+            return;
+        }
+        if (compression != null) {
+            Long2ObjectMap<DeferredChunkCompression> active = this.getDeferredChunkCompressions(version);
+            if (active.get(index) != compression) {
+                return;
+            }
+            active.remove(index);
+            if (!this.ownsDeferredChunkTask(compression)) {
+                return;
+            }
+            if (prepared.failure() != null || !this.matchesDeferredRecipients(compression)
+                    || (prepared.token() != null && !prepared.token().matches(
+                            this.getChunkIfLoaded(data.getX(), data.getZ())))) {
+                this.retryDeferredChunkRequest(compression);
+                if (prepared.failure() != null) {
+                    this.server.getLogger().error("Async chunk compression failed for chunk ("
+                            + data.getX() + ", " + data.getZ() + ")", prepared.failure());
+                }
+                return;
+            }
+        } else if (prepared.selectDelivery() && this.server.cacheChunks && this.asyncChuckExecutor != null
+                && this.retainChunkRecipients(version, index)
+                && this.getChunkSendTasks(version).contains(index)
+                && !this.hasStructuredChunkRecipient(version, index)) {
+            Int2ObjectMap<Player> owner = this.getChunkSendQueue(version).get(index);
+            List<ChunkCompressionRecipient> recipients = new ArrayList<>(owner.size());
+            for (Int2ObjectMap.Entry<Player> entry : owner.int2ObjectEntrySet()) {
+                Player player = entry.getValue();
+                recipients.add(new ChunkCompressionRecipient(entry.getIntKey(), player, player.getChunkDeliveryEpoch()));
+            }
+            DeferredChunkCompression request = new DeferredChunkCompression(
+                    version, index, owner, this.getChunkSendTasks(version), recipients);
+            this.getDeferredChunkCompressions(version).put(index, request);
+            int dimension = this.getDimension();
+            try {
+                this.asyncChuckExecutor.execute(() -> {
+                    BatchPacket packet = null;
+                    Throwable failure = null;
+                    try {
+                        packet = Zlib.withConcurrentCompression(() -> Player.getChunkCacheFromData(version,
+                                data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload(), dimension));
+                    } catch (Throwable throwable) {
+                        failure = throwable;
+                    }
+                    this.asyncChunkRequestCallbackQueue.add(new PreparedChunkRequest(
+                            data, packet, prepared.token(), false, request, failure));
+                });
+            } catch (RuntimeException | Error failure) {
+                Long2ObjectMap<DeferredChunkCompression> active = this.getDeferredChunkCompressions(version);
+                if (active.get(index) == request) {
+                    active.remove(index);
+                    this.retryDeferredChunkRequest(request);
+                }
+                throw failure;
+            }
+            return;
+        }
+        this.chunkRequestCallback(version, data.getTimestamp(), data.getX(), data.getZ(),
+                data.getSubChunkCount(), data.getPayload(), data.getSubChunkBlobs(),
+                data.getBiomes(), data.getBlockEntities(), prepared.packet(), prepared.token());
+    }
+
+    private boolean hasStructuredChunkRecipient(GameVersion version, long index) {
+        Int2ObjectMap<Player> recipients = this.getChunkSendQueue(version).get(index);
+        if (recipients != null) {
+            for (Player player : recipients.values()) {
+                if (this.isChunkRecipient(player, index) && matchMVChunkProtocol(version, player.getGameVersion())
+                        && (player.isSubChunkPullMode() || player.isClientBlobCacheActive())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -4751,25 +4951,9 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
-        Int2ObjectMap<Player> recipients = this.getChunkSendQueue(protocol).get(index);
-        boolean anyBlobMode = false;
-        boolean anyPullMode = false;
-        if (recipients != null) {
-            for (Player player : recipients.values()) {
-                if (this.isChunkRecipient(player, index) && matchMVChunkProtocol(protocol, player.getGameVersion())) {
-                    if (player.isSubChunkPullMode()) {
-                        anyPullMode = true;
-                    }
-                    if (player.isClientBlobCacheActive()) {
-                        anyBlobMode = true;
-                    }
-                }
-            }
-        }
-
         // 缓存/拉取模式接收者存在时不能用 BatchPacket 快路径 / the BatchPacket fast path
         // only applies when no cache/pull-mode recipient remains
-        if ((preparedPacket != null || server.cacheChunks) && !anyBlobMode && !anyPullMode) {
+        if ((preparedPacket != null || server.cacheChunks) && !this.hasStructuredChunkRecipient(protocol, index)) {
             BatchPacket data = preparedPacket != null ? preparedPacket
                     : Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunkIfLoaded(x, z);

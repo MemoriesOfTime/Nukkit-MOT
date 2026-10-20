@@ -6,6 +6,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
+import cn.nukkit.level.format.generic.serializer.ChunkRequestToken;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.utils.Zlib;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
@@ -42,6 +43,9 @@ class ChunkCacheCompressionThreadTest {
         doReturn(0).when(level).getDimension();
         BaseFullChunk chunk = mock(BaseFullChunk.class);
         when(chunk.getChanges()).thenReturn(changes);
+        when(chunk.getMutationRevision()).thenReturn(7L);
+        ChunkRequestToken token = new ChunkRequestToken(chunk);
+        when(chunk.getMutationRevision()).thenReturn(changes);
         doReturn(chunk).when(level).getChunkIfLoaded(3, 5);
         Player recipient = mock(Player.class);
         var used = Player.class.getDeclaredField("usedChunks");
@@ -61,7 +65,7 @@ class ChunkCacheCompressionThreadTest {
         try (var packets = mockStatic(Player.class)) {
             packets.when(() -> Player.getChunkCacheFromData(GameVersion.V1_20_0, 3, 5, 4, payload, 0))
                     .thenReturn(packet);
-            level.asyncChunkRequestCallback(GameVersion.V1_20_0, 7, 3, 5, 4, payload);
+            level.asyncChunkRequestCallback(GameVersion.V1_20_0, 7, 3, 5, 4, payload, token);
             Object prepared = queue.remove();
             var dataAccessor = prepared.getClass().getDeclaredMethod("data");
             var packetAccessor = prepared.getClass().getDeclaredMethod("packet");
@@ -69,13 +73,15 @@ class ChunkCacheCompressionThreadTest {
             packetAccessor.setAccessible(true);
             var data = (NetworkChunkSerializer.NetworkChunkSerializerCallbackData) dataAccessor.invoke(prepared);
             BatchPacket compressed = (BatchPacket) packetAccessor.invoke(prepared);
-            if (cacheOnWorker) { assertNull(data.getPayload()); assertSame(packet, compressed); }
+            if (cacheOnWorker) { assertSame(payload, data.getPayload()); assertSame(packet, compressed); }
             else { assertSame(payload, data.getPayload()); assertNull(compressed); }
             server.cacheChunks = cacheOnMain;
             var callback = Level.class.getDeclaredMethod("chunkRequestCallback", GameVersion.class,
-                    long.class, int.class, int.class, int.class, byte[].class, BatchPacket.class);
+                    long.class, int.class, int.class, int.class, byte[].class, java.util.List.class,
+                    byte[].class, byte[].class, BatchPacket.class, ChunkRequestToken.class);
             callback.setAccessible(true);
-            callback.invoke(level, GameVersion.V1_20_0, 7L, 3, 5, 4, data.getPayload(), compressed);
+            callback.invoke(level, GameVersion.V1_20_0, 7L, 3, 5, 4, data.getPayload(),
+                    null, null, null, compressed, token);
             packets.verify(() -> Player.getChunkCacheFromData(GameVersion.V1_20_0, 3, 5, 4, payload, 0), times(1));
         }
         verify(recipient).sendChunk(3, 5, packet);
