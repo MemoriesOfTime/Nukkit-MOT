@@ -41,6 +41,7 @@ import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
+import cn.nukkit.level.format.generic.serializer.ChunkRequestToken;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.level.generator.PopChunkManager;
 import cn.nukkit.level.generator.task.GenerationTask;
@@ -459,7 +460,7 @@ public class Level implements ChunkManager, Metadatable {
     private final Queue<PreparedChunkRequest> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
     private record PreparedChunkRequest(NetworkChunkSerializer.NetworkChunkSerializerCallbackData data,
-                                        BatchPacket packet) { }
+                                        BatchPacket packet, ChunkRequestToken token) { }
 
     // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
     // Posted to main thread to clear tasks (tasks isn't thread-safe; async worker can't touch it)
@@ -1430,7 +1431,7 @@ public class Level implements ChunkManager, Metadatable {
                 var data = prepared.data();
                 this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(),
                         data.getSubChunkCount(), data.getPayload(), data.getSubChunkBlobs(),
-                        data.getBiomes(), data.getBlockEntities(), prepared.packet());
+                        data.getBiomes(), data.getBlockEntities(), prepared.packet(), prepared.token());
             }
         }
 
@@ -4665,20 +4666,30 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
-        this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload, null, null, null);
+        this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload, null, null, null, null);
+    }
+
+    public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z,
+                                          int subChunkCount, byte[] payload, ChunkRequestToken token) {
+        this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload, null, null, null, token);
     }
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
                                           List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities) {
-        // Called by the serializer worker. Only owned bytes and immutable world/version
-        // metadata are used here; cache publication and player access stay on the main thread.
+        this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload,
+                subChunkBlobs, biomes, blockEntities, null);
+    }
+
+    public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                          List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, ChunkRequestToken token) {
+        // Only owned bytes and immutable metadata are used on the serialization worker.
         BatchPacket packet = server.cacheChunks
                 ? Zlib.withConcurrentCompression(() -> Player.getChunkCacheFromData(
                         gameVersion, x, z, subChunkCount, payload, this.getDimension()))
                 : null;
         this.asyncChunkRequestCallbackQueue.add(new PreparedChunkRequest(
                 new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp,
-                        x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities), packet));
+                        x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities), packet, token));
     }
 
     /**
@@ -4708,17 +4719,30 @@ public class Level implements ChunkManager, Metadatable {
     public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
                                      List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities) {
         this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload,
-                subChunkBlobs, biomes, blockEntities, null);
+                subChunkBlobs, biomes, blockEntities, null, null);
     }
 
     private void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z,
                                       int subChunkCount, byte[] payload, BatchPacket preparedPacket) {
         this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload,
-                null, null, null, preparedPacket);
+                null, null, null, preparedPacket, null);
+    }
+
+    public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z,
+                                     int subChunkCount, byte[] payload, ChunkRequestToken token) {
+        this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload,
+                null, null, null, null, token);
+    }
+
+    public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                     List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, ChunkRequestToken token) {
+        this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload,
+                subChunkBlobs, biomes, blockEntities, null, token);
     }
 
     private void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
-                                      List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, BatchPacket preparedPacket) {
+                                      List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, BatchPacket preparedPacket,
+                                      ChunkRequestToken token) {
         long index = Level.chunkHash(x, z);
 
         if (!this.retainChunkRecipients(protocol, index)) {
@@ -4749,7 +4773,7 @@ public class Level implements ChunkManager, Metadatable {
             BatchPacket data = preparedPacket != null ? preparedPacket
                     : Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunkIfLoaded(x, z);
-            if (server.cacheChunks && chunk != null && chunk.getChanges() <= timestamp) {
+            if (server.cacheChunks && token != null && token.matches(chunk)) {
                 chunk.setChunkPacket(protocol, data);
             }
             //this.sendChunk(x, z, index, data);
