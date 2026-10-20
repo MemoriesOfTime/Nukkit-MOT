@@ -22,6 +22,7 @@ class QuarantinedChunkAdmissionTest {
         field(level, "chunkPopulationQueueSize", 100);
         field(level, "chunkGenerationQueueSize", 100);
         doReturn(centre).when(level).getChunk(anyInt(), anyInt(), eq(true));
+        doReturn(centre).when(level).getChunkIfLoaded(anyInt(), anyInt());
         return level;
     }
 
@@ -42,6 +43,15 @@ class QuarantinedChunkAdmissionTest {
         Level level = level(failed());
         assertFalse(level.populateChunk(3, 5, true));
         assertDoesNotThrow(() -> level.generateChunk(3, 5, true));
+        verify(level.getServer(), never()).getScheduler();
+    }
+
+    @Test
+    void populatedFailurePlaceholderCannotPassLoadedChunkFastPath() throws Exception {
+        BaseFullChunk centre = failed();
+        when(centre.isPopulated()).thenReturn(true);
+        Level level = level(centre);
+        assertFalse(level.populateChunk(3, 5, true));
         verify(level.getServer(), never()).getScheduler();
     }
 

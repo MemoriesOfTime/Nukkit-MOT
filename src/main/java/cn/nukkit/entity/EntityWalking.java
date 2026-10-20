@@ -87,14 +87,29 @@ public abstract class EntityWalking extends BaseEntity {
             double tz = this.z;
             int attempts = 0;
             boolean inWater = true;
+            boolean foundLoadedColumn = false;
             while (attempts++ < 10 && inWater) {
                 int wanderX = Utils.rand(4, 10);
                 int wanderZ = Utils.rand(4, 10);
-                tx = this.x + (Utils.rand() ? wanderX : -wanderX);
-                tz = this.z + (Utils.rand() ? wanderZ : -wanderZ);
-                int txFloor = NukkitMath.floorDouble(tx);
-                int tzFloor = NukkitMath.floorDouble(tz);
-                inWater = Block.isWater(level.getBlockIdAt(chunk, txFloor, level.getHighestBlockAt(txFloor, tzFloor), tzFloor));
+                double candidateX = this.x + (Utils.rand() ? wanderX : -wanderX);
+                double candidateZ = this.z + (Utils.rand() ? wanderZ : -wanderZ);
+                int txFloor = NukkitMath.floorDouble(candidateX);
+                int tzFloor = NukkitMath.floorDouble(candidateZ);
+                FullChunk candidateChunk = level.getChunkIfLoaded(txFloor >> 4, tzFloor >> 4);
+                if (candidateChunk == null) {
+                    continue;
+                }
+                tx = candidateX;
+                tz = candidateZ;
+                foundLoadedColumn = true;
+                int surfaceY = candidateChunk.getHighestBlockAt(txFloor & 15, tzFloor & 15);
+                inWater = Block.isWater(level.getBlockIdAt(candidateChunk, txFloor, surfaceY, tzFloor));
+            }
+            if (!foundLoadedColumn) {
+                // Retry on the next active tick instead of loading disk chunks for a random target.
+                this.target = null;
+                this.moveTime = 0;
+                return;
             }
             this.target = new Vector3(tx, this.y + Utils.rand(-20.0, 20.0) / 10, tz);
         }
@@ -112,7 +127,7 @@ public abstract class EntityWalking extends BaseEntity {
             }
         }
 
-        if (!this.onGround || this.stayTime > 0) {
+        if (!this.onGround || this.stayTime > 0 || (dx == 0 && dz == 0)) {
             return false;
         }
 
@@ -222,7 +237,14 @@ public abstract class EntityWalking extends BaseEntity {
 
                     double diff = Math.abs(x) + Math.abs(z);
                     boolean distance = false;
-                    if (this.riding != null || diff <= 0.001 || !inWater && (this.stayTime > 0 || (this.distance(this.target) <= (this.getWidth() / 2 + 0.3) * nearbyDistanceMultiplier()))) {
+                    // A route node is a navigation point, not a ranged combat target.
+                    double stopDistance = this.getWidth() / 2 + 0.3;
+                    boolean nearTarget = this.distance(this.target) <= stopDistance
+                            * (this.target instanceof EntityLiving ? nearbyDistanceMultiplier() : 1);
+                    boolean nearFollowTarget = this.followTarget != null && !this.followTarget.closed
+                            && this.followTarget.isAlive() && this.followTarget.canBeFollowed()
+                            && this.distance(this.followTarget) <= stopDistance * nearbyDistanceMultiplier();
+                    if (this.riding != null || diff <= 0.001 || !inWater && (this.stayTime > 0 || nearTarget || nearFollowTarget)) {
                         if (!this.isInsideOfWater()) {
                             this.motionX = 0;
                             this.motionZ = 0;

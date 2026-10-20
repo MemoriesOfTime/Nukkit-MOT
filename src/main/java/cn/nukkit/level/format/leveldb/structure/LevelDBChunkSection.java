@@ -16,6 +16,7 @@ import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
 import cn.nukkit.utils.Zlib;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -39,6 +41,10 @@ public class LevelDBChunkSection implements ChunkSection {
 
     protected final int y;
     protected StateBlockStorage[] storages;
+
+    // Positive-only memo. Storage replacement or mutation must recheck the palette.
+    private volatile StateBlockStorage randomTickStorage;
+    private volatile int randomTickStorageVersion;
 
 
     protected byte[] blockLight;
@@ -111,11 +117,7 @@ public class LevelDBChunkSection implements ChunkSection {
         }
 
         int count = maxLayer + 1;
-        if (count == storages.length) {
-            this.storages = storages;
-        }
-
-        this.storages = Arrays.copyOf(this.storages, count);
+        this.storages = Arrays.copyOf(storages, count);
 
         this.blockLight = blockLight;
         this.skyLight = skyLight;
@@ -324,6 +326,38 @@ public class LevelDBChunkSection implements ChunkSection {
         }
     }
 
+    /**
+     * Batch at most sixteen consecutive random samples under one read lock. Stop at the
+     * first ticking block: its callback must run after unlocking and before the next RNG
+     * draw or state read. The result stores consumed attempts in bits 44+, local x/z/y
+     * in bits 32/36/40, and the full block in bits 0..31; air means no callback.
+     */
+    public long sampleRandomTickBlocks(int attempts, Random random) {
+        int limit = Math.min(attempts, 16);
+        if (limit <= 0) {
+            return 0L;
+        }
+        this.readLock.lock();
+        try {
+            StateBlockStorage storage = this.hasLayerUnsafe(0) ? this.storages[0] : null;
+            for (int consumed = 1; consumed <= limit; consumed++) {
+                int n = random.nextInt();
+                int x = n & 0xF;
+                int z = n >>> 8 & 0xF;
+                int y = n >>> 16 & 0xF;
+                int fullBlock = storage == null ? BlockID.AIR : storage.get(x, y, z);
+                if (Level.isRandomTickBlock(fullBlock >> Block.DATA_BITS)) {
+                    int position = x | (z << 4) | (y << 8);
+                    return ((long) consumed << 44) | ((long) position << 32)
+                            | (fullBlock & 0xffffffffL);
+                }
+            }
+            return (long) limit << 44;
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
     @Override
     public int[] getBlockState(int x, int y, int z, int layer) {
         try {
@@ -352,6 +386,54 @@ public class LevelDBChunkSection implements ChunkSection {
         } finally {
             this.readLock.unlock();
         }
+    }
+
+    /**
+     * Reads a cuboid of block state pairs under one read lock.
+     *
+     * <p>Each cell is encoded exactly like {@link #getBlockStatePair}. Bounds are section-local and
+     * inclusive; cells are written column by column in x, z, y order, the order a bounding-box scan
+     * visits them: {@code out[base + (x - x0) * strideX + (z - z0) * strideZ + (y - y0)]}.
+     *
+     * <p>A bounding-box scan used to lock and unlock the section once per cell - a horse visits about
+     * eighty cells every tick. One acquisition per section gives the same values (the cuboid is now read
+     * atomically) without the per-cell synchronisation.
+     *
+     * @return the {@link #getBlockVersion(int) version} of the layer the cells were read from
+     */
+    public int getBlockStatePairs(int layer, int x0, int y0, int z0, int x1, int y1, int z1,
+                                  long[] out, int base, int strideX, int strideZ) {
+        this.readLock.lock();
+        try {
+            StateBlockStorage storage = this.hasLayerUnsafe(layer) ? this.storages[layer] : null;
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    int index = base + (x - x0) * strideX + (z - z0) * strideZ;
+                    for (int y = y0; y <= y1; y++, index++) {
+                        if (storage == null) {
+                            out[index] = 0L;
+                            continue;
+                        }
+                        BlockStateSnapshot state = storage.getBlockState(x, y, z);
+                        out[index] = ((long) state.getLegacyId() << 32) | (state.getLegacyData() & 0xffffffffL);
+                    }
+                }
+            }
+            return storage == null ? -1 : storage.getVersion();
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
+    /**
+     * Version of a layer's states, or -1 while the layer does not exist; unchanged means no cell of the
+     * layer changed. Read without the lock: an answer that races a writer is either the old version
+     * (the reader's cells are consistent with it) or a new one (the reader rescans).
+     */
+    public int getBlockVersion(int layer) {
+        StateBlockStorage[] storages = this.storages;
+        StateBlockStorage storage = layer < storages.length ? storages[layer] : null;
+        return storage == null ? -1 : storage.getVersion();
     }
 
     @Override
@@ -475,19 +557,21 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockSkyLight(int x, int y, int z) {
-        if (this.skyLight == null) {
-            if (!hasSkyLight) {
-                return 0;
-            } else if (compressedLight == null) {
-                return 15;
+        this.skyLightLock.lock();
+        try {
+            if (this.skyLight == null) {
+                if (!hasSkyLight) {
+                    return 0;
+                } else if (compressedLight == null) {
+                    return 15;
+                }
+                this.skyLight = getSkyLightArray();
             }
+            int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
+            return (x & 1) == 0 ? sl & 0x0f : sl >> 4;
+        } finally {
+            this.skyLightLock.unlock();
         }
-        this.skyLight = getSkyLightArray();
-        int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
-        if ((x & 1) == 0) {
-            return sl & 0x0f;
-        }
-        return sl >> 4;
     }
 
     @Override
@@ -796,6 +880,39 @@ public class LevelDBChunkSection implements ChunkSection {
         }
     }
 
+    @Override
+    public boolean mayHaveRandomTickBlocks() {
+        // Legacy subclasses may expose ticking blocks through their virtual reads.
+        if (this.getClass() != LevelDBChunkSection.class) {
+            return true;
+        }
+        StateBlockStorage[] current = this.storages;
+        StateBlockStorage storage = current.length == 0 ? null : current[0];
+        if (storage != null && storage == this.randomTickStorage
+                && storage.getVersion() == this.randomTickStorageVersion) {
+            return true;
+        }
+        // A busy writer is not evidence of an empty section. Fall back to the usual samples.
+        if (!this.readLock.tryLock()) {
+            return true;
+        }
+        try {
+            storage = this.hasLayerUnsafe(0) ? this.storages[0] : null;
+            if (storage != null && storage.mayHaveRandomTickBlocks()) {
+                this.randomTickStorageVersion = storage.getVersion();
+                this.randomTickStorage = storage;
+                return true;
+            }
+            // Never memoize a negative: borrowed data and dynamic mappings can change
+            // without the storage mutation counter.
+            this.randomTickStorage = null;
+            return false;
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
+
     public StateBlockStorage[] getStorages() {
         return storages;
     }
@@ -885,11 +1002,16 @@ public class LevelDBChunkSection implements ChunkSection {
                 }
                 storages[i] = storage.copy();
             }
-            return new LevelDBChunkSection(null, this.y, storages,
-                    this.blockLight == null ? null : this.blockLight.clone(),
-                    this.skyLight == null ? null : this.skyLight.clone(),
-                    this.compressedLight == null ? null : this.compressedLight.clone(),
-                    this.hasBlockLight, this.hasSkyLight);
+            this.skyLightLock.lock();
+            try {
+                byte[] copiedSkyLight = this.skyLight == null ? null : this.skyLight.clone();
+                return new LevelDBChunkSection(null, this.y, storages,
+                        this.blockLight == null ? null : this.blockLight.clone(), copiedSkyLight,
+                        this.compressedLight == null ? null : this.compressedLight.clone(),
+                        this.hasBlockLight, this.hasSkyLight);
+            } finally {
+                this.skyLightLock.unlock();
+            }
         } finally {
             this.readLock.unlock();
         }
@@ -979,6 +1101,19 @@ public class LevelDBChunkSection implements ChunkSection {
             } finally {
                 writeLock.unlock();
             }
+        }
+    }
+
+    @Override
+    public boolean mayContainBlockIds(IntSet blockIds) {
+        this.readLock.lock();
+        try {
+            // Migration has always read layer 0; waterlogged/extra-layer blocks do not widen it.
+            return this.hasLayerUnsafe(0)
+                    ? this.storages[0].mayContainBlockIds(blockIds)
+                    : blockIds.contains(Block.AIR);
+        } finally {
+            this.readLock.unlock();
         }
     }
 

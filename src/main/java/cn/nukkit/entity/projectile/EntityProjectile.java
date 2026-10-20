@@ -30,6 +30,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @Getter
 public abstract class EntityProjectile extends Entity {
 
+    private static final Entity[] NO_COLLISION_CANDIDATES = new Entity[0];
+
     public static final int DATA_SHOOTER_ID = 17;
 
     public static final int PICKUP_NONE = 0;
@@ -39,6 +41,14 @@ public abstract class EntityProjectile extends Entity {
     public Entity shootingEntity;
     public boolean hadCollision = false;
     private boolean shootVibrationSent = false;
+    @Getter(lombok.AccessLevel.NONE)
+    private MovingObjectPosition entityCollision;
+
+    protected Vector3 getEntityImpactPosition(Entity entity) {
+        return this.entityCollision != null && this.entityCollision.entityHit == entity
+                ? this.entityCollision.hitVector : null;
+    }
+
     public int piercing;
 
     @Getter
@@ -152,10 +162,15 @@ public abstract class EntityProjectile extends Entity {
 
             Vector3 moveVector = new Vector3(this.x + this.motionX, this.y + this.motionY, this.z + this.motionZ);
 
-            Entity[] list = this.getLevel().getCollidingEntities(this.boundingBox.addCoord(this.motionX, this.motionY, this.motionZ).expand(1, 1, 1), this);
+            // calculateIntercept cannot hit anything on a zero-length segment. Keep ticking
+            // physics and block contacts, but do not visit every entity in nearby chunks.
+            Entity[] list = this.motionX == 0 && this.motionY == 0 && this.motionZ == 0
+                    ? NO_COLLISION_CANDIDATES
+                    : this.getLevel().getCollidingEntities(this.boundingBox.addCoord(this.motionX, this.motionY, this.motionZ).expand(1, 1, 1), this);
 
             double nearDistance = Integer.MAX_VALUE;
             Entity nearEntity = null;
+            Vector3 nearHitVector = null;
 
             for (Entity entity : list) {
                 if (/*!entity.canCollideWith(this) || */(entity == this.shootingEntity && this.age < 5) || (entity instanceof Player player && player.getGamemode() == Player.SPECTATOR)) {
@@ -174,15 +189,23 @@ public abstract class EntityProjectile extends Entity {
                 if (distance < nearDistance) {
                     nearDistance = distance;
                     nearEntity = entity;
+                    nearHitVector = ob.hitVector;
                 }
             }
 
             if (nearEntity != null) {
                 movingObjectPosition = MovingObjectPosition.fromEntity(nearEntity);
+                movingObjectPosition.hitVector = nearHitVector;
             }
 
             if (movingObjectPosition != null && movingObjectPosition.entityHit != null) {
-                onCollideWithEntity(movingObjectPosition.entityHit);
+                MovingObjectPosition previousCollision = this.entityCollision;
+                this.entityCollision = movingObjectPosition;
+                try {
+                    onCollideWithEntity(movingObjectPosition.entityHit);
+                } finally {
+                    this.entityCollision = previousCollision;
+                }
                 hasUpdate = true;
                 if (this.closed) {
                     return false;

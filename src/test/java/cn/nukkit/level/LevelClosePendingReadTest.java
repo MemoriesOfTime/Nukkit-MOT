@@ -10,6 +10,7 @@ import org.mockito.InOrder;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.WeakHashMap;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -54,7 +55,7 @@ class LevelClosePendingReadTest {
         set(level, "asyncChunkLoadExecutor", executor);
         set(level, "pendingChunkLoads", new ConcurrentHashMap<>());
         set(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
-        set(level, "generators", new ThreadLocal<>());
+        set(level, "generators", new WeakHashMap<>());
         set(level, "autoSave", true);
         doReturn(true).when(level).save(true);
 

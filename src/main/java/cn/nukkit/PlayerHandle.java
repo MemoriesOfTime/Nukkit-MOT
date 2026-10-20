@@ -6,6 +6,8 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.inventory.transaction.*;
 import cn.nukkit.level.Location;
+import cn.nukkit.level.PlayerBlobCacheState;
+import cn.nukkit.level.PlayerSubChunkRequestState;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.SourceInterface;
@@ -64,6 +66,14 @@ public final class PlayerHandle {
 
     public NetworkPlayerSession getNetworkSession() {
         return player.networkSession;
+    }
+
+    public PlayerBlobCacheState getBlobCacheState() {
+        return player.blobCacheState;
+    }
+
+    public PlayerSubChunkRequestState getSubChunkRequestState() {
+        return player.subChunkRequestState;
     }
 
     public void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {
@@ -320,6 +330,9 @@ public final class PlayerHandle {
     }
 
     public void setChunkRadius(int chunkRadius) {
+        if (player.chunkRadius != chunkRadius) {
+            player.nextChunkOrderRun = 0;
+        }
         player.chunkRadius = chunkRadius;
     }
 
@@ -541,13 +554,5 @@ public final class PlayerHandle {
 
     private NetworkSessionState getSessionState() {
         return player.networkSession != null ? player.networkSession.getState() : null;
-    }
-
-    public int getFailedMobEquipmentPacket() {
-        return player.failedMobEquipmentPacket;
-    }
-
-    public void setFailedMobEquipmentPacket(int failedCount) {
-        player.failedMobEquipmentPacket = failedCount;
     }
 }

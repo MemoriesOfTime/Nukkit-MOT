@@ -156,6 +156,29 @@ public interface LevelProvider {
 
     Map<Long, ? extends FullChunk> getLoadedChunks();
 
+    /**
+     * Hashes of the loaded chunks at the time of the call, see {@link cn.nukkit.level.Level#chunkHash(int, int)}.
+     * <p>
+     * A caller that only needs coordinates should prefer this to {@link #getLoadedChunks()}: that one copies
+     * the whole map and boxes every key.
+     */
+    default long[] getLoadedChunkHashes() {
+        Map<Long, ? extends FullChunk> chunks = this.getLoadedChunks();
+        long[] hashes = new long[chunks.size()];
+        int i = 0;
+        for (Long hash : chunks.keySet()) {
+            hashes[i++] = hash;
+        }
+        return hashes;
+    }
+
+    /**
+     * Number of loaded chunks, without copying them.
+     */
+    default int getLoadedChunkCount() {
+        return this.getLoadedChunks().size();
+    }
+
     void doGarbageCollection();
 
     default void doGarbageCollection(long time) {

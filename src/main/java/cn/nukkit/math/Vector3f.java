@@ -367,6 +367,14 @@ public class Vector3f implements Cloneable {
         return this.x == other.x && this.y == other.y && this.z == other.z;
     }
 
+    @Override
+    public int hashCode() {
+        // equals uses ==, so positive and negative zero must share a hash.
+        int hash = Float.hashCode(x == 0f ? 0f : x);
+        hash = 31 * hash + Float.hashCode(y == 0f ? 0f : y);
+        return 31 * hash + Float.hashCode(z == 0f ? 0f : z);
+    }
+
     public int rawHashCode() {
         return super.hashCode();
     }
