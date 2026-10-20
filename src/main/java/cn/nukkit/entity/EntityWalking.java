@@ -87,14 +87,29 @@ public abstract class EntityWalking extends BaseEntity {
             double tz = this.z;
             int attempts = 0;
             boolean inWater = true;
+            boolean foundLoadedColumn = false;
             while (attempts++ < 10 && inWater) {
                 int wanderX = Utils.rand(4, 10);
                 int wanderZ = Utils.rand(4, 10);
-                tx = this.x + (Utils.rand() ? wanderX : -wanderX);
-                tz = this.z + (Utils.rand() ? wanderZ : -wanderZ);
-                int txFloor = NukkitMath.floorDouble(tx);
-                int tzFloor = NukkitMath.floorDouble(tz);
-                inWater = Block.isWater(level.getBlockIdAt(chunk, txFloor, level.getHighestBlockAt(txFloor, tzFloor), tzFloor));
+                double candidateX = this.x + (Utils.rand() ? wanderX : -wanderX);
+                double candidateZ = this.z + (Utils.rand() ? wanderZ : -wanderZ);
+                int txFloor = NukkitMath.floorDouble(candidateX);
+                int tzFloor = NukkitMath.floorDouble(candidateZ);
+                FullChunk candidateChunk = level.getChunkIfLoaded(txFloor >> 4, tzFloor >> 4);
+                if (candidateChunk == null) {
+                    continue;
+                }
+                tx = candidateX;
+                tz = candidateZ;
+                foundLoadedColumn = true;
+                int surfaceY = candidateChunk.getHighestBlockAt(txFloor & 15, tzFloor & 15);
+                inWater = Block.isWater(level.getBlockIdAt(candidateChunk, txFloor, surfaceY, tzFloor));
+            }
+            if (!foundLoadedColumn) {
+                // Retry on the next active tick instead of loading disk chunks for a random target.
+                this.target = null;
+                this.moveTime = 0;
+                return;
             }
             this.target = new Vector3(tx, this.y + Utils.rand(-20.0, 20.0) / 10, tz);
         }

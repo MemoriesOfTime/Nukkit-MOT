@@ -103,7 +103,13 @@ public class BlockFire extends BlockFlowable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL || type == Level.BLOCK_UPDATE_RANDOM) {
-            if (!this.isBlockTopFacingSurfaceSolid(this.down()) && !this.canNeighborBurn()) {
+            boolean supported = this.isBlockTopFacingSurfaceSolid(this.down());
+            if (!supported && !this.areNeighbourChunksLoaded()) {
+                // An unseen flammable neighbour may support this fire. Retry instead of treating it as air.
+                this.scheduleNeighbourRetry();
+                return Level.BLOCK_UPDATE_NORMAL;
+            }
+            if (!supported && !this.canNeighborBurn()) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
             } else if (this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK) && !level.isUpdateScheduled(this, this)) {
                 level.scheduleUpdate(this, tickRate());
@@ -114,13 +120,19 @@ public class BlockFire extends BlockFlowable {
             Block down = this.down();
             boolean forever = this.getId() == SOUL_FIRE || down.getId() == NETHERRACK || down.getId() == MAGMA || (down.getId() == BEDROCK && level.getDimension() == Level.DIMENSION_THE_END);
 
-            boolean canBlockSeeSky = this.getLevel().canBlockSeeSky(this) ||
-                    this.getLevel().canBlockSeeSky(this.east()) ||
-                    this.getLevel().canBlockSeeSky(this.west()) ||
-                    this.getLevel().canBlockSeeSky(this.south()) ||
-                    this.getLevel().canBlockSeeSky(this.north());
+            if ((!forever || !this.isBlockTopFacingSurfaceSolid(down)) && !this.areNeighbourChunksLoaded()) {
+                // Loading a neighbour can wait behind its pending disk write on the main thread.
+                // Keep the age and block unchanged until the support/rain checks can see their neighbours.
+                this.scheduleNeighbourRetry();
+                return 0;
+            }
 
-            if (!forever && canBlockSeeSky && this.getLevel().isRaining()) {
+            if (!forever && this.getLevel().isRaining() &&
+                    (this.getLevel().canBlockSeeSky(this) ||
+                            this.getLevel().canBlockSeeSky(this.east()) ||
+                            this.getLevel().canBlockSeeSky(this.west()) ||
+                            this.getLevel().canBlockSeeSky(this.south()) ||
+                            this.getLevel().canBlockSeeSky(this.north()))) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
             }
 
@@ -209,6 +221,24 @@ public class BlockFire extends BlockFlowable {
         }
 
         return 0;
+    }
+
+    private boolean areNeighbourChunksLoaded() {
+        int x = this.getFloorX();
+        int z = this.getFloorZ();
+        int chunkX = x >> 4;
+        int chunkZ = z >> 4;
+        // Only cardinal neighbours are read by support and rain checks. Spread already uses loaded chunks.
+        return ((x - 1) >> 4 == chunkX || this.level.isChunkLoaded((x - 1) >> 4, chunkZ))
+                && ((x + 1) >> 4 == chunkX || this.level.isChunkLoaded((x + 1) >> 4, chunkZ))
+                && ((z - 1) >> 4 == chunkZ || this.level.isChunkLoaded(chunkX, (z - 1) >> 4))
+                && ((z + 1) >> 4 == chunkZ || this.level.isChunkLoaded(chunkX, (z + 1) >> 4));
+    }
+
+    private void scheduleNeighbourRetry() {
+        if (this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK) && !this.level.isUpdateScheduled(this, this)) {
+            this.level.scheduleUpdate(this, this.tickRate());
+        }
     }
 
     private void tryToCatchBlockOnFire(Block block, int bound, int damage) {

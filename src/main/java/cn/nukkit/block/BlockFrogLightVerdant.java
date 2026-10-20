@@ -5,6 +5,15 @@ package cn.nukkit.block;
  */
 public class BlockFrogLightVerdant extends BlockFrogLight {
 
+    public BlockFrogLightVerdant() {
+        this(0);
+    }
+
+    public BlockFrogLightVerdant(int meta) {
+        super(meta);
+    }
+
+
     @Override
     public String getName() {
         return "Verdant FrogLight";
