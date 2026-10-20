@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 
 /**
  * @author MagicDroidX
@@ -126,6 +127,9 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     private long hash;
 
     protected AtomicLong changes = new AtomicLong();
+    private static final AtomicLongFieldUpdater<BaseFullChunk> MUTATION_REVISION =
+            AtomicLongFieldUpdater.newUpdater(BaseFullChunk.class, "mutationRevision");
+    private volatile long mutationRevision;
 
     protected boolean isInit;
 
@@ -1022,6 +1026,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return changes.get();
     }
 
+    /** Monotonic cache revision; save acknowledgements only reset the dirty counter. */
+    public long getMutationRevision() {
+        return mutationRevision;
+    }
+
     @Override
     public boolean hasChanged() {
         return this.changes.get() != 0;
@@ -1029,6 +1038,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void setChanged() {
+        MUTATION_REVISION.incrementAndGet(this);
         this.changes.incrementAndGet();
         chunkPackets = null;
     }

@@ -1283,6 +1283,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.loadQueue.remove(index);
     }
 
+    /** MAIN-thread generation of this player's world/chunk subscriptions. */
+    public long getChunkDeliveryEpoch() {
+        return this.chunkDeliveryEpoch;
+    }
+
     private void unloadChunks(boolean online) {
         ++this.chunkDeliveryEpoch;
         // 切世界后旧事务引用的 blob 全部作废 / old transaction blob refs are void after a world switch

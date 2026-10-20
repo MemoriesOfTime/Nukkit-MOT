@@ -11,6 +11,7 @@ import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
+import cn.nukkit.level.format.generic.serializer.ChunkRequestToken;
 import cn.nukkit.level.format.leveldb.serializer.*;
 import cn.nukkit.level.format.leveldb.structure.*;
 import cn.nukkit.level.generator.Generator;
@@ -593,22 +594,14 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         long timestamp = chunk.getChanges();
+        ChunkRequestToken token = new ChunkRequestToken(chunk);
 
         if (this.getServer().asyncChunkSending) {
             final BaseChunk chunkClone = chunk.cloneForChunkSending();
             this.level.getAsyncChuckExecutor().execute(() -> {
                 try {
                     NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
-                        getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
-                                timestamp,
-                                chunkX,
-                                chunkZ,
-                                networkChunkSerializerCallback.getSubchunks(),
-                                networkChunkSerializerCallback.getStream().getBuffer(),
-                                networkChunkSerializerCallback.getSubChunkBlobs(),
-                                networkChunkSerializerCallback.getBiomes(),
-                                networkChunkSerializerCallback.getBlockEntities()
-                        );
+                        getLevel().dispatchChunkRequestCallback(networkChunkSerializerCallback, timestamp, chunkX, chunkZ, token, true);
                     }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
@@ -620,16 +613,7 @@ public class LevelDBProvider implements LevelProvider {
         }else {
             try {
                 NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                    this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
-                            timestamp,
-                            chunkX,
-                            chunkZ,
-                            networkChunkSerializerCallback.getSubchunks(),
-                            networkChunkSerializerCallback.getStream().getBuffer(),
-                            networkChunkSerializerCallback.getSubChunkBlobs(),
-                            networkChunkSerializerCallback.getBiomes(),
-                            networkChunkSerializerCallback.getBlockEntities()
-                    );
+                    getLevel().dispatchChunkRequestCallback(networkChunkSerializerCallback, timestamp, chunkX, chunkZ, token, false);
                 }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
             } catch (Throwable t) {
                 getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);

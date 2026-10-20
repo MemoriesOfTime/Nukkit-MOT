@@ -458,8 +458,10 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         CompressionProvider provider = this.compressionOut;
         try {
             int level = Server.getInstance().networkCompressionLevel;
-            this.sendPacket(borrowed ? PacketBatcher.compressBorrowed(provider, batched, level)
-                    : provider.compress(batched, level));
+            BinaryStream input = borrowed && !PacketBatcher.supports(provider)
+                    ? new BinaryStream(batched.getBuffer()) : batched;
+            this.sendPacket(cn.nukkit.utils.OutboundBatchCompression.compress(provider,
+                    input, level, this.getBedrockProtocol()));
         } catch (Exception e) {
             log.error("Unable to compress batched packets", e);
         }

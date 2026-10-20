@@ -7,6 +7,7 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.BaseLevelProvider;
 import cn.nukkit.level.format.generic.BaseRegionLoader;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
+import cn.nukkit.level.format.generic.serializer.ChunkRequestToken;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -115,22 +116,14 @@ public class Anvil extends BaseLevelProvider {
         }
 
         long timestamp = chunk.getChanges();
+        ChunkRequestToken token = new ChunkRequestToken(chunk);
 
         if (this.getServer().asyncChunkSending) {
             final Chunk chunkClone = chunk.cloneForChunkSending();
             this.level.getAsyncChuckExecutor().execute(() -> {
                 try {
                     NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
-                        getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
-                                timestamp,
-                                x,
-                                z,
-                                networkChunkSerializerCallback.getSubchunks(),
-                                networkChunkSerializerCallback.getStream().getBuffer(),
-                                networkChunkSerializerCallback.getSubChunkBlobs(),
-                                networkChunkSerializerCallback.getBiomes(),
-                                networkChunkSerializerCallback.getBlockEntities()
-                        );
+                        getLevel().dispatchChunkRequestCallback(networkChunkSerializerCallback, timestamp, x, z, token, true);
                     }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + x + ", " + z + ")", t);
@@ -142,16 +135,7 @@ public class Anvil extends BaseLevelProvider {
         }else {
             try {
                 NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                    this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
-                            timestamp,
-                            x,
-                            z,
-                            networkChunkSerializerCallback.getSubchunks(),
-                            networkChunkSerializerCallback.getStream().getBuffer(),
-                            networkChunkSerializerCallback.getSubChunkBlobs(),
-                            networkChunkSerializerCallback.getBiomes(),
-                            networkChunkSerializerCallback.getBlockEntities()
-                    );
+                    getLevel().dispatchChunkRequestCallback(networkChunkSerializerCallback, timestamp, x, z, token, false);
                 }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
             } catch (Throwable t) {
                 getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + x + ", " + z + ")", t);
