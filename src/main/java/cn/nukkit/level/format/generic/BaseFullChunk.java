@@ -31,6 +31,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 /**
  * @author MagicDroidX
@@ -127,7 +129,38 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected AtomicLong changes = new AtomicLong();
 
-    protected boolean isInit;
+    // Unlike the dirty/save counter, this revision never resets during a chunk lifetime.
+    private static final AtomicLongFieldUpdater<BaseFullChunk> MUTATION_REVISION =
+            AtomicLongFieldUpdater.newUpdater(BaseFullChunk.class, "mutationRevision");
+    private volatile long mutationRevision;
+    private static final AtomicIntegerFieldUpdater<BaseFullChunk> LIGHT_POPULATION_PENDING =
+            AtomicIntegerFieldUpdater.newUpdater(BaseFullChunk.class, "lightPopulationPending");
+    private volatile int lightPopulationPending;
+
+    protected volatile boolean isInit;
+    private volatile Throwable chunkLoadFailure;
+    private volatile boolean readFailurePlaceholder;
+
+    /** A failed mount must not later be reported as a successful cached load. */
+    public Throwable getChunkLoadFailure() {
+        return this.chunkLoadFailure;
+    }
+
+    /** Lifecycle errors are diagnostic only: decoded terrain and live entities remain writable. */
+    public void markChunkLoadFailure(Throwable failure) {
+        if (this.chunkLoadFailure == null) this.chunkLoadFailure = failure;
+    }
+
+    /** Only an empty stand-in for an unreadable chunk may discard changes on unload. */
+    public void markChunkReadFailure(Throwable failure) {
+        this.markChunkLoadFailure(failure);
+        this.readFailurePlaceholder = true;
+        this.setGenerated(false);
+    }
+
+    public boolean isReadFailurePlaceholder() {
+        return this.readFailurePlaceholder;
+    }
 
     protected boolean lightPopulated;
 
@@ -183,6 +216,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             chunk.heightMap = this.getHeightMapArray().clone();
         }
         chunk.changes = new AtomicLong(this.changes.get());
+        chunk.lightPopulationPending = 0;
         return chunk;
     }
 
@@ -194,6 +228,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             return null;
         }
         chunk.changes = new AtomicLong(this.changes.get());
+        chunk.lightPopulationPending = 0;
 
         if (this.tiles != null) {
             chunk.tiles = new Long2ObjectNonBlockingMap<>();
@@ -1022,6 +1057,49 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return changes.get();
     }
 
+    public long getMutationRevision() {
+        return mutationRevision;
+    }
+
+    public boolean beginLightPopulation() {
+        // Do not acquire the chunk monitor: population workers can hold it for a long time.
+        return LIGHT_POPULATION_PENDING.compareAndSet(this, 0, 1);
+    }
+
+    public void endLightPopulation() {
+        LIGHT_POPULATION_PENDING.set(this, 0);
+    }
+
+    /**
+     * Main-thread merge after identity/revision validation. Never replace block, entity,
+     * tile, biome or persistence data with an asynchronous lighting snapshot.
+     * The generic implementation deliberately favors format-independent correctness.
+     */
+    public void applyLightingFrom(BaseFullChunk snapshot) {
+        int minY = provider.getMinBlockY();
+        int maxY = provider.getMaxBlockY();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                int height = snapshot.getHeightMap(x, z);
+                if (getHeightMap(x, z) != height) {
+                    setHeightMap(x, z, height);
+                }
+                for (int y = minY; y <= maxY; y++) {
+                    int sky = snapshot.getBlockSkyLight(x, y, z);
+                    if (getBlockSkyLight(x, y, z) != sky) {
+                        setBlockSkyLight(x, y, z, sky);
+                    }
+                    int block = snapshot.getBlockLight(x, y, z);
+                    if (getBlockLight(x, y, z) != block) {
+                        setBlockLight(x, y, z, block);
+                    }
+                }
+            }
+        }
+        setLightPopulated();
+        setChanged();
+    }
+
     @Override
     public boolean hasChanged() {
         return this.changes.get() != 0;
@@ -1029,6 +1107,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void setChanged() {
+        MUTATION_REVISION.incrementAndGet(this);
         this.changes.incrementAndGet();
         chunkPackets = null;
     }

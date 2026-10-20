@@ -178,6 +178,41 @@ public class LevelDBChunkSection implements ChunkSection {
         }
     }
 
+    /**
+     * Samples one interior relaxation cell and its six neighbours under the live
+     * palette read lock. Returns current light in the high word and the next
+     * light in the low word. The caller keeps chunk readiness/canonical fences.
+     * Only exact sections use this path: subclasses retain their virtual getters.
+     */
+    public final long sampleInteriorBlockLight(int x, int y, int z) {
+        if (getClass() != LevelDBChunkSection.class || x <= 0 || x >= 15
+                || y <= 0 || y >= 15 || z <= 0 || z >= 15) {
+            throw new IllegalArgumentException("An exact section interior is required");
+        }
+        this.readLock.lock();
+        try {
+            int current = getBlockLight(x, y, z);
+            StateBlockStorage storage = this.hasLayerUnsafe(0) ? this.storages[0] : null;
+            int id = storage == null ? BlockID.AIR : storage.getBlockState(x, y, z).getLegacyId();
+            int expected = Block.getBlockLight(id);
+            expected = Math.max(expected, incomingBlockLight(storage, x - 1, y, z));
+            expected = Math.max(expected, incomingBlockLight(storage, x + 1, y, z));
+            expected = Math.max(expected, incomingBlockLight(storage, x, y - 1, z));
+            expected = Math.max(expected, incomingBlockLight(storage, x, y + 1, z));
+            expected = Math.max(expected, incomingBlockLight(storage, x, y, z - 1));
+            expected = Math.max(expected, incomingBlockLight(storage, x, y, z + 1));
+            return ((long) current << 32) | (expected & 0xffffffffL);
+        } finally {
+            this.readLock.unlock();
+        }
+    }
+
+    private int incomingBlockLight(StateBlockStorage storage, int x, int y, int z) {
+        int id = storage == null ? BlockID.AIR : storage.getBlockState(x, y, z).getLegacyId();
+        int filter = id < 0 || id >= Block.MAX_BLOCK_ID ? 15 : Block.lightFilter[id];
+        return Math.max(0, getBlockLight(x, y, z) - Math.max(1, filter));
+    }
+
     @Override
     public void setBlockId(int x, int y, int z, int id) {
         this.setBlockId(x, y, z, 0, id);
@@ -970,8 +1005,10 @@ public class LevelDBChunkSection implements ChunkSection {
             this.skyLightLock.lock();
             try {
                 byte[] copiedSkyLight = this.skyLight == null ? null : this.skyLight.clone();
-                return new LevelDBChunkSection(null, this.y, storages, this.blockLight, copiedSkyLight,
-                        this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+                return new LevelDBChunkSection(null, this.y, storages,
+                        this.blockLight == null ? null : this.blockLight.clone(), copiedSkyLight,
+                        this.compressedLight == null ? null : this.compressedLight.clone(),
+                        this.hasBlockLight, this.hasSkyLight);
             } finally {
                 this.skyLightLock.unlock();
             }

@@ -68,6 +68,23 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         }
     }
 
+    /**
+     * First writers can both fail on the same immutable empty section. Recheck
+     * under the stable section-array monitor so a late fallback cannot replace
+     * another writer's already-populated section. Existing-section access keeps
+     * its normal fast path; this does not synchronize whole-chunk replacement.
+     */
+    private void materializeSectionIfEmpty(int sectionY) {
+        synchronized (this.sections) {
+            if (this.getSection(sectionY) instanceof EmptyChunkSection) {
+                ChunkSection materialized = this.materializeSection(sectionY);
+                if (materialized != null) {
+                    this.setInternalSection(sectionY, materialized);
+                }
+            }
+        }
+    }
+
     private void removeInvalidTile(int x, int y, int z) {
         BlockEntity entity = getTile(x, y, z);
         if (entity != null && !entity.isBlockEntityValid()) {
@@ -115,11 +132,10 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             setChanged();
             return this.getSection(Y).getAndSetBlock(x, y & 0x0f, z, layer, block);
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
-            return this.getSection(Y).getAndSetBlock(x, y & 0x0f, z, layer, block);
+            this.materializeSectionIfEmpty(Y);
+            Block previous = this.getSection(Y).getAndSetBlock(x, y & 0x0f, z, layer, block);
+            setChanged();
+            return previous;
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -137,11 +153,10 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             setChanged();
             return this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
-            return this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
+            this.materializeSectionIfEmpty(Y);
+            boolean changed = this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
+            setChanged();
+            return changed;
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -159,11 +174,10 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             setChanged();
             return this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
-            return this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
+            this.materializeSectionIfEmpty(Y);
+            boolean changed = this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
+            setChanged();
+            return changed;
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -181,11 +195,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockId(x, y & 0x0f, z, layer, id);
             setChanged();
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
+            this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockId(x, y & 0x0f, z, layer, id);
+            setChanged();
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -223,11 +235,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockData(x, y & 0x0f, z, layer, data);
             setChanged();
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
+            this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockData(x, y & 0x0f, z, layer, data);
+            setChanged();
         } finally {
             removeInvalidTile(x, y, z);
         }
@@ -245,11 +255,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockSkyLight(x, y & 0x0f, z, level);
             setChanged();
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
+            this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockSkyLight(x, y & 0x0f, z, level);
+            setChanged();
         }
     }
 
@@ -265,12 +273,79 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             this.getSection(Y).setBlockLight(x, y & 0x0f, z, level);
             setChanged();
         } catch (ChunkException e) {
-            ChunkSection materialized = this.materializeSection(Y);
-            if (materialized != null) {
-                this.setInternalSection(Y, materialized);
-            }
+            this.materializeSectionIfEmpty(Y);
             this.getSection(Y).setBlockLight(x, y & 0x0f, z, level);
+            setChanged();
         }
+    }
+
+    /** Merge raw section light without LevelDB's implicit-sky height scans. */
+    @Override
+    public void applyLightingFrom(BaseFullChunk snapshot) {
+        if (!(snapshot instanceof BaseChunk source)) {
+            super.applyLightingFrom(snapshot);
+            return;
+        }
+        if (sections.length != source.sections.length || getSectionOffset() != source.getSectionOffset()) {
+            throw new IllegalArgumentException("Lighting snapshot has a different section range");
+        }
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                int height = source.getHeightMap(x, z);
+                if (getHeightMap(x, z) != height) {
+                    setHeightMap(x, z, height);
+                }
+            }
+        }
+        for (int i = 0; i < sections.length; i++) {
+            ChunkSection from = source.sections[i];
+            ChunkSection into = sections[i];
+            byte[] sourceSky = from.getSkyLightArray();
+            byte[] targetSky = into.getSkyLightArray();
+            byte[] sourceBlock = from.getLightArray();
+            byte[] targetBlock = into.getLightArray();
+            boolean skyChanged = !Arrays.equals(sourceSky, targetSky);
+            boolean blockChanged = !Arrays.equals(sourceBlock, targetBlock);
+            if (!skyChanged && !blockChanged) {
+                continue;
+            }
+            if (into instanceof EmptyChunkSection) {
+                int sectionY = i - getSectionOffset();
+                // A block writer may have published a section since the initial read.
+                // Use the same guarded first-write path, then merge into its current result.
+                materializeSectionIfEmpty(sectionY);
+                into = getSection(sectionY);
+                if (into instanceof EmptyChunkSection) {
+                    throw new IllegalStateException("Cannot materialize a lighting section");
+                }
+                targetSky = into.getSkyLightArray();
+                targetBlock = into.getLightArray();
+                skyChanged = !Arrays.equals(sourceSky, targetSky);
+                blockChanged = !Arrays.equals(sourceBlock, targetBlock);
+            }
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        int index = (y << 7) | (z << 3) | (x >> 1);
+                        int shift = (x & 1) << 2;
+                        if (skyChanged) {
+                            int light = (sourceSky[index] >> shift) & 0xf;
+                            if (((targetSky[index] >> shift) & 0xf) != light) {
+                                into.setBlockSkyLight(x, y, z, light);
+                            }
+                        }
+                        if (blockChanged) {
+                            int light = (sourceBlock[index] >> shift) & 0xf;
+                            if (((targetBlock[index] >> shift) & 0xf) != light) {
+                                into.setBlockLight(x, y, z, light);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        setLightPopulated();
+        setChanged();
     }
 
     @Override

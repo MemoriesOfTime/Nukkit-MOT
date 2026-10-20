@@ -17,6 +17,7 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -53,6 +54,7 @@ class LevelGeneratorRetentionTest {
         set(level, "server", server);
         set(level, "provider", provider);
         set(level, "providerLock", new ReentrantReadWriteLock());
+        set(level, "pendingChunkLoads", new ConcurrentHashMap<>());
         set(level, "generatorClass", TestGenerator.class);
         set(level, "generators", new WeakHashMap<Thread, Generator>());
         set(level, "dimensionData", new DimensionData(0, -64, 319));
