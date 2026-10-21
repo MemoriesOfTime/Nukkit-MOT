@@ -40,6 +40,7 @@ class ServerTickMeasurementTest {
 
     @BeforeEach
     void prepareActualTickBody() throws Exception {
+        set("pendingPlayerCloses", new java.util.concurrent.ConcurrentHashMap<Player, Runnable>());
         set("network", network);
         set("scheduler", scheduler);
         set("pluginManager", manager);

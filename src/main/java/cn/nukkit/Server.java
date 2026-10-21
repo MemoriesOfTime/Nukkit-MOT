@@ -22,6 +22,7 @@ import cn.nukkit.event.level.LevelInitEvent;
 import cn.nukkit.event.level.LevelLoadEvent;
 import cn.nukkit.event.server.*;
 import cn.nukkit.inventory.CraftingManager;
+import cn.nukkit.inventory.InventoryMutationGuard;
 import cn.nukkit.inventory.Recipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItemMapping;
@@ -147,6 +148,18 @@ public class Server {
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
     private volatile boolean hasStopped;
+    private volatile String requestedShutdownReason;
+    private boolean shutdownAdvancing;
+    private boolean shutdownAdvanceRequested;
+    private boolean shutdownStopEventDispatched;
+    private boolean shutdownPlayerClosingStarted;
+    private volatile Thread shutdownHookThread;
+    private volatile Thread shutdownHookWorker;
+    private volatile long shutdownDeadlineNanos;
+    private volatile boolean shutdownTimedOut;
+    private final Object deferredShutdownIdentity = new Object();
+    private final CompletableFuture<Void> shutdownCompletion = new CompletableFuture<>();
+    private final ConcurrentMap<Player, Runnable> pendingPlayerCloses = new ConcurrentHashMap<>();
     private volatile long shutdownProgressAt = Long.MAX_VALUE;
 
     private final PluginManager pluginManager;
@@ -1093,7 +1106,7 @@ public class Server {
             }
         });
 
-        Runtime.getRuntime().addShutdownHook(new Thread(this::forceShutdown));
+        Runtime.getRuntime().addShutdownHook(new Thread(this::runShutdownHook, "Server shutdown hook"));
 
         this.start();
     }
@@ -1485,19 +1498,37 @@ public class Server {
         this.forceShutdown(this.getPropertyString("shutdown-message", "§cServer closed").replace("§n", "\n"));
     }
 
+    /** A foreign caller requests the complete owner-thread sequence, before any dependency teardown. */
     public void forceShutdown(String reason) {
-        if (this.hasStopped) {
-            return;
+        if (!this.requestShutdown(reason)) return;
+        if (!this.isPrimaryThread() && this.currentThread.getState() != Thread.State.TERMINATED) return;
+        synchronized (this) {
+            if (this.hasStopped || this.shutdownTimedOut) return;
+            if (this.shutdownAdvancing) {
+                this.shutdownAdvanceRequested = true;
+                return;
+            }
+            this.shutdownAdvancing = true;
         }
         long shutdownStart = System.currentTimeMillis();
-        this.touchShutdownProgress();
-        this.hasStopped = true;
-
         try {
-            isRunning.compareAndSet(true, false);
-
-            ServerStopEvent serverStopEvent = new ServerStopEvent();
-            pluginManager.callEvent(serverStopEvent);
+            if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity,
+                    this::resumeShutdown)) return;
+            this.drainPlayerCloses();
+            if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity,
+                    this::resumeShutdown)) return;
+            reason = this.requestedShutdownReason;
+            this.touchShutdownProgress();
+            if (!this.shutdownStopEventDispatched) {
+                this.shutdownStopEventDispatched = true;
+                pluginManager.callEvent(new ServerStopEvent());
+            }
+            // A stop listener can retain a new native claim; resume without repeating its event.
+            if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity,
+                    this::resumeShutdown)) return;
+            if (this.shutdownTimedOut) return;
+            if (!this.shutdownPlayerClosingStarted) {
+                this.shutdownPlayerClosingStarted = true;
 
             if (this.holdWorldSave) {
                 this.getLogger().warning("World save hold was not released! Any backup currently being taken may be invalid");
@@ -1509,12 +1540,19 @@ public class Server {
             }
 
             LoginChainVerifier.shared().shutdown();
+            }
             this.getLogger().debug("Disconnecting all players...");
             for (Player player : new ArrayList<>(this.players.values())) {
+                if (this.shutdownTimedOut) return;
                 player.close(player.getLeaveMessage(), reason);
                 this.touchShutdownProgress();
             }
 
+            // Quit/serialize listeners can retain another claim; pending players resume their captured close phase.
+            if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity,
+                    this::resumeShutdown)) return;
+            if (this.shutdownTimedOut) return;
+            this.hasStopped = true;
             this.getLogger().debug("Disabling all plugins...");
             this.disablePlugins();
             this.touchShutdownProgress();
@@ -1561,11 +1599,153 @@ public class Server {
 
             this.getLogger().info(this.baseLang.translateString("nukkit.server.stopped",
                     String.valueOf(NukkitMath.round((System.currentTimeMillis() - shutdownStart) / 1000d, 1))));
+            this.shutdownCompletion.complete(null);
         } catch (Exception e) {
+            this.hasStopped = true;
+            this.shutdownCompletion.completeExceptionally(e);
             log.fatal("Exception happened while shutting down, exiting the process", e);
-            Nukkit.shutdownLogging();
-            System.exit(1);
+            if (Thread.currentThread() != this.shutdownHookThread && Thread.currentThread() != this.shutdownHookWorker) {
+                Nukkit.shutdownLogging();
+                System.exit(1);
+            }
+        } catch (Error failure) {
+            this.hasStopped = true;
+            this.shutdownCompletion.completeExceptionally(failure);
+            throw failure;
+        } finally {
+            boolean retry;
+            synchronized (this) {
+                this.shutdownAdvancing = false;
+                retry = this.shutdownAdvanceRequested && !this.hasStopped && !this.shutdownTimedOut;
+                this.shutdownAdvanceRequested = false;
+            }
+            if (retry) this.forceShutdown(this.requestedShutdownReason);
         }
+    }
+
+    private boolean requestShutdown(String reason) {
+        synchronized (this) {
+            if (this.hasStopped || this.shutdownTimedOut) return false;
+            if (this.requestedShutdownReason == null) {
+                this.requestedShutdownReason = reason;
+                this.shutdownDeadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+                this.touchShutdownProgress();
+            }
+        }
+        this.isRunning.set(false);
+        return true;
+    }
+
+    private void resumeShutdown() {
+        if (this.shutdownHookThread != null && this.currentThread.getState() == Thread.State.TERMINATED)
+            this.startShutdownHookFallback();
+        else this.forceShutdown(this.requestedShutdownReason);
+    }
+
+    private void startShutdownHookFallback() {
+        if (this.currentThread.getState() != Thread.State.TERMINATED || this.shutdownTimedOut) return;
+        if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity, this::startShutdownHookFallback)) return;
+        Thread worker;
+        synchronized (this) {
+            if (this.shutdownHookWorker != null || this.shutdownCompletion.isDone() || this.shutdownTimedOut) return;
+            worker = new Thread(() -> {
+                try { this.completeShutdownOnOwner(); }
+                finally { this.shutdownHookWorker = null; }
+            }, "Terminated owner shutdown");
+            worker.setDaemon(true);
+            this.shutdownHookWorker = worker;
+        }
+        worker.start();
+    }
+
+    private void expireShutdown() {
+        synchronized (this) {
+            if (this.shutdownCompletion.isDone()) return;
+            this.shutdownTimedOut = true;
+            this.shutdownCompletion.completeExceptionally(new TimeoutException("Shutdown owner completion deadline"));
+        }
+    }
+
+    /** Only shutdown continuations run here; plugins, levels and scheduled work remain intact while claimed. */
+    private boolean completeShutdownOnOwner() {
+        while (!this.shutdownCompletion.isDone()) {
+            if (System.nanoTime() >= this.shutdownDeadlineNanos || Thread.currentThread().isInterrupted()) {
+                this.expireShutdown();
+                return false;
+            }
+            this.forceShutdown(this.requestedShutdownReason);
+            if (this.shutdownCompletion.isDone()) break;
+            long remaining = this.shutdownDeadlineNanos - System.nanoTime();
+            if (remaining <= 0) { this.expireShutdown(); return false; }
+            try {
+                this.shutdownCompletion.get(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(100)), TimeUnit.NANOSECONDS);
+            } catch (TimeoutException retry) {
+                // A foreign release may only request another owner continuation. Recheck on this owner.
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt(); this.expireShutdown(); return false;
+            } catch (ExecutionException failure) { return false; }
+        }
+        return !this.shutdownCompletion.isCompletedExceptionally();
+    }
+
+    /** Internal: off-thread disconnects remain pending until their inventory owner can close them. */
+    public void deferPlayerClose(Player player, Runnable close) {
+        this.pendingPlayerCloses.putIfAbsent(player, close);
+    }
+
+    private void drainPlayerCloses() {
+        Throwable failure = null;
+        for (var entry : this.pendingPlayerCloses.entrySet()) {
+            if (!this.pendingPlayerCloses.remove(entry.getKey(), entry.getValue())) continue;
+            try { entry.getValue().run(); } catch (RuntimeException | Error closeFailure) {
+                if (failure == null) failure = closeFailure;
+                else if (failure != closeFailure) failure.addSuppressed(closeFailure);
+            }
+        }
+        if (failure instanceof RuntimeException exception) throw exception;
+        if (failure instanceof Error error) throw error;
+    }
+
+    void runShutdownHook() {
+        this.shutdownHookThread = Thread.currentThread();
+        try {
+            if (this.currentThread.getState() == Thread.State.TERMINATED) {
+                if (this.requestShutdown(this.getPropertyString("shutdown-message", "§cServer closed").replace("§n", "\n")))
+                    this.startShutdownHookFallback();
+            } else this.forceShutdown();
+        } finally {
+            if (!this.awaitShutdownCompletion(30_000)) {
+                log.warn("Shutdown owner did not complete before the hook deadline; only previously admitted profiles are available");
+            }
+            this.shutdownHookThread = null;
+        }
+    }
+
+    boolean awaitShutdownCompletion(long timeoutMillis) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeoutMillis));
+        if (this.shutdownDeadlineNanos != 0) deadline = Math.min(deadline, this.shutdownDeadlineNanos);
+        while (!this.shutdownCompletion.isDone()) {
+            // Runtime.exit holds the owner until hooks finish. Waiting for it would deadlock the hook.
+            for (StackTraceElement frame : this.currentThread.getStackTrace()) {
+                if ((frame.getClassName().equals("java.lang.Shutdown")
+                        && (frame.getMethodName().equals("exit") || frame.getMethodName().equals("shutdown")))
+                        || (frame.getClassName().equals("java.lang.Runtime") && frame.getMethodName().equals("exit"))) return false;
+            }
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) { this.expireShutdown(); return false; }
+            try {
+                this.shutdownCompletion.get(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(100)), TimeUnit.NANOSECONDS);
+            } catch (TimeoutException retry) {
+                // Recheck the owner exit boundary and the finite deadline.
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                this.expireShutdown();
+                return false;
+            } catch (ExecutionException failed) {
+                return false;
+            }
+        }
+        return !this.shutdownCompletion.isCompletedExceptionally();
     }
 
     public void start() {
@@ -1592,6 +1772,9 @@ public class Server {
 
         this.tickProcessor();
         this.forceShutdown();
+        if (!this.completeShutdownOnOwner()) {
+            log.warn("Shutdown did not complete before owner exit; only previously admitted profiles are available");
+        }
     }
 
     private static final byte[] QUERY_PREFIX = {(byte) 0xfe, (byte) 0xfd};
@@ -1889,6 +2072,7 @@ public class Server {
     // The actual tick body also accepts a monotonic clock for deterministic boundary tests.
     void tick(long tickTime, LongSupplier nanoTime) {
 
+        this.drainPlayerCloses();
         long time = tickTime - this.nextTick;
         if (time < -25) {
             try {
@@ -2001,8 +2185,11 @@ public class Server {
         return nextTick;
     }
 
+    /** A timed-out shutdown may retain admitted snapshots, but cannot start another live checkpoint. */
+    public boolean isShutdownTimedOut() { return this.shutdownTimedOut; }
+
     public boolean isShutdownInProgress() {
-        return this.hasStopped;
+        return this.hasStopped || this.requestedShutdownReason != null;
     }
 
     public long getShutdownProgressAt() {
@@ -2666,6 +2853,11 @@ public class Server {
                 pluginManager.callEvent(event);
             }
 
+            if (this.shutdownTimedOut && (Thread.currentThread() == this.currentThread
+                    || Thread.currentThread() == this.shutdownHookWorker))
+                throw new IllegalStateException("Player checkpoint admission exceeded the shutdown deadline");
+            // Listeners may refresh a live player's tag; the queued writer owns a detached final snapshot.
+            CompoundTag snapshot = tag.copy();
             if (async) {
                 Task saveTask = new Task() {
                     volatile boolean hasRun = false;
@@ -2688,8 +2880,11 @@ public class Server {
                         try {
                             if (!this.hasRun) {
                                 this.hasRun = true;
-                                saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
-                                unregisterPendingSave(nameLower, this);
+                                try {
+                                    saveOfflinePlayerDataInternal(event.getSerializer(), snapshot, nameLower, event.getUuid().orElse(null));
+                                } finally {
+                                    unregisterPendingSave(nameLower, this);
+                                }
                             }
                         } finally {
                             saveLock.unlock();
@@ -2708,7 +2903,14 @@ public class Server {
                     lock.unlock();
                 }
             } else {
-                saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
+                ReentrantLock lock = playerDataLock(nameLower);
+                lock.lock();
+                try {
+                    flushPendingPlayerDataSaves(nameLower);
+                    saveOfflinePlayerDataInternal(event.getSerializer(), snapshot, nameLower, event.getUuid().orElse(null));
+                } finally {
+                    lock.unlock();
+                }
             }
         }
     }
@@ -2725,8 +2927,14 @@ public class Server {
         ReentrantLock lock = playerDataLock(name);
         lock.lock();
         try {
-            try (OutputStream dataStream = serializer.write(name, uuid)) {
-                NBTIO.writeGZIPCompressed(tag, dataStream, ByteOrder.BIG_ENDIAN);
+            try {
+                if (serializer.getClass() == DefaultPlayerDataSerializer.class) {
+                    ((DefaultPlayerDataSerializer) serializer).writeAtomically(name, uuid, tag);
+                } else {
+                    try (OutputStream dataStream = serializer.write(name, uuid)) {
+                        NBTIO.writeGZIPCompressed(tag, dataStream, ByteOrder.BIG_ENDIAN);
+                    }
+                }
             } catch (Exception e) {
                 log.error(this.getLanguage().translateString("nukkit.data.saveError", name, e));
             }

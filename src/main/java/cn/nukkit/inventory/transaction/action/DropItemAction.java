@@ -42,6 +42,12 @@ public class DropItemAction extends InventoryAction {
         return source.dropItem(this.targetItem);
     }
 
+    /** Exact native coordinator only; standalone execute retains its ordinary public behavior. */
+    public cn.nukkit.entity.item.EntityItem.PreparedDrop prepare(Player source) {
+        return source.getLevel().prepareItemDrop(source.add(0, 1.3, 0), this.targetItem.clone(),
+                source.getDirectionVector().multiply(0.4), 40);
+    }
+
     @Override
     public void onExecuteSuccess(Player source) {
     }

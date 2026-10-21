@@ -123,7 +123,7 @@ public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, Blo
                 }
             }
 
-            player.addWindow(furnace.getInventory());
+            player.requestWindowOpen(furnace.getInventory());
         }
 
         return true;

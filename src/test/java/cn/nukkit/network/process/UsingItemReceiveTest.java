@@ -75,11 +75,15 @@ class UsingItemReceiveTest {
     }
 
     @Test
-    void keepUsingOnlyForJavaSprintAndStartUsingItem() {
-        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, true));
-        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, false));
-        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, true, true));
-        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, false, true));
+    void keepUsingOnSprintOnlyForJavaSameTickStartAndNativeConsumables() {
+        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, true, false));
+        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, true, true));
+        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, false, false));
+        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, false, true));
+        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, false, true, true));
+        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, false, false, true));
+        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, true, true, true));
+        assertFalse(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(false, true, true, false));
     }
 
     @Test

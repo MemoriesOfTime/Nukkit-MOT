@@ -52,7 +52,7 @@ public class BlockCartographyTable extends BlockSolid {
     @Override
     public boolean onActivate(Item item, Player player) {
         if (player != null) {
-            player.addWindow(new CartographyTableInventory(player.getUIInventory(), this), Player.CARTOGRAPHY_WINDOW_ID);
+            player.requestWindowOpen(new CartographyTableInventory(player.getUIInventory(), this), Player.CARTOGRAPHY_WINDOW_ID);
         }
         return true;
     }

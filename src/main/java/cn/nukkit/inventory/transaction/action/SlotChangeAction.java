@@ -80,6 +80,19 @@ public class SlotChangeAction extends InventoryAction {
         }
     }
 
+    /** Stage the slot write without releasing furnace XP before the whole transfer commits. */
+    public boolean executeInventoryWrite(Player source) {
+        return this.inventory.setItem(this.inventorySlot, this.targetItem.clone(), false);
+    }
+
+    /** Irreversible effects run only after all ordinary transfer slots have been accepted. */
+    public void onInventoryWriteCommitted(Player source) {
+        if (this.inventory instanceof FurnaceInventory furnace && this.inventorySlot == 2
+                && (this.targetItem.getId() == Item.AIR || this.targetItem.getCount() == 0)) {
+            furnace.getHolder().releaseExperience();
+        }
+    }
+
     /**
      * Sends inventorySlot changes to other viewers of the inventory. This will not send any change back to the source Player.
      *

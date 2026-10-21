@@ -12,6 +12,7 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -97,6 +98,7 @@ class ServerPlayerSnapshotsP03Test {
         Fixture(boolean alwaysTick) throws Exception {
             set("network", mock(Network.class)); set("scheduler", mock(ServerScheduler.class)); set("pluginManager", plugins);
             set("players", connected); set("playerList", online); set("levelArray", new Level[0]);
+            set("pendingPlayerCloses", new ConcurrentHashMap<>());
             set("tickAverage", new float[20]); set("useAverage", new float[20]); set("alwaysTickPlayers", alwaysTick);
             set("autoSave", false); set("autoSaveTicks", Integer.MAX_VALUE);
         }
