@@ -898,6 +898,23 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public double calculateBreakTimeNotInAir(@NotNull Item item, @Nullable Player player) {
+        double seconds = this.calculateFastestLegitBreakTime(item, player);
+
+        if (player != null && player.isSubmerged() && !hasAquaAffinity0(player)) {
+            seconds *= player.hasEffect(Effect.CONDUIT_POWER) && this.getHardness() >= 0.5 ? 2.5 : 5;
+        }
+        return seconds;
+    }
+
+    /**
+     * 客户端最快合法完成挖掘的时间，不含空中/水下惩罚；仅作反快速破坏校验的下限——
+     * 这些惩罚在客户端逐刻生效，服务端只能按完成时刻回溯整体时长，计入会误拒合法挖掘。
+     * <p>
+     * Fastest legitimate mining time without the in-air/underwater penalties; only the
+     * floor for fast-break validation, where counting them (retroactive here, per tick
+     * on the client) rejects legal mining.
+     */
+    public double calculateFastestLegitBreakTime(@NotNull Item item, @Nullable Player player) {
         Objects.requireNonNull(item, "Block#calculateBreakTime(): Item can not be null");
         double seconds = 0;
         double blockHardness = this.getHardness();
@@ -911,19 +928,15 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
         double speedMultiplier = 1;
         boolean hasConduitPower = false;
-        boolean hasAquaAffinity = false;
         int hasteEffectLevel = 0;
         int miningFatigueLevel = 0;
         if (player != null) {
             hasConduitPower = player.hasEffect(Effect.CONDUIT_POWER);
-            hasAquaAffinity = Optional.ofNullable(player.getInventory().getHelmet().getEnchantment(Enchantment.ID_WATER_WORKER))
-                    .map(Enchantment::getLevel).map(l -> l >= 1).orElse(false);
             hasteEffectLevel = Optional.ofNullable(player.getEffect(Effect.HASTE))
                     .map(Effect::getAmplifier).orElse(-1) + 1;
             miningFatigueLevel = Optional.ofNullable(player.getEffect(Effect.MINING_FATIGUE))
                     .map(Effect::getAmplifier).orElse(-1) + 1;
         }
-
 
         int blockId = this.getId();
 
@@ -959,14 +972,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             speedMultiplier *= Math.pow(0.3, miningFatigueLevel);
         }
 
-        seconds /= speedMultiplier;
+        return seconds / speedMultiplier;
+    }
 
-        if (player != null) {
-            if (player.isSubmerged() && !hasAquaAffinity) {
-                seconds *= hasConduitPower && blockHardness >= 0.5 ? 2.5 : 5;
-            }
-        }
-        return seconds;
+    private static boolean hasAquaAffinity0(Player player) {
+        return Optional.ofNullable(player.getInventory().getHelmet().getEnchantment(Enchantment.ID_WATER_WORKER))
+                .map(Enchantment::getLevel).map(l -> l >= 1).orElse(false);
     }
 
     public double getBreakTime(@NotNull Item item, Player player) {
