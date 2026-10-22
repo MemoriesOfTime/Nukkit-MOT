@@ -3043,6 +3043,13 @@ public class Level implements ChunkManager, Metadatable {
         return itemEntity;
     }
 
+    /**
+     * 接受客户端预测破坏所需的最小服务端进度比例
+     * <p>
+     * Minimum server-side progress accepting a client-predicted destroy
+     */
+    private static final double FAST_BREAK_PROGRESS_TOLERANCE = 0.65d;
+
     public Item useBreakOn(Vector3 vector) {
         return this.useBreakOn(vector, null);
     }
@@ -3093,15 +3100,19 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
 
-            double breakTime = target.calculateBreakTime(item, player);
+            // 校验只用最快合法客户端的下限：位置惩罚在客户端逐刻生效，服务端却按完成时刻回溯整体时长。
+            // The validation uses the fastest legitimate client as its floor: positional
+            // penalties apply per tick on the client but retroactively here.
+            double breakTime = target.calculateFastestLegitBreakTime(item, player);
 
             if (player.isCreative() && breakTime > 0.15) {
                 breakTime = 0.15;
             }
 
-            if (breakTime > 0) {
-                breakTime -= 0.15; // 保留 3 tick（150ms）宽限用于网络延迟补偿
-            }
+            // 时间戳测量宽限从 3 tick（150ms）随挖掘时长增至 450ms 封顶：中段恰为
+            // 65% 进度容差，短方块保留正阈值使瞬破仍被拒，长方块不被比例式放得过松
+            double graceSeconds = Math.min(Math.max(0.15, breakTime * (1 - FAST_BREAK_PROGRESS_TOLERANCE)), 0.45);
+            double requiredSeconds = breakTime - graceSeconds;
 
             Item[] eventDrops;
             if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
@@ -3109,8 +3120,10 @@ public class Level implements ChunkManager, Metadatable {
             } else {
                 eventDrops = target.getDrops(player, item);
             }
-            // lastBreak < 0 表示首次挖掘（初始值 -1），直接放行；否则验证已等待足够时间
-            boolean fastBreak = player.lastBreak >= 0 && (player.lastBreak + breakTime * 1000) > System.currentTimeMillis();
+            // lastBreak < 0 表示首次挖掘（初始值 -1），直接放行；否则验证已等待足够时间。
+            // 直接比较已用时间与阈值而不构造截止时间：高等级挖掘疲劳会把阈值推到 long 溢出。
+            boolean fastBreak = player.lastBreak >= 0
+                    && (System.currentTimeMillis() - player.lastBreak) < requiredSeconds * 1000;
             BlockBreakEvent ev = new BlockBreakEvent(player, target, face, item, eventDrops, player.isCreative(), fastBreak);
 
             if ((player.isSurvival() || player.isAdventure()) && !target.isBreakable(item)) {
