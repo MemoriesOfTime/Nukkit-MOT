@@ -21,6 +21,7 @@ import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityHappyGhast;
+import cn.nukkit.entity.passive.EntityHorseBase;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
@@ -5258,6 +5259,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 if (this.protocol >= ProtocolInfo.v1_19_0) {
                                     this.addWindow(((InventoryHolder) targetEntity).getInventory());
                                 }
+                            } else if (this.riding instanceof EntityHorseBase horseRide
+                                    && (targetEntity == null || targetEntity == this.riding)) {
+                                // Bedrock has no other way to reach the saddle and armor slots:
+                                // the rider presses the inventory button and expects the horse
+                                // screen, not their own bag.
+                                this.addWindow(horseRide.getInventory());
                             } else if (this.protocol >= 407) {
                                 if (this.inventory.open(this)) {
                                     this.inventoryOpen = true;
@@ -8542,7 +8549,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.removeWindow(inventory, false);
     }
 
+    private Set<Inventory> removingAnvilWindows;
+
     protected void removeWindow(Inventory inventory, boolean isResponse) {
+        boolean anvil = inventory instanceof AnvilInventory;
+        if (anvil) {
+            if (this.removingAnvilWindows != null && this.removingAnvilWindows.contains(inventory)) return;
+            if (InventoryMutationGuard.deferUntilReleased(
+                    java.util.Arrays.asList(inventory, this.getInventory(), this.getUIInventory()), inventory,
+                    () -> this.removeWindow(inventory, isResponse))) return;
+            if (this.getWindowId(inventory) < 0) return;
+            if (this.removingAnvilWindows == null) {
+                this.removingAnvilWindows = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            }
+            this.removingAnvilWindows.add(inventory);
+        }
+        try {
+            this.removeWindowNow(inventory, isResponse);
+        } finally {
+            if (anvil) this.removingAnvilWindows.remove(inventory);
+        }
+    }
+
+    private void removeWindowNow(Inventory inventory, boolean isResponse) {
         inventory.close(this);
         // TODO: This needs a proper fix
         // Requiring isResponse here causes issues with inventory events and an item duplication glitch
@@ -9025,6 +9054,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return success
      */
     public boolean pickupEntity(Entity entity, boolean near) {
+        if (!near || !(entity instanceof EntityItem || entity instanceof EntityArrow
+                || entity instanceof EntityThrownTrident)) {
+            return this.pickupEntityUnclaimed(entity, near);
+        }
+        try (InventoryMutationGuard.Lease destination = InventoryMutationGuard.tryClaim(
+                Collections.singleton(this.inventory))) {
+            return destination != null && this.pickupEntityUnclaimed(entity, true);
+        }
+    }
+
+    private boolean pickupEntityUnclaimed(Entity entity, boolean near) {
         if (!this.spawned || !this.isAlive() || !this.isOnline() || this.isSpectator() || entity.isClosed()) {
             return false;
         }
