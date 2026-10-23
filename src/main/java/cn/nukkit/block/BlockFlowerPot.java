@@ -76,6 +76,9 @@ public class BlockFlowerPot extends BlockFlowable implements BlockEntityHolder<B
         if (block instanceof BlockStairs stairs) {
             return stairs.isUpsideDown();
         }
+        if (block instanceof BlockLeaves) {
+            return true;
+        }
         return block.isNarrowSurface() || Block.canStayOnFullSolid(block);
     }
 

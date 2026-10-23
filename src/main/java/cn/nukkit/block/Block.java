@@ -1678,10 +1678,18 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return true;
         }
 
+        // Full-cube blocks that report transparent (light-filtering) but still provide a solid top face
+        // 整块但标记为透明的方块（透光），顶面仍是完整支撑面
+        // Leaves are NOT here: wiki marks their support shape empty for most attachables (torches, plates, etc.); only "everything-supporting" blocks like flower pots accept them
+        if (down instanceof BlockShulkerBox) {
+            return true;
+        }
+
         switch (down.getId()) {
             case SCAFFOLDING:
             case HOPPER_BLOCK:
             case TINTED_GLASS:
+            case FROSTED_ICE:
                 return true;
         }
 
