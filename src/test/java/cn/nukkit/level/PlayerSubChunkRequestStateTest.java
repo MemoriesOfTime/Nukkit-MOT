@@ -291,4 +291,62 @@ public class PlayerSubChunkRequestStateTest {
 
         assertEquals(4 * 1024 * 1024, state.remainingResponseBytes(8), "the ledger resets across ticks");
     }
+
+    @Test
+    public void inFlightAcquireClampsAtCapAndReleases() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        assertEquals(200, state.acquireInFlightOffsets(200));
+        assertEquals(PlayerSubChunkRequestState.MAX_IN_FLIGHT_OFFSETS - 200, state.remainingInFlightOffsets());
+        // 部分获批：只给到剩余额度 / partial grant: only the remaining credit
+        int granted = state.acquireInFlightOffsets(100);
+        assertEquals(PlayerSubChunkRequestState.MAX_IN_FLIGHT_OFFSETS - 200, granted);
+        assertEquals(0, state.remainingInFlightOffsets());
+        assertEquals(0, state.acquireInFlightOffsets(1), "a full window grants nothing");
+        assertEquals(0, state.acquireInFlightOffsets(0), "zero asks for nothing");
+
+        state.releaseInFlightOffsets(granted);
+        assertEquals(granted, state.remainingInFlightOffsets());
+        // 释放不向下溢出 / releases never underflow
+        state.releaseInFlightOffsets(1000);
+        assertEquals(0, state.inFlightOffsetCount());
+    }
+
+    @Test
+    public void completionsQueueFifoWithPushFront() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        PlayerSubChunkRequestState.CompletedSubChunkAnswer a = answer(1);
+        PlayerSubChunkRequestState.CompletedSubChunkAnswer b = answer(2);
+        state.offerCompletion(a);
+        state.offerCompletion(b);
+        assertTrue(state.hasCompletions());
+
+        assertSame(a, state.pollCompletion());
+        // 预算耗尽推回队头：下轮先发它 / budget-blocked head goes back to the front
+        state.pushCompletionFront(a);
+        assertSame(a, state.pollCompletion());
+        assertSame(b, state.pollCompletion());
+        assertNull(state.pollCompletion());
+        assertFalse(state.hasCompletions());
+    }
+
+    @Test
+    public void clearBumpsEpochAndResetsInFlightAndCompletions() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        int epochBefore = state.epoch();
+        state.acquireInFlightOffsets(64);
+        PlayerSubChunkRequestState.CompletedSubChunkAnswer stale = answer(1);
+        state.offerCompletion(stale);
+
+        state.clear();
+
+        assertEquals(epochBefore + 1, state.epoch(), "clear invalidates in-flight answers");
+        assertEquals(0, state.inFlightOffsetCount());
+        assertFalse(state.hasCompletions());
+        assertEquals(PlayerSubChunkRequestState.MAX_IN_FLIGHT_OFFSETS, state.remainingInFlightOffsets());
+    }
+
+    private static PlayerSubChunkRequestState.CompletedSubChunkAnswer answer(int tag) {
+        return new PlayerSubChunkRequestState.CompletedSubChunkAnswer(0, new SubChunkRequestPacket(), false,
+                java.util.Collections.emptyList(), null, null, null, tag);
+    }
 }

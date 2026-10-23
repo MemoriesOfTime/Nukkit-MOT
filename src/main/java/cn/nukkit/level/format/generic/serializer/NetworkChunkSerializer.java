@@ -257,16 +257,16 @@ public class NetworkChunkSerializer {
     }
 
     /**
-     * 序列化单个子区块内的方块实体 NBT（子区块拉取响应用；空时返回空数组）。经 chunk 的
-     * section 索引取本段实体，代价与段内实体数同阶而非全列。
+     * 序列化一份方块实体引用快照（主线程取得）的 NBT；异步子区块路径直接传入快照，不再
+     * 触碰区块的 lazy 分节索引（该索引仅主线程重建）。
      * <p>
-     * Serializes the block entity NBT of a single sub-chunk (sub-chunk pull responses;
-     * empty array when none). Reads the section's entities through the chunk's section
-     * index, costing O(entities in this section) rather than O(entities in the column).
+     * Serializes the NBT of a block-entity reference snapshot (taken on the main
+     * thread); the async sub-chunk path passes the snapshot directly instead of touching
+     * the chunk's lazy per-section index (rebuilt on the main thread only).
      */
-    public static byte[] serializeEntitiesForSubChunk(BaseChunk chunk, int protocol, int subIndex, int minSectionY) {
+    public static byte[] serializeBlockEntities(List<BlockEntity> blockEntities, int protocol) {
         List<CompoundTag> tagList = null;
-        for (BlockEntity blockEntity : chunk.getBlockEntitiesOfSection(subIndex + minSectionY)) {
+        for (BlockEntity blockEntity : blockEntities) {
             if (blockEntity instanceof BlockEntitySpawnable) {
                 if (tagList == null) {
                     tagList = new ObjectArrayList<>();

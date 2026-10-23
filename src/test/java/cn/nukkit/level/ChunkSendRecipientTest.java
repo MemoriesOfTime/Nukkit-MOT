@@ -14,10 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.util.HashMap;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class ChunkSendRecipientTest {
@@ -45,8 +41,8 @@ class ChunkSendRecipientTest {
         doReturn(chunk).when(level).getChunkIfLoaded(3, 5);
         doReturn(0).when(level).getDimension();
         player = mock(Player.class);
-        set(Player.class, player, "usedChunks", new HashMap<Long, Boolean>());
-        player.usedChunks.put(hash, false);
+        set(Player.class, player, "usedChunks", new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>());
+        player.usedChunks.put(hash, Boolean.FALSE);
         when(player.getLoaderId()).thenReturn(1);
         when(player.getGameVersion()).thenReturn(GameVersion.V1_20_0);
         when(player.isConnected()).thenReturn(true);
@@ -99,8 +95,8 @@ class ChunkSendRecipientTest {
     @Test
     void stillServesRemainingRecipientWhenAnotherPlayerLeaves() throws Exception {
         Player departed = mock(Player.class);
-        set(Player.class, departed, "usedChunks", new HashMap<Long, Boolean>());
-        departed.usedChunks.put(hash, false);
+        set(Player.class, departed, "usedChunks", new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>());
+        departed.usedChunks.put(hash, Boolean.FALSE);
         when(departed.getLoaderId()).thenReturn(2);
         when(departed.getGameVersion()).thenReturn(GameVersion.V1_20_0);
         when(departed.isConnected()).thenReturn(true);

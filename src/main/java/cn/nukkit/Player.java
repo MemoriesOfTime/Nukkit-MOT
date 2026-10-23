@@ -1527,7 +1527,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 ++count;
 
                 try {
-                    this.usedChunks.put(index, false);
+                    this.usedChunks.put(index, Boolean.FALSE);
                     this.level.registerChunkLoader(this, chunkX, chunkZ, false);
 
                     // 异步区块加载:读取+解码在异步线程完成,区块由主线程 doTick 挂载后下一 tick 再发送,避免主线程同步读取磁盘
@@ -3694,12 +3694,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            // miss 补发先排空：兑现的是已发出的哈希引用，子区块队列可多等一 tick
+            // miss 补发先排空：兑现的是已发出的哈希引用，子区块队列可多等一 tick；
+            // 随后子区块：先发送异步已完成的应答（预算/字节账本内），再按 in-flight 余量提交延期请求
             // / Miss backlog drains first: it fulfills already-sent hash references,
-            // while the sub-chunk queue can wait another tick
+            // while the sub-chunk queue can wait another tick; then sub-chunks: async
+            // completions are sent first (within the entry/byte ledgers), then deferred
+            // requests are submitted with the remaining in-flight credit
             ClientCacheBlobStatusProcessor.drainDeferredMissResponses(this.playerHandle);
 
-            SubChunkRequestProcessor.drainDeferredRequests(this.playerHandle);
+            SubChunkRequestProcessor.tickRequests(this.playerHandle);
 
             if (!this.loadQueue.isEmpty() || !this.spawned) {
                 this.sendNextChunk();
