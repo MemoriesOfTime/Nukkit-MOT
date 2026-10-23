@@ -73,7 +73,10 @@ public class BlockFlowerPot extends BlockFlowable implements BlockEntityHolder<B
     }
 
     private static boolean isSupportValid(Block block) {
-        return block.isSolid() || block.isNarrowSurface() || Block.canStayOnFullSolid(block);
+        if (block instanceof BlockStairs stairs) {
+            return stairs.isUpsideDown();
+        }
+        return block.isNarrowSurface() || Block.canStayOnFullSolid(block);
     }
 
     @Override
