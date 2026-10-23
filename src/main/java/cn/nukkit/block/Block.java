@@ -1681,6 +1681,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         switch (down.getId()) {
             case SCAFFOLDING:
             case HOPPER_BLOCK:
+            case TINTED_GLASS:
                 return true;
         }
 
