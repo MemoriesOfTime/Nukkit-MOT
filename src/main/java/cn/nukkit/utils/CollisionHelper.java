@@ -1,18 +1,12 @@
 package cn.nukkit.utils;
 
 import cn.nukkit.Server;
-import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockBarrier;
-import cn.nukkit.block.BlockBell;
-import cn.nukkit.block.BlockFence;
-import cn.nukkit.block.BlockFenceGate;
-import cn.nukkit.block.BlockUnknown;
-import cn.nukkit.block.BlockWall;
+import cn.nukkit.block.*;
 import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.ChunkSection;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
@@ -944,11 +938,20 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
         }
 
         boolean skipAir = targetBlockId != Block.AIR;
+        boolean standardLevel = level.getClass() == Level.class;
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 FullChunk chunk = chunkAt(level, entity.chunk, x, z);
+                boolean standardChunk = standardLevel && chunk != null && chunk.getClass() == LevelDBChunk.class;
                 for (int y = clampedMinY; y <= clampedMaxY; y++) {
-                    if (skipAir && isAirAt(chunk, x, y, z)) continue;
+                    int id = chunk == null ? Block.AIR : chunk.getBlockId(x & 0xF, y, z & 0xF, 0);
+                    if (skipAir && id == Block.AIR) continue;
+                    // Custom factories may materialise a different id; only built-in paths filter by raw id.
+                    if (standardChunk && id >= 0 && id < CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID
+                            && id != targetBlockId) {
+                        ChunkSection section = ((LevelDBChunk) chunk).getSection(y >> 4);
+                        if (section.getClass() == LevelDBChunkSection.class || section.getClass() == EmptyChunkSection.class) continue;
+                    }
 
                     Block block = level.getBlock(chunk, x, y, z, 0, false);
                     if (block == null || block.getId() != targetBlockId) continue;

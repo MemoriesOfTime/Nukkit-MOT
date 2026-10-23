@@ -9,6 +9,7 @@ import cn.nukkit.block.util.RedstoneToggleHelper;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityRideable;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.item.EntityItem;
@@ -389,6 +390,9 @@ public class Level implements ChunkManager, Metadatable {
             .maximumSize(4096)
             .expireAfterWrite(700, TimeUnit.MILLISECONDS)
             .build();
+
+    /** Live EntityRideable count in this level; lets the per-tick rideable proximity probe skip entirely when zero. */
+    private final AtomicInteger rideableEntityCount = new AtomicInteger();
 
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
@@ -2507,8 +2511,19 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Block getBlock(FullChunk chunk, int x, int y, int z, int layer, boolean load) {
-        int id = 0;
-        int meta = 0;
+        long pair = this.readBlockStatePair(chunk, x, y, z, layer, load);
+        return Block.get((int) (pair >>> 32), (int) pair, this, x, y, z, layer);
+    }
+
+    /**
+     * 读取方块状态对 {@code (id << 32) | meta}，不物化 Block 对象。
+     * <p>
+     * Reads the block state pair {@code (id << 32) | meta} without materialising a Block.
+     * 越界、或 {@code load=false} 且区块未加载时返回 0（空气）；{@code load=true} 会同步加载区块。
+     *
+     * @return 状态对；高 32 位 id，低 32 位 meta
+     */
+    private long readBlockStatePair(FullChunk chunk, int x, int y, int z, int layer, boolean load) {
         if (isYInRange(y)) {
             int cx = x >> 4;
             int cz = z >> 4;
@@ -2525,23 +2540,18 @@ public class Level implements ChunkManager, Metadatable {
                 if (chunk.getClass() == LevelDBChunk.class) {
                     ChunkSection section = ((LevelDBChunk) chunk).getSection(y >> 4);
                     if (section.getClass() == LevelDBChunkSection.class) {
-                        long pair = ((LevelDBChunkSection) section).getBlockStatePair(x & 0xF, y & 0xF, z & 0xF, layer);
-                        id = (int) (pair >>> 32);
-                        meta = (int) pair;
+                        return ((LevelDBChunkSection) section).getBlockStatePair(x & 0xF, y & 0xF, z & 0xF, layer);
                     } else if (section.getClass() != EmptyChunkSection.class) {
                         int[] state = section.getBlockState(x & 0xF, y & 0xF, z & 0xF, layer);
-                        id = state[0];
-                        meta = state[1];
+                        return ((long) state[0] << 32) | (state[1] & 0xFFFFFFFFL);
                     }
                 } else {
                     int[] state = chunk.getBlockState(x & 0xF, y, z & 0xF, layer);
-                    id = state[0];
-                    meta = state[1];
+                    return ((long) state[0] << 32) | (state[1] & 0xFFFFFFFFL);
                 }
             }
         }
-
-        return Block.get(id, meta, this, x, y, z, layer);
+        return 0L;
     }
 
     public synchronized void updateAllLight(Vector3 pos) {
@@ -3599,6 +3609,41 @@ public class Level implements ChunkManager, Metadatable {
         if (entity == null || entity.getLevel() != this) return;
         long chunkKey = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
         entityNearbyCacheDirty.put(chunkKey, true);
+    }
+
+    /**
+     * 骑乘检测专用查询：与 bb 相交的存活 EntityRideable。
+     * <p>
+     * Rideable proximity probe for the entity base tick. Deliberately bypasses
+     * {@link #nearbyEntitiesCache}: that cache is keyed by entity id and serves the
+     * per-entity-constant target-search box, while this probe uses a tiny grown box —
+     * sharing the entries used to evict each other every tick. The live rideable
+     * count check makes the common no-rideables case O(1).
+     */
+    public Entity[] getNearbyRideables(AxisAlignedBB bb, Entity entity) {
+        if (this.rideableEntityCount.get() <= 0) {
+            return EMPTY_ENTITY_ARR;
+        }
+        int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
+        int maxX = NukkitMath.floorDouble((bb.getMaxX() + 2) * 0.0625);
+        int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
+        int maxZ = NukkitMath.floorDouble((bb.getMaxZ() + 2) * 0.0625);
+        Entity[] result = EMPTY_ENTITY_ARR;
+        int count = 0;
+        for (int x = minX; x <= maxX; ++x) {
+            for (int z = minZ; z <= maxZ; ++z) {
+                for (Entity ent : this.getChunkEntities(x, z, false).values()) {
+                    if (ent != entity && ent instanceof EntityRideable && !ent.closed && ent.isAlive()
+                            && ent.boundingBox.intersectsWith(bb)) {
+                        if (count == result.length) {
+                            result = count == 0 ? new Entity[2] : Arrays.copyOf(result, result.length * 2);
+                        }
+                        result[count++] = ent;
+                    }
+                }
+            }
+        }
+        return count == result.length ? result : Arrays.copyOf(result, count);
     }
 
     @NonComputationAtomic
@@ -4896,7 +4941,10 @@ public class Level implements ChunkManager, Metadatable {
             entity.close();
         }
 
-        this.entities.remove(entity.getId());
+        // removeEntity re-enters itself through Entity.close()'s finally; keep the count idempotent.
+        if (this.entities.remove(entity.getId()) != null && entity instanceof EntityRideable) {
+            this.rideableEntityCount.decrementAndGet();
+        }
         this.updateEntities.remove(entity.getId());
     }
 
@@ -4908,7 +4956,9 @@ public class Level implements ChunkManager, Metadatable {
         if (entity instanceof Player) {
             this.players.put(entity.getId(), (Player) entity);
         }
-        this.entities.put(entity.getId(), entity);
+        if (this.entities.put(entity.getId(), entity) == null && entity instanceof EntityRideable) {
+            this.rideableEntityCount.incrementAndGet();
+        }
     }
 
     public void addBlockEntity(BlockEntity blockEntity) {

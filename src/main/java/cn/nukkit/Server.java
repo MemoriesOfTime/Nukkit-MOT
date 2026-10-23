@@ -490,6 +490,8 @@ public class Server {
      * Zero or less disables the throttle.
      */
     public double entityActivationRangeSquared;
+    /** Ticks between target searches for target-less mobs; 1 = per-tick search. See {@code BaseEntity.shouldRunTargetCheck()}. */
+    public int entityTargetSearchInterval = 10;
     /**
      * Strong RakNet level IP bans enabled.
      */
@@ -4111,6 +4113,7 @@ public class Server {
         int activationBlocks = config.entitySettings().activationBlocks();
         // Below 16 blocks a mob could sleep inside a player's own view of it; clamp instead of guessing.
         this.entityActivationRangeSquared = activationBlocks <= 0 ? 0 : (double) Math.max(16, activationBlocks) * Math.max(16, activationBlocks);
+        this.entityTargetSearchInterval = Math.max(1, config.entitySettings().targetSearchInterval());
 
         // World
         this.netherEnabled = config.worldSettings().nether();

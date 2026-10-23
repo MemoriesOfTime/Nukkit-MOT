@@ -74,6 +74,15 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     private static Int2ObjectOpenHashMap<Block>[] statePrototypes = null;
     private static Object[] statePrototypeLocks = null;
 
+    // ID-level jump semantics, built lazily after init(). Two two-bit fields per id:
+    // solidity and passability, each YES / NO / UNKNOWN; plus one FLOWABLE bit.
+    private static final int JUMP_SOLID_YES = 1;
+    private static final int JUMP_SOLID_NO = 2;
+    private static final int JUMP_PASS_YES = 4;
+    private static final int JUMP_PASS_NO = 8;
+    private static final int JUMP_FLOWABLE = 16;
+    private static volatile byte[] jumpSemantics;
+
     public AxisAlignedBB boundingBox = null;
     public int layer = 0;
 
@@ -153,7 +162,137 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                     lightFilter[id] = 1;
                 }
             });
+
+            // Build now, not on the first mob tick: the reflection scan costs tens of ms once.
+            buildJumpSemantics();
         }
+    }
+
+    /**
+     * 判断 id 的方块是否固体（ID 级快速路径，不物化 Block）。
+     * <p>
+     * Whether the block with this id is solid, without materialising a Block. Returns
+     * {@code 1} / {@code 0} only when the id's class inherits the base implementations
+     * (then the answer is meta-independent); ids whose class overrides {@code isSolid()}
+     * — e.g. snow layers, whose solidity depends on the layer count — return {@code -1}
+     * and the caller must materialise. Also {@code -1} before {@link #init()} or for
+     * unregistered / custom ids.
+     */
+    public static int solidState(int id) {
+        if (id == AIR) {
+            // BlockAir overrides isSolid() (to false); air is nonetheless always answerable.
+            return 0;
+        }
+        byte[] flags = jumpSemantics;
+        if (flags == null) {
+            flags = buildJumpSemantics();
+            if (flags == null) {
+                return -1;
+            }
+        }
+        if (id < 0 || id >= flags.length) {
+            return -1;
+        }
+        int flag = flags[id];
+        return (flag & JUMP_SOLID_YES) != 0 ? 1 : (flag & JUMP_SOLID_NO) != 0 ? 0 : -1;
+    }
+
+    /**
+     * 判断 id 的方块是否可穿过（ID 级快速路径，不物化 Block）。
+     * <p>
+     * Whether the block with this id can be passed through, without materialising a
+     * Block. Same contract as {@link #solidState(int)}: {@code -1} means the class
+     * overrides {@code canPassThrough()} (meta-dependent, e.g. snow layers) or is
+     * unknown, and the caller must materialise.
+     */
+    public static int passableState(int id) {
+        if (id == AIR) {
+            // BlockAir overrides canPassThrough() (to true); air is nonetheless always answerable.
+            return 1;
+        }
+        byte[] flags = jumpSemantics;
+        if (flags == null) {
+            flags = buildJumpSemantics();
+            if (flags == null) {
+                return -1;
+            }
+        }
+        if (id < 0 || id >= flags.length) {
+            return -1;
+        }
+        int flag = flags[id];
+        return (flag & JUMP_PASS_YES) != 0 ? 1 : (flag & JUMP_PASS_NO) != 0 ? 0 : -1;
+    }
+
+    /**
+     * 判断 id 的方块是否 {@link BlockFlowable}（类注册固定，无 meta 风险）。
+     * <p>
+     * Whether the block with this id materialises as a {@link BlockFlowable}. The id-to-class
+     * registration is fixed, so unlike {@link #solidState(int)} this never returns "unknown":
+     * unregistered or custom ids are simply not flowable.
+     */
+    public static boolean isFlowableId(int id) {
+        byte[] flags = jumpSemantics;
+        if (flags == null) {
+            flags = buildJumpSemantics();
+        }
+        if (flags == null || id < 0 || id >= flags.length) {
+            return false;
+        }
+        return (flags[id] & JUMP_FLOWABLE) != 0;
+    }
+
+    private static byte[] buildJumpSemantics() {
+        @SuppressWarnings("rawtypes")
+        Class[] list = Block.list;
+        if (list == null) {
+            return null;
+        }
+        byte[] flags = new byte[list.length];
+        for (int id = 0; id < list.length; id++) {
+            Class<?> clazz = list[id];
+            byte flag = 0;
+            if (clazz == null) {
+                continue; // unregistered ids keep both fields empty = UNKNOWN
+            }
+            try {
+                boolean solidOverridden = declaresOverride(clazz, "isSolid");
+                boolean passOverridden = declaresOverride(clazz, "canPassThrough");
+                if (!solidOverridden || !passOverridden) {
+                    Block prototype = Block.get(id);
+                    if (prototype == null || prototype instanceof BlockUnknown) {
+                        flags[id] = 0;
+                        continue;
+                    }
+                    if (!solidOverridden) {
+                        flag |= prototype.isSolid() ? JUMP_SOLID_YES : JUMP_SOLID_NO;
+                    }
+                    if (!passOverridden) {
+                        flag |= prototype.canPassThrough() ? JUMP_PASS_YES : JUMP_PASS_NO;
+                    }
+                }
+            } catch (Throwable ignored) {
+                flag = 0;
+            }
+            if (BlockFlowable.class.isAssignableFrom(clazz)) {
+                flag |= JUMP_FLOWABLE;
+            }
+            flags[id] = flag;
+        }
+        jumpSemantics = flags;
+        return flags;
+    }
+
+    /** Whether {@code start} or any class below {@code Block} in its hierarchy declares a no-arg method with this name. */
+    private static boolean declaresOverride(Class<?> start, String name) {
+        for (Class<?> c = start; c != null && c != Block.class; c = c.getSuperclass()) {
+            for (java.lang.reflect.Method method : c.getDeclaredMethods()) {
+                if (method.getName().equals(name) && method.getParameterCount() == 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

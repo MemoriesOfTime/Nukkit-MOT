@@ -7,13 +7,14 @@ import cn.nukkit.block.BlockStone;
 import cn.nukkit.entity.mob.EntityWitch;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.Vector3;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.Vector3;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class EntityWitchRouteDistanceTest {
     @Test
@@ -85,15 +86,24 @@ class EntityWitchRouteDistanceTest {
 
     private static EntityWitch jumpingWitch() {
         EntityWitch witch = witch(2, enemy(10));
-        Block origin = mock(Block.class);
-        Block obstacle = mock(Block.class);
-        when(witch.getLevel()).thenReturn(witch.level);
         when(witch.getGravity()).thenReturn(0.08f);
         when(witch.getHorizontalFacing()).thenReturn(BlockFace.SOUTH);
-        when(witch.level.getBlock(any(Vector3.class))).thenReturn(origin);
-        when(origin.getSide(BlockFace.SOUTH)).thenReturn(obstacle);
-        when(origin.up(2)).thenReturn(new BlockAir());
-        when(obstacle.up()).thenReturn(new BlockAir());
+        // The obstacle is the cell one block south of the witch at foot level; everything else is air.
+        when(witch.level.getBlock(anyInt(), anyInt(), anyInt())).thenAnswer(inv -> {
+            int x = inv.getArgument(0);
+            int y = inv.getArgument(1);
+            int z = inv.getArgument(2);
+            Block block = y == 64 && z == 1 ? new BlockStone() : new BlockAir();
+            block.level = witch.level;
+            block.setComponents(x, y, z);
+            return block;
+        });
+        when(witch.level.getBlock(any(Vector3.class))).thenAnswer(inv -> {
+            Vector3 position = inv.getArgument(0);
+            return witch.level.getBlock(position.getFloorX(), position.getFloorY(), position.getFloorZ());
+        });
+        when(witch.level.getBlock(anyInt(), anyInt(), anyInt(), anyInt())).thenAnswer(inv ->
+                witch.level.getBlock((int) inv.getArgument(0), inv.getArgument(1), inv.getArgument(2)));
         when(witch.checkJump(anyDouble(), anyDouble())).thenCallRealMethod();
         return witch;
     }
@@ -121,9 +131,12 @@ class EntityWitchRouteDistanceTest {
         witch.followTarget = enemy;
         witch.moveMultiplier = 1;
         when(witch.getServer()).thenReturn(server);
+        when(witch.getLevel()).thenReturn(level);
         when(server.getMobAiEnabled()).thenReturn(true);
         when(witch.isInTickingRange()).thenReturn(true);
         when(witch.getLevelBlock()).thenReturn(new BlockAir());
+        when(witch.getBuiltinBlockIdAt(anyInt(), anyInt(), anyInt(), anyInt())).thenCallRealMethod();
+        when(level.getBlock(anyInt(), anyInt(), anyInt())).thenReturn(new BlockAir());
         when(witch.getFloorY()).thenReturn(64);
         when(level.getBlock(nullable(FullChunk.class), anyInt(), anyInt(), anyInt(), eq(false))).thenReturn(ground);
         when(witch.getSpeed()).thenReturn(1.0);
