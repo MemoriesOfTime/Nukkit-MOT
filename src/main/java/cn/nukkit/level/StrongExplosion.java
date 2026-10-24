@@ -172,15 +172,18 @@ public class StrongExplosion extends Explosion {
                 double impact = (1 - distance) * exposure;
                 int damage = this.doesDamage ? (int) (((impact * impact + impact) / 2) * 8 * explosionSize + 1) : 0;
 
+                EntityDamageEvent damageEvent;
                 if (this.sourceObject instanceof ExplosionSource.EntitySource es) {
-                    entity.attack(new EntityDamageByEntityEvent(es.entity(), entity, DamageCause.ENTITY_EXPLOSION, damage));
+                    damageEvent = new EntityDamageByEntityEvent(es.entity(), entity, DamageCause.ENTITY_EXPLOSION, damage);
                 } else if (this.sourceObject instanceof ExplosionSource.BlockSource bs) {
-                    entity.attack(new EntityDamageByBlockEvent(bs.block(), entity, DamageCause.BLOCK_EXPLOSION, damage));
+                    damageEvent = new EntityDamageByBlockEvent(bs.block(), entity, DamageCause.BLOCK_EXPLOSION, damage);
                 } else {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.BLOCK_EXPLOSION, damage));
+                    damageEvent = new EntityDamageEvent(entity, DamageCause.BLOCK_EXPLOSION, damage);
                 }
 
-                if (!(entity instanceof EntityItem || entity instanceof EntityXPOrb)) {
+                entity.attack(damageEvent);
+
+                if (!damageEvent.isCancelled() && !(entity instanceof EntityItem || entity instanceof EntityXPOrb)) {
                     entity.setMotion(motion.multiply(impact));
                 }
             }
