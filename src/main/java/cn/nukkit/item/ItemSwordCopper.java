@@ -33,6 +33,6 @@ public class ItemSwordCopper extends StringItemToolBase {
 
     @Override
     public int getAttackDamage() {
-        return 5;
+        return 6;
     }
 }

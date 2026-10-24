@@ -35,6 +35,6 @@ public class ItemPickaxeGold extends ItemTool {
 
     @Override
     public int getAttackDamage() {
-        return 2;
+        return 3;
     }
 }
