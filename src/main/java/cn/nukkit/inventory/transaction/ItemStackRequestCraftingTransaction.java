@@ -44,7 +44,7 @@ public class ItemStackRequestCraftingTransaction extends CraftingTransaction {
     @Override
     public void setInput(Item item) {
         for (Item existing : this.inputs) {
-            if (existing.equals(item, item.hasMeta(), item.hasCompoundTag())) {
+            if (existing.equals(item, item.hasMeta(), true)) {
                 existing.setCount(existing.getCount() + item.getCount());
                 return;
             }
