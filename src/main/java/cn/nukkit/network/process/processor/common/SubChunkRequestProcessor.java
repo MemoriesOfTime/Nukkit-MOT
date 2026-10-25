@@ -216,9 +216,9 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             try {
                 executor.execute(() -> runSerializationTask(task));
             } catch (RejectedExecutionException e) {
-                // 执行器已关停（世界卸载/服停中）：同步兜底，不让请求丢失
-                // / Executor shut down (level unloading / server stopping): synchronous
-                // fallback so the request is not lost
+                // 执行器已关停(仅服停,世界卸载不再关停共享池)：同步兜底,不让请求丢失
+                // / Executor shut down (server stop only; world unload no longer stops the shared
+                // pool): synchronous fallback so the request is not lost
                 dispatchAnswer(playerHandle, state, buildAnswerSafely(task));
             }
         }

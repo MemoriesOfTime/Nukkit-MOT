@@ -338,7 +338,6 @@ public class NetworkChunkSerializer {
         }
     }
 
-    @AllArgsConstructor
     @Data
     public static class NetworkChunkSerializerCallbackData {
         private GameVersion gameVersion;
@@ -350,9 +349,35 @@ public class NetworkChunkSerializer {
         private List<byte[]> subChunkBlobs;
         private byte[] biomes;
         private byte[] blockEntities;
+        /**
+         * 提交代次：主线程据此丢弃被超时重试取代的旧结果；0 表示未携带，不参与校验。
+         * <p>
+         * Submit generation: the main thread drops results superseded by a timeout retry;
+         * 0 means absent and disables the check.
+         */
+        private long sequence;
 
         public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
             this(gameVersion, timestamp, x, z, subChunkCount, payload, null, null, null);
+        }
+
+        public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                                  List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities) {
+            this(gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, 0L);
+        }
+
+        public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                                  List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence) {
+            this.gameVersion = gameVersion;
+            this.timestamp = timestamp;
+            this.x = x;
+            this.z = z;
+            this.subChunkCount = subChunkCount;
+            this.payload = payload;
+            this.subChunkBlobs = subChunkBlobs;
+            this.biomes = biomes;
+            this.blockEntities = blockEntities;
+            this.sequence = sequence;
         }
     }
 }

@@ -75,7 +75,6 @@ import cn.nukkit.utils.collection.nb.LongObjectEntry;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.*;
@@ -460,6 +459,15 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private ExecutorService asyncChunkLoadExecutor;
+    // 每世界在飞异步读取上限,为共享池提供背压(取代原每世界有界队列)
+    // Per-level in-flight cap for async reads, backpressure for the shared pool (replaces the old bounded queue)
+    private Semaphore asyncChunkLoadSlots;
+    // 已开始执行(含原生读)的任务数;close 排空只等这些,不排队的
+    // Tasks that have started executing (native read included); close drains only these, never queued ones
+    private final AtomicInteger runningAsyncChunkLoads = new AtomicInteger();
+    // 排空超时;包内可变以便测试注入(生产只读,volatile 保证注入后可见)
+    // Drain timeout; mutable for tests (read-only in production, volatile so an injection is visible)
+    volatile long asyncChunkLoadDrainTimeoutMillis = 10_000L;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
     // 序列化失败时投递回主线程清理 tasks(tasks 非线程安全,async 线程不能直接碰)
@@ -468,6 +476,15 @@ public class Level implements ChunkManager, Metadatable {
 
     // 任务提交 tick,用于超时自愈 / Submit tick for timeout self-healing
     private final Long2LongOpenHashMap chunkSendTaskStartTick = new Long2LongOpenHashMap();
+
+    // 区块发送代次(仅主线程读写):超时重试时递增,使仍在飞的旧序列化结果失效。
+    // 存值恒 ≥2(首轮跳 2、后续 +1),提交点传 max(1, 代次),0 留给不回传代次的第三方路径。
+    // 仅超时过的区块有条目,量级远小于总区块数,故不随发送完成清理。
+    // Chunk send generation (main thread only): bumped on timeout retries to drop in-flight
+    // older serializations. Values are always ≥2 (first bump lands at 2), submissions carry
+    // max(1, generation), and 0 stays free for third parties that don't echo it. Only timed-out
+    // chunks carry entries, so the map is never cleared.
+    private final Long2LongOpenHashMap chunkSendGeneration = new Long2LongOpenHashMap();
 
     /**
      * 连接/角落位驱动的方块 id 白名单（楼梯/栅栏/玻璃板/铁栏/绊线），延迟初始化。
@@ -585,10 +602,13 @@ public class Level implements ChunkManager, Metadatable {
         this.antiXray = Server.antiXrayWorlds.contains(name);
 
         if (this.server.asyncChunkSending) {
-            this.asyncChuckExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("AsyncChunkThread for " + name).build());
-            this.asyncChunkLoadExecutor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-                    new ArrayBlockingQueue<>(Math.max(16, this.chunkGenerationQueueSize)),
-                    new ThreadFactoryBuilder().setNameFormat("AsyncChunkLoadThread for " + name).build());
+            // 全服共享双 lane 池:忙世界可借闲世界的核,而非各自 1 线程
+            // Server-wide shared lanes: a busy world borrows idle worlds' cores instead of one thread each
+            this.asyncChuckExecutor = this.server.getChunkSerializationPool();
+            this.asyncChunkLoadExecutor = this.server.getWorldChunkLoadPool();
+            // 上限沿用原每世界队列容量公式
+            // Cap reuses the old per-level queue capacity formula
+            this.asyncChunkLoadSlots = new Semaphore(Math.max(16, this.chunkGenerationQueueSize));
         }
 
         // 注册方块变更回调，用于清理红石 override 标记 (issue #782)
@@ -755,28 +775,7 @@ public class Level implements ChunkManager, Metadatable {
         boolean interrupted = false;
         this.providerLock.writeLock().lock();
         try {
-            for (ExecutorService executor : new ExecutorService[]{this.asyncChunkLoadExecutor, this.asyncChuckExecutor}) {
-                if (executor == null) {
-                    continue;
-                }
-                // 有界关闭:先优雅排空 in-flight 异步区块读取,超时则 shutdownNow 再做一次有界等待;绝不无界等待,
-                // 避免任务卡在不可中断 I/O(垂死磁盘 / NFS / LevelDB JNI)时持有 providerLock 永久挂起关服与后续存档
-                // Bounded shutdown: drain in-flight async chunk reads, then shutdownNow + one more bounded await on timeout; never waits
-                // unbounded, so a task wedged in uninterruptible I/O (dying disk / NFS / LevelDB JNI) cannot hang level close (and the save after it) forever while holding providerLock
-                executor.shutdown();
-                try {
-                    if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
-                        this.server.getLogger().warning("Async chunk executor for level " + this.getName() + " did not terminate in time, forcing shutdown");
-                        executor.shutdownNow();
-                        if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                            this.server.getLogger().warning("Async chunk executor for level " + this.getName() + " did not terminate even after forced shutdown; abandoning drain");
-                        }
-                    }
-                } catch (InterruptedException e) {
-                    executor.shutdownNow();
-                    interrupted = true;
-                }
-            }
+            interrupted = this.drainAsyncChunkLoads();
             LevelProvider levelProvider = this.provider;
             if (levelProvider != null) {
                 if (this.autoSave) {
@@ -806,6 +805,40 @@ public class Level implements ChunkManager, Metadatable {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    /**
+     * 有界排空本世界的异步区块读取:先批量失效 pending(排队未启动的任务此后空转,
+     * 卸载不等他世界排入共享池的任务),再只等已在跑的原生读取;超时即放弃,迟到任务由
+     * provider 的 closed 守卫安全空转,不无界挂起关服。序列化 lane 只碰主线程快照,无需等待。
+     * 返回是否被中断。
+     * <p>
+     * Bounded drain: invalidate all pending first (queued tasks no-op; the close never waits
+     * behind other worlds' queued work), then wait only for native reads already running; on
+     * timeout, abandon — late tasks no-op safely through the provider's closed guard. The
+     * serialization lane only touches main-thread snapshots and needs no wait.
+     * Returns whether interrupted.
+     */
+    boolean drainAsyncChunkLoads() {
+        if (this.asyncChunkLoadExecutor == null) {
+            return false;
+        }
+        for (PendingChunkLoad pending : this.pendingChunkLoads.values()) {
+            pending.invalidated = true;
+        }
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(this.asyncChunkLoadDrainTimeoutMillis);
+        while (this.runningAsyncChunkLoads.get() > 0) {
+            if (System.nanoTime() - deadline >= 0) {
+                this.server.getLogger().warning("Async chunk loads for level " + this.getName() + " did not drain in time, abandoning wait");
+                return false;
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void addSound(Vector3 pos, String sound) {
@@ -1428,6 +1461,11 @@ public class Level implements ChunkManager, Metadatable {
             NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
+                // 被超时重试取代:并行 lane 下旧任务可能晚于新任务返回,丢掉免得旧快照落地客户端
+                // Superseded by a timeout retry: with the parallel lane an older task can land last
+                if (this.isSupersededChunkCallback(data)) {
+                    continue;
+                }
                 this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload(),
                         data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities());
             }
@@ -4501,6 +4539,9 @@ public class Level implements ChunkManager, Metadatable {
                     server.getLogger().warning("Chunk send task timed out for index " + index + " in level " + this.getName() + ", forcing retry");
                     tasks.remove(index);
                     this.chunkSendTaskStartTick.remove(index);
+                    // 首轮跳到 2 而非 1:首轮提交已带 1,落 1 则新旧同号无法区分
+                    // Jump to 2 on the first bump: submissions already carry 1, so 1 would collide with the retry
+                    this.chunkSendGeneration.addTo(index, this.chunkSendGeneration.get(index) == 0L ? 2L : 1L);
                 }
                 if (!tasks.contains(index) && queue.containsKey(index)) {
                     chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
@@ -4713,7 +4754,9 @@ public class Level implements ChunkManager, Metadatable {
             }
 
             this.chunkSendTaskStartTick.put(index, this.server.getTick());
-            this.requireProvider().requestChunkTask(protocols, x, z);
+            // 代次下限 1:首轮提交的迟到回调在首轮超时后也能判旧;0 留给不回传代次的第三方
+            // Floored at 1 so a first submission's late callback is droppable too; 0 is reserved for third parties
+            this.requireProvider().requestChunkTask(protocols, x, z, Math.max(1L, this.chunkSendGeneration.get(index)));
         }
     }
 
@@ -4723,8 +4766,27 @@ public class Level implements ChunkManager, Metadatable {
 
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
                                           List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities) {
+        this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, 0L);
+    }
+
+    /**
+     * async 线程调用,携带提交代次入队。/ Async-thread entry carrying the submit generation.
+     */
+    public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                          List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence) {
         this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(
-                gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities));
+                gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence));
+    }
+
+    /**
+     * 该异步结果是否已被超时重试取代(主线程调用);序号 0(第三方不回传)不参与校验。
+     * <p>
+     * Whether this async result was superseded by a timeout retry (main thread);
+     * sequence 0 (third-party, not echoed) is exempt.
+     */
+    boolean isSupersededChunkCallback(NetworkChunkSerializer.NetworkChunkSerializerCallbackData data) {
+        long sequence = data.getSequence();
+        return sequence != 0L && sequence < this.chunkSendGeneration.get(Level.chunkHash(data.getX(), data.getZ()));
     }
 
     /**
@@ -5092,10 +5154,11 @@ public class Level implements ChunkManager, Metadatable {
 
     /**
      * 提交异步区块读取(玩家发送路径专用);读取+解码在异步线程,挂载在主线程 doTick 中完成。
-     * 返回 false 表示未受理(不支持/executor 已关),调用方应回退同步路径;true 表示已在加载或已加载。
+     * 返回 false 表示未受理(不支持/executor 已关/本世界在飞上限已满),调用方应回退同步路径;true 表示已在加载或已加载。
      * <p>
-     * Submit an async chunk read (player chunk-sending path); read+decode off-thread, mounting in doTick.
-     * Returns false if rejected (unsupported/executor down) so the caller falls back to the sync path; true if pending or already loaded.
+     * Submits an async chunk read (player chunk-sending path); read+decode off-thread, mounting in doTick.
+     * Returns false if rejected (unsupported/executor down/per-level in-flight cap reached) so the caller
+     * falls back to the sync path; true if pending or already loaded.
      */
     public boolean requestChunkLoadAsync(int x, int z) {
         LevelProvider levelProvider = this.getProvider();
@@ -5109,9 +5172,15 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         return this.pendingChunkLoads.computeIfAbsent(index, hash -> {
+            // 共享池的每世界背压:满额回退同步路径,防单世界灌满
+            // Per-level backpressure on the shared pool: fall back to the sync path when full
+            if (!this.asyncChunkLoadSlots.tryAcquire()) {
+                return null;
+            }
             PendingChunkLoad pending = new PendingChunkLoad(x, z, hash, levelProvider);
             try {
                 this.asyncChunkLoadExecutor.execute(() -> {
+                    this.runningAsyncChunkLoads.incrementAndGet();
                     try {
                         if (pending.invalidated) {
                             return;
@@ -5125,9 +5194,12 @@ public class Level implements ChunkManager, Metadatable {
                         }
                     } finally {
                         this.completedChunkLoads.add(pending);
+                        this.asyncChunkLoadSlots.release();
+                        this.runningAsyncChunkLoads.decrementAndGet();
                     }
                 });
             } catch (RejectedExecutionException e) {
+                this.asyncChunkLoadSlots.release();
                 return null;
             }
             return pending;

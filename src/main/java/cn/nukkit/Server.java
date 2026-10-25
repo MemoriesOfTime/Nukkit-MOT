@@ -549,7 +549,7 @@ public class Server {
      * <p>
      * 异步区块发送、加载与保存(实验性)
      */
-    public boolean asyncChunkSending;
+    public volatile boolean asyncChunkSending;
     /**
      * 每世界挂起区块写上限,超限暂停卸载(背压)
      * <p>
@@ -612,6 +612,20 @@ public class Server {
      * This is needed for structure generation
      */
     public final ForkJoinPool computeThreadPool;
+    /**
+     * 全世界共享的区块序列化池(CPU lane):全区块/子区块网络序列化。
+     * 懒建以支持配置热重载后打开 async-chunks;async-chunks 关闭时为 null。
+     * <p>
+     * Shared by all worlds: chunk and sub-chunk network serialization (CPU lane).
+     * Created lazily so a config reload can still turn async-chunks on; null when it is off.
+     */
+    private volatile ForkJoinPool chunkSerializationPool;
+    /**
+     * 全世界共享的世界 I/O 池:异步区块读取(后续接入 LevelDB 写)。懒建,语义同上。
+     * <p>
+     * Shared by all worlds: async chunk reads (LevelDB writes later). Lazily created; same semantics as above.
+     */
+    private volatile ForkJoinPool worldChunkLoadPool;
     /**
      * Set LevelDB cache size.
      */
@@ -1483,6 +1497,90 @@ public class Server {
         isRunning.compareAndSet(true, false);
     }
 
+    /**
+     * 懒建取池:热重载打开 async-chunks 后新建世界仍能取到;关闭时为 null。
+     * <p>
+     * Lazily created so levels made after a reload turns async-chunks on still get a pool; null while it is off.
+     */
+    public ExecutorService getChunkSerializationPool() {
+        ForkJoinPool pool = this.chunkSerializationPool;
+        if (pool != null || !this.asyncChunkSending) {
+            return pool;
+        }
+        synchronized (this) {
+            if (this.chunkSerializationPool == null) {
+                this.chunkSerializationPool = createWorldIOPool(
+                        Math.max(2, Math.min(8, Runtime.getRuntime().availableProcessors() - 1)), "ChunkSerialization");
+            }
+            return this.chunkSerializationPool;
+        }
+    }
+
+    /**
+     * 懒建,语义同上 / Lazily created; same semantics as above.
+     */
+    public ExecutorService getWorldChunkLoadPool() {
+        ForkJoinPool pool = this.worldChunkLoadPool;
+        if (pool != null || !this.asyncChunkSending) {
+            return pool;
+        }
+        synchronized (this) {
+            if (this.worldChunkLoadPool == null) {
+                // I/O 密集只取半数核,留核给主线程与序列化 lane / I/O-bound: half the cores, saving the rest for the main thread and serialization
+                this.worldChunkLoadPool = createWorldIOPool(
+                        Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors() >> 1)), "ChunkLoad");
+            }
+            return this.worldChunkLoadPool;
+        }
+    }
+
+    /**
+     * 弹性共享 lane:asyncMode 的 ForkJoinPool,线程按负载 0→上限 增长、空闲自动收缩;
+     * daemon 保证卡死的原生 I/O 不阻塞进程退出。上限按核数自动确定(弹性池错配代价低,不设配置项)。
+     * <p>
+     * Elastic shared lane: an async-mode ForkJoinPool whose workers grow 0→parallelism with
+     * load and idle out when quiet; daemon threads keep a wedged native task from blocking exit.
+     * The cap is auto-sized from the core count (an elastic mis-cap costs little; no config knob).
+     */
+    static ForkJoinPool createWorldIOPool(int parallelism, String laneName) {
+        AtomicInteger workerCount = new AtomicInteger();
+        return new ForkJoinPool(parallelism,
+                pool -> {
+                    ForkJoinWorkerThread worker = new ForkJoinWorkerThread(pool) {};
+                    worker.setName(laneName + " Worker-" + workerCount.incrementAndGet());
+                    worker.setDaemon(true);
+                    return worker;
+                },
+                (thread, ex) -> log.error("Exception in " + thread.getName(), ex),
+                true);
+    }
+
+    /**
+     * 有界关闭共享 lane:先优雅排空,超时 shutdownNow 再等一次;卡在不可中断原生 I/O 的
+     * 任务由 daemon 属性兜底,不阻塞进程退出。
+     * <p>
+     * Bounded shutdown of a shared lane: graceful drain first, then shutdownNow with one more
+     * bounded wait; a task wedged in uninterruptible native I/O is covered by the daemon flag.
+     */
+    private static void shutdownWorldIOPool(ExecutorService pool, String laneName) {
+        if (pool == null) {
+            return;
+        }
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+                log.warn("{} pool did not terminate in time, forcing shutdown", laneName);
+                pool.shutdownNow();
+                if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+                    log.warn("{} pool did not terminate even after forced shutdown; abandoning drain", laneName);
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            pool.shutdownNow();
+        }
+    }
+
     public void forceShutdown() {
         this.forceShutdown(this.getPropertyString("shutdown-message", "§cServer closed").replace("§n", "\n"));
     }
@@ -1534,6 +1632,11 @@ public class Server {
             this.scheduler.cancelAllTasks();
             this.scheduler.mainThreadHeartbeat(Integer.MAX_VALUE);
             this.scheduler.shutdown();
+
+            this.getLogger().debug("Shutting down world I/O pools...");
+            // 世界只排空各自 in-flight,池在此统一关闭 / Levels drain their own in-flight work; the shared pools close here
+            shutdownWorldIOPool(this.chunkSerializationPool, "chunk serialization");
+            shutdownWorldIOPool(this.worldChunkLoadPool, "world I/O");
 
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
