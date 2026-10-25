@@ -257,16 +257,16 @@ public class NetworkChunkSerializer {
     }
 
     /**
-     * 序列化单个子区块内的方块实体 NBT（子区块拉取响应用；空时返回空数组）。经 chunk 的
-     * section 索引取本段实体，代价与段内实体数同阶而非全列。
+     * 序列化一份方块实体引用快照（主线程取得）的 NBT；异步子区块路径直接传入快照，不再
+     * 触碰区块的 lazy 分节索引（该索引仅主线程重建）。
      * <p>
-     * Serializes the block entity NBT of a single sub-chunk (sub-chunk pull responses;
-     * empty array when none). Reads the section's entities through the chunk's section
-     * index, costing O(entities in this section) rather than O(entities in the column).
+     * Serializes the NBT of a block-entity reference snapshot (taken on the main
+     * thread); the async sub-chunk path passes the snapshot directly instead of touching
+     * the chunk's lazy per-section index (rebuilt on the main thread only).
      */
-    public static byte[] serializeEntitiesForSubChunk(BaseChunk chunk, int protocol, int subIndex, int minSectionY) {
+    public static byte[] serializeBlockEntities(List<BlockEntity> blockEntities, int protocol) {
         List<CompoundTag> tagList = null;
-        for (BlockEntity blockEntity : chunk.getBlockEntitiesOfSection(subIndex + minSectionY)) {
+        for (BlockEntity blockEntity : blockEntities) {
             if (blockEntity instanceof BlockEntitySpawnable) {
                 if (tagList == null) {
                     tagList = new ObjectArrayList<>();
@@ -338,7 +338,6 @@ public class NetworkChunkSerializer {
         }
     }
 
-    @AllArgsConstructor
     @Data
     public static class NetworkChunkSerializerCallbackData {
         private GameVersion gameVersion;
@@ -350,9 +349,35 @@ public class NetworkChunkSerializer {
         private List<byte[]> subChunkBlobs;
         private byte[] biomes;
         private byte[] blockEntities;
+        /**
+         * 提交代次：主线程据此丢弃被超时重试取代的旧结果；0 表示未携带，不参与校验。
+         * <p>
+         * Submit generation: the main thread drops results superseded by a timeout retry;
+         * 0 means absent and disables the check.
+         */
+        private long sequence;
 
         public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
             this(gameVersion, timestamp, x, z, subChunkCount, payload, null, null, null);
+        }
+
+        public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                                  List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities) {
+            this(gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, 0L);
+        }
+
+        public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                                  List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence) {
+            this.gameVersion = gameVersion;
+            this.timestamp = timestamp;
+            this.x = x;
+            this.z = z;
+            this.subChunkCount = subChunkCount;
+            this.payload = payload;
+            this.subChunkBlobs = subChunkBlobs;
+            this.biomes = biomes;
+            this.blockEntities = blockEntities;
+            this.sequence = sequence;
         }
     }
 }

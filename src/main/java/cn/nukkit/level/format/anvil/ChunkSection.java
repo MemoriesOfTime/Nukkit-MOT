@@ -612,23 +612,37 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         }
     }
 
+    /**
+     * 读锁与写侧 {@code sectionLock.writeLock()} 配对，使异步子区块序列化读到的是原子快照
+     * （方块编辑只持写锁，列表监视器单独并不排斥它）；锁序 readLock → storage 监视器与写侧一致。
+     * <p>
+     * The read lock pairs with the mutators' {@code sectionLock.writeLock()} so async
+     * sub-chunk serialization reads an atomic snapshot (block edits hold only the write
+     * lock; the list monitor alone does not exclude them); the order readLock → storage
+     * monitor matches the write side.
+     */
     @Override
     public void writeTo(GameVersion gameVersion, BinaryStream stream, boolean antiXray) {
-        synchronized (storage) {
-            if (gameVersion.getProtocol() >= ProtocolInfo.v1_19_80) {
-                stream.putByte((byte) 9);
-                stream.putByte((byte) storage.size());
-                stream.putByte((byte) this.y);
-            } else {
-                stream.putByte((byte) STREAM_STORAGE_VERSION);
-                stream.putByte((byte) storage.size());
-            }
-            for (BlockStorage blockStorage : storage) {
-                if (blockStorage == null) {
-                    blockStorage = new BlockStorage();
+        sectionLock.readLock().lock();
+        try {
+            synchronized (storage) {
+                if (gameVersion.getProtocol() >= ProtocolInfo.v1_19_80) {
+                    stream.putByte((byte) 9);
+                    stream.putByte((byte) storage.size());
+                    stream.putByte((byte) this.y);
+                } else {
+                    stream.putByte((byte) STREAM_STORAGE_VERSION);
+                    stream.putByte((byte) storage.size());
                 }
-                blockStorage.writeTo(gameVersion, stream, antiXray);
+                for (BlockStorage blockStorage : storage) {
+                    if (blockStorage == null) {
+                        blockStorage = new BlockStorage();
+                    }
+                    blockStorage.writeTo(gameVersion, stream, antiXray);
+                }
             }
+        } finally {
+            sectionLock.readLock().unlock();
         }
     }
 

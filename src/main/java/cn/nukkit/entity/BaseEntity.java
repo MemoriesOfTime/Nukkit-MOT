@@ -224,6 +224,24 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return this.lookupForTarget;
     }
 
+    /**
+     * 无目标时仅对候选扫描按实体相位降频；游走和休息仍逐 tick 更新。
+     * 补偿更新也覆盖跨过的搜索相位。
+     * <p>
+     * Phase-spread candidate scans, including caught-up ticks; wandering and resting still update every tick.
+     */
+    protected boolean shouldRunTargetCheck() {
+        if (this.followTarget != null || this.target instanceof EntityCreature || this.isKnockback() || this.attackTime > 0) {
+            return true;
+        }
+        int interval = this.server.entityTargetSearchInterval;
+        if (interval <= 1) {
+            return true;
+        }
+        int tickDiff = Math.max(1, this.lastBaseTickDiff);
+        return hitsResidue((long) this.age - tickDiff + 1 + this.id % interval, tickDiff, interval, 0);
+    }
+
     public void setLookupForTarget(boolean lookupForTarget) {
         this.lookupForTarget = lookupForTarget;
     }

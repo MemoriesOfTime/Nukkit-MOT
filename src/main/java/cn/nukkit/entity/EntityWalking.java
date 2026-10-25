@@ -9,8 +9,10 @@ import cn.nukkit.entity.passive.EntitySkeletonHorse;
 import cn.nukkit.entity.route.RouteFinder;
 import cn.nukkit.entity.route.RouteFinderSearchTask;
 import cn.nukkit.entity.route.RouteFinderThreadPool;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -40,31 +42,34 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
+        boolean searchForTarget = this.shouldRunTargetCheck();
         this.followTarget = null;
 
         if (!this.passengers.isEmpty() && !(this instanceof EntityLlama) && !(this instanceof EntityPig)) {
             return;
         }
 
-        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
-            if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
-                continue;
-            }
+        if (searchForTarget) {
+            for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
+                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
+                    continue;
+                }
 
-            if (creature instanceof BaseEntity baseEntity && baseEntity.isFriendly() == this.isFriendly() && !this.isInLove()) {
-                continue;
-            }
+                if (creature instanceof BaseEntity baseEntity && baseEntity.isFriendly() == this.isFriendly() && !this.isInLove()) {
+                    continue;
+                }
 
-            double distance = this.distanceSquared(creature);
-            if (!this.targetOption(creature, distance)) {
-                continue;
-            }
+                double distance = this.distanceSquared(creature);
+                if (!this.targetOption(creature, distance)) {
+                    continue;
+                }
 
-            this.stayTime = 0;
-            this.moveTime = 0;
-            this.followTarget = creature;
-            if (this.route == null && this.passengers.isEmpty()) {
-                this.target = creature;
+                this.stayTime = 0;
+                this.moveTime = 0;
+                this.followTarget = creature;
+                if (this.route == null && this.passengers.isEmpty()) {
+                    this.target = creature;
+                }
             }
         }
 
@@ -115,6 +120,22 @@ public abstract class EntityWalking extends BaseEntity {
         }
     }
 
+    private boolean isSolidBlockAt(Level level, int id, int x, int y, int z) {
+        int state = Block.solidState(id);
+        if (state >= 0) {
+            return state == 1;
+        }
+        return level.getBlock(x, y, z).isSolid();
+    }
+
+    private boolean isPassableBlockAt(Level level, int id, int x, int y, int z) {
+        int state = Block.passableState(id);
+        if (state >= 0) {
+            return state == 1;
+        }
+        return level.getBlock(x, y, z).canPassThrough();
+    }
+
     protected boolean checkJump(double dx, double dz) {
         if (this.motionY == this.getGravity() * 2) {
             return this.canSwimIn(level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z)));
@@ -131,31 +152,70 @@ public abstract class EntityWalking extends BaseEntity {
             return false;
         }
 
-        Block that = this.getLevel().getBlock(new Vector3(NukkitMath.floorDouble(this.x + dx), (int) this.y, NukkitMath.floorDouble(this.z + dz)));
-        /*if (this.getDirection() == null) {
-            return false;
-        }*/
+        Level level = this.level;
+        int thatX = NukkitMath.floorDouble(this.x + dx);
+        int thatY = (int) this.y;
+        int thatZ = NukkitMath.floorDouble(this.z + dz);
+        BlockFace face = this.getHorizontalFacing();
+        int blockX = thatX + face.getXOffset();
+        int blockY = thatY;
+        int blockZ = thatZ + face.getZOffset();
+        int blockId = this.getBuiltinBlockIdAt(blockX, blockY, blockZ, 0);
+        int downId = this.getBuiltinBlockIdAt(blockX, blockY - 1, blockZ, 0);
+        int downDownId = this.getBuiltinBlockIdAt(blockX, blockY - 2, blockZ, 0);
+        int upId = this.getBuiltinBlockIdAt(blockX, blockY + 1, blockZ, 0);
+        int thatUpId = this.getBuiltinBlockIdAt(thatX, thatY + 2, thatZ, 0);
+        // Fall back as a group: custom blocks may override neighbour reads.
+        if (blockId < 0 || downId < 0 || downDownId < 0 || upId < 0 || thatUpId < 0
+                || this.getBuiltinBlockIdAt(thatX, thatY, thatZ, 0) < 0) {
+            return this.checkJumpUsingBlocks(thatX, thatY, thatZ, face);
+        }
 
-        Block block = that.getSide(this.getHorizontalFacing());
-        Block down;
-        if (this.followTarget == null && this.passengers.isEmpty() && !(down = block.down()).isSolid() && !block.isSolid() && !down.down().isSolid()) {
+        if (this.followTarget == null && this.passengers.isEmpty()
+                && !this.isSolidBlockAt(level, downId, blockX, blockY - 1, blockZ)
+                && !this.isSolidBlockAt(level, blockId, blockX, blockY, blockZ)
+                && !this.isSolidBlockAt(level, downDownId, blockX, blockY - 2, blockZ)) {
             // "hack": try to make mobs not to be so suicidal
             this.stayTime = 10;
-        } else if (!block.canPassThrough() && !(block instanceof BlockFlowable || block.getId() == BlockID.SOUL_SAND) && block.up().canPassThrough() && that.up(2).canPassThrough()) {
-            if (block instanceof BlockFence || block instanceof BlockFenceGate) {
-                this.motionY = this.getGravity();
-            } else if (this.motionY <= this.getGravity() * 4) {
-                this.motionY = this.getGravity() * 4;
-            } else if (block instanceof BlockStairs) {
-                this.motionY = this.getGravity() * 4;
-            } else if (this.motionY <= (this.getGravity() * 8)) {
-                this.motionY = this.getGravity() * 8;
-            } else {
-                this.motionY += this.getGravity() * 0.25;
-            }
-            return true;
+            return false;
+        }
+
+        if (!this.isPassableBlockAt(level, blockId, blockX, blockY, blockZ)
+                && !Block.isFlowableId(blockId) && blockId != BlockID.SOUL_SAND
+                && this.isPassableBlockAt(level, upId, blockX, blockY + 1, blockZ)
+                && this.isPassableBlockAt(level, thatUpId, thatX, thatY + 2, thatZ)) {
+            return this.jumpOver(level.getBlock(blockX, blockY, blockZ));
         }
         return false;
+    }
+
+    private boolean checkJumpUsingBlocks(int x, int y, int z, BlockFace face) {
+        Block that = this.getLevel().getBlock(new Vector3(x, y, z));
+        Block block = that.getSide(face);
+        Block down;
+        if (this.followTarget == null && this.passengers.isEmpty()
+                && !(down = block.down()).isSolid() && !block.isSolid() && !down.down().isSolid()) {
+            this.stayTime = 10;
+            return false;
+        }
+        if (!block.canPassThrough() && !(block instanceof BlockFlowable)
+                && block.getId() != BlockID.SOUL_SAND && block.up().canPassThrough() && that.up(2).canPassThrough()) {
+            return this.jumpOver(block);
+        }
+        return false;
+    }
+
+    private boolean jumpOver(Block block) {
+        if (block instanceof BlockFence || block instanceof BlockFenceGate) {
+            this.motionY = this.getGravity();
+        } else if (this.motionY <= this.getGravity() * 4 || block instanceof BlockStairs) {
+            this.motionY = this.getGravity() * 4;
+        } else if (this.motionY <= this.getGravity() * 8) {
+            this.motionY = this.getGravity() * 8;
+        } else {
+            this.motionY += this.getGravity() * 0.25;
+        }
+        return true;
     }
 
     @Override
@@ -184,10 +244,23 @@ public abstract class EntityWalking extends BaseEntity {
                 return this.followTarget != null ? this.followTarget : this.target;
             }
 
-            Block levelBlock = getLevelBlock();
-            boolean inWater = levelBlock.getId() == 8 || levelBlock.getId() == 9;
-            Block down = level.getBlock(chunk, getFloorX(), getFloorY() - 1, getFloorZ(), false);
-            int downId = down.getId();
+            Level level = this.level;
+            int fx = this.getFloorX();
+            int fy = this.getFloorY();
+            int fz = this.getFloorZ();
+            int levelBlockId = this.getBuiltinBlockIdAt(fx, fy, fz, 0);
+            Block levelBlock = null;
+            if (levelBlockId < 0) {
+                levelBlock = this.getLevelBlock();
+                levelBlockId = levelBlock.getId();
+            }
+            boolean inWater = levelBlockId == BlockID.WATER || levelBlockId == BlockID.STILL_WATER;
+            int downId = this.getBuiltinBlockIdAt(fx, fy - 1, fz, 0);
+            Block down = null;
+            if (downId < 0) {
+                down = level.getBlock(chunk, fx, fy - 1, fz, false);
+                downId = down.getId();
+            }
             if (inWater && (downId == 0 || downId == 8 || downId == 9 || downId == BlockID.LAVA || downId == BlockID.STILL_LAVA || downId == BlockID.SIGN_POST || downId == BlockID.WALL_SIGN)) {
                 onGround = false;
             }
@@ -207,12 +280,12 @@ public abstract class EntityWalking extends BaseEntity {
                             this.motionZ = 0;
                         }
                     } else {
-                        if (levelBlock.getId() == BlockID.WATER) {
-                            BlockWater blockWater = (BlockWater) levelBlock;
+                        if (levelBlockId == BlockID.WATER) {
+                            BlockWater blockWater = (BlockWater) (levelBlock != null ? levelBlock : level.getBlock(chunk, fx, fy, fz, false));
                             Vector3 flowVector = blockWater.getFlowVector();
                             motionX = flowVector.getX() * FLOW_MULTIPLIER;
                             motionZ = flowVector.getZ() * FLOW_MULTIPLIER;
-                        } else if (levelBlock.getId() == BlockID.STILL_WATER) {
+                        } else if (levelBlockId == BlockID.STILL_WATER) {
                             this.motionX = this.getSpeed() * moveMultiplier * 0.05 * (x / diff);
                             this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
                             if (!(this instanceof EntityDrowned || this instanceof EntityIronGolem || this instanceof EntitySkeletonHorse)) {
@@ -250,12 +323,12 @@ public abstract class EntityWalking extends BaseEntity {
                             this.motionZ = 0;
                         }
                     } else {
-                        if (levelBlock.getId() == BlockID.WATER) {
-                            BlockWater blockWater = (BlockWater) levelBlock;
+                        if (levelBlockId == BlockID.WATER) {
+                            BlockWater blockWater = (BlockWater) (levelBlock != null ? levelBlock : level.getBlock(chunk, fx, fy, fz, false));
                             Vector3 flowVector = blockWater.getFlowVector();
                             motionX = flowVector.getX() * FLOW_MULTIPLIER;
                             motionZ = flowVector.getZ() * FLOW_MULTIPLIER;
-                        } else if (levelBlock.getId() == BlockID.STILL_WATER) {
+                        } else if (levelBlockId == BlockID.STILL_WATER) {
                             this.motionX = this.getSpeed() * moveMultiplier * 0.05 * (x / diff);
                             this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
                             if (!(this instanceof EntityDrowned || this instanceof EntityIronGolem || this instanceof EntitySkeletonHorse)) {
@@ -283,6 +356,9 @@ public abstract class EntityWalking extends BaseEntity {
                 this.move(0, this.motionY, 0);
             } else {
                 if (this.onGround) {
+                    if (down == null) {
+                        down = level.getBlock(chunk, fx, fy - 1, fz, false);
+                    }
                     double friction = (1 - this.getDrag()) * down.getFrictionFactor();
                     this.motionX *= friction;
                     this.motionZ *= friction;
@@ -300,7 +376,14 @@ public abstract class EntityWalking extends BaseEntity {
                 if (this.onGround && !inWater) {
                     this.motionY = 0;
                 } else if (this.motionY > -this.getGravity() * 4) {
-                    if (!(this.level.getBlock(NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z)) instanceof BlockLiquid)) {
+                    int headX = NukkitMath.floorDouble(this.x);
+                    int headY = (int) (this.y + 0.8);
+                    int headZ = NukkitMath.floorDouble(this.z);
+                    int headId = this.getBuiltinBlockIdAt(headX, headY, headZ, 0);
+                    boolean headLiquid = headId < 0 ? level.getBlock(headX, headY, headZ) instanceof BlockLiquid
+                            : headId == BlockID.WATER || headId == BlockID.STILL_WATER
+                            || headId == BlockID.LAVA || headId == BlockID.STILL_LAVA;
+                    if (!headLiquid) {
                         this.motionY -= this.getGravity();
                     }
                 } else {
