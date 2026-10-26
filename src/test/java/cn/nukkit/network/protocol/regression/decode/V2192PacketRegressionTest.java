@@ -1,7 +1,6 @@
 package cn.nukkit.network.protocol.regression.decode;
 
 import cn.nukkit.math.BlockVector3;
-import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse;
@@ -255,9 +254,9 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
         var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.PlaySoundPacket.class);
 
         assertEquals("mob.pig.say", cb.getSound());
-        // CB v2192 decodes loopCount unsigned (upstream lag; vanilla reads zigzag since 2168),
-        // so zigzag(3)=0x06 comes back as 6. Byte-level truth: PlaySoundLoopCountWireP18Test.
-        assertEquals(6, cb.getLoopCount());
+        // loopCount 自 v2192 起为 zigzag varint32；CB Beta13 误用 unsigned 读取，
+        // Beta14 起改为 readInt，故 zigzag(3)=0x06 解回 3
+        assertEquals(3, cb.getLoopCount());
         assertTrue(cb.isBypassListenerRangeCheck());
         assertEquals(0xAABBCCDDL, cb.getServerSoundHandle());
         assertEquals(1.25f, cb.getPlaybackPositionSeconds());

@@ -6,16 +6,17 @@ import cn.nukkit.entity.data.Skin;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3f;
-import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.DimensionDefinition;
 import cn.nukkit.network.protocol.types.PassengerOfBlockArguments;
+import cn.nukkit.network.protocol.types.attributelayer.*;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftReservedAction;
 import cn.nukkit.utils.BinaryStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -257,12 +258,7 @@ public class V2225PacketRegressionTest extends AbstractPacketRegressionTest {
     // ==================== ClientboundUpdateSoundDataPacket：单事件 ====================
 
     /**
-     * v1_26_60 起仅写一个事件槽位（2193 前仍为 7 个）。长度含 reset() 写入的 2 字节包
-     * 头 uvarint(348)。CB v2225 codec 尚未跟进单事件化，故按 protocol-docs 做字节级断言。
-     * <p>
-     * Only one event slot since v1_26_60 (still 7 before 2193). Lengths include the 2-byte
-     * packet-id uvarint(348) written by reset(). CB's v2225 codec has not caught up with the
-     * single-event layout, so assert bytes per protocol-docs.
+     * 单个事件槽位，事件结构自带重复类型字节；长度含 reset() 写入的 2 字节包头。
      */
     @Test
     void updateSoundDataSingleEvent() {
@@ -273,9 +269,11 @@ public class V2225PacketRegressionTest extends AbstractPacketRegressionTest {
         nk.volume = 0.5f;
         nk.encode();
         byte[] encoded = nk.getBuffer();
-        // header(2) + handle(8) + tag uvarint(1) + float(4) => 15B；7 槽位旧格式是 2+8+7*5=45B
-        assertEquals(15, encoded.length, "v2225 must encode exactly one sound event slot");
+        // header(2) + handle(8) + tag uvarint(1) + 重复类型字节(1) + float(4) => 16B；
+        // 7 槽位旧格式是 2+8+7*5=45B
+        assertEquals(16, encoded.length, "v2225 must encode exactly one sound event slot");
         assertEquals(1, encoded[10], "SOUND_SET_VOLUME tag after header+handle");
+        assertEquals(1, encoded[11], "event struct repeats the tag as a uint8 type byte");
 
         var decoded = new ClientboundUpdateSoundDataPacket();
         decoded.protocol = V2225;
@@ -378,5 +376,155 @@ public class V2225PacketRegressionTest extends AbstractPacketRegressionTest {
         dismount.getUnsignedVarInt(); // 跳过 reset() 写入的包头 / skip the header written by reset()
         dismount.decode();
         assertNull(dismount.passengerOfBlockArguments);
+    }
+
+    // ==================== ClientboundAttributeLayerSyncPacket：v2225 EAS 变体 ====================
+
+    private static final int ATTRIBUTE_LAYER_SYNC_PACKET_ID = 345;
+
+    private static AttributeLayerSettings layerSettings() {
+        return new AttributeLayerSettings(0, new AttributeLayerSettings.FloatWeight(1f), true, false);
+    }
+
+    private static ClientboundAttributeLayerSyncPacket encodeAttributeLayer(
+            AttributeLayerSyncPayload payload, int protocol) {
+        ClientboundAttributeLayerSyncPacket packet = new ClientboundAttributeLayerSyncPacket();
+        packet.protocol = protocol;
+        packet.gameVersion = cn.nukkit.GameVersion.byProtocol(protocol, false);
+        packet.data = payload;
+        packet.encode();
+        return packet;
+    }
+
+    private static ClientboundAttributeLayerSyncPacket decodeAttributeLayer(
+            ClientboundAttributeLayerSyncPacket encoded, int protocol) {
+        ClientboundAttributeLayerSyncPacket decoded = new ClientboundAttributeLayerSyncPacket();
+        decoded.protocol = protocol;
+        decoded.gameVersion = cn.nukkit.GameVersion.byProtocol(protocol, false);
+        decoded.setBuffer(encoded.getBuffer());
+        decoded.getUnsignedVarInt(); // 跳过 reset() 写入的包头 / skip the header written by reset()
+        decoded.decode();
+        return decoded;
+    }
+
+    /**
+     * 常量变体逐字节；图层级噪声名不再出现。
+     */
+    @Test
+    void attributeLayerConstantVariantBytes() {
+        AttributeLayerData layer = new AttributeLayerData("l", "ignored-noise", 0, layerSettings(),
+                List.of(new EnvironmentAttributeData("a", null,
+                        new BoolAttributeData(true, BoolAttributeData.Operation.OVERRIDE),
+                        null, 0, 0, EnvironmentAttributeData.CameraEase.LINEAR)));
+
+        var encoded = encodeAttributeLayer(new UpdateAttributeLayersData(List.of(layer)), V2225);
+
+        byte[] expected = new byte[]{
+                (byte) 0xD9, 0x02,          // 包 id 345
+                0x00,                       // payload variant: UpdateAttributeLayersData
+                0x01,                       // layer count
+                0x01, 'l',                  // layer name
+                0x00,                       // dimension
+                0x00, 0x00, 0x00, 0x00,     // priority
+                0x00, 0x00, (byte) 0x80, 0x3F, // weight 1.0f (LE)
+                0x01,                       // enabled
+                0x00,                       // transitionsPaused
+                0x01,                       // attribute count
+                0x01, 'a',                  // attribute name
+                0x00,                       // payload variant: constant
+                0x00,                       // attribute data: bool
+                0x01,                       // value
+                0x08, 'o', 'v', 'e', 'r', 'r', 'i', 'd', 'e'
+        };
+        assertArrayEquals(expected, encoded.getBuffer());
+    }
+
+    @Test
+    void attributeLayerTransitionRoundTrip() {
+        EnvironmentAttributeData attribute = new EnvironmentAttributeData("attr:transition",
+                new FloatAttributeData(0.25f, FloatAttributeData.Operation.ADD, null, null),
+                null,
+                new FloatAttributeData(1.5f, FloatAttributeData.Operation.OVERRIDE, 0f, 2f),
+                4, 10, EnvironmentAttributeData.CameraEase.IN_OUT_QUAD);
+        attribute.clockName = "clock";
+
+        AttributeLayerData layer = new AttributeLayerData("l", "layer-noise", 0, layerSettings(), List.of(attribute));
+        var decoded = decodeAttributeLayer(
+                encodeAttributeLayer(new UpdateAttributeLayersData(List.of(layer)), V2225), V2225);
+
+        var data = assertInstanceOf(UpdateAttributeLayersData.class, decoded.data);
+        AttributeLayerData out = data.attributeLayers.get(0);
+        assertNull(out.noiseName, "v2225 moved the noise name off the layer");
+        EnvironmentAttributeData attr = out.attributes.get(0);
+        assertEquals("attr:transition", attr.attributeName);
+        assertNull(attr.attribute, "transition payload has no constant value");
+        assertFalse(attr.noiseTransition);
+        assertEquals(0.25f, ((FloatAttributeData) attr.from).value, 0.0001f);
+        assertEquals(1.5f, ((FloatAttributeData) attr.to).value, 0.0001f);
+        assertEquals(0f, ((FloatAttributeData) attr.to).constraintMin, 0.0001f);
+        assertEquals(2f, ((FloatAttributeData) attr.to).constraintMax, 0.0001f);
+        assertEquals(10, attr.totalTransitionTicks);
+        assertEquals(4, attr.currentTransitionTicks);
+        assertEquals(EnvironmentAttributeData.CameraEase.IN_OUT_QUAD, attr.easing);
+        assertEquals("clock", attr.clockName);
+    }
+
+    @Test
+    void attributeLayerNoiseTransitionRoundTrip() {
+        EnvironmentAttributeData attribute = new EnvironmentAttributeData("attr:noise",
+                new BoolAttributeData(false, BoolAttributeData.Operation.AND),
+                null,
+                new BoolAttributeData(true, BoolAttributeData.Operation.OR),
+                2, 8, EnvironmentAttributeData.CameraEase.IN_OUT_CUBIC, 3, true);
+        attribute.clockName = "";
+        attribute.noiseName = "noise";
+        attribute.noiseAlignment = new EnvironmentAttributeData.NoiseAlignment(
+                EnvironmentAttributeData.NoiseAlignment.Type.MIN_LOCAL_TRANSITION_END, 7);
+
+        AttributeLayerData layer = new AttributeLayerData("l", 0, layerSettings(), List.of(attribute));
+        var decoded = decodeAttributeLayer(
+                encodeAttributeLayer(new UpdateAttributeLayersData(List.of(layer)), V2225), V2225);
+
+        EnvironmentAttributeData attr = assertInstanceOf(UpdateAttributeLayersData.class, decoded.data)
+                .attributeLayers.get(0).attributes.get(0);
+        assertTrue(attr.noiseTransition);
+        assertEquals(8, attr.totalTransitionTicks);
+        assertEquals(2, attr.currentTransitionTicks);
+        assertEquals(EnvironmentAttributeData.CameraEase.IN_OUT_CUBIC, attr.easing);
+        assertEquals(3, attr.localTransitionTicks);
+        assertEquals("noise", attr.noiseName);
+        assertEquals(7, attr.noiseAlignment.value());
+        assertEquals(EnvironmentAttributeData.NoiseAlignment.Type.MIN_LOCAL_TRANSITION_END, attr.noiseAlignment.type());
+        assertEquals(BoolAttributeData.Operation.OR, ((BoolAttributeData) attr.to).operation);
+    }
+
+    /**
+     * 旧布局边界：2193 仍写图层级噪声名；两条属性连续解析，覆盖尾部噪声对齐的读取。
+     */
+    @Test
+    void attributeLayerLegacyLayoutUnchanged() {
+        EnvironmentAttributeData first = new EnvironmentAttributeData("a1",
+                new BoolAttributeData(false, BoolAttributeData.Operation.AND),
+                new BoolAttributeData(true, BoolAttributeData.Operation.OVERRIDE),
+                new BoolAttributeData(true, BoolAttributeData.Operation.OR),
+                1, 5, EnvironmentAttributeData.CameraEase.SPRING, 2, true);
+        EnvironmentAttributeData second = new EnvironmentAttributeData("a2", null,
+                new BoolAttributeData(true, BoolAttributeData.Operation.OVERRIDE),
+                null, 0, 0, EnvironmentAttributeData.CameraEase.LINEAR);
+        second.noiseAlignment = new EnvironmentAttributeData.NoiseAlignment(
+                EnvironmentAttributeData.NoiseAlignment.Type.MIN_LOCAL_TRANSITION_END, 9);
+
+        AttributeLayerData layer = new AttributeLayerData("l", "legacy-noise", 0, layerSettings(),
+                List.of(first, second));
+        int v2193 = cn.nukkit.network.protocol.ProtocolInfo.v1_26_50;
+        var decoded = decodeAttributeLayer(
+                encodeAttributeLayer(new UpdateAttributeLayersData(List.of(layer)), v2193), v2193);
+
+        AttributeLayerData out = assertInstanceOf(UpdateAttributeLayersData.class, decoded.data).attributeLayers.get(0);
+        assertEquals("legacy-noise", out.noiseName);
+        assertEquals(2, out.attributes.size());
+        assertEquals("a1", out.attributes.get(0).attributeName);
+        assertEquals("a2", out.attributes.get(1).attributeName);
+        assertEquals(9, out.attributes.get(1).noiseAlignment.value());
     }
 }

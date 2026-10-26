@@ -211,6 +211,8 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
         // must repeat into all 7 slots (the client consumes the last one) and slot 0 must not be
         // STOP, or decode would map stop=true
         int slots = protocolVersion >= cn.nukkit.network.protocol.ProtocolInfo.v1_26_60 ? 1 : 7;
+        // v2225 起事件结构自带重复类型字节
+        boolean hasTypeByte = protocolVersion >= cn.nukkit.network.protocol.ProtocolInfo.v1_26_60;
         var volume = new cn.nukkit.network.protocol.ClientboundUpdateSoundDataPacket();
         volume.protocol = protocolVersion;
         volume.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
@@ -224,6 +226,9 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
             for (int i = 0; i < slots; i++) {
                 assertEquals(1, org.cloudburstmc.protocol.common.util.VarInts.readUnsignedInt(volumeBuf),
                         "slot " + i + " should be SET_VOLUME");
+                if (hasTypeByte) {
+                    assertEquals(1, volumeBuf.readUnsignedByte(), "event struct repeats the SET_VOLUME tag");
+                }
                 assertEquals(0.5f, volumeBuf.readFloatLE());
             }
             assertEquals(0, volumeBuf.readableBytes(), "expected exactly " + slots + " slots");
@@ -244,6 +249,9 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
             for (int i = 0; i < slots; i++) {
                 assertEquals(0, org.cloudburstmc.protocol.common.util.VarInts.readUnsignedInt(stopBuf),
                         "slot " + i + " should be STOP");
+                if (hasTypeByte) {
+                    assertEquals(0, stopBuf.readUnsignedByte(), "event struct repeats the STOP tag");
+                }
             }
             assertEquals(0, stopBuf.readableBytes(), "expected exactly " + slots + " slots");
         } finally {
@@ -265,6 +273,9 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
             for (int i = 0; i < slots; i++) {
                 assertEquals(3, org.cloudburstmc.protocol.common.util.VarInts.readUnsignedInt(fadeBuf),
                         "slot " + i + " should be FADE");
+                if (hasTypeByte) {
+                    assertEquals(3, fadeBuf.readUnsignedByte(), "event struct repeats the FADE tag");
+                }
                 assertEquals(0.5f, fadeBuf.readFloatLE());
                 assertEquals(2.0f, fadeBuf.readFloatLE());
             }
