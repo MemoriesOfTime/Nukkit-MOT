@@ -121,7 +121,7 @@
         <dependency>
             <groupId>org.cloudburstmc.netty</groupId>
             <artifactId>netty-transport-nethernet</artifactId>
-            <version>2.0.0.CR4-20261006.110144-17</version>
+            <version>2.0.0.CR6-20261023.132252-11</version>
             <scope>compile</scope>
             <exclusions>
                 <!-- 统一使用服务器自带的 Netty 4.2.x；Use the Netty version this server ships with (4.2.x) -->
@@ -137,15 +137,27 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>org.cloudburstmc.netty</groupId>
+            <artifactId>netty-transport-common</artifactId>
+            <version>2.0.0.CR6-20261023.132252-11</version>
+            <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-transport</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
             <groupId>dev.opencollab</groupId>
             <artifactId>libdatachannel-java</artifactId>
-            <version>0.24.6.0-20261006.072145-3</version>
+            <version>0.24.6.0-20261023.142230-9</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>dev.opencollab</groupId>
             <artifactId>libdatachannel-java-arch-detect</artifactId>
-            <version>0.24.6.0-20261006.072145-3</version>
+            <version>0.24.6.0-20261023.142230-9</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -157,9 +169,13 @@
         <dependency>
             <groupId>dev.mot.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.1.0.CR1-20261007.033337-7</version>
+            <version>1.1.0.CR4-20261026.103812-1</version>
             <scope>compile</scope>
             <exclusions>
+                <exclusion>
+                    <groupId>dev.mot.netty</groupId>
+                    <artifactId>netty-transport-common</artifactId>
+                </exclusion>
                 <exclusion>
                     <groupId>io.netty</groupId>
                     <artifactId>netty-common</artifactId>
