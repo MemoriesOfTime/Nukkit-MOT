@@ -16,6 +16,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
@@ -585,6 +586,24 @@ public class PluginManager {
             }
             this.registerEvent(eventClass, listener, eh.priority(), new MethodEventExecutor(method), plugin, eh.ignoreCancelled());
         }
+    }
+
+    public <E extends Event> void registerEvent(Class<E> clazz, Consumer<E> handler, Plugin plugin) throws PluginException {
+        Listener listener = new Listener() {};
+        EventExecutor executor = (ignored, event) -> {
+            @SuppressWarnings("unchecked") E typedEvent = (E) event;
+            handler.accept(typedEvent);
+        };
+        this.registerEvent(clazz, listener, EventPriority.NORMAL, executor, plugin);
+    }
+
+    public <E extends Event> void registerEvent(Class<E> clazz, Consumer<E> handler, EventPriority priority, Plugin plugin) throws PluginException {
+        Listener listener = new Listener() {};
+        EventExecutor executor = (ignored, event) -> {
+            @SuppressWarnings("unchecked") E typedEvent = (E) event;
+            handler.accept(typedEvent);
+        };
+        this.registerEvent(clazz, listener, priority, executor, plugin);
     }
 
     public void registerEvent(Class<? extends Event> event, Listener listener, EventPriority priority, EventExecutor executor, Plugin plugin) throws PluginException {
