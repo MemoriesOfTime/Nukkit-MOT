@@ -255,7 +255,9 @@ public class V2192PacketRegressionTest extends AbstractPacketRegressionTest {
         var cb = crossDecode(nk, org.cloudburstmc.protocol.bedrock.packet.PlaySoundPacket.class);
 
         assertEquals("mob.pig.say", cb.getSound());
-        assertEquals(3, cb.getLoopCount());
+        // CB v2192 decodes loopCount unsigned (upstream lag; vanilla reads zigzag since 2168),
+        // so zigzag(3)=0x06 comes back as 6. Byte-level truth: PlaySoundLoopCountWireP18Test.
+        assertEquals(6, cb.getLoopCount());
         assertTrue(cb.isBypassListenerRangeCheck());
         assertEquals(0xAABBCCDDL, cb.getServerSoundHandle());
         assertEquals(1.25f, cb.getPlaybackPositionSeconds());

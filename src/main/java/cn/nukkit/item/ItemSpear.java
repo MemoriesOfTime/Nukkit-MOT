@@ -7,6 +7,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityLiving;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.player.PlayerSpearLungeEvent;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Sound;
@@ -331,6 +332,13 @@ public abstract class ItemSpear extends StringItemToolBase {
         }
 
         direction = direction.normalize().multiply(0.5 + lungeLevel * 0.4);
+        // The charged hit has already finished and may have entered combat. Only the lunge
+        // is cancellable here; neither the charged damage nor the ordinary jab is cancelled.
+        PlayerSpearLungeEvent event = new PlayerSpearLungeEvent(player, this);
+        player.getServer().getPluginManager().callEvent(event);
+        if (event.isCancelled()) {
+            return;
+        }
         player.setMotion(player.getMotion().add(direction));
         player.getLevel().addSound(player, Sound.ITEM_SPEAR_LUNGE);
         if (player.isSurvival() || player.isAdventure()) {

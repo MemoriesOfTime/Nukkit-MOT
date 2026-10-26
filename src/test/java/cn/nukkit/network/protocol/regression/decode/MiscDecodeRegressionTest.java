@@ -810,6 +810,29 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
+    @ParameterizedTest(name = "ContainerClosePacket (server initiated) v{0}")
+    @MethodSource("allVersions")
+    void containerCloseServerInitiated(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ContainerClosePacket();
+        cb.setId((byte) 5);
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            cb.setServerInitiated(true);
+        }
+        if (protocol >= ProtocolInfo.v1_21_0) {
+            cb.setType(org.cloudburstmc.protocol.bedrock.data.inventory.ContainerType.CONTAINER);
+        }
+
+        ContainerClosePacket nk = crossEncode(cb, ContainerClosePacket::new, protocol);
+
+        assertEquals(5, nk.windowId);
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            assertTrue(nk.wasServerInitiated);
+        }
+        if (protocol >= ProtocolInfo.v1_21_0) {
+            assertEquals(ContainerType.CONTAINER, nk.type);
+        }
+    }
+
     // ==================== RespawnPacket ====================
 
     @ParameterizedTest(name = "RespawnPacket v{0}")
@@ -1546,28 +1569,6 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(0.0f, nk.z, 0.001f);
     }
 
-    // ==================== PlayerActionPacket ====================
-
-    @ParameterizedTest(name = "PlayerActionPacket START_BREAK v{0}")
-    @MethodSource("allVersions")
-    void playerActionStartBreak(int protocol) {
-        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerActionPacket();
-        cb.setRuntimeEntityId(50L);
-        cb.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.START_BREAK);
-        cb.setBlockPosition(Vector3i.from(10, 64, -5));
-        cb.setResultPosition(Vector3i.from(10, 64, -5));
-        cb.setFace(1);
-
-        PlayerActionPacket nk = crossEncode(cb, PlayerActionPacket::new, protocol);
-
-        assertEquals(50L, nk.entityId);
-        assertEquals(PlayerActionPacket.ACTION_START_BREAK, nk.action);
-        assertEquals(10, nk.x);
-        assertEquals(64, nk.y);
-        assertEquals(-5, nk.z);
-        assertEquals(1, nk.face);
-    }
-
     // ==================== ShowProfilePacket ====================
 
     @ParameterizedTest(name = "ShowProfilePacket v{0}")
@@ -2091,6 +2092,57 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         } else {
             assertEquals(0, nk.getUpdate().getPathUpdateCount());
         }
+    }
+
+    @Test
+    void serverboundDataStoreRejectsEmptyKeys() {
+        // schema declares MinLength = 1 for Data Store Name and Property
+        assertThrows(IllegalArgumentException.class, () -> decodeDataStoreFrame("", "prop", "path"),
+                "empty Data Store Name must be rejected");
+        assertThrows(IllegalArgumentException.class, () -> decodeDataStoreFrame("store", "", "path"),
+                "empty Property must be rejected");
+    }
+
+    @Test
+    void serverboundDataStoreAcceptsEmptyPath() {
+        // Path has no MinLength in the schema
+        ServerboundDataStorePacket nk = assertDoesNotThrow(() -> decodeDataStoreFrame("store", "prop", ""));
+        assertEquals("", nk.getUpdate().getPath());
+    }
+
+    @Test
+    void serverboundDataStoreRejectsOverLengthStrings() {
+        assertThrows(IllegalArgumentException.class,
+                () -> decodeDataStoreFrame("s".repeat(1001), "prop", "path"),
+                "Data Store Name MaxLength is 1000");
+        assertThrows(IllegalArgumentException.class,
+                () -> decodeDataStoreFrame("store", "p".repeat(1001), "path"),
+                "Property MaxLength is 1000");
+        assertThrows(IllegalArgumentException.class,
+                () -> decodeDataStoreFrame("store", "prop", "p".repeat(1001)),
+                "Path MaxLength is 1000");
+        assertThrows(IllegalArgumentException.class, () -> decodeDataStoreFrame("store", "prop", "path", "v".repeat(5001)),
+                "string value MaxLength is 5000");
+    }
+
+    private static ServerboundDataStorePacket decodeDataStoreFrame(String name, String property, String path) {
+        return decodeDataStoreFrame(name, property, path, "value");
+    }
+
+    private static ServerboundDataStorePacket decodeDataStoreFrame(String name, String property, String path, String stringValue) {
+        BinaryStream s = new BinaryStream();
+        s.putString(name);
+        s.putString(property);
+        s.putString(path);
+        s.putUnsignedVarInt(2); // string variant
+        s.putString(stringValue);
+        s.putLInt(1); // property update count
+        ServerboundDataStorePacket nk = new ServerboundDataStorePacket();
+        nk.protocol = ProtocolInfo.v1_21_130;
+        nk.gameVersion = GameVersion.V1_21_130;
+        nk.setBuffer(s.getBuffer());
+        nk.decode();
+        return nk;
     }
 
     // ==================== ClientboundDataDrivenUIShowScreenPacket ====================

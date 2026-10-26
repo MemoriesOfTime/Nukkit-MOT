@@ -775,6 +775,7 @@ public class ArmorDamageReductionTest {
         lenient().when(level.getChunkPlayers(0, 0)).thenReturn(Collections.emptyMap());
         lenient().when(level.getNearbyEntities(any(), any())).thenReturn(new Entity[0]);
         lenient().when(level.getNearbyEntities(any(), any(), anyBoolean(), anyBoolean())).thenReturn(new Entity[0]);
+        lenient().when(level.getNearbyRideables(any(), any())).thenReturn(new Entity[0]);
         lenient().when(level.getBlockIdAt(any(FullChunk.class), anyInt(), anyInt(), anyInt())).thenReturn(0);
         lenient().when(level.getVibrationManager()).thenReturn(mock(VibrationManager.class));
         try {

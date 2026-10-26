@@ -21,6 +21,8 @@ public class SubChunkPacket extends DataPacket {
     public BlockVector3 centerPosition;
     public List<SubChunkData> subChunks = new ArrayList<>();
 
+    private static final byte[] NO_DATA = new byte[0];
+
     @Override
     public byte pid() {
         return NETWORK_ID;
@@ -118,7 +120,7 @@ public class SubChunkPacket extends DataPacket {
             this.putByte((byte) subChunk.result.ordinal());
 
             if (subChunk.result != SubChunkRequestResult.SUCCESS_ALL_AIR || !this.cacheEnabled) {
-                this.putByteArray(subChunk.data);
+                this.putByteArray(subChunk.data == null ? NO_DATA : subChunk.data);
             }
 
             this.putByte((byte) subChunk.heightMapType.ordinal());
@@ -145,7 +147,7 @@ public class SubChunkPacket extends DataPacket {
         if (!this.subChunks.isEmpty()) {
             SubChunkData subChunk = this.subChunks.get(0);
             this.putSignedBlockPosition(subChunk.position);
-            this.putByteArray(subChunk.data);
+            this.putByteArray(subChunk.data == null ? NO_DATA : subChunk.data);
             this.putVarInt(subChunk.result.ordinal());
 
             this.putByte((byte) subChunk.heightMapType.ordinal());

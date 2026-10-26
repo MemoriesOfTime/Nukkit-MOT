@@ -310,6 +310,9 @@ public class PlayerAuthInputPacket extends DataPacket {
      * to filter or replace actions.
      */
     public List<PlayerBlockActionData> getDecodedBlockActions() {
+        if (this.decodedBlockActions.isEmpty()) {
+            return List.of();
+        }
         return this.blockActionData.equals(this.decodedBlockActionSnapshot)
                 ? this.decodedBlockActions.stream().map(PlayerAuthInputPacket::copyBlockAction).toList()
                 : List.of();

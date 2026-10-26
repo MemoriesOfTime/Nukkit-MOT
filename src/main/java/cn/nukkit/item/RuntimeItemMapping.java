@@ -129,7 +129,7 @@ public class RuntimeItemMapping {
             boolean componentBased = entry.has("componentBased") && entry.get("componentBased").getAsBoolean();
             if (protocolId >= ProtocolInfo.v1_21_60) {
                 CompoundTag components = (CompoundTag) itemComponents.get(identifier);
-                this.vanillaItems.put(identifier, new ItemComponentPacket.ItemDefinition(
+                this.vanillaItems.put(identifier, ItemComponentPacket.ItemDefinition.vanilla(
                         identifier,
                         runtimeId,
                         componentBased,

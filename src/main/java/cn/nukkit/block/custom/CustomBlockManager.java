@@ -254,6 +254,22 @@ public class CustomBlockManager {
             throw new IllegalArgumentException("Block network data can not be empty for block with more permutations: " + identifier);
         }
 
+        if (blockDefinition != null) {
+            CompoundTag networkData = blockDefinition.nbt().getCompound("vanilla_block_data");
+            if (blockDefinition.nukkitId() != nukkitId
+                    || !networkData.containsInt("block_id") || networkData.getInt("block_id") != nukkitId) {
+                CompoundTag ownedNbt = blockDefinition.nbt().copy();
+                CompoundTag ownedNetworkData = ownedNbt.getCompound("vanilla_block_data");
+                ownedNetworkData.putInt("block_id", nukkitId);
+                ownedNbt.putCompound("vanilla_block_data", ownedNetworkData);
+                log.warn("Rebinding custom block definition IDs: record={}, network={}, allocated={}",
+                        blockDefinition.nukkitId(), networkData.containsInt("block_id")
+                                ? Integer.toString(networkData.getInt("block_id")) : "missing-or-non-int", nukkitId);
+                blockDefinition = new CustomBlockDefinition(blockDefinition.identifier(), ownedNbt, nukkitId,
+                        blockDefinition.typeOf(), blockDefinition.registerCreativeItem());
+            }
+        }
+
         CustomBlockState defaultState = this.createBlockState(identifier, nukkitId << Block.DATA_BITS, properties, factory);
         this.legacy2CustomState.put(defaultState.getLegacyId(), defaultState);
 
@@ -448,18 +464,6 @@ public class CustomBlockManager {
         }
 
         Object2ObjectMap<NbtMap, IntSet> state2Legacy = new Object2ObjectLinkedOpenHashMap<>();
-
-        for (Int2IntMap.Entry entry : palette.getLegacyToRuntimeIdMap().int2IntEntrySet()) {
-            int rid = entry.getIntValue();
-            NbtMap state = runtimeId2State.get(rid);
-            if (state == null) {
-                log.info("Unknown runtime ID {}! protocol={}", rid, palette.getProtocol());
-                continue;
-            }
-            IntSet legacyIds = state2Legacy.computeIfAbsent(state, s -> new IntOpenHashSet());
-            legacyIds.add(entry.getIntKey());
-        }
-
         lastName = null;
         group = new ObjectArrayList<>();
         for (CustomBlockState definition : this.legacy2CustomState.values()) {
@@ -481,10 +485,26 @@ public class CustomBlockManager {
             vanillaPaletteList.put(lastName, group);
         }
 
-        palette.clearStates();
+        Object2IntMap<NbtMap> state2RuntimeId = new Object2IntOpenHashMap<>();
+        state2RuntimeId.defaultReturnValue(-1);
+        runtimeId = 0;
+        for (List<NbtMap> states : vanillaPaletteList.values()) {
+            for (NbtMap state : states) {
+                state2RuntimeId.put(state, runtimeId++);
+            }
+        }
+        // 映射键须对应 dat 的 runtimeId，详见 BlockPalette#remapRuntimeIds。
+        Int2IntMap runtimeIdMapping = new Int2IntOpenHashMap();
+        for (Int2ObjectMap.Entry<NbtMap> entry : runtimeId2State.int2ObjectEntrySet()) {
+            int replacement = state2RuntimeId.getInt(entry.getValue());
+            if (replacement != -1) {
+                runtimeIdMapping.put(entry.getIntKey(), replacement);
+            }
+        }
+        palette.remapRuntimeIds(runtimeIdMapping, vanillaPalette.size());
         boolean levelDb = palette.getProtocol() == GlobalBlockPalette.getPaletteByProtocol(GameVersion.getFeatureVersion()).getProtocol(); //防止小版本不相等问题
         if (levelDb) {
-            BlockStateMapping.get().clearMapping();
+            BlockStateMapping.get().remapRuntimeIds(runtimeIdMapping);
         }
 
         runtimeId = 0;
@@ -497,8 +517,10 @@ public class CustomBlockManager {
                 IntSet legacyIds = state2Legacy.get(state);
                 if (legacyIds != null) {
                     CompoundTag nukkitState = convertNbtMap(state);
-                    for (Integer fullId : legacyIds) {
-                        palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
+                    int[] fullIds = legacyIds.toIntArray();
+                    Arrays.sort(fullIds);
+                    for (int fullId : fullIds) {
+                        palette.registerState(fullId >> Block.DATA_BITS, fullId & Block.DATA_MASK, runtimeId, nukkitState);
                     }
                 }
 

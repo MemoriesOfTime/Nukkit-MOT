@@ -111,11 +111,15 @@ dependencies {
         // 改用下方 arch-detect：自带全部平台原生库；Use arch-detect below, it bundles every platform's natives
         exclude("dev.opencollab", "libdatachannel-java")
     }
+    api(libs.netty.transport.common) {
+        exclude("io.netty", "netty-transport")
+    }
     api(libs.libdatachannel)
     api(libs.libdatachannel.arch.detect) {
         exclude("dev.opencollab", "libdatachannel-java")
     }
     api(libs.raknet) {
+        exclude("dev.mot.netty", "netty-transport-common")
         exclude("io.netty", "netty-common")
         exclude("io.netty", "netty-codec-base")
         exclude("io.netty", "netty-buffer")

@@ -31,6 +31,20 @@ public interface LevelProvider {
 
     void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ);
 
+    /**
+     * 带提交代次的区块序列化请求：异步回调会把该代次带回，供 {@link Level} 丢弃已被超时重试取代的旧结果；
+     * 默认实现忽略代次并退化为原方法，第三方 provider 无需改动。
+     * <p>
+     * Chunk serialization request carrying a submit generation; the async callback returns it so the
+     * level can drop results superseded by a timeout retry. The default implementation ignores the
+     * generation and delegates to the legacy method, so third-party providers keep working unchanged.
+     *
+     * @param sequence 提交代次，0 表示不参与代次校验 / submit generation; 0 disables the check
+     */
+    default void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ, long sequence) {
+        requestChunkTask(protocols, chunkX, chunkZ);
+    }
+
     String getPath();
 
     String getGenerator();
@@ -146,6 +160,29 @@ public interface LevelProvider {
     void setSpawn(Vector3 pos);
 
     Map<Long, ? extends FullChunk> getLoadedChunks();
+
+    /**
+     * Hashes of the loaded chunks at the time of the call, see {@link cn.nukkit.level.Level#chunkHash(int, int)}.
+     * <p>
+     * A caller that only needs coordinates should prefer this to {@link #getLoadedChunks()}: that one copies
+     * the whole map and boxes every key.
+     */
+    default long[] getLoadedChunkHashes() {
+        Map<Long, ? extends FullChunk> chunks = this.getLoadedChunks();
+        long[] hashes = new long[chunks.size()];
+        int i = 0;
+        for (Long hash : chunks.keySet()) {
+            hashes[i++] = hash;
+        }
+        return hashes;
+    }
+
+    /**
+     * Number of loaded chunks, without copying them.
+     */
+    default int getLoadedChunkCount() {
+        return this.getLoadedChunks().size();
+    }
 
     void doGarbageCollection();
 

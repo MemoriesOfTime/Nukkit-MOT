@@ -37,6 +37,8 @@ public class Explosion {
     private final Level level;
     private final Position source;
     private final double size;
+    private final boolean finiteInputSize;
+    private boolean numericalRefusal;
     private double fireSpawnChance;
 
     private Set<Block> affectedBlocks;
@@ -56,8 +58,52 @@ public class Explosion {
     protected Explosion(Position center, double size, ExplosionSource sourceObject) {
         this.level = center.getLevel();
         this.source = center;
+        this.finiteInputSize = Double.isFinite(size);
         this.size = Math.max(size, 0);
         this.sourceObject = sourceObject;
+    }
+
+    /** Numerical refusal also applies when an entity calls B after ignoring A's result. */
+    protected final boolean hasSafeExplosionNumbers(double multiplier, double divisor, double decay) {
+        double product = this.size * multiplier;
+        double maximumForce = product / divisor;
+        double radius = this.size * 2d;
+        if (numericalRefusal || !finiteInputSize || !Double.isFinite(product)
+                || !Double.isFinite(maximumForce) || !(maximumForce - decay < maximumForce)
+                || !Double.isFinite(radius) || !safeBoundingAxis(this.source.x, radius)
+                || !safeBoundingAxis(this.source.y, radius) || !safeBoundingAxis(this.source.z, radius)) {
+            numericalRefusal = true;
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean safeBoundingAxis(double center, double radius) {
+        return Double.isFinite(center) && center - radius - 1 > Integer.MIN_VALUE
+                && center + radius + 1 < Integer.MAX_VALUE;
+    }
+
+    /** Number of ordinary ray steps before this inward ray can first sample provider height. */
+    final long emptyHeightRaySteps(double y, double stepY) {
+        if (y < this.level.getMinBlockY() && stepY > 0) {
+            return Math.max(1L, (long) Math.ceil((this.level.getMinBlockY() - y) / stepY));
+        }
+        if (y >= (double) this.level.getMaxBlockY() + 1 && stepY < 0) {
+            // The upper boundary is exclusive: floor(y) must be at most maxBlockY.
+            return Math.max(1L, (long) Math.floor((y - ((double) this.level.getMaxBlockY() + 1))
+                    / -stepY) + 1L);
+        }
+        return 1L;
+    }
+
+    /** A custom resistance must not make a ray nonfinite or increase its original force. */
+    protected final boolean hasSafeRayForce(double previous, double current, double decay) {
+        if (!Double.isFinite(current) || current > previous
+                || current > 0 && !(current - decay < current)) {
+            numericalRefusal = true;
+            return false;
+        }
+        return true;
     }
 
     public double getFireSpawnChance() {
@@ -94,6 +140,7 @@ public class Explosion {
      * @return {@code true} if success
      */
     public boolean explodeA() {
+        if (!hasSafeExplosionNumbers(1.3d, 1d, STEP_LEN * 0.75d)) return false;
         if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
             Entity entity = entitySource.entity();
             if (entity instanceof EntityExplosive) {
@@ -136,6 +183,7 @@ public class Explosion {
                         double pointerZ = this.source.z;
 
                         for (double blastForce = this.size * random.nextDouble(0.7, 1.3); blastForce > 0; blastForce -= STEP_LEN * 0.75d) {
+                            double previousBlastForce = blastForce;
                             int x = (int) pointerX;
                             int y = (int) pointerY;
                             int z = (int) pointerZ;
@@ -145,24 +193,40 @@ public class Explosion {
                                     pointerZ >= z ? z : z - 1
                             );
                             if (!this.level.isYInRange((int) vBlock.y)) {
-                                break;
-                            }
-                            Block block = this.level.getBlock(vBlock);
-                            if (!block.isAir()) {
-                                Block layer1 = block.getLevelBlockAtLayer(1);
-                                double resistance = Math.max(block.getResistance(), layer1.getResistance());
-                                blastForce -= (resistance / 5 + 0.3d) * STEP_LEN;
-                                if (blastForce > 0) {
-                                    if (this.affectedBlocks.add(block)) {
-                                        if (incendiary && random.nextDouble() <= fireSpawnChance) {
-                                            this.fireIgnitions.add(block);
-                                        }
-                                        if (!layer1.isAir()) {
-                                            this.affectedBlocks.add(layer1);
+                                if (vBlock.y < level.getMinBlockY() && vector.y <= 0
+                                        || vBlock.y > level.getMaxBlockY() && vector.y >= 0) {
+                                    break;
+                                }
+                                // Preserve the ordinary final step and its loop decay, skipping only
+                                // empty samples that cannot read a block or invoke a callback.
+                                long skipped = emptyHeightRaySteps(pointerY, vector.y) - 1L;
+                                double emptyDecay = skipped * (STEP_LEN * 0.75d);
+                                if (emptyDecay >= blastForce) {
+                                    break;
+                                }
+                                blastForce -= emptyDecay;
+                                pointerX += vector.x * skipped;
+                                pointerY += vector.y * skipped;
+                                pointerZ += vector.z * skipped;
+                            } else {
+                                Block block = this.level.getBlock(vBlock);
+                                if (!block.isAir()) {
+                                    Block layer1 = block.getLevelBlockAtLayer(1);
+                                    double resistance = Math.max(block.getResistance(), layer1.getResistance());
+                                    blastForce -= (resistance / 5 + 0.3d) * STEP_LEN;
+                                    if (blastForce > 0) {
+                                        if (this.affectedBlocks.add(block)) {
+                                            if (incendiary && random.nextDouble() <= fireSpawnChance) {
+                                                this.fireIgnitions.add(block);
+                                            }
+                                            if (!layer1.isAir()) {
+                                                this.affectedBlocks.add(layer1);
+                                            }
                                         }
                                     }
                                 }
                             }
+                            if (!hasSafeRayForce(previousBlastForce, blastForce, STEP_LEN * 0.75d)) return false;
                             pointerX += vector.x;
                             pointerY += vector.y;
                             pointerZ += vector.z;
@@ -181,6 +245,7 @@ public class Explosion {
      * @return {@code false} if explosion was canceled, otherwise {@code true}
      */
     public boolean explodeB() {
+        if (!hasSafeExplosionNumbers(1.3d, 1d, STEP_LEN * 0.75d)) return false;
         LongArraySet updateBlocks = new LongArraySet();
         Vector3 sourceVec = this.source.floor();
         double yield = (1d / this.size) * 100d;
@@ -209,6 +274,8 @@ public class Explosion {
             affectedBlocks = ev.getAffectedBlocks();
             fireIgnitions = ev.getIgnitions();
         }
+
+        if (!hasSafeExplosionNumbers(1.3d, 1d, STEP_LEN * 0.75d)) return false;
 
         double explosionSize = this.size * 2d;
         AxisAlignedBB explosionBB = new SimpleAxisAlignedBB(

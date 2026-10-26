@@ -563,8 +563,8 @@ class RakNetPlayerSessionTest {
 
             receiveBatch(fixture.session, encryptBatch(clientCipher, key, 1, payload));
 
-            assertEquals(1, fixture.session.queuedInboundPacketCount(),
-                    "soft backpressure must advance both the cipher stream and checksum counter");
+            assertEquals(2, fixture.session.queuedInboundPacketCount(),
+                    "soft backpressure must retain both batches and advance the cipher exactly once");
             assertNull(fixture.session.getDisconnectReason());
             verify(fixture.channel, never()).close();
         }
