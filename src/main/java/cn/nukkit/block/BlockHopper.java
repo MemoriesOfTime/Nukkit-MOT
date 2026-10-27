@@ -301,6 +301,9 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
 
         void setTransferCooldown(int transferCooldown);
 
+        /** Keep a cancelled transfer eligible when plugin policy changes without an inventory write. */
+        default void requestTransferRetry() { }
+
         default boolean pullItems() {
             Vector3 up = this.getPosition().up();
             BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(up);
@@ -330,6 +333,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                     ev.call();
 
                     if (ev.isCancelled()) {
+                        this.requestTransferRetry();
                         return false;
                     }
 
@@ -359,6 +363,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                         ev.call();
 
                         if (ev.isCancelled()) {
+                            this.requestTransferRetry();
                             continue;
                         }
 
