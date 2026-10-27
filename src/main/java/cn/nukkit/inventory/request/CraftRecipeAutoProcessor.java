@@ -81,8 +81,16 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         }
 
         List<Item> consumedItems = collectConsumedItems(player, consumeActions);
-        if (consumedItems == null || !validateConsumePlan(ingredients, consumedItems)) {
+        int times = Math.max(1, action.getTimesCrafted());
+        if (consumedItems == null) {
             return context.error();
+        }
+        if (!validateConsumePlan(ingredients, consumedItems, 1)) {
+            if (!(recipe instanceof CraftingRecipe) || times <= 1
+                    || !validateConsumePlan(ingredients, consumedItems, times)) {
+                return context.error();
+            }
+
         }
 
         if (recipe instanceof MultiRecipe multiRecipe) {
@@ -105,7 +113,6 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         if (recipeResult == null || recipeResult.isNull()) {
             return null;
         }
-        int times = Math.max(1, action.getTimesCrafted());
         if (!validateAutoCraftingRecipe(player, recipe, recipeResult, times, consumedItems)) {
             return context.error();
         }
@@ -203,13 +210,20 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         return actual;
     }
 
-    private static boolean validateConsumePlan(List<ItemDescriptorWithCount> ingredients, List<Item> consumedItems) {
+    private static boolean validateConsumePlan(List<ItemDescriptorWithCount> ingredients,
+                                               List<Item> consumedItems, int multiplier) {
         List<Item> actual = cloneItems(consumedItems);
         for (ItemDescriptorWithCount ingredient : ingredients) {
             if (ingredient == null || ingredient.getDescriptor() == null || ingredient.getCount() <= 0) {
                 continue;
             }
-            int remaining = ingredient.getCount();
+            // Newer clients describe one recipe; CONSUME contains the full craft count.
+            // Keep the already-total form compatible, but require exact coverage in both forms.
+            long required = (long) ingredient.getCount() * multiplier;
+            if (required > Integer.MAX_VALUE) {
+                return false;
+            }
+            int remaining = (int) required;
             for (Item actualItem : new ArrayList<>(actual)) {
                 if (!matchesDescriptor(ingredient, actualItem)) {
                     continue;
@@ -256,10 +270,14 @@ public class CraftRecipeAutoProcessor implements ItemStackRequestActionProcessor
         Item primaryOutput = output.clone();
         primaryOutput.setCount(primaryOutput.getCount() * Math.max(1, multiplier));
         List<Item> extraOutputs = CraftRecipeActionProcessor.scaleItems(craftingRecipe.getExtraResults(), Math.max(1, multiplier));
-        // 与 validateCraftingRecipe 保持一致:匹配前封顶到"材料×multiplier",避免 matchItemList 严格相等误判。
-        List<Item> cappedInputs = CraftRecipeActionProcessor.capInputsToIngredients(
-                inputs, craftingRecipe.getIngredientsAggregate(), Math.max(1, multiplier));
-        Recipe matched = player.getServer().getCraftingManager().matchRecipe(cappedInputs, primaryOutput, extraOutputs);
+        // These inputs are actual debit quantities, not whole inventory stacks.
+        // Matching them unchanged rejects surplus items before any consume action runs.
+        // CraftingManager also tries an unscaled recipe match, so enforce this request's
+        // exact multiplier independently before allowing it to select the recipe.
+        if (!craftingRecipe.matchItems(inputs, extraOutputs, Math.max(1, multiplier))) {
+            return false;
+        }
+        Recipe matched = player.getServer().getCraftingManager().matchRecipe(inputs, primaryOutput, extraOutputs);
         return matched == recipe;
     }
 
