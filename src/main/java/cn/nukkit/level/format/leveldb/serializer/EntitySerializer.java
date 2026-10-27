@@ -11,11 +11,6 @@ import java.util.List;
 public class EntitySerializer {
 
     public static void loadEntities(DB db, ChunkBuilder builder) {
-        if (!EntityStorageV1_18_30.INSTANCE.hasData(db, builder)) {
-            EntityStorageLegacy.INSTANCE.loadEntities(db, builder);
-            return;
-        }
-
         EntityStorageV1_18_30.EntityReadResult readResult = EntityStorageV1_18_30.INSTANCE.readEntities(
                 db,
                 builder.getChunkX(),
