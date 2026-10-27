@@ -588,13 +588,15 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ) {
+        Level.ChunkRequestOwner requestOwner = getLevel().getClass() == Level.class
+                ? getLevel().captureChunkRequestOwner(protocols, chunkX, chunkZ) : null;
         LevelDBChunk chunk = (LevelDBChunk) this.getChunk(chunkX, chunkZ, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
         }
 
         long timestamp = chunk.getChanges();
-        ChunkRequestToken token = new ChunkRequestToken(chunk);
+        ChunkRequestToken token = new ChunkRequestToken(chunk, requestOwner);
 
         if (this.getServer().asyncChunkSending) {
             final BaseChunk chunkClone = chunk.cloneForChunkSending();
@@ -606,7 +608,11 @@ public class LevelDBProvider implements LevelProvider {
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                     for (GameVersion gv : protocols) {
-                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                        if (getLevel().getClass() == Level.class) {
+                            getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, token);
+                        } else {
+                            getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                        }
                     }
                 }
             });
@@ -618,7 +624,11 @@ public class LevelDBProvider implements LevelProvider {
             } catch (Throwable t) {
                 getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                 for (GameVersion gv : protocols) {
-                    getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                    if (getLevel().getClass() == Level.class) {
+                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, token);
+                    } else {
+                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                    }
                 }
             }
         }

@@ -184,6 +184,32 @@ class ChunkProviderCallbackCompatibilityTest {
         fixture.assertNoProviderFailure();
     }
 
+    @ParameterizedTest
+    @CsvSource({"ANVIL,false", "ANVIL,true", "LEVELDB,false", "LEVELDB,true"})
+    void customLevelKeepsItsLegacyFailureHook(ProviderKind kind, boolean async) throws Exception {
+        FailureHookLevel level = mock(FailureHookLevel.class, CALLS_REAL_METHODS);
+        Fixture fixture = new Fixture(kind, async, level);
+        ObjectSet<GameVersion> protocols = new ObjectOpenHashSet<>();
+        protocols.add(VERSION);
+        try (MockedStatic<NetworkChunkSerializer> serializer = mockStatic(NetworkChunkSerializer.class)) {
+            serializer.when(() -> NetworkChunkSerializer.serialize(same(protocols),
+                    same(async ? fixture.copy : fixture.source), any(), eq(false), same(DIMENSION), eq(true)))
+                    .thenThrow(new IllegalStateException("custom level serializer failure"));
+            fixture.provider.requestChunkTask(protocols, X, Z);
+            serializer.verify(() -> NetworkChunkSerializer.serialize(same(protocols),
+                    same(async ? fixture.copy : fixture.source), any(), eq(false), same(DIMENSION), eq(true)));
+        }
+        verify(fixture.executor, times(async ? 1 : 0)).execute(any(Runnable.class));
+        verify(level).onAsyncChunkRequestFailed(VERSION, X, Z);
+        assertEquals(1, level.failures, "existing custom failure hook executes once");
+        assertEquals(1, fixture.failed.size(), "delegating legacy hook enqueues once");
+        Object failure = fixture.failed.element();
+        assertEquals(VERSION, field(failure, "protocol"));
+        assertEquals(X, field(failure, "x"));
+        assertEquals(Z, field(failure, "z"));
+        assertTrue(fixture.prepared.isEmpty(), "failed serialization cannot enqueue a success");
+    }
+
     private static NetworkChunkSerializerCallbackData preparedData(Object prepared) throws Exception {
         return (NetworkChunkSerializerCallbackData) field(prepared, "data");
     }
@@ -207,6 +233,7 @@ class ChunkProviderCallbackCompatibilityTest {
         final BaseChunk source;
         final BaseChunk copy;
         final Queue<Object> prepared = new ConcurrentLinkedQueue<>();
+        final Queue<Object> failed = new ConcurrentLinkedQueue<>();
         final ExecutorService executor = mock(ExecutorService.class);
 
         Fixture(ProviderKind kind, boolean async, Level level) throws Exception {
@@ -222,7 +249,7 @@ class ChunkProviderCallbackCompatibilityTest {
             }
             set(level, Level.class, "chunkSendTaskStartTick", new Long2LongOpenHashMap());
             set(level, Level.class, "asyncChunkRequestCallbackQueue", prepared);
-            set(level, Level.class, "asyncChunkRequestFailedQueue", new ConcurrentLinkedQueue<>());
+            set(level, Level.class, "asyncChunkRequestFailedQueue", failed);
             doReturn(DIMENSION).when(level).getDimensionData();
             doReturn(false).when(level).antiXrayEnabled();
             doReturn(true).when(level).isClientCacheDeliveryWanted();
@@ -289,6 +316,18 @@ class ChunkProviderCallbackCompatibilityTest {
 
         void assertNoProviderFailure() {
             verify(level, never()).onAsyncChunkRequestFailed(any(GameVersion.class), anyInt(), anyInt());
+        }
+    }
+
+    static class FailureHookLevel extends Level {
+        int failures;
+
+        FailureHookLevel() { super(null, null, null, null); }
+
+        @Override
+        public void onAsyncChunkRequestFailed(GameVersion version, int x, int z) {
+            failures++;
+            super.onAsyncChunkRequestFailed(version, x, z);
         }
     }
 

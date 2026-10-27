@@ -110,13 +110,15 @@ public class Anvil extends BaseLevelProvider {
 
     @Override
     public void requestChunkTask(ObjectSet<GameVersion> protocols, int x, int z) throws ChunkException {
+        Level.ChunkRequestOwner requestOwner = getLevel().getClass() == Level.class
+                ? getLevel().captureChunkRequestOwner(protocols, x, z) : null;
         Chunk chunk = (Chunk) this.getChunk(x, z, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
         }
 
         long timestamp = chunk.getChanges();
-        ChunkRequestToken token = new ChunkRequestToken(chunk);
+        ChunkRequestToken token = new ChunkRequestToken(chunk, requestOwner);
 
         if (this.getServer().asyncChunkSending) {
             final Chunk chunkClone = chunk.cloneForChunkSending();
@@ -128,7 +130,11 @@ public class Anvil extends BaseLevelProvider {
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + x + ", " + z + ")", t);
                     for (GameVersion gv : protocols) {
-                        getLevel().onAsyncChunkRequestFailed(gv, x, z);
+                        if (getLevel().getClass() == Level.class) {
+                            getLevel().onAsyncChunkRequestFailed(gv, x, z, token);
+                        } else {
+                            getLevel().onAsyncChunkRequestFailed(gv, x, z);
+                        }
                     }
                 }
             });
@@ -140,7 +146,11 @@ public class Anvil extends BaseLevelProvider {
             } catch (Throwable t) {
                 getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + x + ", " + z + ")", t);
                 for (GameVersion gv : protocols) {
-                    getLevel().onAsyncChunkRequestFailed(gv, x, z);
+                    if (getLevel().getClass() == Level.class) {
+                        getLevel().onAsyncChunkRequestFailed(gv, x, z, token);
+                    } else {
+                        getLevel().onAsyncChunkRequestFailed(gv, x, z);
+                    }
                 }
             }
         }

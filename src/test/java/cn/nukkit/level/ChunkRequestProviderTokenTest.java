@@ -14,6 +14,7 @@ import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.utils.BinaryStream;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -35,6 +36,11 @@ class ChunkRequestProviderTokenTest {
     @CsvSource({"false,false", "false,true", "true,false", "true,true"})
     void bothProvidersCarryTheLiveOwnerThroughSyncAndAsyncSerialization(boolean anvil, boolean async) throws Exception {
         Level level = mock(Level.class, CALLS_REAL_METHODS);
+        for (String name : new String[]{"chunkSendQueues", "chunkSendTasks"}) {
+            Field field = Level.class.getDeclaredField(name);
+            field.setAccessible(true);
+            field.set(level, new Object2ObjectOpenHashMap<>());
+        }
         doReturn(false).when(level).isClientCacheDeliveryWanted();
         doNothing().when(level).asyncChunkRequestCallback(any(GameVersion.class), anyLong(),
                 anyInt(), anyInt(), anyInt(), any(byte[].class), any(), any(), any(), any(ChunkRequestToken.class));
