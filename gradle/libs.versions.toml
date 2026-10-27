@@ -30,9 +30,10 @@ junit = "5.10.2"
 junit_platform = "1.10.2"
 mockito = "5.23.0"
 nukkitx_natives = "1.0.3"
-raknet = "1.1.0.CR1-20261007.033337-7"
-cloudburst_nethernet = "2.0.0.CR4-20261006.110144-17"
-libdatachannel = "0.24.6.0-20261006.072145-3"
+raknet = "1.1.0.CR4-20261026.103812-1"
+cloudburst_nethernet = "2.0.0.CR6-20261023.132252-11"
+cloudburst_netty_common = "2.0.0.CR6-20261023.132252-11"
+libdatachannel = "0.24.6.0-20261023.142230-9"
 expiringmap = "0.5.11"
 slf4j_api = "2.0.18"
 cloudburst_common = "3.0.0.Beta13-20260915.235937-24"
@@ -45,6 +46,7 @@ netease_protocol_extension = "1.21.124-R1"
 [libraries]
 raknet = { module = "dev.mot.netty:netty-transport-raknet", version.ref = "raknet" }
 nethernet = { module = "org.cloudburstmc.netty:netty-transport-nethernet", version.ref = "cloudburst_nethernet" }
+netty-transport-common = { module = "org.cloudburstmc.netty:netty-transport-common", version.ref = "cloudburst_netty_common" }
 libdatachannel = { module = "dev.opencollab:libdatachannel-java", version.ref = "libdatachannel" }
 libdatachannel-arch-detect = { module = "dev.opencollab:libdatachannel-java-arch-detect", version.ref = "libdatachannel" }
 netty-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "netty_epoll" }

@@ -22,7 +22,10 @@ import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
-import org.cloudburstmc.netty.channel.nethernet.signaling.*;
+import org.cloudburstmc.netty.channel.nethernet.signaling.JoinRefusal;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPServerSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
 import org.cloudburstmc.netty.util.nethernet.NetherNetLogging;
 import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
 import org.cloudburstmc.netty.util.nethernet.TokenTrust;
@@ -159,7 +162,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 // RakNet and relayed to a system-assigned loopback port; 0 still means
                 // system-assigned). A mapping (19132:19134) pins the internal port instead
                 .setIceOnLocalPort(false)
-                .setIceServers(iceServers(settings))
+                .setStunServers(stunServers(settings))
                 .setAdvertisedAddresses(mediaPorts == null ? Set.of() : mediaPorts.advertisedAddresses())
                 .setTokenTrust(TokenTrust.ANY)
                 .setMotdProvider((host, remoteAddress, client) -> this.buildPong())
@@ -263,12 +266,17 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         return expiry != null && expiry >= System.currentTimeMillis();
     }
 
-    private static List<IceServerInfo> iceServers(NetherNetSettings settings) {
+    /**
+     * CR6 起 ICE 配置只剩 STUN 发现（TURN 支持随上游移除），URL 原样交给信令层。
+     * Since CR6 the ICE configuration is STUN discovery only (upstream dropped TURN);
+     * URLs pass through to the signaling layer as-is.
+     */
+    private static List<String> stunServers(NetherNetSettings settings) {
         List<String> urls = settings.iceServers();
         if (urls == null || urls.isEmpty()) {
             return List.of();
         }
-        return List.of(new IceServerInfo.Builder().setUrls(List.copyOf(urls)).build());
+        return List.copyOf(urls);
     }
 
     /**

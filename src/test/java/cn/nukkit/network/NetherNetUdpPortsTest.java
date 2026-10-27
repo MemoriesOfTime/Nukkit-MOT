@@ -299,7 +299,7 @@ class NetherNetUdpPortsTest {
         }
 
         @Override
-        public void bind(SocketAddress localAddress, EventLoop eventLoop) {
+        public void bind(SocketAddress localAddress, InetSocketAddress advertisedAddress, EventLoop eventLoop) {
         }
 
         @Override

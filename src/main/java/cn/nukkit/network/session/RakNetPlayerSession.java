@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import com.nukkitx.natives.sha256.Sha256;
 import com.nukkitx.natives.util.Natives;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -30,8 +29,8 @@ import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 import org.apache.logging.log4j.message.FormattedMessage;
+import org.cloudburstmc.netty.channel.TransportDisconnectReason;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
-import org.cloudburstmc.netty.channel.raknet.RakDisconnectReason;
 import org.cloudburstmc.netty.channel.raknet.packet.RakMessage;
 import org.cloudburstmc.netty.handler.codec.raknet.common.RakSessionCodec;
 
@@ -95,7 +94,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private Player player;
     private volatile String disconnectReason = null;
-    private RakDisconnectReason transportDisconnectReason = null;
+    private TransportDisconnectReason transportDisconnectReason = null;
 
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
@@ -242,7 +241,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object event) throws Exception {
-        if (event instanceof RakDisconnectReason reason) {
+        if (event instanceof TransportDisconnectReason reason) {
             this.transportDisconnectReason = reason;
         }
         super.userEventTriggered(ctx, event);
@@ -270,6 +269,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             case QUEUE_TOO_LONG -> "transport:queue_too_long";
             case SPLIT_QUEUE_TOO_LONG -> "transport:split_queue_too_long";
             case ORDERING_QUEUE_TOO_LONG -> "transport:ordering_queue_too_long";
+            // 以下三类为共享枚举里 WebRTC 侧新增的值，RakNet 理论不触发，防御性列出
+            // The three below were added to the shared enum for the WebRTC side; RakNet is
+            // not expected to fire them, listed defensively
+            case ABORTED_BY_REMOTE_PEER -> "transport:aborted_by_remote_peer";
+            case CONNECTION_LOST -> "transport:connection_lost";
+            case TRANSPORT_FAILED -> "transport:transport_failed";
         };
     }
 
