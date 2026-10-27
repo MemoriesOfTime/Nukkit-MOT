@@ -2849,6 +2849,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendRotation = true;
                     }
                 } else {
+                    // Seed the rollback position when the first input only changes rotation.
+                    this.lastX = this.x;
+                    this.lastY = this.y;
+                    this.lastZ = this.z;
                     this.lastYaw = this.yaw;
                     this.lastPitch = this.pitch;
                     this.needSendRotation = true;
