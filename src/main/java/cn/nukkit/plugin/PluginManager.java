@@ -589,21 +589,25 @@ public class PluginManager {
     }
 
     public <E extends Event> void registerEvent(Class<E> clazz, Consumer<E> handler, Plugin plugin) throws PluginException {
-        Listener listener = new Listener() {};
-        EventExecutor executor = (ignored, event) -> {
-            @SuppressWarnings("unchecked") E typedEvent = (E) event;
-            handler.accept(typedEvent);
-        };
-        this.registerEvent(clazz, listener, EventPriority.NORMAL, executor, plugin);
+        this.registerEvent(clazz, handler, EventPriority.NORMAL, false, plugin);
     }
 
     public <E extends Event> void registerEvent(Class<E> clazz, Consumer<E> handler, EventPriority priority, Plugin plugin) throws PluginException {
+        this.registerEvent(clazz, handler, priority, false, plugin);
+    }
+
+    public <E extends Event> void registerEvent(Class<E> clazz, Consumer<E> handler, boolean ignoreCancelled, Plugin plugin) throws PluginException {
+        this.registerEvent(clazz, handler, EventPriority.NORMAL, ignoreCancelled, plugin);
+    }
+
+    public <E extends Event> void registerEvent(Class<E> clazz, Consumer<E> handler, EventPriority priority, boolean ignoreCancelled, Plugin plugin) throws PluginException {
         Listener listener = new Listener() {};
         EventExecutor executor = (ignored, event) -> {
-            @SuppressWarnings("unchecked") E typedEvent = (E) event;
+            @SuppressWarnings("unchecked")
+            E typedEvent = (E) event;
             handler.accept(typedEvent);
         };
-        this.registerEvent(clazz, listener, priority, executor, plugin);
+        this.registerEvent(clazz, listener, priority, executor, plugin, ignoreCancelled);
     }
 
     public void registerEvent(Class<? extends Event> event, Listener listener, EventPriority priority, EventExecutor executor, Plugin plugin) throws PluginException {
