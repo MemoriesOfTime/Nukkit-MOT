@@ -6,6 +6,7 @@ import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
@@ -73,7 +74,7 @@ class PlayerCancelledBlockVisualTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"786,false", "786,true", "2193,false", "2193,true"})
+    @CsvSource({"685,false", "685,true", "786,false", "786,true", "2193,false", "2193,true"})
     void deniedClickRebuildsBothLayersAndDoorBottom(int protocol, boolean upperDoor) throws Exception {
         Level level = mock(Level.class);
         Player player = player(level, protocol);
@@ -81,10 +82,24 @@ class PlayerCancelledBlockVisualTest {
         Block adjacent = mock(Block.class);
         Block bottom = mock(Block.class);
         Block liquid = mock(Block.class);
+        target.y = 64;
+        adjacent.y = 65;
+        bottom.y = 63;
+        when(target.getFloorY()).thenReturn(64);
+        when(adjacent.getFloorY()).thenReturn(65);
+        when(bottom.getFloorY()).thenReturn(63);
+        BaseFullChunk loaded = mock(BaseFullChunk.class);
+        when(level.isYInRange(anyInt())).thenReturn(true);
+        when(level.getChunkIfLoaded(0, 0)).thenReturn(loaded);
+        when(level.getBlock(same(loaded), eq(0), anyInt(), eq(0), anyInt(), eq(false))).thenAnswer(call -> {
+            if ((int) call.getArgument(4) == 1) return liquid;
+            return switch ((int) call.getArgument(2)) {
+                case 63 -> bottom;
+                case 65 -> adjacent;
+                default -> target;
+            };
+        });
         when(target.getSide(BlockFace.UP)).thenReturn(adjacent);
-        when(target.getLevelBlockAtLayer(1)).thenReturn(liquid);
-        when(adjacent.getLevelBlockAtLayer(1)).thenReturn(liquid);
-        when(bottom.getLevelBlockAtLayer(1)).thenReturn(liquid);
         when(level.getBlock(any(Vector3.class))).thenReturn(target);
         if (upperDoor) {
             when(target.getDamage()).thenReturn(8);
@@ -95,15 +110,15 @@ class PlayerCancelledBlockVisualTest {
         player.handleInventoryTransactionPacket(click(protocol));
         verify(level).useItemOn(any(Vector3.class), any(Item.class), eq(BlockFace.UP),
                 anyFloat(), anyFloat(), anyFloat(), same(player));
-        verify(level).sendBlocks(any(Player[].class), eq(new Block[]{target, adjacent}),
-                eq(UpdateBlockPacket.FLAG_ALL_PRIORITY));
-        verify(level).sendBlocks(any(Player[].class), eq(new Block[]{liquid, liquid}),
+        verify(level).sendBlocks(any(Player[].class), eq(new Block[]{target}),
+                eq(UpdateBlockPacket.FLAG_ALL_PRIORITY), eq(0));
+        verify(level).sendBlocks(any(Player[].class), eq(new Block[]{adjacent}),
+                eq(UpdateBlockPacket.FLAG_ALL_PRIORITY), eq(0));
+        verify(level, times(upperDoor ? 3 : 2)).sendBlocks(any(Player[].class), eq(new Block[]{liquid}),
                 eq(UpdateBlockPacket.FLAG_ALL_PRIORITY), eq(1));
         if (upperDoor) {
             verify(level).sendBlocks(any(Player[].class), eq(new Block[]{bottom}),
-                    eq(UpdateBlockPacket.FLAG_ALL_PRIORITY));
-            verify(level).sendBlocks(any(Player[].class), eq(new Block[]{liquid}),
-                    eq(UpdateBlockPacket.FLAG_ALL_PRIORITY), eq(1));
+                    eq(UpdateBlockPacket.FLAG_ALL_PRIORITY), eq(0));
         }
         verify(level, never()).sendBlocks(any(Player[].class), any(Vector3[].class), eq(UpdateBlockPacket.FLAG_NOGRAPHIC));
     }

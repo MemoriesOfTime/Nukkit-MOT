@@ -1,11 +1,14 @@
 package cn.nukkit;
 
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockAir;
 import cn.nukkit.block.BlockStone;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.server.DataPacketReceiveEvent;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
@@ -39,7 +42,9 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.cloudburstmc.protocol.bedrock.data.PlayerActionType.BLOCK_PREDICT_DESTROY;
 import static org.cloudburstmc.protocol.bedrock.data.PlayerActionType.START_BREAK;
 
@@ -64,6 +69,7 @@ class PlayerAuthInputBlockActionsTest extends AbstractPacketRegressionTest {
                 "Both predicted removals must reach the authoritative break check, including repeated action types");
         assertEquals(List.of(rejectedX), harness.restored,
                 "A rejected prediction must resend that block without restoring the accepted neighbor");
+        harness.assertRestoredLayers(List.of(rejectedX));
     }
 
     @ParameterizedTest(name = "v{0}")
@@ -79,6 +85,7 @@ class PlayerAuthInputBlockActionsTest extends AbstractPacketRegressionTest {
         assertEquals(List.of("break:1", "start:2", "break:2", "start:3"), harness.trace,
                 "Grouping all completions first must not move the second completion ahead of its own start");
         assertEquals(List.of(), harness.restored);
+        harness.assertRestoredLayers(List.of());
     }
 
     @ParameterizedTest(name = "legacy map v{0}")
@@ -96,6 +103,7 @@ class PlayerAuthInputBlockActionsTest extends AbstractPacketRegressionTest {
 
         assertEquals(List.of("break:1", "start:2"), harness.trace);
         assertEquals(List.of(1), harness.restored);
+        harness.assertRestoredLayers(List.of(1));
     }
 
     @ParameterizedTest(name = "decoded snapshot v{0}")
@@ -118,6 +126,7 @@ class PlayerAuthInputBlockActionsTest extends AbstractPacketRegressionTest {
         harness.player.handleDataPacket(packet);
         assertEquals(List.of("break:1", "break:2", "start:3"), harness.trace,
                 "snapshot mutations must not change replay or trigger lossy legacy-map fallback");
+        harness.assertRestoredLayers(List.of());
     }
 
     private static Stream<Arguments> legacyMapEdits() {
@@ -164,6 +173,7 @@ class PlayerAuthInputBlockActionsTest extends AbstractPacketRegressionTest {
                 "An event listener's map edit must override the decoded actions before execution");
         assertEquals(expectedBreaks, harness.breaks, "Removed or replaced predictions must never execute");
         assertEquals(expectedBreaks, harness.restored, "The replacement still uses the authoritative rejection path");
+        harness.assertRestoredLayers(expectedBreaks);
     }
 
     private enum LegacyMapEdit {
@@ -215,8 +225,11 @@ class PlayerAuthInputBlockActionsTest extends AbstractPacketRegressionTest {
 
     private static final class Harness {
         final TestPlayer player;
+        final Level level;
         final List<Integer> breaks = new ArrayList<>();
         final List<Integer> restored = new ArrayList<>();
+        final List<Integer> restoredLayer1 = new ArrayList<>();
+        final List<String> restorationOrder = new ArrayList<>();
         final List<String> trace = new ArrayList<>();
         Consumer<PlayerAuthInputPacket> packetListener = packet -> {};
 
@@ -224,7 +237,21 @@ class PlayerAuthInputBlockActionsTest extends AbstractPacketRegressionTest {
             MockServer.reset();
             Server server = MockServer.get();
             server.serverAuthoritativeMovementMode = 1;
-            Level level = Mockito.mock(Level.class);
+            level = Mockito.mock(Level.class);
+            BaseFullChunk loaded = Mockito.mock(BaseFullChunk.class);
+            Mockito.when(level.isYInRange(64)).thenReturn(true);
+            Mockito.when(level.getChunkIfLoaded(0, 0)).thenReturn(loaded);
+            Mockito.when(level.getBlock(Mockito.same(loaded), Mockito.anyInt(), Mockito.eq(64),
+                    Mockito.eq(0), Mockito.anyInt(), Mockito.eq(false))).thenAnswer(invocation -> {
+                int layer = invocation.getArgument(4);
+                assertTrue(layer == 0 || layer == 1);
+                Block block = layer == 0 ? new BlockStone() : new BlockAir();
+                block.setComponents(invocation.getArgument(1, Integer.class),
+                        invocation.getArgument(2, Integer.class), invocation.getArgument(3, Integer.class));
+                block.layer = layer;
+                block.level = level;
+                return block;
+            });
             PluginManager manager = server.getPluginManager();
             Mockito.when(server.getDefaultLevel()).thenReturn(level);
             Mockito.when(level.getBlock(Mockito.any(Vector3.class))).thenAnswer(invocation -> {
@@ -265,15 +292,32 @@ class PlayerAuthInputBlockActionsTest extends AbstractPacketRegressionTest {
             Mockito.doAnswer(invocation -> {
                 Player[] recipients = invocation.getArgument(0);
                 assertEquals(List.of(player), List.of(recipients));
+                assertEquals(UpdateBlockPacket.FLAG_ALL_PRIORITY, (int) invocation.getArgument(2));
+                int layer = invocation.getArgument(3);
+                assertTrue(layer == 0 || layer == 1);
                 Vector3[] positions = invocation.getArgument(1);
+                assertEquals(1, positions.length);
                 for (Vector3 position : positions) {
                     assertEquals(64, position.getFloorY());
                     assertEquals(0, position.getFloorZ());
-                    restored.add(position.getFloorX());
+                    Block block = assertInstanceOf(Block.class, position);
+                    assertEquals(layer, block.layer);
+                    assertEquals(layer == 0 ? Block.STONE : Block.AIR, block.getId());
+                    (layer == 0 ? restored : restoredLayer1).add(position.getFloorX());
+                    restorationOrder.add(position.getFloorX() + ":" + layer);
                 }
                 return null;
             }).when(level).sendBlocks(Mockito.any(Player[].class), Mockito.any(Vector3[].class),
-                    Mockito.eq(UpdateBlockPacket.FLAG_ALL_PRIORITY));
+                    Mockito.anyInt(), Mockito.anyInt());
+        }
+
+        void assertRestoredLayers(List<Integer> expected) {
+            assertEquals(expected, restoredLayer1,
+                    "Layer 1 must restore exactly the rejected positions, without accepted neighbors");
+            assertEquals(expected.stream().flatMap(x -> Stream.of(x + ":0", x + ":1")).toList(),
+                    restorationOrder, "Each rejected block must restore layer 0 before layer 1");
+            Mockito.verify(level, Mockito.never()).sendBlocks(Mockito.any(Player[].class),
+                    Mockito.any(Vector3[].class), Mockito.anyInt());
         }
     }
 
