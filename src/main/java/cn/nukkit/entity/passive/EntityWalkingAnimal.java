@@ -15,7 +15,6 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.Objects;
-import java.util.Optional;
 
 public abstract class EntityWalkingAnimal extends EntityWalking implements EntityAnimal {
 
@@ -61,8 +60,10 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
         this.entityBaseTick(tickDiff);
 
         // fix look at
-        Optional.ofNullable(this.updateMove(tickDiff))
-                .ifPresent(this::lookAt);
+        Vector3 movementTarget = this.updateMove(tickDiff);
+        if (movementTarget != null) {
+            this.lookAt(movementTarget);
+        }
         return true;
     }
 
