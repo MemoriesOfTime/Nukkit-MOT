@@ -772,6 +772,7 @@
                             <arguments>
                                 <argument>${project.build.directory}/dependency-list.txt</argument>
                                 <argument>${project.build.outputDirectory}/DEPENDENCIES.txt</argument>
+                                <argument>${settings.localRepository}</argument>
                             </arguments>
                         </configuration>
                     </execution>
