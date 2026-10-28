@@ -71,8 +71,8 @@
         <jose4j.version>0.9.6</jose4j.version>
         <nukkitx-natives.version>1.0.3</nukkitx-natives.version>
         <raknet.version>1.1.0.CR4-20261026.103812-1</raknet.version>
-        <cloudburst-common.version>3.0.0.Beta13-20260915.235937-24</cloudburst-common.version>
-        <cloudburst-codec.version>3.0.0.Beta13-20260916.122344-26</cloudburst-codec.version>
+        <cloudburst-common.version>3.0.0.Beta14-20261006.183140-3</cloudburst-common.version>
+        <cloudburst-codec.version>3.0.0.Beta14-20261006.183140-3</cloudburst-codec.version>
         <jackson-dataformat-toml.version>2.20.1</jackson-dataformat-toml.version>
         <eu.okaeri.version>6.1.0-beta.1</eu.okaeri.version>
 
