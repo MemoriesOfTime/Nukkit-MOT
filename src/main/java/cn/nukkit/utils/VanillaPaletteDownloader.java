@@ -77,7 +77,7 @@ public final class VanillaPaletteDownloader {
             JsonObject manifest = fetchManifest();
             return processManifest(binDir, manifest);
         } catch (Exception e) {
-            log.warn(getLang().translateString("nukkit.palette.downloadFailed", MIRROR_BASE_URL, e.toString()));
+            log.warn(getLang().translateString("nukkit.palette.downloadFailed", new String[]{MIRROR_BASE_URL, e.toString()}));
             logManualRecoveryHint();
             return new Result(0, 0, 0, false);
         }
@@ -133,7 +133,7 @@ public final class VanillaPaletteDownloader {
         try {
             downloadBundle(bundlePath, bundle);
         } catch (Exception e) {
-            log.warn(getLang().translateString("nukkit.palette.bundleFailed", bundle.file, e.toString()));
+            log.warn(getLang().translateString("nukkit.palette.bundleFailed", new String[]{bundle.file, e.toString()}));
             logManualRecoveryHint();
             return new Result(0, present, missing.size(), true);
         }
@@ -200,7 +200,7 @@ public final class VanillaPaletteDownloader {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                 downloaded++;
             } catch (Exception e) {
-                log.warn(getLang().translateString("nukkit.palette.fileFailed", member.file, e.toString()));
+                log.warn(getLang().translateString("nukkit.palette.fileFailed", new String[]{member.file, e.toString()}));
                 failed++;
             } finally {
                 tryDelete(temp);
@@ -244,7 +244,7 @@ public final class VanillaPaletteDownloader {
                     Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                     downloaded++;
                 } catch (Exception e) {
-                    log.warn(getLang().translateString("nukkit.palette.extractFailed", member.file, e.toString()));
+                    log.warn(getLang().translateString("nukkit.palette.extractFailed", new String[]{member.file, e.toString()}));
                     failed++;
                     Files.deleteIfExists(temp);
                 }
