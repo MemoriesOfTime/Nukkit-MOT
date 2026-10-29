@@ -3211,7 +3211,8 @@ public abstract class Entity extends Location implements Metadatable {
 
             if (!this.justCreated) {
                 Map<Integer, Player> newChunk = this.level.getChunkPlayers(cx, cz);
-                for (Player player : new ArrayList<>(this.hasSpawned.values())) {
+                for (Object viewer : this.hasSpawned.values().toArray()) {
+                    Player player = (Player) viewer;
                     if (!newChunk.containsKey(player.getLoaderId())) {
                         this.despawnFrom(player);
                     } else {
@@ -3411,7 +3412,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void despawnFromAll() {
-        for (Player player : new ArrayList<>(this.hasSpawned.values())) {
+        for (Object viewer : this.hasSpawned.values().toArray()) {
+            Player player = (Player) viewer;
             this.despawnFrom(player);
         }
     }
