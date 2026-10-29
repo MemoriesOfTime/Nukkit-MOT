@@ -1400,8 +1400,6 @@ public class Level implements ChunkManager, Metadatable {
 
         this.tickEntities(currentTick);
 
-        this.reportEntityActivation();
-
         var updateBlockEntities = this.updateBlockEntities.iterator();
         while (updateBlockEntities.hasNext()) {
             BlockEntity be = updateBlockEntities.next();
@@ -1555,21 +1553,6 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
-    /** Mob updates skipped by entity activation since the last report. */
-    private long activationSkippedUpdates;
-    /** Mob updates actually run since the last report. */
-    private long activationRunUpdates;
-    private long lastActivationReport = System.currentTimeMillis();
-    private static final long ACTIVATION_REPORT_INTERVAL_MS = 600_000L;
-
-    public long getActivationSkippedUpdates() {
-        return this.activationSkippedUpdates;
-    }
-
-    public long getActivationRunUpdates() {
-        return this.activationRunUpdates;
-    }
-
     /**
      * Runs one scheduled entity update. A mob asleep under entity activation is skipped but stays scheduled.
      *
@@ -1580,31 +1563,9 @@ public class Level implements ChunkManager, Metadatable {
             return false;
         }
         if (entity.isActivationThrottled(currentTick)) {
-            this.activationSkippedUpdates++;
             return true;
         }
-        if (entity instanceof cn.nukkit.entity.BaseEntity) {
-            this.activationRunUpdates++;
-        }
         return entity.onUpdate(currentTick);
-    }
-
-    /** One line per level every ten minutes: how much mob work entity activation saved. Silent when idle. */
-    private void reportEntityActivation() {
-        long now = System.currentTimeMillis();
-        if (now - this.lastActivationReport < ACTIVATION_REPORT_INTERVAL_MS) {
-            return;
-        }
-        this.lastActivationReport = now;
-        long skipped = this.activationSkippedUpdates;
-        long run = this.activationRunUpdates;
-        this.activationSkippedUpdates = 0;
-        this.activationRunUpdates = 0;
-        if (skipped == 0) {
-            return;
-        }
-        this.server.getLogger().info("Entity activation in level " + this.getFolderName() + ": skipped " + skipped
-                + " of " + (skipped + run) + " mob updates (" + (skipped * 100 / (skipped + run)) + "%) in the last 10 min");
     }
 
     private void performThunder(long index, FullChunk chunk) {
@@ -6565,7 +6526,9 @@ public class Level implements ChunkManager, Metadatable {
             return GameVersion.V1_20_50_NETEASE;
         }
 
-        if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_60.getProtocol()) {
+            return GameVersion.V1_26_60;
+        } else if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
             return GameVersion.V1_26_50;
         } else if (protocol >= GameVersion.V1_26_40.getProtocol()) {
             return GameVersion.V1_26_40;
@@ -6734,7 +6697,9 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == GameVersion.V1_26_40.getProtocol())
             if (player >= GameVersion.V1_26_40.getProtocol()) if (player < GameVersion.V1_26_50_27.getProtocol()) return true;
         if (chunk == GameVersion.V1_26_50.getProtocol())
-            if (player >= GameVersion.V1_26_50_27.getProtocol()) return true;
+            if (player >= GameVersion.V1_26_50_27.getProtocol()) if (player < GameVersion.V1_26_60.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_60.getProtocol())
+            if (player >= GameVersion.V1_26_60.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 
