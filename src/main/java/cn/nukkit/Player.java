@@ -317,7 +317,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private final int loaderId;
 
-    public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
+    public final Map<Long, Boolean> usedChunks = new ConcurrentHashMap<>();
 
     private int chunksSent = 0;
     private long chunkDeliveryEpoch;
