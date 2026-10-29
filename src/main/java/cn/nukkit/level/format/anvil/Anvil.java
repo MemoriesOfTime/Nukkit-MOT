@@ -116,6 +116,8 @@ public class Anvil extends BaseLevelProvider {
 
     @Override
     public void requestChunkTask(ObjectSet<GameVersion> protocols, int x, int z, long sequence) throws ChunkException {
+        Level.ChunkRequestOwner owner = getLevel().getClass() == Level.class
+                ? getLevel().captureChunkRequestOwner(protocols, x, z) : null;
         Chunk chunk = (Chunk) this.getChunk(x, z, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
@@ -128,7 +130,7 @@ public class Anvil extends BaseLevelProvider {
         // serialize synchronously, same fallback as SubChunkRequestProcessor
         ExecutorService executor = this.getServer().asyncChunkSending ? this.level.getAsyncChuckExecutor() : null;
         if (executor == null) {
-            this.requestChunkTaskSync(protocols, chunk, timestamp, x, z);
+            this.requestChunkTaskSync(protocols, chunk, timestamp, x, z, sequence, owner);
             return;
         }
 
@@ -146,19 +148,19 @@ public class Anvil extends BaseLevelProvider {
                                 networkChunkSerializerCallback.getSubChunkBlobs(),
                                 networkChunkSerializerCallback.getBiomes(),
                                 networkChunkSerializerCallback.getBlockEntities(),
-                                sequence
+                                sequence, owner
                         );
                     }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + x + ", " + z + ")", t);
                     for (GameVersion gv : protocols) {
-                        getLevel().onAsyncChunkRequestFailed(gv, x, z);
+                        getLevel().onAsyncChunkRequestFailed(gv, x, z, sequence, owner);
                     }
                 }
             });
         } catch (RejectedExecutionException e) {
             // 关服中池已停：同步兜底，不让请求丢失 / pool already down during shutdown: sync fallback
-            this.requestChunkTaskSync(protocols, chunk, timestamp, x, z);
+            this.requestChunkTaskSync(protocols, chunk, timestamp, x, z, sequence, owner);
         }
     }
 
@@ -167,7 +169,7 @@ public class Anvil extends BaseLevelProvider {
      * <p>
      * Main-thread serialization (async-chunks off / world predates the setting / executor shut down)
      */
-    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, Chunk chunk, long timestamp, int x, int z) {
+    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, Chunk chunk, long timestamp, int x, int z, long sequence, Level.ChunkRequestOwner owner) {
         try {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
                 this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
@@ -178,13 +180,13 @@ public class Anvil extends BaseLevelProvider {
                         networkChunkSerializerCallback.getStream().getBuffer(),
                         networkChunkSerializerCallback.getSubChunkBlobs(),
                         networkChunkSerializerCallback.getBiomes(),
-                        networkChunkSerializerCallback.getBlockEntities()
+                        networkChunkSerializerCallback.getBlockEntities(), owner
                 );
             }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
         } catch (Throwable t) {
             getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + x + ", " + z + ")", t);
             for (GameVersion gv : protocols) {
-                getLevel().onAsyncChunkRequestFailed(gv, x, z);
+                getLevel().onAsyncChunkRequestFailed(gv, x, z, sequence, owner);
             }
         }
     }
