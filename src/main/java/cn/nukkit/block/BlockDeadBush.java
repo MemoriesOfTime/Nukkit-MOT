@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockRefusalDiagnostics;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
@@ -50,6 +51,7 @@ public class BlockDeadBush extends BlockFlowable {
             this.getLevel().setBlock(block, this, true, true);
             return true;
         }
+        BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.DEAD_BUSH_SUPPORT);
         return false;
     }
 

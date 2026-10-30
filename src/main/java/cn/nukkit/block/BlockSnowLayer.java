@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockRefusalDiagnostics;
 import cn.nukkit.Player;
 import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.item.Item;
@@ -70,6 +71,7 @@ public class BlockSnowLayer extends BlockFallableMeta {
 
             return true;
         }
+        BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.SNOW_LAYER_SUPPORT);
         return false;
     }
 
