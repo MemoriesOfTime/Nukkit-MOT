@@ -199,9 +199,21 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             return false;
         }
 
+        BlockEntity sourceEntity = this.level.getBlockEntityIfLoaded(this);
+        if (!(sourceEntity instanceof BlockEntityPistonArm sourceArm) || sourceArm.closed) {
+            return false;
+        }
+        int sourceArmState = sourceArm.state;
+        Block sourcePiston = this.clone();
+
         BlockPistonEvent event = new BlockPistonEvent(this, direction, calculator.getBlocksToMove(), calculator.getBlocksToDestroy(), extending);
         this.level.getServer().getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
+        if (event.isCancelled() || sourceArm.closed || sourceArm.state != sourceArmState
+                || this.level != sourcePiston.level || this.layer != sourcePiston.layer
+                || this.x != sourcePiston.x || this.y != sourcePiston.y || this.z != sourcePiston.z
+                || !Block.equals(this, sourcePiston)
+                || this.level.getBlockEntityIfLoaded(sourcePiston) != sourceArm
+                || !Block.equals(this.level.getBlock(sourcePiston, sourcePiston.layer, false), sourcePiston)) {
             return false;
         }
 
