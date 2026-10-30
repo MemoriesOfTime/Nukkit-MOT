@@ -174,6 +174,11 @@ public class ShapelessRecipe implements CraftingRecipe {
             return false;
         }
 
+        // Only the base recipe has no virtual secondary-result policy to evaluate.
+        if (getClass() == ShapelessRecipe.class && extraOutputList.isEmpty()) {
+            return true;
+        }
+
         List<Item> haveOutputs = new ArrayList<>();
         for (Item item : extraOutputList) {
             if (item.isNull())
