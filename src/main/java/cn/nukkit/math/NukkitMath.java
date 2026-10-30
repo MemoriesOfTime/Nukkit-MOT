@@ -83,7 +83,10 @@ public class NukkitMath {
     }
 
     public static int randomRange(NukkitRandom random, int start) {
-        return randomRange(random, 0, 0x7fffffff);
+        long width = (long) Integer.MAX_VALUE - start + 1;
+        // Negative starts need all 32 random bits to reach the upper half of the range.
+        long value = start < 0 ? Integer.toUnsignedLong(random.nextSignedInt()) : random.nextInt();
+        return (int) (start + value % width);
     }
 
     public static int randomRange(NukkitRandom random, int start, int end) {
