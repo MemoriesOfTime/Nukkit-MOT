@@ -1,0 +1,221 @@
+{
+  "playerBaseDamage": 1,
+  "playerSource": "https://github.com/Mojang/bedrock-samples/blob/main/behavior_pack/entities/player.json",
+  "damageComponentSource": "https://learn.microsoft.com/en-us/minecraft/creator/reference/content/itemreference/examples/itemcomponents/minecraft_damage",
+  "bdsExportRepository": "AllayMC/Allay",
+  "bdsExportCommit": "59d4007e322a0acf2b0add59133c81e1f7e4c501",
+  "bdsExportSha256": "07ed576de6713f8b1152db26ef53f53df0766d35a261bd1d399fd02596635571",
+  "bdsExportPath": "data/resources/unpacked/items_raw.json",
+  "entries": [
+    {
+      "identifier": "minecraft:wooden_sword",
+      "javaClass": "cn.nukkit.item.ItemSwordWood",
+      "attackDamageExtra": 4
+    },
+    {
+      "identifier": "minecraft:golden_sword",
+      "javaClass": "cn.nukkit.item.ItemSwordGold",
+      "attackDamageExtra": 4
+    },
+    {
+      "identifier": "minecraft:stone_sword",
+      "javaClass": "cn.nukkit.item.ItemSwordStone",
+      "attackDamageExtra": 5
+    },
+    {
+      "identifier": "minecraft:copper_sword",
+      "javaClass": "cn.nukkit.item.ItemSwordCopper",
+      "attackDamageExtra": 5
+    },
+    {
+      "identifier": "minecraft:iron_sword",
+      "javaClass": "cn.nukkit.item.ItemSwordIron",
+      "attackDamageExtra": 6
+    },
+    {
+      "identifier": "minecraft:diamond_sword",
+      "javaClass": "cn.nukkit.item.ItemSwordDiamond",
+      "attackDamageExtra": 7
+    },
+    {
+      "identifier": "minecraft:netherite_sword",
+      "javaClass": "cn.nukkit.item.ItemSwordNetherite",
+      "attackDamageExtra": 8
+    },
+    {
+      "identifier": "minecraft:wooden_axe",
+      "javaClass": "cn.nukkit.item.ItemAxeWood",
+      "attackDamageExtra": 3
+    },
+    {
+      "identifier": "minecraft:golden_axe",
+      "javaClass": "cn.nukkit.item.ItemAxeGold",
+      "attackDamageExtra": 3
+    },
+    {
+      "identifier": "minecraft:stone_axe",
+      "javaClass": "cn.nukkit.item.ItemAxeStone",
+      "attackDamageExtra": 4
+    },
+    {
+      "identifier": "minecraft:copper_axe",
+      "javaClass": "cn.nukkit.item.ItemAxeCopper",
+      "attackDamageExtra": 4
+    },
+    {
+      "identifier": "minecraft:iron_axe",
+      "javaClass": "cn.nukkit.item.ItemAxeIron",
+      "attackDamageExtra": 5
+    },
+    {
+      "identifier": "minecraft:diamond_axe",
+      "javaClass": "cn.nukkit.item.ItemAxeDiamond",
+      "attackDamageExtra": 6
+    },
+    {
+      "identifier": "minecraft:netherite_axe",
+      "javaClass": "cn.nukkit.item.ItemAxeNetherite",
+      "attackDamageExtra": 7
+    },
+    {
+      "identifier": "minecraft:wooden_pickaxe",
+      "javaClass": "cn.nukkit.item.ItemPickaxeWood",
+      "attackDamageExtra": 2
+    },
+    {
+      "identifier": "minecraft:golden_pickaxe",
+      "javaClass": "cn.nukkit.item.ItemPickaxeGold",
+      "attackDamageExtra": 2
+    },
+    {
+      "identifier": "minecraft:stone_pickaxe",
+      "javaClass": "cn.nukkit.item.ItemPickaxeStone",
+      "attackDamageExtra": 3
+    },
+    {
+      "identifier": "minecraft:copper_pickaxe",
+      "javaClass": "cn.nukkit.item.ItemPickaxeCopper",
+      "attackDamageExtra": 3
+    },
+    {
+      "identifier": "minecraft:iron_pickaxe",
+      "javaClass": "cn.nukkit.item.ItemPickaxeIron",
+      "attackDamageExtra": 4
+    },
+    {
+      "identifier": "minecraft:diamond_pickaxe",
+      "javaClass": "cn.nukkit.item.ItemPickaxeDiamond",
+      "attackDamageExtra": 5
+    },
+    {
+      "identifier": "minecraft:netherite_pickaxe",
+      "javaClass": "cn.nukkit.item.ItemPickaxeNetherite",
+      "attackDamageExtra": 6
+    },
+    {
+      "identifier": "minecraft:wooden_shovel",
+      "javaClass": "cn.nukkit.item.ItemShovelWood",
+      "attackDamageExtra": 1
+    },
+    {
+      "identifier": "minecraft:golden_shovel",
+      "javaClass": "cn.nukkit.item.ItemShovelGold",
+      "attackDamageExtra": 1
+    },
+    {
+      "identifier": "minecraft:stone_shovel",
+      "javaClass": "cn.nukkit.item.ItemShovelStone",
+      "attackDamageExtra": 2
+    },
+    {
+      "identifier": "minecraft:copper_shovel",
+      "javaClass": "cn.nukkit.item.ItemShovelCopper",
+      "attackDamageExtra": 2
+    },
+    {
+      "identifier": "minecraft:iron_shovel",
+      "javaClass": "cn.nukkit.item.ItemShovelIron",
+      "attackDamageExtra": 3
+    },
+    {
+      "identifier": "minecraft:diamond_shovel",
+      "javaClass": "cn.nukkit.item.ItemShovelDiamond",
+      "attackDamageExtra": 4
+    },
+    {
+      "identifier": "minecraft:netherite_shovel",
+      "javaClass": "cn.nukkit.item.ItemShovelNetherite",
+      "attackDamageExtra": 5
+    },
+    {
+      "identifier": "minecraft:wooden_hoe",
+      "javaClass": "cn.nukkit.item.ItemHoeWood",
+      "attackDamageExtra": 2
+    },
+    {
+      "identifier": "minecraft:golden_hoe",
+      "javaClass": "cn.nukkit.item.ItemHoeGold",
+      "attackDamageExtra": 2
+    },
+    {
+      "identifier": "minecraft:stone_hoe",
+      "javaClass": "cn.nukkit.item.ItemHoeStone",
+      "attackDamageExtra": 3
+    },
+    {
+      "identifier": "minecraft:copper_hoe",
+      "javaClass": "cn.nukkit.item.ItemHoeCopper",
+      "attackDamageExtra": 3
+    },
+    {
+      "identifier": "minecraft:iron_hoe",
+      "javaClass": "cn.nukkit.item.ItemHoeIron",
+      "attackDamageExtra": 4
+    },
+    {
+      "identifier": "minecraft:diamond_hoe",
+      "javaClass": "cn.nukkit.item.ItemHoeDiamond",
+      "attackDamageExtra": 5
+    },
+    {
+      "identifier": "minecraft:netherite_hoe",
+      "javaClass": "cn.nukkit.item.ItemHoeNetherite",
+      "attackDamageExtra": 6
+    },
+    {
+      "identifier": "minecraft:trident",
+      "javaClass": "cn.nukkit.item.ItemTrident",
+      "attackDamageExtra": 8
+    },
+    {
+      "identifier": "minecraft:mace",
+      "javaClass": "cn.nukkit.item.ItemMace",
+      "attackDamageExtra": 5
+    },
+    {
+      "identifier": "minecraft:bow",
+      "javaClass": "cn.nukkit.item.ItemBow",
+      "attackDamageExtra": 0
+    },
+    {
+      "identifier": "minecraft:crossbow",
+      "javaClass": "cn.nukkit.item.ItemCrossbow",
+      "attackDamageExtra": 0
+    },
+    {
+      "identifier": "minecraft:air",
+      "javaClass": null,
+      "attackDamageExtra": 0
+    },
+    {
+      "identifier": "minecraft:diamond",
+      "javaClass": null,
+      "attackDamageExtra": 0
+    },
+    {
+      "identifier": "minecraft:dirt",
+      "javaClass": null,
+      "attackDamageExtra": 0
+    }
+  ]
+}
