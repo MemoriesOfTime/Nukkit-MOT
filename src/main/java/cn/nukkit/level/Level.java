@@ -4491,7 +4491,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void processChunkRequest() {
-        Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = new Long2ObjectOpenHashMap<>();
+        Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = null;
         for (GameVersion protocolId : this.pendingChunkRequests.keySet()) {
             LongSet pending = this.getPendingChunkRequests(protocolId);
             if (pending.isEmpty()) {
@@ -4516,6 +4516,9 @@ public class Level implements ChunkManager, Metadatable {
                     this.chunkSendGeneration.addTo(index, this.chunkSendGeneration.get(index) == 0L ? 2L : 1L);
                 }
                 if (!tasks.contains(index) && queue.containsKey(index)) {
+                    if (chunkRequests == null) {
+                        chunkRequests = new Long2ObjectOpenHashMap<>();
+                    }
                     chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
                     tasks.add(index);
                 }
@@ -4523,7 +4526,9 @@ public class Level implements ChunkManager, Metadatable {
             pending.clear();
         }
 
-        this.chunkRequestInternal(chunkRequests);
+        if (chunkRequests != null) {
+            this.chunkRequestInternal(chunkRequests);
+        }
     }
 
     /**
