@@ -205,7 +205,17 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             return 0;
         }
 
-        SubChunkTask task = buildSubChunkTask(playerHandle, state, pk, offsets, granted, cacheMode, level);
+        int requestEpoch = state.epoch();
+        SubChunkTask task;
+        try {
+            task = buildSubChunkTask(playerHandle, state, pk, offsets, granted, cacheMode, level);
+        } catch (RuntimeException | Error failure) {
+            if (state.epoch() == requestEpoch) {
+                state.releaseInFlightOffsets(granted);
+                state.tryDefer(pk);
+            }
+            throw failure;
+        }
         ExecutorService executor = executorOverride != null ? executorOverride : level.getAsyncChuckExecutor();
         if (executor == null) {
             // async-chunks=false：该 level 无异步执行器，同步兜底（与执行器关停同路径）

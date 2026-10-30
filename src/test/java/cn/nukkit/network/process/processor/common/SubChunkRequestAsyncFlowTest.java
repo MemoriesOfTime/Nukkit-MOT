@@ -100,6 +100,70 @@ class SubChunkRequestAsyncFlowTest {
         SubChunkRequestProcessor.executorOverride = null;
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"heights", "sections", "blockEntities"})
+    void snapshotFailureReturnsOnlyItsCreditAndKeepsTheUnsubmittedTail(String stage) {
+        BaseChunk chunk = chunkWithSection();
+        putChunkInView(chunk);
+        state.acquireInFlightOffsets(5);
+        IllegalStateException failure = new IllegalStateException("controlled " + stage + " snapshot failure");
+        switch (stage) {
+            case "heights" -> when(chunk.getHeightMapArray()).thenThrow(failure);
+            case "sections" -> when(chunk.getSections()).thenThrow(failure);
+            case "blockEntities" -> when(chunk.getBlockEntitiesOfSection(anyInt())).thenThrow(failure);
+            default -> throw new AssertionError(stage);
+        }
+        SubChunkRequestPacket request = request(-4, 1);
+        request.positionOffsets.add(new BlockVector3(0, 1, 0));
+        request.positionOffsets.add(new BlockVector3(0, 2, 0));
+
+        assertSame(failure, assertThrows(IllegalStateException.class,
+                () -> SubChunkRequestProcessor.INSTANCE.handle(playerHandle, request)));
+
+        assertEquals(5, state.inFlightOffsetCount(), "only this request's reservation may be released");
+        assertEquals(1, state.deferredPacketCount(), "snapshot failure keeps one fresh request");
+        assertSame(request, state.peekDeferred());
+        assertEquals(3, state.deferredOffsetCount(), "the never-submitted tail must survive too");
+        assertFalse(state.hasCompletions());
+        verify(SubChunkRequestProcessor.executorOverride, never()).execute(any());
+    }
+
+    @Test
+    void snapshotErrorReturnsReservedCreditAndPreservesTheOriginalError() {
+        BaseChunk chunk = chunkWithSection();
+        putChunkInView(chunk);
+        AssertionError failure = new AssertionError("controlled snapshot error");
+        when(chunk.getHeightMapArray()).thenThrow(failure);
+
+        assertSame(failure, assertThrows(AssertionError.class,
+                () -> SubChunkRequestProcessor.INSTANCE.handle(playerHandle, request(-4, 1))));
+
+        assertEquals(0, state.inFlightOffsetCount());
+        assertEquals(1, state.deferredOffsetCount());
+        assertFalse(state.hasCompletions());
+    }
+
+    @Test
+    void snapshotFailureAfterClearCannotReleaseNewEpochCreditOrRestoreOldRequests() {
+        BaseChunk chunk = chunkWithSection();
+        putChunkInView(chunk);
+        int epoch = state.epoch();
+        IllegalStateException failure = new IllegalStateException("snapshot failed after clear");
+        when(chunk.getHeightMapArray()).thenAnswer(inv -> {
+            state.clear();
+            assertEquals(7, state.acquireInFlightOffsets(7));
+            throw failure;
+        });
+
+        assertSame(failure, assertThrows(IllegalStateException.class,
+                () -> SubChunkRequestProcessor.INSTANCE.handle(playerHandle, request(-4, 1))));
+
+        assertNotEquals(epoch, state.epoch());
+        assertEquals(7, state.inFlightOffsetCount(), "clear already discarded the old reservation");
+        assertFalse(state.hasDeferred(), "a failed old snapshot cannot recreate an old-epoch request");
+        assertFalse(state.hasCompletions());
+    }
+
     private static void setFinal(Class<?> type, Object target, String name, Object value) throws Exception {
         var field = type.getDeclaredField(name);
         field.setAccessible(true);
