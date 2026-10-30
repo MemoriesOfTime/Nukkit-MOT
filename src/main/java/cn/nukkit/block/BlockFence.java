@@ -221,6 +221,10 @@ public class BlockFence extends BlockTransparentMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(this, this.getDamage() & ~CONNECTION_FLAGS);
+        int meta = this.getDamage() & ~CONNECTION_FLAGS;
+        if (this.getClass() == BlockFence.class && (meta == 6 || meta == 7)) {
+            return new ItemBlock(Block.get(FENCE, 0), 0);
+        }
+        return new ItemBlock(this, meta);
     }
 }
