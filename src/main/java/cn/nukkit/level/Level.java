@@ -2566,10 +2566,11 @@ public class Level implements ChunkManager, Metadatable {
         if (size == 0) {
             return;
         }
-        Queue<Long> lightPropagationQueue = new ConcurrentLinkedQueue<>();
-        Queue<Object[]> lightRemovalQueue = new ConcurrentLinkedQueue<>();
-        LongOpenHashSet visited = new LongOpenHashSet();
-        LongOpenHashSet removalVisited = new LongOpenHashSet();
+        // Allocate traversal scratch only if a queued root changes its emitted light.
+        Queue<Long> lightPropagationQueue = null;
+        Queue<Object[]> lightRemovalQueue = null;
+        LongOpenHashSet visited = null;
+        LongOpenHashSet removalVisited = null;
 
         Iterator<Map.Entry<Long, Set<Integer>>> iter = map.entrySet().iterator();
         while (iter.hasNext() && size-- > 0) {
@@ -2587,6 +2588,12 @@ public class Level implements ChunkManager, Metadatable {
                     int oldLevel = chunk.getBlockLight(lcx, pos.getFloorY(), lcz);
                     int newLevel = Block.getBlockLight(chunk.getBlockId(lcx, pos.getFloorY(), lcz));
                     if (oldLevel != newLevel) {
+                        if (lightPropagationQueue == null) {
+                            lightPropagationQueue = new ConcurrentLinkedQueue<>();
+                            lightRemovalQueue = new ConcurrentLinkedQueue<>();
+                            visited = new LongOpenHashSet();
+                            removalVisited = new LongOpenHashSet();
+                        }
                         chunk.setBlockLight(((int) pos.x) & 0x0f, (int) pos.y, ((int) pos.z) & 0x0f, newLevel & 0x0f);
 
                         long hash = Hash.hashBlock(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ());
@@ -2600,6 +2607,10 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
             }
+        }
+
+        if (lightPropagationQueue == null) {
+            return;
         }
 
         while (!lightRemovalQueue.isEmpty()) {
