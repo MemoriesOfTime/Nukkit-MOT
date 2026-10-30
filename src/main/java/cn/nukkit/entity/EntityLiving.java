@@ -125,16 +125,52 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         return !(this instanceof EntitySmite) || effectId != Effect.REGENERATION && effectId != Effect.POISON;
     }
 
-    @Override
-    public boolean attack(EntityDamageEvent source) {
-        if (this.noDamageTicks > 0) {
+    /** Prepare the hurt-window difference before armor, resistance and absorption. */
+    protected static boolean applyAttackCooldown(EntityLiving target, EntityDamageEvent source) {
+        if (target.noDamageTicks > 0) {
             return false;
-        } else if (this.attackTime > 0) {
-            EntityDamageEvent lastCause = this.getLastDamageCause();
-            if (lastCause != null && lastCause.getDamage() >= source.getDamage()) {
+        }
+        EntityDamageEvent previous = target.getLastDamageCause();
+        if (target.attackTime > 0 && previous != null) {
+            // Keep the raw BASE ceiling: plugin balance must not make equal hits stronger.
+            if (previous.getDamage() >= source.getDamage()) {
                 return false;
             }
+            // HumanType and Living both call this; never reduce a prepared event twice.
+            // The ceiling check above also rejects replay of an already accepted event.
+            if (!source.isApplicable(EntityDamageEvent.DamageModifier.PREVIOUS_DAMAGE_COOLDOWN)) {
+                source.setDamage(-previous.getDamage(), EntityDamageEvent.DamageModifier.PREVIOUS_DAMAGE_COOLDOWN);
+                if (source.getDamage() > 0) {
+                    float ratio = (source.getDamage() - previous.getDamage()) / source.getDamage();
+                    // Attacker potion budgets were computed from the full BASE in the
+                    // constructor. Pay their share of this difference, not the full budget.
+                    if (source.isApplicable(EntityDamageEvent.DamageModifier.STRENGTH)) {
+                        source.setDamage(source.getDamage(EntityDamageEvent.DamageModifier.STRENGTH) * ratio,
+                                EntityDamageEvent.DamageModifier.STRENGTH);
+                    }
+                    if (source.isApplicable(EntityDamageEvent.DamageModifier.WEAKNESS)) {
+                        source.setDamage(source.getDamage(EntityDamageEvent.DamageModifier.WEAKNESS) * ratio,
+                                EntityDamageEvent.DamageModifier.WEAKNESS);
+                    }
+                    if (source.isApplicable(EntityDamageEvent.DamageModifier.RESISTANCE)
+                            && !Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction()) {
+                        // Legacy keeps the constructor's resistance budget. Scale it once;
+                        // vanilla mode recalculates resistance after target armor instead.
+                        source.setDamage(source.getDamage(EntityDamageEvent.DamageModifier.RESISTANCE) * ratio,
+                                EntityDamageEvent.DamageModifier.RESISTANCE);
+                    }
+                }
+            }
         }
+        return true;
+    }
+
+    @Override
+    public boolean attack(EntityDamageEvent source) {
+        if (!applyAttackCooldown(this, source)) {
+            return false;
+        }
+        boolean supplement = source.isApplicable(EntityDamageEvent.DamageModifier.PREVIOUS_DAMAGE_COOLDOWN);
 
         if (this.blockedByShield(source)) {
             return false;
@@ -155,15 +191,21 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
                 double deltaX = this.x - damager.x;
                 double deltaZ = this.z - damager.z;
-                this.knockBack(damager, source.getDamage(), deltaX, deltaZ, ((EntityDamageByEntityEvent) source).getKnockBack());
+                if (!supplement) {
+                    this.knockBack(damager, source.getDamage(), deltaX, deltaZ, ((EntityDamageByEntityEvent) source).getKnockBack());
+                }
             }
 
-            EntityEventPacket pk = new EntityEventPacket();
-            pk.eid = this.getId();
-            pk.event = this.getHealth() < 1 ? EntityEventPacket.DEATH_ANIMATION : EntityEventPacket.HURT_ANIMATION;
-            Server.broadcastPacket(this.hasSpawned.values(), pk);
+            if (!supplement || this.getHealth() < 1) {
+                EntityEventPacket pk = new EntityEventPacket();
+                pk.eid = this.getId();
+                pk.event = this.getHealth() < 1 ? EntityEventPacket.DEATH_ANIMATION : EntityEventPacket.HURT_ANIMATION;
+                Server.broadcastPacket(this.hasSpawned.values(), pk);
+            }
 
-            this.attackTime = source.getAttackCooldown();
+            if (!supplement) {
+                this.attackTime = source.getAttackCooldown();
+            }
             this.scheduleUpdate();
             return true;
         } else {
