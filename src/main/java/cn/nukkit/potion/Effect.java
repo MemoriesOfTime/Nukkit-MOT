@@ -215,12 +215,12 @@ public class Effect implements Cloneable {
                 }
                 return true;
             case Effect.WITHER:
-                if ((interval = (50 >> this.amplifier)) > 0) {
+                if ((interval = (40 >> this.amplifier)) > 0) {
                     return (this.duration % interval) == 0;
                 }
                 return true;
             case Effect.REGENERATION:
-                if ((interval = (40 >> this.amplifier)) > 0) {
+                if ((interval = (50 >> this.amplifier)) > 0) {
                     return (this.duration % interval) == 0;
                 }
                 return true;
@@ -299,7 +299,7 @@ public class Effect implements Cloneable {
                     player.setMovementSpeed(player.getMovementSpeed() / (1 + 0.2f * (oldEffect.amplifier + 1)), false);
                 }
                 player.setMovementSpeed(player.getMovementSpeed() * (1 + 0.2f * (this.amplifier + 1)));*/
-                entityLiving.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED, 1 + 0.2f * this.amplifier, EntityMovementSpeedModifier.Operation.MULTIPLY));
+                entityLiving.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED, 1 + 0.2f * (this.amplifier + 1), EntityMovementSpeedModifier.Operation.MULTIPLY));
             }
 
             if (this.id == Effect.SLOWNESS) {
@@ -307,7 +307,7 @@ public class Effect implements Cloneable {
                     player.setMovementSpeed(player.getMovementSpeed() / (1 - 0.15f * (oldEffect.amplifier + 1)), false);
                 }
                 player.setMovementSpeed(player.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));*/
-                entityLiving.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SLOWNESS, 1 - 0.15f * this.amplifier, EntityMovementSpeedModifier.Operation.MULTIPLY));
+                entityLiving.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SLOWNESS, 1 - 0.15f * (this.amplifier + 1), EntityMovementSpeedModifier.Operation.MULTIPLY));
             }
         }
 

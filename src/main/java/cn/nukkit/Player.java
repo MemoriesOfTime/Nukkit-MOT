@@ -3,10 +3,7 @@ package cn.nukkit;
 import cn.nukkit.AdventureSettings.Type;
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.block.*;
-import cn.nukkit.blockentity.BlockEntity;
-import cn.nukkit.blockentity.BlockEntityCampfire;
-import cn.nukkit.blockentity.BlockEntityItemFrame;
-import cn.nukkit.blockentity.BlockEntitySpawnable;
+import cn.nukkit.blockentity.*;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
@@ -5994,6 +5991,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     switch (useItemData.actionType) {
                         case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK:
+                            Level clickLevel = this.level;
                             boolean spamming = !server.doNotLimitInteractions
                                     && lastRightClickPos != null
                                     && System.currentTimeMillis() - lastRightClickTime < 100.0
@@ -6058,30 +6056,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 }
                             }
 
-                            if (blockVector.distanceSquared(this) > 10000) {
+                            if (this.level != clickLevel || blockVector.distanceSquared(this) > 10000) {
                                 break;
                             }
 
                             Block target = this.level.getBlock(blockVector.asVector3());
                             block = target.getSide(face);
 
-                            this.level.sendBlocks(new Player[]{this}, new Block[]{target, block}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-                            this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1), block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
-
-                            for (Vector3 restorePos : new Vector3[]{blockVector.asVector3(), blockVector.getSide(face).asVector3()}) {
-                                if (this.level.getBlockEntity(restorePos) instanceof BlockEntitySpawnable spawnable) {
-                                    spawnable.spawnTo(this);
-                                }
+                            if (!this.sendRefusedBlockLayers(clickLevel, target)
+                                    || !this.sendRefusedBlockLayers(clickLevel, block)
+                                    || this.level != clickLevel) {
+                                break;
                             }
 
                             if (target instanceof BlockDoor door && (door.getDamage() & 0x08) > 0) {
                                 Block part = target.down();
                                 if (part.getId() == target.getId()) {
                                     target = part;
-                                    this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-                                    this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
+                                    if (!this.sendRefusedBlockLayers(clickLevel, target)) {
+                                        break;
+                                    }
                                 }
                             }
+                            this.resendRefusedBlockActors(clickLevel, blockVector.asVector3(), blockVector.getSide(face).asVector3());
                             break;
                         case InventoryTransactionPacket.USE_ITEM_ACTION_BREAK_BLOCK:
                             if (!this.spawned || !this.isAlive()) {
@@ -6092,6 +6089,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             Item i = this.getInventory().getItemInHand();
                             Item oldItem = i.clone();
+                            Level breakLevel = this.level;
 
                             if (this.canInteract(blockVector.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7)
                                     && (i = this.level.useBreakOn(blockVector.asVector3(), face, i, this, true)) != null) {
@@ -6114,12 +6112,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             inventory.sendHeldItem(this);
 
                             if (blockVector.distanceSquared(this) < 10000) {
-                                target = this.level.getBlock(blockVector.asVector3());
-                                this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-
-                                BlockEntity blockEntity = this.level.getBlockEntity(blockVector.asVector3());
-                                if (blockEntity instanceof BlockEntitySpawnable) {
-                                    ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+                                if (this.sendRefusedBlockLayers(breakLevel, blockVector.asVector3())) {
+                                    this.resendRefusedBlockActors(breakLevel, blockVector.asVector3());
                                 }
                             }
                             break;
@@ -6601,12 +6595,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        Block target = this.level.getBlock(pos);
+        Level interactionLevel = this.level;
+        Block target = interactionLevel.getBlock(pos);
         PlayerInteractEvent playerInteractEvent = new PlayerInteractEvent(this, this.inventory.getItemInHand(), target, face,
                 target.getId() == 0 ? Action.LEFT_CLICK_AIR : Action.LEFT_CLICK_BLOCK);
         this.getServer().getPluginManager().callEvent(playerInteractEvent);
         if (playerInteractEvent.isCancelled()) {
             this.needSendHeldItem = true;
+            if (this.sendRefusedBlockLayers(interactionLevel, pos)) {
+                this.resendRefusedBlockActors(interactionLevel, pos);
+            }
             return;
         }
 
@@ -6683,17 +6681,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         Item handItem = this.getInventory().getItemInHand();
         Item clone = handItem.clone();
+        Level breakLevel = this.level;
 
         boolean canInteract = this.canInteract(blockPos.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7);
         if (canInteract) {
             handItem = this.level.useBreakOn(blockPos.asVector3(), face, handItem, this, true);
             if (handItem == null) {
                 this.armDeniedCreativeBreakCorrection(blockPos);
-                this.level.sendBlocks(new Player[]{this}, new Vector3[]{blockPos.asVector3()}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-
-                BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
-                if (blockEntity instanceof BlockEntitySpawnable) {
-                    ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+                if (this.sendRefusedBlockLayers(breakLevel, blockPos.asVector3())) {
+                    this.resendRefusedBlockActors(breakLevel, blockPos.asVector3());
                 }
             } else if (this.isSurvival()) {
                 this.getFoodData().updateFoodExpLevel(0.005);
@@ -6717,13 +6713,87 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.armDeniedCreativeBreakCorrection(blockPos);
 
         if (blockPos.distanceSquared(this) < 10000) {
-            Vector3 pos = blockPos.asVector3();
-            this.level.sendBlocks(this, new Block[]{this.level.getBlock(pos, false)}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-            BlockEntity blockEntity = this.level.getBlockEntityIfLoaded(this.chunk, pos);
-            if (blockEntity instanceof BlockEntitySpawnable) {
-                ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+            if (this.sendRefusedBlockLayers(breakLevel, blockPos.asVector3())) {
+                this.resendRefusedBlockActors(breakLevel, blockPos.asVector3());
             }
         }
+    }
+
+    /**
+     * 拒绝的预测交互后，仅从已加载区块的权威存储按层重发方块，不触发同步区块加载。
+     * <p>
+     * Restores both block layers from still-loaded authoritative storage after a refused prediction,
+     * never triggering a synchronous chunk load. Returns false when the world or chunk became invalid.
+     */
+    private boolean sendRefusedBlockLayers(Level origin, Vector3 pos) {
+        if (this.level != origin || !origin.isYInRange(pos.getFloorY())) {
+            return false;
+        }
+        FullChunk loaded = origin.getChunkIfLoaded(pos.getFloorX() >> 4, pos.getFloorZ() >> 4);
+        if (loaded == null) {
+            return false;
+        }
+        for (int layer = 0; layer <= 1; layer++) {
+            // Packet listeners may teleport the player or replace/unload the chunk synchronously.
+            if (this.level != origin || origin.getChunkIfLoaded(pos.getFloorX() >> 4, pos.getFloorZ() >> 4) != loaded) {
+                return false;
+            }
+            Block block = origin.getBlock(loaded, pos.getFloorX(), pos.getFloorY(), pos.getFloorZ(), layer, false);
+            origin.sendBlocks(new Player[]{this}, new Block[]{block}, UpdateBlockPacket.FLAG_ALL_PRIORITY, layer);
+        }
+        return this.level == origin && origin.getChunkIfLoaded(pos.getFloorX() >> 4, pos.getFloorZ() >> 4) == loaded;
+    }
+
+    /**
+     * 方块层全部重发后，补发公开的方块实体数据，含互惠相邻的双箱另一半。
+     * <p>
+     * Resends public block-actor data after the block layers, including the second half of a live,
+     * adjacent, reciprocal double chest; never opens or mutates a container.
+     */
+    private void resendRefusedBlockActors(Level origin, Vector3... positions) {
+        if (this.level != origin) {
+            return;
+        }
+        List<BlockEntitySpawnable> actors = new ArrayList<>();
+        for (Vector3 pos : positions) {
+            BlockEntity actor = origin.getBlockEntityIfLoaded(pos);
+            if (actor instanceof BlockEntitySpawnable spawnable && !spawnable.closed
+                    && spawnable.getLevel() == origin) {
+                actors.add(spawnable);
+            }
+        }
+        // A refused prediction can flip or remove both halves; only a live reciprocal pair is relevant.
+        for (int i = 0; i < actors.size(); i++) {
+            if (actors.get(i) instanceof BlockEntityChest chest) {
+                BlockEntityChest pair = chest.getPair();
+                if (pair != null && !pair.closed && pair.getLevel() == origin
+                        && pair.getFloorY() == chest.getFloorY()
+                        && Math.abs(pair.getFloorX() - chest.getFloorX())
+                        + Math.abs(pair.getFloorZ() - chest.getFloorZ()) == 1
+                        && pair.getPair() == chest && origin.getBlockEntityIfLoaded(pair) == pair
+                        && !containsIdentity(actors, pair)) {
+                    actors.add(pair);
+                    if (!this.sendRefusedBlockLayers(origin, pair)) {
+                        actors.remove(actors.size() - 1);
+                    }
+                }
+            }
+        }
+        for (BlockEntitySpawnable actor : actors) {
+            if (this.level == origin && !actor.closed && actor.getLevel() == origin
+                    && origin.getBlockEntityIfLoaded(actor) == actor) {
+                actor.spawnTo(this);
+            }
+        }
+    }
+
+    private static boolean containsIdentity(List<BlockEntitySpawnable> actors, BlockEntitySpawnable actor) {
+        for (BlockEntitySpawnable present : actors) {
+            if (present == actor) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

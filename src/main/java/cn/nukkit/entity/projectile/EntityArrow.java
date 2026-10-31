@@ -265,12 +265,12 @@ public class EntityArrow extends EntitySlenderProjectile {
                     }
                     if (entity instanceof EntitySmite) {
                         if (shootingEntity != null) {
-                            entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                            entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())));
                         } else {
-                            entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                            entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())));
                         }
                     } else {
-                        entity.heal(new EntityRegainHealthEvent(entity, 0.5f * (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
+                        entity.heal(new EntityRegainHealthEvent(entity, (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
                     }
                     break;
                 case Effect.INSTANT_DAMAGE:
@@ -278,11 +278,11 @@ public class EntityArrow extends EntitySlenderProjectile {
                         break;
                     }
                     if (entity instanceof EntitySmite) {
-                        entity.heal(new EntityRegainHealthEvent(entity, 0.5f * (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
+                        entity.heal(new EntityRegainHealthEvent(entity, (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
                     } else if (shootingEntity != null) {
-                        entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                        entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())));
                     } else {
-                        entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                        entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())));
                     }
                     break;
                 case Effect.SATURATION:
