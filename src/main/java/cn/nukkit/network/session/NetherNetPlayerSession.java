@@ -69,6 +69,9 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
      * close(), so Netty never fires channelInactive and the session must notice on its own.
      */
     private volatile boolean transportWasActive;
+    // Set once at login: whether the login chain's identity key matched the key this transport's
+    // signaling assertion proved, over the DTLS fingerprints of this very connection.
+    private volatile boolean identityKeyBound;
 
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
@@ -727,5 +730,18 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         Object[] withCause = Arrays.copyOf(arguments, arguments.length + 1);
         withCause[arguments.length] = failure == null ? "unknown" : failure.toString();
         log.warn(message + ", cause={}", withCause);
+    }
+
+    /**
+     * Whether the login chain is bound to this transport: the peer proved, before the transport was
+     * accepted, that it holds the key the chain is signed with. NetherNet's replacement for the
+     * Bedrock encryption handshake RakNet uses for the same proof.
+     */
+    public boolean isIdentityKeyBound() {
+        return this.identityKeyBound;
+    }
+
+    public void setIdentityKeyBound(boolean identityKeyBound) {
+        this.identityKeyBound = identityKeyBound;
     }
 }

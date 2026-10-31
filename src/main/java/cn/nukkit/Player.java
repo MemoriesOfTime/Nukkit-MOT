@@ -86,6 +86,7 @@ import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
+import cn.nukkit.network.session.NetherNetPlayerSession;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode;
 import cn.nukkit.network.session.login.SessionLoginPhase;
@@ -9895,6 +9896,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
         return this.isInventoryServerAuthoritative();
+    }
+
+    /**
+     * Whether this connection proved it holds the private key of its login chain's identity: RakNet
+     * through the Bedrock encryption handshake, NetherNet through the signaling assertion signed over
+     * the DTLS fingerprints of the same connection. A well-signed chain without this proof may be a
+     * replay of one the player sent to another server.
+     */
+    public boolean isLoginKeyProven() {
+        if (this.networkSession instanceof NetherNetPlayerSession netherNet) {
+            return netherNet.isIdentityKeyBound();
+        }
+        return this.isEnableNetworkEncryption();
     }
 
     public boolean isEnableNetworkEncryption() {
