@@ -39,6 +39,9 @@ public class BlockLantern extends BlockFlowable {
             case CHAIN_BLOCK:
                 return true;
             default:
+                if (support instanceof BlockCampfire) {
+                    return true;
+                }
                 if (support instanceof BlockFence) {
                     return true;
                 }
