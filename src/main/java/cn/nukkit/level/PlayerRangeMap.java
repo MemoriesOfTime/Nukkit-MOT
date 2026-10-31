@@ -140,6 +140,11 @@ public final class PlayerRangeMap extends ForwardingConcurrentMap<Long, Player> 
             }
 
             @Override
+            public boolean equals(Object other) {
+                return other == this || super.equals(other);
+            }
+
+            @Override
             public Player setValue(Player value) {
                 Player previous = entry.setValue(value);
                 revision.incrementAndGet();

@@ -1574,6 +1574,10 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
     @ParameterizedTest(name = "ClientboundAttributeLayerSyncPacket UpdateLayers v{0}")
     @MethodSource("versionsFrom944")
     void testClientboundAttributeLayerSyncPacketUpdateLayers(int protocolVersion) {
+        // CB Beta14-20261006 没有 v2225 环境属性变体的序列化器，跳过交叉验证；
+        // 该版本由 V2225PacketRegressionTest 做字节级覆盖
+        org.junit.jupiter.api.Assumptions.assumeTrue(protocolVersion < cn.nukkit.network.protocol.ProtocolInfo.v1_26_60,
+                "CB v2225 codec lacks the EAS variant layout");
         var nukkitPacket = new cn.nukkit.network.protocol.ClientboundAttributeLayerSyncPacket();
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);

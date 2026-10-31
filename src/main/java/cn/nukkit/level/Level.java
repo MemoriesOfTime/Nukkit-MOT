@@ -1400,8 +1400,6 @@ public class Level implements ChunkManager, Metadatable {
 
         this.tickEntities(currentTick);
 
-        this.reportEntityActivation();
-
         var updateBlockEntities = this.updateBlockEntities.iterator();
         while (updateBlockEntities.hasNext()) {
             BlockEntity be = updateBlockEntities.next();
@@ -1555,21 +1553,6 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
-    /** Mob updates skipped by entity activation since the last report. */
-    private long activationSkippedUpdates;
-    /** Mob updates actually run since the last report. */
-    private long activationRunUpdates;
-    private long lastActivationReport = System.currentTimeMillis();
-    private static final long ACTIVATION_REPORT_INTERVAL_MS = 600_000L;
-
-    public long getActivationSkippedUpdates() {
-        return this.activationSkippedUpdates;
-    }
-
-    public long getActivationRunUpdates() {
-        return this.activationRunUpdates;
-    }
-
     /**
      * Runs one scheduled entity update. A mob asleep under entity activation is skipped but stays scheduled.
      *
@@ -1580,31 +1563,9 @@ public class Level implements ChunkManager, Metadatable {
             return false;
         }
         if (entity.isActivationThrottled(currentTick)) {
-            this.activationSkippedUpdates++;
             return true;
         }
-        if (entity instanceof cn.nukkit.entity.BaseEntity) {
-            this.activationRunUpdates++;
-        }
         return entity.onUpdate(currentTick);
-    }
-
-    /** One line per level every ten minutes: how much mob work entity activation saved. Silent when idle. */
-    private void reportEntityActivation() {
-        long now = System.currentTimeMillis();
-        if (now - this.lastActivationReport < ACTIVATION_REPORT_INTERVAL_MS) {
-            return;
-        }
-        this.lastActivationReport = now;
-        long skipped = this.activationSkippedUpdates;
-        long run = this.activationRunUpdates;
-        this.activationSkippedUpdates = 0;
-        this.activationRunUpdates = 0;
-        if (skipped == 0) {
-            return;
-        }
-        this.server.getLogger().info("Entity activation in level " + this.getFolderName() + ": skipped " + skipped
-                + " of " + (skipped + run) + " mob updates (" + (skipped * 100 / (skipped + run)) + "%) in the last 10 min");
     }
 
     private void performThunder(long index, FullChunk chunk) {
@@ -2605,10 +2566,11 @@ public class Level implements ChunkManager, Metadatable {
         if (size == 0) {
             return;
         }
-        Queue<Long> lightPropagationQueue = new ConcurrentLinkedQueue<>();
-        Queue<Object[]> lightRemovalQueue = new ConcurrentLinkedQueue<>();
-        LongOpenHashSet visited = new LongOpenHashSet();
-        LongOpenHashSet removalVisited = new LongOpenHashSet();
+        // Allocate traversal scratch only if a queued root changes its emitted light.
+        Queue<Long> lightPropagationQueue = null;
+        Queue<Object[]> lightRemovalQueue = null;
+        LongOpenHashSet visited = null;
+        LongOpenHashSet removalVisited = null;
 
         Iterator<Map.Entry<Long, Set<Integer>>> iter = map.entrySet().iterator();
         while (iter.hasNext() && size-- > 0) {
@@ -2626,6 +2588,12 @@ public class Level implements ChunkManager, Metadatable {
                     int oldLevel = chunk.getBlockLight(lcx, pos.getFloorY(), lcz);
                     int newLevel = Block.getBlockLight(chunk.getBlockId(lcx, pos.getFloorY(), lcz));
                     if (oldLevel != newLevel) {
+                        if (lightPropagationQueue == null) {
+                            lightPropagationQueue = new ConcurrentLinkedQueue<>();
+                            lightRemovalQueue = new ConcurrentLinkedQueue<>();
+                            visited = new LongOpenHashSet();
+                            removalVisited = new LongOpenHashSet();
+                        }
                         chunk.setBlockLight(((int) pos.x) & 0x0f, (int) pos.y, ((int) pos.z) & 0x0f, newLevel & 0x0f);
 
                         long hash = Hash.hashBlock(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ());
@@ -2639,6 +2607,10 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
             }
+        }
+
+        if (lightPropagationQueue == null) {
+            return;
         }
 
         while (!lightRemovalQueue.isEmpty()) {
@@ -4519,7 +4491,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void processChunkRequest() {
-        Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = new Long2ObjectOpenHashMap<>();
+        Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = null;
         for (GameVersion protocolId : this.pendingChunkRequests.keySet()) {
             LongSet pending = this.getPendingChunkRequests(protocolId);
             if (pending.isEmpty()) {
@@ -4544,6 +4516,9 @@ public class Level implements ChunkManager, Metadatable {
                     this.chunkSendGeneration.addTo(index, this.chunkSendGeneration.get(index) == 0L ? 2L : 1L);
                 }
                 if (!tasks.contains(index) && queue.containsKey(index)) {
+                    if (chunkRequests == null) {
+                        chunkRequests = new Long2ObjectOpenHashMap<>();
+                    }
                     chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
                     tasks.add(index);
                 }
@@ -4551,7 +4526,9 @@ public class Level implements ChunkManager, Metadatable {
             pending.clear();
         }
 
-        this.chunkRequestInternal(chunkRequests);
+        if (chunkRequests != null) {
+            this.chunkRequestInternal(chunkRequests);
+        }
     }
 
     /**
@@ -6565,7 +6542,9 @@ public class Level implements ChunkManager, Metadatable {
             return GameVersion.V1_20_50_NETEASE;
         }
 
-        if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_60.getProtocol()) {
+            return GameVersion.V1_26_60;
+        } else if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
             return GameVersion.V1_26_50;
         } else if (protocol >= GameVersion.V1_26_40.getProtocol()) {
             return GameVersion.V1_26_40;
@@ -6734,7 +6713,9 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == GameVersion.V1_26_40.getProtocol())
             if (player >= GameVersion.V1_26_40.getProtocol()) if (player < GameVersion.V1_26_50_27.getProtocol()) return true;
         if (chunk == GameVersion.V1_26_50.getProtocol())
-            if (player >= GameVersion.V1_26_50_27.getProtocol()) return true;
+            if (player >= GameVersion.V1_26_50_27.getProtocol()) if (player < GameVersion.V1_26_60.getProtocol()) return true;
+        if (chunk == GameVersion.V1_26_60.getProtocol())
+            if (player >= GameVersion.V1_26_60.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

@@ -293,7 +293,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                             changed = true;
                             continue;
                         }
-                        BlockEntity blockEntity = BlockEntity.createBlockEntity(nbt.getString("id").replaceFirst("BlockEntity", ""), this, nbt);
+                        String id = nbt.getString("id");
+                        int legacyNameIndex = id.indexOf("BlockEntity");
+                        if (legacyNameIndex >= 0) {
+                            // Strip only the first marker, including legacy embedded names.
+                            id = id.substring(0, legacyNameIndex) + id.substring(legacyNameIndex + "BlockEntity".length());
+                        }
+                        BlockEntity blockEntity = BlockEntity.createBlockEntity(id, this, nbt);
                         if (blockEntity == null) {
                             // Valid id and coordinates, but the tile type could not be built
                             // (unregistered/unknown type such as a modded or custom tile, or a

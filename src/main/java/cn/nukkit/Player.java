@@ -318,7 +318,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private final int loaderId;
 
-    public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
+    public final Map<Long, Boolean> usedChunks = new ConcurrentHashMap<>();
 
     private int chunksSent = 0;
     private long chunkDeliveryEpoch;
@@ -2933,6 +2933,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             // Ground check
             if (!this.isSpectator() && (!this.onGround || dy != 0)) {
                 AxisAlignedBB bb = this.boundingBox.clone();
+                // Only exposed faces below the feet support a player; wall/head contacts do not.
+                bb.setMaxY(bb.getMinY() + 1.0E-4);
                 bb.setMinY(bb.getMinY() - 0.75);
 
                 // Hack: fix fall damage from walls while falling
@@ -2943,7 +2945,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     bb.setMaxZ(bb.getMaxZ() - 0.1);
                 }
 
-                this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+                this.onGround = CollisionHelper.hasExposedBlockSupport(this.level, this, bb);
             }
 
             this.isCollided = this.onGround;
@@ -6065,6 +6067,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     || !this.sendRefusedBlockLayers(clickLevel, block)
                                     || this.level != clickLevel) {
                                 break;
+                            }
+
+                            for (Vector3 restorePos : new Vector3[]{blockVector.asVector3(), blockVector.getSide(face).asVector3()}) {
+                                if (this.level.getBlockEntity(restorePos) instanceof BlockEntitySpawnable spawnable) {
+                                    spawnable.spawnTo(this);
+                                }
                             }
 
                             if (target instanceof BlockDoor door && (door.getDamage() & 0x08) > 0) {

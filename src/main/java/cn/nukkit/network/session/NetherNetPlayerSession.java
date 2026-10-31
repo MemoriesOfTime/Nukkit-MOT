@@ -11,6 +11,7 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.DisconnectPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.session.login.NetworkSessionState;
+import cn.nukkit.network.session.login.SessionLoginContext;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.BinaryStream;
@@ -439,7 +440,10 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     }
 
     public boolean isLoginPhaseTimedOut(long nowNanos, int timeoutMillis) {
-        return RakNetPlayerSession.isLoginPhaseTimedOut(this.state.getLogin().getPhase(), this.state.getLogin().getLastActivityNanos(), nowNanos, timeoutMillis);
+        SessionLoginContext login = this.state.getLogin();
+        return RakNetPlayerSession.isLoginPhaseTimedOut(
+                login.getPhase(), login.getLastActivityNanos(), login.getPhaseStartedNanos(),
+                this.channel.isActive(), nowNanos, timeoutMillis);
     }
 
     /**

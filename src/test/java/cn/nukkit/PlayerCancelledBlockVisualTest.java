@@ -2,6 +2,7 @@ package cn.nukkit;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockDoor;
+import cn.nukkit.blockentity.BlockEntitySpawnable;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.item.Item;
@@ -20,8 +21,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -60,9 +62,13 @@ class PlayerCancelledBlockVisualTest {
     }
 
     private static InventoryTransactionPacket click(int protocol) {
+        return click(protocol, new BlockVector3(0, 64, 0));
+    }
+
+    private static InventoryTransactionPacket click(int protocol, BlockVector3 blockPos) {
         UseItemData data = new UseItemData();
         data.actionType = InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK;
-        data.blockPos = new BlockVector3(0, 64, 0);
+        data.blockPos = blockPos;
         data.face = BlockFace.UP;
         data.clickPos = new Vector3f();
         InventoryTransactionPacket packet = new InventoryTransactionPacket();
@@ -121,6 +127,30 @@ class PlayerCancelledBlockVisualTest {
                     eq(UpdateBlockPacket.FLAG_ALL_PRIORITY), eq(0));
         }
         verify(level, never()).sendBlocks(any(Player[].class), any(Vector3[].class), eq(UpdateBlockPacket.FLAG_NOGRAPHIC));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {786, 2193})
+    void deniedClickResyncsBlockEntityAtBothSentPositions(int protocol) throws Exception {
+        Level level = mock(Level.class);
+        Player player = player(level, protocol);
+        Block target = mock(Block.class);
+        Block adjacent = mock(Block.class);
+        Block liquid = mock(Block.class);
+        when(target.getSide(BlockFace.UP)).thenReturn(adjacent);
+        when(target.getLevelBlockAtLayer(1)).thenReturn(liquid);
+        when(adjacent.getLevelBlockAtLayer(1)).thenReturn(liquid);
+        when(level.getBlock(any(Vector3.class))).thenReturn(target);
+        BlockEntitySpawnable targetTile = mock(BlockEntitySpawnable.class);
+        BlockEntitySpawnable adjacentTile = mock(BlockEntitySpawnable.class);
+        when(level.getBlockEntity(new Vector3(3, 64, 5))).thenReturn(targetTile);
+        when(level.getBlockEntity(new Vector3(3, 65, 5))).thenReturn(adjacentTile);
+        player.handleInventoryTransactionPacket(click(protocol, new BlockVector3(3, 64, 5)));
+        InOrder order = inOrder(level, targetTile, adjacentTile);
+        order.verify(level).sendBlocks(any(Player[].class), eq(new Block[]{target, adjacent}),
+                eq(UpdateBlockPacket.FLAG_ALL_PRIORITY));
+        order.verify(targetTile).spawnTo(player);
+        order.verify(adjacentTile).spawnTo(player);
     }
 
     @ParameterizedTest
