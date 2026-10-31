@@ -98,11 +98,15 @@ public final class ZlibThreadLocal implements ZlibProvider {
 
     @Override
     public byte[] deflateRaw(byte[] data, int level) throws IOException {
+        return deflateRaw(data, data.length, level);
+    }
+
+    byte[] deflateRaw(byte[] data, int length, int level) throws IOException {
         Deflater deflater = DEFLATER_RAW.get();
         try {
             deflater.reset();
-            deflater.setLevel(data.length < Server.getInstance().networkCompressionThreshold ? 0 : level);
-            deflater.setInput(data);
+            deflater.setLevel(length < Server.getInstance().networkCompressionThreshold ? 0 : level);
+            deflater.setInput(data, 0, length);
             deflater.finish();
             FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
             bos.reset();

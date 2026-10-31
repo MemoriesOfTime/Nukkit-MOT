@@ -1387,6 +1387,7 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private void unloadChunksUnsafe(boolean wait) {
+        int failedCaptures = 0;
         Iterator<BaseFullChunk> iterator = this.chunks.values().iterator();
         while (iterator.hasNext()) {
             LevelDBChunk chunk = (LevelDBChunk) iterator.next();
@@ -1398,8 +1399,26 @@ public class LevelDBProvider implements LevelProvider {
                     // since a synchronous db.write on the main thread hangs on write stalls.
                     long hash = Level.chunkHash(chunk.getX(), chunk.getZ());
                     if (chunk.isGenerated() && chunk.hasChanged() && !this.isPendingWriteCurrent(hash, chunk)) {
-                        this.stagePendingWrite(hash, chunk.getX(), chunk.getZ(), chunk, true);
-                        this.executor.execute(() -> this.commitPendingWrite(hash));
+                        boolean staged = false;
+                        for (int attempt = 1; attempt <= 2; attempt++) {
+                            try {
+                                this.stagePendingWrite(hash, chunk.getX(), chunk.getZ(), chunk, true);
+                                staged = true;
+                                break;
+                            } catch (Exception failure) {
+                                if (attempt == 2) {
+                                    failedCaptures++;
+                                    log.error("Unsaved chunk {}, {} after {} close capture attempts for: {}",
+                                            chunk.getX(), chunk.getZ(), attempt, this.getName(), failure);
+                                } else {
+                                    log.warn("Retrying close capture for chunk {}, {} in: {}",
+                                            chunk.getX(), chunk.getZ(), this.getName(), failure);
+                                }
+                            }
+                        }
+                        // A rejected submission leaves a registered slot for the final sweep;
+                        // only a failed capture needs to serialize the live chunk again.
+                        if (staged) this.executor.execute(() -> this.commitPendingWrite(hash));
                     }
                 } catch (Exception e) {
                     log.error("Failed to stage chunk {}, {} during close for: {}", chunk.getX(), chunk.getZ(), this.getName(), e);
@@ -1410,6 +1429,10 @@ public class LevelDBProvider implements LevelProvider {
                 chunk.unload(level.isSaveOnUnloadEnabled(), false);
             }
             iterator.remove();
+        }
+        if (failedCaptures != 0) {
+            log.error("Close could not capture {} dirty chunks for: {}; latest revisions were not saved",
+                    failedCaptures, this.getName());
         }
     }
 

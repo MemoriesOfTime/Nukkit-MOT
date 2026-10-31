@@ -40,8 +40,9 @@ class EntitySavedMobStateTest {
         clearInvocations(MockServer.get().getLogger());
     }
 
+    // Amplifier 1 is level II: Speed +40%, Slowness -30%, both on the 0.1 base speed.
     @ParameterizedTest
-    @CsvSource({"1, 0.12", "2, 0.085"})
+    @CsvSource({"1, 0.14", "2, 0.07"})
     void savedMovementEffectSurvivesTheWholeWitchConstructor(int effectId, float expectedSpeed) {
         EntityWitch witch = new EntityWitch(chunk(), nbt().putList(new ListTag<CompoundTag>("ActiveEffects")
                 .add(effect(effectId))));
@@ -60,15 +61,15 @@ class EntitySavedMobStateTest {
     void bothSavedMovementEffectsAndTheirSpeedSurviveSaveAndReload() {
         EntityWitch witch = new EntityWitch(chunk(), nbt().putList(new ListTag<CompoundTag>("ActiveEffects")
                 .add(effect(Effect.SPEED)).add(effect(Effect.SLOWNESS))));
-        assertEquals(0.102f, witch.getMovementSpeed(), 0.000001f);
+        assertEquals(0.098f, witch.getMovementSpeed(), 0.000001f);
         assertEquals(2, witch.getMovementSpeedModifiers().size());
 
         witch.saveNBT();
         EntityWitch restored = new EntityWitch(chunk(), witch.namedTag.clone());
-        assertEquals(0.102f, restored.getMovementSpeed(), 0.000001f);
+        assertEquals(0.098f, restored.getMovementSpeed(), 0.000001f);
         assertEquals(2, restored.getMovementSpeedModifiers().size());
         restored.removeEffect(Effect.SPEED);
-        assertEquals(0.085f, restored.getMovementSpeed(), 0.000001f);
+        assertEquals(0.07f, restored.getMovementSpeed(), 0.000001f);
         restored.removeEffect(Effect.SLOWNESS);
         assertEquals(Player.DEFAULT_SPEED, restored.getMovementSpeed(), 0.000001f);
     }
@@ -79,7 +80,7 @@ class EntitySavedMobStateTest {
         assertEquals(Player.DEFAULT_SPEED, witch.getMovementSpeed());
         assertTrue(witch.getMovementSpeedModifiers().isEmpty());
         witch.addEffect(Effect.getEffect(Effect.SPEED).setAmplifier(1).setDuration(600));
-        assertEquals(0.12f, witch.getMovementSpeed(), 0.000001f);
+        assertEquals(0.14f, witch.getMovementSpeed(), 0.000001f);
     }
 
     @Test

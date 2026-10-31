@@ -177,11 +177,11 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
             if (cache.matchesExpanded(boundingBox, scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ)) {
                 Block[] blocks = this.getExpandedCollisionCandidates(boundingBox,
                         scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ);
-                return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ);
+                return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ, true);
             }
         }
         Block[] blocks = this.getCollisionCandidates(boundingBox.grow(expandX, expandY, expandZ), boundingBox);
-        return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ);
+        return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ, true);
     }
 
     /**
@@ -190,9 +190,17 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
      */
     static Block[] filterCollisionBlocks(Block[] blocks, AxisAlignedBB boundingBox,
                                          double expandX, double expandY, double expandZ) {
+        return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ, false);
+    }
+
+    private static Block[] filterCollisionBlocks(Block[] blocks, AxisAlignedBB boundingBox,
+                                                 double expandX, double expandY, double expandZ,
+                                                 boolean ownsInput) {
         if (blocks.length == 0) return Block.EMPTY_ARRAY;
 
-        Block[] result = Block.EMPTY_ARRAY;
+        // Native scans materialise a fresh array. Compact only that exclusively owned input;
+        // writes never reach a later unread slot, and callbacks keep their original order.
+        Block[] result = ownsInput ? blocks : Block.EMPTY_ARRAY;
         int count = 0;
 
         for (Block block : blocks) {
@@ -1292,6 +1300,101 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
                 boundingBox,
                 true
         );
+    }
+
+    /**
+     * Tests exposed upper faces inside a player's bounded foot probe. The probe's maxY includes
+     * the caller's small coordinate-rounding tolerance; minY keeps its existing support depth.
+     *
+     * <p>A top face alone is insufficient: it may be hidden inside a stacked wall. Only the
+     * part covered by shapes crossing the foot cap is excluded. Uncovered floor or a lower
+     * stair remains support, including tiny side overlaps caused by float wire coordinates.
+     */
+    public static boolean hasExposedBlockSupport(Level level, Entity entity, AxisAlignedBB boundingBox) {
+        if (level == null || !isFinite(boundingBox)) return false;
+
+        int minX = NukkitMath.floorDouble(boundingBox.getMinX());
+        int minY = NukkitMath.floorDouble(boundingBox.getMinY());
+        int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
+        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
+        int maxY = NukkitMath.floorDouble(boundingBox.getMaxY());
+        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
+        if (minX > maxX || minY > maxY || minZ > maxZ) return false;
+
+        int clampedMinY = Math.max(minY, level.getMinBlockY());
+        int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
+        if (clampedMinY > clampedMaxY) return false;
+        if (exceedsMaxIterations(minX, clampedMinY, minZ, maxX, clampedMaxY, maxZ)) {
+            if (entity != null) {
+                logRunawayAABB(entity, boundingBox, "hasExposedBlockSupport");
+            } else {
+                logRunawayAABBStatic(boundingBox, "hasExposedBlockSupport");
+            }
+            return false;
+        }
+
+        FullChunk hint = entity != null && entity.getLevel() == level ? entity.chunk : null;
+        List<AxisAlignedBB> shapes = null;
+        for (int z = minZ; z <= maxZ; ++z) {
+            for (int x = minX; x <= maxX; ++x) {
+                FullChunk chunk = chunkAt(level, hint, x, z);
+                for (int y = clampedMinY; y <= clampedMaxY; ++y) {
+                    if (isAirAt(chunk, x, y, z)) continue;
+                    Block block = level.getBlock(chunk, x, y, z, 0, false);
+                    if (block == null || block.canPassThrough()) continue;
+
+                    if (shapes == null) shapes = new ArrayList<>(4);
+                    block.addCollisionBoxesToList(boundingBox, shapes);
+                }
+            }
+        }
+        if (shapes == null) return false;
+        for (AxisAlignedBB shape : shapes) {
+            double top = shape.getMaxY();
+            if (Double.isFinite(top) && top > boundingBox.getMinY() && top <= boundingBox.getMaxY()
+                    && hasExposedTop(shape, shapes, boundingBox)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Exact rectangle coverage inside the feet band; no horizontal tolerance or extra world reads. */
+    private static boolean hasExposedTop(AxisAlignedBB support, List<AxisAlignedBB> shapes, AxisAlignedBB probe) {
+        double minX = Math.max(support.getMinX(), probe.getMinX());
+        double minZ = Math.max(support.getMinZ(), probe.getMinZ());
+        double maxX = Math.min(support.getMaxX(), probe.getMaxX());
+        double maxZ = Math.min(support.getMaxZ(), probe.getMaxZ());
+        if (!(minX < maxX && minZ < maxZ)) return false;
+
+        // Within each X strip the covering shapes are constant. Walk the union of their Z
+        // intervals; a gap is an exposed part of this upper face. Boundaries use strict area
+        // comparisons, so even a very thin real edge survives without an arbitrary inset.
+        for (double x = minX; x < maxX;) {
+            double nextX = maxX;
+            for (AxisAlignedBB shape : shapes) {
+                double top = shape.getMaxY();
+                if (!Double.isFinite(top) || top <= probe.getMaxY()
+                        || shape.getMaxZ() <= minZ || shape.getMinZ() >= maxZ) continue;
+                if (shape.getMinX() > x) nextX = Math.min(nextX, shape.getMinX());
+                if (shape.getMaxX() > x) nextX = Math.min(nextX, shape.getMaxX());
+            }
+            for (double z = minZ; z < maxZ;) {
+                double coveredUntil = z;
+                for (AxisAlignedBB shape : shapes) {
+                    double top = shape.getMaxY();
+                    if (Double.isFinite(top) && top > probe.getMaxY()
+                            && shape.getMinX() < nextX && shape.getMaxX() > x
+                            && shape.getMinZ() <= z && shape.getMaxZ() > coveredUntil) {
+                        coveredUntil = shape.getMaxZ();
+                    }
+                }
+                if (coveredUntil == z) return true;
+                z = coveredUntil;
+            }
+            x = nextX;
+        }
+        return false;
     }
 
     /**

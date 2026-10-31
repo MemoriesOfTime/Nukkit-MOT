@@ -7,6 +7,8 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 import java.util.HashMap;
@@ -82,10 +84,11 @@ class BlockTripWireHookLiveStateTest {
     }
 
 
-    @Test
-    void changedLivePowerSchedulesBothHooksAndTheirNextTickCorrectsPower() {
+    @ParameterizedTest
+    @ValueSource(ints = {0, 9})
+    void changedLivePowerOrDisarmedStateSchedulesBothHooksAndTheirNextTickCorrectsPower(int liveMeta) {
         Fixture f = new Fixture(BlockFace.SOUTH, false);
-        f.onPowerChange(() -> f.put(f.wirePosition, new BlockTripWire(0)));
+        f.onPowerChange(() -> f.put(f.wirePosition, new BlockTripWire(liveMeta)));
         f.calculate(false, -1, null);
         verify(f.level).scheduleUpdate(any(Block.class), eq(f.hook), eq(10));
         verify(f.level).scheduleUpdate(any(Block.class), eq(f.peerPosition), eq(10));
@@ -96,7 +99,7 @@ class BlockTripWireHookLiveStateTest {
         }
         assertFalse(((BlockTripWireHook) f.at(f.hook)).isPowered());
         assertFalse(((BlockTripWireHook) f.at(f.peerPosition)).isPowered());
-        assertFalse(((BlockTripWire) f.at(f.wirePosition)).isPowered());
+        assertEquals((liveMeta & 1) != 0, ((BlockTripWire) f.at(f.wirePosition)).isPowered());
     }
 
     @Test
@@ -105,6 +108,44 @@ class BlockTripWireHookLiveStateTest {
         f.calculate(false, -1, null);
         verify(f.level, never()).scheduleUpdate(any(Block.class), any(Vector3.class), anyInt());
     }
+
+    @ParameterizedTest
+    @ValueSource(ints = {4, 13})
+    void scheduledConnectedHookReconcilesCallbackPowerOrDisarmedChange(int liveMeta) {
+        Fixture f = new Fixture(BlockFace.SOUTH, true);
+        f.hook.setPowered(false);
+        f.put(f.hook, f.hook);
+        ((BlockTripWireHook) f.at(f.peerPosition)).setPowered(false);
+        f.onPowerChange(() -> f.put(f.wirePosition, new BlockTripWire(liveMeta)));
+        try (MockedStatic<Block> blocks = mockStatic(Block.class, CALLS_REAL_METHODS)) {
+            blocks.when(() -> Block.get(Block.TRIPWIRE_HOOK)).thenAnswer(i -> new BlockTripWireHook());
+            f.hook.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
+        }
+        verify(f.level).scheduleUpdate(any(Block.class), eq(f.hook), eq(10));
+        verify(f.level).scheduleUpdate(any(Block.class), eq(f.peerPosition), eq(10));
+        BlockTripWireHook current = (BlockTripWireHook) f.at(f.hook);
+        try (MockedStatic<Block> blocks = mockStatic(Block.class, CALLS_REAL_METHODS)) {
+            blocks.when(() -> Block.get(Block.TRIPWIRE_HOOK)).thenAnswer(i -> new BlockTripWireHook());
+            current.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
+        }
+        assertFalse(((BlockTripWireHook) f.at(f.hook)).isPowered());
+        assertFalse(((BlockTripWireHook) f.at(f.peerPosition)).isPowered());
+        assertEquals(liveMeta, f.at(f.wirePosition).getDamage());
+    }
+
+    @Test
+    void ordinaryConnectedPowerChangeDoesNotRewriteTheWireOrAddHookWork() {
+        Fixture f = new Fixture(BlockFace.SOUTH, true);
+        f.hook.setPowered(false);
+        f.put(f.hook, f.hook);
+        ((BlockTripWireHook) f.at(f.peerPosition)).setPowered(false);
+        f.calculate(false, -1, null);
+        assertTrue(((BlockTripWireHook) f.at(f.hook)).isPowered());
+        assertTrue(((BlockTripWireHook) f.at(f.peerPosition)).isPowered());
+        assertEquals(0, f.wireWrites);
+        verify(f.level, never()).scheduleUpdate(any(Block.class), any(Vector3.class), anyInt());
+    }
+
 
     private static final class Fixture {
         final Level level = mock(Level.class);

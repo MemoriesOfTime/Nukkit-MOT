@@ -49,7 +49,7 @@ public interface CompressionProvider {
     CompressionProvider ZLIB_RAW = new CompressionProvider() {
         @Override
         public byte[] compress(BinaryStream packet, int level) throws Exception {
-            return Zlib.deflateRaw(packet.getBuffer(), level);
+            return Zlib.deflateRaw(packet, level);
         }
 
         @Override
