@@ -21,6 +21,10 @@ abstract class JavaAgentArgumentProvider : CommandLineArgumentProvider {
 group = "cn.nukkit"
 version = "MOT-SNAPSHOT"
 
+val skipTests = providers.gradleProperty("skip-tests")
+    .map { value -> value.isEmpty() || value.toBoolean() }
+    .getOrElse(false)
+
 java {
     // 用 JDK 21 构建，但字节码经下方 release=17 钉在 Java 17（与 pom.xml release=17 一致），
     // 产物仍可跑在 JRE 17+；缺了 release，字节码会直接跟 toolchain 变成 class file 65
@@ -371,6 +375,13 @@ tasks {
 
     check {
         dependsOn(buildTools.compileJavaTaskName)
+    }
+
+    withType<Test>().configureEach {
+        enabled = !skipTests
+    }
+    named<JavaCompile>("compileTestJava") {
+        enabled = !skipTests
     }
 
     test {
