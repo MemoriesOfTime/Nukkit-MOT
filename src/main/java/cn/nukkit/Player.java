@@ -2932,6 +2932,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             // Ground check
             if (!this.isSpectator() && (!this.onGround || dy != 0)) {
                 AxisAlignedBB bb = this.boundingBox.clone();
+                // Only exposed faces below the feet support a player; wall/head contacts do not.
+                bb.setMaxY(bb.getMinY() + 1.0E-4);
                 bb.setMinY(bb.getMinY() - 0.75);
 
                 // Hack: fix fall damage from walls while falling
@@ -2942,7 +2944,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     bb.setMaxZ(bb.getMaxZ() - 0.1);
                 }
 
-                this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+                this.onGround = CollisionHelper.hasExposedBlockSupport(this.level, this, bb);
             }
 
             this.isCollided = this.onGround;

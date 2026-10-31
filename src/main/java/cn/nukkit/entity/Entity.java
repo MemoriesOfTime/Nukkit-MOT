@@ -2975,7 +2975,13 @@ public abstract class Entity extends Location implements Metadatable {
             AxisAlignedBB bb = this.boundingBox.clone();
             bb.setMinY(bb.getMinY() - 0.75);
 
-            this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+            if (this instanceof Player) {
+                // fastMove updates fall state before Player's final movement check.
+                bb.setMaxY(this.boundingBox.getMinY() + 1.0E-4);
+                this.onGround = CollisionHelper.hasExposedBlockSupport(this.level, this, bb);
+            } else {
+                this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+            }
         }
         this.isCollided = this.onGround;
         this.updateFallState(this.onGround);
