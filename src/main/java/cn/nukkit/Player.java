@@ -6062,6 +6062,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.level.sendBlocks(new Player[]{this}, new Block[]{target, block}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
                             this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1), block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
 
+                            for (Vector3 restorePos : new Vector3[]{blockVector.asVector3(), blockVector.getSide(face).asVector3()}) {
+                                if (this.level.getBlockEntity(restorePos) instanceof BlockEntitySpawnable spawnable) {
+                                    spawnable.spawnTo(this);
+                                }
+                            }
+
                             if (target instanceof BlockDoor door && (door.getDamage() & 0x08) > 0) {
                                 Block part = target.down();
                                 if (part.getId() == target.getId()) {
