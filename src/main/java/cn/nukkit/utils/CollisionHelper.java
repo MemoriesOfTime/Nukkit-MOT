@@ -177,11 +177,11 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
             if (cache.matchesExpanded(boundingBox, scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ)) {
                 Block[] blocks = this.getExpandedCollisionCandidates(boundingBox,
                         scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ);
-                return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ);
+                return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ, true);
             }
         }
         Block[] blocks = this.getCollisionCandidates(boundingBox.grow(expandX, expandY, expandZ), boundingBox);
-        return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ);
+        return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ, true);
     }
 
     /**
@@ -190,9 +190,17 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
      */
     static Block[] filterCollisionBlocks(Block[] blocks, AxisAlignedBB boundingBox,
                                          double expandX, double expandY, double expandZ) {
+        return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ, false);
+    }
+
+    private static Block[] filterCollisionBlocks(Block[] blocks, AxisAlignedBB boundingBox,
+                                                 double expandX, double expandY, double expandZ,
+                                                 boolean ownsInput) {
         if (blocks.length == 0) return Block.EMPTY_ARRAY;
 
-        Block[] result = Block.EMPTY_ARRAY;
+        // Native scans materialise a fresh array. Compact only that exclusively owned input;
+        // writes never reach a later unread slot, and callbacks keep their original order.
+        Block[] result = ownsInput ? blocks : Block.EMPTY_ARRAY;
         int count = 0;
 
         for (Block block : blocks) {
