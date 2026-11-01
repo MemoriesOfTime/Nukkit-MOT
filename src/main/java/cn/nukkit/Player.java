@@ -431,6 +431,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private static final int NO_SHIELD_DELAY = 10;
     private static final int TELEPORT_CHUNK_READY_OFFSET = 1;
+    // 出生/传送额外等待列方块数据的上限(tick)，超时即放行
+    // Upper bound (ticks) spawn/teleport waits for column block data before releasing
+    private static final int DATA_WAIT_TICKS = 40;
     private int noShieldTicks;
 
     public int pickedXPOrb = 0;
@@ -1276,6 +1279,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             this.usedChunks.remove(index);
+            this.forgetColumnData(index);
         }
         level.unregisterChunkLoader(this, x, z);
         this.loadQueue.remove(index);
@@ -1362,6 +1366,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         this.usedChunks.put(index, Boolean.TRUE);
         this.chunksSent++;
+
+        boolean pullShell = packet instanceof LevelChunkPacket levelChunk && levelChunk.requestSubChunks;
+        this.trackColumnSent(index, pullShell);
 
         if (this.spawned) {
             for (Entity entity : this.level.getChunkEntities(x, z).values()) {
@@ -1585,7 +1592,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        if (!this.hasSpawnChunks && this.chunksSent >= server.spawnThreshold) {
+        if (!this.hasSpawnChunks && this.chunksSent >= server.spawnThreshold && this.isSpawnAreaDataReady()) {
             this.hasSpawnChunks = true;
 
             if (this.protocol <= ProtocolInfo.v1_5_0) {
@@ -8211,6 +8218,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    /**
+     * 传送目标 3×3 就绪判定：拉取模式下还要求各列已派发方块数据。
+     * <p>
+     * Readiness for the 3×3 around the teleport target: in pull mode each column
+     * must also have dispatched its block data.
+     */
     protected boolean checkTeleportPosition() {
         if (this.teleportPosition != null) {
             int chunkX = (int) this.teleportPosition.x >> 4;
@@ -8219,6 +8232,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : Math.max(this.chunkRadius, this.server.c_s_spawnThreshold));
             int maxChunkOffset = Math.min(TELEPORT_CHUNK_READY_OFFSET, chunkSendRadius);
             long chunkSendRadiusSqr = (long) chunkSendRadius * chunkSendRadius;
+            int tick = this.server.getTick();
             for (int X = -maxChunkOffset; X <= maxChunkOffset; ++X) {
                 for (int Z = -maxChunkOffset; Z <= maxChunkOffset; ++Z) {
                     if ((long) X * X + (long) Z * Z > chunkSendRadiusSqr) {
@@ -8226,6 +8240,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     long index = Level.chunkHash(chunkX + X, chunkZ + Z);
                     if (!this.usedChunks.containsKey(index) || !this.usedChunks.get(index)) {
+                        return false;
+                    }
+                    if (!this.isColumnDataReady(index, tick)) {
                         return false;
                     }
                 }
@@ -8237,6 +8254,53 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return false;
+    }
+
+    /**
+     * 出生点 3×3 是否有地形数据：非拉取模式恒为 true。
+     * <p>
+     * Whether spawn's 3×3 has terrain data: always true outside pull mode.
+     */
+    private boolean isSpawnAreaDataReady() {
+        if (!this.isSubChunkPullMode()) {
+            return true;
+        }
+        int centerX = this.getChunkX();
+        int centerZ = this.getChunkZ();
+        int tick = this.server.getTick();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (!this.isColumnDataReady(Level.chunkHash(centerX + dx, centerZ + dz), tick)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 该列数据是否就绪；状态对象缺失(mock)时视为就绪。
+     * <p>
+     * Whether the column's data is ready; a missing state object (mocks) counts as ready.
+     */
+    private boolean isColumnDataReady(long index, int tick) {
+        PlayerSubChunkRequestState state = this.subChunkRequestState;
+        return state == null || state.isColumnDataReady(index, tick, DATA_WAIT_TICKS);
+    }
+
+    private void trackColumnSent(long index, boolean pullShell) {
+        PlayerSubChunkRequestState state = this.subChunkRequestState;
+        if (state == null) {
+            return;
+        }
+        state.onColumnSent(index, this.server == null ? 0 : this.server.getTick(), pullShell);
+    }
+
+    private void forgetColumnData(long index) {
+        PlayerSubChunkRequestState state = this.subChunkRequestState;
+        if (state != null) {
+            state.forgetColumn(index);
+        }
     }
 
     protected void sendPlayStatus(int status) {
@@ -8795,7 +8859,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void onChunkChanged(FullChunk chunk) {
-        this.usedChunks.remove(Level.chunkHash(chunk.getX(), chunk.getZ()));
+        long index = Level.chunkHash(chunk.getX(), chunk.getZ());
+        this.usedChunks.remove(index);
+        this.forgetColumnData(index);
     }
 
     @Override

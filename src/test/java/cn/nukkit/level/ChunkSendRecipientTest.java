@@ -8,6 +8,7 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +38,7 @@ class ChunkSendRecipientTest {
             set(Level.class, level, name, new Object2ObjectOpenHashMap<>());
         }
         set(Level.class, level, "chunkSendTaskStartTick", new Long2LongOpenHashMap());
-        set(Level.class, level, "chunkSendGeneration", new Long2LongOpenHashMap());
+        set(Level.class, level, "chunkRequestEpochs", new Object2ObjectOpenHashMap<>());
         chunk = mock(BaseFullChunk.class);
         doReturn(chunk).when(level).getChunk(3, 5);
         doReturn(chunk).when(level).getChunkIfLoaded(3, 5);
@@ -114,51 +115,44 @@ class ChunkSendRecipientTest {
     }
 
     /**
-     * 超时重试必须自增代次并以新代次重新提交：仍在飞的旧任务回调随后会被 isSupersededChunkCallback 丢弃。
-     * 首轮提交即携带序号 1（而非 0），配合首跳到 2 的代次，首轮超时前的旧任务从第一轮起就可被丢弃。
+     * 超时重试换新代次，旧任务的回调随后可被判旧丢弃。
      * <p>
-     * A timeout retry must bump the generation and resubmit with it, so the still-in-flight older
-     * task's callback is dropped by isSupersededChunkCallback afterwards. The first submission already
-     * carries sequence 1 (never 0); combined with the first bump landing at 2, even a pre-first-timeout
-     * task is droppable from the first retry on.
+     * A timeout retry takes a fresh epoch; the old task's callback is then droppable.
      */
     @Test
-    void timeoutRetryBumpsGenerationAndResubmitsWithIt() throws Exception {
+    void timeoutRetryTakesANewIdAndResubmitsWithIt() throws Exception {
         when(server.getLogger()).thenReturn(mock(cn.nukkit.utils.MainLogger.class));
         level.requestChunk(3, 5, player);
         process();
         verify(provider).requestChunkTask(any(it.unimi.dsi.fastutil.objects.ObjectSet.class), eq(3), eq(5), eq(1L));
 
-        // 200 tick 无回调 → 强制重试,代次首跳到 2(首轮提交带 1)
-        // No callback within 200 ticks → forced retry, the generation first jumps to 2 (submissions carry 1)
+        // 200 ticks without a callback → forced retry with a new epoch
         when(server.getTick()).thenReturn(300);
         level.requestChunk(3, 5, player);
         process();
 
         verify(provider).requestChunkTask(any(it.unimi.dsi.fastutil.objects.ObjectSet.class), eq(3), eq(5), eq(2L));
-        // 仍卡在旧任务里的那次序列化(提交时带的 1)现在确实可被判旧丢弃
-        // The wedged older serialization (which carried 1 at submit) is now genuinely droppable
-        Assertions.assertTrue(level.isSupersededChunkCallback(callbackWithGeneration(1L)));
+        // the wedged older serialization (which carried 1 at submit) is now droppable
+        Assertions.assertTrue(level.isSupersededChunkCallback(callbackWithSubmission(1L)));
     }
 
     /**
-     * 只有严格旧于当前代次的回调会被丢弃；序号 0（未回传代次的第三方 provider / 插件直调 3 参）永不丢弃。
+     * 只丢弃代次不符的回调；代次 0（第三方/插件直调）永不丢弃。
      * <p>
-     * Only callbacks strictly older than the current generation are dropped; sequence 0 (third-party
-     * providers that don't echo it / plugin calls to the 3-arg overload) is never dropped.
+     * Only mismatched-epoch callbacks are dropped; epoch 0 (third parties) never is.
      */
     @Test
-    void dropsOnlyCallbacksOlderThanCurrentGeneration() throws Exception {
-        Long2LongOpenHashMap generations = get(Level.class, level, "chunkSendGeneration");
-        generations.put(hash, 2L);
+    void dropsCallbacksThatDoNotMatchTheCurrentSubmission() throws Exception {
+        Object2ObjectMap<GameVersion, Long2LongOpenHashMap> epochs = get(Level.class, level, "chunkRequestEpochs");
+        epochs.computeIfAbsent(GameVersion.V1_20_0, version -> new Long2LongOpenHashMap()).put(hash, 2L);
 
-        Assertions.assertTrue(level.isSupersededChunkCallback(callbackWithGeneration(1L)));
-        Assertions.assertFalse(level.isSupersededChunkCallback(callbackWithGeneration(2L)));
-        Assertions.assertFalse(level.isSupersededChunkCallback(callbackWithGeneration(0L)));
+        Assertions.assertTrue(level.isSupersededChunkCallback(callbackWithSubmission(1L)));
+        Assertions.assertFalse(level.isSupersededChunkCallback(callbackWithSubmission(2L)));
+        Assertions.assertFalse(level.isSupersededChunkCallback(callbackWithSubmission(0L)));
     }
 
     private static cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer.NetworkChunkSerializerCallbackData
-    callbackWithGeneration(long generation) {
+    callbackWithSubmission(long generation) {
         return new cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer.NetworkChunkSerializerCallbackData(
                 GameVersion.V1_20_0, 0L, 3, 5, 1, new byte[]{0}, null, null, null, generation);
     }

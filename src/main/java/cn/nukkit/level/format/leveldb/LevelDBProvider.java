@@ -604,7 +604,7 @@ public class LevelDBProvider implements LevelProvider {
         // serialize synchronously, same fallback as SubChunkRequestProcessor
         ExecutorService executor = this.getServer().asyncChunkSending ? this.level.getAsyncChuckExecutor() : null;
         if (executor == null) {
-            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ);
+            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence);
             return;
         }
 
@@ -628,13 +628,13 @@ public class LevelDBProvider implements LevelProvider {
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                     for (GameVersion gv : protocols) {
-                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence);
                     }
                 }
             });
         } catch (RejectedExecutionException e) {
             // 关服中池已停：同步兜底，不让请求丢失 / pool already down during shutdown: sync fallback
-            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ);
+            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence);
         }
     }
 
@@ -643,7 +643,7 @@ public class LevelDBProvider implements LevelProvider {
      * <p>
      * Main-thread serialization (async-chunks off / world predates the setting / executor shut down)
      */
-    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, BaseChunk chunk, long timestamp, int chunkX, int chunkZ) {
+    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, BaseChunk chunk, long timestamp, int chunkX, int chunkZ, long sequence) {
         try {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
                 this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
@@ -654,13 +654,14 @@ public class LevelDBProvider implements LevelProvider {
                         networkChunkSerializerCallback.getStream().getBuffer(),
                         networkChunkSerializerCallback.getSubChunkBlobs(),
                         networkChunkSerializerCallback.getBiomes(),
-                        networkChunkSerializerCallback.getBlockEntities()
+                        networkChunkSerializerCallback.getBlockEntities(),
+                        sequence
                 );
             }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
         } catch (Throwable t) {
             getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
             for (GameVersion gv : protocols) {
-                getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence);
             }
         }
     }

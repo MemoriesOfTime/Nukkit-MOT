@@ -172,19 +172,26 @@ class SubChunkRequestAsyncFlowTest {
 
     /** 装配一个真实 section 引用的 mock 区块（writeTo 放 3 字节载荷） / mock chunk holding a real section reference (writeTo emits a 3-byte payload) */
     private BaseChunk chunkWithSection() {
-        ChunkSection section = mock(ChunkSection.class);
-        when(section.isEmpty()).thenReturn(false);
-        doAnswer(inv -> {
-            ((BinaryStream) inv.getArgument(1)).put(new byte[]{1, 2, 3});
-            return null;
-        }).when(section).writeTo(any(), any(), anyBoolean());
         BaseChunk chunk = mock(BaseChunk.class);
         ChunkSection[] sections = new ChunkSection[24];
-        sections[0] = section;
+        sections[0] = sectionWithPayload(new byte[]{1, 2, 3});
         when(chunk.getSections()).thenReturn(sections);
+        // minSectionY=-4 → storage offset 4, matching LevelDB's sections[] layout
+        when(chunk.getSectionOffset()).thenReturn(4);
         when(chunk.getHeightMapArray()).thenReturn(new short[256]);
         when(chunk.getBlockEntitiesOfSection(anyInt())).thenReturn(Collections.emptyList());
         return chunk;
+    }
+
+    /** writeTo 输出指定载荷的 mock section（put 拷贝，载荷可安全复用） / mock section whose writeTo emits the given payload (put copies, the array is safely reused) */
+    private static ChunkSection sectionWithPayload(byte[] payload) {
+        ChunkSection section = mock(ChunkSection.class);
+        when(section.isEmpty()).thenReturn(false);
+        doAnswer(inv -> {
+            ((BinaryStream) inv.getArgument(1)).put(payload);
+            return null;
+        }).when(section).writeTo(any(), any(), anyBoolean());
+        return section;
     }
 
     private SubChunkRequestPacket request(int y, int offsets) {
@@ -233,7 +240,7 @@ class SubChunkRequestAsyncFlowTest {
     }
 
     @Test
-    void serializationFailureReleasesCreditAndAllowsRetry() {
+    void serializationFailureDegradesOnlyThatEntryAndAllowsRetry() {
         BaseChunk chunk = chunkWithSection();
         ChunkSection section = chunk.getSections()[0];
         doThrow(new IllegalStateException("broken section"))
@@ -252,11 +259,106 @@ class SubChunkRequestAsyncFlowTest {
 
         assertEquals(0, state.inFlightOffsetCount(), "failed serialization must release all reserved offsets");
         assertFalse(state.hasCompletions());
+        // the failing entry degrades to CHUNK_NOT_FOUND; the rest still dispatch
+        List<SubChunkPacket> sent = sentPackets();
+        assertEquals(1, sent.size(), "a broken section must not swallow the whole answer");
+        assertEquals(SubChunkRequestResult.CHUNK_NOT_FOUND, sent.get(0).subChunks.get(0).result);
+        assertNull(sent.get(0).subChunks.get(0).data, "a degraded entry carries no payload");
+
         putChunkInView(chunkWithSection());
         SubChunkRequestProcessor.INSTANCE.handle(playerHandle, request(-4, 1));
         SubChunkRequestProcessor.tickRequests(playerHandle);
-        assertEquals(1, sentPackets().size(), "a later retry can still deliver terrain");
+        assertEquals(2, sentPackets().size(), "a later retry can still deliver terrain");
+        assertEquals(SubChunkRequestResult.SUCCESS, sentPackets().get(1).subChunks.get(0).result);
         assertEquals(0, state.inFlightOffsetCount());
+    }
+
+    @Test
+    void sectionIndexResolvesThroughTheChunkStorageOffsetNotTheProtocolIndex() {
+        // a LEGACY-shaped chunk (offset 0) on a minSectionY=-4 dimension: world section 0
+        // must serialize sections[0], not sections[subIndex=4]
+        BaseChunk chunk = mock(BaseChunk.class);
+        ChunkSection worldSection0 = sectionWithPayload(new byte[]{1, 2, 3});
+        ChunkSection worldSection4 = sectionWithPayload(new byte[]{4, 5, 6});
+        ChunkSection[] sections = new ChunkSection[24];
+        sections[0] = worldSection0;
+        sections[4] = worldSection4;
+        when(chunk.getSections()).thenReturn(sections);
+        when(chunk.getSectionOffset()).thenReturn(0);
+        when(chunk.getHeightMapArray()).thenReturn(new short[256]);
+        when(chunk.getBlockEntitiesOfSection(anyInt())).thenReturn(Collections.emptyList());
+        putChunkInView(chunk);
+
+        SubChunkRequestProcessor.INSTANCE.handle(playerHandle, request(0, 1));
+
+        SubChunkRequestProcessor.tickRequests(playerHandle);
+
+        SubChunkPacket.SubChunkData entry = sentPackets().get(0).subChunks.get(0);
+        assertEquals(SubChunkRequestResult.SUCCESS, entry.result);
+        assertArrayEquals(new byte[]{1, 2, 3}, entry.data,
+                "world section 0 must serialize sections[storageOffset + 0]");
+        verify(worldSection4, never()).writeTo(any(), any(), anyBoolean());
+    }
+
+    @Test
+    void nearestOffsetsWinWhenTheBudgetIsTight() {
+        BaseChunk chunk = chunkWithSection();
+        when(level.getChunkIfLoaded(anyInt(), anyInt())).thenReturn(chunk);
+        for (int[] column : new int[][]{{3, 5}, {8, 5}, {0, 0}}) {
+            player.usedChunks.put(Level.chunkHash(column[0], column[1]), Boolean.TRUE);
+        }
+        SubChunkRequestPacket pk = request(-4, 0);
+        pk.positionOffsets.add(new BlockVector3(5, 0, 0));    // farthest from the player at (0,0)
+        pk.positionOffsets.add(new BlockVector3(0, 0, 0));
+        pk.positionOffsets.add(new BlockVector3(-3, 0, -5));  // exactly the player's own column
+
+        SubChunkRequestProcessor.INSTANCE.handle(playerHandle, pk);
+        SubChunkRequestProcessor.tickRequests(playerHandle);
+
+        // budget 2 by distance: the player's column must be in the first batch
+        List<SubChunkPacket.SubChunkData> delivered = sentPackets().stream()
+                .flatMap(packet -> packet.subChunks.stream()).toList();
+        assertEquals(2, delivered.size());
+        assertEquals(new BlockVector3(-3, 0, -5), delivered.get(0).offset);
+        assertEquals(new BlockVector3(0, 0, 0), delivered.get(1).offset);
+        assertEquals(1, state.deferredOffsetCount(), "the farthest offset waits for the next tick");
+
+        tick.incrementAndGet();
+        SubChunkRequestProcessor.tickRequests(playerHandle);
+        tick.incrementAndGet();
+        SubChunkRequestProcessor.tickRequests(playerHandle);
+
+        List<SubChunkPacket.SubChunkData> rest = sentPackets().stream()
+                .flatMap(packet -> packet.subChunks.stream()).toList();
+        assertEquals(3, rest.size());
+        assertEquals(new BlockVector3(5, 0, 0), rest.get(2).offset);
+        assertFalse(state.hasDeferred());
+    }
+
+    @Test
+    void queuedRequestsAreDrainedNearestFirst() {
+        BaseChunk chunk = chunkWithSection();
+        when(level.getChunkIfLoaded(anyInt(), anyInt())).thenReturn(chunk);
+        for (int[] column : new int[][]{{30, 5}, {3, 5}}) {
+            player.usedChunks.put(Level.chunkHash(column[0], column[1]), Boolean.TRUE);
+        }
+        // the far column queues first; distance order must reverse it
+        SubChunkRequestPacket far = request(-4, 1);
+        far.subChunkPosition = new BlockVector3(30, -4, 5);
+        SubChunkRequestPacket near = request(-4, 1);
+        near.subChunkPosition = new BlockVector3(3, -4, 5);
+        assertTrue(state.tryDefer(far));
+        assertTrue(state.tryDefer(near));
+
+        SubChunkRequestProcessor.tickRequests(playerHandle);   // drain: submit by distance
+        tick.incrementAndGet();
+        SubChunkRequestProcessor.tickRequests(playerHandle);   // send
+
+        List<SubChunkPacket> sent = sentPackets();
+        assertEquals(2, sent.size());
+        assertEquals(3, sent.get(0).centerPosition.x, "the queued request nearest the player goes first");
+        assertEquals(30, sent.get(1).centerPosition.x);
+        assertFalse(state.hasDeferred());
     }
 
     @Test

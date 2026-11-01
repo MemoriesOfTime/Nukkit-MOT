@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.objenesis.ObjenesisStd;
 
 import java.io.InputStream;
@@ -41,7 +42,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class LevelIdleChunkRequestAllocationTest {
@@ -181,10 +181,12 @@ class LevelIdleChunkRequestAllocationTest {
         assertTrue(tasks.contains(hash));
         assertSame(owner, queue(fixture.level, VERSION).get(hash));
         assertEquals(300L, fixture.buckets.started.get(hash));
-        assertEquals(2L, fixture.buckets.generations.get(hash), "Retry must retain upstream generation fencing");
+        ArgumentCaptor<Long> submission = ArgumentCaptor.forClass(Long.class);
         verify(fixture.level).getChunk(3, 5);
         verify(fixture.provider).requestChunkTask(
-                argThat((ObjectSet<GameVersion> versions) -> versions.equals(Set.of(VERSION))), eq(3), eq(5), eq(2L));
+                argThat((ObjectSet<GameVersion> versions) -> versions.equals(Set.of(VERSION))), eq(3), eq(5), submission.capture());
+        assertEquals(submission.getValue(), fixture.buckets.epochs.get(VERSION).get(hash),
+                "The retry must be tracked under the id it hands to the provider");
         verify(logger).warning(contains("forcing retry"));
         verify(player, never()).sendChunk(anyInt(), anyInt(), any(DataPacket.class));
     }
@@ -211,9 +213,9 @@ class LevelIdleChunkRequestAllocationTest {
 
         Set<GameVersion> expectedVersions = Set.of(VERSION, secondVersion);
         verify(fixture.provider).requestChunkTask(
-                argThat((ObjectSet<GameVersion> versions) -> versions.equals(expectedVersions)), eq(3), eq(5), eq(1L));
+                argThat((ObjectSet<GameVersion> versions) -> versions.equals(expectedVersions)), eq(3), eq(5), anyLong());
         verify(fixture.provider).requestChunkTask(
-                argThat((ObjectSet<GameVersion> versions) -> versions.equals(expectedVersions)), eq(4), eq(5), eq(1L));
+                argThat((ObjectSet<GameVersion> versions) -> versions.equals(expectedVersions)), eq(4), eq(5), anyLong());
         verify(fixture.provider, times(2)).requestChunkTask(any(ObjectSet.class), anyInt(), anyInt(), anyLong());
         verify(fixture.level, times(2)).getChunk(3, 5);
         verify(fixture.level, times(2)).getChunk(4, 5);
@@ -224,6 +226,9 @@ class LevelIdleChunkRequestAllocationTest {
                 assertTrue(tasks(fixture.level, version).contains(hash));
                 assertSame(player, queue(fixture.level, version).get(hash).get(player.getLoaderId()));
                 assertEquals(100L, fixture.buckets.started.get(hash));
+                assertEquals(fixture.buckets.epochs.get(VERSION).get(hash),
+                        fixture.buckets.epochs.get(secondVersion).get(hash),
+                        "Both versions of one coordinate share the submission id");
             }
             verify(player, never()).sendChunk(anyInt(), anyInt(), any(DataPacket.class));
         }
@@ -266,14 +271,14 @@ class LevelIdleChunkRequestAllocationTest {
         final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> queues =
                 new Object2ObjectOpenHashMap<>();
         final Long2LongOpenHashMap started = new Long2LongOpenHashMap();
-        final Long2LongOpenHashMap generations = new Long2LongOpenHashMap();
+        final Object2ObjectMap<GameVersion, Long2LongOpenHashMap> epochs = new Object2ObjectOpenHashMap<>();
 
         void install(Level level) throws Exception {
             set(level, "pendingChunkRequests", pending);
             set(level, "chunkSendTasks", tasks);
             set(level, "chunkSendQueues", queues);
             set(level, "chunkSendTaskStartTick", started);
-            set(level, "chunkSendGeneration", generations);
+            set(level, "chunkRequestEpochs", epochs);
         }
     }
 
