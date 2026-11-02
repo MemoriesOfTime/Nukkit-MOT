@@ -94,6 +94,12 @@ public class PopulationTask extends AsyncTask {
                     }
                 }
 
+                BaseFullChunk[] originalChunks = this.chunks.clone();
+                long[] originalRevisions = new long[originalChunks.length];
+                for (int i = 0; i < originalChunks.length; i++) {
+                    originalRevisions[i] = originalChunks[i].getMutationRevision();
+                }
+
                 for (BaseFullChunk chunk : this.chunks) {
                     manager.setChunk(chunk.getX(), chunk.getZ(), chunk);
                     if (!chunk.isGenerated()) {
@@ -124,7 +130,19 @@ public class PopulationTask extends AsyncTask {
                         chunks[index] = null;
                         BaseFullChunk newChunk = manager.getChunk(centerChunk.getX() + x, centerChunk.getZ() + z);
                         if (newChunk != null) {
-                            if (newChunk.hasChanged()) {
+                            boolean changed = newChunk.hasChanged();
+                            if (!changed) {
+                                // A save ACK may clear dirty while generation still owns the chunk.
+                                // Match identities: constructor and completion use different x/z orders.
+                                changed = true;
+                                for (int i = 0; i < originalChunks.length; i++) {
+                                    if (newChunk == originalChunks[i]) {
+                                        changed = newChunk.getMutationRevision() != originalRevisions[i];
+                                        break;
+                                    }
+                                }
+                            }
+                            if (changed) {
                                 chunks[index] = newChunk;
                             }
                         }
